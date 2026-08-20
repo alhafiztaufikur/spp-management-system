@@ -314,7 +314,7 @@ Cakupan CSRF saat ini belum merata. Master Siswa, Role Management, Master Kelas,
 - Biaya Lain baru dapat dibayar setelah `tagihan_biaya_lain` diterbitkan dari Master Biaya Lain kepada semua siswa, tingkat, rombel, atau siswa terpilih. Nominal tagihan adalah snapshot dan pembayaran dapat dicicil sampai lunas.
 - `laporan/global.php` hanya berisi katalog tujuh template. Query dan aturan laporan berada di `includes/reports.php`, halaman web di `laporan/template.php`, serta cetak/PDF/Excel di `laporan/export_global.php`.
 - Tujuh template terdiri dari Status Pembayaran, Penerimaan Harian, SPP Tahun Ajaran per Kelas, Pembayaran per Item, Mutasi Tabungan per Kelas, Tabungan Siswa, dan Setoran Kas Harian.
-- Laporan Umum (`laporan/index.php`) tetap khusus admin/bendahara. Seluruh template Laporan Global dapat dibuka admin, bendahara, dan kasir. URL `laporan/rekap_kelas.php` dipertahankan sebagai redirect kompatibilitas.
+- Laporan Umum (`laporan/index.php`) tetap khusus admin/bendahara. Seluruh template Laporan Global dapat dibuka admin, bendahara, dan kasir. Halaman mandiri `laporan/rekap_kelas.php` tersedia kembali untuk admin/bendahara sebagai rekap pembayaran bulanan per tingkat kelas 1–6, berdampingan dengan template Per Item pada Laporan Global.
 - Tahun ajaran selalu Juli–Juni. Laporan transaksi memakai `TGL_BYR`, sedangkan laporan SPP memakai periode `bayar_spp_periode`; kedua konsep tidak boleh dipertukarkan.
 - PDF memerlukan Composer dependency dan ekstensi GD untuk menampilkan logo PNG. XAMPP menyediakan `php_gd.dll`; aktifkan `extension=gd` lalu restart Apache.
 - Upgrade database memakai `sql/add_modular_global_reports.sql`, wajib didahului backup dan dijalankan dua kali pada salinan database untuk membuktikan idempotensi.

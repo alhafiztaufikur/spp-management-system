@@ -13,6 +13,36 @@ File ini mencatat perubahan proyek secara reverse chronological. Baca [PROJECT_C
 - Jangan menghapus atau menulis ulang entri lama. Tambahkan entri koreksi bila diperlukan.
 - Perubahan implementasi dan entri changelog wajib masuk commit yang sama.
 
+## 2026-08-20 - Pemulihan Rekap Pembayaran per Kelas
+
+**AI/Aktor:** Codex berbasis GPT-5, bersama pemilik proyek
+
+**Tujuan:** Mengembalikan halaman mandiri rekap pembayaran per kelas dari riwayat Git tanpa menghapus sistem Laporan Global yang baru.
+
+**Perubahan fitur dan perilaku:**
+
+- Memulihkan versi penuh terakhir `laporan/rekap_kelas.php` dari commit `a3497e2`, sebelum file tersebut diganti menjadi redirect pada commit `75e6b4f`.
+- Mengembalikan menu `Rekap per Kelas` untuk admin dan bendahara, termasuk status menu aktif saat membuka detail siswa.
+- Rekap lama kembali menyediakan filter kelas 1–6, bulan, tahun, pencarian siswa, ringkasan, tabel komponen pembayaran, tampilan mobile, detail siswa, dan cetak browser.
+- Laporan Global dan template Per Item tetap tersedia sebagai fitur terpisah.
+
+**Database dan migrasi:**
+
+- Tidak ada perubahan schema atau migrasi database.
+
+**Kompatibilitas dan data lama:**
+
+- Halaman memakai kolom tingkat legacy `siswa.KELAS` yang tetap dipertahankan pada schema saat ini, sehingga siswa dari seluruh rombel pada tingkat yang sama dirangkum bersama.
+- URL lama `rekap_kelas.php?kelas={1-6}&bulan={01-12}&tahun={YYYY}&q={pencarian}` kembali merender halaman dan tidak lagi mengalihkan ke Laporan Global.
+
+**Verifikasi:**
+
+- Lint PHP, pemeriksaan HTTP untuk halaman dan filter, pembandingan sumber dengan blob historis, `node --check`, serta `git diff --check` dijalankan setelah pemulihan.
+
+**Catatan tindak lanjut:**
+
+- Rekap mandiri mempertahankan konsep tingkat kelas 1–6 dari versi lama; laporan per rombel seperti 1A/1B tetap tersedia melalui Laporan Global.
+
 ## 2026-08-20 - Perombakan Dashboard menjadi Closing Harian
 
 **AI/Aktor:** Antigravity, bersama pemilik proyek
