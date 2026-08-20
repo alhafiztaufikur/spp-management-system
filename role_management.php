@@ -121,6 +121,49 @@ if ($_SERVER['REQUEST_METHOD'] === 'POST') {
         exit;
     }
 
+    if ($aksi === 'hapus') {
+        $accountId = filter_input(INPUT_POST, 'account_id', FILTER_VALIDATE_INT);
+        $currentAdminId = (int)($_SESSION['admin_id'] ?? 0);
+
+        if (!$accountId) {
+            setAccountFlash('error', 'Akun yang dipilih tidak valid.');
+        } elseif ($accountId === $currentAdminId) {
+            setAccountFlash('error', 'Anda tidak dapat menghapus akun Anda sendiri yang sedang login.');
+        } else {
+            $check = $koneksi->prepare("SELECT id, nama, username, role FROM admin WHERE id = ? LIMIT 1");
+            $check->bind_param('i', $accountId);
+            $check->execute();
+            $account = $check->get_result()->fetch_assoc();
+            $check->close();
+
+            if (!$account) {
+                setAccountFlash('error', 'Akun tidak ditemukan.');
+            } else {
+                if ($account['role'] === 'admin') {
+                    $countAdmins = (int)$koneksi->query("SELECT COUNT(*) AS total FROM admin WHERE role = 'admin'")->fetch_assoc()['total'];
+                    if ($countAdmins <= 1) {
+                        setAccountFlash('error', 'Tidak dapat menghapus akun Admin terakhir di sistem.');
+                        header('Location: role_management.php');
+                        exit;
+                    }
+                }
+
+                $stmt = $koneksi->prepare("DELETE FROM admin WHERE id = ?");
+                $stmt->bind_param('i', $accountId);
+
+                if ($stmt->execute()) {
+                    setAccountFlash('success', "Akun {$account['nama']} (@{$account['username']}) berhasil dihapus.");
+                } else {
+                    setAccountFlash('error', 'Akun gagal dihapus. Silakan coba lagi.');
+                }
+                $stmt->close();
+            }
+        }
+
+        header('Location: role_management.php');
+        exit;
+    }
+
     setAccountFlash('error', 'Aksi tidak dikenali.');
     header('Location: role_management.php');
     exit;
@@ -261,14 +304,28 @@ $roleLabels = ['admin' => 'Admin', 'bendahara' => 'Bendahara', 'kasir' => 'Kasir
                 </td>
                 <td data-label="Role"><span class="badge-role badge-role-<?= htmlspecialchars($account['role']) ?>"><?= htmlspecialchars($roleLabels[$account['role']] ?? $account['role']) ?></span></td>
                 <td data-label="Dibuat"><?= date('d/m/Y', strtotime($account['created_at'])) ?></td>
-                <td data-label="Aksi">
-                  <button type="button" class="btn-tbl btn-tbl-edit btn-reset-password"
-                    data-account-id="<?= (int)$account['id'] ?>"
-                    data-account-name="<?= htmlspecialchars($account['nama']) ?>"
-                    data-account-username="<?= htmlspecialchars($account['username']) ?>">
-                    <svg width="13" height="13" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.5" stroke-linecap="round" stroke-linejoin="round"><rect x="3" y="11" width="18" height="11" rx="2"/><path d="M7 11V7a5 5 0 0 1 9.9-1"/></svg>
-                    Ganti Password
-                  </button>
+                <td data-label="Aksi" class="aksi-col">
+                  <div class="savings-row-actions">
+                    <button type="button" class="btn-tbl btn-tbl-edit btn-reset-password"
+                      data-account-id="<?= (int)$account['id'] ?>"
+                      data-account-name="<?= htmlspecialchars($account['nama']) ?>"
+                      data-account-username="<?= htmlspecialchars($account['username']) ?>">
+                      <svg width="13" height="13" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.5" stroke-linecap="round" stroke-linejoin="round"><rect x="3" y="11" width="18" height="11" rx="2"/><path d="M7 11V7a5 5 0 0 1 9.9-1"/></svg>
+                      Ganti Password
+                    </button>
+                    <?php if ((int)$account['id'] !== (int)($_SESSION['admin_id'] ?? 0)): ?>
+                    <button type="button" class="btn-tbl btn-tbl-del btn-delete-account"
+                      data-account-id="<?= (int)$account['id'] ?>"
+                      data-account-name="<?= htmlspecialchars($account['nama']) ?>"
+                      data-account-username="<?= htmlspecialchars($account['username']) ?>"
+                      title="Hapus akun">
+                      <svg width="13" height="13" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.5" stroke-linecap="round" stroke-linejoin="round"><path d="M3 6h18"/><path d="M19 6v14a2 2 0 0 1-2 2H7a2 2 0 0 1-2-2V6m3 0V4a2 2 0 0 1 2-2h4a2 2 0 0 1 2 2v2"/></svg>
+                      Hapus
+                    </button>
+                    <?php else: ?>
+                    <span class="account-self-badge">👤 Akun Anda</span>
+                    <?php endif; ?>
+                  </div>
                 </td>
               </tr>
               <?php endwhile; ?>
@@ -311,11 +368,32 @@ $roleLabels = ['admin' => 'Admin', 'bendahara' => 'Bendahara', 'kasir' => 'Kasir
     </div>
   </div>
 
+  <div class="modal-overlay" id="delete-account-modal" role="dialog" aria-modal="true" aria-labelledby="delete-modal-title">
+    <div class="modal-box">
+      <div class="modal-icon">⚠️</div>
+      <div class="modal-title" id="delete-modal-title">Konfirmasi Hapus Akun</div>
+      <p style="color:var(--text-secondary);margin:12px 0 6px;font-size:13px;">Apakah Anda yakin ingin menghapus akun petugas berikut?</p>
+      <div class="modal-account" id="delete-account-label" style="font-weight:700;color:var(--red);"></div>
+      <p class="payment-auto-note" style="margin-top:8px;">Tindakan ini permanen dan tidak dapat dibatalkan.</p>
+      <form method="POST" action="role_management.php" id="form-delete-account" style="margin-top:16px;">
+        <input type="hidden" name="csrf_token" value="<?= htmlspecialchars($csrfToken) ?>" />
+        <input type="hidden" name="aksi" value="hapus" />
+        <input type="hidden" name="account_id" id="delete-account-id" />
+        <div class="modal-actions">
+          <button type="button" class="btn btn-ghost" id="btn-cancel-delete">Batal</button>
+          <button type="submit" class="btn btn-error" style="background:var(--red);color:#fff;border:none;">Hapus Akun</button>
+        </div>
+      </form>
+    </div>
+  </div>
+
   <script src="assets/js/app.js?v=2.8"></script>
   <script>
     (function () {
       const modal = document.getElementById('reset-password-modal');
       const resetForm = document.getElementById('form-reset-password');
+      const deleteModal = document.getElementById('delete-account-modal');
+      const deleteForm = document.getElementById('form-delete-account');
 
       document.querySelectorAll('[data-toggle-password]').forEach(function (button) {
         button.addEventListener('click', function () {
@@ -337,17 +415,39 @@ $roleLabels = ['admin' => 'Admin', 'bendahara' => 'Bendahara', 'kasir' => 'Kasir
         });
       });
 
+      document.querySelectorAll('.btn-delete-account').forEach(function (button) {
+        button.addEventListener('click', function () {
+          deleteForm.reset();
+          document.getElementById('delete-account-id').value = button.dataset.accountId;
+          document.getElementById('delete-account-label').textContent =
+            button.dataset.accountName + ' (@' + button.dataset.accountUsername + ')';
+          deleteModal.classList.add('show');
+        });
+      });
+
       function closeResetModal() {
         modal.classList.remove('show');
         resetForm.reset();
       }
 
+      function closeDeleteModal() {
+        deleteModal.classList.remove('show');
+        deleteForm.reset();
+      }
+
       document.getElementById('btn-cancel-reset').addEventListener('click', closeResetModal);
+      document.getElementById('btn-cancel-delete').addEventListener('click', closeDeleteModal);
       modal.addEventListener('click', function (event) {
         if (event.target === modal) closeResetModal();
       });
+      deleteModal.addEventListener('click', function (event) {
+        if (event.target === deleteModal) closeDeleteModal();
+      });
       document.addEventListener('keydown', function (event) {
-        if (event.key === 'Escape' && modal.classList.contains('show')) closeResetModal();
+        if (event.key === 'Escape') {
+          if (modal.classList.contains('show')) closeResetModal();
+          if (deleteModal.classList.contains('show')) closeDeleteModal();
+        }
       });
 
       resetForm.addEventListener('submit', function (event) {

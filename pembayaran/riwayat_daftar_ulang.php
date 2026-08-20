@@ -229,8 +229,8 @@ unset($_SESSION['flash']);
             <?php else: foreach ($visibleGroups as $index => $group): ?>
               <tr>
                 <td data-label="No"><?= $offset + $index + 1 ?></td>
-                <td data-label="Siswa"><strong><?= du_e($group['nama']) ?></strong><small class="du-history-nis">NIS <?= du_e($group['no_induk']) ?><?= !empty($group['no_induk_diknas']) ? ' · Diknas ' . du_e($group['no_induk_diknas']) : '' ?></small></td>
-                <td data-label="Kelas / Tahun"><strong>Kelas <?= du_e($group['kelas']) ?></strong><small class="du-history-nis"><?= du_e($group['th_ajaran']) ?></small></td>
+                <td data-label="Siswa"><strong><?= du_e($group['nama']) ?></strong><br><span class="badge-nis"><?= du_e($group['no_induk']) ?></span><?php if (!empty($group['no_induk_diknas'])): ?><small class="report-secondary-id">Diknas <?= du_e($group['no_induk_diknas']) ?></small><?php endif; ?></td>
+                <td data-label="Kelas / Tahun"><div class="du-class-year-cell"><span class="kelas-badge">Kelas <?= du_e($group['kelas']) ?></span><small class="du-history-nis"><?= du_e($group['th_ajaran']) ?></small></div></td>
                 <td data-label="Tagihan" class="nominal"><?= du_money($group['total']) ?></td>
                 <td data-label="Terbayar" class="nominal"><?= du_money($group['paid']) ?></td>
                 <td data-label="Sisa" class="nominal"><?= du_money($group['remaining']) ?></td>

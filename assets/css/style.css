@@ -309,17 +309,22 @@
   display: inline-flex;
   align-items: center;
   justify-content: center;
-  width: 82px;
-  min-height: 30px;
-  padding: 5px 10px;
+  min-width: 64px;
+  width: auto;
+  max-width: 100%;
+  min-height: 26px;
+  padding: 4px 10px;
   border: 1px solid rgba(245, 158, 11, .25);
   border-radius: 999px;
   background: rgba(245, 158, 11, .10);
   color: var(--orange);
   font-size: 11px;
   font-weight: 850;
-  line-height: 1;
+  line-height: 1.2;
   white-space: nowrap;
+}
+.text-center {
+  text-align: center !important;
 }
 .savings-balance {
   font-weight: 850;
@@ -332,8 +337,22 @@
 }
 .savings-row-actions {
   display: flex;
+  align-items: center;
   gap: 6px;
   flex-wrap: wrap;
+}
+.account-self-badge {
+  display: inline-flex;
+  align-items: center;
+  gap: 4px;
+  padding: 4px 10px;
+  border-radius: 20px;
+  background: rgba(52, 211, 153, 0.10);
+  border: 1px solid rgba(52, 211, 153, 0.22);
+  color: var(--accent-light);
+  font-size: 11px;
+  font-weight: 600;
+  white-space: nowrap;
 }
 
 @media (max-width: 560px) {
@@ -4289,6 +4308,18 @@ input[list]::-webkit-calendar-picker-indicator { display: none !important; }
   color: var(--text-muted);
   font-size: 10.5px;
 }
+.du-class-year-cell {
+  display: inline-flex;
+  flex-direction: column;
+  align-items: center;
+  text-align: center;
+}
+.du-class-year-cell .du-history-nis,
+.du-class-year-cell .report-secondary-id {
+  margin-top: 3px;
+  text-align: center;
+  display: block;
+}
 .du-payment-details {
   display: grid;
   gap: 10px;
@@ -4381,10 +4412,16 @@ input[list]::-webkit-calendar-picker-indicator { display: none !important; }
   text-decoration: none;
   transition: border-color .16s ease, background .16s ease, color .16s ease;
 }
-a.du-page-link:hover {
+a.du-page-link:hover,
+button.du-page-link:not(.is-disabled):hover {
   border-color: rgba(22,163,74,.4);
   background: rgba(22,163,74,.08);
   color: var(--accent);
+  cursor: pointer;
+}
+button.du-page-link {
+  font-family: inherit;
+  cursor: pointer;
 }
 .du-page-link.is-active {
   border-color: var(--accent);

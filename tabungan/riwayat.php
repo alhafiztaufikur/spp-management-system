@@ -402,6 +402,7 @@ $bln_names = ['01'=>'Januari','02'=>'Februari','03'=>'Maret','04'=>'April','05'=
             </tbody>
           </table>
         </div>
+        <div id="savings-recap-pagination"></div>
       </div>
 
     </div>
@@ -419,54 +420,135 @@ document.addEventListener('DOMContentLoaded', function(){
   const resetButton = document.getElementById('savings-reset-filter');
   const resultCount = document.getElementById('savings-result-count');
   const table = document.getElementById('savings-recap-table');
+  const paginationContainer = document.getElementById('savings-recap-pagination');
   if (!searchInput || !classFilter || !statusFilter || !table) return;
 
   const rows = Array.from(table.querySelectorAll('tbody tr[data-search]'));
   const noMatch = table.querySelector('.savings-no-match');
+  let savingsCurrentPage = 1;
+  const perPage = 10;
 
-  function applySavingsFilter() {
+  function renderSavingsPagination(totalFiltered, currentPage, totalPages) {
+    if (!paginationContainer) return;
+    if (totalFiltered === 0) {
+      paginationContainer.innerHTML = '';
+      return;
+    }
+
+    const startShown = (currentPage - 1) * perPage + 1;
+    const endShown = Math.min(totalFiltered, currentPage * perPage);
+
+    const windowWidth = 5;
+    let windowStart = Math.max(1, currentPage - Math.floor(windowWidth / 2));
+    let windowEnd = Math.min(totalPages, windowStart + windowWidth - 1);
+    windowStart = Math.max(1, windowEnd - windowWidth + 1);
+
+    let numberButtonsHtml = '';
+    for (let p = windowStart; p <= windowEnd; p++) {
+      if (p === currentPage) {
+        numberButtonsHtml += `<span class="du-page-link is-active" aria-current="page">${p}</span>`;
+      } else {
+        numberButtonsHtml += `<button type="button" class="du-page-link" data-page="${p}">${p}</button>`;
+      }
+    }
+
+    let navInner = '';
+    if (currentPage > 1) {
+      navInner += `<button type="button" class="du-page-link du-page-desktop-only" data-page="1">Awal</button>`;
+      navInner += `<button type="button" class="du-page-link du-page-prev" data-page="${currentPage - 1}">Sebelumnya</button>`;
+    } else {
+      navInner += `<span class="du-page-link du-page-desktop-only is-disabled">Awal</span>`;
+      navInner += `<span class="du-page-link du-page-prev is-disabled">Sebelumnya</span>`;
+    }
+
+    navInner += `<span class="du-page-mobile-label">Halaman ${currentPage} dari ${totalPages}</span>`;
+    navInner += `<span class="du-page-numbers">${numberButtonsHtml}</span>`;
+
+    if (currentPage < totalPages) {
+      navInner += `<button type="button" class="du-page-link du-page-next" data-page="${currentPage + 1}">Berikutnya</button>`;
+      navInner += `<button type="button" class="du-page-link du-page-desktop-only" data-page="${totalPages}">Akhir</button>`;
+    } else {
+      navInner += `<span class="du-page-link du-page-next is-disabled">Berikutnya</span>`;
+      navInner += `<span class="du-page-link du-page-desktop-only is-disabled">Akhir</span>`;
+    }
+
+    paginationContainer.innerHTML = `
+      <div class="du-pagination-footer">
+        <p class="du-pagination-info">Menampilkan <strong>${startShown}&ndash;${endShown}</strong> dari <strong>${totalFiltered}</strong> siswa</p>
+        <nav class="du-pagination" aria-label="Navigasi halaman">
+          ${navInner}
+        </nav>
+      </div>
+    `;
+  }
+
+  function applySavingsFilter(resetPage = false) {
+    if (resetPage) savingsCurrentPage = 1;
+
     const query = searchInput.value.trim().toLowerCase();
     const selectedClass = classFilter.value;
     const selectedStatus = statusFilter.value;
-    let shown = 0;
 
-    rows.forEach(function(row) {
+    const visibleRows = rows.filter(function(row) {
       const saldo = Number(row.dataset.saldo || 0);
       const matchesText = !query || (row.dataset.search || '').includes(query);
       const matchesClass = !selectedClass || row.dataset.class === selectedClass;
       const matchesStatus = !selectedStatus ||
         (selectedStatus === 'positive' && saldo > 0) ||
         (selectedStatus === 'zero' && saldo <= 0);
-      const visible = matchesText && matchesClass && matchesStatus;
+      return matchesText && matchesClass && matchesStatus;
+    });
 
-      row.hidden = !visible;
-      if (visible) {
-        shown += 1;
+    const totalFiltered = visibleRows.length;
+    const totalPages = Math.max(1, Math.ceil(totalFiltered / perPage));
+    if (savingsCurrentPage > totalPages) savingsCurrentPage = totalPages;
+    if (savingsCurrentPage < 1) savingsCurrentPage = 1;
+
+    const startShownIndex = (savingsCurrentPage - 1) * perPage;
+    const endShownIndex = startShownIndex + perPage;
+
+    rows.forEach(function(row) { row.hidden = true; });
+
+    visibleRows.forEach(function(row, idx) {
+      if (idx >= startShownIndex && idx < endShownIndex) {
+        row.hidden = false;
         const numberCell = row.querySelector('.savings-row-number');
-        if (numberCell) numberCell.textContent = shown;
+        if (numberCell) numberCell.textContent = idx + 1;
       }
     });
 
-    if (noMatch) noMatch.hidden = shown !== 0;
+    if (noMatch) noMatch.hidden = totalFiltered !== 0;
     if (resultCount) {
-      resultCount.textContent = 'Menampilkan ' + shown.toLocaleString('id-ID') + ' siswa';
+      resultCount.textContent = 'Menampilkan ' + totalFiltered.toLocaleString('id-ID') + ' siswa';
     }
+
+    renderSavingsPagination(totalFiltered, savingsCurrentPage, totalPages);
   }
 
-  searchInput.addEventListener('input', applySavingsFilter);
-  classFilter.addEventListener('change', applySavingsFilter);
-  statusFilter.addEventListener('change', applySavingsFilter);
+  if (paginationContainer) {
+    paginationContainer.addEventListener('click', function(e) {
+      const btn = e.target.closest('button.du-page-link');
+      if (btn && !btn.classList.contains('is-disabled') && btn.dataset.page) {
+        savingsCurrentPage = parseInt(btn.dataset.page, 10);
+        applySavingsFilter(false);
+      }
+    });
+  }
+
+  searchInput.addEventListener('input', function () { applySavingsFilter(true); });
+  classFilter.addEventListener('change', function () { applySavingsFilter(true); });
+  statusFilter.addEventListener('change', function () { applySavingsFilter(true); });
   if (resetButton) {
     resetButton.addEventListener('click', function () {
       searchInput.value = '';
       classFilter.value = '';
       statusFilter.value = '';
-      applySavingsFilter();
+      applySavingsFilter(true);
       searchInput.focus();
     });
   }
 
-  applySavingsFilter();
+  applySavingsFilter(true);
 });
 </script>
 </body>
