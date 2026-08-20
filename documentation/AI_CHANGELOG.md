@@ -1,4 +1,4 @@
-﻿# Riwayat Perubahan AI SistemSPP
+# Riwayat Perubahan AI SistemSPP
 
 File ini mencatat perubahan proyek secara reverse chronological. Baca [PROJECT_CONTEXT.md](./PROJECT_CONTEXT.md) terlebih dahulu untuk memahami arsitektur, aturan bisnis, dan kewajiban dokumentasi.
 
@@ -12,6 +12,26 @@ File ini mencatat perubahan proyek secara reverse chronological. Baca [PROJECT_C
 - Jangan mencantumkan data siswa nyata, password, token, cookie, atau secret.
 - Jangan menghapus atau menulis ulang entri lama. Tambahkan entri koreksi bila diperlukan.
 - Perubahan implementasi dan entri changelog wajib masuk commit yang sama.
+
+## 2026-08-20 - Perombakan Dashboard menjadi Closing Harian
+
+**AI/Aktor:** Antigravity, bersama pemilik proyek
+
+**Tujuan:** Merombak keseluruhan antarmuka Dashboard agar berfokus 100% pada *closing harian* (rekap penerimaan uang hari ini) dan menyembunyikan metrik/statistik *all-time* (global) yang kurang relevan bagi operasional kasir.
+
+**Perubahan Perilaku / Kode:**
+- **`dashboard.php`**: Dihapus kueri lama yang meload metrik *all-time* (seperti total siswa, total transaksi keseluruhan). Mengimpor `includes/reports.php` dan memanfaatkan fungsi `report_settlement_data()` khusus untuk tanggal hari ini.
+- Mengubah 4 kotak metrik statistik di atas menjadi representasi uang masuk hari ini (Transaksi Hari ini, Total Penerimaan Kotor, Tunai Diterima, dan Kas Disetorkan/Tunai Bersih).
+- Mengubah tautan "Quick Actions" untuk mengarahkan pengguna pada operasi *closing*: Input Pembayaran, Mutasi Tabungan (arah ke riwayat tabungan), dan Rincian Setoran Lengkap.
+- Menghapus tabel "Transaksi Terbaru" agar fokus UI tidak terdistraksi.
+- Menjadikan tabel "Rekap Setoran Kas Fisik Hari Ini" sebagai satu-satunya tabel yang tampil di dashboard, lengkap dengan fungsionalitas Export Excel yang otomatis disesuaikan untuk mengekspor rekap tanggal hari berjalan.
+
+**Kompatibilitas:** Sepenuhnya *backward-compatible*. Data tidak berubah, ini murni perombakan cara menampilkan agregasi data laporan pada halaman depan.
+
+**Tindak Lanjut / Verifikasi:**
+- Uji sintaks `php -l dashboard.php` lolos tanpa *error*.
+- Memastikan navigasi tombol aksi cepat (`tabungan/riwayat.php`) berfungsi tanpa error.
+- Tampilan dievaluasi melalui tangkapan visual, dan fitur *export Excel* dipastikan menuju *endpoint* yang sudah ada dengan parameter `tanggal_awal=TODAY&tanggal_akhir=TODAY`.
 
 ## 2026-08-18 - Laporan Global Modular dan Master Kelas/Rombel
 

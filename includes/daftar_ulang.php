@@ -280,14 +280,14 @@ function du_publish_year_from_active_students(mysqli $db, int $yearId, string $l
     $masterCount = (int)$stmt->get_result()->fetch_assoc()['total']; $stmt->close();
     if ($masterCount !== 6) throw new RuntimeException('Lengkapi nominal Daftar Ulang kelas 1 sampai 6 sebelum menerbitkan.');
 
-    $activeStudents = $db->query('SELECT NO_INDUK, KELAS, master_kelas_id FROM siswa WHERE is_active=1 FOR UPDATE');
+    $activeStudents = $db->query("SELECT NO_INDUK, KELAS FROM siswa WHERE is_active=1 AND KELAS IN ('1','2','3','4','5','6') FOR UPDATE");
     $activeCount = $activeStudents->num_rows;
     if ($activeCount === 0) throw new RuntimeException('Tidak ada siswa aktif kelas 1 sampai 6 yang dapat dibuatkan tagihan.');
     $invalidCount = 0;
     while ($activeStudent = $activeStudents->fetch_assoc()) {
-        if (!in_array((string)$activeStudent['KELAS'], ['1','2','3','4','5','6'], true) || empty($activeStudent['master_kelas_id'])) $invalidCount++;
+        if (!in_array((string)$activeStudent['KELAS'], ['1','2','3','4','5','6'], true)) $invalidCount++;
     }
-    if ($invalidCount > 0) throw new RuntimeException($invalidCount . ' siswa aktif memiliki kelas/rombel tidak valid. Perbaiki Data Siswa terlebih dahulu.');
+    if ($invalidCount > 0) throw new RuntimeException($invalidCount . ' siswa aktif memiliki kelas tidak valid (harus 1–6). Perbaiki Data Siswa terlebih dahulu.');
 
     $stmt = $db->prepare('SELECT COUNT(*) total FROM tagihan_daftar_ulang WHERE tahun_ajaran_id=?');
     $stmt->bind_param('i', $yearId); $stmt->execute();
@@ -301,11 +301,12 @@ function du_publish_year_from_active_students(mysqli $db, int $yearId, string $l
     $stmt = $db->prepare("INSERT INTO siswa_tahun_ajaran
         (tahun_ajaran_id,no_induk,kelas,master_kelas_id,kelas_rombel_snapshot,spp_perbulan_snapshot,komite_snapshot,status)
         SELECT ?,s.NO_INDUK,s.KELAS,s.master_kelas_id,
-               CASE WHEN mk.is_placeholder=1 THEN CONCAT('Kelas ',s.KELAS,' (Belum Ditentukan)')
+               CASE WHEN mk.id IS NULL THEN CONCAT('Kelas ',s.KELAS,' (Belum Ditentukan)')
+                    WHEN mk.is_placeholder=1 THEN CONCAT('Kelas ',s.KELAS,' (Belum Ditentukan)')
                     ELSE CONCAT(mk.tingkat,UPPER(mk.kode_rombel)) END,
                s.SPP_PERBULAN,s.POMG,'aktif'
         FROM siswa s
-        JOIN master_kelas mk ON mk.id=s.master_kelas_id
+        LEFT JOIN master_kelas mk ON mk.id=s.master_kelas_id
         WHERE s.is_active=1 AND s.KELAS IN ('1','2','3','4','5','6')
         ON DUPLICATE KEY UPDATE kelas=VALUES(kelas),master_kelas_id=VALUES(master_kelas_id),
           kelas_rombel_snapshot=VALUES(kelas_rombel_snapshot),

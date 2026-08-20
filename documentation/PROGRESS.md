@@ -51,6 +51,7 @@ Dokumen kerja ini melacak pekerjaan teknis yang sedang dan sudah dilakukan. Perb
 | REP-004 | Area `Sisa Pembayaran` pada struk terlalu ramai dan tidak sesuai kuitansi acuan. | Sedang | Selesai | Struk biasa dan struk tahunan hanya menampilkan `Sisa PSB` dan `Sisa DU`; rincian pembayaran utama tetap tidak berubah. |
 | REP-005 | Laporan Global masih satu halaman besar dan belum menyediakan template status, SPP tahunan, tabungan, serta setoran kas. | Tinggi | Selesai | Laporan Global menjadi katalog tujuh template dengan registry/query bersama, pagination, web, cetak, PDF, Excel, dan filter konsisten. |
 | UI-001 | Beberapa tampilan mobile dan dark mode kurang rapi/user friendly. | Sedang | Selesai bertahap | Sidebar mobile, logout, bottom nav, preview Excel, riwayat tabungan, avatar role, dan palet dark mode sudah direvisi. |
+| UI-002 | Halaman Dashboard menampilkan metrik all-time sehingga kurang relevan untuk aktivitas operasional harian (closing kasir). | Sedang | Selesai | Dashboard dirombak total menjadi dashboard closing harian; fokus pada transaksi hari ini, kas fisik bersih, quick actions operasional, dan memuat tabel rekap setoran kas harian. |
 
 ## Log perubahan alur aplikasi
 
@@ -64,9 +65,8 @@ Dokumen kerja ini melacak pekerjaan teknis yang sedang dan sudah dilakukan. Perb
 
 ### Dashboard dan navigasi tabel
 
-- Dashboard menampilkan ringkasan siswa, transaksi, total nominal, dan bayar bulan ini.
-- Baris `Transaksi Terbaru` dapat diklik langsung untuk membuka halaman edit transaksi.
-- Tombol `Edit` dan `Hapus` tetap dipertahankan sebagai aksi eksplisit, tetapi bukan satu-satunya cara masuk detail.
+- Dashboard beralih fungsi dari ringkasan global menjadi dashboard *closing* harian yang menampilkan data penerimaan kotor, tunai bersih, kas disetorkan, serta tabel rekap kas khusus untuk hari ini.
+- Baris tabel pada seluruh aplikasi umumnya dapat diklik langsung untuk membuka halaman detail/edit.
 
 ### Data siswa
 
