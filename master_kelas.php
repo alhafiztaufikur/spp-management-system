@@ -84,7 +84,7 @@ $classes = $koneksi->query("SELECT mk.*,
   <meta charset="UTF-8"><meta name="viewport" content="width=device-width,initial-scale=1.0">
   <title>Master Kelas | SistemSPP</title>
   <link rel="icon" type="image/png" href="assets/img/favicon.png">
-  <link rel="stylesheet" href="assets/css/style.css?v=6.5">
+  <link rel="stylesheet" href="assets/css/style.css?v=7.7">
   <script>(function(){var t=localStorage.getItem('spp_theme')||'dark';document.documentElement.setAttribute('data-theme',t);})();</script>
 </head>
 <body>
@@ -99,7 +99,22 @@ $classes = $koneksi->query("SELECT mk.*,
     </div>
     <?php if ($flash): ?><div class="alert alert-<?= htmlspecialchars($flash['type']) ?>" id="flash-msg"><?= htmlspecialchars($flash['msg']) ?></div><?php endif; ?>
 
-    <div class="main-card">
+    <section class="main-card master-modern-shell">
+      <div class="master-modern-hero">
+        <div>
+          <span class="recap-class-overline">Data Master</span>
+          <h1>Master Kelas/Rombel</h1>
+          <p>Atur rombel yang dipakai Data Siswa, pembayaran, laporan, dan histori tahun ajaran.</p>
+        </div>
+        <div class="master-modern-stats">
+          <div><span>Total Rombel</span><strong><?= number_format(count($classes)) ?></strong></div>
+          <div><span>Siswa Aktif</span><strong><?= number_format(array_sum(array_map(fn($row)=>(int)$row['siswa_count'], $classes))) ?></strong></div>
+          <div><span>Histori</span><strong><?= number_format(array_sum(array_map(fn($row)=>(int)$row['history_count'], $classes))) ?></strong></div>
+        </div>
+      </div>
+    </section>
+
+    <div class="main-card master-modern-card master-modern-form">
       <div class="card-title-row"><div><div class="card-title"><?= $editClass ? 'Edit Rombel' : 'Tambah Rombel' ?></div><p class="payment-auto-note">Tingkat tetap 1–6. Kode rombel membentuk label seperti 1A, 1B, atau 2C.</p></div></div>
       <form method="post" class="report-filter-grid">
         <input type="hidden" name="csrf_token" value="<?= htmlspecialchars($_SESSION['csrf_master_kelas']) ?>">
@@ -110,7 +125,7 @@ $classes = $koneksi->query("SELECT mk.*,
       </form>
     </div>
 
-    <div class="main-card">
+    <div class="main-card master-modern-card master-modern-list">
       <div class="card-title-row"><div><div class="card-title">Daftar Kelas/Rombel</div><p class="payment-auto-note">Placeholder menjaga data lama tetap valid sampai siswa dipindahkan ke rombel sebenarnya.</p></div></div>
       <div class="table-container"><table class="payment-table responsive-table"><thead><tr><th>No</th><th>Label</th><th>Tingkat</th><th>Status</th><th class="text-center">Siswa Aktif</th><th class="text-center">Histori</th><th>Aksi</th></tr></thead><tbody>
       <?php foreach($classes as $i=>$class): $label=class_label($class); ?>

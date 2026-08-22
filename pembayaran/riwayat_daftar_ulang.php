@@ -183,7 +183,7 @@ unset($_SESSION['flash']);
   <meta name="description" content="Rekap pembayaran dan cicilan daftar ulang siswa." />
   <link rel="preconnect" href="https://fonts.googleapis.com" />
   <link href="https://fonts.googleapis.com/css2?family=Inter:wght@300;400;500;600;700;800&display=swap" rel="stylesheet" />
-  <link rel="stylesheet" href="../assets/css/style.css?v=5.7" />
+  <link rel="stylesheet" href="../assets/css/style.css?v=7.5" />
   <script>(function(){var t=localStorage.getItem('spp_theme')||'dark';document.documentElement.setAttribute('data-theme',t);})();</script>
 </head>
 <body>
@@ -199,20 +199,29 @@ unset($_SESSION['flash']);
 
       <?php if ($flash): ?><div class="alert alert-<?= du_e($flash['type'] ?? 'error') ?>" id="flash-msg"><?= du_e($flash['msg'] ?? '') ?></div><?php endif; ?>
 
-      <div class="main-card du-history-card">
-        <div class="card-title-row">
-          <div class="card-title"><svg width="18" height="18" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><path d="M4 19.5A2.5 2.5 0 0 1 6.5 17H20"/><path d="M4 4.5A2.5 2.5 0 0 1 6.5 2H20v20H6.5A2.5 2.5 0 0 1 4 19.5z"/><path d="M9 7h6M9 11h6"/></svg>Rekap Daftar Ulang Siswa</div>
-          <a href="form.php" class="btn btn-primary">+ Input Pembayaran</a>
-        </div>
+      <section class="main-card class-recap-card recap-report-shell history-recap-shell du-history-card">
+        <div class="recap-report-header">
+          <div class="recap-report-copy">
+            <span class="recap-class-overline">Daftar Ulang</span>
+            <h1>Riwayat Daftar Ulang</h1>
+            <p><?= number_format($summary['students']) ?> siswa/periode cocok dengan filter saat ini.</p>
+          </div>
 
-        <form method="GET" class="filter-bar du-history-filter">
+        <form method="GET" class="recap-header-controls history-recap-filter filter-bar du-history-filter">
+          <span class="recap-filter-label">Filter Riwayat</span>
           <div class="search-box"><svg width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><circle cx="11" cy="11" r="8"/><line x1="21" y1="21" x2="16.65" y2="16.65"/></svg><input type="text" name="q" value="<?= du_e($search) ?>" placeholder="Cari nama / NIS / NIS Diknas..." /></div>
           <select class="field-input field-select filter-sel" name="kelas"><option value="">Kelas 1–6</option><?php foreach ($allowedClasses as $class): ?><option value="<?= $class ?>" <?= $filterClass === $class ? 'selected' : '' ?>>Kelas <?= $class ?></option><?php endforeach; ?></select>
           <select class="field-input field-select filter-sel" name="tahun_ajaran"><option value="">Semua Tahun Ajaran</option><?php foreach ($academicYears as $year): ?><option value="<?= du_e($year) ?>" <?= $filterYear === $year ? 'selected' : '' ?>><?= du_e($year) ?></option><?php endforeach; ?></select>
           <select class="field-input field-select filter-sel" name="status"><option value="">Semua Status</option><option value="cicilan" <?= $filterStatus === 'cicilan' ? 'selected' : '' ?>>Belum Lunas</option><option value="lunas" <?= $filterStatus === 'lunas' ? 'selected' : '' ?>>Lunas</option></select>
           <select class="field-input field-select filter-sel du-page-size" name="per_page" aria-label="Jumlah data per halaman"><?php foreach ($allowedPageSizes as $pageSize): ?><option value="<?= $pageSize ?>" <?= $perPage === $pageSize ? 'selected' : '' ?>><?= $pageSize ?> / halaman</option><?php endforeach; ?></select>
-          <button class="btn btn-primary" type="submit">Tampilkan</button><a class="btn btn-ghost" href="riwayat_daftar_ulang.php">Reset</a>
+          <div class="history-recap-actions"><button class="btn btn-primary" type="submit">Tampilkan Rekap</button><a class="btn btn-ghost" href="riwayat_daftar_ulang.php">Reset</a><a href="form.php" class="btn btn-primary">Input Pembayaran</a></div>
         </form>
+        </div>
+
+        <div class="recap-period-strip history-recap-strip">
+          <div><strong>Rekap Tagihan Daftar Ulang</strong><span>Menampilkan <?= number_format($firstShown) ?>–<?= number_format($lastShown) ?> dari <?= number_format($summary['students']) ?> siswa/periode.</span></div>
+          <span><?= number_format($summary['students']) ?> data</span>
+        </div>
 
         <div class="history-summary-grid du-history-summary">
           <div><span>Siswa / Periode</span><strong><?= number_format($summary['students']) ?></strong></div>
@@ -290,7 +299,7 @@ unset($_SESSION['flash']);
           <?php endif; ?>
         </div>
         <?php endif; ?>
-      </div>
+      </section>
     </main>
   </div>
   <script src="../assets/js/app.js?v=4.4"></script>

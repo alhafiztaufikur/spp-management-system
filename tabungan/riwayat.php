@@ -138,6 +138,9 @@ $historyPaginationQuery = pagination_query([
 
 $bln_names = ['01'=>'Januari','02'=>'Februari','03'=>'Maret','04'=>'April','05'=>'Mei','06'=>'Juni',
                '07'=>'Juli','08'=>'Agustus','09'=>'September','10'=>'Oktober','11'=>'November','12'=>'Desember'];
+$firstShown = $totalHistoryRows > 0 ? $offset + 1 : 0;
+$lastShown = $totalHistoryRows > 0 ? min($offset + count($rows), $totalHistoryRows) : 0;
+$periodLabel = ($bln_names[str_pad((string)$filter_bulan, 2, '0', STR_PAD_LEFT)] ?? $filter_bulan) . ' ' . $filter_tahun;
 ?>
 <!DOCTYPE html>
 <html lang="id">
@@ -149,7 +152,7 @@ $bln_names = ['01'=>'Januari','02'=>'Februari','03'=>'Maret','04'=>'April','05'=
   <link rel="preconnect" href="https://fonts.googleapis.com" />
   <link href="https://fonts.googleapis.com/css2?family=Inter:wght@300;400;500;600;700;800&display=swap" rel="stylesheet" />
   <script>(function(){var t=localStorage.getItem('spp_theme')||'dark';document.documentElement.setAttribute('data-theme',t);})();</script>
-  <link rel="stylesheet" href="../assets/css/style.css?v=6.0" />
+  <link rel="stylesheet" href="../assets/css/style.css?v=7.5" />
 </head>
 <body>
 <div class="bg-orbs"><div class="orb orb-1"></div><div class="orb orb-2"></div><div class="orb orb-3"></div></div>
@@ -210,9 +213,17 @@ $bln_names = ['01'=>'Januari','02'=>'Februari','03'=>'Maret','04'=>'April','05'=
         </div>
       </div>
 
-      <!-- Filter -->
-      <div class="main-card" style="margin-bottom:16px;">
-        <form method="GET" class="tabungan-filter-form">
+      <!-- Filter dan Tabel Transaksi -->
+      <section class="main-card class-recap-card recap-report-shell history-recap-shell savings-history-shell">
+        <div class="recap-report-header">
+          <div class="recap-report-copy">
+            <span class="recap-class-overline">Tabungan</span>
+            <h1>Riwayat Tabungan</h1>
+            <p><?= number_format($totalHistoryRows) ?> transaksi tabungan cocok dengan filter saat ini.</p>
+          </div>
+
+        <form method="GET" class="recap-header-controls history-recap-filter tabungan-filter-form">
+          <span class="recap-filter-label">Filter Riwayat</span>
           <div class="field-row tabungan-filter-month">
             <label class="field-label">Bulan</label>
             <select class="field-input field-select" name="bulan">
@@ -244,15 +255,23 @@ $bln_names = ['01'=>'Januari','02'=>'Februari','03'=>'Maret','04'=>'April','05'=
               <?php endforeach; ?>
             </select>
           </div>
-          <div class="tabungan-filter-actions">
-            <button type="submit" class="btn btn-primary">Filter</button>
+          <div class="history-recap-actions tabungan-filter-actions">
+            <button type="submit" class="btn btn-primary">Tampilkan Rekap</button>
             <a href="riwayat.php" class="btn btn-ghost">Reset</a>
+            <?php if (hasRole(['admin','kasir'])): ?>
+            <a href="masuk.php" class="btn btn-primary">Tabungan Masuk</a>
+            <a href="keluar.php" class="btn btn-warning">Tabungan Keluar</a>
+            <?php endif; ?>
           </div>
         </form>
-      </div>
+        </div>
 
       <!-- Tabel Transaksi -->
-      <div class="main-card savings-transaction-card">
+        <div class="recap-period-strip history-recap-strip">
+          <div><strong>Daftar Transaksi <?= htmlspecialchars($periodLabel) ?></strong><span>Menampilkan <?= number_format($firstShown) ?>–<?= number_format($lastShown) ?> dari <?= number_format($totalHistoryRows) ?> transaksi.</span></div>
+          <span><?= number_format($totalHistoryRows) ?> transaksi</span>
+        </div>
+      <div class="savings-transaction-card">
         <div class="card-header tabungan-card-header">
           <h3 class="card-title">Daftar Transaksi — <?= $bln_names[str_pad($filter_bulan,2,'0',STR_PAD_LEFT)] ?> <?= $filter_tahun ?></h3>
           <?php if (hasRole(['admin','kasir'])): ?>
@@ -299,6 +318,7 @@ $bln_names = ['01'=>'Januari','02'=>'Februari','03'=>'Maret','04'=>'April','05'=
         </div>
         <?php render_pagination('riwayat.php', $historyPaginationQuery, $page, $totalPages, $totalHistoryRows, $perPage, 'transaksi'); ?>
       </div>
+      </section>
 
       <!-- Rekap Saldo Per Siswa -->
       <div class="main-card savings-recap-card" style="margin-top:16px;">
@@ -336,11 +356,16 @@ $bln_names = ['01'=>'Januari','02'=>'Februari','03'=>'Maret','04'=>'April','05'=
             <option value="positive">Ada saldo</option>
             <option value="zero">Saldo kosong</option>
           </select>
+          <select class="field-input field-select" id="savings-per-page-filter" aria-label="Jumlah siswa per halaman">
+            <option value="10">10 / halaman</option>
+            <option value="25">25 / halaman</option>
+            <option value="50">50 / halaman</option>
+          </select>
           <button type="button" class="btn btn-ghost" id="savings-reset-filter">Reset</button>
         </div>
 
         <div class="savings-result-info">
-          <span id="savings-result-count">Menampilkan <?= number_format(count($saldo_list)) ?> siswa</span>
+          <span id="savings-result-count">Ditemukan <?= number_format(count($saldo_list)) ?> siswa</span>
           <span>Klik baris aksi untuk lihat riwayat, setor, atau tarik.</span>
         </div>
 
@@ -417,6 +442,7 @@ document.addEventListener('DOMContentLoaded', function(){
   const searchInput = document.getElementById('savings-student-search');
   const classFilter = document.getElementById('savings-class-filter');
   const statusFilter = document.getElementById('savings-status-filter');
+  const perPageFilter = document.getElementById('savings-per-page-filter');
   const resetButton = document.getElementById('savings-reset-filter');
   const resultCount = document.getElementById('savings-result-count');
   const table = document.getElementById('savings-recap-table');
@@ -426,7 +452,11 @@ document.addEventListener('DOMContentLoaded', function(){
   const rows = Array.from(table.querySelectorAll('tbody tr[data-search]'));
   const noMatch = table.querySelector('.savings-no-match');
   let savingsCurrentPage = 1;
-  const perPage = 10;
+
+  function savingsPerPage() {
+    const value = parseInt(perPageFilter?.value || '10', 10);
+    return [10, 25, 50].includes(value) ? value : 10;
+  }
 
   function renderSavingsPagination(totalFiltered, currentPage, totalPages) {
     if (!paginationContainer) return;
@@ -435,6 +465,7 @@ document.addEventListener('DOMContentLoaded', function(){
       return;
     }
 
+    const perPage = savingsPerPage();
     const startShown = (currentPage - 1) * perPage + 1;
     const endShown = Math.min(totalFiltered, currentPage * perPage);
 
@@ -500,6 +531,7 @@ document.addEventListener('DOMContentLoaded', function(){
     });
 
     const totalFiltered = visibleRows.length;
+    const perPage = savingsPerPage();
     const totalPages = Math.max(1, Math.ceil(totalFiltered / perPage));
     if (savingsCurrentPage > totalPages) savingsCurrentPage = totalPages;
     if (savingsCurrentPage < 1) savingsCurrentPage = 1;
@@ -519,7 +551,7 @@ document.addEventListener('DOMContentLoaded', function(){
 
     if (noMatch) noMatch.hidden = totalFiltered !== 0;
     if (resultCount) {
-      resultCount.textContent = 'Menampilkan ' + totalFiltered.toLocaleString('id-ID') + ' siswa';
+      resultCount.textContent = 'Ditemukan ' + totalFiltered.toLocaleString('id-ID') + ' siswa';
     }
 
     renderSavingsPagination(totalFiltered, savingsCurrentPage, totalPages);
@@ -538,11 +570,13 @@ document.addEventListener('DOMContentLoaded', function(){
   searchInput.addEventListener('input', function () { applySavingsFilter(true); });
   classFilter.addEventListener('change', function () { applySavingsFilter(true); });
   statusFilter.addEventListener('change', function () { applySavingsFilter(true); });
+  if (perPageFilter) perPageFilter.addEventListener('change', function () { applySavingsFilter(true); });
   if (resetButton) {
     resetButton.addEventListener('click', function () {
       searchInput.value = '';
       classFilter.value = '';
       statusFilter.value = '';
+      if (perPageFilter) perPageFilter.value = '10';
       applySavingsFilter(true);
       searchInput.focus();
     });

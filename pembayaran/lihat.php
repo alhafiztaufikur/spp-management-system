@@ -115,6 +115,9 @@ $bln_list = [
     '05' => 'Mei', '06' => 'Juni', '07' => 'Juli', '08' => 'Agustus',
     '09' => 'September', '10' => 'Oktober', '11' => 'November', '12' => 'Desember'
 ];
+$firstShown = $totalPayments > 0 ? $offset + 1 : 0;
+$lastShown = $totalPayments > 0 ? min($offset + $perPage, $totalPayments) : 0;
+$periodLabel = ($filter_bln ? ($bln_list[$filter_bln] ?? $filter_bln) : 'Semua bulan') . ($filter_thn ? ' ' . $filter_thn : '');
 ?>
 <!DOCTYPE html>
 <html lang="id">
@@ -126,7 +129,7 @@ $bln_list = [
   <meta name="description" content="Lihat semua data transaksi pembayaran siswa." />
   <link rel="preconnect" href="https://fonts.googleapis.com" />
   <link href="https://fonts.googleapis.com/css2?family=Inter:wght@300;400;500;600;700;800&display=swap" rel="stylesheet" />
-  <link rel="stylesheet" href="../assets/css/style.css?v=6.1" />
+  <link rel="stylesheet" href="../assets/css/style.css?v=7.5" />
   <!-- Prevent theme flash -->
   <script>(function(){var t=localStorage.getItem('spp_theme')||'dark';document.documentElement.setAttribute('data-theme',t);})();</script>
 </head>
@@ -180,20 +183,17 @@ $bln_list = [
       </div>
       <?php endif; ?>
 
-      <div class="main-card">
-        <div class="card-title-row">
-          <div class="card-title">
-            <svg width="18" height="18" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><path d="M1 12s4-8 11-8 11 8 11 8-4 8-11 8-11-8-11-8z"/><circle cx="12" cy="12" r="3"/></svg>
-            Data Pembayaran Siswa
+      <section class="main-card class-recap-card recap-report-shell history-recap-shell payment-history-shell">
+        <div class="recap-report-header">
+          <div class="recap-report-copy">
+            <span class="recap-class-overline">Pembayaran</span>
+            <h1>Riwayat Pembayaran Siswa</h1>
+            <p><?= number_format($totalPayments) ?> transaksi cocok dengan filter saat ini.</p>
           </div>
-          <a href="form.php" class="btn btn-primary" id="btn-tambah" style="padding:8px 18px;font-size:13px">
-            <svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.5" stroke-linecap="round" stroke-linejoin="round"><circle cx="12" cy="12" r="10"/><line x1="12" y1="8" x2="12" y2="16"/><line x1="8" y1="12" x2="16" y2="12"/></svg>
-            Tambah Baru
-          </a>
-        </div>
 
         <!-- Filter Bar -->
-        <form method="GET" action="lihat.php" class="filter-bar">
+        <form method="GET" action="lihat.php" class="recap-header-controls history-recap-filter filter-bar">
+          <span class="recap-filter-label">Filter Riwayat</span>
           <div class="search-box">
             <svg width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><circle cx="11" cy="11" r="8"/><line x1="21" y1="21" x2="16.65" y2="16.65"/></svg>
             <input type="text" id="search-lihat" name="search" placeholder="Cari nama / NIS / NIS Diknas..."
@@ -216,9 +216,18 @@ $bln_list = [
             <option value="<?= $pageSize ?>" <?= $perPage === $pageSize ? 'selected' : '' ?>><?= $pageSize ?> / halaman</option>
             <?php endforeach; ?>
           </select>
-          <button type="submit" class="btn btn-primary" id="btn-filter" style="padding:8px 16px;font-size:13px">Filter</button>
-          <a href="lihat.php" class="btn btn-ghost" id="btn-reset-filter" style="padding:8px 16px;font-size:13px">Reset</a>
+          <div class="history-recap-actions">
+            <button type="submit" class="btn btn-primary" id="btn-filter">Tampilkan Rekap</button>
+            <a href="lihat.php" class="btn btn-ghost" id="btn-reset-filter">Reset</a>
+            <a href="form.php" class="btn btn-primary" id="btn-tambah">Tambah Baru</a>
+          </div>
         </form>
+        </div>
+
+        <div class="recap-period-strip history-recap-strip">
+          <div><strong>Transaksi Pembayaran <?= htmlspecialchars($periodLabel) ?></strong><span>Menampilkan <?= number_format($firstShown) ?>–<?= number_format($lastShown) ?> dari <?= number_format($totalPayments) ?> transaksi.</span></div>
+          <span><?= number_format($totalPayments) ?> transaksi</span>
+        </div>
 
         <!-- Table -->
         <div class="table-container">
@@ -307,7 +316,7 @@ $bln_list = [
           </table>
         </div>
         <?php render_pagination('lihat.php', $paymentPaginationQuery, $page, $totalPages, $totalPayments, $perPage, 'transaksi'); ?>
-      </div>
+      </section>
     </main>
   </div>
 

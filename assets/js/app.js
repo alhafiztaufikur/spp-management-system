@@ -177,12 +177,36 @@ function studentSearchOptionLabel(opt) {
   return nis && nama ? nis + ' - ' + nama : (opt.value || nama);
 }
 
+function studentSearchClassFilter(input) {
+  const selector = input?.dataset.studentClassFilter || '';
+  if (!selector) return { value: '', label: '' };
+  const select = document.querySelector(selector);
+  if (!select) return { value: '', label: '' };
+  const value = String(select.value || '');
+  const selected = select.options?.[select.selectedIndex];
+  return {
+    value: value === '0' ? '' : value,
+    label: selected ? selected.textContent.trim() : ''
+  };
+}
+
+function studentSearchOptionsForClass(input, options) {
+  const filter = studentSearchClassFilter(input);
+  if (!filter.value) return options;
+  return options.filter(opt => String(opt.dataset.kelasId || '') === filter.value);
+}
+
 function selectStudentSearchOption(input, opt) {
   input.value = opt.value || studentSearchOptionLabel(opt);
   input.dataset.studentSelected = '1';
   input.dataset.studentSuppressPanel = '1';
   try {
-    window.pilihSiswaDatalist(input);
+    const callbackName = input.dataset.studentSelectCallback || '';
+    if (callbackName && typeof window[callbackName] === 'function') {
+      window[callbackName](input, opt);
+    } else if (typeof window.pilihSiswaDatalist === 'function') {
+      window.pilihSiswaDatalist(input);
+    }
   } finally {
     closeStudentSearchPanel(input);
   }
@@ -207,11 +231,13 @@ function renderStudentSearchPanel(input, forceAll) {
 
   const query = input.value.trim().toLowerCase();
   const allOptions = Array.from(list.options);
+  const classFilter = studentSearchClassFilter(input);
+  const scopedOptions = studentSearchOptionsForClass(input, allOptions);
   const showAll = !!forceAll || !query || input.dataset.studentSelected === '1';
 
   const matches = (!showAll
-    ? allOptions.filter(opt => studentSearchText(opt).includes(query))
-    : allOptions
+    ? scopedOptions.filter(opt => studentSearchText(opt).includes(query))
+    : scopedOptions
   ).slice(0, showAll ? 12 : 8);
 
   input.setAttribute('aria-expanded', 'true');
@@ -229,9 +255,15 @@ function renderStudentSearchPanel(input, forceAll) {
   if (showAll) {
     const hint = document.createElement('div');
     hint.className = 'student-search-hint';
-    hint.textContent = allOptions.length > matches.length
-      ? 'Menampilkan ' + matches.length + ' siswa pertama. Ketik nama atau NIS untuk mencari lebih spesifik.'
-      : 'Pilih siswa dari daftar.';
+    if (classFilter.value) {
+      hint.textContent = scopedOptions.length > matches.length
+        ? 'Menampilkan ' + matches.length + ' siswa pertama dari ' + classFilter.label + '. Ketik nama atau NIS untuk mencari lebih spesifik.'
+        : 'Menampilkan siswa dari ' + classFilter.label + '.';
+    } else {
+      hint.textContent = allOptions.length > matches.length
+        ? 'Menampilkan ' + matches.length + ' siswa pertama. Ketik nama atau NIS untuk mencari lebih spesifik.'
+        : 'Pilih siswa dari daftar.';
+    }
     panel.appendChild(hint);
   }
 
@@ -263,8 +295,13 @@ function renderStudentSearchPanel(input, forceAll) {
 }
 
 function initStudentSearchCombobox() {
-  const input = document.getElementById('siswa-search');
-  const list = document.getElementById('siswa-list');
+  const inputs = Array.from(document.querySelectorAll('input[data-student-search], #siswa-search'));
+  inputs.forEach(initStudentSearchInput);
+}
+
+function initStudentSearchInput(input) {
+  const listId = input.dataset.studentList || input.getAttribute('list') || 'siswa-list';
+  const list = document.getElementById(listId);
   if (!input || !list || input.dataset.studentComboboxReady === '1') return;
 
   const box = input.closest('.search-box');
@@ -286,6 +323,7 @@ function initStudentSearchCombobox() {
   input.addEventListener('input', function () {
     delete input.dataset.studentSelected;
     delete input.dataset.studentSuppressPanel;
+    syncStudentSearchQueryTarget(input, input.value);
     renderStudentSearchPanel(input);
   });
   input.addEventListener('focus', function () {
@@ -295,6 +333,26 @@ function initStudentSearchCombobox() {
     delete input.dataset.studentSuppressPanel;
     renderStudentSearchPanel(input, true);
   });
+  const classFilterSelector = input.dataset.studentClassFilter || '';
+  const classFilter = classFilterSelector ? document.querySelector(classFilterSelector) : null;
+  if (classFilter) {
+    classFilter.addEventListener('change', function () {
+      const current = input.value.trim();
+      const options = Array.from(list.options);
+      const selected = options.find(opt => current === opt.value || current === studentSearchOptionLabel(opt));
+      const selectedStillValid = !selected || studentSearchOptionsForClass(input, [selected]).length > 0;
+      if (!selectedStillValid) {
+        input.value = '';
+        delete input.dataset.studentSelected;
+        delete input.dataset.studentSuppressPanel;
+        syncStudentSearchQueryTarget(input, '');
+      }
+      if (document.activeElement === input) {
+        delete input.dataset.studentSuppressPanel;
+        renderStudentSearchPanel(input, true);
+      }
+    });
+  }
   input.addEventListener('keydown', function (event) {
     if (event.key === 'Escape') {
       closeStudentSearchPanel(input);
@@ -309,6 +367,25 @@ function initStudentSearchCombobox() {
   document.addEventListener('mousedown', function (event) {
     if (!box.contains(event.target)) closeStudentSearchPanel(input);
   });
+}
+
+function syncStudentSearchQueryTarget(input, value) {
+  const targetId = input.dataset.studentQueryTarget || '';
+  if (!targetId) return;
+  const target = document.getElementById(targetId);
+  if (!target) return;
+  const listId = input.dataset.studentList || input.getAttribute('list') || '';
+  const list = listId ? document.getElementById(listId) : null;
+  const typed = value || '';
+  const exact = list
+    ? Array.from(list.options).find(opt => typed === opt.value || typed === studentSearchOptionLabel(opt))
+    : null;
+  target.value = exact ? (exact.dataset.nis || exact.dataset.diknas || typed) : typed;
+}
+
+function selectReportStudentSearchOption(input, opt) {
+  input.value = studentSearchOptionLabel(opt);
+  syncStudentSearchQueryTarget(input, opt.dataset.nis || opt.dataset.diknas || input.value);
 }
 
 function applyDefaultDaftarUlangClass(opt) {
@@ -1479,6 +1556,8 @@ function closeReportDateRangePicker(picker) {
   const button = picker?.querySelector('.report-date-range-button');
   if (!popover || !button) return;
   popover.hidden = true;
+  picker.classList.remove('is-open');
+  picker.closest('.report-filter-card')?.classList.remove('is-date-picker-open');
   button.setAttribute('aria-expanded', 'false');
 }
 
@@ -1523,6 +1602,8 @@ function initReportDateRangePickers() {
       const willOpen = popover.hidden;
       document.querySelectorAll('[data-range-picker]').forEach(closeReportDateRangePicker);
       popover.hidden = !willOpen;
+      picker.classList.toggle('is-open', willOpen);
+      picker.closest('.report-filter-card')?.classList.toggle('is-date-picker-open', willOpen);
       button.setAttribute('aria-expanded', willOpen ? 'true' : 'false');
       if (willOpen) {
         syncInputsFromHidden();

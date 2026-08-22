@@ -9,6 +9,7 @@ requireRole(['admin', 'bendahara']);
 
 $filter_bulan = (int)($_GET['bulan'] ?? date('m'));
 $filter_tahun = (int)($_GET['tahun'] ?? date('Y'));
+$filter_q = mb_substr(trim((string)($_GET['q'] ?? '')), 0, 100);
 $dateParam = static function (string $key): string {
     $value = trim((string)($_GET[$key] ?? ''));
     return preg_match('/^\d{4}-\d{2}-\d{2}$/', $value) ? $value : '';
@@ -30,6 +31,18 @@ $period_start = $filter_tanggal_awal !== '' ? $filter_tanggal_awal . ' 00:00:00'
 $period_end = $filter_tanggal_akhir !== ''
     ? date('Y-m-d H:i:s', strtotime($filter_tanggal_akhir . ' +1 day'))
     : date('Y-m-d H:i:s', strtotime($period_start . ' +1 month'));
+$studentWhere = '';
+$studentParams = [];
+if ($filter_q !== '') {
+    $studentWhere = ' AND (s.NO_INDUK LIKE ? OR s.NAMA LIKE ? OR s.NO_induk_diknas LIKE ?)';
+    $studentLike = '%' . $filter_q . '%';
+    $studentParams = [$studentLike, $studentLike, $studentLike];
+}
+$bind = static function (mysqli_stmt $stmt, string $baseTypes, array $baseParams) use ($studentParams): void {
+    $types = $baseTypes . str_repeat('s', count($studentParams));
+    $params = array_merge($baseParams, $studentParams);
+    $stmt->bind_param($types, ...$params);
+};
 if ($filter_tanggal_awal !== '' && $filter_tanggal_akhir !== '') {
     $startTs = strtotime($filter_tanggal_awal);
     $endTs = strtotime($filter_tanggal_akhir);
@@ -51,10 +64,10 @@ $stmt = $koneksi->prepare("
            b.U_SPP, b.U_MAKAN, b.U_SORGA, b.U_INFAQ, b.U_KOMITE,
            b.sistem_pembayaran, b.total_jumlah, b.TGL_BYR
     FROM bayar b JOIN siswa s ON s.NO_INDUK = b.NO_INDUK
-    WHERE b.TGL_BYR >= ? AND b.TGL_BYR < ?
+    WHERE b.TGL_BYR >= ? AND b.TGL_BYR < ? $studentWhere
     ORDER BY b.TGL_BYR DESC
 ");
-$stmt->bind_param('ss', $period_start, $period_end);
+$bind($stmt, 'ss', [$period_start, $period_end]);
 $stmt->execute();
 $rows = $stmt->get_result()->fetch_all(MYSQLI_ASSOC);
 $stmt->close();
@@ -65,9 +78,10 @@ $stmtKomponen = $koneksi->prepare("
            SUM(U_SPP) AS spp, SUM(U_MAKAN) AS makan,
            SUM(U_SORGA) AS sorga, SUM(U_INFAQ) AS infaq,
            SUM(U_KOMITE) AS komite
-    FROM bayar WHERE TGL_BYR >= ? AND TGL_BYR < ?
+    FROM bayar b JOIN siswa s ON s.NO_INDUK = b.NO_INDUK
+    WHERE b.TGL_BYR >= ? AND b.TGL_BYR < ? $studentWhere
 ");
-$stmtKomponen->bind_param('ss', $period_start, $period_end);
+$bind($stmtKomponen, 'ss', [$period_start, $period_end]);
 $stmtKomponen->execute();
 $komponenTetap = $stmtKomponen->get_result()->fetch_assoc();
 $stmtKomponen->close();
@@ -88,10 +102,11 @@ foreach ($komponenMap as $nama => $key) {
 $stmtBiayaLain = $koneksi->prepare("
     SELECT d.nama_biaya_snapshot AS nama, SUM(d.nominal_snapshot) AS total
     FROM bayar_biaya_lain d JOIN bayar b ON b.id = d.bayar_id
-    WHERE b.TGL_BYR >= ? AND b.TGL_BYR < ?
+    JOIN siswa s ON s.NO_INDUK = b.NO_INDUK
+    WHERE b.TGL_BYR >= ? AND b.TGL_BYR < ? $studentWhere
     GROUP BY d.nama_biaya_snapshot ORDER BY d.nama_biaya_snapshot ASC
 ");
-$stmtBiayaLain->bind_param('ss', $period_start, $period_end);
+$bind($stmtBiayaLain, 'ss', [$period_start, $period_end]);
 $stmtBiayaLain->execute();
 $komponen_rows = array_merge($komponen_rows, $stmtBiayaLain->get_result()->fetch_all(MYSQLI_ASSOC));
 $stmtBiayaLain->close();
@@ -100,14 +115,16 @@ $stmtBiayaLain->close();
 $stmt2 = $koneksi->prepare("
     SELECT tm.NO_INDUK, s.NO_induk_diknas, s.NAMA, s.KELAS, tm.TANGGAL, tm.MASUK as nominal, 'masuk' as jenis
     FROM transaksi_m tm JOIN siswa s ON s.NO_INDUK = tm.NO_INDUK
-    WHERE tm.TANGGAL >= ? AND tm.TANGGAL < ?
+    WHERE tm.TANGGAL >= ? AND tm.TANGGAL < ? $studentWhere
     UNION ALL
     SELECT tk.NO_INDUK, s.NO_induk_diknas, s.NAMA, s.KELAS, tk.TANGGAL, tk.KELUAR as nominal, 'keluar' as jenis
     FROM transaksi_k tk JOIN siswa s ON s.NO_INDUK = tk.NO_INDUK
-    WHERE tk.TANGGAL >= ? AND tk.TANGGAL < ?
+    WHERE tk.TANGGAL >= ? AND tk.TANGGAL < ? $studentWhere
     ORDER BY TANGGAL DESC
 ");
-$stmt2->bind_param('ssss', $period_start, $period_end, $period_start, $period_end);
+$tabTypes = 'ssss' . str_repeat('s', count($studentParams) * 2);
+$tabParams = array_merge([$period_start, $period_end], $studentParams, [$period_start, $period_end], $studentParams);
+$stmt2->bind_param($tabTypes, ...$tabParams);
 $stmt2->execute();
 $tab_rows = $stmt2->get_result()->fetch_all(MYSQLI_ASSOC);
 $stmt2->close();
@@ -341,8 +358,8 @@ if ($download) {
 
 <?php if (!$download): ?>
 <div class="no-print">
-  <a class="primary" href="export_excel.php?bulan=<?= $filter_bulan ?>&tahun=<?= $filter_tahun ?>&tanggal_awal=<?= urlencode($filter_tanggal_awal) ?>&tanggal_akhir=<?= urlencode($filter_tanggal_akhir) ?>&download=1">Download Excel</a>
-  <a href="index.php?bulan=<?= $filter_bulan ?>&tahun=<?= $filter_tahun ?>&tanggal_awal=<?= urlencode($filter_tanggal_awal) ?>&tanggal_akhir=<?= urlencode($filter_tanggal_akhir) ?>">Kembali</a>
+  <a class="primary" href="export_excel.php?bulan=<?= $filter_bulan ?>&tahun=<?= $filter_tahun ?>&tanggal_awal=<?= urlencode($filter_tanggal_awal) ?>&tanggal_akhir=<?= urlencode($filter_tanggal_akhir) ?>&q=<?= urlencode($filter_q) ?>&download=1">Download Excel</a>
+  <a href="index.php?bulan=<?= $filter_bulan ?>&tahun=<?= $filter_tahun ?>&tanggal_awal=<?= urlencode($filter_tanggal_awal) ?>&tanggal_akhir=<?= urlencode($filter_tanggal_akhir) ?>&q=<?= urlencode($filter_q) ?>">Kembali</a>
 </div>
 <main class="preview-sheet">
 <?php endif; ?>

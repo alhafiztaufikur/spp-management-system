@@ -7,6 +7,7 @@ require_once '../koneksi.php';
 require_once '../includes/auth.php';
 require_once '../includes/pagination.php';
 require_once '../includes/daftar_ulang.php';
+require_once '../includes/kelas.php';
 requireRole(['admin', 'bendahara']);
 
 $flash = $_SESSION['flash'] ?? null;
@@ -84,6 +85,7 @@ $bln_names = [
 
 $filter_bulan = report_month_code($_GET['bulan'] ?? date('m'));
 $filter_tahun = preg_match('/^\d{4}$/', (string)($_GET['tahun'] ?? '')) ? (string)$_GET['tahun'] : date('Y');
+$filter_q = mb_substr(trim((string)($_GET['q'] ?? '')), 0, 100);
 $filter_tanggal = report_date_param('tanggal');
 $filter_tanggal_awal = report_date_param('tanggal_awal') ?: $filter_tanggal;
 $filter_tanggal_akhir = report_date_param('tanggal_akhir') ?: $filter_tanggal;
@@ -131,6 +133,29 @@ $periodLabel = report_transaction_date_label($filter_tanggal_awal, $filter_tangg
 $academicYear = report_academic_year($filter_bulan, $filter_tahun);
 
 $isUnpaidReport = in_array($report_type, ['belum_spp', 'belum_komite', 'belum_du', 'belum_biaya_lain'], true);
+$studentSearchSql = '';
+$studentSearchParams = [];
+if ($filter_q !== '') {
+    $studentSearchSql = ' AND (s.NO_INDUK LIKE ? OR s.NAMA LIKE ? OR s.NO_induk_diknas LIKE ?)';
+    $studentLike = '%' . $filter_q . '%';
+    $studentSearchParams = [$studentLike, $studentLike, $studentLike];
+}
+
+$studentOptions = $koneksi->query("
+    SELECT s.NO_INDUK, s.NO_induk_diknas, s.NAMA, s.KELAS,
+           mk.tingkat AS master_tingkat, mk.kode_rombel, mk.is_placeholder
+    FROM siswa s
+    LEFT JOIN master_kelas mk ON mk.id = s.master_kelas_id
+    WHERE s.is_active = 1
+    ORDER BY s.NAMA ASC
+")->fetch_all(MYSQLI_ASSOC);
+$studentSearchDisplay = $filter_q;
+foreach ($studentOptions as $studentOption) {
+    if ($filter_q !== '' && ($filter_q === $studentOption['NO_INDUK'] || $filter_q === (string)($studentOption['NO_induk_diknas'] ?? ''))) {
+        $studentSearchDisplay = $studentOption['NO_INDUK'] . ' - ' . $studentOption['NAMA'];
+        break;
+    }
+}
 
 // Rekap pembayaran pada tanggal/periode transaksi.
 $stmt = $koneksi->prepare("
@@ -146,9 +171,10 @@ $stmt = $koneksi->prepare("
            COALESCE(SUM(b.U_KOMITE), 0) AS komite,
            COALESCE(SUM(b.total_jumlah), 0) AS total
     FROM bayar b
-    WHERE b.TGL_BYR >= ? AND b.TGL_BYR < ?
+    JOIN siswa s ON s.NO_INDUK = b.NO_INDUK
+    WHERE b.TGL_BYR >= ? AND b.TGL_BYR < ? $studentSearchSql
 ");
-$stmt->bind_param('ss', $periodStart, $periodEnd);
+report_bind($stmt, 'ss' . str_repeat('s', count($studentSearchParams)), array_merge([$periodStart, $periodEnd], $studentSearchParams));
 $stmt->execute();
 $bayar_recap = $stmt->get_result()->fetch_assoc();
 $stmt->close();
@@ -157,11 +183,12 @@ $stmtBiayaLain = $koneksi->prepare("
     SELECT d.nama_biaya_snapshot AS nama, COALESCE(SUM(d.nominal_snapshot), 0) AS total
     FROM bayar_biaya_lain d
     JOIN bayar b ON b.id = d.bayar_id
-    WHERE b.TGL_BYR >= ? AND b.TGL_BYR < ?
+    JOIN siswa s ON s.NO_INDUK = b.NO_INDUK
+    WHERE b.TGL_BYR >= ? AND b.TGL_BYR < ? $studentSearchSql
     GROUP BY d.nama_biaya_snapshot
     ORDER BY d.nama_biaya_snapshot ASC
 ");
-$stmtBiayaLain->bind_param('ss', $periodStart, $periodEnd);
+report_bind($stmtBiayaLain, 'ss' . str_repeat('s', count($studentSearchParams)), array_merge([$periodStart, $periodEnd], $studentSearchParams));
 $stmtBiayaLain->execute();
 $rekap_biaya_lain = $stmtBiayaLain->get_result()->fetch_all(MYSQLI_ASSOC);
 $stmtBiayaLain->close();
@@ -170,26 +197,35 @@ $stmtDu = $koneksi->prepare("
     SELECT COALESCE(SUM(bd.jumlah), 0) AS total_du
     FROM bayar_du bd
     JOIN bayar b ON b.id = bd.bayar_id
-    WHERE b.TGL_BYR >= ? AND b.TGL_BYR < ?
+    JOIN siswa s ON s.NO_INDUK = b.NO_INDUK
+    WHERE b.TGL_BYR >= ? AND b.TGL_BYR < ? $studentSearchSql
 ");
-$stmtDu->bind_param('ss', $periodStart, $periodEnd);
+report_bind($stmtDu, 'ss' . str_repeat('s', count($studentSearchParams)), array_merge([$periodStart, $periodEnd], $studentSearchParams));
 $stmtDu->execute();
 $total_du_periode = (float)($stmtDu->get_result()->fetch_assoc()['total_du'] ?? 0);
 $stmtDu->close();
 
-$stmt2 = $koneksi->prepare("SELECT COALESCE(SUM(MASUK),0) AS total_masuk FROM transaksi_m WHERE TANGGAL >= ? AND TANGGAL < ?");
-$stmt2->bind_param('ss', $periodStart, $periodEnd);
+$stmt2 = $koneksi->prepare("SELECT COALESCE(SUM(tm.MASUK),0) AS total_masuk FROM transaksi_m tm JOIN siswa s ON s.NO_INDUK = tm.NO_INDUK WHERE tm.TANGGAL >= ? AND tm.TANGGAL < ? $studentSearchSql");
+report_bind($stmt2, 'ss' . str_repeat('s', count($studentSearchParams)), array_merge([$periodStart, $periodEnd], $studentSearchParams));
 $stmt2->execute();
 $tab_masuk = (float)$stmt2->get_result()->fetch_assoc()['total_masuk'];
 $stmt2->close();
 
-$stmt3 = $koneksi->prepare("SELECT COALESCE(SUM(KELUAR),0) AS total_keluar FROM transaksi_k WHERE TANGGAL >= ? AND TANGGAL < ?");
-$stmt3->bind_param('ss', $periodStart, $periodEnd);
+$stmt3 = $koneksi->prepare("SELECT COALESCE(SUM(tk.KELUAR),0) AS total_keluar FROM transaksi_k tk JOIN siswa s ON s.NO_INDUK = tk.NO_INDUK WHERE tk.TANGGAL >= ? AND tk.TANGGAL < ? $studentSearchSql");
+report_bind($stmt3, 'ss' . str_repeat('s', count($studentSearchParams)), array_merge([$periodStart, $periodEnd], $studentSearchParams));
 $stmt3->execute();
 $tab_keluar = (float)$stmt3->get_result()->fetch_assoc()['total_keluar'];
 $stmt3->close();
 
-$total_saldo = (float)$koneksi->query("SELECT COALESCE(SUM(SALDO),0) AS s FROM tabungan")->fetch_assoc()['s'];
+if ($filter_q === '') {
+    $total_saldo = (float)$koneksi->query("SELECT COALESCE(SUM(SALDO),0) AS s FROM tabungan")->fetch_assoc()['s'];
+} else {
+    $stmtSaldo = $koneksi->prepare("SELECT COALESCE(SUM(t.SALDO),0) AS s FROM tabungan t JOIN siswa s ON s.NO_INDUK = t.NO_INDUK WHERE 1=1 $studentSearchSql");
+    report_bind($stmtSaldo, str_repeat('s', count($studentSearchParams)), $studentSearchParams);
+    $stmtSaldo->execute();
+    $total_saldo = (float)($stmtSaldo->get_result()->fetch_assoc()['s'] ?? 0);
+    $stmtSaldo->close();
+}
 
 $bayar_detail = [];
 $unpaid_rows = [];
@@ -203,6 +239,11 @@ if (!$isUnpaidReport) {
     $detailParams = [$periodStart, $periodEnd];
     if ($report_type === 'sudah_bayar') {
         $whereDetail .= ' AND b.total_jumlah > 0';
+    }
+    if ($filter_q !== '') {
+        $whereDetail .= $studentSearchSql;
+        $detailTypes .= str_repeat('s', count($studentSearchParams));
+        $detailParams = array_merge($detailParams, $studentSearchParams);
     }
 
     $orderSql = match ($sort) {
@@ -270,13 +311,13 @@ if (!$isUnpaidReport) {
                     ON b.NO_INDUK = s.NO_INDUK
                     AND b.TAHUN = ?
                     AND (b.BULAN = ? OR b.BULAN = ? OR b.BULAN = ?)
-                WHERE s.is_active = 1 AND s.$studentBillColumn > 0
+                WHERE s.is_active = 1 AND s.$studentBillColumn > 0 $studentSearchSql
                 GROUP BY s.NO_INDUK, s.NO_induk_diknas, s.NAMA, s.KELAS, s.$studentBillColumn
             ) unpaid
             WHERE sisa > 0
             ORDER BY $orderUnpaid
         ");
-        $stmtUnpaid->bind_param('ssss', $filter_tahun, $periodMonthCode, $periodMonthName, $periodMonthLegacy);
+        report_bind($stmtUnpaid, 'ssss' . str_repeat('s', count($studentSearchParams)), array_merge([$filter_tahun, $periodMonthCode, $periodMonthName, $periodMonthLegacy], $studentSearchParams));
     } elseif ($report_type === 'belum_du') {
         $stmtUnpaid = $koneksi->prepare("
             SELECT *
@@ -288,13 +329,13 @@ if (!$isUnpaidReport) {
                 FROM tagihan_daftar_ulang tdu
                 JOIN siswa s ON s.NO_INDUK = tdu.no_induk
                 LEFT JOIN bayar_du bd ON bd.tagihan_daftar_ulang_id = tdu.id
-                WHERE s.is_active = 1 AND tdu.tahun_ajaran_snapshot = ? AND tdu.nominal_tagihan > 0
+                WHERE s.is_active = 1 AND tdu.tahun_ajaran_snapshot = ? AND tdu.nominal_tagihan > 0 $studentSearchSql
                 GROUP BY s.NO_INDUK, s.NO_induk_diknas, s.NAMA, s.KELAS, tdu.nominal_tagihan
             ) unpaid
             WHERE sisa > 0
             ORDER BY $orderUnpaid
         ");
-        $stmtUnpaid->bind_param('s', $academicYear);
+        report_bind($stmtUnpaid, 's' . str_repeat('s', count($studentSearchParams)), array_merge([$academicYear], $studentSearchParams));
     } else {
         $stmtUnpaid = $koneksi->prepare("
             SELECT *
@@ -308,12 +349,13 @@ if (!$isUnpaidReport) {
                 JOIN master_biaya_lain m ON m.is_active = 1
                 LEFT JOIN bayar b ON b.NO_INDUK = s.NO_INDUK
                 LEFT JOIN bayar_biaya_lain d ON d.bayar_id = b.id AND d.master_biaya_lain_id = m.id
-                WHERE s.is_active = 1
+                WHERE s.is_active = 1 $studentSearchSql
                 GROUP BY s.NO_INDUK, s.NO_induk_diknas, s.NAMA, s.KELAS, m.id, m.nama, m.nominal
             ) unpaid
             WHERE sisa > 0
             ORDER BY $orderUnpaid
         ");
+        report_bind($stmtUnpaid, str_repeat('s', count($studentSearchParams)), $studentSearchParams);
     }
     $stmtUnpaid->execute();
     $unpaid_rows = $stmtUnpaid->get_result()->fetch_all(MYSQLI_ASSOC);
@@ -326,6 +368,7 @@ $laporanPaginationQuery = pagination_query([
     'tahun' => $filter_tahun,
     'tanggal_awal' => $filter_tanggal_awal,
     'tanggal_akhir' => $filter_tanggal_akhir,
+    'q' => $filter_q,
     'jenis_laporan' => $report_type,
     'urut' => $sort,
     'per_page' => $perPage,
@@ -335,6 +378,7 @@ $exportQuery = http_build_query([
     'tahun' => $filter_tahun,
     'tanggal_awal' => $filter_tanggal_awal,
     'tanggal_akhir' => $filter_tanggal_akhir,
+    'q' => $filter_q,
 ]);
 ?>
 <!DOCTYPE html>
@@ -347,7 +391,7 @@ $exportQuery = http_build_query([
   <link rel="preconnect" href="https://fonts.googleapis.com" />
   <link href="https://fonts.googleapis.com/css2?family=Inter:wght@300;400;500;600;700;800&display=swap" rel="stylesheet" />
   <script>(function(){var t=localStorage.getItem('spp_theme')||'dark';document.documentElement.setAttribute('data-theme',t);})();</script>
-  <link rel="stylesheet" href="../assets/css/style.css?v=6.4" />
+  <link rel="stylesheet" href="../assets/css/style.css?v=7.4" />
 </head>
 <body>
 <div class="bg-orbs"><div class="orb orb-1"></div><div class="orb orb-2"></div><div class="orb orb-3"></div></div>
@@ -374,8 +418,14 @@ $exportQuery = http_build_query([
       </div>
       <?php endif; ?>
 
-      <div class="main-card report-filter-card" style="margin-bottom:16px;">
-        <form method="GET" class="report-filter-grid">
+      <section class="main-card class-recap-card recap-report-shell report-general-shell" style="margin-bottom:16px;">
+        <div class="recap-report-header">
+          <div class="recap-report-copy">
+            <span class="recap-class-overline">Laporan Umum</span>
+            <h1>Rekap Laporan Keuangan</h1>
+            <p><?= report_e($reportTypes[$report_type]) ?> untuk periode <?= report_e($periodLabel) ?>.</p>
+          </div>
+        <form method="GET" class="recap-header-controls report-filter-card report-general-filter report-filter-grid">
           <div class="field-row report-date-range-field">
             <label class="field-label">Tanggal transaksi</label>
             <div class="report-date-range-control report-date-range-picker" data-range-picker data-empty-label="<?= report_e($periodLabel) ?>">
@@ -448,6 +498,26 @@ $exportQuery = http_build_query([
               <?php endforeach; ?>
             </select>
           </div>
+          <div class="field-row full-span">
+            <label class="field-label" for="report-siswa-search">Cari Siswa (Nama / NIS / NIS Diknas)</label>
+            <div class="search-box">
+              <svg width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.5" stroke-linecap="round" stroke-linejoin="round"><circle cx="11" cy="11" r="8"/><line x1="21" y1="21" x2="16.65" y2="16.65"/></svg>
+              <input type="text" id="report-siswa-search" data-student-search data-student-list="report-siswa-list" data-student-select-callback="selectReportStudentSearchOption" data-student-query-target="report-student-query" value="<?= report_e($studentSearchDisplay) ?>" placeholder="Ketik nama, NIS, atau NIS Diknas..." autocomplete="off">
+              <input type="hidden" id="report-student-query" name="q" value="<?= report_e($filter_q) ?>">
+            </div>
+            <datalist id="report-siswa-list">
+              <?php foreach ($studentOptions as $studentOption): ?>
+              <?php $studentClassLabel = class_label(['tingkat' => $studentOption['master_tingkat'] ?: $studentOption['KELAS'], 'kode_rombel' => $studentOption['kode_rombel'] ?? 'BELUM', 'is_placeholder' => $studentOption['is_placeholder'] ?? 1]); ?>
+              <option value="<?= report_e($studentOption['NO_INDUK']) ?> - <?= report_e($studentOption['NAMA']) ?>"
+                data-nis="<?= report_e($studentOption['NO_INDUK']) ?>"
+                data-diknas="<?= report_e((string)($studentOption['NO_induk_diknas'] ?? '')) ?>"
+                data-nama="<?= report_e($studentOption['NAMA']) ?>"
+                data-kelas="<?= report_e($studentClassLabel) ?>">
+                <?= report_e($studentOption['NAMA']) ?> (<?= report_e($studentClassLabel) ?>)
+              </option>
+              <?php endforeach; ?>
+            </datalist>
+          </div>
           <div class="report-filter-actions">
             <button type="submit" class="btn btn-primary">Tampilkan</button>
             <a href="index.php" class="btn btn-ghost">Reset</a>
@@ -458,7 +528,8 @@ $exportQuery = http_build_query([
             <a href="export_pdf.php?<?= report_e($exportQuery) ?>" class="btn btn-warning">Export PDF</a>
           </div>
         </form>
-      </div>
+        </div>
+      </section>
 
       <div class="stats-grid report-stats-grid" style="margin-bottom:8px;">
         <div class="stat-card stat-blue">
@@ -561,6 +632,7 @@ $exportQuery = http_build_query([
           <input type="hidden" name="tahun" value="<?= report_e($filter_tahun) ?>">
           <input type="hidden" name="tanggal_awal" value="<?= report_e($filter_tanggal_awal) ?>">
           <input type="hidden" name="tanggal_akhir" value="<?= report_e($filter_tanggal_akhir) ?>">
+          <input type="hidden" name="q" value="<?= report_e($filter_q) ?>">
           <input type="hidden" name="mode" value="selected">
           <div class="table-container">
             <table class="payment-table" id="tbl-laporan">
@@ -599,7 +671,7 @@ $exportQuery = http_build_query([
 </div>
 
 <div class="toast" id="toast"><span id="toast-icon"></span><span id="toast-msg"></span></div>
-<script src="../assets/js/app.js?v=6.4"></script>
+<script src="../assets/js/app.js?v=7.2"></script>
 <script>
 document.addEventListener('DOMContentLoaded', function(){
   autoHideFlash();

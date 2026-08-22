@@ -285,6 +285,11 @@ FROM (
       AND CONSTRAINT_NAME='chk_tagihan_du_kelas'
   )
   UNION ALL
+  SELECT 'chk_tabungan_saldo_nonnegative', EXISTS(
+    SELECT 1 FROM information_schema.CHECK_CONSTRAINTS WHERE CONSTRAINT_SCHEMA=DATABASE()
+      AND CONSTRAINT_NAME='chk_tabungan_saldo_nonnegative'
+  )
+  UNION ALL
   SELECT 'fk_bayar_du_tagihan', EXISTS(
     SELECT 1 FROM information_schema.TABLE_CONSTRAINTS WHERE CONSTRAINT_SCHEMA=DATABASE()
       AND TABLE_NAME='bayar_du' AND CONSTRAINT_NAME='fk_bayar_du_tagihan' AND CONSTRAINT_TYPE='FOREIGN KEY'

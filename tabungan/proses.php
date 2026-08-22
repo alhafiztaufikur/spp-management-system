@@ -49,12 +49,22 @@ try {
     $saldo = (float)($res['SALDO'] ?? 0);
     $stmt->close();
 
+    if ($aksi === 'keluar' && $saldo <= 0) {
+        throw new Exception('Saldo tabungan kosong. Penarikan tidak bisa diproses.');
+    }
+
     if ($aksi === 'keluar' && $nominal > $saldo) {
-        throw new Exception('Nominal penarikan melebihi saldo tabungan! Saldo: Rp ' . number_format($saldo, 0, ',', '.'));
+        throw new Exception('Nominal penarikan melebihi saldo tabungan! Saldo: Rp ' . number_format(max($saldo, 0), 0, ',', '.'));
     }
 
     // 2) Hitung saldo baru
     $saldo_baru = ($aksi === 'masuk') ? $saldo + $nominal : $saldo - $nominal;
+    if ($saldo_baru < -0.001) {
+        throw new Exception('Transaksi ditolak karena akan membuat saldo tabungan minus.');
+    }
+    if ($saldo_baru < 0) {
+        $saldo_baru = 0;
+    }
 
     // 3) Upsert tabel tabungan
     $stmt2 = $koneksi->prepare(

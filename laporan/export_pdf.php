@@ -10,6 +10,7 @@ requireRole(['admin', 'bendahara']);
 
 $filter_bulan = (int)($_GET['bulan'] ?? date('m'));
 $filter_tahun = (int)($_GET['tahun'] ?? date('Y'));
+$filter_q = mb_substr(trim((string)($_GET['q'] ?? '')), 0, 100);
 $dateParam = static function (string $key): string {
     $value = trim((string)($_GET[$key] ?? ''));
     return preg_match('/^\d{4}-\d{2}-\d{2}$/', $value) ? $value : '';
@@ -32,7 +33,7 @@ $selected_ids = array_values(array_unique(array_filter(array_map('intval', $sele
 
 if ($selected_mode && !$selected_ids) {
     $_SESSION['flash'] = ['type' => 'error', 'msg' => 'Pilih minimal satu transaksi untuk dicetak.'];
-    header('Location: index.php?bulan=' . urlencode((string)$filter_bulan) . '&tahun=' . urlencode((string)$filter_tahun) . '&tanggal_awal=' . urlencode($filter_tanggal_awal) . '&tanggal_akhir=' . urlencode($filter_tanggal_akhir));
+    header('Location: index.php?bulan=' . urlencode((string)$filter_bulan) . '&tahun=' . urlencode((string)$filter_tahun) . '&tanggal_awal=' . urlencode($filter_tanggal_awal) . '&tanggal_akhir=' . urlencode($filter_tanggal_akhir) . '&q=' . urlencode($filter_q));
     exit;
 }
 
@@ -114,6 +115,12 @@ $period_end = $filter_tanggal_akhir !== ''
 $where_sql = 'WHERE b.TGL_BYR >= ? AND b.TGL_BYR < ?';
 $types = 'ss';
 $params = [$period_start, $period_end];
+if ($filter_q !== '') {
+    $where_sql .= ' AND (s.NO_INDUK LIKE ? OR s.NAMA LIKE ? OR s.NO_induk_diknas LIKE ?)';
+    $types .= 'sss';
+    $studentLike = '%' . $filter_q . '%';
+    array_push($params, $studentLike, $studentLike, $studentLike);
+}
 if ($selected_ids) {
     $where_sql .= ' AND b.id IN (' . implode(',', array_fill(0, count($selected_ids), '?')) . ')';
     $types .= str_repeat('i', count($selected_ids));
@@ -169,7 +176,7 @@ $stmt->close();
 
 if ($selected_mode && !$rows) {
     $_SESSION['flash'] = ['type' => 'error', 'msg' => 'Transaksi yang dipilih tidak ditemukan pada periode ini.'];
-    header('Location: index.php?bulan=' . urlencode((string)$filter_bulan) . '&tahun=' . urlencode((string)$filter_tahun) . '&tanggal_awal=' . urlencode($filter_tanggal_awal) . '&tanggal_akhir=' . urlencode($filter_tanggal_akhir));
+    header('Location: index.php?bulan=' . urlencode((string)$filter_bulan) . '&tahun=' . urlencode((string)$filter_tahun) . '&tanggal_awal=' . urlencode($filter_tanggal_awal) . '&tanggal_akhir=' . urlencode($filter_tanggal_akhir) . '&q=' . urlencode($filter_q));
     exit;
 }
 

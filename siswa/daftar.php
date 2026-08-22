@@ -450,7 +450,7 @@ $canEditOpening = !$editStudent || (int)($editStudent['history_count'] ?? 0) ===
   <link rel="icon" type="image/png" href="../assets/img/favicon.png" />
   <link rel="preconnect" href="https://fonts.googleapis.com" />
   <link href="https://fonts.googleapis.com/css2?family=Inter:wght@300;400;500;600;700;800&display=swap" rel="stylesheet" />
-  <link rel="stylesheet" href="../assets/css/style.css?v=4.7" />
+  <link rel="stylesheet" href="../assets/css/style.css?v=8.1" />
   <script>(function(){var t=localStorage.getItem('spp_theme')||'dark';document.documentElement.setAttribute('data-theme',t);})();</script>
 </head>
 <body>
@@ -470,7 +470,22 @@ $canEditOpening = !$editStudent || (int)($editStudent['history_count'] ?? 0) ===
       <div class="alert alert-<?= htmlspecialchars($flash['type']) ?>" id="flash-msg"><?= htmlspecialchars($flash['msg']) ?></div>
       <?php endif; ?>
 
-      <div class="main-card">
+      <section class="main-card master-modern-shell student-master-shell">
+        <div class="master-modern-hero">
+          <div>
+            <span class="recap-class-overline">Data Master</span>
+            <h1>Data Siswa</h1>
+            <p>Kelola identitas siswa, rombel, tarif, saldo awal legacy, dan status aktif siswa.</p>
+          </div>
+          <div class="master-modern-stats">
+            <div><span>Hasil Filter</span><strong><?= number_format($totalStudents) ?></strong></div>
+            <div><span>Per Halaman</span><strong><?= number_format($perPage) ?></strong></div>
+            <div><span>Halaman</span><strong><?= number_format($page) ?>/<?= number_format($totalPages) ?></strong></div>
+          </div>
+        </div>
+      </section>
+
+      <div class="main-card master-modern-card master-modern-form">
         <div class="card-title-row">
           <div class="card-title"><?= $editStudent ? 'Edit Siswa' : 'Tambah Siswa Baru' ?></div>
           <?php if ($editStudent): ?><span class="master-status <?= $editStudent['is_active'] ? 'is-active' : 'is-inactive' ?>"><?= $editStudent['is_active'] ? 'Aktif' : 'Diarsipkan' ?></span><?php endif; ?>
@@ -492,12 +507,35 @@ $canEditOpening = !$editStudent || (int)($editStudent['history_count'] ?? 0) ===
             </div>
             <div class="field-row">
               <label class="field-label" for="kelas-baru">Kelas/Rombel</label>
-              <select class="field-input field-select" id="kelas-baru" name="master_kelas_id" required>
-                <option value="">-- Pilih Kelas/Rombel --</option>
-                <?php $selectedClassId = (int)form_student_value('master_kelas_id', $oldInput, $formStudent, $fieldMap, 0); foreach ($classOptions as $classOption): ?>
-                <option value="<?= (int)$classOption['id'] ?>" <?= $selectedClassId === (int)$classOption['id'] ? 'selected' : '' ?>><?= htmlspecialchars($classOption['label']) ?></option>
-                <?php endforeach; ?>
-              </select>
+              <?php
+                $selectedClassId = (int)form_student_value('master_kelas_id', $oldInput, $formStudent, $fieldMap, 0);
+                $selectedClassLabel = '';
+                foreach ($classOptions as $classOption) {
+                    if ($selectedClassId === (int)$classOption['id']) {
+                        $selectedClassLabel = (string)$classOption['label'];
+                        break;
+                    }
+                }
+              ?>
+              <input type="hidden" id="kelas-baru" name="master_kelas_id" value="<?= $selectedClassId > 0 ? $selectedClassId : '' ?>" />
+              <div class="class-picker" data-class-picker>
+                <button class="field-input class-picker-button" type="button" data-class-picker-button aria-haspopup="listbox" aria-expanded="false">
+                  <span data-class-picker-label><?= htmlspecialchars($selectedClassLabel !== '' ? $selectedClassLabel : '-- Pilih Kelas/Rombel --') ?></span>
+                  <svg width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.4" stroke-linecap="round" stroke-linejoin="round"><polyline points="6 9 12 15 18 9"/></svg>
+                </button>
+                <div class="class-picker-panel" data-class-picker-panel hidden role="listbox">
+                  <?php foreach ($classOptions as $classOption): ?>
+                  <button type="button" class="class-picker-option <?= $selectedClassId === (int)$classOption['id'] ? 'is-selected' : '' ?>"
+                    data-class-picker-option
+                    data-value="<?= (int)$classOption['id'] ?>"
+                    data-label="<?= htmlspecialchars($classOption['label'], ENT_QUOTES, 'UTF-8') ?>"
+                    role="option"
+                    aria-selected="<?= $selectedClassId === (int)$classOption['id'] ? 'true' : 'false' ?>">
+                    <?= htmlspecialchars($classOption['label']) ?>
+                  </button>
+                  <?php endforeach; ?>
+                </div>
+              </div>
               <small class="payment-auto-note">Kelola pilihan melalui menu Master Kelas.</small>
             </div>
           </div>
@@ -585,7 +623,7 @@ $canEditOpening = !$editStudent || (int)($editStudent['history_count'] ?? 0) ===
         </form>
       </div>
 
-      <div class="main-card" style="margin-top:0">
+      <div class="main-card master-modern-card master-modern-list" style="margin-top:0">
         <div class="card-title-row"><div class="card-title">Daftar Siswa (<?= number_format($totalStudents) ?>)</div></div>
         <form method="GET" action="daftar.php" class="filter-bar student-filter-bar">
           <div class="search-box">
@@ -662,10 +700,52 @@ $canEditOpening = !$editStudent || (int)($editStudent['history_count'] ?? 0) ===
         document.getElementById('student-total-pangkal').value = format(Math.max(0, number('student-pangkal') - number('student-potong-pangkal')));
         document.getElementById('student-total-du').value = format(Math.max(0, number('student-daftar_ulang') - number('student-potong-du')));
       };
+      const classPicker = document.querySelector('[data-class-picker]');
+      const classInput = document.getElementById('kelas-baru');
+      const classButton = classPicker?.querySelector('[data-class-picker-button]');
+      const classPanel = classPicker?.querySelector('[data-class-picker-panel]');
+      const classLabel = classPicker?.querySelector('[data-class-picker-label]');
+      const closeClassPicker = () => {
+        if (!classPicker || !classPanel || !classButton) return;
+        classPicker.classList.remove('is-open');
+        classPanel.hidden = true;
+        classButton.setAttribute('aria-expanded', 'false');
+      };
+      classButton?.addEventListener('click', function () {
+        const open = !classPicker.classList.contains('is-open');
+        classPicker.classList.toggle('is-open', open);
+        classPanel.hidden = !open;
+        classButton.setAttribute('aria-expanded', open ? 'true' : 'false');
+      });
+      classPicker?.querySelectorAll('[data-class-picker-option]').forEach(option => {
+        option.addEventListener('click', function () {
+          classInput.value = this.dataset.value || '';
+          classLabel.textContent = this.dataset.label || '-- Pilih Kelas/Rombel --';
+          classPicker.querySelectorAll('[data-class-picker-option]').forEach(item => {
+            const selected = item === this;
+            item.classList.toggle('is-selected', selected);
+            item.setAttribute('aria-selected', selected ? 'true' : 'false');
+          });
+          closeClassPicker();
+        });
+      });
+      document.addEventListener('click', function (event) {
+        if (classPicker && !classPicker.contains(event.target)) closeClassPicker();
+      });
+      document.addEventListener('keydown', function (event) {
+        if (event.key === 'Escape') closeClassPicker();
+      });
       const syncPanel = () => panel.classList.toggle('is-open', toggle.checked);
       toggle.addEventListener('change', syncPanel);
       moneyInputs.forEach(input => input.addEventListener('input', function () { this.value = format(this.value); updateDerived(); }));
-      document.getElementById('form-master-siswa').addEventListener('submit', function () {
+      document.getElementById('form-master-siswa').addEventListener('submit', function (event) {
+        if (!classInput.value) {
+          event.preventDefault();
+          classButton?.focus();
+          classPicker?.classList.add('has-error');
+          return;
+        }
+        classPicker?.classList.remove('has-error');
         if (toggle.checked) moneyInputs.forEach(input => input.value = input.value.replace(/\./g, ''));
       });
       syncPanel();

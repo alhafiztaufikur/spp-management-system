@@ -125,7 +125,7 @@ unset($_SESSION['flash']);
   <meta name="description" content="Form input transaksi pembayaran siswa." />
   <link rel="preconnect" href="https://fonts.googleapis.com" />
   <link href="https://fonts.googleapis.com/css2?family=Inter:wght@300;400;500;600;700;800&display=swap" rel="stylesheet" />
-  <link rel="stylesheet" href="../assets/css/style.css?v=5.9" />
+  <link rel="stylesheet" href="../assets/css/style.css?v=8.0" />
   <!-- Prevent theme flash -->
   <script>(function(){var t=localStorage.getItem('spp_theme')||'dark';document.documentElement.setAttribute('data-theme',t);})();</script>
 </head>
@@ -247,27 +247,6 @@ unset($_SESSION['flash']);
                 </div>
                 <strong id="totalJumlah">Rp 0</strong>
                 <input type="hidden" name="total_jumlah" id="hidden-total" value="0" />
-              </div>
-              <div class="payment-year-summary-heading">
-                <span>Ringkasan Tahun Ajaran</span>
-                <span class="payment-help-wrap">
-                  <button class="payment-help" type="button" aria-label="Penjelasan tahun ajaran" aria-describedby="payment-year-tooltip">?</button>
-                  <span class="payment-help-tooltip" id="payment-year-tooltip" role="tooltip">Tahun ajaran berjalan Juli sampai Juni. Januari 2026 termasuk TA 2025/2026, sedangkan Desember 2026 termasuk TA 2026/2027.</span>
-                </span>
-              </div>
-              <div class="payment-year-summary">
-                <div class="payment-year-card">
-                  <span id="academic-total-label">Total Tagihan TA <?= htmlspecialchars($activeAcademicYear) ?></span>
-                  <strong id="academic-total-value">Rp 0</strong>
-                </div>
-                <div class="payment-year-card">
-                  <span>Sudah Terbayar</span>
-                  <strong id="academic-paid-value">Rp 0</strong>
-                </div>
-                <div class="payment-year-card is-remaining">
-                  <span>Sisa Tagihan</span>
-                  <strong id="academic-remaining-value">Rp 0</strong>
-                </div>
               </div>
             </section>
           </div>

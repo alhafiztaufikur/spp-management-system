@@ -12,7 +12,7 @@ require_once 'includes/auth.php';
 requireRole(['admin', 'bendahara']);
 require_once 'includes/reports.php';
 
-// Data Rekap Setoran Hari Ini
+// Data Rekap Penerimaan Hari Ini
 $todayDate = date('Y-m-d');
 $setoranFilters = [
     'tanggal_awal' => $todayDate,
@@ -31,20 +31,40 @@ $setoranFilters = [
     'tahun_ajaran' => du_current_academic_year()
 ];
 
-// Calculate cash breakdown via reports logic
-$setoranData = report_settlement_data($koneksi, $setoranFilters);
-$setoranRows = $setoranData['rows'] ?? [];
+$paymentComponents = report_payment_components($koneksi, $setoranFilters);
+$paymentComponents = array_values(array_filter($paymentComponents, static fn($row) => ($row['kategori_key'] ?? '') !== 'potongan'));
+$totalPembayaran = array_sum(array_map(static fn($row) => (float)($row['nominal'] ?? 0), $paymentComponents));
+$jumlahTransaksi = count(array_unique(array_column($paymentComponents, 'id')));
 
-// Calculate Dashboard Visual Metrics
-$pendapatanTunai = (float)($setoranRows[0]['nominal'] ?? 0);
-$va = (float)($setoranRows[1]['nominal'] ?? 0);
-$qris = (float)($setoranRows[2]['nominal'] ?? 0);
-$tabunganMasuk = (float)($setoranRows[3]['nominal'] ?? 0);
+$startToday = $todayDate . ' 00:00:00';
+$endToday = date('Y-m-d H:i:s', strtotime($todayDate . ' +1 day'));
+$savingTransactions = report_savings_transactions($koneksi, $startToday, $endToday, $setoranFilters);
+$tabunganMasuk = array_sum(array_map(static fn($row) => (float)($row['masuk'] ?? 0), $savingTransactions));
+$tabunganKeluar = array_sum(array_map(static fn($row) => (float)($row['keluar'] ?? 0), $savingTransactions));
+$totalPenerimaan = $totalPembayaran + $tabunganMasuk - $tabunganKeluar;
 
-$jumlahTransaksi = (int)($setoranData['settlement']['payment_count'] ?? 0);
-$totalPenerimaanKotor = $pendapatanTunai + $va + $qris + $tabunganMasuk;
-$tunaiDiterima = $pendapatanTunai + $tabunganMasuk;
-$kasFisik = (float)($setoranData['settlement']['cash'] ?? 0);
+$rekapHarianRows = [
+    ['label' => 'Transaksi Pembayaran', 'desc' => 'Semua pembayaran siswa hari ini', 'nominal' => $totalPembayaran, 'kind' => 'payment', 'icon' => 'card'],
+    ['label' => 'Tabungan Masuk', 'desc' => 'Setoran tabungan yang diterima', 'nominal' => $tabunganMasuk, 'kind' => 'saving-in', 'icon' => 'up'],
+    ['label' => 'Tabungan Keluar', 'desc' => 'Penarikan tabungan siswa', 'nominal' => $tabunganKeluar, 'kind' => 'saving-out', 'icon' => 'down'],
+    ['label' => 'Total Penerimaan', 'desc' => 'Pembayaran + masuk - keluar', 'nominal' => $totalPenerimaan, 'kind' => 'total', 'icon' => 'total'],
+];
+$bulanIndo = [
+    '01' => 'Januari',
+    '02' => 'Februari',
+    '03' => 'Maret',
+    '04' => 'April',
+    '05' => 'Mei',
+    '06' => 'Juni',
+    '07' => 'Juli',
+    '08' => 'Agustus',
+    '09' => 'September',
+    '10' => 'Oktober',
+    '11' => 'November',
+    '12' => 'Desember',
+];
+$todayLabel = date('d') . ' ' . ($bulanIndo[date('m')] ?? date('F')) . ' ' . date('Y');
+$exportSetoranUrl = 'laporan/export_global.php?template=setoran&format=excel&tanggal_awal=' . $todayDate . '&tanggal_akhir=' . $todayDate . '&kategori=semua';
 
 ?>
 <!DOCTYPE html>
@@ -57,7 +77,7 @@ $kasFisik = (float)($setoranData['settlement']['cash'] ?? 0);
   <meta name="description" content="Dashboard admin sistem pembayaran SPP sekolah. Fokus rekap harian." />
   <link rel="preconnect" href="https://fonts.googleapis.com" />
   <link href="https://fonts.googleapis.com/css2?family=Inter:wght@300;400;500;600;700;800&display=swap" rel="stylesheet" />
-  <link rel="stylesheet" href="assets/css/style.css?v=4.8" />
+  <link rel="stylesheet" href="assets/css/style.css?v=7.6" />
   <!-- Prevent theme flash -->
   <script>(function(){var t=localStorage.getItem('spp_theme')||'dark';document.documentElement.setAttribute('data-theme',t);})();</script>
 </head>
@@ -87,108 +107,112 @@ $kasFisik = (float)($setoranData['settlement']['cash'] ?? 0);
         <div class="clock-badge" id="liveClock">--:--:--</div>
       </div>
 
-      <!-- Stats Cards (Daily Focus) -->
-      <div class="stats-grid">
-        <div class="stat-card stat-blue">
-          <div class="stat-icon">
-            <svg width="22" height="22" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><rect x="2" y="5" width="20" height="14" rx="2"/><line x1="2" y1="10" x2="22" y2="10"/></svg>
+      <section class="dashboard-closing-shell">
+        <div class="dashboard-closing-hero">
+          <div class="dashboard-total-card">
+            <span class="dashboard-eyebrow">Dashboard Closing</span>
+            <h1>Ringkasan Hari Ini</h1>
+            <p><?= $todayLabel ?></p>
+            <div class="dashboard-total-value"><?= report_money($totalPenerimaan) ?></div>
+            <div class="dashboard-total-meta">
+              <span><?= number_format($jumlahTransaksi) ?> transaksi</span>
+              <span>Total bersih</span>
+            </div>
           </div>
-          <div class="stat-info">
-            <span class="stat-value"><?= number_format($jumlahTransaksi) ?></span>
-            <span class="stat-label">Transaksi Hari Ini</span>
-          </div>
-        </div>
-        <div class="stat-card stat-purple">
-          <div class="stat-icon">
-            <svg width="22" height="22" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><line x1="12" y1="1" x2="12" y2="23"/><path d="M17 5H9.5a3.5 3.5 0 0 0 0 7h5a3.5 3.5 0 0 1 0 7H6"/></svg>
-          </div>
-          <div class="stat-info">
-            <span class="stat-value">Rp <?= number_format($totalPenerimaanKotor, 0, ',', '.') ?></span>
-            <span class="stat-label">Total Penerimaan</span>
-          </div>
-        </div>
-        <div class="stat-card stat-green">
-          <div class="stat-icon">
-            <svg width="22" height="22" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><path d="M17 21v-2a4 4 0 0 0-4-4H5a4 4 0 0 0-4 4v2"/><circle cx="9" cy="7" r="4"/><path d="M23 21v-2a4 4 0 0 0-3-3.87"/><path d="M16 3.13a4 4 0 0 1 0 7.75"/></svg>
-          </div>
-          <div class="stat-info">
-            <span class="stat-value">Rp <?= number_format($tunaiDiterima, 0, ',', '.') ?></span>
-            <span class="stat-label">Tunai Diterima</span>
-          </div>
-        </div>
-        <div class="stat-card stat-orange">
-          <div class="stat-icon">
-            <svg width="22" height="22" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><rect x="3" y="4" width="18" height="18" rx="2" ry="2"/><line x1="16" y1="2" x2="16" y2="6"/><line x1="8" y1="2" x2="8" y2="6"/><line x1="3" y1="10" x2="21" y2="10"/></svg>
-          </div>
-          <div class="stat-info">
-            <span class="stat-value">Rp <?= number_format($kasFisik, 0, ',', '.') ?></span>
-            <span class="stat-label">Kas Disetorkan</span>
-          </div>
-        </div>
-      </div>
 
-      <!-- Quick Actions -->
-      <div class="quick-actions">
-        <a href="pembayaran/form.php" class="quick-btn">
-          <svg width="18" height="18" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><circle cx="12" cy="12" r="10"/><line x1="12" y1="8" x2="12" y2="16"/><line x1="8" y1="12" x2="16" y2="12"/></svg>
-          Input Pembayaran
-        </a>
-        <a href="tabungan/riwayat.php" class="quick-btn quick-btn-ghost">
-          <svg width="18" height="18" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><line x1="12" y1="1" x2="12" y2="23"/><path d="M17 5H9.5a3.5 3.5 0 0 0 0 7h5a3.5 3.5 0 0 1 0 7H6"/></svg>
-          Riwayat Tabungan
-        </a>
-        <a href="laporan/template.php?template=setoran" class="quick-btn quick-btn-ghost">
-          <svg width="18" height="18" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><path d="M14 2H6a2 2 0 0 0-2 2v16a2 2 0 0 0 2 2h12a2 2 0 0 0 2-2V8z"/><polyline points="14 2 14 8 20 8"/><line x1="16" y1="13" x2="8" y2="13"/><line x1="16" y1="17" x2="8" y2="17"/><polyline points="10 9 9 9 8 9"/></svg>
-          Rincian Setoran Lengkap
-        </a>
-      </div>
-
-      <!-- Rekap Setoran Kas Fisik Hari Ini -->
-      <div class="main-card" style="margin-top:0; margin-bottom: 24px;">
-        <div class="card-title-row">
-          <div class="card-title">
-            <svg width="18" height="18" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><rect x="2" y="5" width="20" height="14" rx="2"/><line x1="2" y1="10" x2="22" y2="10"/></svg>
-            Rekap Setoran Kas Fisik Hari Ini (<?= date('d/m/Y') ?>)
+          <div class="dashboard-closing-side">
+            <div class="dashboard-mini-stat is-payment">
+              <span class="dashboard-mini-icon">
+                <svg width="18" height="18" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.4" stroke-linecap="round" stroke-linejoin="round"><rect x="2" y="5" width="20" height="14" rx="2"/><line x1="2" y1="10" x2="22" y2="10"/></svg>
+              </span>
+              <div>
+                <strong><?= report_money($totalPembayaran) ?></strong>
+                <small>Transaksi Pembayaran</small>
+              </div>
+            </div>
+            <div class="dashboard-mini-stat is-in">
+              <span class="dashboard-mini-icon">
+                <svg width="18" height="18" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.4" stroke-linecap="round" stroke-linejoin="round"><line x1="12" y1="19" x2="12" y2="5"/><polyline points="5 12 12 5 19 12"/></svg>
+              </span>
+              <div>
+                <strong><?= report_money($tabunganMasuk) ?></strong>
+                <small>Tabungan Masuk</small>
+              </div>
+            </div>
+            <div class="dashboard-mini-stat is-out">
+              <span class="dashboard-mini-icon">
+                <svg width="18" height="18" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.4" stroke-linecap="round" stroke-linejoin="round"><line x1="12" y1="5" x2="12" y2="19"/><polyline points="19 12 12 19 5 12"/></svg>
+              </span>
+              <div>
+                <strong><?= report_money($tabunganKeluar) ?></strong>
+                <small>Tabungan Keluar</small>
+              </div>
+            </div>
           </div>
-          <a href="laporan/export_global.php?template=setoran&format=excel&tanggal_awal=<?= $todayDate ?>&tanggal_akhir=<?= $todayDate ?>&kategori=semua" class="btn btn-primary" style="padding:6px 14px;font-size:13px">
-            Export Excel
+        </div>
+
+        <div class="dashboard-action-strip">
+          <a href="pembayaran/form.php" class="quick-btn">
+            <svg width="18" height="18" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.2" stroke-linecap="round" stroke-linejoin="round"><circle cx="12" cy="12" r="10"/><line x1="12" y1="8" x2="12" y2="16"/><line x1="8" y1="12" x2="16" y2="12"/></svg>
+            Pembayaran
+          </a>
+          <a href="tabungan/riwayat.php" class="quick-btn quick-btn-ghost">
+            <svg width="18" height="18" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.2" stroke-linecap="round" stroke-linejoin="round"><line x1="12" y1="1" x2="12" y2="23"/><path d="M17 5H9.5a3.5 3.5 0 0 0 0 7h5a3.5 3.5 0 0 1 0 7H6"/></svg>
+            Tabungan
+          </a>
+          <a href="laporan/template.php?template=setoran" class="quick-btn quick-btn-ghost">
+            <svg width="18" height="18" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.2" stroke-linecap="round" stroke-linejoin="round"><path d="M14 2H6a2 2 0 0 0-2 2v16a2 2 0 0 0 2 2h12a2 2 0 0 0 2-2V8z"/><polyline points="14 2 14 8 20 8"/><line x1="16" y1="13" x2="8" y2="13"/><line x1="16" y1="17" x2="8" y2="17"/></svg>
+            Laporan
+          </a>
+          <a href="<?= htmlspecialchars($exportSetoranUrl) ?>" class="quick-btn quick-btn-soft">
+            <svg width="18" height="18" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.2" stroke-linecap="round" stroke-linejoin="round"><path d="M21 15v4a2 2 0 0 1-2 2H5a2 2 0 0 1-2-2v-4"/><polyline points="7 10 12 15 17 10"/><line x1="12" y1="15" x2="12" y2="3"/></svg>
+            Export
           </a>
         </div>
-        <div class="table-container">
-          <table class="payment-table responsive-table">
-            <thead>
-              <tr>
-                <th>Komponen Setoran</th>
-                <th>Klasifikasi</th>
-                <th style="text-align: right;">Nominal</th>
-              </tr>
-            </thead>
-            <tbody>
-              <?php if (empty($setoranRows)): ?>
-              <tr>
-                <td colspan="3" class="text-center" style="padding: 20px; color: var(--text-muted);">
-                  Data setoran belum tersedia
-                </td>
-              </tr>
-              <?php else: ?>
-                <?php foreach ($setoranRows as $row): ?>
-                <tr>
-                  <td><?= htmlspecialchars($row['bagian']) ?></td>
-                  <td><?= htmlspecialchars($row['jenis']) ?></td>
-                  <td style="text-align: right; <?= (float)$row['nominal'] < 0 ? 'color:#b42318;font-weight:600;' : '' ?>">
-                    <?= report_money((float)$row['nominal']) ?>
-                  </td>
-                </tr>
-                <?php endforeach; ?>
-              <?php endif; ?>
-            </tbody>
-          </table>
+
+        <div class="dashboard-breakdown-card">
+          <div class="dashboard-breakdown-head">
+            <div>
+              <span class="dashboard-eyebrow">Rekap Penerimaan</span>
+              <h2>Rincian Hari Ini</h2>
+              <p>Pembayaran + tabungan masuk - tabungan keluar.</p>
+            </div>
+            <span class="dashboard-date-pill"><?= $todayLabel ?></span>
+          </div>
+
+          <div class="dashboard-breakdown-list">
+            <?php foreach ($rekapHarianRows as $row): ?>
+              <?php
+                $nominal = (float)($row['nominal'] ?? 0);
+                $isDeduct = $row['kind'] === 'saving-out';
+                $displayNominal = ($isDeduct && $nominal > 0 ? '- ' : '') . report_money($nominal);
+              ?>
+              <div class="dashboard-breakdown-row is-<?= htmlspecialchars($row['kind']) ?>">
+                <span class="dashboard-breakdown-icon">
+                  <?php if ($row['icon'] === 'up'): ?>
+                    <svg width="17" height="17" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.4" stroke-linecap="round" stroke-linejoin="round"><line x1="12" y1="19" x2="12" y2="5"/><polyline points="5 12 12 5 19 12"/></svg>
+                  <?php elseif ($row['icon'] === 'down'): ?>
+                    <svg width="17" height="17" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.4" stroke-linecap="round" stroke-linejoin="round"><line x1="12" y1="5" x2="12" y2="19"/><polyline points="19 12 12 19 5 12"/></svg>
+                  <?php elseif ($row['icon'] === 'total'): ?>
+                    <svg width="17" height="17" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.4" stroke-linecap="round" stroke-linejoin="round"><path d="M4 19h16"/><path d="M7 15l3-3 3 2 4-6"/><path d="M17 8h-4V4"/></svg>
+                  <?php else: ?>
+                    <svg width="17" height="17" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.4" stroke-linecap="round" stroke-linejoin="round"><rect x="2" y="5" width="20" height="14" rx="2"/><line x1="2" y1="10" x2="22" y2="10"/></svg>
+                  <?php endif; ?>
+                </span>
+                <div class="dashboard-breakdown-copy">
+                  <strong><?= htmlspecialchars($row['label']) ?></strong>
+                  <small><?= htmlspecialchars($row['desc']) ?></small>
+                </div>
+                <div class="dashboard-breakdown-amount"><?= $displayNominal ?></div>
+              </div>
+            <?php endforeach; ?>
+          </div>
         </div>
-      </div>
+      </section>
 
     </main>
   </div><!-- /layout -->
 
-  <script src="assets/js/app.js?v=3.8"></script>
+  <script src="assets/js/app.js?v=6.2"></script>
 </body>
 </html>
