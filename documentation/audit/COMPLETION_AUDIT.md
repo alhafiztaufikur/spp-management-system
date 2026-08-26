@@ -6,7 +6,7 @@ Aturan status: `TERBUKTI`, `PARSIAL`, `BELUM DIUJI`, `PENDING CLIENT`, atau `TID
 
 Dokumen ini adalah pemeriksaan requirement-by-requirement. Status **NO-GO** tetap berlaku bila satu saja gate kritis pada bagian 21 rencana belum terbukti. Bukti lokal tidak dipromosikan menjadi bukti target client.
 
-Koreksi evidence terbaru: regression disposable diulang sebagai `REG-FINAL-006` dan lulus 18/18 pada clone `db_spp_audit_20260827_033642_suite_4402` setelah sinkronisasi username sesi; concurrency retest `CONC-004` lulus 25/25. Ringkasan tersanitasi disimpan di luar repository; referensi run sebelumnya tetap dipertahankan sebagai histori.
+Koreksi evidence terbaru: regression disposable diulang sebagai `REG-FINAL-008` dan lulus 18/18 pada clone `db_spp_audit_20260827_035115_suite_5476` setelah koreksi field probe time-based SQLi; concurrency retest `CONC-004` lulus 25/25. Ringkasan tersanitasi disimpan di luar repository; referensi run sebelumnya tetap dipertahankan sebagai histori.
 
 Retest containment Apache lokal `WEB-CONTAINMENT-002` juga lulus: route publik login 200, artefak internal/tests 403, dan security headers aktif. Ini belum membuktikan virtual host HTTPS target.
 
@@ -54,7 +54,7 @@ Bukti lokal terkuat:
 
 - migration matrix 19 file: fresh + dua pass + verifier + fingerprint logis PASS;
 - data/schema verifier snapshot audit: MISSING=0 dan FAIL=0;
-- disposable regression: 18/18 script PASS pada clone `db_spp_audit_20260827_033642_suite_4402` (`REG-FINAL-006`), dengan fixture mentah dipurge dan ringkasan tersanitasi dipertahankan; cakupan tetap meliputi session lifecycle, GET method-safety Master Daftar Ulang, focused SQLi boolean/error/encoding/duplicate/array/XSS corpus, array/scalar boundary, POST dengan CSRF, body JSON/text, focused SQLi filter NIS, lifecycle NIS + arsip/restore siswa, isolasi child Daftar Ulang timestamp identik, sanitasi fallback error laporan, pemeriksaan CSRF sebelum pembuatan tahun ajaran, atomisitas ensure tahun saat aksi gagal, validasi scalar alasan audit, dan seluruh target publish Biaya Lain;
+- disposable regression: 18/18 script PASS pada clone `db_spp_audit_20260827_035115_suite_5476` (`REG-FINAL-008`), dengan fixture mentah dipurge dan ringkasan tersanitasi dipertahankan; cakupan tetap meliputi session lifecycle, GET method-safety Master Daftar Ulang, focused SQLi boolean/error/encoding/time-based/duplicate/array/XSS corpus, array/scalar boundary, POST dengan CSRF, body JSON/text, focused SQLi filter NIS, lifecycle NIS + arsip/restore siswa, isolasi child Daftar Ulang timestamp identik, sanitasi fallback error laporan, pemeriksaan CSRF sebelum pembuatan tahun ajaran, atomisitas ensure tahun saat aksi gagal, validasi scalar alasan audit, dan seluruh target publish Biaya Lain;
 - frontend static remediation: FE-001 dashboard `data-label`, FE-007 reduced-motion, FE-008 conditional clock timer, FE-013 toast live-region, serta modal tabungan dialog/focus/Escape semantics telah diterapkan dan dilint. Browser runtime resmi tetap tidak tersedia, sehingga Wave 6 browser/accessibility belum dapat dinyatakan selesai.
 - report HTTP smoke: 34/34 PASS, 0 HTTP 500/fatal;
 - route-role HTTP matrix: 168/168 PASS; 19 tabel domain count/checksum identik sebelum clone di-drop;

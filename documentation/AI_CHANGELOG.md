@@ -13,6 +13,22 @@ File ini mencatat perubahan proyek secara reverse chronological. Baca [PROJECT_C
 - Jangan menghapus atau menulis ulang entri lama. Tambahkan entri koreksi bila diperlukan.
 - Perubahan implementasi dan entri changelog wajib masuk commit yang sama.
 
+## 2026-08-27 - Probe Time-based SQLi Terfokus
+
+**AI/Aktor:** Codex berbasis GPT-5
+
+**Tujuan:** Memperluas corpus keamanan dengan pemeriksaan keterlambatan injeksi pada route read-only yang memakai filter laporan/riwayat.
+
+**Perubahan fitur dan perilaku:** `tests/security_input_corpus_test.php` kini mengukur latency request dan mengirim payload `SLEEP(3)` sebagai nilai literal pada empat route read-only; batas latency dibandingkan dengan baseline route yang sama.
+
+**Database dan migrasi:** Tidak ada migrasi. Pengujian berjalan pada clone disposable `db_spp_audit_20260827_034249_suite_4017` yang kemudian dihapus; `db_spp` dan snapshot audit tidak disentuh.
+
+**Kompatibilitas dan data lama:** Perilaku filter aplikasi tidak berubah; payload tidak menghasilkan SQL error, HTTP 500, atau delay injeksi.
+
+**Verifikasi:** Regression disposable `REG-FINAL-008` lulus 18/18 (`FAILURE_COUNT=0`), termasuk probe time-based baru pada field filter yang tepat. Dump, log server, dan suite log mentah dipurge; ringkasan tersanitasi dipertahankan di luar repository.
+
+**Catatan tindak lanjut:** Probe ini tetap terfokus dan tidak menggantikan DAST Cartesian penuh, mutating-route/failpoint, browser sink, atau validasi target client.
+
 ## 2026-08-27 - Regression Disposable Final pada HEAD Terkini
 
 **AI/Aktor:** Codex berbasis GPT-5

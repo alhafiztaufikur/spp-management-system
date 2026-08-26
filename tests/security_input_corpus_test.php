@@ -43,7 +43,9 @@ function input_corpus_request(
         'follow_location' => 0,
         'timeout' => 10,
     ]]);
+    $startedAt = hrtime(true);
     $body = file_get_contents($url, false, $context);
+    $elapsedMs = (hrtime(true) - $startedAt) / 1_000_000;
     if ($body === false) {
         throw new RuntimeException('Request corpus input gagal.');
     }
@@ -56,7 +58,7 @@ function input_corpus_request(
             $cookies[$match[1]] = $match[2];
         }
     }
-    return ['status' => $status, 'body' => $body];
+    return ['status' => $status, 'body' => $body, 'elapsed_ms' => $elapsedMs];
 }
 
 function input_corpus_csrf(string $body): string
@@ -167,6 +169,30 @@ try {
             input_corpus_assert($response['status'] !== 500, "Input corpus {$path} menghasilkan HTTP 500.");
             input_corpus_assert(!preg_match($sqlMarkers, $response['body']), "Input corpus {$path} membocorkan error SQL.");
         }
+    }
+
+    // Time-based SQLi probes run only against simple read-only pages. A
+    // prepared statement must treat the payload as a literal and remain close
+    // to the baseline latency; an injected SLEEP(3) would exceed this bound.
+    $timePayload = "' OR SLEEP(3) OR '1'='1";
+    $timeCases = [
+        ['/tabungan/riwayat.php', ['nis' => 'literal', 'bulan' => '8', 'tahun' => '2026'], 'nis'],
+        ['/pembayaran/lihat.php', ['search' => 'literal', 'bulan' => '8', 'tahun' => '2026'], 'search'],
+        ['/siswa/daftar.php', ['q' => 'literal'], 'q'],
+        ['/laporan/template.php', ['template' => 'penerimaan', 'q' => 'literal'], 'q'],
+    ];
+    foreach ($timeCases as [$path, $baselineQuery, $timeField]) {
+        $baseline = input_corpus_request($baseUrl . $path . '?' . http_build_query($baselineQuery), 'GET', [], $cookies);
+        input_corpus_assert($baseline['status'] !== 500 && !preg_match($sqlMarkers, $baseline['body']), "Baseline time probe {$path} menghasilkan error.");
+        $timeQuery = $baselineQuery;
+        $timeQuery[$timeField] = $timePayload;
+        $timeResponse = input_corpus_request($baseUrl . $path . '?' . http_build_query($timeQuery), 'GET', [], $cookies);
+        input_corpus_assert($timeResponse['status'] !== 500 && !preg_match($sqlMarkers, $timeResponse['body']), "Time-based probe {$path} menghasilkan error SQL/HTTP 500.");
+        $timeLimitMs = max(2500.0, ((float)$baseline['elapsed_ms'] * 6) + 500.0);
+        input_corpus_assert(
+            (float)$timeResponse['elapsed_ms'] <= $timeLimitMs,
+            "Time-based probe {$path} melampaui batas latency (" . round((float)$timeResponse['elapsed_ms']) . "ms > " . round($timeLimitMs) . "ms)."
+        );
     }
     $arrayResponse = input_corpus_request($baseUrl . '/tabungan/riwayat.php?' . http_build_query(['nis' => [$payload], 'page' => ['1']]), 'GET', [], $cookies);
     input_corpus_assert($arrayResponse['status'] !== 500 && !preg_match($sqlMarkers, $arrayResponse['body']), 'Array/scalar confusion pada riwayat tabungan menghasilkan error.');
@@ -304,7 +330,7 @@ try {
     $xssPayload = '<script>alert(1)</script>';
     $xssResponse = input_corpus_request($baseUrl . '/siswa/daftar.php?' . http_build_query(['q' => $xssPayload]), 'GET', [], $cookies);
     input_corpus_assert($xssResponse['status'] !== 500 && !str_contains($xssResponse['body'], $xssPayload), 'Payload reflected XSS tampil mentah pada daftar siswa.');
-    echo "OK: corpus SQLi boolean/error/quote/encoding pada route GET termasuk export, array/scalar laporan/tabungan/pembayaran, POST boundary, duplicate, oversized, dan reflected-XSS fokus tidak menghasilkan SQL error, HTTP 500, atau payload mentah.\n";
+    echo "OK: corpus SQLi boolean/error/time-based/quote/encoding pada route GET termasuk export, array/scalar laporan/tabungan/pembayaran, POST boundary, duplicate, oversized, dan reflected-XSS fokus tidak menghasilkan SQL error, HTTP 500, delay injeksi, atau payload mentah.\n";
 } catch (Throwable $error) {
     $failure = $error;
 }
