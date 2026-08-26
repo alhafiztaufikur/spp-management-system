@@ -2,7 +2,8 @@
 // ============================================
 // role_management.php - Manajemen Akun Petugas
 // ============================================
-session_start();
+require_once __DIR__ . '/includes/security.php';
+security_bootstrap_session();
 if (!isset($_SESSION['admin_id'])) {
     header('Location: login.php');
     exit;
@@ -10,12 +11,10 @@ if (!isset($_SESSION['admin_id'])) {
 
 require_once 'koneksi.php';
 require_once 'includes/auth.php';
+require_once 'includes/audit.php';
 requireRole(['admin']);
 
-if (empty($_SESSION['csrf_token'])) {
-    $_SESSION['csrf_token'] = bin2hex(random_bytes(32));
-}
-$csrfToken   = $_SESSION['csrf_token'];
+$csrfToken   = security_csrf_token('role-management');
 $allowedRole = ['admin', 'bendahara', 'kasir'];
 
 $flash = $_SESSION['flash'] ?? null;
@@ -30,21 +29,33 @@ function validPassword(string $password): bool {
     return $length >= 8 && $length <= 72;
 }
 
+function accountAuditSnapshot(array $account): array {
+    return [
+        'id' => isset($account['id']) ? (int)$account['id'] : null,
+        'username' => (string)($account['username'] ?? ''),
+        'nama' => (string)($account['nama'] ?? ''),
+        'role' => (string)($account['role'] ?? ''),
+        'password_reset_required' => (int)($account['password_reset_required'] ?? 0),
+        'session_version' => (int)($account['session_version'] ?? 1),
+    ];
+}
+
 if ($_SERVER['REQUEST_METHOD'] === 'POST') {
-    if (!hash_equals($csrfToken, (string)($_POST['csrf_token'] ?? ''))) {
+    if (!security_csrf_is_valid('role-management', $_POST['csrf_token'] ?? null)) {
         setAccountFlash('error', 'Permintaan tidak valid. Silakan muat ulang halaman dan coba lagi.');
         header('Location: role_management.php');
         exit;
     }
 
-    $aksi = $_POST['aksi'] ?? '';
+    try {
+        $aksi = security_input_scalar($_POST, 'aksi');
 
     if ($aksi === 'tambah') {
-        $nama                 = trim($_POST['nama'] ?? '');
-        $username             = trim($_POST['username'] ?? '');
-        $role                 = $_POST['role'] ?? '';
-        $password             = $_POST['password'] ?? '';
-        $passwordConfirmation = $_POST['password_confirmation'] ?? '';
+        $nama                 = trim((string)security_input_scalar($_POST, 'nama'));
+        $username             = trim((string)security_input_scalar($_POST, 'username'));
+        $role                 = security_input_scalar($_POST, 'role');
+        $password             = security_input_scalar($_POST, 'password');
+        $passwordConfirmation = security_input_scalar($_POST, 'password_confirmation');
 
         if (strlen($nama) < 3 || strlen($nama) > 100) {
             setAccountFlash('error', 'Nama lengkap harus berisi 3 sampai 100 karakter.');
@@ -57,25 +68,45 @@ if ($_SERVER['REQUEST_METHOD'] === 'POST') {
         } elseif ($password !== $passwordConfirmation) {
             setAccountFlash('error', 'Konfirmasi password tidak sama.');
         } else {
-            $check = $koneksi->prepare("SELECT id FROM admin WHERE username = ? LIMIT 1");
+            $koneksi->begin_transaction();
+            $check = $koneksi->prepare("SELECT id FROM admin WHERE username = ? LIMIT 1 FOR UPDATE");
             $check->bind_param('s', $username);
             $check->execute();
             $usernameExists = (bool)$check->get_result()->fetch_assoc();
             $check->close();
 
             if ($usernameExists) {
+                $koneksi->rollback();
                 setAccountFlash('error', 'Username sudah digunakan. Silakan pilih username lain.');
             } else {
                 $passwordHash = password_hash($password, PASSWORD_DEFAULT);
                 $stmt = $koneksi->prepare("INSERT INTO admin (username, password, nama, role) VALUES (?, ?, ?, ?)");
                 $stmt->bind_param('ssss', $username, $passwordHash, $nama, $role);
-
-                if ($stmt->execute()) {
-                    setAccountFlash('success', "Akun {$nama} berhasil dibuat sebagai {$role}.");
-                } else {
-                    setAccountFlash('error', 'Akun gagal dibuat. Silakan coba lagi.');
-                }
+                $stmt->execute();
+                $accountId = (int)$koneksi->insert_id;
                 $stmt->close();
+
+                $createdAccount = [
+                    'id' => $accountId,
+                    'username' => $username,
+                    'nama' => $nama,
+                    'role' => $role,
+                    'password_reset_required' => 0,
+                    'session_version' => 1,
+                ];
+                audit_event_write(
+                    $koneksi,
+                    'account.created',
+                    'admin',
+                    $accountId,
+                    'create',
+                    null,
+                    accountAuditSnapshot($createdAccount),
+                    'Pembuatan akun petugas melalui Role Management',
+                    ['result' => 'committed', 'source' => 'role_management.php']
+                );
+                $koneksi->commit();
+                setAccountFlash('success', "Akun {$nama} berhasil dibuat sebagai {$role}.");
             }
         }
 
@@ -84,9 +115,10 @@ if ($_SERVER['REQUEST_METHOD'] === 'POST') {
     }
 
     if ($aksi === 'reset_password') {
-        $accountId            = filter_input(INPUT_POST, 'account_id', FILTER_VALIDATE_INT);
-        $password             = $_POST['new_password'] ?? '';
-        $passwordConfirmation = $_POST['new_password_confirmation'] ?? '';
+        $accountId            = filter_var(security_input_scalar($_POST, 'account_id'), FILTER_VALIDATE_INT);
+        $password             = security_input_scalar($_POST, 'new_password');
+        $passwordConfirmation = security_input_scalar($_POST, 'new_password_confirmation');
+        $auditReasonRaw       = security_input_scalar($_POST, 'audit_reason');
 
         if (!$accountId) {
             setAccountFlash('error', 'Akun yang dipilih tidak valid.');
@@ -95,25 +127,40 @@ if ($_SERVER['REQUEST_METHOD'] === 'POST') {
         } elseif ($password !== $passwordConfirmation) {
             setAccountFlash('error', 'Konfirmasi password baru tidak sama.');
         } else {
-            $check = $koneksi->prepare("SELECT nama FROM admin WHERE id = ? LIMIT 1");
+            $auditReason = audit_require_reason($auditReasonRaw, 'Alasan penggantian password');
+            $koneksi->begin_transaction();
+            $check = $koneksi->prepare("SELECT id, nama, username, role, password_reset_required, session_version FROM admin WHERE id = ? LIMIT 1 FOR UPDATE");
             $check->bind_param('i', $accountId);
             $check->execute();
             $account = $check->get_result()->fetch_assoc();
             $check->close();
 
             if (!$account) {
-                setAccountFlash('error', 'Akun tidak ditemukan.');
+                throw new RuntimeException('Akun tidak ditemukan.');
             } else {
+                $beforeAccount = accountAuditSnapshot($account);
                 $passwordHash = password_hash($password, PASSWORD_DEFAULT);
-                $stmt = $koneksi->prepare("UPDATE admin SET password = ? WHERE id = ?");
+                $stmt = $koneksi->prepare("UPDATE admin SET password = ?, password_reset_required = 0, session_version = session_version + 1 WHERE id = ?");
                 $stmt->bind_param('si', $passwordHash, $accountId);
-
-                if ($stmt->execute()) {
-                    setAccountFlash('success', "Password akun {$account['nama']} berhasil diganti.");
-                } else {
-                    setAccountFlash('error', 'Password gagal diganti. Silakan coba lagi.');
-                }
+                $stmt->execute();
                 $stmt->close();
+
+                $afterAccount = $beforeAccount;
+                $afterAccount['password_reset_required'] = 0;
+                $afterAccount['session_version'] = (int)$beforeAccount['session_version'] + 1;
+                audit_event_write(
+                    $koneksi,
+                    'account.password_reset',
+                    'admin',
+                    $accountId,
+                    'reset_password',
+                    $beforeAccount,
+                    $afterAccount,
+                    $auditReason,
+                    ['result' => 'committed', 'source' => 'role_management.php', 'sessions_revoked' => true]
+                );
+                $koneksi->commit();
+                setAccountFlash('success', "Password akun {$account['nama']} berhasil diganti.");
             }
         }
 
@@ -122,7 +169,7 @@ if ($_SERVER['REQUEST_METHOD'] === 'POST') {
     }
 
     if ($aksi === 'hapus') {
-        $accountId = filter_input(INPUT_POST, 'account_id', FILTER_VALIDATE_INT);
+        $accountId = filter_var(security_input_scalar($_POST, 'account_id'), FILTER_VALIDATE_INT);
         $currentAdminId = (int)($_SESSION['admin_id'] ?? 0);
 
         if (!$accountId) {
@@ -130,33 +177,43 @@ if ($_SERVER['REQUEST_METHOD'] === 'POST') {
         } elseif ($accountId === $currentAdminId) {
             setAccountFlash('error', 'Anda tidak dapat menghapus akun Anda sendiri yang sedang login.');
         } else {
-            $check = $koneksi->prepare("SELECT id, nama, username, role FROM admin WHERE id = ? LIMIT 1");
+            $auditReason = audit_require_reason(security_input_scalar($_POST, 'audit_reason'), 'Alasan penghapusan akun');
+            $koneksi->begin_transaction();
+
+            $lockedAdmins = $koneksi->query("SELECT id FROM admin WHERE role = 'admin' ORDER BY id FOR UPDATE");
+            $adminCount = $lockedAdmins->num_rows;
+            $lockedAdmins->free();
+
+            $check = $koneksi->prepare("SELECT id, nama, username, role, password_reset_required, session_version FROM admin WHERE id = ? LIMIT 1 FOR UPDATE");
             $check->bind_param('i', $accountId);
             $check->execute();
             $account = $check->get_result()->fetch_assoc();
             $check->close();
 
             if (!$account) {
-                setAccountFlash('error', 'Akun tidak ditemukan.');
+                throw new RuntimeException('Akun tidak ditemukan.');
             } else {
-                if ($account['role'] === 'admin') {
-                    $countAdmins = (int)$koneksi->query("SELECT COUNT(*) AS total FROM admin WHERE role = 'admin'")->fetch_assoc()['total'];
-                    if ($countAdmins <= 1) {
-                        setAccountFlash('error', 'Tidak dapat menghapus akun Admin terakhir di sistem.');
-                        header('Location: role_management.php');
-                        exit;
-                    }
+                if ($account['role'] === 'admin' && $adminCount <= 1) {
+                    throw new RuntimeException('Tidak dapat menghapus akun Admin terakhir di sistem.');
                 }
 
                 $stmt = $koneksi->prepare("DELETE FROM admin WHERE id = ?");
                 $stmt->bind_param('i', $accountId);
-
-                if ($stmt->execute()) {
-                    setAccountFlash('success', "Akun {$account['nama']} (@{$account['username']}) berhasil dihapus.");
-                } else {
-                    setAccountFlash('error', 'Akun gagal dihapus. Silakan coba lagi.');
-                }
+                $stmt->execute();
                 $stmt->close();
+                audit_event_write(
+                    $koneksi,
+                    'account.deleted',
+                    'admin',
+                    $accountId,
+                    'delete',
+                    accountAuditSnapshot($account),
+                    null,
+                    $auditReason,
+                    ['result' => 'committed', 'source' => 'role_management.php']
+                );
+                $koneksi->commit();
+                setAccountFlash('success', "Akun {$account['nama']} (@{$account['username']}) berhasil dihapus.");
             }
         }
 
@@ -167,10 +224,20 @@ if ($_SERVER['REQUEST_METHOD'] === 'POST') {
     setAccountFlash('error', 'Aksi tidak dikenali.');
     header('Location: role_management.php');
     exit;
+    } catch (Throwable $exception) {
+        try {
+            $koneksi->rollback();
+        } catch (Throwable) {
+            // Tidak ada transaksi aktif atau koneksi sudah tidak tersedia.
+        }
+        setAccountFlash('error', security_exception_message($exception, 'Perubahan akun gagal diproses.', 'role-management'));
+        header('Location: role_management.php');
+        exit;
+    }
 }
 
 $accounts = $koneksi->query(
-    "SELECT id, username, nama, role, created_at
+    "SELECT id, username, nama, role, password_reset_required, created_at
      FROM admin
      ORDER BY FIELD(role, 'admin', 'bendahara', 'kasir'), nama ASC"
 );
@@ -199,7 +266,7 @@ $roleLabels = ['admin' => 'Admin', 'bendahara' => 'Bendahara', 'kasir' => 'Kasir
 
     <main class="main-content">
       <div class="topbar">
-        <button class="sidebar-toggle" onclick="toggleSidebar()" id="btn-sidebar-toggle" title="Toggle Sidebar">
+        <button class="sidebar-toggle" onclick="toggleSidebar()" id="btn-sidebar-toggle" title="Toggle Sidebar" aria-label="Buka navigasi" aria-expanded="false">
           <svg width="20" height="20" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><line x1="3" y1="12" x2="21" y2="12"/><line x1="3" y1="6" x2="21" y2="6"/><line x1="3" y1="18" x2="21" y2="18"/></svg>
         </button>
         <div class="topbar-title">
@@ -299,6 +366,9 @@ $roleLabels = ['admin' => 'Admin', 'bendahara' => 'Bendahara', 'kasir' => 'Kasir
                     <span>
                       <span class="account-name"><?= htmlspecialchars($account['nama']) ?></span>
                       <span class="account-username">@<?= htmlspecialchars($account['username']) ?></span>
+                      <?php if ((int)$account['password_reset_required'] === 1): ?>
+                      <span class="master-status is-inactive">Reset password wajib</span>
+                      <?php endif; ?>
                     </span>
                   </div>
                 </td>
@@ -359,6 +429,10 @@ $roleLabels = ['admin' => 'Admin', 'bendahara' => 'Bendahara', 'kasir' => 'Kasir
             <label class="field-label" for="new-password-confirmation">Konfirmasi Password Baru</label>
             <input class="field-input" type="password" id="new-password-confirmation" name="new_password_confirmation" minlength="8" maxlength="72" required autocomplete="new-password" placeholder="Ulangi password baru" />
           </div>
+          <div class="field-row">
+            <label class="field-label" for="reset-audit-reason">Alasan Penggantian</label>
+            <textarea class="field-input field-textarea" id="reset-audit-reason" name="audit_reason" minlength="5" maxlength="255" required autocomplete="off" placeholder="Jelaskan alasan penggantian password."></textarea>
+          </div>
         </div>
         <div class="modal-actions">
           <button type="button" class="btn btn-ghost" id="btn-cancel-reset">Batal</button>
@@ -379,6 +453,10 @@ $roleLabels = ['admin' => 'Admin', 'bendahara' => 'Bendahara', 'kasir' => 'Kasir
         <input type="hidden" name="csrf_token" value="<?= htmlspecialchars($csrfToken) ?>" />
         <input type="hidden" name="aksi" value="hapus" />
         <input type="hidden" name="account_id" id="delete-account-id" />
+        <div class="field-row" style="margin-top:12px;">
+          <label class="field-label" for="delete-audit-reason">Alasan Penghapusan</label>
+          <textarea class="field-input field-textarea" id="delete-audit-reason" name="audit_reason" minlength="5" maxlength="255" required autocomplete="off" placeholder="Jelaskan alasan penghapusan akun."></textarea>
+        </div>
         <div class="modal-actions">
           <button type="button" class="btn btn-ghost" id="btn-cancel-delete">Batal</button>
           <button type="submit" class="btn btn-error" style="background:var(--red);color:#fff;border:none;">Hapus Akun</button>

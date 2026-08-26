@@ -1,10 +1,12 @@
 <?php
 function page_int_param(string $name, int $default = 1): int {
-    return max(1, (int)($_GET[$name] ?? $default));
+    $raw = $_GET[$name] ?? $default;
+    return max(1, is_scalar($raw) ? (int)$raw : $default);
 }
 
 function page_size_param(string $name = 'per_page', array $allowed = [10, 25, 50], int $default = 10): int {
-    $requested = (int)($_GET[$name] ?? $default);
+    $raw = $_GET[$name] ?? $default;
+    $requested = is_scalar($raw) ? (int)$raw : $default;
     return in_array($requested, $allowed, true) ? $requested : $default;
 }
 

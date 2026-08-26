@@ -1,11 +1,16 @@
 <?php
 require_once __DIR__.'/../koneksi.php';
+require_once __DIR__.'/support/assert_audit_database.php';
 require_once __DIR__.'/../includes/reports.php';
+test_require_audit_database($koneksi);
 function modular_assert(bool $ok,string $message):void{if(!$ok)throw new RuntimeException($message);}
 try{
     modular_assert(count(report_registry())===7,'Katalog tidak berisi tujuh template.');
-    $placeholders=(int)$koneksi->query("SELECT COUNT(*) total FROM master_kelas WHERE is_placeholder=1 AND is_active=1")->fetch_assoc()['total'];
-    modular_assert($placeholders===6,'Placeholder kelas 1-6 tidak lengkap.');
+    $missingClassLevels=(int)$koneksi->query("SELECT COUNT(*) total
+      FROM (SELECT 1 tingkat UNION ALL SELECT 2 UNION ALL SELECT 3 UNION ALL SELECT 4 UNION ALL SELECT 5 UNION ALL SELECT 6) levels
+      LEFT JOIN master_kelas mk ON mk.tingkat=levels.tingkat AND mk.is_active=1
+      WHERE mk.id IS NULL")->fetch_assoc()['total'];
+    modular_assert($missingClassLevels===0,'Tingkat 1-6 harus memiliki rombel aktif atau placeholder aktif.');
     $missing=(int)$koneksi->query("SELECT COUNT(*) total FROM siswa WHERE KELAS IN ('1','2','3','4','5','6') AND master_kelas_id IS NULL")->fetch_assoc()['total'];
     modular_assert($missing===0,'Masih ada siswa SD tanpa Master Kelas.');
     $orphan=(int)$koneksi->query("SELECT COUNT(*) total FROM bayar_biaya_lain d LEFT JOIN tagihan_biaya_lain t ON t.id=d.tagihan_biaya_lain_id WHERE d.tagihan_biaya_lain_id IS NOT NULL AND t.id IS NULL")->fetch_assoc()['total'];

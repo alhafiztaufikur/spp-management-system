@@ -2,11 +2,13 @@
 // ============================================
 // pembayaran/lihat.php - View All Payments
 // ============================================
-session_start();
+require_once __DIR__ . '/../includes/security.php';
+security_bootstrap_session();
 if (!isset($_SESSION['admin_id'])) { header('Location: ../login.php'); exit; }
 require_once '../koneksi.php';
 require_once '../includes/auth.php';
 require_once '../includes/pagination.php';
+require_once '../includes/idempotency.php';
 requireRole(['admin', 'kasir']);
 
 $flash = $_SESSION['flash'] ?? null;
@@ -51,10 +53,13 @@ function payment_was_updated($createdAt, $updatedAt): bool {
     return $created && $updated && $updated > ($created + 1);
 }
 
-// Filter
-$search     = trim($_GET['search'] ?? '');
-$filter_bln = $_GET['bulan']  ?? '';
-$filter_thn = $_GET['tahun']  ?? '';
+// Filter. Reject array-shaped query values before scalar normalization.
+$rawSearch = $_GET['search'] ?? '';
+$rawFilterBulan = $_GET['bulan'] ?? '';
+$rawFilterTahun = $_GET['tahun'] ?? '';
+$search = is_scalar($rawSearch) ? trim((string)$rawSearch) : '';
+$filter_bln = is_scalar($rawFilterBulan) ? (string)$rawFilterBulan : '';
+$filter_thn = is_scalar($rawFilterTahun) ? (string)$rawFilterTahun : '';
 $allowedPageSizes = [10, 25, 50];
 $perPage = page_size_param('per_page', $allowedPageSizes, 10);
 $page = page_int_param('page');
@@ -141,7 +146,7 @@ $bln_list = [
 
     <main class="main-content">
       <div class="topbar">
-        <button class="sidebar-toggle" onclick="toggleSidebar()" id="btn-sidebar-toggle">
+        <button class="sidebar-toggle" onclick="toggleSidebar()" id="btn-sidebar-toggle" aria-label="Buka navigasi" aria-expanded="false">
           <svg width="20" height="20" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><line x1="3" y1="12" x2="21" y2="12"/><line x1="3" y1="6" x2="21" y2="6"/><line x1="3" y1="18" x2="21" y2="18"/></svg>
         </button>
         <div class="topbar-title">
@@ -279,12 +284,17 @@ $bln_list = [
                     <svg width="13" height="13" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.5" stroke-linecap="round" stroke-linejoin="round"><path d="M11 4H4a2 2 0 0 0-2 2v14a2 2 0 0 0 2 2h14a2 2 0 0 0 2-2v-7"/><path d="M18.5 2.5a2.121 2.121 0 0 1 3 3L12 15l-4 1 1-4 9.5-9.5z"/></svg>
                     Edit
                   </a>
-                  <a href="proses.php?aksi=hapus&id=<?= $row['id'] ?>"
-                     class="btn-tbl btn-tbl-del" title="Hapus"
-                     onclick="return confirm('Yakin ingin menghapus data pembayaran ini?')">
+                  <form method="POST" action="proses.php" style="display:inline" onsubmit="return preparePaymentDeletion(this)">
+                    <input type="hidden" name="csrf_token" value="<?= htmlspecialchars(security_csrf_token('payment'), ENT_QUOTES, 'UTF-8') ?>" />
+                    <input type="hidden" name="idempotency_key" value="<?= htmlspecialchars(idempotency_generate_key(), ENT_QUOTES, 'UTF-8') ?>" />
+                    <input type="hidden" name="aksi" value="hapus" />
+                    <input type="hidden" name="id" value="<?= (int)$row['id'] ?>" />
+                    <input type="hidden" name="audit_reason" value="" />
+                    <button type="submit" class="btn-tbl btn-tbl-del" title="Hapus">
                     <svg width="13" height="13" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.5" stroke-linecap="round" stroke-linejoin="round"><polyline points="3 6 5 6 21 6"/><path d="M19 6l-1 14a2 2 0 0 1-2 2H8a2 2 0 0 1-2-2L5 6"/></svg>
                     Hapus
-                  </a>
+                    </button>
+                  </form>
                   <?php if ((int)($row['payment_batch_count'] ?? 1) === 12): ?>
                   <a href="../laporan/cetak_struk_tahunan.php?batch=<?= urlencode((string)$row['payment_batch_token']) ?>" class="btn-tbl btn-tbl-print" target="_blank" rel="noopener" title="Cetak seluruh struk tahunan">12 Struk</a>
                   <?php endif; ?>
@@ -312,6 +322,19 @@ $bln_list = [
   </div>
 
   <script src="../assets/js/app.js?v=4.1"></script>
+  <script>
+    function preparePaymentDeletion(form) {
+      const input = window.prompt('Tuliskan alasan penghapusan pembayaran (5–255 karakter):');
+      if (input === null) return false;
+      const reason = input.trim();
+      if (reason.length < 5 || reason.length > 255) {
+        window.alert('Alasan penghapusan wajib berisi 5 sampai 255 karakter.');
+        return false;
+      }
+      form.elements.audit_reason.value = reason;
+      return window.confirm('Yakin ingin menghapus data pembayaran ini? Tindakan dan alasannya akan dicatat.');
+    }
+  </script>
   <?php if ($showPrintPrompt): ?>
   <script>
     document.addEventListener('DOMContentLoaded', function () {

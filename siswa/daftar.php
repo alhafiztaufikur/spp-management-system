@@ -1,5 +1,6 @@
 <?php
-session_start();
+require_once __DIR__ . '/../includes/security.php';
+security_bootstrap_session();
 if (!isset($_SESSION['admin_id'])) { header('Location: ../login.php'); exit; }
 require_once '../koneksi.php';
 require_once '../includes/auth.php';
@@ -8,9 +9,7 @@ require_once '../includes/kelas.php';
 require_once '../includes/pagination.php';
 requireRole(['admin']);
 
-if (empty($_SESSION['csrf_student'])) {
-    $_SESSION['csrf_student'] = bin2hex(random_bytes(32));
-}
+$_SESSION['csrf_student'] = security_csrf_token('student-master');
 
 function student_amount($value): float {
     if ($value === null || $value === '') return 0.0;
@@ -103,9 +102,9 @@ function fail_student(string $message, array $oldInput, string $location): void 
 }
 
 function validate_student_identity(mysqli $db, array $source): array {
-    $noInduk = trim((string)($source['no_induk'] ?? ''));
-    $name = trim((string)($source['nama'] ?? ''));
-    $classId = (int)($source['master_kelas_id'] ?? 0);
+    $noInduk = trim((string)security_input_scalar($source, 'no_induk'));
+    $name = trim((string)security_input_scalar($source, 'nama'));
+    $classId = (int)security_input_scalar($source, 'master_kelas_id', 0);
     if (!preg_match('/^[0-9]{1,10}$/', $noInduk)) {
         throw new RuntimeException('Nomor induk wajib berupa 1 sampai 10 digit.');
     }
@@ -123,16 +122,16 @@ $oldInput = $_SESSION['student_old_input'] ?? [];
 unset($_SESSION['student_old_input']);
 
 if ($_SERVER['REQUEST_METHOD'] === 'POST') {
-    $action = $_POST['aksi'] ?? '';
+    $action = security_input_scalar($_POST, 'aksi');
     $returnLocation = 'daftar.php';
-    $postedToken = (string)($_POST['csrf_token'] ?? '');
-    if (!hash_equals($_SESSION['csrf_student'], $postedToken)) {
+    $postedToken = (string)security_input_scalar($_POST, 'csrf_token');
+    if (!security_csrf_is_valid('student-master', $postedToken)) {
         fail_student('Permintaan tidak valid atau sesi telah kedaluwarsa.', $_POST, $returnLocation);
     }
 
     try {
         if ($action === 'tambah' || $action === 'update') {
-            $id = (int)($_POST['id'] ?? 0);
+            $id = (int)security_input_scalar($_POST, 'id', 0);
             if ($action === 'update') $returnLocation .= '?edit=' . $id;
             $koneksi->begin_transaction();
             $oldStudent = $action === 'update' ? find_student($koneksi, $id, true) : null;
@@ -146,7 +145,7 @@ if ($_SERVER['REQUEST_METHOD'] === 'POST') {
             $stmtDuplicate->close();
             if ($duplicate) throw new RuntimeException('Nomor induk sudah digunakan siswa lain.');
 
-            $advanced = isset($_POST['advanced_enabled']) && $_POST['advanced_enabled'] === '1';
+            $advanced = security_input_scalar($_POST, 'advanced_enabled') === '1';
             $advancedColumns = [
                 'SPP_PERBULAN', 'PANGKAL', 'BANGUNAN', 'SERAGAM', 'KEGIATAN',
                 'MAKAN', 'SORGA', 'INFAQ', 'POMG', 'DAFTAR_ULANG',
@@ -163,11 +162,11 @@ if ($_SERVER['REQUEST_METHOD'] === 'POST') {
             $values = [];
             foreach ($advancedColumns as $column) {
                 $values[$column] = $advanced
-                    ? student_amount($_POST[$postMap[$column]] ?? 0)
+                    ? student_amount(security_input_scalar($_POST, $postMap[$column], 0))
                     : (float)($oldStudent[$column] ?? 0);
             }
             $nisDiknas = $advanced
-                ? trim((string)($_POST['no_induk_diknas'] ?? ''))
+                ? trim((string)security_input_scalar($_POST, 'no_induk_diknas'))
                 : (string)($oldStudent['NO_induk_diknas'] ?? '');
             if ($nisDiknas !== '' && !preg_match('/^[0-9]{10}$/', $nisDiknas)) {
                 throw new RuntimeException('No. Induk Diknas harus tepat 10 digit jika diisi.');
@@ -207,10 +206,10 @@ if ($_SERVER['REQUEST_METHOD'] === 'POST') {
             foreach ($openingMap as $column => $postName) {
                 $oldValue = (float)($oldStudent[$column] ?? 0);
                 if ($advanced && $canEditOpening) {
-                    $values[$column] = student_amount($_POST[$postName] ?? 0);
+                    $values[$column] = student_amount(security_input_scalar($_POST, $postName, 0));
                 } else {
                     $values[$column] = $oldValue;
-                    if (!$canEditOpening && isset($_POST[$postName]) && student_amount($_POST[$postName]) !== $oldValue) {
+                    if (!$canEditOpening && array_key_exists($postName, $_POST) && student_amount(security_input_scalar($_POST, $postName, 0)) !== $oldValue) {
                         throw new RuntimeException('Saldo awal tidak dapat diubah setelah siswa memiliki histori transaksi.');
                     }
                 }
@@ -324,7 +323,7 @@ if ($_SERVER['REQUEST_METHOD'] === 'POST') {
         }
 
         if ($action === 'toggle_status') {
-            $id = (int)($_POST['id'] ?? 0);
+            $id = (int)security_input_scalar($_POST, 'id', 0);
             $koneksi->begin_transaction();
             $student = find_student($koneksi, $id, true);
             if (!$student) throw new RuntimeException('Data siswa tidak ditemukan.');
@@ -353,22 +352,22 @@ if ($_SERVER['REQUEST_METHOD'] === 'POST') {
         }
     } catch (Throwable $error) {
         try { $koneksi->rollback(); } catch (Throwable $ignored) {}
-        fail_student($error->getMessage(), $_POST, $returnLocation);
+        fail_student(security_exception_message($error, 'Data siswa gagal diproses.', 'student-master'), $_POST, $returnLocation);
     }
 }
 
-$editId = (int)($_GET['edit'] ?? 0);
+$editId = (int)security_input_scalar($_GET, 'edit', 0);
 $editStudent = $editId > 0 ? find_student($koneksi, $editId) : null;
 if ($editId > 0 && !$editStudent) {
     $_SESSION['flash'] = ['type' => 'error', 'msg' => 'Data siswa tidak ditemukan.'];
     student_redirect('daftar.php');
 }
 
-$query = trim((string)($_GET['q'] ?? ''));
-$filterClass = (int)($_GET['kelas'] ?? 0);
+$query = trim((string)security_input_scalar($_GET, 'q'));
+$filterClass = (int)security_input_scalar($_GET, 'kelas', 0);
 $classOptions = class_all($koneksi, true, true);
 if ($filterClass > 0 && !array_filter($classOptions, fn($row) => (int)$row['id'] === $filterClass)) $filterClass = 0;
-$filterStatus = (string)($_GET['status'] ?? 'active');
+$filterStatus = (string)security_input_scalar($_GET, 'status', 'active');
 if (!in_array($filterStatus, ['active', 'archived', 'all'], true)) $filterStatus = 'active';
 $allowedPageSizes = [10, 25, 50];
 $perPage = page_size_param('per_page', $allowedPageSizes, 10);
@@ -459,7 +458,7 @@ $canEditOpening = !$editStudent || (int)($editStudent['history_count'] ?? 0) ===
     <?php include '../includes/sidebar.php'; ?>
     <main class="main-content">
       <div class="topbar">
-        <button class="sidebar-toggle" onclick="toggleSidebar()" id="btn-sidebar-toggle">
+        <button class="sidebar-toggle" onclick="toggleSidebar()" id="btn-sidebar-toggle" aria-label="Buka navigasi" aria-expanded="false">
           <svg width="20" height="20" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><line x1="3" y1="12" x2="21" y2="12"/><line x1="3" y1="6" x2="21" y2="6"/><line x1="3" y1="18" x2="21" y2="18"/></svg>
         </button>
         <div class="topbar-title"><h2>Data Siswa</h2><span class="breadcrumb">SistemSPP / Data Siswa</span></div>

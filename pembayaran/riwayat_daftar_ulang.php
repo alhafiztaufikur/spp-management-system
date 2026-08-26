@@ -1,5 +1,6 @@
 <?php
-session_start();
+require_once __DIR__ . '/../includes/security.php';
+security_bootstrap_session();
 if (!isset($_SESSION['admin_id'])) { header('Location: ../login.php'); exit; }
 require_once '../koneksi.php';
 require_once '../includes/auth.php';
@@ -29,13 +30,13 @@ function du_history_page_url(array $query, int $page): string {
     return 'riwayat_daftar_ulang.php?' . http_build_query($query);
 }
 
-$search = trim((string)($_GET['q'] ?? ''));
-$filterClass = trim((string)($_GET['kelas'] ?? ''));
-$filterYear = trim((string)($_GET['tahun_ajaran'] ?? ''));
-$filterStatus = trim((string)($_GET['status'] ?? ''));
+$search = trim((string)security_input_scalar($_GET, 'q'));
+$filterClass = trim((string)security_input_scalar($_GET, 'kelas'));
+$filterYear = trim((string)security_input_scalar($_GET, 'tahun_ajaran'));
+$filterStatus = trim((string)security_input_scalar($_GET, 'status'));
 $allowedPageSizes = [10, 25, 50, 100];
-$requestedPage = (int)($_GET['page'] ?? 1);
-$requestedPageSize = (int)($_GET['per_page'] ?? 10);
+$requestedPage = (int)security_input_scalar($_GET, 'page', 1);
+$requestedPageSize = (int)security_input_scalar($_GET, 'per_page', 10);
 $perPage = in_array($requestedPageSize, $allowedPageSizes, true) ? $requestedPageSize : 10;
 $page = max(1, $requestedPage);
 $allowedClasses = ['1', '2', '3', '4', '5', '6'];
@@ -111,7 +112,7 @@ $pageParams = $params;
 $pageParams[] = $perPage;
 $pageParams[] = $offset;
 $stmt = $koneksi->prepare($pageSql);
-if (!$stmt) throw new RuntimeException('Query halaman Riwayat Daftar Ulang tidak dapat disiapkan: ' . $koneksi->error);
+if (!$stmt) throw new RuntimeException('Laporan Riwayat Daftar Ulang sementara tidak dapat dimuat.');
 $pageTypes = $types . 'ii';
 $stmt->bind_param($pageTypes, ...$pageParams);
 $stmt->execute();

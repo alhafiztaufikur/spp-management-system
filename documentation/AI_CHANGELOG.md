@@ -13,6 +13,1187 @@ File ini mencatat perubahan proyek secara reverse chronological. Baca [PROJECT_C
 - Jangan menghapus atau menulis ulang entri lama. Tambahkan entri koreksi bila diperlukan.
 - Perubahan implementasi dan entri changelog wajib masuk commit yang sama.
 
+## 2026-08-27 - Sinkronisasi Bukti Dokumentasi Audit
+
+**AI/Aktor:** Codex berbasis GPT-5
+
+**Tujuan:** Menghapus dua klaim historis yang sudah tidak merepresentasikan source saat ini dan mencatat regression disposable terbaru.
+
+**Perubahan fitur dan perilaku:** Tidak ada perubahan runtime. Manifest migrasi kini menyatakan schema tidak menanam akun/password default; inventaris dead-code menandai hint credential sebagai historical/remediated; bagian temuan keamanan diberi penanda bahwa line reference rinci merujuk baseline 20 Agustus.
+
+**Database dan migrasi:** Tidak ada mutasi database atau migrasi.
+
+**Kompatibilitas dan data lama:** Histori temuan dipertahankan; tidak ada backfill atau perubahan data aplikasi.
+
+**Verifikasi:** Ringkasan tersanitasi `regression-20260827_025835-current/sanitized-summary.txt` diverifikasi tanpa pola secret/cookie/token dan dengan ACL terbatas; regression disposable 18/18 PASS, source audit tidak berubah, dan seluruh port audit bebas.
+
+**Catatan tindak lanjut:** Gate browser/UAT, deployment client, backup terenkripsi, rollback, dan sign-off owner tetap terbuka.
+
+## 2026-08-27 - Hardening ACL Evidence Audit
+
+**AI/Aktor:** Codex berbasis GPT-5
+
+**Tujuan:** Menutup akses umum yang tidak semestinya ke evidence audit di luar document root.
+
+**Perubahan fitur dan perilaku:** Tidak ada perubahan runtime aplikasi. Pernyataan cleanup pada register audit dan `KNOWN_LIMITATIONS.md` juga diperjelas agar berlaku pada run yang disebut, bukan klaim bahwa seluruh evidence historis telah kosong.
+
+**Database dan migrasi:** Tidak ada mutasi database atau schema.
+
+**Kompatibilitas dan data lama:** Tidak ada perubahan pada data aplikasi; evidence historis tetap dipertahankan sebagai material terbatas.
+
+**Verifikasi:** ACL root dan 2.767 objek di `C:\xampp\sistemspp-audit-evidence\20260820-090000-wave0` diubah dari inheritance yang memberi `Authenticated Users` hak `Modify` menjadi hanya owner audit, `BUILTIN\\Administrators`, dan `SYSTEM`; root dan child sample diverifikasi ulang (`OPS-003`). Regression disposable terbaru tetap lulus 18/18 dan seluruh port audit bebas.
+
+**Catatan tindak lanjut:** Terapkan ACL, enkripsi, dan retensi yang setara pada host client; evidence lama yang berisi dump/log/cookie harus dimusnahkan terkontrol setelah masa retensi disetujui.
+
+## 2026-08-27 - Retest Ketersediaan Browser UAT
+
+**AI/Aktor:** Codex berbasis GPT-5
+
+**Tujuan:** Memastikan status UAT browser didasarkan pada pemeriksaan runtime resmi, bukan asumsi atau pengganti automation yang tidak setara.
+
+**Perubahan fitur dan perilaku:** Tidak ada perubahan runtime aplikasi.
+
+**Database dan migrasi:** Tidak ada mutasi database atau inspeksi cookie/session.
+
+**Kompatibilitas dan data lama:** Tidak ada perubahan.
+
+**Verifikasi:** Browser skill runtime resmi dicoba ulang; `agent.browsers.list()` mengembalikan daftar kosong dan `getDefault()` tidak menemukan browser. Hasil dicatat sebagai `UI-BROWSER-004`; tidak ada fallback automation atau data mutation.
+
+**Catatan tindak lanjut:** UAT browser seluruh role/route/state, accessibility tree, contrast, screen reader, keyboard, console/network, dan screenshot regression memerlukan runtime browser atau host client yang tersedia.
+
+## 2026-08-27 - Retest Security Session Username
+
+**AI/Aktor:** Codex berbasis GPT-5 / security regression agent
+
+**Tujuan:** Memastikan username sesi menggunakan nilai kanonis dari database setelah login dan saat revalidasi akun, tanpa mengubah hasil hardening keamanan yang sudah lulus.
+
+**Perubahan fitur dan perilaku:**
+
+- `login.php` kini menyimpan `admin_username` dari baris akun yang berhasil diautentikasi.
+- `includes/auth.php` menyegarkan `admin_username` dari akun aktif pada setiap revalidasi sesi.
+- Tidak ada perubahan pada alur role, revocation, atau audit event selain konsistensi identitas sesi.
+
+**Database dan migrasi:** Tidak ada migrasi baru atau perubahan data baseline.
+
+**Kompatibilitas dan data lama:** Sesi yang valid tetap bekerja; sesi akun yang dihapus atau role-nya berubah tetap direvalidasi oleh kontrol yang sama.
+
+**Verifikasi:** Security regression direct `SEC-REG-FINAL-002` pada `db_spp_audit_20260820_090000` lulus; baseline/after identik (`audit_event=0`, fixture legacy=0, rate-limit rows=0, `session_version=1`), server 8099 dihentikan, serta PHP lint untuk `login.php` dan `includes/auth.php` lulus.
+
+**Catatan tindak lanjut:** Verifikasi HTTPS/HSTS, ACL/credential, browser/UAT, dan pengulangan pada tag/package final tetap terbuka.
+
+## 2026-08-27 - Sinkronisasi Bukti Audit dan Inventaris Worktree
+
+**AI/Aktor:** Codex berbasis GPT-5
+
+**Tujuan:** Menjaga register audit tetap sesuai dengan bukti runtime terbaru tanpa menaikkan status lokal menjadi kesiapan produksi.
+
+**Perubahan fitur dan perilaku:**
+
+- Tidak ada perubahan runtime aplikasi pada entri ini. `FULLSEC-011` diperjelas sebagai temuan baseline yang memiliki remediation `audit_event` append-only, actor/reason/before-after/request ID, serta residual retention/approval/monitoring.
+- Manifest membedakan artefak Git-tracked dari 6 test PHP dan 1 migrasi SQL untracked di worktree yang belum boleh dianggap bagian tag release.
+- Bukti Excel diperluas melalui `REP-XLS-004` (11/11 workbook dibuka read-only pada Excel lokal, formula native 0) dan benchmark laporan bounded `REP-PERF-001`.
+- `PROJECT_CONTEXT.md` memperjelas bahwa konteks tagihan legacy boleh dipetakan untuk saldo, tetapi `bayar_du.bayar_id` tidak pernah diisi otomatis; kepemilikan pembayaran tetap legacy sampai rekonsiliasi manual.
+
+**Database dan migrasi:**
+
+- Snapshot audit hanya diberi grant `SELECT` sementara untuk benchmark, kemudian grant dicabut dan diverifikasi. `db_spp` tidak disentuh dan tidak ada migrasi/backfill baru.
+
+**Kompatibilitas dan data lama:**
+
+- Tidak ada perubahan perilaku pembayaran, tabungan, legacy, atau schema. Artefak untracked tetap memerlukan keputusan packaging/commit.
+
+**Verifikasi:**
+
+- Excel COM: 11 file dibuka, formula native total 0.
+- Benchmark read-only: tujuh template, 2–4 SELECT, 1.987–3.567 ms/report pada snapshot audit.
+- Coverage matrix 40/40, lint helper, dan `git diff --check` lulus.
+- Link checker dokumentasi Markdown memeriksa 12 link file relatif tanpa target hilang (`DOC-001`).
+
+**Catatan tindak lanjut:**
+
+- Browser runtime resmi masih mengembalikan daftar kosong; UAT browser penuh, performance budget produksi, client target, dan deployment gates tetap terbuka.
+
+## 2026-08-27 - Klarifikasi Status Kontrak Invariant
+
+**AI/Aktor:** Codex berbasis GPT-5
+
+**Tujuan:** Mencegah pembaca menafsirkan kolom level gate pada kontrak data sebagai hasil verifier terbaru.
+
+**Perubahan fitur dan perilaku:**
+
+- `documentation/audit/DATA_CONTRACT.md` kini membedakan tingkat pengendalian invariant dari status observasi suatu run.
+- Referensi hasil salinan audit dan queue baseline diarahkan ke `RECONCILIATION_REPORT.md`; tidak ada angka baseline yang dipromosikan sebagai status produksi terkini.
+
+**Database dan migrasi:** Tidak ada perubahan.
+
+**Kompatibilitas dan data lama:** Aturan legacy tetap sama; tidak ada pencocokan atau backfill otomatis.
+
+**Verifikasi:** PHP lint 64 file, Node check, pemeriksaan link dokumentasi, coverage matrix 40/40, route contract, dan `git diff --check` lulus.
+
+**Catatan tindak lanjut:** Hasil verifier produksi/client dan keputusan deployment tetap merupakan gate eksternal yang belum dipenuhi.
+
+## 2026-08-27 - Retest Postflight dan Pembersihan Evidence
+
+**AI/Aktor:** Codex berbasis GPT-5
+
+**Tujuan:** Memastikan snapshot audit dan evidence lokal tetap bersih setelah seluruh regression/security run.
+
+**Perubahan fitur dan perilaku:** Tidak ada perubahan runtime, schema, atau data aplikasi.
+
+**Database dan migrasi:** `verify_schema.sql` read-only pada snapshot audit menghasilkan 87 requirement tanpa missing; `run_data_verifier.ps1` menghasilkan 17/17 invariant PASS. `db_spp` tidak disentuh.
+
+**Kompatibilitas dan data lama:** Tidak ada perubahan; aturan legacy tetap berlaku.
+
+**Verifikasi:** Port audit bebas; 59 artefak cookie/session uji nonvendor di evidence root dihapus dan diverifikasi tersisa 0. Secret-history scanner diulang pada 49 commit/142 kandidat revisi tanpa mencetak nilai. Regression disposable diulang pada clone unik dan lulus 18/18 (`REG-FINAL-003`), release rehearsal package bersih + 19 migrasi lulus (`DEP-REHEARSAL-007`), dan seluruh 18 test PHP/SQL verifier lulus containment guard (`TESTISO-002`); clone/server/fixture/database sementara dibersihkan. Hasil dicatat sebagai `DBPOST-003`, `DATA-FINAL-002`, `OPS-002`, `SECRET-002`, `REG-FINAL-003`, `DEP-REHEARSAL-007`, dan `TESTISO-002`.
+
+**Catatan tindak lanjut:** Retensi/ACL evidence produksi, postflight target client, dan sign-off deployment tetap terbuka.
+
+## 2026-08-27 - Klarifikasi Artefak Runtime dan Handover
+
+**AI/Aktor:** Codex berbasis GPT-5
+
+**Tujuan:** Mencegah SQL, tests, dokumentasi internal, atau evidence ikut tersaji pada document root produksi.
+
+**Perubahan fitur dan perilaku:** `RELEASE_MANIFEST.md` kini membedakan paket runtime publik dari handover bundle terbatas. Runtime package wajib mengecualikan `sql/`, `tests/`, `documentation/`, `.git/`, dump, evidence, dan konfigurasi lokal; dokumentasi/source migrasi diserahkan terpisah dengan ACL.
+
+**Database dan migrasi:** Tidak ada perubahan.
+
+**Kompatibilitas dan data lama:** Tidak ada perubahan perilaku aplikasi atau aturan legacy.
+
+**Verifikasi:** Release rehearsal `DEP-REHEARSAL-007` sebelumnya membuktikan exclusion artefak internal pada package staging; link checker dan `git diff --check` lulus setelah klarifikasi.
+
+**Catatan tindak lanjut:** Allowlist final, checksum, commit/tag, dan pemeriksaan document root host client tetap wajib sebelum release.
+
+## 2026-08-27 - Assertion Isi Paket Runtime
+
+**AI/Aktor:** Codex berbasis GPT-5
+
+**Tujuan:** Memastikan exclusion artefak internal diverifikasi pada filesystem staging, bukan hanya melalui HTTP.
+
+**Perubahan fitur dan perilaku:** `tests/support/run_release_rehearsal.ps1` kini gagal bila `.git`, `sql`, `tests`, `documentation`, `.env`, atau `config/app.local.php` tersalin ke paket runtime.
+
+**Database dan migrasi:** Tidak ada perubahan pada database aplikasi; rehearsal memakai schema disposable.
+
+**Kompatibilitas dan data lama:** Tidak ada perubahan runtime produksi.
+
+**Verifikasi:** PowerShell parser lulus; `DEP-REHEARSAL-008` lulus dengan schema + 19 migrasi dua pass, verifier, auth/HTTP smoke, Composer, filesystem allowlist, dan cleanup disposable.
+
+**Catatan tindak lanjut:** Ulangi assertion pada tag/package final dan host client; status produksi tetap menunggu HTTPS, ACL, UAT, backup/rollback, dan sign-off.
+
+## 2026-08-27 - Gate Statis Final Worktree
+
+**AI/Aktor:** Codex berbasis GPT-5
+
+**Tujuan:** Memastikan perubahan audit terakhir tidak menimbulkan regresi syntax, coverage, route contract, atau whitespace.
+
+**Perubahan fitur dan perilaku:** Tidak ada perubahan runtime; hanya verifikasi terhadap source saat ini.
+
+**Database dan migrasi:** Tidak ada mutasi database.
+
+**Kompatibilitas dan data lama:** Tidak ada perubahan.
+
+**Verifikasi:** PHP lint 64 file, Node check, coverage matrix 40/40, route contract 29/26/15, PowerShell parser release rehearsal, Composer validate/platform/audit (0 advisory), 14 artefak wajib, link checker, dan `git diff --check` lulus (`STATIC-005`, `DEP-SBOM-002`).
+
+**Catatan tindak lanjut:** Gate statis harus dijalankan ulang pada commit/tag final; gate client/produksi tetap terbuka.
+
+## 2026-08-27 - Hardening Layout Login Mobile
+
+**AI/Aktor:** Codex berbasis GPT-5
+
+**Tujuan:** Mencegah flex item halaman login mempertahankan lebar minimum konten sehingga form terpotong pada viewport mobile.
+
+**Perubahan fitur dan perilaku:**
+
+- Menetapkan `min-width: 0`, basis flex, dan batas `100vw` pada panel login serta inner form di breakpoint tablet/mobile. Input dan tombol kini dapat menyusut mengikuti viewport tanpa horizontal overflow.
+- Versi query asset `login.css` dinaikkan dari `3.4` ke `3.5` agar perbaikan tidak tertahan cache browser.
+
+**Database dan migrasi:**
+
+- Tidak ada perubahan schema, migrasi, atau data.
+
+**Kompatibilitas dan data lama:**
+
+- Layout desktop tetap menggunakan split panel; breakpoint mobile hanya memperketat sizing dan tidak mengubah alur login.
+
+**Verifikasi:**
+
+- Playwright + Chrome headless viewport 390x844: `innerWidth=390`, `scrollWidth=390`, panel 390px, form/input/button 350px.
+- Cache-busted smoke mengonfirmasi stylesheet `assets/css/login.css?v=3.5` termuat dan `scrollWidth=390`.
+- Keyboard Tab mencapai theme, username, password, toggle password, dan submit; toggle dark→light tidak menambah overflow.
+- Smoke autentikasi pada dashboard, laporan, pembayaran, tabungan, dan Master Daftar Ulang di viewport 390px/1440px menghasilkan HTTP 200 tanpa overflow atau console error (`UI-BROWSER-002`).
+- PHP lint, Node check, dan `git diff --check` lulus.
+
+**Catatan tindak lanjut:**
+
+- Smoke ini mencakup login dan enam halaman read-only lokal; UAT browser seluruh route/role, accessibility tree, console/network menyeluruh, dan target client tetap terbuka.
+
+## 2026-08-26 - CSRF Gate Sebelum Pembuatan Tahun Ajaran
+
+**AI/Aktor:** Codex berbasis GPT-5
+
+**Tujuan:** Memastikan POST Master Daftar Ulang yang tokennya tidak valid tidak membuat state tahun ajaran sebelum validasi keamanan.
+
+**Perubahan fitur dan perilaku:**
+
+- `master_daftar_ulang.php` memindahkan `master_du_ensure_year()` ke setelah validasi CSRF. POST invalid/cross-site kini ditolak sebelum operasi database; GET tetap read-only.
+
+**Database dan migrasi:**
+
+- Tidak ada perubahan schema atau migrasi.
+
+**Kompatibilitas dan data lama:**
+
+- POST sah tetap memastikan tahun ajaran dan melanjutkan alur sebelumnya; histori dan pembayaran legacy tidak disentuh.
+
+**Verifikasi:**
+
+- Probe token CSRF salah dengan label tahun valid: 302 dan jumlah tahun ajaran before/after identik.
+- Regression disposable `regression-csrf-du-20260826_231000`: 18/18 PASS; PHP lint dan `git diff --check` PASS.
+
+**Catatan tindak lanjut:**
+
+- Matrix seluruh kombinasi method/content-type/CSRF dan fault-injection masih menjadi residual audit.
+
+## 2026-08-26 - Atomisitas Ensure Tahun Ajaran Daftar Ulang
+
+**AI/Aktor:** Codex berbasis GPT-5
+
+**Tujuan:** Mencegah kegagalan aksi POST yang sah meninggalkan draft tahun ajaran baru.
+
+**Perubahan fitur dan perilaku:**
+
+- `master_du_ensure_year()` dipindahkan ke dalam transaksi aksi Master Daftar Ulang. Aksi tidak dikenali atau validasi bisnis yang gagal sekarang menggulung balik pembuatan tahun yang baru.
+
+**Database dan migrasi:**
+
+- Tidak ada perubahan schema/migrasi; hanya urutan operasi transaksi pada handler.
+
+**Kompatibilitas dan data lama:**
+
+- POST valid tetap membuat/menggunakan tahun ajaran seperti sebelumnya; GET tetap read-only dan legacy tidak disentuh.
+
+**Verifikasi:**
+
+- Probe valid-CSRF dengan aksi invalid dan label tahun terisolasi: redirect, jumlah `tahun_ajaran` before/after identik.
+- Regression disposable `regression-du-atomic-20260826_234500`: 18/18 PASS.
+
+**Catatan tindak lanjut:**
+
+- Failpoint di tengah setiap write dan matrix seluruh method/content-type/CSRF masih terbuka.
+
+## 2026-08-27 - Validasi Scalar Alasan Audit
+
+**AI/Aktor:** Codex berbasis GPT-5
+
+**Tujuan:** Mencegah nilai array/struktur tidak sengaja berubah menjadi teks `Array` dan masuk ke audit trail.
+
+**Perubahan fitur dan perilaku:**
+
+- `audit_require_reason()` sekarang menolak input non-scalar sebelum normalisasi dan batas panjang.
+
+**Database dan migrasi:**
+
+- Tidak ada perubahan schema/migrasi atau data baseline.
+
+**Kompatibilitas dan data lama:**
+
+- Alasan teks biasa tetap berfungsi; request berbentuk array harus diperbaiki oleh caller.
+
+**Verifikasi:**
+
+- Assertion `audit_event_test.php` membuktikan array reason ditolak.
+- Regression disposable `regression-audit-reason-20260827_001500`: 18/18 PASS; PHP lint dan `git diff --check` PASS.
+
+**Catatan tindak lanjut:**
+
+- DAST input lengkap dan fault-injection tetap belum tersedia pada lingkungan target.
+
+## 2026-08-26 - Final Security Regression dan Revalidasi Username
+
+**AI/Aktor:** Codex berbasis GPT-5
+
+**Tujuan:** Memastikan revalidasi sesi membawa snapshot username yang konsisten dan mengulang regression keamanan langsung pada snapshot audit.
+
+**Perubahan fitur dan perilaku:**
+
+- Login dan `includes/auth.php` kini menyimpan serta menyegarkan `admin_username` ketika akun berhasil diverifikasi; perubahan role/password/session version tetap memaksa revalidasi sesi.
+
+**Database dan migrasi:**
+
+- Tidak ada migrasi baru. Probe memakai `db_spp_audit_20260820_090000`; baseline dan after tetap identik, tanpa fixture tersisa.
+
+**Kompatibilitas dan data lama:**
+
+- Tidak mengubah data pembayaran, tabungan, atau histori legacy; kontrol MD5 legacy tetap memerlukan reset eksplisit.
+
+**Verifikasi:**
+
+- Security regression direct PASS untuk request ID, security headers/cookie/HSTS, CSRF, POST-only, revocation, MD5 block, multi-bucket throttle, last-admin guard, dan logout.
+- Port 8099 dilepas setelah uji; PHP lint login/auth PASS.
+
+**Catatan tindak lanjut:**
+
+- Bukti ini lokal pada snapshot audit; TLS/ACL/credential target, browser/UAT, DAST penuh, dan keputusan deployment tetap terbuka.
+
+## 2026-08-26 - Sanitasi Fallback Error Riwayat Daftar Ulang
+
+**AI/Aktor:** Codex berbasis GPT-5
+
+**Tujuan:** Menutup satu fallback query yang sebelumnya menyusun pesan exception dari `$koneksi->error` dan berpotensi membocorkan detail internal.
+
+**Perubahan fitur dan perilaku:**
+
+- `pembayaran/riwayat_daftar_ulang.php` kini mengembalikan pesan domain generik ketika statement halaman gagal disiapkan; detail teknis tetap ditangani oleh logging/exception handler terpusat.
+
+**Database dan migrasi:**
+
+- Tidak ada perubahan schema, migrasi, saldo, atau histori.
+
+**Kompatibilitas dan data lama:**
+
+- Jalur normal dan filter laporan tidak berubah; hanya pesan kegagalan internal yang disanitasi.
+
+**Verifikasi:**
+
+- PHP lint seluruh 64 file dan `git diff --check` lulus setelah perubahan.
+- Regression disposable final tetap lulus 18/18 sebelum perubahan fallback ini; perubahan hanya pada cabang error prepare.
+
+**Catatan tindak lanjut:**
+
+- Failure injection untuk seluruh query report dan browser/UAT deployment masih merupakan residual audit.
+
+## 2026-08-26 - Regression Disposable Final Audit
+
+**AI/Aktor:** Codex berbasis GPT-5
+
+**Tujuan:** Memverifikasi ulang paket hardening dan regression terbaru setelah seluruh perbaikan boundary input, idempotency, audit, dan lifecycle diterapkan.
+
+**Perubahan fitur dan perilaku:**
+
+- Tidak ada perubahan perilaku baru pada source dalam run ini; seluruh suite dijalankan pada clone disposable.
+
+**Database dan migrasi:**
+
+- Database `db_spp_audit_20260826_221654_suite_8627` dibuat dan dikelola harness disposable. `db_spp` tidak pernah menjadi target mutasi.
+
+**Kompatibilitas dan data lama:**
+
+- Tidak ada backfill atau perubahan histori baseline. Guard legacy, relasi pembayaran, dan audit append-only tetap diuji sesuai kontrak.
+
+**Verifikasi:**
+
+- `run_disposable_regression.ps1 -AllowEmptyPassword -GenerateTemporaryAdmin`: 18/18 PASS.
+- PHP lint 64 file, `node --check assets/js/app.js`, coverage matrix 40/40, route contract, dan `git diff --check` PASS.
+
+**Catatan tindak lanjut:**
+
+- Status audit tetap NO-GO sampai browser/UAT, DAST penuh, PDF/Excel client, failpoint/deadlock/retry, target TLS/ACL/credential, backup terenkripsi, serta keputusan owner tersedia.
+
+## 2026-08-26 - Harness Recovery Migrasi Pasca-Kegagalan
+
+**AI/Aktor:** Codex berbasis GPT-5
+
+**Tujuan:** Membuktikan migrasi dapat dijalankan ulang setelah kegagalan SQL sintetis tanpa menyentuh database utama.
+
+**Perubahan fitur dan perilaku:**
+
+- Menambahkan `tests/support/run_migration_failure_recovery.ps1`. Harness membuat database `db_spp_audit_failure_*`, menyuntikkan satu statement invalid setelah masing-masing migrasi kanonik, mengharapkan kegagalan, lalu menjalankan ulang migrasi asli.
+
+**Database dan migrasi:**
+
+- Tidak ada perubahan pada migrasi produksi. Database disposable dibersihkan dengan guard identitas.
+
+**Kompatibilitas dan data lama:**
+
+- Bukti hanya mencakup rerun setelah statement migrasi selesai; tidak mengklaim rollback DDL, failpoint di tengah statement, deadlock/retry, atau upgrade semua generasi histori.
+
+**Verifikasi:**
+
+- Run `migration-failure-20260826_191000`: 19/19 failure injection teramati, 19/19 recovery PASS, verifier schema/data PASS.
+- PowerShell parser PASS dan tidak ada database `db_spp_audit_failure_*` tersisa setelah cleanup.
+
+**Catatan tindak lanjut:**
+
+- Recovery produksi, snapshot histori client, deadlock/retry, dan sign-off deployment masih terbuka; status audit tetap NO-GO.
+
+## 2026-08-26 - Perluasan Oracle Formula Spreadsheet
+
+**AI/Aktor:** Codex berbasis GPT-5
+
+**Tujuan:** Memperkuat pemeriksaan netralisasi formula dan control character pada helper export tanpa mengklaim validasi aplikasi spreadsheet client.
+
+**Perubahan fitur dan perilaku:**
+
+- `tests/report_export_parity_test.php` kini menguji awalan `=`, `+`, `-`, `@`, whitespace Unicode, CR/LF/tab, dan NUL; setiap hasil harus bebas control character dan diawali apostrophe.
+
+**Database dan migrasi:**
+
+- Tidak ada perubahan schema/migrasi; fixture tetap berada di transaksi test dan di-rollback.
+
+**Kompatibilitas dan data lama:**
+
+- Tidak mengubah format export atau data lama. Verifikasi ini hanya memperluas oracle helper yang telah dipakai export.
+
+**Verifikasi:**
+
+- `regression-formula-20260826_193000`: 18/18 PASS.
+- PHP lint dan `git diff --check` PASS.
+
+**Catatan tindak lanjut:**
+
+- Workbook tetap harus dibuka pada client target untuk memverifikasi tipe sel dan perilaku formula; FULLSEC-014 tetap belum tertutup.
+
+## 2026-08-26 - Hardening Scalar Filter Rekap Kelas
+
+**AI/Aktor:** Codex berbasis GPT-5
+
+**Tujuan:** Menghindari cast langsung parameter GET array pada halaman rekap kelas yang dilindungi.
+
+**Perubahan fitur dan perilaku:**
+
+- `laporan/rekap_kelas.php` memakai `security_input_scalar()` untuk filter kelas, bulan, tahun, dan pencarian. Markup, CSS, selector, dan konsep visual tidak diubah.
+
+**Database dan migrasi:**
+
+- Tidak ada perubahan schema, migrasi, saldo, atau histori.
+
+**Kompatibilitas dan data lama:**
+
+- Filter scalar valid tetap sama; input array kembali ke default aman.
+
+**Verifikasi:**
+
+- `regression-recap-scalar-20260826_201500`: 18/18 PASS, termasuk probe array seluruh filter rekap.
+- PHP lint, route contract, coverage checker, dan `git diff --check` PASS.
+
+**Catatan tindak lanjut:**
+
+- Screenshot/browser regression, DAST parameter penuh, dan validasi akurasi snapshot rekap tetap terbuka.
+
+## 2026-08-26 - Hardening Scalar Pagination Parameter
+
+**AI/Aktor:** Codex berbasis GPT-5
+
+**Tujuan:** Mencegah parameter GET berbentuk array memicu cast/warning pada helper pagination.
+
+**Perubahan fitur dan perilaku:**
+
+- `includes/pagination.php` kini hanya meng-cast nilai scalar pada `page_int_param()` dan `page_size_param()`; array/object kembali ke nilai default.
+
+**Database dan migrasi:**
+
+- Tidak ada perubahan schema, migrasi, atau data.
+
+**Kompatibilitas dan data lama:**
+
+- Parameter halaman scalar valid tetap berperilaku sama; input array diperlakukan sebagai default yang aman.
+
+**Verifikasi:**
+
+- `regression-pagination-scalar-20260826_200000`: 18/18 PASS, termasuk corpus array/scalar endpoint tabungan dan laporan.
+- PHP lint, Node check, route contract, coverage checker, dan `git diff --check` PASS.
+
+**Catatan tindak lanjut:**
+
+- DAST parameter penuh, time-based payload, dan browser sink tetap di luar coverage lokal.
+
+## 2026-08-26 - Corpus Content-Type Terstruktur pada Endpoint Mutasi
+
+**AI/Aktor:** Codex berbasis GPT-5
+
+**Tujuan:** Menambah bukti boundary method/content-type tanpa mengklaim DAST atau Cartesian coverage penuh.
+
+**Perubahan fitur dan perilaku:**
+
+- `tests/security_input_corpus_test.php` kini dapat mengirim raw body dan menguji `application/json` serta `text/plain` ke endpoint mutasi pembayaran, tabungan, master kelas/biaya/Daftar Ulang, siswa, dan role management.
+- Request sengaja tanpa token form; aplikasi harus menolak atau mengarahkan ulang tanpa SQL error/HTTP 500 dan tidak memperlakukan body terstruktur sebagai `$_POST` form.
+
+**Database dan migrasi:**
+
+- Tidak ada perubahan schema/migrasi. Clone disposable dibersihkan oleh harness; `db_spp` tidak disentuh.
+
+**Kompatibilitas dan data lama:**
+
+- Form `application/x-www-form-urlencoded` dan URL tetap tidak berubah. Probe ini hanya menambah coverage negatif untuk content-type non-form.
+
+**Verifikasi:**
+
+- `regression-rollback-20260826_185000`: 18/18 test PASS, termasuk corpus JSON/text, SQLi/array boundary, security, payment, savings, report, dan lifecycle; snapshot count sembilan tabel bisnis sebelum/sesudah tetap identik.
+- `payment_process_integration_test.php` memverifikasi penolakan payment plan tahunan me-rollback claim idempotency yang dibuat sebelum validasi gagal.
+- PHP lint dan `git diff --check` PASS.
+
+**Catatan tindak lanjut:**
+
+- Full Cartesian route × method × content-type × parameter, failpoint/deadlock/retry, authenticated DAST, dan browser/UAT client tetap terbuka; status serah-terima tetap NO-GO.
+
+## 2026-08-26 - Retest Release Rehearsal Final Scalar Boundary
+
+**AI/Aktor:** Codex berbasis GPT-5
+
+**Tujuan:** Memastikan clean package terbaru setelah normalisasi scalar pada route master, siswa, role, payment, savings, dan histori Daftar Ulang tetap dapat dipasang ulang.
+
+**Perubahan fitur dan perilaku:**
+
+- Tidak ada perubahan tambahan pada rehearsal; source terbaru diprovision apa adanya.
+
+**Database dan migrasi:**
+
+- `db_spp_audit_migration_20260826_171823_20904_20d17597` menerima schema + 19 migrasi dua pass, verifier lulus, lalu dihapus.
+
+**Kompatibilitas dan data lama:**
+
+- Tidak ada data baseline yang dimutasi.
+
+**Verifikasi:**
+
+- `run_release_rehearsal.ps1 -AllowEmptyPassword`: PASS pada evidence `release-rehearsal-20260826_174000`.
+- Migration matrix, schema/data verifier, least-privilege grant, login/dashboard smoke, deny artefak internal, Composer checks, dan cleanup probe: PASS.
+
+**Catatan tindak lanjut:**
+
+- Target Apache/HTTPS/PDF/ACL/credential/rollback/UAT client tetap belum diuji.
+
+## 2026-08-26 - Retest Clean Package Setelah Hardening POST
+
+**AI/Aktor:** Codex berbasis GPT-5
+
+**Tujuan:** Memastikan paket instalasi bersih tetap reproducible setelah normalisasi scalar pada handler pembayaran/tabungan dan verifier kontrak route.
+
+**Perubahan fitur dan perilaku:**
+
+- Tidak ada perubahan tambahan pada rehearsal; source terbaru diprovision apa adanya.
+
+**Database dan migrasi:**
+
+- `db_spp_audit_migration_20260826_171319_13708_d7fe8e3b` menerima schema + 19 migrasi dua pass, diverifikasi, lalu dihapus.
+
+**Kompatibilitas dan data lama:**
+
+- Tidak ada data baseline yang dimutasi.
+
+**Verifikasi:**
+
+- `run_release_rehearsal.ps1 -AllowEmptyPassword`: PASS pada evidence `release-rehearsal-20260826_172000`.
+- Schema/data verifier, migration matrix, least-privilege grant, login/dashboard smoke, deny artefak internal, dan Composer checks: PASS; post-run probe migration database: 0.
+
+**Catatan tindak lanjut:**
+
+- Target Apache/HTTPS/PDF/ACL/credential/rollback/UAT client tetap belum diuji.
+
+## 2026-08-26 - Hardening Scalar Input Laporan dan Export
+
+**AI/Aktor:** Codex berbasis GPT-5
+
+**Tujuan:** Menutup boundary input array pada filter laporan, receipt, dan export yang sebelumnya mengandalkan cast langsung ke string atau integer.
+
+**Perubahan fitur dan perilaku:**
+
+- `includes/reports.php` memakai helper scalar-only untuk seluruh filter laporan.
+- `laporan/index.php`, `template.php`, `export_global.php`, `export_pdf.php`, `export_excel.php`, `detail_siswa.php`, `cetak_struk.php`, dan `cetak_struk_tahunan.php` menormalisasi parameter scalar; `ids[]` pada PDF tetap didukung sebagai daftar terpilih.
+- `security_input_scalar()` dipakai pada field scalar pembayaran dan tabungan; array list Biaya Lain tetap diproses hanya pada jalur yang memang mengharapkan array.
+- `verify_route_security_contract.ps1` diselaraskan agar memverifikasi helper scalar tersebut sebagai kontrak input handler pembayaran.
+- URL dan perilaku filter scalar valid tetap kompatibel; input array diperlakukan sebagai nilai kosong/default dan tidak memicu warning/HTTP 500.
+
+**Database dan migrasi:**
+
+- Tidak ada perubahan schema, migrasi, saldo, jurnal, pembayaran, atau data legacy.
+
+**Kompatibilitas dan data lama:**
+
+- Tidak ada backfill atau mutasi baseline; semua pengujian memakai clone disposable.
+
+**Verifikasi:**
+
+- `security_input_corpus_test.php` diperluas dengan probe array/scalar pada laporan index/template/global, export PDF/Excel, detail siswa, dan receipt.
+- Regression disposable `regression-route-scalar-20260826_175000`: **18/18 PASS**; probe GET laporan/export dan POST pembayaran/tabungan, master, siswa, role, serta histori Daftar Ulang dengan CSRF valid tidak menghasilkan HTTP 500 atau marker SQL.
+- `master_daftar_ulang.php` tidak lagi membuat tahun ajaran pada GET; probe before/after dan regression `regression-get-safety-20260826_180000` membuktikan GET read-only, sementara pembuatan tetap dilakukan pada POST.
+- Clean release rehearsal terbaru `release-rehearsal-20260826_181000` juga PASS setelah perubahan method-safety; database migration disposable dibersihkan.
+- PHP lint, Node check, coverage matrix, route contract, Composer checks, data verifier, dan `git diff --check` dijalankan ulang setelah perubahan.
+
+**Catatan tindak lanjut:**
+
+- Ini tetap focused corpus, bukan authenticated DAST penuh; mutating route, time-based payload, seluruh kombinasi parameter/content-type, browser sink, dan UAT client masih terbuka.
+
+## 2026-08-26 - Sinkronisasi Bukti Audit Terakhir
+
+**AI/Aktor:** Codex berbasis GPT-5
+
+**Tujuan:** Menyamakan referensi evidence pada ringkasan audit dengan rehearsal dan regression final terbaru.
+
+**Perubahan fitur dan perilaku:**
+
+- Tidak ada perubahan runtime atau schema; hanya referensi dokumentasi yang diperbarui.
+
+**Database dan migrasi:**
+
+- Tidak ada database yang dimutasi.
+
+**Kompatibilitas dan data lama:**
+
+- Tidak ada perubahan data atau perilaku legacy.
+
+**Verifikasi:**
+
+- PHP lint 64 file, `node --check assets/js/app.js`, route security contract, coverage matrix 40/40, Composer validate/platform/audit, dan `git diff --check`: PASS.
+- Evidence terbaru dirujuk konsisten pada saat entri ini dibuat: regression `regression-final-20260826_165546`, release rehearsal `release-rehearsal-20260826_165900`.
+
+**Catatan tindak lanjut:**
+
+- Status keseluruhan tetap NO-GO sampai browser/UAT client, target HTTPS/Apache, PDF/Excel client, rollback/RPO-RTO, dan sign-off risiko tersedia.
+
+## 2026-08-26 - Retest Clean Release Rehearsal
+
+**AI/Aktor:** Codex berbasis GPT-5
+
+**Tujuan:** Memverifikasi ulang paket runtime bersih setelah remediation frontend dan input boundary terbaru.
+
+**Perubahan fitur dan perilaku:**
+
+- Tidak ada perubahan kode pada rehearsal ini; validasi memakai source terkini.
+
+**Database dan migrasi:**
+
+- `db_spp_audit_migration_20260826_165823_1952_7a4e896a` dibuat disposable, menerima schema + 19 migrasi dua pass, diverifikasi, lalu dihapus.
+
+**Kompatibilitas dan data lama:**
+
+- Tidak ada data baseline yang dimutasi.
+
+**Verifikasi:**
+
+- `run_release_rehearsal.ps1 -AllowEmptyPassword`: PASS pada evidence `release-rehearsal-20260826_165900`.
+- Auth/dashboard smoke, deny artefak internal, schema/data verifier, least-privilege grant, Composer validate/platform check: PASS.
+
+**Catatan tindak lanjut:**
+
+- Target Apache/HTTPS/PDF/ACL/credential/rollback/UAT client tetap belum diuji.
+
+## 2026-08-26 - Hardening Array/Scalar Boundary Endpoint Tabungan
+
+**AI/Aktor:** Codex berbasis GPT-5
+
+**Tujuan:** Menutup variasi input array yang dapat menyebabkan error pada endpoint tabungan ketika parameter `nis` seharusnya scalar.
+
+**Perubahan fitur dan perilaku:**
+
+- `tabungan/get_saldo.php`, `tabungan/masuk.php`, dan `tabungan/keluar.php` kini menormalkan `nis` hanya jika scalar; array diperlakukan sebagai filter kosong tanpa TypeError/HTTP 500.
+- `tests/security_input_corpus_test.php` menambah probe array/scalar untuk ketiga endpoint tersebut.
+
+**Database dan migrasi:**
+
+- Tidak ada perubahan database atau migrasi.
+
+**Kompatibilitas dan data lama:**
+
+- Filter scalar dan format URL tetap kompatibel; input array yang sebelumnya error sekarang ditolak secara aman sebagai nilai kosong.
+
+**Verifikasi:**
+
+- PHP lint ketiga route + test dan `node --check assets/js/app.js`: PASS.
+- Regression disposable final: **PASS 18/18**, clone `db_spp_audit_20260826_165547_suite_2778`, evidence `regression-final-20260826_165546`.
+
+**Catatan tindak lanjut:**
+
+- Corpus ini tetap bukan DAST Cartesian seluruh route/parameter dan belum menggantikan browser sink testing.
+
+## 2026-08-26 - Remediasi Frontend Statis Wave 6
+
+**AI/Aktor:** Codex berbasis GPT-5
+
+**Tujuan:** Mengurangi defect frontend yang dapat dibuktikan tanpa browser runtime, sambil mempertahankan konsep visual `laporan/rekap_kelas.php`.
+
+**Perubahan fitur dan perilaku:**
+
+- Sel rekap dashboard mendapat `data-label` untuk konteks kartu mobile.
+- Timer jam global hanya dibuat pada halaman yang benar-benar memiliki `#liveClock`.
+- `prefers-reduced-motion` ditambahkan pada stylesheet aplikasi dan login.
+- Toast laporan/tabungan diberi live-region semantics; modal tabungan diberi `dialog` semantics, label relasi, `tabindex`, fokus awal, restore focus, dan penutupan Escape.
+
+**Database dan migrasi:**
+
+- Tidak ada perubahan database atau migrasi.
+
+**Kompatibilitas dan data lama:**
+
+- Tidak ada perubahan kontrak backend atau data; halaman rekap kelas protected tidak diubah konsep maupun markup-nya.
+
+**Verifikasi:**
+
+- `node --check assets/js/app.js`: PASS.
+- PHP lint route yang berubah: PASS.
+- `git diff --check`: PASS.
+- Regression disposable final setelah perubahan: **PASS 18/18**, evidence `regression-final-20260826_164653`.
+- Browser runtime resmi tidak tersedia (`agent.browsers.list()` mengembalikan `[]`), sehingga screenshot/accessibility tree/runtime UAT tetap belum diuji.
+
+**Catatan tindak lanjut:**
+
+- Uji keyboard, screen reader, contrast, viewport, tema, dan performance pada browser target sebelum Wave 6 ditutup.
+
+## 2026-08-26 - Audit Lifecycle Master Siswa
+
+**AI/Aktor:** Codex berbasis GPT-5
+
+**Tujuan:** Menutup celah bukti TC-STD-001 untuk perubahan NIS, arsip/restore, cascade histori, dan audit perubahan master siswa tanpa menyentuh database baseline.
+
+**Perubahan fitur dan perilaku:**
+
+- Menambahkan `tests/student_lifecycle_integration_test.php` yang menguji endpoint admin secara HTTP: ganti NIS, cascade FK histori `bayar`/`transaksi_m`, snapshot before/after pada `siswa_audit_log`, arsip, restore, dan filter status arsip.
+- Cleanup fixture memperhitungkan placement/tagihan Daftar Ulang otomatis dalam urutan FK yang aman.
+
+**Database dan migrasi:**
+
+- Tidak ada migrasi atau perubahan schema; seluruh fixture berjalan pada clone disposable dan clone di-drop.
+
+**Kompatibilitas dan data lama:**
+
+- Kontrak NIS lama tetap mengikuti `ON UPDATE CASCADE`; tidak ada backfill atau tebakan relasi histori.
+
+**Verifikasi:**
+
+- `run_disposable_regression.ps1 -GenerateTemporaryAdmin`: **PASS 18/18**, clone `db_spp_audit_20260826_163853_suite_4100`, evidence `regression-lifecycle-20260826_163852`.
+- PHP lint test baru dan `git diff --check` lulus.
+
+**Catatan tindak lanjut:**
+
+- Browser/UAT, seluruh tipe referensi, serta deployment target tetap berada di luar bukti lokal ini.
+
+## 2026-08-26 - Clean Deploy Provisioning Rehearsal
+
+**AI/Aktor:** Codex berbasis GPT-5
+
+**Tujuan:** Membuktikan paket runtime bersih dapat dipasang pada schema audit kosong dan melakukan smoke autentikasi tanpa membawa artefak internal.
+
+**Perubahan fitur dan perilaku:**
+
+- `tests/support/run_release_rehearsal.ps1` kini menjalankan schema kosong + 19 migrasi kanonik melalui migration matrix, memberi grant runtime disposable, membuat admin fixture ephemeral, lalu menguji login dan dashboard pada package staging.
+- Rehearsal tetap memeriksa URL internal, Composer, dan cleanup exact; evidence tersanitasi dipertahankan di luar repository, sedangkan package stage dibersihkan.
+
+**Database dan migrasi:**
+
+- Database migration rehearsal hanya memakai namespace `db_spp_audit_migration_*`, diverifikasi, lalu di-drop; `db_spp` tidak disentuh.
+
+**Kompatibilitas dan data lama:**
+
+- Tidak ada perubahan aplikasi produksi atau data histori.
+
+**Verifikasi yang benar-benar dijalankan:**
+
+- `run_release_rehearsal.ps1`: **PASS**, evidence `release-rehearsal-20260826_162519`; schema/data verifier, 19 migrasi, login/dashboard, HTTP deny, dan Composer checks lulus.
+- Tidak ada disposable database atau server yang tersisa.
+
+**Catatan tindak lanjut:**
+
+- Host HTTPS/Apache target, PDF HTTP, secret/ACL target, rollback, backup terenkripsi, dan sign-off infra masih terbuka.
+
+## 2026-08-26 - Perluasan Corpus Input Read-only
+
+**AI/Aktor:** Codex berbasis GPT-5
+
+**Tujuan:** Memperluas bukti DAST fokus tanpa menyentuh mutasi atau database sumber.
+
+**Perubahan fitur dan perilaku:**
+
+- `tests/security_input_corpus_test.php` kini menguji predicate boolean, quote/error, slash, NUL/encoding, parameter duplikat, array/scalar, oversized, dan reflected-XSS pada 24 route GET terautentikasi yang read-only.
+- Tidak ada perubahan schema, saldo, pembayaran, atau histori legacy.
+
+**Database dan migrasi:**
+
+- Tidak ada migrasi; test tetap memakai clone disposable.
+
+**Kompatibilitas dan data lama:**
+
+- Tidak ada perubahan format URL normal atau perilaku bisnis.
+
+**Verifikasi yang benar-benar dijalankan:**
+
+- Regression disposable terbaru `regression-20260826_163314_suite_3628`: **PASS 17/17**; seluruh payload fokus pada 26 route termasuk export tidak menghasilkan SQL error, HTTP 500, atau payload XSS mentah.
+
+**Catatan tindak lanjut:**
+
+- Corpus ini bukan DAST penuh; route mutasi, time-based, sink browser, dan seluruh Cartesian parameter tetap terbuka.
+
+## 2026-08-26 - Backup Restore Drill Disposable
+
+**AI/Aktor:** Codex berbasis GPT-5
+
+**Tujuan:** Menutup bukti lokal bahwa backup logical dapat dipulihkan ke schema berbeda tanpa menyentuh database sumber.
+
+**Perubahan fitur dan perilaku:**
+
+- Menambahkan `tests/support/run_backup_restore_drill.ps1` dengan guard nama database audit/restore, probe identitas `DATABASE()`, perbandingan row count tiap tabel, verifier schema/data, dan cleanup exact.
+- Guard `run_data_verifier.ps1` menerima namespace restore audit yang tetap terisolasi; `db_spp` tetap ditolak.
+
+**Database dan migrasi:**
+
+- Tidak ada migrasi atau backfill; source `db_spp_audit_20260820_090000` hanya dibaca.
+
+**Kompatibilitas dan data lama:**
+
+- Tidak ada perubahan perilaku aplikasi atau relasi histori.
+
+**Verifikasi yang benar-benar dijalankan:**
+
+- `run_backup_restore_drill.ps1`: **PASS**; 22 tabel row-count cocok, `verify_schema.sql` PASS, INV-001--017 PASS, evidence `backup-restore-20260826_161023`.
+- Restore schema disposable di-drop; `db_spp` tidak disentuh.
+
+**Catatan tindak lanjut:**
+
+- Backup terenkripsi, host kosong, least-privilege credential, RPO/RTO, monitoring, dan rollback target client tetap terbuka.
+
+## 2026-08-26 - Isolasi Child Daftar Ulang pada Timestamp Identik
+
+**AI/Aktor:** Codex berbasis GPT-5
+
+**Tujuan:** Memastikan koreksi/hapus satu header pembayaran tidak mengubah child Daftar Ulang lain yang kebetulan memiliki NIS dan timestamp sama.
+
+**Perubahan fitur dan perilaku:**
+
+- `tests/academic_year_billing_test.php` kini membuat dua header dan dua child dengan timestamp identik, menghapus header pertama, lalu memeriksa saldo dan child header kedua berdasarkan `bayar_id`.
+- Tidak ada perubahan pada handler produksi atau schema.
+
+**Database dan migrasi:**
+
+- Tidak ada migrasi; seluruh skenario berada dalam transaction rollback-only.
+
+**Kompatibilitas dan data lama:**
+
+- Tidak ada perubahan perilaku data legacy.
+
+**Verifikasi yang benar-benar dijalankan:**
+
+- Regression disposable terbaru `regression-20260826_161334_suite_6626`: **PASS 17/17**, termasuk assertion isolasi timestamp identik.
+- Tidak ada fixture tersisa pada clone; `db_spp` tidak disentuh.
+
+**Catatan tindak lanjut:**
+
+- Skenario lintas siswa dan fault-injection/deadlock masih memerlukan perluasan terpisah.
+
+## 2026-08-26 - Verifikasi Target Publish Biaya Lain
+
+**AI/Aktor:** Codex berbasis GPT-5
+
+**Tujuan:** Menutup variasi acceptance target `all`, `tingkat`, `rombel`, dan `siswa` pada penerbitan Biaya Lain.
+
+**Perubahan fitur dan perilaku:**
+
+- Menambahkan `tests/optional_fee_publish_integration_test.php` untuk membuat fixture anonim pada clone disposable, login melalui HTTP, menerbitkan empat master biaya ke target berbeda, dan memeriksa jumlah tagihan tepat sasaran.
+- Parser CSRF test diarahkan ke form `form-terbit-biaya` agar token yang diverifikasi adalah token form penerbitan, bukan hidden field dari form lain.
+- Tidak ada perubahan schema, saldo, pembayaran, atau histori produksi; seluruh fixture dihapus pada akhir test.
+
+**Verifikasi yang benar-benar dijalankan:**
+
+- `run_disposable_regression.ps1 -GenerateTemporaryAdmin`: **PASS 15/15** pada clone `db_spp_audit_20260826_153630_suite_3269`; cleanup domain dan mutation request lulus, clone di-drop.
+- PHP lint 61 file, `node --check assets/js/app.js`, dan `git diff --check` lulus.
+- `tests/support/verify_test_coverage_matrix.ps1`: 40/40 mapped, PASS 10, FAIL 0, NOT TESTED 25, PENDING DECISION 5.
+
+**Di luar scope:** Repeat lintas target, deadlock/retry, failpoint, DAST penuh, browser UAT, dan gate deployment/client tetap terbuka.
+
+## 2026-08-26 - Rehearsal Paket Runtime Bersih
+
+**AI/Aktor:** Codex berbasis GPT-5
+
+**Tujuan:** Memeriksa bahwa paket runtime lokal dapat dijalankan tanpa membawa artefak internal atau konfigurasi secret.
+
+**Perubahan fitur dan perilaku:**
+
+- Menambahkan `tests/support/run_release_rehearsal.ps1`, harness yang membuat staging di luar repository dengan `.git`, `sql`, `tests`, dokumentasi, dan konfigurasi lokal dikeluarkan.
+- Harness menguji login/asset publik, deny URL internal, `composer validate`, dan `composer check-platform-reqs`, lalu menghentikan server dan membersihkan staging.
+- Tidak ada perubahan database aplikasi, schema, atau perilaku produksi.
+
+**Verifikasi yang benar-benar dijalankan:**
+
+- `run_release_rehearsal.ps1`: **RELEASE_REHEARSAL=PASS**; `login.php` dan asset 200, URL internal 403/404, Composer platform lulus, staging/server dibersihkan.
+- `composer validate --strict`, `composer check-platform-reqs --no-dev`, dan `composer audit --locked --no-dev` pada worktree: PASS tanpa advisory.
+
+**Di luar scope:** Fresh install/migrate, PDF HTTP dari paket staging, virtual host/HTTPS, target client, backup/RPO/RTO, dan release tag final.
+
+## 2026-08-26 - Regression Lifecycle Session Akun
+
+**AI/Aktor:** Codex berbasis GPT-5
+
+**Tujuan:** Memverifikasi bahwa perubahan role dan penghapusan akun mencabut kewenangan session aktif.
+
+**Perubahan fitur dan perilaku:**
+
+- Menambahkan `tests/session_lifecycle_test.php` yang membuat akun fixture anonim, login melalui HTTP, mengubah role menjadi kasir, lalu menghapus akun kedua saat session masih aktif.
+- Test memastikan dashboard admin dialihkan setelah role berubah dan session akun terhapus kembali ke login.
+- Tidak ada perubahan schema atau database sumber; fixture hanya hidup di clone disposable dan dibersihkan.
+
+**Verifikasi yang benar-benar dijalankan:**
+
+- `run_disposable_regression.ps1 -GenerateTemporaryAdmin`: **PASS 16/16** pada clone `db_spp_audit_20260826_154651_suite_5600`.
+- PHP lint 62 file, Node check, route contract, data/schema verifier, dan cleanup disposable tetap lulus.
+
+**Di luar scope:** Idle/absolute timeout, reuse cookie lintas proses, seluruh route pascarevokasi, browser UAT, dan deployment client.
+
+## 2026-08-26 - Focused SQLi Input Corpus
+
+**AI/Aktor:** Codex berbasis GPT-5
+
+**Tujuan:** Memperluas bukti SQL injection dari filter NIS ke parameter GET pada route laporan dan histori yang bersifat read-only.
+
+**Perubahan fitur dan perilaku:**
+
+- Menambahkan `tests/security_input_corpus_test.php` untuk login pada clone disposable dan mengirim payload quote/comment ke sepuluh route GET terautentikasi.
+- Test menolak HTTP 500 dan marker error SQL, tanpa mengubah database; ini bukti fokus, bukan klaim DAST seluruh aplikasi.
+
+**Verifikasi yang benar-benar dijalankan:**
+
+- `run_disposable_regression.ps1 -GenerateTemporaryAdmin`: **PASS 17/17** pada clone `db_spp_audit_20260826_154928_suite_6970`.
+- Payload quote/comment tidak menghasilkan SQL error atau HTTP 500 pada seluruh sepuluh route yang dipilih; cleanup clone lulus.
+
+**Di luar scope:** Boolean/error/time fuzzing, array-scalar/duplicate/oversized input, seluruh route/mutasi, stored/reflected/DOM XSS, dan browser UAT.
+
+## 2026-08-26 - Perlindungan Jurnal Tabungan Manual Saat Koreksi Pembayaran
+
+**AI/Aktor:** Codex berbasis GPT-5
+
+**Tujuan:** Membuktikan bahwa transaksi tabungan manual yang kebetulan memiliki timestamp sama tidak ikut dibalikkan ketika pembayaran dikoreksi atau dihapus.
+
+**Perubahan fitur dan perilaku:**
+
+- `tests/payment_process_integration_test.php` kini membuat fixture `transaksi_m` dengan `bayar_id=NULL` dan timestamp pembayaran.
+- Setelah payment dipindah dan dihapus melalui endpoint, test memeriksa row manual, nominal, dan `bayar_id` tetap utuh; cleanup menggunakan ID exact.
+- Tidak ada perubahan schema atau perilaku produksi.
+
+**Verifikasi yang benar-benar dijalankan:**
+
+- Regression disposable `db_spp_audit_20260826_155257_suite_8080`: **PASS 17/17**.
+- Jurnal manual tetap satu row dengan nominal fixture dan relasi NULL; clone/server dibersihkan.
+
+**Di luar scope:** Rekonsiliasi manual production, failpoint/deadlock/retry, dan browser UAT.
+
+## 2026-08-26 - Snapshot dan Cap Biaya Lain
+
+**AI/Aktor:** Codex berbasis GPT-5
+
+**Tujuan:** Memastikan perubahan master Biaya Lain tidak mengubah histori tagihan/detail, dan cicilan melebihi nominal ditolak atomik.
+
+**Perubahan fitur dan perilaku:**
+
+- `optional_fee_publish_integration_test.php` mengubah nama/nominal master setelah publish dan membandingkan snapshot tagihan sebelum/sesudah.
+- `payment_process_integration_test.php` mengubah master setelah pembayaran, memeriksa detail snapshot tetap, lalu mengirim overpay dan memastikan jumlah detail tidak berubah.
+- Tidak ada perubahan schema atau perilaku produksi; fixture dibersihkan pada clone.
+
+**Verifikasi yang benar-benar dijalankan:**
+
+- Regression disposable `db_spp_audit_20260826_155659_suite_1733`: **PASS 17/17**.
+- TC-FEE-002 dinaikkan ke PASS; coverage checker tetap memetakan 40/40 test case.
+
+**Di luar scope:** Failpoint/deadlock/retry, browser UAT, dan deployment client.
+
+## 2026-08-26 - Retest Idle Timeout Session
+
+**AI/Aktor:** Codex berbasis GPT-5
+
+**Tujuan:** Menambah bukti runtime bahwa session yang idle melewati batas dicabut, selain role change dan penghapusan akun.
+
+**Perubahan fitur dan perilaku:**
+
+- `tests/session_lifecycle_test.php` memodifikasi `__security_last_seen` pada session fixture disposable, lalu mengakses dashboard setelah melewati `SPP_SESSION_IDLE_TIMEOUT`.
+- Assertion memastikan redirect ke login; fixture role-change dan deleted-account tetap dijalankan pada test yang sama.
+- Tidak ada perubahan schema atau database sumber.
+
+**Verifikasi yang benar-benar dijalankan:**
+
+- Regression disposable `db_spp_audit_20260826_155904_suite_6399`: **PASS 17/17**.
+- Idle timeout, role change, dan deleted account lulus; clone/server/session fixture dibersihkan.
+
+**Di luar scope:** Absolute timeout, reuse cookie lintas proses, seluruh route pascarevokasi, browser UAT, dan host client.
+
+## 2026-08-26 - Retest Absolute Timeout Session
+
+**AI/Aktor:** Codex berbasis GPT-5
+
+**Tujuan:** Melengkapi retest lifecycle dengan umur maksimum session, bukan hanya idle timeout.
+
+**Perubahan fitur dan perilaku:**
+
+- `tests/session_lifecycle_test.php` membuat akun fixture terpisah, mengubah `__security_created_at` melewati `SPP_SESSION_ABSOLUTE_TIMEOUT`, lalu menguji akses dashboard melalui cookie aktif.
+- Assertion mengharuskan redirect ke login; idle timeout, role change, dan deleted account tetap dijalankan.
+- Tidak ada perubahan schema atau database sumber.
+
+**Verifikasi yang benar-benar dijalankan:**
+
+- Regression disposable `db_spp_audit_20260826_160022_suite_9004`: **PASS 17/17**.
+- Absolute timeout dan seluruh assertion lifecycle yang tercakup lulus; clone/server/session fixture dibersihkan.
+
+**Di luar scope:** Reuse cookie lintas proses, seluruh route pascarevokasi, browser UAT, dan host client.
+
+## 2026-08-26 - Hardening Array/Scalar Filter Riwayat Tabungan
+
+**AI/Aktor:** Codex berbasis GPT-5
+
+**Temuan:** Focused input corpus menemukan `nis[]=...` pada `tabungan/riwayat.php` memicu `TypeError` dari `trim(array)` dan HTTP 500.
+
+**Perubahan fitur dan perilaku:**
+
+- `tabungan/riwayat.php` kini memeriksa `is_scalar()` untuk `nis`, bulan, dan tahun; bentuk array ditolak sebagai filter kosong/default sebelum validasi dan prepared statement.
+- Filter normal NIS kosong/exact dan format URL tetap kompatibel; tidak ada perubahan schema, saldo, pembayaran, atau legacy transaction.
+
+**Verifikasi yang benar-benar dijalankan:**
+
+- Rerun `run_disposable_regression.ps1 -GenerateTemporaryAdmin`: **PASS 17/17** pada clone `db_spp_audit_20260826_160323_suite_7179`.
+- Corpus quote/comment, array/scalar, oversized, dan reflected-XSS fokus tidak menghasilkan SQL error, HTTP 500, atau payload mentah; PHP lint route lulus.
+
+**Di luar scope:** DAST seluruh route/mutasi, boolean/error/time fuzzing, DOM/stored XSS, browser UAT, dan deployment client.
+
+## 2026-08-26 - Concurrency Payment Periode SPP
+
+**AI/Aktor:** Codex berbasis GPT-5
+
+**Tujuan:** Memverifikasi bahwa dua operator tidak dapat membuat dua pembayaran untuk siswa dan periode SPP yang sama ketika transaksi berjalan bersamaan.
+
+**Perubahan fitur dan perilaku:**
+
+- Runner `tests/support/run_concurrency_matrix.ps1` kini menambahkan fixture siswa dengan kelas aktif dan tarif SPP, membuat pembayaran prasyarat, lalu mengirim dua POST periode 08/2026 dengan key `payment` berbeda di dua server.
+- Blocker `SELECT ... FOR UPDATE` memaksa race pada baris siswa; oracle memeriksa header `bayar`, claim `bayar_spp_periode`, audit `payment.created`, dan redirect penolakan.
+- Tidak ada perubahan schema atau perilaku produksi tambahan di luar implementasi idempotency yang sudah dicatat pada entri berikutnya.
+
+**Verifikasi yang benar-benar dijalankan:**
+
+- `run_concurrency_matrix.ps1 -AllowEmptyRootPassword`: **PASS 25/25** pada clone `db_spp_audit_20260826_151239`; withdrawal/replay tabungan, payment-period race, publish Daftar Ulang, publish Biaya Lain, dan last-admin tidak menggandakan data bisnis, seluruh response 302 tanpa 500.
+- Clone, server, cookie/token, dan artefak sensitif dibersihkan; `db_spp` tidak menjadi target mutasi.
+- Snapshot sumber audit kemudian dibackup sebelum migrasi (`pre-idempotency-migration-20260826`, SHA-256 dicatat di execution log), diterapkan `add_mutation_idempotency.sql` tanpa backfill, lalu `verify_schema.sql` dan verifier data 17/17 lulus.
+- Setelah migrasi snapshot tersebut, regression disposable diulang pada clone `db_spp_audit_20260826_151628_suite_8792`: 13/13 PASS dan cleanup bisnis/mutation request nol.
+- Menambahkan `tests/tabungan_riwayat_sqli_test.php`; regression terbaru `db_spp_audit_20260826_151957_suite_9048` lulus 14/14. Filter kosong, exact NIS, dan payload `' OR 1=1 --` tetap 200, menghasilkan 0 row, tanpa SQL error. Ini bukan DAST menyeluruh.
+- Payment integration juga menguji satu header legacy (`payment_link_version=0`): edit UI dan crafted delete ditolak, row/audit tetap utuh. Rerun clone `db_spp_audit_20260826_152423_suite_8799` tetap PASS 14/14.
+
+**Di luar scope:** Target tingkat/rombel/siswa pada publish Biaya Lain, deadlock/retry, failpoint, DAST, browser UAT, dan keputusan client tetap terbuka.
+
+## 2026-08-26 - Idempotency Mutasi Tabungan/Pembayaran dan Verifikasi Replay
+
+**AI/Aktor:** Codex berbasis GPT-5
+
+**Tujuan:** Menutup temuan integritas finansial bahwa submit ulang form Tabungan/Pembayaran dapat menggandakan saldo, jurnal, dan audit event.
+
+**Perubahan fitur dan perilaku:**
+
+- Menambahkan `includes/idempotency.php` dan hidden `idempotency_key` acak 64-hex pada form Tabungan Masuk/Keluar.
+- Handler `tabungan/proses.php` mengklaim key scope `savings` setelah transaksi dimulai; duplicate/replay atau payload berbeda ditolak sebelum mutasi kedua.
+- Form pembayaran input/edit/delete memakai key yang sama dengan scope `payment`; replay create diuji dan tidak menggandakan header, nominal, atau audit.
+- Klaim ikut rollback bila transaksi gagal; histori lama tidak diberi key atau direlasikan otomatis.
+
+**Database dan migrasi:**
+
+- Menambahkan `sql/add_mutation_idempotency.sql`, tabel `mutation_request`, definisi pada `sql/schema.sql`, dan requirement verifier tanpa FK actor.
+- Manifest kanonik menjadi 19 migrasi. Matrix fresh/pass1/pass2 lulus dan database disposable dibersihkan.
+
+**Verifikasi:**
+
+- PHP lint helper, handler, form, dan test lulus; `git diff --check` lulus.
+- `run_migration_matrix.ps1 -AllowEmptyPassword`: PASS seluruh 19 migrasi, verifier, fingerprint logis, cleanup.
+- `run_disposable_regression.ps1 -GenerateTemporaryAdmin`: PASS 13/13, termasuk replay payment.
+- `run_concurrency_matrix.ps1 -AllowEmptyRootPassword`: PASS 13/13; withdrawal paralel, replay savings key tunggal (saldo/jurnal/audit sekali), dan last-admin.
+
+**Di luar scope:** Idempotency publish Daftar Ulang/Biaya Lain, payment concurrency, deadlock retry, failpoint, DAST, browser UAT, dan keputusan client tetap terbuka. Tidak ada database utama yang dimutasi.
+
+## 2026-08-26 - Evidence PDF Laporan dan Sinkronisasi Gate Audit
+
+**AI/Aktor:** Codex berbasis GPT-5
+
+**Tujuan:** Menutup keterbatasan parser/render PDF lokal secara evidence-backed dan menyelaraskan status audit tanpa mengubah status NO-GO client.
+
+**Perubahan fitur dan perilaku:**
+
+- Tidak ada perubahan perilaku aplikasi.
+- Menambahkan pemeriksa kontrak keamanan statis untuk 29 route produksi serta metadata evidence yang lebih lengkap pada wrapper regression disposable.
+- Menambahkan SBOM Composer, completion audit, konfigurasi contoh HSTS/rate-limit secret, dan menyelaraskan dokumen audit, runbook, SOP, flowchart, manifest, serta matriks role dengan implementasi saat ini.
+
+**Database dan migrasi:**
+
+- Tidak ada perubahan data atau migrasi pada pekerjaan ini. Pemeriksaan database tetap read-only pada snapshot audit dan `db_spp` tidak menjadi target mutasi.
+
+**Kompatibilitas dan data lama:**
+
+- Tidak ada perubahan kontrak URL, laporan, pembayaran, tabungan, maupun transaksi legacy.
+
+**Verifikasi yang benar-benar dijalankan:**
+
+- Sebelas PDF hasil HTTP smoke dibuka dengan `pypdf`; seluruh 17 halaman mempunyai teks nonkosong.
+- PyMuPDF merender 17/17 halaman ke PNG; lima contact sheet kecil diinspeksi tanpa halaman kosong, clipping, atau overlap yang terlihat. Bukti dibatasi pada artefak tersimpan tersebut.
+- Sebelas artefak `.xls` dapat diparse sebagai tabel HTML dan tidak memuat sel fixture berprefix formula berbahaya; pembukaan pada client spreadsheet tetap belum diuji.
+- PDF SOP 12 halaman dan flowchart 4 halaman diregenerasi dari HTML final, diparse, dirender, dan diinspeksi visual.
+- `composer validate --strict`, `composer audit --locked --no-dev`, dan `composer check-platform-reqs --no-dev` lulus.
+- `tests/support/verify_route_security_contract.ps1` lulus untuk 29 route, 26 role guard, dan 15 kelompok kontrak method/CSRF literal.
+- `tests/support/run_route_role_http_matrix.ps1` lulus 168/168 pada clone disposable untuk anonymous, invalid cookie, admin, bendahara, kasir, direct role denial, method/CSRF utama, JSON auth, logout, dan session pascalogout. Count serta checksum 19 tabel domain tetap identik; clone di-drop dan credential/dump sementara dikosongkan.
+- `tests/support/run_concurrency_matrix.ps1` lulus 9/9 menggunakan dua server PHP dan transaksi blocker: withdrawal paralel tidak membuat saldo negatif/duplikat, dan dua delete admin paralel tetap menyisakan satu admin. Clone di-drop serta seluruh cookie/token/dump sementara dikosongkan.
+- Coverage checker sesudah bukti concurrency tetap konsisten 40/40: PASS 6, FAIL 0, NOT TESTED 29, PENDING DECISION 5.
+
+**Catatan tindak lanjut:**
+
+- Status serah-terima tetap **NO-GO**. PDF belum diuji pada viewer/print target, Excel belum dibuka pada client nyata, dan browser UAT, concurrency/failpoint, historical upgrade, load test, infra target, serta keputusan owner masih terbuka.
+
+## 2026-08-26 - Penutupan Wave Audit, Audit Append-only, dan Evidence Release Gate
+
+**AI/Aktor:** Codex berbasis GPT-5 bersama agen audit repository
+
+**Tujuan:** Menjalankan strategi audit menyeluruh sampai batas yang dapat dibuktikan pada lingkungan lokal, memperbaiki temuan integritas/security yang sudah masuk scope, dan menyerahkan dokumentasi release secara jujur.
+
+**Perubahan fitur dan perilaku:**
+
+- Menambahkan jurnal `audit_event` append-only, trigger penolak update/delete, request ID, actor snapshot tanpa FK, alasan koreksi wajib, before/after teredaksi, dan integrasi pembayaran, tabungan, serta Role Management.
+- Menambahkan guard disposable untuk seluruh regression mutatif, rate-limit login multi-bucket, session revalidation, penolakan hash MD5 lama, CSRF/method guard, dan hardening route.
+- Mempertahankan kontrak legacy: pembayaran `payment_link_version=0` tidak ditebak relasinya dan tidak dapat diedit/dihapus dari aplikasi.
+- Menyelaraskan manifest 18 migrasi, matrix coverage, execution log, PROGRESS, PROJECT_CONTEXT, serta menambahkan `EXECUTIVE_REPORT.md`, `KNOWN_LIMITATIONS.md`, dan `RELEASE_MANIFEST.md`.
+
+**Database dan migrasi:**
+
+- `sql/add_financial_audit_log.sql` dan `sql/schema.sql` memakai actor snapshot tanpa FK agar histori audit tidak berubah saat akun dihapus; `sql/verify_schema.sql` memeriksa kontrak tersebut.
+- Matrix migrasi kanonik 18 file dijalankan fresh + dua pass pada database disposable; tidak ada migrasi atau test mutatif dijalankan ke `db_spp`.
+- Clone regression `db_spp_audit_20260825_120004_suite_4825` di-drop setelah test; event fixture append-only tidak dihapus paksa.
+
+**Kompatibilitas dan data lama:**
+
+- Filter NIS `tabungan/riwayat.php` tetap kompatibel (kosong = semua, terisi = exact match) tetapi seluruh query memakai prepared statement; payload SQL diperlakukan literal.
+- Histori transaksi dan operator legacy tidak dicocokkan otomatis. Rekonsiliasi memerlukan prosedur manual dan persetujuan tertulis.
+
+**Verifikasi yang benar-benar dijalankan:**
+
+- `tests/support/run_migration_matrix.ps1`: `MIGRATION_MATRIX_STATUS=PASS` untuk 18 migrasi, dua pass, verifier schema/data, fingerprint logis, dan cleanup guard.
+- `tests/support/run_disposable_regression.ps1`: 13/13 PASS (audit event, role, payment, savings, security, SPP, DU, legacy, pagination, reports, optional fee), fixture bisnis nol, 14 event fixture di clone.
+- HTTP report smoke 34/34 PASS, oracle Wave 5 PASS, 0 HTTP 500/fatal; PDF hanya mendapat structural signature/page-object checks.
+- PHP lint 58 file, `node --check assets/js/app.js`, dan `git diff --check` PASS.
+- `tests/support/verify_test_coverage_matrix.ps1` memetakan 40/40 test case: PASS 5, FAIL 0, NOT TESTED 30, PENDING DECISION 5.
+
+**Catatan tindak lanjut:**
+
+- Status serah-terima tetap **NO-GO**: browser/accessibility UAT, visual PDF, client Excel, concurrency/failpoint, target HTTPS/backup/restore/RPO-RTO, dependency runtime Apache, keputusan bisnis, dan CSP strict belum dibuktikan.
+- CSRF sebelumnya dicatat sebagai debt pada entri lama; endpoint yang sekarang dipasang token tetap memerlukan route-matrix/DAST lebih luas sebelum residual dianggap tertutup.
+
+## 2026-08-20 - Rencana Audit Maksimal dan Kesiapan Serah-Terima
+
+**AI/Aktor:** Codex berbasis GPT-5, bersama pemilik proyek
+
+**Tujuan:** Menyusun rencana pemeriksaan end-to-end yang dapat dipakai untuk menemukan anomali keamanan, integritas finansial, alur setengah jadi, dead code, drift dokumentasi, dan blocker sebelum aplikasi diserahkan kepada client.
+
+**Perubahan fitur dan perilaku:**
+
+- Menambahkan `documentation/RENCANA_AUDIT_FINAL_SISTEMSPP.md` sebagai rencana induk 23 bagian yang mencakup containment, backup/restore, route-role-method, authentication/session, CSRF, injection/XSS, audit trail, integritas pembayaran/SPP/DU/biaya lain/tabungan, migrasi, parity laporan, frontend/accessibility, performa, dead code, deployment, UAT, dan gate go/no-go.
+- Menetapkan `laporan/rekap_kelas.php` beserta alur pendukungnya sebagai artefak referensi visual yang dilindungi dari penghapusan atau klasifikasi dead code.
+- Mencatat baseline reconnaissance secara jujur, termasuk exposure artefak nonpublik melalui web, privilege database runtime, payment SPP tanpa claim periode, mismatch cache biaya awal, CSRF/method safety, dependency PDF, dan drift dokumentasi. Temuan tersebut belum diperbaiki dalam perubahan ini.
+- Menambahkan rencana tersebut ke urutan baca `PROJECT_CONTEXT.md` untuk pekerjaan audit, hardening, dead-code cleanup, deployment, dan handover.
+
+**Database dan migrasi:**
+
+- Tidak ada perubahan schema, migrasi, maupun data. Pemeriksaan database yang dilakukan hanya query read-only dan tidak menampilkan identitas siswa.
+
+**Kompatibilitas dan data lama:**
+
+- Tidak ada perilaku aplikasi yang diubah. Aturan transaksi legacy tetap sama dan tidak ada backfill otomatis.
+
+**Verifikasi:**
+
+- Inventaris file, endpoint, role guard, schema, migrasi, dependency, test, frontend, dan dokumentasi diperiksa terhadap commit baseline `a446af3`.
+- HTTP `HEAD` read-only membuktikan enam URL artefak sensitif masih mengembalikan 200 pada XAMPP lokal; tidak ada script test yang dieksekusi.
+- Query database read-only mengonfirmasi 16 pembayaran SPP tanpa claim periode, dua mismatch cache biaya awal, serta privilege runtime MySQL yang terlalu luas.
+- `composer validate --strict` berhasil; `composer check-platform-reqs` secara jujur gagal karena ekstensi GD belum aktif dan `vendor/` belum tersedia.
+- Struktur Markdown, link lokal, `git diff --check`, dan status perubahan diperiksa setelah penyusunan.
+
+**Catatan tindak lanjut:**
+
+- Mulai eksekusi dari Wave 0. Jangan menjalankan test mutasi, migrasi, fuzzing, atau load test sebelum web exposure ditutup serta database audit terisolasi dan backup dapat direstore.
+
 ## 2026-08-20 - Pemulihan Rekap Pembayaran per Kelas
 
 **AI/Aktor:** Codex berbasis GPT-5, bersama pemilik proyek

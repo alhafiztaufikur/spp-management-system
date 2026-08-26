@@ -1,0 +1,27 @@
+Options -Indexes
+ServerSignature Off
+
+<IfModule mod_rewrite.c>
+    RewriteEngine On
+
+    # Source, test, dependency, configuration, and internal documentation are
+    # never public application routes.
+    RewriteRule ^(?:\.git|\.agents|\.codex|tests|sql|documentation|includes|config|vendor)(?:/|$) - [F,L,NC]
+    RewriteRule ^(?:composer\.(?:json|lock)|\.env(?:\..*)?|.*\.(?:bak|backup|dump|log|sql|sqlite|sqlite3))$ - [F,L,NC]
+</IfModule>
+
+<FilesMatch "^(?:\.|composer\.(?:json|lock)$|koneksi\.php$)">
+    Require all denied
+</FilesMatch>
+
+<IfModule mod_headers.c>
+    Header always unset X-Powered-By
+    Header onsuccess unset X-Content-Type-Options
+    Header onsuccess unset X-Frame-Options
+    Header onsuccess unset Referrer-Policy
+    Header onsuccess unset Permissions-Policy
+    Header always set X-Content-Type-Options "nosniff"
+    Header always set X-Frame-Options "DENY"
+    Header always set Referrer-Policy "strict-origin-when-cross-origin"
+    Header always set Permissions-Policy "camera=(), microphone=(), geolocation=()"
+</IfModule>

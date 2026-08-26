@@ -1,6 +1,8 @@
 <?php
 require_once __DIR__ . '/../koneksi.php';
+require_once __DIR__ . '/support/assert_audit_database.php';
 require_once __DIR__ . '/../includes/daftar_ulang.php';
+test_require_audit_database($koneksi);
 
 function test_assert(bool $condition, string $message): void {
     if (!$condition) throw new RuntimeException($message);
@@ -65,14 +67,29 @@ try {
     $stmt = $koneksi->prepare('INSERT INTO bayar_du(bayar_id,tagihan_daftar_ulang_id,no_induk,kelas,th_ajaran,jumlah) VALUES (?,?,?,?,?,?)');
     $stmt->bind_param('iisssd', $paymentId, $billId, $number, $class, $label, $installment); $stmt->execute(); $stmt->close();
 
+    // Dua header sengaja memakai timestamp dan NIS yang sama. Koreksi satu
+    // header harus menyentuh child berdasarkan bayar_id, bukan NIS/tanggal.
+    $secondInstallment = 100000.0;
+    $stmt = $koneksi->prepare("INSERT INTO bayar(NO_INDUK,KELAS,TGL_BYR,BULAN,TAHUN,user_id,sistem_pembayaran,payment_link_version) VALUES (?,?,?,?,?,?,'Tunai',1)");
+    $stmt->bind_param('ssssss', $number, $class, $date, $month, $year, $user); $stmt->execute();
+    $secondPaymentId = (int)$koneksi->insert_id; $stmt->close();
+    $stmt = $koneksi->prepare('INSERT INTO bayar_du(bayar_id,tagihan_daftar_ulang_id,no_induk,kelas,th_ajaran,jumlah) VALUES (?,?,?,?,?,?)');
+    $stmt->bind_param('iisssd', $secondPaymentId, $billId, $number, $class, $label, $secondInstallment); $stmt->execute(); $stmt->close();
+
     $bill = du_require_bill($koneksi, $number, 9, 2098, false);
-    test_assert(abs($bill['terbayar'] - 200000) < .001 && abs($bill['sisa'] - 400000) < .001, 'Cicilan tidak mengurangi saldo tagihan dengan benar.');
+    test_assert(abs($bill['terbayar'] - 300000) < .001 && abs($bill['sisa'] - 300000) < .001, 'Cicilan tidak mengurangi saldo tagihan dengan benar.');
     $stmt = $koneksi->prepare('DELETE FROM bayar WHERE id=?'); $stmt->bind_param('i', $paymentId); $stmt->execute(); $stmt->close();
     $bill = du_require_bill($koneksi, $number, 9, 2098, false);
-    test_assert(abs($bill['terbayar']) < .001, 'Penghapusan pembayaran tidak memulihkan saldo tagihan.');
+    test_assert(abs($bill['terbayar'] - $secondInstallment) < .001 && abs($bill['sisa'] - 500000) < .001, 'Penghapusan satu pembayaran ikut menghapus cicilan child lain.');
+    $stmt = $koneksi->prepare('SELECT COUNT(*) AS total, COALESCE(SUM(jumlah), 0) AS jumlah FROM bayar_du WHERE bayar_id=?');
+    $stmt->bind_param('i', $secondPaymentId); $stmt->execute(); $secondChild = $stmt->get_result()->fetch_assoc(); $stmt->close();
+    test_assert((int)$secondChild['total'] === 1 && abs((float)$secondChild['jumlah'] - $secondInstallment) < .001, 'Child pembayaran kedua dengan timestamp sama tidak tetap terisolasi.');
+    $stmt = $koneksi->prepare('DELETE FROM bayar WHERE id=?'); $stmt->bind_param('i', $secondPaymentId); $stmt->execute(); $stmt->close();
+    $bill = du_require_bill($koneksi, $number, 9, 2098, false);
+    test_assert(abs($bill['terbayar']) < .001, 'Penghapusan pembayaran kedua tidak memulihkan saldo tagihan.');
 
     $koneksi->rollback();
-    echo "OK: mapping Juli-Juni, simpan-terbit atomik, penerbitan idempoten, tunggakan, cicilan, dan pemulihan saldo.\n";
+    echo "OK: mapping Juli-Juni, simpan-terbit atomik, penerbitan idempoten, tunggakan, cicilan, isolasi child timestamp identik, dan pemulihan saldo.\n";
 } catch (Throwable $error) {
     $koneksi->rollback();
     fwrite(STDERR, 'FAILED: ' . $error->getMessage() . PHP_EOL);

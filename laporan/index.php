@@ -2,7 +2,8 @@
 // ============================================
 // laporan/index.php - Rekap Laporan Keuangan
 // ============================================
-session_start();
+require_once '../includes/security.php';
+security_bootstrap_session();
 require_once '../koneksi.php';
 require_once '../includes/auth.php';
 require_once '../includes/pagination.php';
@@ -44,8 +45,11 @@ function report_bind(mysqli_stmt $stmt, string $types, array $params): void {
 }
 
 function report_date_param(string $key): string {
-    $value = trim((string)($_GET[$key] ?? ''));
-    return preg_match('/^\d{4}-\d{2}-\d{2}$/', $value) ? $value : '';
+    $raw = $_GET[$key] ?? '';
+    $value = trim((string)(is_scalar($raw) ? $raw : ''));
+    if (!preg_match('/^\d{4}-\d{2}-\d{2}$/', $value)) return '';
+    $date = DateTimeImmutable::createFromFormat('!Y-m-d', $value);
+    return $date && $date->format('Y-m-d') === $value ? $value : '';
 }
 
 function report_date_label_id(int $timestamp): string {
@@ -82,8 +86,10 @@ $bln_names = [
     '09' => 'September', '10' => 'Oktober', '11' => 'November', '12' => 'Desember',
 ];
 
-$filter_bulan = report_month_code($_GET['bulan'] ?? date('m'));
-$filter_tahun = preg_match('/^\d{4}$/', (string)($_GET['tahun'] ?? '')) ? (string)$_GET['tahun'] : date('Y');
+$filterMonthRaw = $_GET['bulan'] ?? date('m');
+$filterYearRaw = $_GET['tahun'] ?? '';
+$filter_bulan = report_month_code(is_scalar($filterMonthRaw) ? $filterMonthRaw : date('m'));
+$filter_tahun = is_scalar($filterYearRaw) && preg_match('/^\d{4}$/', (string)$filterYearRaw) ? (string)$filterYearRaw : date('Y');
 $filter_tanggal = report_date_param('tanggal');
 $filter_tanggal_awal = report_date_param('tanggal_awal') ?: $filter_tanggal;
 $filter_tanggal_akhir = report_date_param('tanggal_akhir') ?: $filter_tanggal;
@@ -96,6 +102,10 @@ if ($filter_tanggal_akhir !== '' && $filter_tanggal_awal === '') {
 if ($filter_tanggal_awal !== '' && $filter_tanggal_akhir !== '' && strtotime($filter_tanggal_awal) > strtotime($filter_tanggal_akhir)) {
     [$filter_tanggal_awal, $filter_tanggal_akhir] = [$filter_tanggal_akhir, $filter_tanggal_awal];
 }
+if ($filter_tanggal_awal !== '' && $filter_tanggal_akhir !== '' && (new DateTimeImmutable($filter_tanggal_awal))->diff(new DateTimeImmutable($filter_tanggal_akhir))->days > 365) {
+    http_response_code(413);
+    exit('Rentang laporan dibatasi maksimal 366 hari kalender.');
+}
 
 $reportTypes = [
     'semua' => 'Semua transaksi',
@@ -105,7 +115,7 @@ $reportTypes = [
     'belum_du' => 'Daftar ulang belum lunas',
     'belum_biaya_lain' => 'Biaya lain belum lunas',
 ];
-$report_type = $_GET['jenis_laporan'] ?? 'semua';
+$report_type = is_scalar($_GET['jenis_laporan'] ?? null) ? (string)$_GET['jenis_laporan'] : 'semua';
 if (!isset($reportTypes[$report_type])) $report_type = 'semua';
 
 $sortOptions = [
@@ -115,7 +125,7 @@ $sortOptions = [
     'nominal_terbesar' => 'Nominal terbesar',
     'sisa_terbesar' => 'Sisa terbesar',
 ];
-$sort = $_GET['urut'] ?? 'terbaru';
+$sort = is_scalar($_GET['urut'] ?? null) ? (string)$_GET['urut'] : 'terbaru';
 if (!isset($sortOptions[$sort])) $sort = 'terbaru';
 
 $allowedPageSizes = [10, 25, 50];
@@ -144,6 +154,7 @@ $stmt = $koneksi->prepare("
            COALESCE(SUM(b.U_SORGA), 0) AS sorga,
            COALESCE(SUM(b.U_INFAQ), 0) AS infaq,
            COALESCE(SUM(b.U_KOMITE), 0) AS komite,
+           COALESCE(SUM(b.potong_spp), 0) AS potong_spp,
            COALESCE(SUM(b.total_jumlah), 0) AS total
     FROM bayar b
     WHERE b.TGL_BYR >= ? AND b.TGL_BYR < ?
@@ -177,7 +188,7 @@ $stmtDu->execute();
 $total_du_periode = (float)($stmtDu->get_result()->fetch_assoc()['total_du'] ?? 0);
 $stmtDu->close();
 
-$stmt2 = $koneksi->prepare("SELECT COALESCE(SUM(MASUK),0) AS total_masuk FROM transaksi_m WHERE TANGGAL >= ? AND TANGGAL < ?");
+$stmt2 = $koneksi->prepare("SELECT COALESCE(SUM(MASUK),0) AS total_masuk FROM transaksi_m WHERE bayar_id IS NULL AND TANGGAL >= ? AND TANGGAL < ?");
 $stmt2->bind_param('ss', $periodStart, $periodEnd);
 $stmt2->execute();
 $tab_masuk = (float)$stmt2->get_result()->fetch_assoc()['total_masuk'];
@@ -255,41 +266,59 @@ if (!$isUnpaidReport) {
         default => 'CAST(KELAS AS UNSIGNED) ASC, NAMA ASC',
     };
 
-    if ($report_type === 'belum_spp' || $report_type === 'belum_komite') {
-        $studentBillColumn = $report_type === 'belum_spp' ? 'SPP_PERBULAN' : 'POMG';
-        $paymentColumn = $report_type === 'belum_spp' ? 'U_SPP' : 'U_KOMITE';
+    if ($report_type === 'belum_spp') {
         $stmtUnpaid = $koneksi->prepare("
             SELECT *
             FROM (
-                SELECT s.NO_INDUK, s.NO_induk_diknas, s.NAMA, s.KELAS,
-                       s.$studentBillColumn AS tagihan,
-                       COALESCE(SUM(b.$paymentColumn), 0) AS sudah_bayar,
-                       GREATEST(s.$studentBillColumn - COALESCE(SUM(b.$paymentColumn), 0), 0) AS sisa
-                FROM siswa s
-                LEFT JOIN bayar b
-                    ON b.NO_INDUK = s.NO_INDUK
-                    AND b.TAHUN = ?
-                    AND (b.BULAN = ? OR b.BULAN = ? OR b.BULAN = ?)
-                WHERE s.is_active = 1 AND s.$studentBillColumn > 0
-                GROUP BY s.NO_INDUK, s.NO_induk_diknas, s.NAMA, s.KELAS, s.$studentBillColumn
+                SELECT s.NO_INDUK, s.NO_induk_diknas, s.NAMA, sta.kelas_rombel_snapshot AS KELAS,
+                       sta.spp_perbulan_snapshot AS tagihan,
+                       COALESCE(SUM(b.U_SPP), 0) AS sudah_bayar,
+                       GREATEST(sta.spp_perbulan_snapshot - COALESCE(SUM(b.U_SPP), 0), 0) AS sisa
+                FROM siswa_tahun_ajaran sta
+                JOIN tahun_ajaran ta ON ta.id = sta.tahun_ajaran_id
+                JOIN siswa s ON s.NO_INDUK = sta.no_induk
+                LEFT JOIN bayar_spp_periode bsp ON bsp.no_induk = sta.no_induk AND bsp.tahun = ? AND bsp.bulan = ?
+                LEFT JOIN bayar b ON b.id = bsp.bayar_id
+                WHERE ta.label = ? AND sta.status = 'aktif' AND s.is_active = 1 AND sta.spp_perbulan_snapshot > 0
+                GROUP BY sta.id, s.NO_INDUK, s.NO_induk_diknas, s.NAMA, sta.kelas_rombel_snapshot, sta.spp_perbulan_snapshot
             ) unpaid
             WHERE sisa > 0
             ORDER BY $orderUnpaid
         ");
-        $stmtUnpaid->bind_param('ssss', $filter_tahun, $periodMonthCode, $periodMonthName, $periodMonthLegacy);
+        $stmtUnpaid->bind_param('sss', $filter_tahun, $periodMonthCode, $academicYear);
+    } elseif ($report_type === 'belum_komite') {
+        $stmtUnpaid = $koneksi->prepare("
+            SELECT *
+            FROM (
+                SELECT s.NO_INDUK, s.NO_induk_diknas, s.NAMA, sta.kelas_rombel_snapshot AS KELAS,
+                       sta.komite_snapshot AS tagihan,
+                       COALESCE(SUM(b.U_KOMITE), 0) AS sudah_bayar,
+                       GREATEST(sta.komite_snapshot - COALESCE(SUM(b.U_KOMITE), 0), 0) AS sisa
+                FROM siswa_tahun_ajaran sta
+                JOIN tahun_ajaran ta ON ta.id = sta.tahun_ajaran_id
+                JOIN siswa s ON s.NO_INDUK = sta.no_induk
+                LEFT JOIN bayar b ON b.NO_INDUK = sta.no_induk AND b.TAHUN = ?
+                    AND (b.BULAN = ? OR b.BULAN = ? OR b.BULAN = ?)
+                WHERE ta.label = ? AND sta.status = 'aktif' AND s.is_active = 1 AND sta.komite_snapshot > 0
+                GROUP BY sta.id, s.NO_INDUK, s.NO_induk_diknas, s.NAMA, sta.kelas_rombel_snapshot, sta.komite_snapshot
+            ) unpaid
+            WHERE sisa > 0
+            ORDER BY $orderUnpaid
+        ");
+        $stmtUnpaid->bind_param('sssss', $filter_tahun, $periodMonthCode, $periodMonthName, $periodMonthLegacy, $academicYear);
     } elseif ($report_type === 'belum_du') {
         $stmtUnpaid = $koneksi->prepare("
             SELECT *
             FROM (
-                SELECT s.NO_INDUK, s.NO_induk_diknas, s.NAMA, s.KELAS,
+                SELECT s.NO_INDUK, s.NO_induk_diknas, s.NAMA, tdu.kelas_snapshot AS KELAS,
                        tdu.nominal_tagihan AS tagihan,
                        COALESCE(SUM(bd.jumlah), 0) AS sudah_bayar,
                        GREATEST(tdu.nominal_tagihan - COALESCE(SUM(bd.jumlah), 0), 0) AS sisa
                 FROM tagihan_daftar_ulang tdu
                 JOIN siswa s ON s.NO_INDUK = tdu.no_induk
                 LEFT JOIN bayar_du bd ON bd.tagihan_daftar_ulang_id = tdu.id
-                WHERE s.is_active = 1 AND tdu.tahun_ajaran_snapshot = ? AND tdu.nominal_tagihan > 0
-                GROUP BY s.NO_INDUK, s.NO_induk_diknas, s.NAMA, s.KELAS, tdu.nominal_tagihan
+                WHERE s.is_active = 1 AND tdu.tahun_ajaran_snapshot = ? AND tdu.status = 'open' AND tdu.nominal_tagihan > 0
+                GROUP BY s.NO_INDUK, s.NO_induk_diknas, s.NAMA, tdu.kelas_snapshot, tdu.nominal_tagihan
             ) unpaid
             WHERE sisa > 0
             ORDER BY $orderUnpaid
@@ -299,17 +328,17 @@ if (!$isUnpaidReport) {
         $stmtUnpaid = $koneksi->prepare("
             SELECT *
             FROM (
-                SELECT s.NO_INDUK, s.NO_induk_diknas, s.NAMA, s.KELAS,
-                       m.nama AS komponen,
-                       m.nominal AS tagihan,
+                SELECT s.NO_INDUK, s.NO_induk_diknas, s.NAMA,
+                       COALESCE(t.kelas_rombel_snapshot, s.KELAS) AS KELAS,
+                       t.nama_snapshot AS komponen,
+                       t.nominal_tagihan AS tagihan,
                        COALESCE(SUM(d.nominal_snapshot), 0) AS sudah_bayar,
-                       GREATEST(m.nominal - COALESCE(SUM(d.nominal_snapshot), 0), 0) AS sisa
-                FROM siswa s
-                JOIN master_biaya_lain m ON m.is_active = 1
-                LEFT JOIN bayar b ON b.NO_INDUK = s.NO_INDUK
-                LEFT JOIN bayar_biaya_lain d ON d.bayar_id = b.id AND d.master_biaya_lain_id = m.id
-                WHERE s.is_active = 1
-                GROUP BY s.NO_INDUK, s.NO_induk_diknas, s.NAMA, s.KELAS, m.id, m.nama, m.nominal
+                       GREATEST(t.nominal_tagihan - COALESCE(SUM(d.nominal_snapshot), 0), 0) AS sisa
+                FROM tagihan_biaya_lain t
+                JOIN siswa s ON s.NO_INDUK = t.no_induk
+                LEFT JOIN bayar_biaya_lain d ON d.tagihan_biaya_lain_id = t.id
+                WHERE s.is_active = 1 AND t.status = 'open'
+                GROUP BY t.id, s.NO_INDUK, s.NO_induk_diknas, s.NAMA, t.kelas_rombel_snapshot, s.KELAS, t.nama_snapshot, t.nominal_tagihan
             ) unpaid
             WHERE sisa > 0
             ORDER BY $orderUnpaid
@@ -357,7 +386,7 @@ $exportQuery = http_build_query([
 
   <main class="main-content">
     <div class="topbar">
-      <button class="sidebar-toggle" onclick="toggleSidebar()" id="btn-sidebar-toggle">
+      <button class="sidebar-toggle" onclick="toggleSidebar()" id="btn-sidebar-toggle" aria-label="Buka navigasi" aria-expanded="false">
         <svg width="20" height="20" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><line x1="3" y1="12" x2="21" y2="12"/><line x1="3" y1="6" x2="21" y2="6"/><line x1="3" y1="18" x2="21" y2="18"/></svg>
       </button>
       <div class="topbar-title">
@@ -499,10 +528,11 @@ $exportQuery = http_build_query([
                 'Uang Sorga' => $bayar_recap['sorga'],
                 'Uang Infaq' => $bayar_recap['infaq'],
                 'Daftar Ulang' => $total_du_periode,
+                'Potongan SPP' => -(float)$bayar_recap['potong_spp'],
               ];
               $shownComponents = 0;
               foreach ($komponen_map as $nama => $val):
-                if ((float)$val <= 0) continue;
+                if (abs((float)$val) < 0.005) continue;
                 $shownComponents++;
               ?>
               <tr><td><?= report_e($nama) ?></td><td class="nominal"><?= report_money($val) ?></td></tr>
@@ -598,7 +628,7 @@ $exportQuery = http_build_query([
   </main>
 </div>
 
-<div class="toast" id="toast"><span id="toast-icon"></span><span id="toast-msg"></span></div>
+<div class="toast" id="toast" role="status" aria-live="polite" aria-atomic="true"><span id="toast-icon" aria-hidden="true"></span><span id="toast-msg"></span></div>
 <script src="../assets/js/app.js?v=6.4"></script>
 <script>
 document.addEventListener('DOMContentLoaded', function(){

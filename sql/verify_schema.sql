@@ -3,8 +3,6 @@
 -- Jalankan setelah schema baru atau seluruh migrasi upgrade.
 -- =========================================================
 
-USE `db_spp`;
-
 SELECT requirement,
        IF(is_present = 1, 'OK', 'MISSING') AS status
 FROM (
@@ -318,6 +316,167 @@ FROM (
            WHERE TABLE_SCHEMA = DATABASE() AND TABLE_NAME = 'siswa'
              AND INDEX_NAME = 'idx_siswa_status_kelas_nama'
          )
+  UNION ALL
+  SELECT 'admin.session_version', EXISTS(
+    SELECT 1 FROM information_schema.COLUMNS
+    WHERE TABLE_SCHEMA=DATABASE() AND TABLE_NAME='admin'
+      AND COLUMN_NAME='session_version' AND DATA_TYPE='int' AND IS_NULLABLE='NO'
+  )
+  UNION ALL
+  SELECT 'admin.password_reset_required', EXISTS(
+    SELECT 1 FROM information_schema.COLUMNS
+    WHERE TABLE_SCHEMA=DATABASE() AND TABLE_NAME='admin'
+      AND COLUMN_NAME='password_reset_required' AND DATA_TYPE='tinyint' AND IS_NULLABLE='NO'
+  )
+  UNION ALL
+  SELECT 'table.login_rate_limit', EXISTS(
+    SELECT 1 FROM information_schema.TABLES
+    WHERE TABLE_SCHEMA=DATABASE() AND TABLE_NAME='login_rate_limit' AND ENGINE='InnoDB'
+  )
+  UNION ALL
+  SELECT 'login_rate_limit.bucket_hash_ascii_bin', EXISTS(
+    SELECT 1 FROM information_schema.COLUMNS
+    WHERE TABLE_SCHEMA=DATABASE() AND TABLE_NAME='login_rate_limit'
+      AND COLUMN_NAME='bucket_hash' AND DATA_TYPE='char'
+      AND CHARACTER_MAXIMUM_LENGTH=64 AND CHARACTER_SET_NAME='ascii'
+      AND COLLATION_NAME='ascii_bin'
+  )
+  UNION ALL
+  SELECT 'idx_login_rate_limit_cleanup', EXISTS(
+    SELECT 1 FROM information_schema.STATISTICS
+    WHERE TABLE_SCHEMA=DATABASE() AND TABLE_NAME='login_rate_limit'
+      AND INDEX_NAME='idx_login_rate_limit_cleanup'
+  )
+  UNION ALL
+  SELECT 'idx_login_rate_limit_blocked', EXISTS(
+    SELECT 1 FROM information_schema.STATISTICS
+    WHERE TABLE_SCHEMA=DATABASE() AND TABLE_NAME='login_rate_limit'
+      AND INDEX_NAME='idx_login_rate_limit_blocked'
+  )
+  UNION ALL
+  SELECT 'table.mutation_request', EXISTS(
+    SELECT 1 FROM information_schema.TABLES
+    WHERE TABLE_SCHEMA=DATABASE() AND TABLE_NAME='mutation_request' AND ENGINE='InnoDB'
+  )
+  UNION ALL
+  SELECT 'mutation_request.required_columns', (
+    SELECT COUNT(*) = 5
+    FROM information_schema.COLUMNS
+    WHERE TABLE_SCHEMA=DATABASE() AND TABLE_NAME='mutation_request'
+      AND COLUMN_NAME IN ('id','scope','request_key','actor_admin_id','created_at')
+  )
+  UNION ALL
+  SELECT 'mutation_request.key_ascii_bin', (
+    SELECT COUNT(*) = 2
+    FROM information_schema.COLUMNS
+    WHERE TABLE_SCHEMA=DATABASE() AND TABLE_NAME='mutation_request'
+      AND (
+        (COLUMN_NAME='scope' AND DATA_TYPE='varchar' AND CHARACTER_MAXIMUM_LENGTH=40)
+        OR (COLUMN_NAME='request_key' AND DATA_TYPE='char' AND CHARACTER_MAXIMUM_LENGTH=64)
+      )
+      AND CHARACTER_SET_NAME='ascii' AND COLLATION_NAME='ascii_bin'
+  )
+  UNION ALL
+  SELECT 'uk_mutation_request_scope_key', EXISTS(
+    SELECT 1
+    FROM information_schema.STATISTICS
+    WHERE TABLE_SCHEMA=DATABASE() AND TABLE_NAME='mutation_request'
+      AND INDEX_NAME='uk_mutation_request_scope_key'
+    GROUP BY INDEX_NAME, NON_UNIQUE
+    HAVING NON_UNIQUE=0
+       AND GROUP_CONCAT(COLUMN_NAME ORDER BY SEQ_IN_INDEX)='scope,request_key'
+  )
+  UNION ALL
+  SELECT 'idx_mutation_request_created_at', EXISTS(
+    SELECT 1 FROM information_schema.STATISTICS
+    WHERE TABLE_SCHEMA=DATABASE() AND TABLE_NAME='mutation_request'
+      AND INDEX_NAME='idx_mutation_request_created_at'
+  )
+  UNION ALL
+  SELECT 'mutation_request.actor_snapshot_without_fk', NOT EXISTS(
+    SELECT 1 FROM information_schema.TABLE_CONSTRAINTS
+    WHERE CONSTRAINT_SCHEMA=DATABASE() AND TABLE_NAME='mutation_request'
+      AND CONSTRAINT_TYPE='FOREIGN KEY'
+  )
+  UNION ALL
+  SELECT 'table.audit_event', EXISTS(
+    SELECT 1 FROM information_schema.TABLES
+    WHERE TABLE_SCHEMA=DATABASE() AND TABLE_NAME='audit_event' AND ENGINE='InnoDB'
+  )
+  UNION ALL
+  SELECT 'audit_event.request_id_ascii_bin', EXISTS(
+    SELECT 1 FROM information_schema.COLUMNS
+    WHERE TABLE_SCHEMA=DATABASE() AND TABLE_NAME='audit_event'
+      AND COLUMN_NAME='request_id' AND DATA_TYPE='char'
+      AND CHARACTER_MAXIMUM_LENGTH=24 AND CHARACTER_SET_NAME='ascii'
+      AND COLLATION_NAME='ascii_bin'
+  )
+  UNION ALL
+  SELECT 'audit_event.required_columns', (
+    SELECT COUNT(*) = 13
+    FROM information_schema.COLUMNS
+    WHERE TABLE_SCHEMA=DATABASE() AND TABLE_NAME='audit_event'
+      AND COLUMN_NAME IN (
+        'id','event_type','entity_type','entity_id','action','actor_admin_id',
+        'actor_name_snapshot','request_id','reason','before_data','after_data',
+        'metadata','created_at'
+      )
+  )
+  UNION ALL
+  SELECT 'audit_event.created_at_microseconds', EXISTS(
+    SELECT 1 FROM information_schema.COLUMNS
+    WHERE TABLE_SCHEMA=DATABASE() AND TABLE_NAME='audit_event'
+      AND COLUMN_NAME='created_at' AND DATA_TYPE='datetime'
+      AND DATETIME_PRECISION=6 AND IS_NULLABLE='NO'
+  )
+  UNION ALL
+  SELECT 'audit_event.json_checks', (
+    SELECT COUNT(*) = 3
+    FROM information_schema.TABLE_CONSTRAINTS
+    WHERE CONSTRAINT_SCHEMA=DATABASE() AND TABLE_NAME='audit_event'
+      AND CONSTRAINT_TYPE='CHECK'
+      AND CONSTRAINT_NAME IN (
+        'chk_audit_event_before_json',
+        'chk_audit_event_after_json',
+        'chk_audit_event_metadata_json'
+      )
+  )
+  UNION ALL
+  SELECT 'idx_audit_event_entity', EXISTS(
+    SELECT 1 FROM information_schema.STATISTICS
+    WHERE TABLE_SCHEMA=DATABASE() AND TABLE_NAME='audit_event'
+      AND INDEX_NAME='idx_audit_event_entity'
+  )
+  UNION ALL
+  SELECT 'idx_audit_event_actor', EXISTS(
+    SELECT 1 FROM information_schema.STATISTICS
+    WHERE TABLE_SCHEMA=DATABASE() AND TABLE_NAME='audit_event'
+      AND INDEX_NAME='idx_audit_event_actor'
+  )
+  UNION ALL
+  SELECT 'idx_audit_event_type_time', EXISTS(
+    SELECT 1 FROM information_schema.STATISTICS
+    WHERE TABLE_SCHEMA=DATABASE() AND TABLE_NAME='audit_event'
+      AND INDEX_NAME='idx_audit_event_type_time'
+  )
+  UNION ALL
+  SELECT 'audit_event.actor_snapshot_without_fk', NOT EXISTS(
+    SELECT 1 FROM information_schema.TABLE_CONSTRAINTS
+    WHERE CONSTRAINT_SCHEMA=DATABASE() AND TABLE_NAME='audit_event'
+      AND CONSTRAINT_TYPE='FOREIGN KEY'
+  )
+  UNION ALL
+  SELECT 'trigger.audit_event_no_update', EXISTS(
+    SELECT 1 FROM information_schema.TRIGGERS
+    WHERE TRIGGER_SCHEMA=DATABASE() AND EVENT_OBJECT_TABLE='audit_event'
+      AND TRIGGER_NAME='trg_audit_event_no_update' AND EVENT_MANIPULATION='UPDATE'
+  )
+  UNION ALL
+  SELECT 'trigger.audit_event_no_delete', EXISTS(
+    SELECT 1 FROM information_schema.TRIGGERS
+    WHERE TRIGGER_SCHEMA=DATABASE() AND EVENT_OBJECT_TABLE='audit_event'
+      AND TRIGGER_NAME='trg_audit_event_no_delete' AND EVENT_MANIPULATION='DELETE'
+  )
   UNION ALL
   SELECT 'fk_bayar_du_bayar',
          EXISTS(

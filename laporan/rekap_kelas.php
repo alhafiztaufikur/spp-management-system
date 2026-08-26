@@ -1,5 +1,6 @@
 <?php
-session_start();
+require_once '../includes/security.php';
+security_bootstrap_session();
 if (!isset($_SESSION['admin_id'])) { header('Location: ../login.php'); exit; }
 require_once '../koneksi.php';
 require_once '../includes/auth.php';
@@ -22,19 +23,19 @@ function recap_money($value): string {
 
 $classes = array_map('strval', range(1, 6));
 
-$filterClass = trim((string)($_GET['kelas'] ?? ($classes[0] ?? '')));
+$filterClass = trim((string)security_input_scalar($_GET, 'kelas', $classes[0] ?? ''));
 if ($classes && !in_array($filterClass, $classes, true)) {
     $filterClass = $classes[0];
 }
-$filterMonth = str_pad((string)(int)($_GET['bulan'] ?? date('m')), 2, '0', STR_PAD_LEFT);
+$filterMonth = str_pad((string)(int)security_input_scalar($_GET, 'bulan', date('m')), 2, '0', STR_PAD_LEFT);
 if (!isset($monthNames[$filterMonth])) {
     $filterMonth = date('m');
 }
-$filterYear = (int)($_GET['tahun'] ?? date('Y'));
+$filterYear = (int)security_input_scalar($_GET, 'tahun', date('Y'));
 if ($filterYear < 2000 || $filterYear > 2100) {
     $filterYear = (int)date('Y');
 }
-$search = trim((string)($_GET['q'] ?? ''));
+$search = trim((string)security_input_scalar($_GET, 'q', ''));
 
 $classCountStmt = $koneksi->prepare('SELECT COUNT(*) AS total FROM siswa WHERE is_active = 1 AND KELAS = ?');
 $classCountStmt->bind_param('s', $filterClass);

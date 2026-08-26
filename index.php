@@ -2,7 +2,8 @@
 // ============================================
 // index.php - Entry Point
 // ============================================
-session_start();
+require_once __DIR__ . '/includes/security.php';
+security_bootstrap_session();
 if (isset($_SESSION['admin_id'])) {
     header('Location: dashboard.php');
 } else {

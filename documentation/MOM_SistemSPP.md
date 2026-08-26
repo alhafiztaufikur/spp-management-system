@@ -1,18 +1,20 @@
 # Minutes of Meeting (MoM) Project SistemSPP
 
+Status dokumen: **catatan historis/draf, belum ditandatangani peserta**. Data rapat yang tidak pernah dicatat tidak boleh ditebak oleh developer/AI; pemilik sistem harus melengkapinya sebelum dokumen dipakai sebagai bukti keputusan client.
+
 ## Informasi Rapat
 
 | Keterangan | Detail |
 | --- | --- |
 | Nama Rapat | Pembahasan Progres, Revisi, dan Finalisasi Project SistemSPP |
 | Tanggal | 31 Juli 2026 |
-| Waktu | [Isi waktu rapat] |
-| Tempat/Media | [Isi lokasi atau media rapat] |
-| Pemimpin Rapat | [Isi nama] |
-| Notulis | [Isi nama] |
-| Peserta | [Isi nama peserta] |
+| Waktu | Belum dicatat oleh pemilik rapat |
+| Tempat/Media | Belum dicatat oleh pemilik rapat |
+| Pemimpin Rapat | Belum dicatat oleh pemilik rapat |
+| Notulis | Belum dicatat oleh pemilik rapat |
+| Peserta | Belum dicatat oleh pemilik rapat |
 | Repository | `https://github.com/alhafiztaufikur/spp-management-system` |
-| Commit terakhir yang sudah dipush | `876bb40 - Polish SistemSPP reports and mobile UI` |
+| Referensi historis saat rapat | `876bb40 - Polish SistemSPP reports and mobile UI`; bukan commit/tag release audit saat ini |
 
 ## Tujuan Rapat
 
@@ -49,7 +51,7 @@ Mode Advance tersedia untuk mengisi data keuangan siswa secara lebih lengkap. Si
 
 ### 4. Fitur Pembayaran
 
-Fitur pembayaran digunakan untuk mencatat transaksi pembayaran siswa. Komponen pembayaran meliputi uang pangkal, bangunan, seragam, kegiatan, SPP, makan, Sorga, infaq, uang Komite, daftar ulang, tabungan wajib, potongan SPP, dan biaya lain.
+Fitur pembayaran digunakan untuk mencatat transaksi pembayaran siswa. Komponen pembayaran meliputi uang pangkal, bangunan, seragam, kegiatan, SPP, makan, Sorga, infaq, uang Komite, daftar ulang, potongan SPP, dan biaya lain. Setoran tabungan dicatat melalui modul Tabungan Masuk, bukan dari pembayaran.
 
 Sistem pembayaran sudah ditambahkan dengan pilihan `Tunai`, `VA`, dan `Qris`. Nilai metode pembayaran disimpan pada transaksi dan ikut tampil pada slip maupun laporan export.
 
@@ -85,7 +87,7 @@ Aplikasi menggunakan tiga role pengguna, yaitu admin, bendahara, dan kasir.
 | --- | --- |
 | Admin | Dashboard, pembayaran, data siswa, master biaya lain, master daftar ulang, role management, tabungan, dan laporan |
 | Bendahara | Dashboard, riwayat tabungan, dan laporan |
-| Kasir | Tabungan masuk, tabungan keluar, dan riwayat tabungan |
+| Kasir | Input/riwayat/koreksi pembayaran, tabungan masuk/keluar/riwayat, struk, dan Laporan Global sesuai keputusan role yang masih perlu sign-off client |
 
 Hak akses tidak hanya dibatasi dari tampilan menu, tetapi juga melalui pengecekan role pada backend. Tampilan profile pada sidebar sudah diganti menjadi avatar agar lebih rapi untuk setiap role.
 
@@ -116,7 +118,7 @@ Beberapa validasi utama sudah diterapkan, seperti validasi role, pengecekan logi
 
 Query yang menerima input pengguna menggunakan prepared statement. Integritas relasi pembayaran juga diperkuat dengan `payment_link_version` dan referensi `bayar_id` pada child transaksi tertentu, sehingga edit atau hapus pembayaran tidak mengganggu transaksi lain.
 
-Masih terdapat catatan pengembangan lanjutan, yaitu penerapan CSRF token secara merata pada endpoint mutasi yang belum dilindungi sepenuhnya.
+CSRF server-side sudah dipasang pada jalur mutasi pembayaran, tabungan, siswa, master, dan role management yang diuji. Review route-matrix/DAST untuk endpoint baru, CSP strict, dan XSS residual tetap menjadi pekerjaan audit berikutnya.
 
 ## Keputusan Rapat
 
@@ -135,19 +137,19 @@ Masih terdapat catatan pengembangan lanjutan, yaitu penerapan CSRF token secara 
 
 | No | Tindak Lanjut | PIC | Target |
 | --- | --- | --- | --- |
-| 1 | Melengkapi nama peserta, waktu, tempat, PIC, dan target tanggal pada dokumen MoM | [Isi nama] | [Isi tanggal] |
-| 2 | Melakukan uji coba fitur utama sebagai admin, bendahara, dan kasir | [Isi nama] | [Isi tanggal] |
-| 3 | Mengecek ulang tampilan mobile pada dashboard, tabungan, dan preview Excel | [Isi nama] | [Isi tanggal] |
-| 4 | Mengecek hasil slip PDF dari periode kosong dan periode yang memiliki transaksi | [Isi nama] | [Isi tanggal] |
-| 5 | Menyiapkan screenshot aplikasi untuk lampiran laporan project | [Isi nama] | [Isi tanggal] |
-| 6 | Menambahkan CSRF token secara merata pada endpoint mutasi yang belum terlindungi | [Isi nama] | [Isi tanggal] |
-| 7 | Menyusun panduan singkat penggunaan sistem untuk pengguna admin, bendahara, dan kasir | [Isi nama] | [Isi tanggal] |
+| 1 | Melengkapi identitas rapat dan mengesahkan keputusan | Pemilik Sistem (belum ditetapkan) | Sebelum sign-off |
+| 2 | Melakukan UAT fitur utama sebagai admin, bendahara, dan kasir | Perwakilan tiap role (belum ditetapkan) | Sebelum GO |
+| 3 | Mengecek tampilan mobile/desktop, tema, zoom, dan keyboard | QA/client (belum ditetapkan) | Sebelum GO |
+| 4 | Mengecek PDF dan Excel pada aplikasi client | Bendahara/QA (belum ditetapkan) | Sebelum GO |
+| 5 | Menyiapkan screenshot tanpa PII untuk bukti UAT | QA/client (belum ditetapkan) | Saat UAT |
+| 6 | Menjalankan route-matrix/DAST untuk seluruh endpoint | Audit teknis (belum dijadwalkan) | Sebelum GO |
+| 7 | Mengesahkan SOP penggunaan, backup, koreksi, dan support | Pemilik Sistem/Infra (belum ditetapkan) | Sebelum handover |
 
 ## Kendala dan Risiko
 
-1. Belum tersedia automated test suite, sehingga pengujian masih banyak dilakukan secara manual.
+1. Regression otomatis tersedia pada `tests/`, tetapi concurrency, failpoint, browser UAT, dan target client belum dibuktikan.
 2. Export Excel masih menggunakan format tabel HTML dengan ekstensi `.xls`, bukan file XLSX native.
-3. Beberapa endpoint mutasi masih perlu pemerataan perlindungan CSRF.
+3. Cakupan DAST/XSS/CSP strict dan endpoint legacy masih perlu pengujian lebih luas.
 4. Konfigurasi database masih berada langsung di file `koneksi.php`, sehingga perlu penyesuaian bila aplikasi dipindahkan ke server produksi.
 5. Dependency Dompdf membutuhkan Composer. Jika folder `vendor/` belum tersedia, developer perlu menjalankan `composer install`.
 6. Tampilan mobile tetap perlu diuji langsung pada beberapa ukuran layar karena browser dapat memiliki perilaku rendering yang berbeda.
@@ -170,7 +172,7 @@ Masih terdapat catatan pengembangan lanjutan, yaitu penerapan CSRF token secara 
 | Excel | Preview sebelum download, tampilan mobile lebih rapi |
 | Riwayat Tabungan | Filter dan tabel mobile diperbaiki |
 | Dokumentasi | MoM, changelog, dan konteks project diperbarui |
-| Git | Perubahan sudah dipush ke `origin/main` pada commit `876bb40` |
+| Audit | Matrix 19 migrasi PASS; regression disposable 18/18 PASS; replay idempotency savings/payment dan concurrency savings/payment/DU/fee 25/25 teruji; status handover tetap NO-GO sampai gate client/infra |
 
 ## Kesimpulan
 

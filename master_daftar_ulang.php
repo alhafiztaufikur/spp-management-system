@@ -1,12 +1,13 @@
 <?php
-session_start();
+require_once __DIR__ . '/includes/security.php';
+security_bootstrap_session();
 if (!isset($_SESSION['admin_id'])) { header('Location: login.php'); exit; }
 require_once 'koneksi.php';
 require_once 'includes/auth.php';
 require_once 'includes/daftar_ulang.php';
 requireRole(['admin']);
 
-if (empty($_SESSION['csrf_master_du'])) $_SESSION['csrf_master_du'] = bin2hex(random_bytes(32));
+$_SESSION['csrf_master_du'] = security_csrf_token('master-registration');
 
 function master_du_e($value): string { return htmlspecialchars((string)$value, ENT_QUOTES, 'UTF-8'); }
 function master_du_amount($value): float { return (float)str_replace(['.', ','], ['', '.'], trim((string)$value)); }
@@ -25,31 +26,37 @@ function master_du_ensure_year(mysqli $db, string $label): array {
     return master_du_year($db, $label);
 }
 
-$selectedYear = trim((string)($_GET['tahun'] ?? $_POST['tahun_ajaran'] ?? du_current_academic_year()));
+$yearInput = array_key_exists('tahun', $_GET) ? $_GET['tahun'] : ($_POST['tahun_ajaran'] ?? du_current_academic_year());
+$selectedYear = trim((string)(is_scalar($yearInput) ? $yearInput : du_current_academic_year()));
 try { $selectedYear = du_normalize_academic_year($selectedYear); }
 catch (Throwable $e) { $selectedYear = du_current_academic_year(); }
-master_du_ensure_year($koneksi, $selectedYear);
+$isPostRequest = ($_SERVER['REQUEST_METHOD'] ?? 'GET') === 'POST';
 
 $flash = $_SESSION['flash'] ?? null;
 unset($_SESSION['flash']);
 
 if ($_SERVER['REQUEST_METHOD'] === 'POST') {
-    $token = (string)($_POST['csrf_token'] ?? '');
-    if (!hash_equals($_SESSION['csrf_master_du'], $token)) {
+    $token = (string)security_input_scalar($_POST, 'csrf_token');
+    if (!security_csrf_is_valid('master-registration', $token)) {
         $_SESSION['flash'] = ['type' => 'error', 'msg' => 'Permintaan tidak valid atau sesi telah kedaluwarsa.'];
         master_du_redirect($selectedYear);
     }
-    $action = (string)($_POST['aksi'] ?? '');
+    $action = (string)security_input_scalar($_POST, 'aksi');
     try {
         $koneksi->begin_transaction();
+        // Keep year creation inside the same transaction as the requested
+        // action. Invalid CSRF is handled above; validation/action failures
+        // must also roll back a newly created draft year.
+        master_du_ensure_year($koneksi, $selectedYear);
         $year = master_du_year($koneksi, $selectedYear, true);
         $yearId = (int)$year['id'];
 
         if (in_array($action, ['simpan_tarif', 'simpan_dan_terbitkan'], true)) {
             if ($year['status'] === 'closed') throw new RuntimeException('Tahun ajaran sudah ditutup; tarif tidak dapat diubah.');
-            $amounts = $_POST['jumlah'] ?? [];
+            $amounts = is_array($_POST['jumlah'] ?? null) ? $_POST['jumlah'] : [];
             for ($class = 1; $class <= 6; $class++) {
-                $amount = master_du_amount($amounts[(string)$class] ?? $amounts[$class] ?? 0);
+                $amountRaw = $amounts[(string)$class] ?? $amounts[$class] ?? 0;
+                $amount = master_du_amount(is_scalar($amountRaw) ? $amountRaw : 0);
                 if ($amount <= 0) throw new RuntimeException('Nominal kelas ' . $class . ' harus lebih dari Rp 0.');
                 $classText = (string)$class;
                 $stmt = $koneksi->prepare('SELECT id, Jumlah FROM Daftar_ulang WHERE tahun_ajaran_id = ? AND kelas = ? LIMIT 1 FOR UPDATE');
@@ -114,7 +121,7 @@ if ($_SERVER['REQUEST_METHOD'] === 'POST') {
         $koneksi->commit();
     } catch (Throwable $error) {
         $koneksi->rollback();
-        $_SESSION['flash'] = ['type'=>'error','msg'=>$error->getMessage()];
+        $_SESSION['flash'] = ['type'=>'error','msg'=>security_exception_message($error, 'Master Daftar Ulang gagal diproses.', 'master-registration')];
     }
     master_du_redirect($selectedYear);
 }
@@ -128,7 +135,14 @@ for ($offset=-2; $offset<=3; $offset++) {
     if (!isset($yearRowsByLabel[$label])) $yearRowsByLabel[$label]=['label'=>$label,'status'=>'draft'];
 }
 krsort($yearRowsByLabel); $yearRows=array_values($yearRowsByLabel);
-$year=master_du_year($koneksi,$selectedYear); $yearId=(int)$year['id'];
+try {
+    $year = master_du_year($koneksi, $selectedYear);
+} catch (Throwable $error) {
+    if ($isPostRequest) throw $error;
+    // GET harus tetap read-only. Tahun draft akan dibuat oleh POST form.
+    $year = ['id' => 0, 'label' => $selectedYear, 'status' => 'draft'];
+}
+$yearId=(int)$year['id'];
 
 $masters=array_fill(1,6,0.0);
 $stmt=$koneksi->prepare('SELECT kelas,Jumlah FROM Daftar_ulang WHERE tahun_ajaran_id=? ORDER BY CAST(kelas AS UNSIGNED)');

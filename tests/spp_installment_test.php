@@ -1,5 +1,7 @@
 <?php
 require_once __DIR__ . '/../koneksi.php';
+require_once __DIR__ . '/support/assert_audit_database.php';
+test_require_audit_database($koneksi);
 
 function spp_installment_assert(bool $condition, string $message): void {
     if (!$condition) throw new RuntimeException($message);

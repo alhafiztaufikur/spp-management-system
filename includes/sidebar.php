@@ -155,13 +155,16 @@ $roleAvatar = $roleAvatars[$role] ?? 'US';
         <span class="admin-role"><?= $roleLabel ?></span>
       </div>
     </div>
-    <a href="<?= $root ?>logout.php" class="logout-btn" title="Logout">
+    <form method="POST" action="<?= $root ?>logout.php" style="margin:0">
+      <input type="hidden" name="csrf_token" value="<?= htmlspecialchars(security_csrf_token('logout'), ENT_QUOTES, 'UTF-8') ?>" />
+      <button type="submit" class="logout-btn" title="Logout" style="width:100%;border:0;cursor:pointer">
       <svg width="18" height="18" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><path d="M9 21H5a2 2 0 0 1-2-2V5a2 2 0 0 1 2-2h4"/><polyline points="16 17 21 12 16 7"/><line x1="21" y1="12" x2="9" y2="12"/></svg>
       <span class="logout-text">Logout</span>
-    </a>
+      </button>
+    </form>
   </div>
 </aside>
-<div class="sidebar-backdrop" onclick="toggleSidebar()"></div>
+<div class="sidebar-backdrop" onclick="toggleSidebar()" aria-hidden="true"></div>
 
 <!-- Material 3 Bottom Navigation for Mobile -->
 <nav class="bottom-nav">

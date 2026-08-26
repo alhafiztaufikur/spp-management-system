@@ -1,12 +1,13 @@
 <?php
-session_start();
+require_once __DIR__ . '/includes/security.php';
+security_bootstrap_session();
 if (!isset($_SESSION['admin_id'])) { header('Location: login.php'); exit; }
 require_once 'koneksi.php';
 require_once 'includes/auth.php';
 require_once 'includes/biaya_lain.php';
 requireRole(['admin']);
 
-if (empty($_SESSION['csrf_master_biaya_lain'])) $_SESSION['csrf_master_biaya_lain'] = bin2hex(random_bytes(32));
+$_SESSION['csrf_master_biaya_lain'] = security_csrf_token('master-other-fees');
 
 function master_amount($value): float {
     if ($value === null || $value === '') return 0.0;
@@ -22,16 +23,16 @@ $flash = $_SESSION['flash'] ?? null;
 unset($_SESSION['flash']);
 
 if ($_SERVER['REQUEST_METHOD'] === 'POST') {
-    if (!hash_equals($_SESSION['csrf_master_biaya_lain'], (string)($_POST['csrf_token'] ?? ''))) {
+    if (!security_csrf_is_valid('master-other-fees', $_POST['csrf_token'] ?? null)) {
         $_SESSION['flash'] = ['type' => 'error', 'msg' => 'Permintaan tidak valid atau sesi telah kedaluwarsa.'];
         master_redirect();
     }
-    $aksi = $_POST['aksi'] ?? '';
+    $aksi = security_input_scalar($_POST, 'aksi');
 
     if ($aksi === 'terbitkan_tagihan') {
         try {
-            $masterId = (int)($_POST['master_id'] ?? 0);
-            $target = (string)($_POST['target'] ?? 'all');
+            $masterId = (int)security_input_scalar($_POST, 'master_id', 0);
+            $target = (string)security_input_scalar($_POST, 'target', 'all');
             if (!in_array($target, ['all', 'tingkat', 'rombel', 'siswa'], true)) throw new RuntimeException('Target penerbitan tidak valid.');
 
             $koneksi->begin_transaction();
@@ -42,15 +43,21 @@ if ($_SERVER['REQUEST_METHOD'] === 'POST') {
 
             $where = ['s.is_active=1']; $types = ''; $params = []; $targetValue = null;
             if ($target === 'tingkat') {
-                $level = (int)($_POST['tingkat'] ?? 0);
+                $level = (int)security_input_scalar($_POST, 'tingkat', 0);
                 if ($level < 1 || $level > 6) throw new RuntimeException('Pilih tingkat kelas 1 sampai 6.');
                 $where[] = 's.KELAS=?'; $types .= 'i'; $params[] = $level; $targetValue = (string)$level;
             } elseif ($target === 'rombel') {
-                $classId = (int)($_POST['master_kelas_id'] ?? 0);
+                $classId = (int)security_input_scalar($_POST, 'master_kelas_id', 0);
                 if ($classId <= 0) throw new RuntimeException('Pilih rombel tujuan.');
                 $where[] = 's.master_kelas_id=?'; $types .= 'i'; $params[] = $classId; $targetValue = (string)$classId;
             } elseif ($target === 'siswa') {
-                $students = array_values(array_unique(array_filter(array_map('trim', (array)($_POST['no_induk'] ?? [])))));
+                $rawStudents = $_POST['no_induk'] ?? [];
+                $rawStudents = is_array($rawStudents) ? $rawStudents : [];
+                $students = [];
+                foreach ($rawStudents as $rawStudent) {
+                    if (is_scalar($rawStudent) && trim((string)$rawStudent) !== '') $students[] = trim((string)$rawStudent);
+                }
+                $students = array_values(array_unique($students));
                 if (!$students) throw new RuntimeException('Pilih minimal satu siswa.');
                 $where[] = 's.NO_INDUK IN (' . implode(',', array_fill(0, count($students), '?')) . ')';
                 $types .= str_repeat('s', count($students)); $params = array_merge($params, $students);
@@ -89,15 +96,15 @@ if ($_SERVER['REQUEST_METHOD'] === 'POST') {
                 : 'Semua siswa pada target tersebut sudah memiliki tagihan. Tidak ada duplikasi dibuat.'];
         } catch (Throwable $error) {
             if ($koneksi->errno || $koneksi->thread_id) { try { $koneksi->rollback(); } catch (Throwable $ignored) {} }
-            $_SESSION['flash'] = ['type' => 'error', 'msg' => $error->getMessage()];
+            $_SESSION['flash'] = ['type' => 'error', 'msg' => security_exception_message($error, 'Tagihan biaya lain gagal diterbitkan.', 'master-other-fees')];
         }
         master_redirect();
     }
 
     if ($aksi === 'tambah' || $aksi === 'update') {
-        $id = (int)($_POST['id'] ?? 0);
-        $nama = trim($_POST['nama'] ?? '');
-        $nominal = master_amount($_POST['nominal'] ?? 0);
+        $id = (int)security_input_scalar($_POST, 'id', 0);
+        $nama = trim((string)security_input_scalar($_POST, 'nama'));
+        $nominal = master_amount(security_input_scalar($_POST, 'nominal', 0));
         $isActive = isset($_POST['is_active']) ? 1 : 0;
 
         if ($nama === '' || mb_strlen($nama) > 100) {
@@ -142,7 +149,7 @@ if ($_SERVER['REQUEST_METHOD'] === 'POST') {
     }
 
     if ($aksi === 'toggle') {
-        $id = (int)($_POST['id'] ?? 0);
+        $id = (int)security_input_scalar($_POST, 'id', 0);
         $stmt = $koneksi->prepare('UPDATE master_biaya_lain SET is_active = IF(is_active = 1, 0, 1) WHERE id = ?');
         $stmt->bind_param('i', $id);
         $stmt->execute();
@@ -152,7 +159,7 @@ if ($_SERVER['REQUEST_METHOD'] === 'POST') {
     }
 
     if ($aksi === 'hapus') {
-        $id = (int)($_POST['id'] ?? 0);
+        $id = (int)security_input_scalar($_POST, 'id', 0);
         $stmtCount = $koneksi->prepare('SELECT (SELECT COUNT(*) FROM bayar_biaya_lain WHERE master_biaya_lain_id=?) + (SELECT COUNT(*) FROM tagihan_biaya_lain WHERE master_biaya_lain_id=?) AS jumlah');
         $stmtCount->bind_param('ii', $id, $id);
         $stmtCount->execute();
@@ -173,7 +180,7 @@ if ($_SERVER['REQUEST_METHOD'] === 'POST') {
 }
 
 $editData = null;
-$editId = (int)($_GET['edit'] ?? 0);
+$editId = (int)security_input_scalar($_GET, 'edit', 0);
 if ($editId > 0) {
     $stmt = $koneksi->prepare('SELECT * FROM master_biaya_lain WHERE id = ?');
     $stmt->bind_param('i', $editId);
@@ -213,7 +220,7 @@ $activeStudents = $koneksi->query("SELECT s.NO_INDUK,s.NAMA,s.KELAS,s.master_kel
     <?php include 'includes/sidebar.php'; ?>
     <main class="main-content">
       <div class="topbar">
-        <button class="sidebar-toggle" onclick="toggleSidebar()" id="btn-sidebar-toggle" title="Toggle Sidebar">
+        <button class="sidebar-toggle" onclick="toggleSidebar()" id="btn-sidebar-toggle" title="Toggle Sidebar" aria-label="Buka navigasi" aria-expanded="false">
           <svg width="20" height="20" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><line x1="3" y1="12" x2="21" y2="12"/><line x1="3" y1="6" x2="21" y2="6"/><line x1="3" y1="18" x2="21" y2="18"/></svg>
         </button>
         <div class="topbar-title"><h2>Master Biaya Lain</h2><span class="breadcrumb">SistemSPP / Master Biaya Lain</span></div>

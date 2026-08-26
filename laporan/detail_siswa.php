@@ -1,5 +1,6 @@
 <?php
-session_start();
+require_once __DIR__ . '/../includes/security.php';
+security_bootstrap_session();
 if (!isset($_SESSION['admin_id'])) { header('Location: ../login.php'); exit; }
 require_once '../koneksi.php';
 require_once '../includes/auth.php';
@@ -35,7 +36,8 @@ function history_full_date($value): array {
     ];
 }
 
-$noInduk = trim((string)($_GET['nis'] ?? ''));
+$noIndukRaw = $_GET['nis'] ?? '';
+$noInduk = trim((string)(is_scalar($noIndukRaw) ? $noIndukRaw : ''));
 if ($noInduk === '' || strlen($noInduk) > 50) {
     $_SESSION['flash'] = ['type' => 'error', 'msg' => 'Siswa untuk detail rekap tidak valid.'];
     header('Location: rekap_kelas.php');
@@ -141,7 +143,7 @@ unset($transaction);
 
 $backParams = [];
 foreach (['kelas', 'bulan', 'tahun', 'q'] as $key) {
-    if (isset($_GET[$key]) && trim((string)$_GET[$key]) !== '') $backParams[$key] = trim((string)$_GET[$key]);
+    if (isset($_GET[$key]) && is_scalar($_GET[$key]) && trim((string)$_GET[$key]) !== '') $backParams[$key] = trim((string)$_GET[$key]);
 }
 $backUrl = 'rekap_kelas.php' . ($backParams ? '?' . http_build_query($backParams) : '');
 $schoolPeriod = $summary['first_date']

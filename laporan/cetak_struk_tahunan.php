@@ -1,5 +1,6 @@
 <?php
-session_start();
+require_once __DIR__ . '/../includes/security.php';
+security_bootstrap_session();
 if (!isset($_SESSION['admin_id'])) { header('Location: ../login.php'); exit; }
 require_once '../koneksi.php';
 require_once '../includes/auth.php';
@@ -7,7 +8,8 @@ requireRole(['admin', 'bendahara', 'kasir']);
 
 header('Cache-Control: no-store, no-cache, must-revalidate, max-age=0');
 
-$batchToken = strtolower(trim((string)($_GET['batch'] ?? '')));
+$batchRaw = $_GET['batch'] ?? '';
+$batchToken = strtolower(trim((string)(is_scalar($batchRaw) ? $batchRaw : '')));
 if (!preg_match('/^[a-f0-9]{32}$/', $batchToken)) {
     $_SESSION['flash'] = ['type' => 'error', 'msg' => 'Kelompok struk tahunan tidak valid.'];
     header('Location: index.php');
@@ -141,7 +143,7 @@ if (!$ids) {
 }
 
 $paymentStmt = $koneksi->prepare("
-    SELECT b.*, s.NAMA, s.NO_induk_diknas, s.KELAS AS KELAS_SISWA, s.PANGKAL, s.PANGKAL_BAYAR,
+    SELECT b.*, s.NAMA, s.NO_induk_diknas, COALESCE(NULLIF(b.kelas_rombel_snapshot, ''), NULLIF(b.KELAS, ''), s.KELAS) AS KELAS_SISWA, s.PANGKAL, s.PANGKAL_BAYAR,
            s.BANGUNAN, s.BANGUNAN_BAYAR, s.SERAGAM, s.SERAGAM_BAYAR,
            s.KEGIATAN, s.KEGIATAN_BAYAR, s.MAKAN, s.SORGA, s.INFAQ,
            s.SPP_PERBULAN, s.POMG, s.potong_pangkal, s.tot_pangkal,

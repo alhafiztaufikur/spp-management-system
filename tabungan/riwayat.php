@@ -2,7 +2,8 @@
 // ============================================
 // tabungan/riwayat.php — Riwayat Transaksi Tabungan
 // ============================================
-session_start();
+require_once __DIR__ . '/../includes/security.php';
+security_bootstrap_session();
 require_once '../koneksi.php';
 require_once '../includes/auth.php';
 require_once '../includes/pagination.php';
@@ -11,10 +12,14 @@ requireRole(['admin', 'kasir', 'bendahara']);
 $flash = $_SESSION['flash'] ?? null;
 unset($_SESSION['flash']);
 
-// Filter
-$filter_nis = trim($_GET['nis'] ?? '');
-$filter_bulan = $_GET['bulan'] ?? date('m');
-$filter_tahun = $_GET['tahun'] ?? date('Y');
+// Filter. Array/object-shaped query values are rejected to the empty/default
+// filter rather than reaching trim(), arithmetic, or a SQL binder as arrays.
+$rawFilterNis = $_GET['nis'] ?? '';
+$rawFilterBulan = $_GET['bulan'] ?? date('m');
+$rawFilterTahun = $_GET['tahun'] ?? date('Y');
+$filter_nis = is_scalar($rawFilterNis) ? trim((string)$rawFilterNis) : '';
+$filter_bulan = is_scalar($rawFilterBulan) ? (string)$rawFilterBulan : date('m');
+$filter_tahun = is_scalar($rawFilterTahun) ? (string)$rawFilterTahun : date('Y');
 $allowedPageSizes = [10, 25, 50];
 $perPage = page_size_param('per_page', $allowedPageSizes, 10);
 $page = page_int_param('page');
@@ -158,7 +163,7 @@ $bln_names = ['01'=>'Januari','02'=>'Februari','03'=>'Maret','04'=>'April','05'=
 
   <main class="main-content">
     <div class="topbar">
-      <button class="sidebar-toggle" onclick="toggleSidebar()" id="btn-sidebar-toggle">
+      <button class="sidebar-toggle" onclick="toggleSidebar()" id="btn-sidebar-toggle" aria-label="Buka navigasi" aria-expanded="false">
         <svg width="20" height="20" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><line x1="3" y1="12" x2="21" y2="12"/><line x1="3" y1="6" x2="21" y2="6"/><line x1="3" y1="18" x2="21" y2="18"/></svg>
       </button>
       <div class="topbar-title">
@@ -408,7 +413,7 @@ $bln_names = ['01'=>'Januari','02'=>'Februari','03'=>'Maret','04'=>'April','05'=
     </div>
   </main>
 </div>
-<div class="toast" id="toast"><span id="toast-icon"></span><span id="toast-msg"></span></div>
+<div class="toast" id="toast" role="status" aria-live="polite" aria-atomic="true"><span id="toast-icon" aria-hidden="true"></span><span id="toast-msg"></span></div>
 <script src="../assets/js/app.js?v=2.8"></script>
 <script>
 document.addEventListener('DOMContentLoaded', function(){

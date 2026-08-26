@@ -1,5 +1,6 @@
 <?php
-session_start();
+require_once '../includes/security.php';
+security_bootstrap_session();
 require_once '../koneksi.php';
 require_once '../includes/auth.php';
 require_once '../includes/reports.php';

@@ -41,7 +41,7 @@ URL lokal:
 http://localhost/spp-management-system/
 ```
 
-Konfigurasi koneksi berada di `koneksi.php`. Default lokal menggunakan host `localhost`, user MySQL `root`, password kosong, dan database `db_spp`. Jangan menyalin konfigurasi lokal ini ke produksi tanpa secret management dan kredensial baru.
+Bootstrap koneksi berada di `koneksi.php`, tetapi nilai koneksi wajib berasal dari environment `SPP_DB_*` atau file ignored `config/app.local.php` yang dibuat dari `config/app.example.php`. Tidak ada fallback user `root`. Mode `production` menolak password database kosong; gunakan user runtime khusus satu schema dan akun migrasi terpisah.
 
 Aplikasi menetapkan timezone PHP ke `Asia/Jakarta` dan session MySQL ke `+07:00` dari `koneksi.php`, sehingga timestamp transaksi tampil konsisten dengan WIB.
 
@@ -50,9 +50,10 @@ Aplikasi menetapkan timezone PHP ke `Asia/Jakarta` dan session MySQL ke `+07:00`
 1. Aktifkan Apache dan MySQL dari XAMPP.
 2. Pastikan repository berada di document root Apache.
 3. Jalankan `composer install` bila folder `vendor/` belum tersedia.
-4. Untuk instalasi database baru, jalankan `sql/schema.sql`.
-5. Buka URL lokal dan login menggunakan akun seed pengembangan.
-6. Segera ganti password seed pada lingkungan selain pengembangan lokal.
+4. Salin `config/app.example.php` menjadi `config/app.local.php`, isi credential lokal yang tidak di-commit, atau set environment `SPP_DB_HOST`, `SPP_DB_PORT`, `SPP_DB_USER`, `SPP_DB_PASS`, `SPP_DB_NAME`, dan `SPP_APP_ENV`.
+5. Untuk instalasi database baru dan kosong, jalankan `sql/schema.sql` menggunakan akun migrasi, bukan akun runtime.
+6. Provision akun administrator pertama secara out-of-band menggunakan `password_hash()`; schema tidak membuat akun/password default.
+7. Buka URL lokal dan login dengan akun yang baru diprovisikan.
 
 Contoh impor schema baru melalui PowerShell:
 
@@ -61,7 +62,7 @@ composer install
 Get-Content sql\schema.sql -Raw | C:\xampp\mysql\bin\mysql.exe -u root
 ```
 
-`sql/schema.sql` menyediakan akun seed lokal `admin`, `bendahara`, dan `kasir`. Password seed terlihat di schema dan hanya ditujukan untuk pengembangan. Login lama yang masih memakai MD5 akan otomatis dinaikkan ke `PASSWORD_DEFAULT` setelah autentikasi berhasil.
+`sql/schema.sql` tidak menyediakan akun/password default bersama. Hash MD5 yang ditemukan pada upgrade lama ditandai `password_reset_required=1` dan tidak dapat dipakai untuk login; admin harus meresetnya melalui Role Management atau prosedur out-of-band.
 
 ## 4. Struktur Repository
 
@@ -91,14 +92,16 @@ Guard backend memakai `requireRole()` dari `includes/auth.php`. Menyembunyikan m
 | Fitur | Admin | Bendahara | Kasir |
 | --- | :---: | :---: | :---: |
 | Dashboard | Ya | Ya | Tidak |
-| Input/lihat/edit pembayaran | Ya | Tidak | Tidak |
+| Input/lihat/edit pembayaran | Ya | Tidak | Ya |
 | Master Siswa | Ya | Tidak | Tidak |
 | Master Biaya Lain | Ya | Tidak | Tidak |
 | Master Daftar Ulang | Ya | Tidak | Tidak |
 | Role Management | Ya | Tidak | Tidak |
 | Tabungan masuk/keluar | Ya | Tidak | Ya |
 | Riwayat tabungan | Ya | Ya | Ya |
-| Laporan, PDF, dan Excel | Ya | Ya | Tidak |
+| Laporan Umum, PDF, dan Excel Umum | Ya | Ya | Tidak |
+| Tujuh Laporan Global dan struk | Ya | Ya | Ya (pending DEC-001) |
+| Rekap per Kelas | Ya | Ya | Tidak |
 
 Role yang valid hanya `admin`, `bendahara`, dan `kasir`. Pengguna tanpa role valid harus dikeluarkan dari session dan diarahkan kembali ke login.
 
@@ -124,6 +127,10 @@ Menyimpan identitas, kelas, tarif per siswa, potongan, saldo awal pembayaran, da
 ### `siswa_audit_log`
 
 Menyimpan aksi, admin, waktu, nomor induk snapshot, serta JSON sebelum dan sesudah perubahan siswa. Relasi siswa dan admin memakai `ON DELETE SET NULL` agar catatan audit tidak hilang ketika parent tidak tersedia.
+
+### `audit_event`
+
+`audit_event` adalah jurnal append-only untuk aksi akun, pembayaran, dan tabungan. Event menyimpan `event_type`, entitas, aksi, waktu presisi, actor ID/nama/username/role sebagai snapshot, request ID, alasan koreksi, serta JSON before/after yang telah direduksi (password, token, cookie, CSRF, dan secret tidak pernah disimpan). Tidak ada FK ke `admin` pada tabel ini agar penghapusan akun tidak mengubah histori audit. Dua trigger menolak `UPDATE` dan `DELETE`; event finansial dibuat dalam transaksi bisnis yang sama sehingga rollback bisnis ikut membatalkan event.
 
 ### `bayar`
 
@@ -154,6 +161,8 @@ Tabel `Daftar_ulang` dipakai sebagai template tarif per kombinasi `kelas + th_aj
 ### `tabungan`, `transaksi_m`, dan `transaksi_k`
 
 `tabungan` menyimpan saldo berjalan per siswa. `transaksi_m` dan `transaksi_k` menyimpan jurnal masuk dan keluar dari modul Tabungan Masuk/Keluar. Pembayaran siswa tidak lagi membuat setoran tabungan; `transaksi_m.bayar_id` dipertahankan untuk kompatibilitas schema dan cleanup histori lama, tetapi alur baru harus menyimpannya `NULL`. Semua foreign key nomor induk mengikuti perubahan nomor induk melalui `ON UPDATE CASCADE`.
+
+Form Tabungan Masuk/Keluar juga memuat `idempotency_key` acak 64 karakter hex. Handler mengklaim key pada `mutation_request` di dalam transaksi yang sama dengan lock siswa/saldo, jurnal, dan `audit_event`. Unique `(scope, request_key)` membuat submit ulang atau replay dengan payload berbeda ditolak tanpa mutasi kedua. Klaim yang gagal atau transaksi yang rollback tidak meninggalkan reservasi; klaim yang committed dipertahankan sehingga penghapusan akun tidak membuka kembali token lama. Transaksi histori tidak diberi key secara otomatis.
 
 ## 7. Alur dan Aturan Bisnis
 
@@ -191,6 +200,7 @@ Tabel `Daftar_ulang` dipakai sebagai template tarif per kombinasi `kelas + th_aj
 - Form pembayaran juga menampilkan alert inline bila `Input Bayar` lebih besar dari sisa tagihan sebelum submit; input tersebut diberi invalid state dan browser menahan submit melalui custom validity.
 - Simpan, edit, dan hapus transaksi utama, daftar ulang, serta detail biaya lain dijalankan dalam transaction.
 - Pembayaran baru menyimpan relasi eksplisit ke Daftar Ulang melalui `bayar_id`. Pembayaran tidak boleh membuat setoran tabungan; POST lama dengan `tabungan_wajib > 0` wajib ditolak.
+- Form pembayaran input/edit/hapus membawa `idempotency_key` acak 64 karakter hex. Handler mengklaim scope `payment` pada `mutation_request` sebelum menulis; refresh/retry dengan key committed yang sama ditolak dan tidak menggandakan header, child, saldo cache, atau audit event. Key dari transaksi yang rollback ikut rollback.
 - Pembayaran `payment_link_version=0` adalah legacy. Sistem menandainya di daftar dan menolak edit/hapus, termasuk akses endpoint langsung; rekonsiliasi harus dilakukan manual tanpa pencocokan otomatis.
 
 ### Makan, Sorga, dan Infaq
@@ -239,6 +249,7 @@ Tabel `Daftar_ulang` dipakai sebagai template tarif per kombinasi `kelas + th_aj
 - Hanya siswa aktif yang dapat menerima transaksi tabungan baru.
 - Penarikan tidak boleh melebihi saldo.
 - Saldo dan jurnal harus diperbarui dalam satu transaction dengan row lock.
+- Setiap mutasi baru wajib membawa idempotency key dari form. Replay key yang sama ditolak sebelum saldo/jurnal/audit berubah.
 - Histori siswa arsip tetap tampil.
 
 ### Laporan
@@ -267,16 +278,11 @@ Schema ini bersifat destruktif untuk sebagian tabel karena memakai `DROP TABLE`.
 
 ### Upgrade database lama
 
-1. Buat backup database.
-2. Periksa nilai `siswa.KELAS`. Label lama maksimal 5 karakter akan dipertahankan untuk kompatibilitas; siswa baru tetap dibatasi kelas `1` sampai `6`.
-3. Jalankan `sql/add_master_biaya_lain.sql`.
-4. Jalankan `sql/add_master_daftar_ulang.sql`.
-5. Jalankan `sql/add_academic_year_billing.sql`.
-6. Jalankan `sql/add_student_advanced.sql`.
-7. Jalankan `sql/add_student_optional_fees.sql`.
-8. Jalankan `sql/add_payment_references.sql`.
-9. Jalankan `sql/add_payment_method.sql`.
-10. Jalankan `sql/verify_schema.sql` dan uji aplikasi.
+1. Buat backup database dan buktikan restore ke nama database berbeda.
+2. Jalankan manifest kanonik `documentation/audit/MIGRATION_MANIFEST.md` pada salinan disposable; jangan menebak urutan dari nama file.
+3. Terapkan 19 migrasi secara berurutan dalam maintenance window sesuai `MIGRATION_MANIFEST.md`: role, security, audit append-only, mutation idempotency, master/advanced, relasi pembayaran, metode/timestamp, DU, billing, optional fees, annual claim/cicilan, aktivasi legacy, normalisasi operator, sinkron cache, cleanup linked saving, lalu laporan modular.
+4. Jalankan `sql/verify_schema.sql` dan `sql/verify_data_integrity.sql` dengan target database dipilih eksplisit (kedua file tidak lagi memaksa `USE db_spp`).
+5. Uji regression pada database disposable dan simpan output sebelum cutover. Database `db_spp` produksi/lokal berhistori tidak dimutasi oleh audit ini.
 
 Contoh PowerShell:
 
@@ -291,7 +297,7 @@ Get-Content sql\add_payment_method.sql -Raw | C:\xampp\mysql\bin\mysql.exe -u ro
 Get-Content sql\verify_schema.sql -Raw | C:\xampp\mysql\bin\mysql.exe -u root
 ```
 
-Seluruh migrasi bertahap dirancang idempotent. Migrasi siswa melakukan preflight dan berhenti bila menemukan kelas kosong atau lebih dari 5 karakter. Migrasi tahun ajaran menambahkan penempatan dan tagihan siswa, lalu menghubungkan histori `bayar_du` yang memiliki kelas+tahun ajaran valid tanpa mengubah nominal transaksi. Tahun ajaran memakai batas Juli–Juni dan tagihan terbit menjadi sumber saldo Daftar Ulang baru. Migrasi relasi pembayaran lain tetap mempertahankan data legacy yang belum dapat dibuktikan relasinya.
+Seluruh migrasi bertahap dirancang idempotent. Migrasi siswa melakukan preflight dan berhenti bila menemukan kelas kosong atau lebih dari 5 karakter. Migrasi tahun ajaran menambahkan penempatan dan tagihan siswa. Bila histori `bayar_du` memiliki NIS, kelas, dan tahun ajaran valid, migrasi boleh membuat konteks tagihan `tagihan_daftar_ulang_id` untuk rekonsiliasi saldo, tanpa mengubah nominal transaksi; ini **bukan** pencocokan kepemilikan pembayaran dan tidak pernah mengisi `bayar_du.bayar_id`. Kepemilikan child terhadap header pembayaran hanya dibuat oleh alur pembayaran baru (`payment_link_version=1`); histori lama tetap `bayar_id=NULL`/versi 0 dan tidak ditebak berdasarkan NIS, tanggal, atau tahun ajaran. Tahun ajaran memakai batas Juli–Juni dan tagihan terbit menjadi sumber saldo Daftar Ulang baru. Migrasi relasi pembayaran lain tetap mempertahankan data legacy yang belum dapat dibuktikan relasinya.
 
 ## 9. Konvensi Keamanan
 
@@ -300,11 +306,18 @@ Seluruh migrasi bertahap dirancang idempotent. Migrasi siswa melakukan preflight
 - Mutasi lintas tabel wajib memakai database transaction dan rollback saat gagal.
 - Data uang, role, status, tarif, dan total harus divalidasi ulang di backend.
 - Output pengguna wajib melalui `htmlspecialchars()` sesuai konteks HTML.
-- Mutation baru wajib memakai CSRF token dan `hash_equals()`.
+- Mutation baru wajib memakai CSRF token dan `hash_equals()`; mutasi finansial yang dapat di-submit ulang juga wajib memakai idempotency key yang diklaim atomik di database.
 - Nomor induk, ID, nominal, role, hidden input, dan atribut `readonly` dari browser tetap dianggap tidak tepercaya.
+- Field request yang secara bisnis scalar dinormalisasi melalui `security_input_scalar()` atau helper setara; array hanya diterima pada field list yang didefinisikan eksplisit, seperti detail Biaya Lain dan tarif kelas.
+- Handler mutasi mengharapkan form URL-encoded; body `application/json`/`text/plain` tidak boleh dianggap sebagai `$_POST` form dan wajib berhenti pada pemeriksaan method/CSRF sebelum mutasi.
+- Master Daftar Ulang memvalidasi CSRF sebelum memastikan tahun ajaran, dan operasi ensure tersebut berada di dalam transaksi aksi agar POST invalid atau aksi gagal tidak meninggalkan draft baru.
+- Alasan audit wajib berupa nilai scalar tunggal; array/objek ditolak sebelum normalisasi untuk mencegah nilai implisit masuk ke jurnal audit.
+- GET/HEAD/OPTIONS tidak boleh memutasi data. Khusus `master_daftar_ulang.php`, tahun ajaran baru dibuat hanya oleh POST; GET tahun yang belum ada memakai tampilan draft read-only.
 - Jangan menulis password plaintext, dump data siswa nyata, cookie, token session, atau secret ke repository maupun dokumentasi.
+- `SPP_ENABLE_HSTS=1` hanya boleh diaktifkan setelah HTTPS end-to-end dan redirect HTTP target lulus; default tetap nonaktif.
+- `SPP_RATE_LIMIT_KEY` harus berupa secret acak stabil dari environment server untuk HMAC bucket login dan tidak boleh dicatat ke repository/log.
 
-Cakupan CSRF saat ini belum merata. Master Siswa, Role Management, Master Kelas, dan Master Biaya Lain sudah memakai CSRF, sedangkan pembayaran dan tabungan masih menjadi technical debt. Jangan menyatakan endpoint tersebut sudah terlindungi sebelum implementasinya benar-benar ditambahkan dan diuji.
+Cakupan CSRF server-side saat ini dipasang pada mutasi pembayaran, tabungan, siswa, master, dan role management. Route-wide DAST dan kombinasi content-type/parameter tetap menjadi coverage gap; jangan menganggap static guard sebagai bukti browser UAT.
 
 ## 9A. Master Kelas, Tagihan Biaya Lain, dan Laporan Global Modular
 
@@ -363,7 +376,7 @@ git diff --check
 - Regression test berbasis PHP tersedia di folder `tests`; pengujian visual tetap dilakukan manual pada browser/PDF viewer.
 - Export Excel masih berupa HTML table dengan ekstensi `.xls`, bukan file XLSX native.
 - Export PDF memakai Dompdf; validasi visual tetap perlu dilakukan pada viewer PDF/browser karena engine PDF berbeda dari rendering HTML browser.
-- CSRF belum diterapkan pada seluruh endpoint mutasi.
+- Endpoint mutasi pembayaran, tabungan, siswa, master biaya/DU, dan role management sekarang memerlukan token CSRF server-side; residual review tetap diperlukan untuk route baru atau endpoint legacy yang belum mempunyai test negatif khusus.
 - Beberapa kolom transaksi legacy masih memakai `DOUBLE` dan struktur lama tetap dipertahankan untuk kompatibilitas.
 - Penamaan `user_id` pada tabel legacy belum konsisten antara ID dan nama pengguna serta belum semuanya menjadi foreign key.
 - Konfigurasi database masih berada langsung di `koneksi.php` dan belum menggunakan environment variable.
@@ -385,7 +398,8 @@ git diff --check
 
 1. `documentation/PROJECT_CONTEXT.md`
 2. `documentation/AI_CHANGELOG.md`
-3. `git status` dan `git log` terbaru
-4. File implementasi dan SQL yang berhubungan langsung dengan permintaan
+3. `documentation/RENCANA_AUDIT_FINAL_SISTEMSPP.md` bila pekerjaan menyangkut audit menyeluruh, hardening, pembersihan dead code, deployment, atau serah-terima client
+4. `git status` dan `git log` terbaru
+5. File implementasi dan SQL yang berhubungan langsung dengan permintaan
 
 Dokumentasi membantu orientasi, tetapi bukan pengganti pembacaan kode untuk perubahan yang akan diimplementasikan.

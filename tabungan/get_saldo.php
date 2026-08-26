@@ -1,14 +1,19 @@
 <?php
 // tabungan/get_saldo.php — AJAX: ambil saldo tabungan siswa
-session_start();
+require_once __DIR__ . '/../includes/security.php';
+security_bootstrap_session();
 require_once '../koneksi.php';
+require_once '../includes/auth.php';
 
-if (!isset($_SESSION['admin_id'])) {
-    echo json_encode(['saldo' => 0]);
+if (($_SERVER['REQUEST_METHOD'] ?? 'GET') !== 'GET') {
+    header('Allow: GET');
+    http_response_code(405);
     exit;
 }
+requireRoleJson(['admin', 'kasir']);
 
-$nis  = trim($_GET['nis'] ?? '');
+$rawNis = $_GET['nis'] ?? '';
+$nis = is_scalar($rawNis) ? trim((string)$rawNis) : '';
 $saldo = 0;
 
 if ($nis) {
@@ -20,5 +25,4 @@ if ($nis) {
     $stmt->close();
 }
 
-header('Content-Type: application/json');
 echo json_encode(['saldo' => $saldo]);

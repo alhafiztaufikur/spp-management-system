@@ -1,5 +1,6 @@
 <?php
-require_once __DIR__.'/../koneksi.php';require_once __DIR__.'/../includes/kelas.php';
+require_once __DIR__.'/../koneksi.php';require_once __DIR__.'/support/assert_audit_database.php';require_once __DIR__.'/../includes/kelas.php';
+test_require_audit_database($koneksi);
 function class_test_assert(bool $ok,string $message):void{if(!$ok)throw new RuntimeException($message);}
 $failure=null;
 try{

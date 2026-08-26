@@ -94,7 +94,7 @@
 <body>
 
   <section class="page">
-    <header class="letterhead"><img src="../assets/img/school-logo.png" alt="Logo Mutiara Hikmah" /><div class="head-copy"><strong>SEKOLAH DASAR AL-QUR’AN (SDA) MUTIARA HIKMAH</strong><span>Flowchart Lengkap Alur Kasir SistemSPP · Perum Bekasi Griya Asri II, Tambun Selatan · Telp. 021-88363466</span></div><div class="head-code">FLC-KSR-01<br>4 Agustus 2026</div></header>
+    <header class="letterhead"><img src="../assets/img/school-logo.png" alt="Logo Mutiara Hikmah" /><div class="head-copy"><strong>SEKOLAH DASAR AL-QUR’AN (SDA) MUTIARA HIKMAH</strong><span>Flowchart Lengkap Alur Kasir SistemSPP · Perum Bekasi Griya Asri II, Tambun Selatan · Telp. 021-88363466</span></div><div class="head-code">FLC-KSR-01<br>26 Agustus 2026</div></header>
     <img class="watermark" src="../assets/img/school-logo.png" alt="" />
     <div class="content">
       <div class="eyebrow">Diagram 1 · End-to-End</div><h1>Alur Utama Kasir: Login sampai Riwayat</h1><p class="subtitle">Gambaran menyeluruh urutan kerja kasir dan respons sistem pada transaksi pembayaran siswa.</p>
@@ -112,7 +112,7 @@
 
       <div class="section-title"><span>2</span><h2>Persiapan dan input transaksi</h2></div>
       <div class="flow-row">
-        <div class="node"><strong>Pilih Bulanan / Tahunan</strong><small>1 struk atau 12 struk</small></div><div class="arrow">›</div>
+        <div class="node"><strong>Pilih Pembayaran Bulanan</strong><small>1 struk; mode tahunan baru ditolak</small></div><div class="arrow">›</div>
         <div class="node"><strong>Isi Tanggal & Periode</strong><small>Tahun harus konsisten</small></div><div class="arrow">›</div>
         <div class="node"><strong>Pilih Metode</strong><small>Tunai, VA, atau QRIS</small></div><div class="arrow">›</div>
         <div class="node"><strong>Cari dan Pilih Siswa</strong><small>Nama atau nomor induk</small></div><div class="arrow">›</div>
@@ -156,7 +156,7 @@
         <div class="step-label">5 · Nominal komponen</div><div class="validation-decision">Nominal ≤ sisa tagihan?</div><div class="tiny-arrow">›</div><div class="pass-box"><span class="branch-label yes">YA</span> Lanjut validasi komponen lain.</div><div class="tiny-arrow">›</div><div class="reject-box"><span class="branch-label no">TIDAK</span> Tolak nilai negatif, bukan angka, atau melebihi sisa.</div>
         <div class="step-label">6 · Daftar ulang</div><div class="validation-decision">Master kelas/tahun tersedia?</div><div class="tiny-arrow">›</div><div class="pass-box"><span class="branch-label yes">YA</span> Cicilan maksimal sebesar sisa daftar ulang.</div><div class="tiny-arrow">›</div><div class="reject-box"><span class="branch-label no">TIDAK</span> Kunci input dan minta admin melengkapi master.</div>
         <div class="step-label">7 · Biaya lain</div><div class="validation-decision">Aktif, unik, belum lunas?</div><div class="tiny-arrow">›</div><div class="pass-box"><span class="branch-label yes">YA</span> Simpan snapshot nama, nominal, dan keterangan.</div><div class="tiny-arrow">›</div><div class="reject-box"><span class="branch-label no">TIDAK</span> Tolak biaya nonaktif, duplikat, lunas, atau melebihi sisa.</div>
-        <div class="step-label">8 · Paket tahunan</div><div class="validation-decision">12 bulan kosong & total penuh?</div><div class="tiny-arrow">›</div><div class="pass-box"><span class="branch-label yes">YA</span> Pecah SPP Januari–Desember.</div><div class="tiny-arrow">›</div><div class="reject-box"><span class="branch-label no">TIDAK</span> Tolak seluruh paket bila satu bulan sudah dibayar.</div>
+        <div class="step-label">8 · Permintaan tahunan legacy</div><div class="validation-decision">payment_plan = annual?</div><div class="tiny-arrow">›</div><div class="reject-box"><span class="branch-label no">TOLAK</span> Backend rollback sebelum mutasi; arahkan ke transaksi bulanan sesuai urutan Juli–Juni.</div>
         <div class="step-label">9 · Final</div><div class="validation-decision">Semua pemeriksaan lulus?</div><div class="tiny-arrow">›</div><div class="pass-box"><span class="branch-label yes">YA</span> Mulai transaksi database dan simpan.</div><div class="tiny-arrow">›</div><div class="reject-box"><span class="branch-label no">TIDAK</span> ROLLBACK dan tampilkan pesan spesifik.</div>
       </div>
 
@@ -170,7 +170,7 @@
     <header class="letterhead"><img src="../assets/img/school-logo.png" alt="Logo" /><div class="head-copy"><strong>SEKOLAH DASAR AL-QUR’AN (SDA) MUTIARA HIKMAH</strong><span>Flowchart Lengkap Alur Kasir SistemSPP</span></div><div class="head-code">FLC-KSR-01<br>Diagram Struk</div></header>
     <img class="watermark" src="../assets/img/school-logo.png" alt="" />
     <div class="content">
-      <div class="eyebrow">Diagram 3 · Monthly vs Annual</div><h1>Cabang Pembayaran Bulanan dan Tahunan</h1><p class="subtitle">Paket tahunan adalah 12 transaksi terpisah; komponen non-SPP hanya diletakkan pada transaksi pertama agar tidak berulang.</p>
+      <div class="eyebrow">Diagram 3 · Monthly and Legacy</div><h1>Cabang Pembayaran Bulanan dan Histori Tahunan</h1><p class="subtitle">Transaksi baru hanya bulanan. Batch tahunan lama dipertahankan sebagai histori baca/cetak dan tidak boleh ditebak ulang.</p>
 
       <div class="flow-row" style="justify-content:center;margin-bottom:4mm">
         <div class="node start" style="flex:0 0 55mm"><strong>DATA SISWA & INPUT SIAP</strong></div><div class="arrow">›</div><div class="decision" style="flex-basis:38mm"><strong>Jenis pembayaran?</strong></div>
@@ -192,32 +192,32 @@
           </div>
         </div>
 
-        <div class="join">GABUNG<br>KE CETAK</div>
+        <div class="join">BULANAN<br>KE CETAK</div>
 
         <div class="plan annual">
-          <div class="plan-title">CABANG B · TAHUNAN (12 STRUK)</div>
+          <div class="plan-title">CABANG B · TAHUNAN (DITOLAK)</div>
           <div class="plan-body stack">
-            <div class="node"><strong>Pilih Tahun Transaksi</strong><small>Tahun harus sama dengan Tanggal Bayar</small></div>
+            <div class="node"><strong>Request annual</strong><small>payment_plan=annual</small></div>
             <div class="arrow down">›</div>
-            <div class="node system"><strong>Cek Januari–Desember</strong><small>Semua 12 periode wajib belum dibayar</small></div>
+            <div class="node system"><strong>Guard backend</strong><small>Reject sebelum query/mutasi</small></div>
             <div class="arrow down">›</div>
-            <div class="node"><strong>Ambil SPP Bulanan × 12</strong><small>Total tahunan wajib penuh; potongan dibagi</small></div>
+            <div class="node"><strong>Tolak annual</strong><small>Gunakan pembayaran bulanan berurutan</small></div>
             <div class="arrow down">›</div>
-            <div class="node database"><strong>Buat 12 Header Transaksi</strong><small>Batch token, urutan 1/12–12/12, 12 klaim</small></div>
+            <div class="node database"><strong>Rollback tanpa perubahan</strong><small>Arahkan ke transaksi bulanan Juli–Juni</small></div>
             <div class="arrow down">›</div>
-            <div class="node"><strong>Hasil: 12 Nomor / 12 Struk</strong><small>Januari–Desember, masing-masing halaman A5</small></div>
+            <div class="node"><strong>Histori batch lama</strong><small>Baca/cetak sesuai hak akses; bukan alur baru</small></div>
           </div>
         </div>
       </div>
 
       <div class="flow-row" style="margin-top:4mm">
-        <div class="node database"><strong>COMMIT</strong><small>Seluruh header dan detail berhasil</small></div><div class="arrow">›</div>
-        <div class="node"><strong>Popup Cetak</strong><small>“Cetak struk?” / “Cetak 12 struk?”</small></div><div class="arrow">›</div>
+        <div class="node database"><strong>COMMIT BULANAN</strong><small>Header dan detail transaksi berhasil</small></div><div class="arrow">›</div>
+        <div class="node"><strong>Popup Cetak</strong><small>“Cetak struk?”; batch lama hanya dari riwayat</small></div><div class="arrow">›</div>
         <div class="decision"><strong>Cetak sekarang?</strong></div><div class="arrow">›</div>
         <div class="node"><strong>YA: Preview & Print</strong><small>Periksa identitas, periode, total, petugas</small></div><div class="arrow">›</div>
         <div class="node end"><strong>SELESAI</strong><small>Struk diserahkan dan riwayat tersedia</small></div>
       </div>
-      <div class="callout"><span class="branch-label no">TIDAK, NANTI</span> Transaksi tetap tersimpan → buka Riwayat Pembayaran → pilih Cetak pada struk tunggal atau tombol 12 Struk untuk satu batch.</div>
+      <div class="callout"><span class="branch-label no">TIDAK, NANTI</span> Transaksi bulanan tetap tersimpan → buka Riwayat Pembayaran → pilih Cetak pada struk tunggal. Batch tahunan lama hanya dari riwayat.</div>
       <div class="callout red"><strong>Penolakan paket:</strong> jika misalnya SPP Agustus sudah tercatat, sistem menolak keseluruhan pembayaran tahunan. Kasir menggunakan mode bulanan hanya untuk periode yang memang belum terbayar.</div>
     </div>
     <footer class="footer"><span>Flowchart Alur Kasir SistemSPP · Bulanan/Tahunan</span><b>Halaman 3 dari 4</b></footer>
@@ -232,13 +232,13 @@
       <div class="section-title"><span>1</span><h2>Penyimpanan transaksi baru</h2></div>
       <div class="db-flow">
         <div class="node start"><strong>BEGIN</strong><small>Mulai transaksi MySQL</small></div><div class="arrow">›</div>
-        <div class="db-node"><code>bayar</code><span>INSERT header 1/12 baris</span></div><div class="arrow">›</div>
+        <div class="db-node"><code>bayar</code><span>INSERT satu header bulanan</span></div><div class="arrow">›</div>
         <div class="table-grid">
           <div class="table-card"><code>bayar_spp_periode</code><span>Klaim unik siswa/bulan/tahun jika SPP &gt; 0.</span></div>
-          <div class="table-card"><code>bayar_du</code><span>Cicilan DU pada transaksi pertama.</span></div>
-          <div class="table-card"><code>bayar_biaya_lain</code><span>Snapshot biaya lain pada transaksi pertama.</span></div>
-          <div class="table-card"><code>transaksi_m</code><span>Jurnal tabungan wajib terkait.</span></div>
-          <div class="table-card"><code>tabungan</code><span>Saldo siswa ditambah sesuai jurnal.</span></div>
+          <div class="table-card"><code>bayar_du</code><span>Cicilan DU dengan <code>bayar_id</code>.</span></div>
+          <div class="table-card"><code>bayar_biaya_lain</code><span>Snapshot biaya lain milik header.</span></div>
+          <div class="table-card"><code>audit_event</code><span>Actor, request, reason, before/after.</span></div>
+          <div class="table-card"><code>tabungan</code><span>Tidak berubah oleh pembayaran.</span></div>
         </div><div class="arrow">›</div>
         <div class="db-node"><code>COMMIT</code><span>Semua sukses; jika gagal → ROLLBACK</span></div>
       </div>
@@ -263,7 +263,7 @@
             <div class="arrow down">›</div>
             <div class="node database"><strong>UPDATE header</strong><small>Sinkron klaim SPP; buat ulang DU/biaya lain</small></div>
             <div class="arrow down">›</div>
-            <div class="node database"><strong>Balikkan & buat ulang tabungan</strong><small>Saldo dan jurnal tetap konsisten</small></div>
+            <div class="node database"><strong>Tulis audit koreksi</strong><small>Before/after, actor, request ID, dan alasan</small></div>
             <div class="arrow down">›</div>
             <div class="node"><strong>COMMIT → Cetak ulang</strong></div>
           </div>
@@ -276,11 +276,11 @@
           <div class="plan-body stack">
             <div class="node"><strong>Pilih transaksi → Hapus</strong><small>Konfirmasi dan bukti otorisasi</small></div>
             <div class="arrow down">›</div>
-            <div class="node system"><strong>Kunci transaksi terkait</strong><small>Cegah perubahan bersamaan</small></div>
+            <div class="node system"><strong>Kunci & validasi transaksi</strong><small>Legacy v0 ditolak; child dipilih lewat bayar_id</small></div>
             <div class="arrow down">›</div>
-            <div class="node database"><strong>Balikkan setoran tabungan</strong><small>Tolak jika menyebabkan saldo negatif</small></div>
+            <div class="node database"><strong>Jaga tabungan manual</strong><small>Tidak ada jurnal/saldo manual yang diubah</small></div>
             <div class="arrow down">›</div>
-            <div class="node database"><strong>DELETE header</strong><small>FK cascade: SPP periode, DU, biaya lain, jurnal</small></div>
+            <div class="node database"><strong>DELETE header + audit</strong><small>FK cascade: SPP periode, DU, biaya lain milik ID</small></div>
             <div class="arrow down">›</div>
             <div class="node"><strong>COMMIT → Periode terbuka kembali</strong></div>
           </div>

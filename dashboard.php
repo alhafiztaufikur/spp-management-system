@@ -2,7 +2,8 @@
 // ============================================
 // dashboard.php - Daily Closing Dashboard
 // ============================================
-session_start();
+require_once __DIR__ . '/includes/security.php';
+security_bootstrap_session();
 if (!isset($_SESSION['admin_id'])) {
     header('Location: login.php');
     exit;
@@ -77,7 +78,7 @@ $kasFisik = (float)($setoranData['settlement']['cash'] ?? 0);
     <main class="main-content">
       <!-- Topbar -->
       <div class="topbar">
-        <button class="sidebar-toggle" onclick="toggleSidebar()" id="btn-sidebar-toggle" title="Toggle Sidebar">
+        <button class="sidebar-toggle" onclick="toggleSidebar()" id="btn-sidebar-toggle" title="Toggle Sidebar" aria-label="Buka navigasi" aria-expanded="false">
           <svg width="20" height="20" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><line x1="3" y1="12" x2="21" y2="12"/><line x1="3" y1="6" x2="21" y2="6"/><line x1="3" y1="18" x2="21" y2="18"/></svg>
         </button>
         <div class="topbar-title">
@@ -173,9 +174,9 @@ $kasFisik = (float)($setoranData['settlement']['cash'] ?? 0);
               <?php else: ?>
                 <?php foreach ($setoranRows as $row): ?>
                 <tr>
-                  <td><?= htmlspecialchars($row['bagian']) ?></td>
-                  <td><?= htmlspecialchars($row['jenis']) ?></td>
-                  <td style="text-align: right; <?= (float)$row['nominal'] < 0 ? 'color:#b42318;font-weight:600;' : '' ?>">
+                  <td data-label="Komponen Setoran"><?= htmlspecialchars($row['bagian']) ?></td>
+                  <td data-label="Klasifikasi"><?= htmlspecialchars($row['jenis']) ?></td>
+                  <td data-label="Nominal" style="text-align: right; <?= (float)$row['nominal'] < 0 ? 'color:#b42318;font-weight:600;' : '' ?>">
                     <?= report_money((float)$row['nominal']) ?>
                   </td>
                 </tr>

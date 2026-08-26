@@ -1,18 +1,14 @@
 <?php
-session_start();
+require_once '../includes/security.php';
+security_bootstrap_session();
 require_once '../koneksi.php'; require_once '../includes/auth.php'; require_once '../includes/reports.php'; require_once '../includes/pagination.php';
 requireRole(['admin','bendahara','kasir']);
-$registry=report_registry(); $template=(string)($_GET['template']??'');
+$registry=report_registry(); $template=(string)report_input_scalar($_GET, 'template');
 if(!isset($registry[$template])){ header('Location: global.php'); exit; }
 $filters=report_filters($koneksi,$_GET);
-if(!isset($_GET['kategori'])&&in_array($template,['penerimaan','setoran'],true)) $filters['kategori']='semua';
-if($template==='tabungan-siswa'&&!isset($_GET['mode'])) $filters['mode']='buku';
-$classes=report_classes($koneksi);$realClasses=array_values(array_filter($classes,fn($class)=>(int)$class['is_placeholder']===0));$missingRombel=false;
-if(!isset($_GET['kelas'])&&in_array($template,['spp-tahunan','per-item','tabungan-kelas'],true)){
-    if($realClasses)$filters['kelas']=(int)$realClasses[0]['id'];else $missingRombel=true;
-}
+$classes=report_classes($koneksi);$defaults=report_template_defaults($template,$_GET,$filters,$classes);$filters=$defaults['filters'];$missingRombel=$defaults['missing_rombel'];
 try { $report=report_build($koneksi,$template,$filters); }
-catch(Throwable $e){ $report=['title'=>$registry[$template]['label'],'subtitle'=>'Gagal memuat laporan','columns'=>[],'rows'=>[],'error'=>$e->getMessage()]; }
+catch(Throwable $e){ $report=['title'=>$registry[$template]['label'],'subtitle'=>'Gagal memuat laporan','columns'=>[],'rows'=>[],'error'=>security_exception_message($e,'Laporan tidak dapat dimuat.','report-template')]; }
 if($missingRombel){$report['rows']=[];$report['error']='Belum ada rombel nyata. Admin perlu membuat Master Kelas/Rombel lalu memindahkan siswa dari placeholder Belum Ditentukan.';}
 $pagination=report_paginate($report['rows'],$filters,false); $years=report_years($koneksi); $operators=report_operators($koneksi); $categories=report_categories($koneksi); $query=array_merge($_GET,$filters,['template'=>$template]);
 function template_url(array $changes=[]):string { global $query; return 'template.php?'.http_build_query(array_merge($query,$changes)); }

@@ -71,8 +71,10 @@ function updateClock() {
   const now = new Date();
   el.textContent = now.toLocaleTimeString('id-ID', { hour:'2-digit', minute:'2-digit', second:'2-digit' });
 }
-setInterval(updateClock, 1000);
-updateClock();
+if (document.getElementById('liveClock')) {
+  setInterval(updateClock, 1000);
+  updateClock();
+}
 
 /* ── Sidebar Toggle ──────────────────────── */
 function toggleSidebar() {
@@ -84,6 +86,13 @@ function toggleSidebar() {
   } else {
     sb.classList.toggle('collapsed');
     mc && mc.classList.toggle('expanded');
+  }
+  const toggle = document.getElementById('btn-sidebar-toggle');
+  if (toggle) {
+    const expanded = window.innerWidth <= 768
+      ? sb.classList.contains('open')
+      : !sb.classList.contains('collapsed');
+    toggle.setAttribute('aria-expanded', expanded ? 'true' : 'false');
   }
 }
 
@@ -1745,12 +1754,23 @@ function showToast(icon, msg, type = 'success') {
 
 /* ── Modal ───────────────────────────────── */
 function showModal(title, body) {
-  document.getElementById('modal-title').textContent = title;
-  document.getElementById('modal-body').textContent  = body;
-  document.getElementById('modal-overlay').classList.add('show');
+  const titleEl = document.getElementById('modal-title');
+  const bodyEl = document.getElementById('modal-body');
+  const overlay = document.getElementById('modal-overlay');
+  if (!titleEl || !bodyEl || !overlay) return;
+  window.__sppModalReturnFocus = document.activeElement;
+  titleEl.textContent = title;
+  bodyEl.textContent  = body;
+  overlay.classList.add('show');
+  overlay.querySelector('.modal-box')?.focus();
 }
 function closeModal() {
-  document.getElementById('modal-overlay')?.classList.remove('show');
+  const overlay = document.getElementById('modal-overlay');
+  if (!overlay) return;
+  overlay.classList.remove('show');
+  const returnFocus = window.__sppModalReturnFocus;
+  if (returnFocus && typeof returnFocus.focus === 'function') returnFocus.focus();
+  window.__sppModalReturnFocus = null;
 }
 function konfirmasiHapus() {
   closeModal();
@@ -1761,4 +1781,10 @@ function konfirmasiHapus() {
 document.addEventListener('click', function (e) {
   const overlay = document.getElementById('modal-overlay');
   if (e.target === overlay) closeModal();
+});
+document.addEventListener('keydown', function (e) {
+  if (e.key === 'Escape') {
+    const overlay = document.getElementById('modal-overlay');
+    if (overlay?.classList.contains('show')) closeModal();
+  }
 });

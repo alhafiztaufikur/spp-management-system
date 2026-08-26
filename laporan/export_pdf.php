@@ -2,17 +2,26 @@
 // ============================================
 // laporan/export_pdf.php - Server-rendered payment slips PDF
 // ============================================
-session_start();
+require_once '../includes/security.php';
+security_bootstrap_session();
 require_once '../koneksi.php';
 require_once '../includes/auth.php';
 require_once '../vendor/autoload.php';
 requireRole(['admin', 'bendahara']);
 
-$filter_bulan = (int)($_GET['bulan'] ?? date('m'));
-$filter_tahun = (int)($_GET['tahun'] ?? date('Y'));
-$dateParam = static function (string $key): string {
-    $value = trim((string)($_GET[$key] ?? ''));
-    return preg_match('/^\d{4}-\d{2}-\d{2}$/', $value) ? $value : '';
+$requestScalar = static function (string $key, $default = '') {
+    $value = $_GET[$key] ?? $default;
+    return is_scalar($value) ? $value : $default;
+};
+$filter_bulan = (int)$requestScalar('bulan', date('m'));
+$filter_tahun = (int)$requestScalar('tahun', date('Y'));
+if ($filter_bulan < 1 || $filter_bulan > 12) $filter_bulan = (int)date('m');
+if ($filter_tahun < 2000 || $filter_tahun > 2100) $filter_tahun = (int)date('Y');
+$dateParam = static function (string $key) use ($requestScalar): string {
+    $value = trim((string)$requestScalar($key));
+    if (!preg_match('/^\d{4}-\d{2}-\d{2}$/', $value)) return '';
+    $date = DateTimeImmutable::createFromFormat('!Y-m-d', $value);
+    return $date && $date->format('Y-m-d') === $value ? $value : '';
 };
 $filter_tanggal = $dateParam('tanggal');
 $filter_tanggal_awal = $dateParam('tanggal_awal') ?: $filter_tanggal;
@@ -22,13 +31,21 @@ if ($filter_tanggal_akhir !== '' && $filter_tanggal_awal === '') $filter_tanggal
 if ($filter_tanggal_awal !== '' && $filter_tanggal_akhir !== '' && strtotime($filter_tanggal_awal) > strtotime($filter_tanggal_akhir)) {
     [$filter_tanggal_awal, $filter_tanggal_akhir] = [$filter_tanggal_akhir, $filter_tanggal_awal];
 }
-$preview_mode = isset($_GET['contoh']) && $_GET['contoh'] === '1';
-$selected_mode = isset($_GET['mode']) && $_GET['mode'] === 'selected';
+if ($filter_tanggal_awal !== '' && $filter_tanggal_akhir !== '' && (new DateTimeImmutable($filter_tanggal_awal))->diff(new DateTimeImmutable($filter_tanggal_akhir))->days > 365) {
+    http_response_code(413);
+    exit('Rentang PDF dibatasi maksimal 366 hari kalender. Persempit filter laporan.');
+}
+$preview_mode = $requestScalar('contoh') === '1';
+$selected_mode = $requestScalar('mode') === 'selected';
 $selected_ids_raw = $_GET['ids'] ?? [];
 if (!is_array($selected_ids_raw)) {
     $selected_ids_raw = preg_split('/[,\s]+/', (string)$selected_ids_raw, -1, PREG_SPLIT_NO_EMPTY);
 }
 $selected_ids = array_values(array_unique(array_filter(array_map('intval', $selected_ids_raw), fn($id) => $id > 0)));
+if (count($selected_ids) > 200) {
+    http_response_code(413);
+    exit('Pilihan PDF dibatasi maksimal 200 transaksi.');
+}
 
 if ($selected_mode && !$selected_ids) {
     $_SESSION['flash'] = ['type' => 'error', 'msg' => 'Pilih minimal satu transaksi untuk dicetak.'];
@@ -114,7 +131,7 @@ $period_end = $filter_tanggal_akhir !== ''
 $where_sql = 'WHERE b.TGL_BYR >= ? AND b.TGL_BYR < ?';
 $types = 'ss';
 $params = [$period_start, $period_end];
-if ($selected_ids) {
+if ($selected_mode && $selected_ids) {
     $where_sql .= ' AND b.id IN (' . implode(',', array_fill(0, count($selected_ids), '?')) . ')';
     $types .= str_repeat('i', count($selected_ids));
     array_push($params, ...$selected_ids);
@@ -125,7 +142,7 @@ $stmt = $koneksi->prepare("
         b.*,
         s.NAMA,
         s.NO_induk_diknas,
-        s.KELAS AS KELAS_SISWA,
+        COALESCE(NULLIF(b.kelas_rombel_snapshot, ''), NULLIF(b.KELAS, ''), s.KELAS) AS KELAS_SISWA,
         s.PANGKAL,
         s.PANGKAL_BAYAR,
         s.potong_pangkal,
@@ -134,21 +151,16 @@ $stmt = $koneksi->prepare("
         s.potong_du,
         s.tot_du,
         COALESCE(du_current.jumlah, 0) AS uang_du,
+        du_current.tagihan_daftar_ulang_id,
+        COALESCE(tdu.nominal_tagihan, 0) AS du_nominal_tagihan,
         COALESCE(psb_paid.total_pangkal_bayar, 0) AS total_pangkal_bayar,
         COALESCE(du_paid.total_du_bayar, 0) AS total_du_bayar,
         COALESCE(op.nama, NULLIF(b.user_id, '')) AS operator_name
     FROM bayar b
     JOIN siswa s ON s.NO_INDUK = b.NO_INDUK
     LEFT JOIN admin op ON op.id = CAST(b.user_id AS UNSIGNED)
-    LEFT JOIN (
-        SELECT no_induk, th_ajaran, kelas, SUM(jumlah) AS jumlah
-        FROM bayar_du
-        GROUP BY no_induk, th_ajaran, kelas
-    ) du_current
-        ON du_current.no_induk = b.NO_INDUK
-        AND du_current.th_ajaran = b.th_ajaran
-        AND du_current.kelas = b.kelas_du
-        AND b.kelas_du <> ''
+    LEFT JOIN bayar_du du_current ON du_current.bayar_id = b.id
+    LEFT JOIN tagihan_daftar_ulang tdu ON tdu.id = du_current.tagihan_daftar_ulang_id
     LEFT JOIN (
         SELECT NO_INDUK, SUM(U_PANGKAL) AS total_pangkal_bayar
         FROM bayar
@@ -161,11 +173,17 @@ $stmt = $koneksi->prepare("
     ) du_paid ON du_paid.no_induk = b.NO_INDUK
     $where_sql
     ORDER BY b.TGL_BYR DESC, b.id DESC
+    LIMIT 201
 ");
 $stmt->bind_param($types, ...$params);
 $stmt->execute();
 $rows = $stmt->get_result()->fetch_all(MYSQLI_ASSOC);
 $stmt->close();
+
+if (count($rows) > 200) {
+    http_response_code(413);
+    exit('PDF dibatasi maksimal 200 struk. Persempit filter atau gunakan pilihan transaksi.');
+}
 
 if ($selected_mode && !$rows) {
     $_SESSION['flash'] = ['type' => 'error', 'msg' => 'Transaksi yang dipilih tidak ditemukan pada periode ini.'];
@@ -193,8 +211,13 @@ if ($rows) {
     $stmt_details->close();
 }
 
-if (!$rows && !$selected_mode) {
-    $preview_mode = true;
+if (!$rows && !$selected_mode && !$preview_mode) {
+    $_SESSION['flash'] = ['type' => 'error', 'msg' => 'Tidak ada transaksi pada periode yang dipilih. PDF tidak dibuat.'];
+    header('Location: index.php?bulan=' . urlencode((string)$filter_bulan) . '&tahun=' . urlencode((string)$filter_tahun) . '&tanggal_awal=' . urlencode($filter_tanggal_awal) . '&tanggal_akhir=' . urlencode($filter_tanggal_akhir));
+    exit;
+}
+
+if (!$rows && $preview_mode) {
     $rows[] = [
         'id' => 0,
         'NO_INDUK' => '000000001',
@@ -269,6 +292,7 @@ function total_psb_bill(array $row): float {
 }
 
 function total_du_bill(array $row): float {
+    if ((float)($row['du_nominal_tagihan'] ?? 0) > 0) return (float)$row['du_nominal_tagihan'];
     $derived = (float)$row['tot_du'];
     if ($derived > 0) return $derived;
     return max(0, (float)$row['DAFTAR_ULANG'] - (float)$row['potong_du']);

@@ -2,12 +2,14 @@
 // ============================================
 // pembayaran/form.php - Form Input Pembayaran
 // ============================================
-session_start();
+require_once __DIR__ . '/../includes/security.php';
+security_bootstrap_session();
 if (!isset($_SESSION['admin_id'])) { header('Location: ../login.php'); exit; }
 require_once '../koneksi.php';
 require_once '../includes/auth.php';
 require_once '../includes/daftar_ulang.php';
 require_once '../includes/biaya_lain.php';
+require_once '../includes/idempotency.php';
 requireRole(['admin', 'kasir']);
 
 $siswa_sql = "
@@ -142,7 +144,7 @@ unset($_SESSION['flash']);
     <!-- Main -->
     <main class="main-content">
       <div class="topbar">
-        <button class="sidebar-toggle" onclick="toggleSidebar()" id="btn-sidebar-toggle">
+        <button class="sidebar-toggle" onclick="toggleSidebar()" id="btn-sidebar-toggle" aria-label="Buka navigasi" aria-expanded="false">
           <svg width="20" height="20" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><line x1="3" y1="12" x2="21" y2="12"/><line x1="3" y1="6" x2="21" y2="6"/><line x1="3" y1="18" x2="21" y2="18"/></svg>
         </button>
         <div class="topbar-title">
@@ -174,6 +176,8 @@ unset($_SESSION['flash']);
         </div>
 
         <form method="POST" action="../pembayaran/proses.php" id="form-bayar">
+          <input type="hidden" name="csrf_token" value="<?= htmlspecialchars(security_csrf_token('payment'), ENT_QUOTES, 'UTF-8') ?>" />
+          <input type="hidden" name="idempotency_key" value="<?= htmlspecialchars(idempotency_generate_key(), ENT_QUOTES, 'UTF-8') ?>" />
           <input type="hidden" name="aksi" value="input" />
 
           <!-- Pengaturan transaksi + ringkasan tagihan -->

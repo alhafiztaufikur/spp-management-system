@@ -2,16 +2,31 @@
 // ============================================
 // laporan/export_excel.php — Export ke Excel
 // ============================================
-session_start();
+require_once __DIR__ . '/../includes/security.php';
+security_bootstrap_session();
 require_once '../koneksi.php';
 require_once '../includes/auth.php';
 requireRole(['admin', 'bendahara']);
 
-$filter_bulan = (int)($_GET['bulan'] ?? date('m'));
-$filter_tahun = (int)($_GET['tahun'] ?? date('Y'));
-$dateParam = static function (string $key): string {
-    $value = trim((string)($_GET[$key] ?? ''));
-    return preg_match('/^\d{4}-\d{2}-\d{2}$/', $value) ? $value : '';
+function excel_text($value, bool $identifier = false): string {
+    $text = str_replace(["\0", "\r", "\n", "\t"], ' ', (string)$value);
+    if ($identifier || preg_match('/^[\p{Z}\s]*[=+\-@]/u', $text)) $text = "'" . $text;
+    return htmlspecialchars($text, ENT_QUOTES, 'UTF-8');
+}
+
+$requestScalar = static function (string $key, $default = '') {
+    $value = $_GET[$key] ?? $default;
+    return is_scalar($value) ? $value : $default;
+};
+$filter_bulan = (int)$requestScalar('bulan', date('m'));
+$filter_tahun = (int)$requestScalar('tahun', date('Y'));
+if ($filter_bulan < 1 || $filter_bulan > 12) $filter_bulan = (int)date('m');
+if ($filter_tahun < 2000 || $filter_tahun > 2100) $filter_tahun = (int)date('Y');
+$dateParam = static function (string $key) use ($requestScalar): string {
+    $value = trim((string)$requestScalar($key));
+    if (!preg_match('/^\d{4}-\d{2}-\d{2}$/', $value)) return '';
+    $date = DateTimeImmutable::createFromFormat('!Y-m-d', $value);
+    return $date && $date->format('Y-m-d') === $value ? $value : '';
 };
 $filter_tanggal = $dateParam('tanggal');
 $filter_tanggal_awal = $dateParam('tanggal_awal') ?: $filter_tanggal;
@@ -21,7 +36,11 @@ if ($filter_tanggal_akhir !== '' && $filter_tanggal_awal === '') $filter_tanggal
 if ($filter_tanggal_awal !== '' && $filter_tanggal_akhir !== '' && strtotime($filter_tanggal_awal) > strtotime($filter_tanggal_akhir)) {
     [$filter_tanggal_awal, $filter_tanggal_akhir] = [$filter_tanggal_akhir, $filter_tanggal_awal];
 }
-$download = isset($_GET['download']) && $_GET['download'] === '1';
+if ($filter_tanggal_awal !== '' && $filter_tanggal_akhir !== '' && (new DateTimeImmutable($filter_tanggal_awal))->diff(new DateTimeImmutable($filter_tanggal_akhir))->days > 365) {
+    http_response_code(413);
+    exit('Rentang Excel dibatasi maksimal 366 hari kalender. Persempit filter laporan.');
+}
+$download = $requestScalar('download') === '1';
 
 $bln_names = ['1'=>'Januari','2'=>'Februari','3'=>'Maret','4'=>'April','5'=>'Mei','6'=>'Juni',
                '7'=>'Juli','8'=>'Agustus','9'=>'September','10'=>'Oktober','11'=>'November','12'=>'Desember'];
@@ -52,19 +71,21 @@ $stmt = $koneksi->prepare("
            b.sistem_pembayaran, b.total_jumlah, b.TGL_BYR
     FROM bayar b JOIN siswa s ON s.NO_INDUK = b.NO_INDUK
     WHERE b.TGL_BYR >= ? AND b.TGL_BYR < ?
-    ORDER BY b.TGL_BYR DESC
+    ORDER BY b.TGL_BYR DESC, b.id DESC
+    LIMIT 10001
 ");
 $stmt->bind_param('ss', $period_start, $period_end);
 $stmt->execute();
 $rows = $stmt->get_result()->fetch_all(MYSQLI_ASSOC);
 $stmt->close();
+if (count($rows) > 10000) { http_response_code(413); exit('Ekspor Excel dibatasi maksimal 10.000 transaksi. Persempit filter laporan.'); }
 
 $stmtKomponen = $koneksi->prepare("
     SELECT SUM(U_PANGKAL) AS pangkal, SUM(U_BANGUNAN) AS bangunan,
            SUM(U_SERAGAM) AS seragam, SUM(U_KEGIATAN) AS kegiatan,
            SUM(U_SPP) AS spp, SUM(U_MAKAN) AS makan,
            SUM(U_SORGA) AS sorga, SUM(U_INFAQ) AS infaq,
-           SUM(U_KOMITE) AS komite
+           SUM(U_KOMITE) AS komite, SUM(potong_spp) AS potong_spp
     FROM bayar WHERE TGL_BYR >= ? AND TGL_BYR < ?
 ");
 $stmtKomponen->bind_param('ss', $period_start, $period_end);
@@ -77,13 +98,22 @@ $komponenMap = [
     'Uang Pangkal' => 'pangkal', 'Uang Bangunan' => 'bangunan',
     'Uang Seragam' => 'seragam', 'Uang Kegiatan' => 'kegiatan',
     'Uang SPP' => 'spp', 'Uang Komite' => 'komite', 'Uang Makan' => 'makan',
-    'Uang Sorga' => 'sorga', 'Uang Infaq' => 'infaq'
+    'Uang Sorga' => 'sorga', 'Uang Infaq' => 'infaq', 'Potongan SPP' => 'potong_spp'
 ];
 foreach ($komponenMap as $nama => $key) {
-    if ((float)($komponenTetap[$key] ?? 0) > 0) {
-        $komponen_rows[] = ['nama' => $nama, 'total' => $komponenTetap[$key]];
+    $amount = (float)($komponenTetap[$key] ?? 0);
+    if ($key === 'potong_spp') $amount *= -1;
+    if (abs($amount) >= 0.005) {
+        $komponen_rows[] = ['nama' => $nama, 'total' => $amount];
     }
 }
+
+$stmtDu = $koneksi->prepare("SELECT COALESCE(SUM(bd.jumlah),0) total FROM bayar_du bd JOIN bayar b ON b.id=bd.bayar_id WHERE b.TGL_BYR >= ? AND b.TGL_BYR < ?");
+$stmtDu->bind_param('ss', $period_start, $period_end);
+$stmtDu->execute();
+$duTotal = (float)($stmtDu->get_result()->fetch_assoc()['total'] ?? 0);
+$stmtDu->close();
+if ($duTotal >= 0.005) $komponen_rows[] = ['nama' => 'Daftar Ulang', 'total' => $duTotal];
 
 $stmtBiayaLain = $koneksi->prepare("
     SELECT d.nama_biaya_snapshot AS nama, SUM(d.nominal_snapshot) AS total
@@ -100,17 +130,19 @@ $stmtBiayaLain->close();
 $stmt2 = $koneksi->prepare("
     SELECT tm.NO_INDUK, s.NO_induk_diknas, s.NAMA, s.KELAS, tm.TANGGAL, tm.MASUK as nominal, 'masuk' as jenis
     FROM transaksi_m tm JOIN siswa s ON s.NO_INDUK = tm.NO_INDUK
-    WHERE tm.TANGGAL >= ? AND tm.TANGGAL < ?
+    WHERE tm.bayar_id IS NULL AND tm.TANGGAL >= ? AND tm.TANGGAL < ?
     UNION ALL
     SELECT tk.NO_INDUK, s.NO_induk_diknas, s.NAMA, s.KELAS, tk.TANGGAL, tk.KELUAR as nominal, 'keluar' as jenis
     FROM transaksi_k tk JOIN siswa s ON s.NO_INDUK = tk.NO_INDUK
     WHERE tk.TANGGAL >= ? AND tk.TANGGAL < ?
-    ORDER BY TANGGAL DESC
+    ORDER BY TANGGAL DESC, jenis ASC, NO_INDUK ASC
+    LIMIT 10001
 ");
 $stmt2->bind_param('ssss', $period_start, $period_end, $period_start, $period_end);
 $stmt2->execute();
 $tab_rows = $stmt2->get_result()->fetch_all(MYSQLI_ASSOC);
 $stmt2->close();
+if (count($tab_rows) > 10000) { http_response_code(413); exit('Ekspor Excel dibatasi maksimal 10.000 mutasi tabungan. Persempit filter laporan.'); }
 
 $preview_total_pembayaran = 0.0;
 foreach ($rows as $row) {
@@ -243,6 +275,7 @@ if ($download) {
     }
     th { background: #1f6f3f; color: white; font-weight: bold; padding: 8px 10px; border: 1px solid #8eb99a; }
     td { padding: 7px 10px; border: 1px solid #cfd8cf; }
+    .excel-text { mso-number-format: "\\@"; }
     .total-row { background: #fff4e6; color: #17231c; font-weight: bold; }
     .header-row { background: #f28c28; color: white; font-size: 12pt; font-weight: bold; }
     .section-header { background: #e6f3e8; font-weight: bold; font-size: 11pt; }
@@ -381,7 +414,7 @@ if ($download) {
   <tr><td colspan="2" class="empty-row">Belum ada komponen pembayaran pada periode ini.</td></tr>
   <?php endif; ?>
   <?php foreach ($komponen_rows as $komponen): ?>
-  <tr><td><?= htmlspecialchars($komponen['nama']) ?></td><td><?= number_format((float)$komponen['total'],0,',','.') ?></td></tr>
+  <tr><td><?= excel_text($komponen['nama']) ?></td><td><?= number_format((float)$komponen['total'],0,',','.') ?></td></tr>
   <?php endforeach; ?>
 </table>
 </div>
@@ -406,10 +439,10 @@ if ($download) {
   ?>
   <tr>
     <td><?= $i+1 ?></td>
-    <td><?= htmlspecialchars($r['NO_INDUK']) ?><?= !empty($r['NO_induk_diknas']) ? '<br>Diknas: ' . htmlspecialchars($r['NO_induk_diknas']) : '' ?></td>
-    <td><?= htmlspecialchars($r['NAMA']) ?></td>
-    <td><?= htmlspecialchars($r['KELAS']) ?></td>
-    <td><?= htmlspecialchars($r['BULAN']) ?> <?= htmlspecialchars($r['TAHUN']) ?><br>Sistem: <?= htmlspecialchars($r['sistem_pembayaran'] ?? 'VA') ?></td>
+    <td class="excel-text"><?= excel_text($r['NO_INDUK'], true) ?><?= !empty($r['NO_induk_diknas']) ? '<br>Diknas: ' . excel_text($r['NO_induk_diknas'], true) : '' ?></td>
+    <td><?= excel_text($r['NAMA']) ?></td>
+    <td><?= excel_text($r['KELAS']) ?></td>
+    <td><?= excel_text($r['BULAN']) ?> <?= excel_text($r['TAHUN']) ?><br>Sistem: <?= excel_text($r['sistem_pembayaran'] ?? 'VA') ?></td>
     <td><?= number_format((float)$r['total_jumlah'],0,',','.') ?></td>
     <td><?= date('d M Y', strtotime($r['TGL_BYR'])) ?></td>
   </tr>
@@ -444,9 +477,9 @@ if ($download) {
   ?>
   <tr>
     <td><?= $i+1 ?></td>
-    <td><?= htmlspecialchars($t['NO_INDUK']) ?><?= !empty($t['NO_induk_diknas']) ? '<br>Diknas: ' . htmlspecialchars($t['NO_induk_diknas']) : '' ?></td>
-    <td><?= htmlspecialchars($t['NAMA']) ?></td>
-    <td><?= htmlspecialchars($t['KELAS']) ?></td>
+    <td class="excel-text"><?= excel_text($t['NO_INDUK'], true) ?><?= !empty($t['NO_induk_diknas']) ? '<br>Diknas: ' . excel_text($t['NO_induk_diknas'], true) : '' ?></td>
+    <td><?= excel_text($t['NAMA']) ?></td>
+    <td><?= excel_text($t['KELAS']) ?></td>
     <td><?= date('d M Y H:i', strtotime($t['TANGGAL'])) ?></td>
     <td><?= $t['jenis'] === 'masuk' ? '↑ Masuk' : '↓ Keluar' ?></td>
     <td><?= number_format((float)$t['nominal'],0,',','.') ?></td>

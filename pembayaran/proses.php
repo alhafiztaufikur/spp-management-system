@@ -2,15 +2,21 @@
 // ============================================
 // pembayaran/proses.php - Insert / Update / Delete
 // ============================================
-session_start();
+require_once __DIR__ . '/../includes/security.php';
+security_bootstrap_session();
 if (!isset($_SESSION['admin_id'])) { header('Location: ../login.php'); exit; }
 require_once '../koneksi.php';
 require_once '../includes/auth.php';
+require_once '../includes/audit.php';
 require_once '../includes/daftar_ulang.php';
 require_once '../includes/biaya_lain.php';
+require_once '../includes/idempotency.php';
 requireRole(['admin', 'kasir']);
+security_require_post();
+security_require_csrf('payment');
 
-$aksi = $_POST['aksi'] ?? $_GET['aksi'] ?? '';
+$aksi = security_input_scalar($_POST, 'aksi');
+$paymentIdempotencyKey = trim((string)security_input_scalar($_POST, 'idempotency_key'));
 
 function parse_amount($value) {
     if ($value === null || $value === '') return 0.0;
@@ -613,41 +619,93 @@ function find_linked_payment(mysqli $db, int $bayarId): array {
     return $payment;
 }
 
+/**
+ * Snapshot finansial terpilih untuk audit. Snapshot sengaja tidak memuat data
+ * siswa selain NIS dan tidak memuat data autentikasi apa pun.
+ */
+function payment_audit_snapshot(mysqli $db, int $bayarId): array {
+    $stmt = $db->prepare('SELECT
+        id, NO_INDUK, KELAS, master_kelas_id, kelas_rombel_snapshot,
+        U_PANGKAL, U_BANGUNAN, U_SERAGAM, U_KEGIATAN, U_SPP,
+        U_MAKAN, U_SORGA, U_INFAQ, U_KOMITE, U_LAIN,
+        KETERANGAN, TGL_BYR, BULAN, TAHUN, user_id, sistem_pembayaran,
+        th_ajaran, kelas_du, potong_spp, total_jumlah,
+        payment_link_version, payment_batch_token, payment_batch_sequence,
+        payment_batch_count, created_at, updated_at
+      FROM bayar WHERE id = ? LIMIT 1');
+    $stmt->bind_param('i', $bayarId);
+    $stmt->execute();
+    $payment = $stmt->get_result()->fetch_assoc();
+    $stmt->close();
+    if (!$payment) {
+        return [];
+    }
+
+    $stmt = $db->prepare('SELECT bayar_id, no_induk, bulan, tahun, created_at
+      FROM bayar_spp_periode WHERE bayar_id = ? ORDER BY tahun, bulan');
+    $stmt->bind_param('i', $bayarId);
+    $stmt->execute();
+    $sppPeriods = $stmt->get_result()->fetch_all(MYSQLI_ASSOC);
+    $stmt->close();
+
+    $stmt = $db->prepare('SELECT id, tagihan_daftar_ulang_id, no_induk, kelas, th_ajaran, jumlah
+      FROM bayar_du WHERE bayar_id = ? ORDER BY id');
+    $stmt->bind_param('i', $bayarId);
+    $stmt->execute();
+    $registration = $stmt->get_result()->fetch_all(MYSQLI_ASSOC);
+    $stmt->close();
+
+    $stmt = $db->prepare('SELECT id, master_biaya_lain_id, tagihan_biaya_lain_id,
+        nama_biaya_snapshot, nominal_snapshot, keterangan, urutan, legacy_key
+      FROM bayar_biaya_lain WHERE bayar_id = ? ORDER BY urutan, id');
+    $stmt->bind_param('i', $bayarId);
+    $stmt->execute();
+    $otherFees = $stmt->get_result()->fetch_all(MYSQLI_ASSOC);
+    $stmt->close();
+
+    return [
+        'payment' => $payment,
+        'spp_periods' => $sppPeriods,
+        'registration' => $registration,
+        'other_fees' => $otherFees,
+    ];
+}
+
 // ── INSERT ──────────────────────────────────
 if ($aksi === 'input') {
-    $no_induk        = trim($_POST['no_induk'] ?? '');
+    $no_induk        = trim((string)security_input_scalar($_POST, 'no_induk'));
     // Transaksi baru selalu memakai waktu server Asia/Jakarta.
     $tanggal_bayar   = date('Y-m-d H:i:s');
-    $bulan_bayar     = normalize_month_code($_POST['bulan_bayar'] ?? '');
-    $tahun_bayar     = $_POST['tahun_bayar'] ?? date('Y');
-    $sistem_pembayaran = $_POST['sistem_pembayaran'] ?? 'VA';
+    $bulan_bayar     = normalize_month_code(security_input_scalar($_POST, 'bulan_bayar'));
+    $tahun_bayar     = security_input_scalar($_POST, 'tahun_bayar', date('Y'));
+    $sistem_pembayaran = security_input_scalar($_POST, 'sistem_pembayaran', 'VA');
     
-    $uang_pangkal    = parse_amount($_POST['uang_pangkal'] ?? 0);
-    $uang_bangunan   = parse_amount($_POST['uang_bangunan'] ?? 0);
-    $uang_seragam    = parse_amount($_POST['uang_seragam'] ?? 0);
-    $uang_kegiatan   = parse_amount($_POST['uang_kegiatan'] ?? 0);
-    $uang_spp        = parse_amount($_POST['uang_spp'] ?? 0);
-    $uang_komite     = parse_amount($_POST['uang_komite'] ?? 0);
-    $uang_makan      = parse_amount($_POST['uang_makan'] ?? 0);
-    $uang_sorga      = parse_amount($_POST['uang_sorga'] ?? 0);
-    $uang_infaq      = parse_amount($_POST['uang_infaq'] ?? 0);
+    $uang_pangkal    = parse_amount(security_input_scalar($_POST, 'uang_pangkal', 0));
+    $uang_bangunan   = parse_amount(security_input_scalar($_POST, 'uang_bangunan', 0));
+    $uang_seragam    = parse_amount(security_input_scalar($_POST, 'uang_seragam', 0));
+    $uang_kegiatan   = parse_amount(security_input_scalar($_POST, 'uang_kegiatan', 0));
+    $uang_spp        = parse_amount(security_input_scalar($_POST, 'uang_spp', 0));
+    $uang_komite     = parse_amount(security_input_scalar($_POST, 'uang_komite', 0));
+    $uang_makan      = parse_amount(security_input_scalar($_POST, 'uang_makan', 0));
+    $uang_sorga      = parse_amount(security_input_scalar($_POST, 'uang_sorga', 0));
+    $uang_infaq      = parse_amount(security_input_scalar($_POST, 'uang_infaq', 0));
     $uang_lain       = 0.0;
-    $uang_du         = parse_amount($_POST['uang_du'] ?? 0);
+    $uang_du         = parse_amount(security_input_scalar($_POST, 'uang_du', 0));
     $ll_1_ket = $ll_2_ket = $ll_3_ket = $ll_4_ket = '';
     $ll_1_nom = $ll_2_nom = $ll_3_nom = $ll_4_nom = 0.0;
     
-    $potongan_spp    = parse_amount($_POST['potongan_spp'] ?? 0);
-    $legacy_tabungan_input = parse_amount($_POST['tabungan_wajib'] ?? 0);
+    $potongan_spp    = parse_amount(security_input_scalar($_POST, 'potongan_spp', 0));
+    $legacy_tabungan_input = parse_amount(security_input_scalar($_POST, 'tabungan_wajib', 0));
     $total_jumlah    = 0.0;
-    $catatan         = trim((string)($_POST['catatan'] ?? ''));
+    $catatan         = trim((string)security_input_scalar($_POST, 'catatan'));
     if (mb_strlen($catatan) > 255) {
         $_SESSION['flash'] = ['type' => 'error', 'msg' => 'Catatan maksimal 255 karakter.'];
         header('Location: form.php');
         exit;
     }
-    $kelas_du        = $_POST['kelas_du'] ?? '';
-    $tahun_ajaran_du = $_POST['tahun_ajaran_du'] ?? '';
-    $payment_plan    = $_POST['payment_plan'] ?? 'monthly';
+    $kelas_du        = security_input_scalar($_POST, 'kelas_du');
+    $tahun_ajaran_du = security_input_scalar($_POST, 'tahun_ajaran_du');
+    $payment_plan    = security_input_scalar($_POST, 'payment_plan', 'monthly');
 
     if (empty($no_induk)) {
         $_SESSION['flash'] = ['type' => 'error', 'msg' => 'Pilih siswa terlebih dahulu!'];
@@ -658,6 +716,7 @@ if ($aksi === 'input') {
     $koneksi->begin_transaction();
 
     try {
+        idempotency_claim($koneksi, 'payment', $paymentIdempotencyKey, (int)current_operator_id());
         if ($payment_plan !== 'monthly') throw new RuntimeException('Pembayaran banyak bulan sedang ditangguhkan. Gunakan transaksi bulanan.');
         $sistem_pembayaran = normalize_payment_method($sistem_pembayaran);
         validate_payment_amounts([
@@ -798,6 +857,24 @@ if ($aksi === 'input') {
         }
         $stmt->close();
 
+        foreach ($receipt_ids as $auditPaymentId) {
+            audit_event_write(
+                $koneksi,
+                'payment.created',
+                'bayar',
+                $auditPaymentId,
+                'create',
+                null,
+                payment_audit_snapshot($koneksi, $auditPaymentId),
+                null,
+                [
+                    'result' => 'committed',
+                    'source' => 'pembayaran/proses.php',
+                    'batch_count' => $batch_count,
+                ]
+            );
+        }
+
         $koneksi->commit();
         $_SESSION['flash'] = [
             'type' => 'success',
@@ -815,9 +892,9 @@ if ($aksi === 'input') {
         ];
         header('Location: lihat.php');
         exit;
-    } catch (Exception $e) {
+    } catch (Throwable $e) {
         $koneksi->rollback();
-        $_SESSION['flash'] = ['type' => 'error', 'msg' => 'Gagal menyimpan: ' . $e->getMessage()];
+        $_SESSION['flash'] = ['type' => 'error', 'msg' => security_exception_message($e, 'Pembayaran gagal disimpan.', 'payment-create')];
         header('Location: form.php');
         exit;
     }
@@ -825,43 +902,44 @@ if ($aksi === 'input') {
 
 // ── UPDATE ──────────────────────────────────
 if ($aksi === 'update') {
-    $id = (int)($_POST['id'] ?? 0);
+    $id = (int)security_input_scalar($_POST, 'id', 0);
     if ($id <= 0) { header('Location: lihat.php'); exit; }
 
-    $no_induk        = trim($_POST['no_induk'] ?? '');
-    $tanggal_bayar   = $_POST['tanggal_bayar'] ?? date('Y-m-d H:i:s');
+    $no_induk        = trim((string)security_input_scalar($_POST, 'no_induk'));
+    $tanggal_bayar   = security_input_scalar($_POST, 'tanggal_bayar', date('Y-m-d H:i:s'));
     if (strlen($tanggal_bayar) === 10) {
         $tanggal_bayar .= ' ' . date('H:i:s');
     }
-    $bulan_bayar     = normalize_month_code($_POST['bulan_bayar'] ?? '');
-    $tahun_bayar     = $_POST['tahun_bayar'] ?? date('Y');
-    $sistem_pembayaran = $_POST['sistem_pembayaran'] ?? 'VA';
+    $bulan_bayar     = normalize_month_code(security_input_scalar($_POST, 'bulan_bayar'));
+    $tahun_bayar     = security_input_scalar($_POST, 'tahun_bayar', date('Y'));
+    $sistem_pembayaran = security_input_scalar($_POST, 'sistem_pembayaran', 'VA');
     
-    $uang_pangkal    = parse_amount($_POST['uang_pangkal'] ?? 0);
-    $uang_bangunan   = parse_amount($_POST['uang_bangunan'] ?? 0);
-    $uang_seragam    = parse_amount($_POST['uang_seragam'] ?? 0);
-    $uang_kegiatan   = parse_amount($_POST['uang_kegiatan'] ?? 0);
-    $uang_spp        = parse_amount($_POST['uang_spp'] ?? 0);
-    $uang_komite     = parse_amount($_POST['uang_komite'] ?? 0);
-    $uang_makan      = parse_amount($_POST['uang_makan'] ?? 0);
-    $uang_sorga      = parse_amount($_POST['uang_sorga'] ?? 0);
-    $uang_infaq      = parse_amount($_POST['uang_infaq'] ?? 0);
+    $uang_pangkal    = parse_amount(security_input_scalar($_POST, 'uang_pangkal', 0));
+    $uang_bangunan   = parse_amount(security_input_scalar($_POST, 'uang_bangunan', 0));
+    $uang_seragam    = parse_amount(security_input_scalar($_POST, 'uang_seragam', 0));
+    $uang_kegiatan   = parse_amount(security_input_scalar($_POST, 'uang_kegiatan', 0));
+    $uang_spp        = parse_amount(security_input_scalar($_POST, 'uang_spp', 0));
+    $uang_komite     = parse_amount(security_input_scalar($_POST, 'uang_komite', 0));
+    $uang_makan      = parse_amount(security_input_scalar($_POST, 'uang_makan', 0));
+    $uang_sorga      = parse_amount(security_input_scalar($_POST, 'uang_sorga', 0));
+    $uang_infaq      = parse_amount(security_input_scalar($_POST, 'uang_infaq', 0));
     $uang_lain       = 0.0;
-    $uang_du         = parse_amount($_POST['uang_du'] ?? 0);
+    $uang_du         = parse_amount(security_input_scalar($_POST, 'uang_du', 0));
     $ll_1_ket = $ll_2_ket = $ll_3_ket = $ll_4_ket = '';
     $ll_1_nom = $ll_2_nom = $ll_3_nom = $ll_4_nom = 0.0;
     
-    $potongan_spp    = parse_amount($_POST['potongan_spp'] ?? 0);
-    $legacy_tabungan_input = parse_amount($_POST['tabungan_wajib'] ?? 0);
+    $potongan_spp    = parse_amount(security_input_scalar($_POST, 'potongan_spp', 0));
+    $legacy_tabungan_input = parse_amount(security_input_scalar($_POST, 'tabungan_wajib', 0));
     $total_jumlah    = 0.0;
-    $catatan         = trim((string)($_POST['catatan'] ?? ''));
+    $catatan         = trim((string)security_input_scalar($_POST, 'catatan'));
     if (mb_strlen($catatan) > 255) {
         $_SESSION['flash'] = ['type' => 'error', 'msg' => 'Catatan maksimal 255 karakter.'];
         header('Location: edit.php?id=' . $id);
         exit;
     }
-    $kelas_du        = $_POST['kelas_du'] ?? '';
-    $tahun_ajaran_du = $_POST['tahun_ajaran_du'] ?? '';
+    $kelas_du        = security_input_scalar($_POST, 'kelas_du');
+    $tahun_ajaran_du = security_input_scalar($_POST, 'tahun_ajaran_du');
+    $audit_reason = security_input_scalar($_POST, 'audit_reason');
 
     if (empty($no_induk)) {
         $_SESSION['flash'] = ['type' => 'error', 'msg' => 'Pilih siswa terlebih dahulu!'];
@@ -871,7 +949,10 @@ if ($aksi === 'update') {
 
     $koneksi->begin_transaction();
     try {
+        idempotency_claim($koneksi, 'payment', $paymentIdempotencyKey, (int)current_operator_id());
+        $audit_reason = audit_require_reason($audit_reason, 'Alasan perubahan pembayaran');
         $old_bayar = find_linked_payment($koneksi, $id);
+        $before_audit = payment_audit_snapshot($koneksi, $id);
         $sistem_pembayaran = normalize_payment_method($sistem_pembayaran);
         validate_payment_amounts([
             'Pangkal' => $uang_pangkal, 'Bangunan' => $uang_bangunan,
@@ -948,19 +1029,17 @@ if ($aksi === 'update') {
         $sql = "UPDATE bayar SET
             NO_INDUK=?, KELAS=?, U_PANGKAL=?, U_BANGUNAN=?, U_SERAGAM=?, U_KEGIATAN=?,
             U_SPP=?, U_MAKAN=?, U_SORGA=?, U_INFAQ=?, U_KOMITE=?, U_LAIN=?, KETERANGAN=?,
-            TGL_BYR=?, BULAN=?, TAHUN=?, user_id=?, sistem_pembayaran=?,
+            TGL_BYR=?, BULAN=?, TAHUN=?, sistem_pembayaran=?,
             LAIN_LAIN1=?, JUMLAH1=?, LAIN_LAIN2=?, JUMLAH2=?, LAIN_LAIN3=?, JUMLAH3=?, LAIN_LAIN4=?, JUMLAH4=?,
             th_ajaran=?, kelas_du=?, potong_spp=?, total_jumlah=?, payment_link_version=1
             WHERE id=?";
 
         $stmt = $koneksi->prepare($sql);
-        $user_id = current_operator_id();
-        
         $stmt->bind_param(
-            'ssddddddddddsssssssdsdsdsdssddi',
+            'ssddddddddddssssssdsdsdsdssddi',
             $no_induk, $kelas_siswa, $uang_pangkal, $uang_bangunan, $uang_seragam, $uang_kegiatan,
             $uang_spp, $uang_makan, $uang_sorga, $uang_infaq, $uang_komite, $uang_lain, $catatan,
-            $tanggal_bayar, $bulan_bayar, $tahun_bayar, $user_id, $sistem_pembayaran,
+            $tanggal_bayar, $bulan_bayar, $tahun_bayar, $sistem_pembayaran,
             $ll_1_ket, $ll_1_nom, $ll_2_ket, $ll_2_nom, $ll_3_ket, $ll_3_nom, $ll_4_ket, $ll_4_nom,
             $tahun_ajaran_du, $kelas_du, $potongan_spp, $total_jumlah, $id
         );
@@ -1011,6 +1090,23 @@ if ($aksi === 'update') {
             $stmt_ins_du->close();
         }
 
+        audit_event_write(
+            $koneksi,
+            'payment.updated',
+            'bayar',
+            $id,
+            'update',
+            $before_audit,
+            payment_audit_snapshot($koneksi, $id),
+            $audit_reason,
+            [
+                'result' => 'committed',
+                'source' => 'pembayaran/proses.php',
+                'original_operator_id' => $old_bayar['user_id'] ?? null,
+                'corrector_id' => current_operator_id(),
+            ]
+        );
+
         $koneksi->commit();
         $_SESSION['flash'] = [
             'type' => 'success',
@@ -1024,9 +1120,9 @@ if ($aksi === 'update') {
         ];
         header('Location: lihat.php');
         exit;
-    } catch (Exception $e) {
+    } catch (Throwable $e) {
         $koneksi->rollback();
-        $_SESSION['flash'] = ['type' => 'error', 'msg' => 'Gagal memperbarui: ' . $e->getMessage()];
+        $_SESSION['flash'] = ['type' => 'error', 'msg' => security_exception_message($e, 'Pembayaran gagal diperbarui.', 'payment-update')];
         header('Location: edit.php?id=' . $id);
         exit;
     }
@@ -1034,13 +1130,17 @@ if ($aksi === 'update') {
 
 // ── DELETE ──────────────────────────────────
 if ($aksi === 'hapus') {
-    $id = (int)($_GET['id'] ?? 0);
+    $id = (int)security_input_scalar($_POST, 'id', 0);
+    $audit_reason = security_input_scalar($_POST, 'audit_reason');
     if ($id <= 0) { header('Location: lihat.php'); exit; }
 
     $koneksi->begin_transaction();
 
     try {
+        idempotency_claim($koneksi, 'payment', $paymentIdempotencyKey, (int)current_operator_id());
+        $audit_reason = audit_require_reason($audit_reason, 'Alasan penghapusan pembayaran');
         $old_bayar = find_linked_payment($koneksi, $id);
+        $before_audit = payment_audit_snapshot($koneksi, $id);
 
         if ((float)$old_bayar['U_SPP'] > 0) {
             $oldSppMonth = normalize_month_code((string)$old_bayar['BULAN']);
@@ -1072,11 +1172,28 @@ if ($aksi === 'hapus') {
         $stmt_del->execute();
         $stmt_del->close();
 
+        audit_event_write(
+            $koneksi,
+            'payment.deleted',
+            'bayar',
+            $id,
+            'delete',
+            $before_audit,
+            null,
+            $audit_reason,
+            [
+                'result' => 'committed',
+                'source' => 'pembayaran/proses.php',
+                'original_operator_id' => $old_bayar['user_id'] ?? null,
+                'corrector_id' => current_operator_id(),
+            ]
+        );
+
         $koneksi->commit();
         $_SESSION['flash'] = ['type' => 'success', 'msg' => 'Data pembayaran berhasil dihapus!'];
-    } catch (Exception $e) {
+    } catch (Throwable $e) {
         $koneksi->rollback();
-        $_SESSION['flash'] = ['type' => 'error', 'msg' => 'Gagal menghapus data: ' . $e->getMessage()];
+        $_SESSION['flash'] = ['type' => 'error', 'msg' => security_exception_message($e, 'Pembayaran gagal dihapus.', 'payment-delete')];
     }
 
     header('Location: lihat.php');

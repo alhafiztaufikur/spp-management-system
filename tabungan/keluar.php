@@ -2,15 +2,18 @@
 // ============================================
 // tabungan/keluar.php — Form Tabungan Keluar
 // ============================================
-session_start();
+require_once __DIR__ . '/../includes/security.php';
+security_bootstrap_session();
 require_once '../koneksi.php';
 require_once '../includes/auth.php';
+require_once '../includes/idempotency.php';
 requireRole(['admin', 'kasir']);
 
 $flash = $_SESSION['flash'] ?? null;
 unset($_SESSION['flash']);
 
-$prefill_nis = preg_replace('/[^\w.-]/', '', trim($_GET['nis'] ?? ''));
+$rawPrefillNis = $_GET['nis'] ?? '';
+$prefill_nis = preg_replace('/[^\w.-]/', '', is_scalar($rawPrefillNis) ? trim((string)$rawPrefillNis) : '');
 $siswa_list = $koneksi->query("SELECT id, NO_INDUK, NO_induk_diknas, NAMA, KELAS FROM siswa WHERE is_active = 1 ORDER BY NAMA ASC");
 ?>
 <!DOCTYPE html>
@@ -38,7 +41,7 @@ $siswa_list = $koneksi->query("SELECT id, NO_INDUK, NO_induk_diknas, NAMA, KELAS
 
     <main class="main-content">
       <div class="topbar">
-        <button class="sidebar-toggle" onclick="toggleSidebar()" id="btn-sidebar-toggle">
+        <button class="sidebar-toggle" onclick="toggleSidebar()" id="btn-sidebar-toggle" aria-label="Buka navigasi" aria-expanded="false">
           <svg width="20" height="20" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><line x1="3" y1="12" x2="21" y2="12"/><line x1="3" y1="6" x2="21" y2="6"/><line x1="3" y1="18" x2="21" y2="18"/></svg>
         </button>
         <div class="topbar-title">
@@ -64,6 +67,8 @@ $siswa_list = $koneksi->query("SELECT id, NO_INDUK, NO_induk_diknas, NAMA, KELAS
           </div>
 
           <form method="POST" action="proses.php" id="form-tabungan">
+            <input type="hidden" name="csrf_token" value="<?= htmlspecialchars(security_csrf_token('savings'), ENT_QUOTES, 'UTF-8') ?>" />
+            <input type="hidden" name="idempotency_key" value="<?= htmlspecialchars(idempotency_generate_key(), ENT_QUOTES, 'UTF-8') ?>" />
             <input type="hidden" name="aksi" value="keluar" />
 
             <div class="section-divider"><span>Data Siswa</span></div>
@@ -146,9 +151,9 @@ $siswa_list = $koneksi->query("SELECT id, NO_INDUK, NO_induk_diknas, NAMA, KELAS
     </main>
   </div>
 
-  <div class="toast" id="toast"><span id="toast-icon"></span><span id="toast-msg"></span></div>
-  <div class="modal-overlay" id="modal-overlay">
-    <div class="modal-box">
+  <div class="toast" id="toast" role="status" aria-live="polite" aria-atomic="true"><span id="toast-icon" aria-hidden="true"></span><span id="toast-msg"></span></div>
+  <div class="modal-overlay" id="modal-overlay" role="presentation">
+    <div class="modal-box" role="dialog" aria-modal="true" aria-labelledby="modal-title" aria-describedby="modal-body" tabindex="-1">
       <h3 class="modal-title" id="modal-title"></h3>
       <p class="modal-body" id="modal-body"></p>
       <div class="modal-actions">

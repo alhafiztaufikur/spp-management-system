@@ -2,15 +2,17 @@
 // ============================================
 // pembayaran/edit.php
 // ============================================
-session_start();
+require_once __DIR__ . '/../includes/security.php';
+security_bootstrap_session();
 if (!isset($_SESSION['admin_id'])) { header('Location: ../login.php'); exit; }
 require_once '../koneksi.php';
 require_once '../includes/auth.php';
 require_once '../includes/daftar_ulang.php';
 require_once '../includes/biaya_lain.php';
+require_once '../includes/idempotency.php';
 requireRole(['admin', 'kasir']);
 
-$id = (int)($_GET['id'] ?? 0);
+$id = (int)security_input_scalar($_GET, 'id', 0);
 if ($id <= 0) { header('Location: lihat.php'); exit; }
 
 $stmt = $koneksi->prepare("SELECT p.*, s.NO_INDUK, s.NAMA, s.KELAS, s.SPP_PERBULAN FROM bayar p JOIN siswa s ON s.NO_INDUK = p.NO_INDUK WHERE p.id = ?");
@@ -226,7 +228,7 @@ $selectedPaymentMethod = $d['sistem_pembayaran'] ?? 'VA';
 
     <main class="main-content">
       <div class="topbar">
-        <button class="sidebar-toggle" onclick="toggleSidebar()" id="btn-sidebar-toggle">
+        <button class="sidebar-toggle" onclick="toggleSidebar()" id="btn-sidebar-toggle" aria-label="Buka navigasi" aria-expanded="false">
           <svg width="20" height="20" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><line x1="3" y1="12" x2="21" y2="12"/><line x1="3" y1="6" x2="21" y2="6"/><line x1="3" y1="18" x2="21" y2="18"/></svg>
         </button>
         <div class="topbar-title">
@@ -246,6 +248,8 @@ $selectedPaymentMethod = $d['sistem_pembayaran'] ?? 'VA';
         </div>
 
         <form method="POST" action="../pembayaran/proses.php" id="form-bayar">
+          <input type="hidden" name="csrf_token" value="<?= htmlspecialchars(security_csrf_token('payment'), ENT_QUOTES, 'UTF-8') ?>" />
+          <input type="hidden" name="idempotency_key" value="<?= htmlspecialchars(idempotency_generate_key(), ENT_QUOTES, 'UTF-8') ?>" />
           <input type="hidden" name="aksi" value="update" />
           <input type="hidden" name="id" value="<?= $d['id'] ?>" />
 
@@ -502,6 +506,15 @@ $selectedPaymentMethod = $d['sistem_pembayaran'] ?? 'VA';
           <div class="section-divider"><span>Catatan</span></div>
           <textarea class="field-input field-textarea" name="catatan" maxlength="255"
             placeholder="Catatan..."><?= htmlspecialchars($d['KETERANGAN'] ?? '') ?></textarea>
+
+          <div class="section-divider"><span>Audit Perubahan</span></div>
+          <div class="field-row">
+            <label class="field-label" for="audit-reason">Alasan Perubahan <span aria-hidden="true">*</span></label>
+            <textarea class="field-input field-textarea" id="audit-reason" name="audit_reason"
+              minlength="5" maxlength="255" required autocomplete="off"
+              placeholder="Jelaskan alasan koreksi (5–255 karakter)."></textarea>
+            <span class="field-hint">Alasan disimpan pada jejak audit append-only bersama nilai sebelum dan sesudah.</span>
+          </div>
 
           <!-- Action Buttons -->
           <div class="action-bar">

@@ -1,5 +1,6 @@
 <?php
-session_start();
+require_once __DIR__ . '/../includes/security.php';
+security_bootstrap_session();
 if (!isset($_SESSION['admin_id'])) { header('Location: ../login.php'); exit; }
 require_once '../koneksi.php';
 require_once '../includes/auth.php';
@@ -7,7 +8,8 @@ requireRole(['admin', 'bendahara', 'kasir']);
 
 header('Cache-Control: no-store, no-cache, must-revalidate, max-age=0');
 
-$paymentId = max(0, (int)($_GET['id'] ?? 0));
+$paymentIdRaw = $_GET['id'] ?? 0;
+$paymentId = max(0, (int)(is_scalar($paymentIdRaw) ? $paymentIdRaw : 0));
 if ($paymentId <= 0) {
     $_SESSION['flash'] = ['type' => 'error', 'msg' => 'Transaksi untuk struk tidak valid.'];
     header('Location: index.php');
@@ -157,7 +159,7 @@ $stmt = $koneksi->prepare("
     SELECT
         b.*,
         s.NAMA,
-        s.KELAS AS KELAS_SISWA,
+        COALESCE(NULLIF(b.kelas_rombel_snapshot, ''), NULLIF(b.KELAS, ''), s.KELAS) AS KELAS_SISWA,
         s.PANGKAL,
         s.NO_induk_diknas,
         s.PANGKAL_BAYAR,

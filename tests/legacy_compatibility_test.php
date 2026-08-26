@@ -1,6 +1,8 @@
 <?php
 require_once __DIR__ . '/../koneksi.php';
+require_once __DIR__ . '/support/assert_audit_database.php';
 require_once __DIR__ . '/../includes/daftar_ulang.php';
+test_require_audit_database($koneksi);
 
 function legacy_assert(bool $condition, string $message): void {
     if (!$condition) throw new RuntimeException($message);

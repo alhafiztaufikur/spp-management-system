@@ -161,7 +161,7 @@
     <header class="letterhead">
       <img src="../assets/img/school-logo.png" alt="Logo Mutiara Hikmah" />
       <div class="head-copy"><strong>SEKOLAH DASAR AL-QUR’AN (SDA)<br>MUTIARA HIKMAH</strong><span>Perum Bekasi Griya Asri II, Blok E, Jl. H. Nabrih, Ds. Sumber Jaya, Kp. Buwek, Tambun Selatan · Telp. 021-88363466</span></div>
-      <div class="head-code">SOP-KSR-01<br>Versi 1.0</div>
+      <div class="head-code">SOP-KSR-01<br>Versi 1.1</div>
     </header>
     <img class="watermark" src="../assets/img/school-logo.png" alt="" />
     <div class="content">
@@ -169,21 +169,22 @@
         <img class="cover-logo" src="../assets/img/school-logo.png" alt="Logo SDA Mutiara Hikmah" />
         <div class="eyebrow" style="text-align:center">Standar Operasional Prosedur</div>
         <h1>ALUR KASIR<br>SISTEM PEMBAYARAN SPP</h1>
-        <p class="cover-subtitle">Panduan lengkap mulai dari login kasir, input pembayaran siswa, validasi, pembayaran bulanan/tahunan, daftar ulang, biaya lain, pencetakan struk, koreksi transaksi, hingga integrasi database.</p>
+        <p class="cover-subtitle">Panduan lengkap mulai dari login kasir, input pembayaran siswa, validasi, pembayaran bulanan, daftar ulang, biaya lain, pencetakan struk, koreksi transaksi, hingga integrasi database.</p>
         <div class="meta-grid">
           <div><span>Nama Aplikasi</span><strong>SistemSPP</strong></div>
           <div><span>Unit Pengguna</span><strong>Kasir / Bagian Keuangan</strong></div>
-          <div><span>Tanggal Dokumen</span><strong>4 Agustus 2026</strong></div>
+          <div><span>Tanggal Dokumen</span><strong>26 Agustus 2026</strong></div>
           <div><span>Klasifikasi</span><strong>Dokumen Internal Sekolah</strong></div>
         </div>
       </div>
       <div class="callout info" style="margin-top:12mm"><strong>Tujuan utama:</strong> memastikan setiap penerimaan uang tercatat satu kali, memiliki jejak transaksi yang dapat diaudit, terhubung ke komponen pembayaran yang benar, dan menghasilkan struk sesuai periode.</div>
+      <div class="callout danger"><strong>Pembaruan kontrak aplikasi:</strong> transaksi baru hanya mendukung pembayaran bulanan. Backend menolak mode tahunan dan POST lama dengan <code>tabungan_wajib</code>. Setoran tabungan harus dicatat melalui menu Tabungan Masuk; pembayaran legacy bertanda v0 tidak boleh diedit atau dihapus dan harus direkonsiliasi manual.</div>
     </div>
     <footer class="footer"><span>SOP Alur Kasir SistemSPP</span><span class="page-no">Halaman 1 dari 12</span></footer>
   </section>
 
   <section class="page">
-    <header class="letterhead"><img src="../assets/img/school-logo.png" alt="Logo" /><div class="head-copy"><strong>SEKOLAH DASAR AL-QUR’AN (SDA)<br>MUTIARA HIKMAH</strong><span>Standar Operasional Prosedur SistemSPP</span></div><div class="head-code">SOP-KSR-01<br>Versi 1.0</div></header>
+    <header class="letterhead"><img src="../assets/img/school-logo.png" alt="Logo" /><div class="head-copy"><strong>SEKOLAH DASAR AL-QUR’AN (SDA)<br>MUTIARA HIKMAH</strong><span>Standar Operasional Prosedur SistemSPP</span></div><div class="head-code">SOP-KSR-01<br>Versi 1.1</div></header>
     <img class="watermark" src="../assets/img/school-logo.png" alt="" />
     <div class="content">
       <div class="eyebrow">01 · Ruang Lingkup</div><h2>Tujuan, Aktor, dan Prinsip Kerja</h2>
@@ -197,7 +198,7 @@
         <div class="card num-card"><span class="num">1</span><h3>Satu sumber data</h3><p>Riwayat, laporan, struk, daftar ulang, dan rekap kelas mengambil data dari transaksi yang sama—bukan salinan manual.</p></div>
         <div class="card num-card"><span class="num">2</span><h3>Satu SPP per periode</h3><p>SPP siswa untuk bulan dan tahun yang sama tidak boleh dibayar dua kali.</p></div>
         <div class="card num-card"><span class="num">3</span><h3>Transaksi atomik</h3><p>Header dan seluruh detail disimpan bersama. Jika satu bagian gagal, semua perubahan dibatalkan.</p></div>
-        <div class="card num-card"><span class="num">4</span><h3>Jejak koreksi</h3><p>Edit memperbarui relasi terkait; hapus membersihkan detail melalui relasi database dan pembalikan tabungan.</p></div>
+        <div class="card num-card"><span class="num">4</span><h3>Jejak koreksi</h3><p>Edit/hapus wajib menyebut alasan. Hanya child dengan <code>bayar_id</code> yang terkena; setoran tabungan manual tidak ikut berubah.</p></div>
       </div>
       <h3 style="margin-top:6mm">Alur besar</h3>
       <div class="flow"><div class="flow-box">Login Kasir</div><div class="flow-arrow">›</div><div class="flow-box">Pilih Menu Pembayaran</div><div class="flow-arrow">›</div><div class="flow-box">Pilih Siswa & Periode</div><div class="flow-arrow">›</div><div class="flow-box">Isi Komponen</div></div>
@@ -208,7 +209,7 @@
   </section>
 
   <section class="page">
-    <header class="letterhead"><img src="../assets/img/school-logo.png" alt="Logo" /><div class="head-copy"><strong>SEKOLAH DASAR AL-QUR’AN (SDA)<br>MUTIARA HIKMAH</strong><span>Standar Operasional Prosedur SistemSPP</span></div><div class="head-code">SOP-KSR-01<br>Versi 1.0</div></header>
+    <header class="letterhead"><img src="../assets/img/school-logo.png" alt="Logo" /><div class="head-copy"><strong>SEKOLAH DASAR AL-QUR’AN (SDA)<br>MUTIARA HIKMAH</strong><span>Standar Operasional Prosedur SistemSPP</span></div><div class="head-code">SOP-KSR-01<br>Versi 1.1</div></header>
     <img class="watermark" src="../assets/img/school-logo.png" alt="" />
     <div class="content">
       <div class="eyebrow">02 · Akses Sistem</div><h2>Kasir Login dan Membuka Form Pembayaran</h2>
@@ -225,7 +226,7 @@
       </div>
       <h3>Menu yang tersedia untuk kasir</h3>
       <table><thead><tr><th>Kelompok</th><th>Menu</th><th>Fungsi</th></tr></thead><tbody>
-        <tr><td>Pembayaran</td><td>Input Pembayaran</td><td>Mencatat pembayaran bulanan atau tahunan beserta komponen lainnya.</td></tr>
+        <tr><td>Pembayaran</td><td>Input Pembayaran</td><td>Mencatat pembayaran bulanan beserta komponen lainnya. Mode tahunan baru ditolak.</td></tr>
         <tr><td>Pembayaran</td><td>Riwayat Pembayaran</td><td>Melihat, mengedit, menghapus, dan mencetak transaksi sesuai kewenangan.</td></tr>
         <tr><td>Pembayaran</td><td>Riwayat Daftar Ulang</td><td>Melihat tagihan, cicilan, sisa, detail tanggal, serta membuka edit pembayaran.</td></tr>
         <tr><td>Tabungan</td><td>Masuk / Keluar / Riwayat</td><td>Mengelola transaksi tabungan siswa yang berdiri sendiri.</td></tr>
@@ -236,14 +237,14 @@
   </section>
 
   <section class="page">
-    <header class="letterhead"><img src="../assets/img/school-logo.png" alt="Logo" /><div class="head-copy"><strong>SEKOLAH DASAR AL-QUR’AN (SDA)<br>MUTIARA HIKMAH</strong><span>Standar Operasional Prosedur SistemSPP</span></div><div class="head-code">SOP-KSR-01<br>Versi 1.0</div></header>
+    <header class="letterhead"><img src="../assets/img/school-logo.png" alt="Logo" /><div class="head-copy"><strong>SEKOLAH DASAR AL-QUR’AN (SDA)<br>MUTIARA HIKMAH</strong><span>Standar Operasional Prosedur SistemSPP</span></div><div class="head-code">SOP-KSR-01<br>Versi 1.1</div></header>
     <img class="watermark" src="../assets/img/school-logo.png" alt="" />
     <div class="content">
       <div class="eyebrow">03 · Persiapan Transaksi</div><h2>Memilih Jenis Pembayaran, Tanggal, dan Siswa</h2>
       <ol>
-        <li><strong>Pilih jenis pembayaran SPP:</strong> Bulanan (1 struk) atau Tahunan (12 struk).</li>
+        <li><strong>Pilih jenis pembayaran SPP:</strong> hanya Bulanan (1 struk). Mode Tahunan baru ditolak oleh backend dan tidak boleh dipaksakan.</li>
         <li><strong>Periksa Tanggal Bayar:</strong> tanggal harus sesuai tanggal uang benar-benar diterima.</li>
-        <li><strong>Pilih bulan dan tahun periode:</strong> untuk mode bulanan pilih bulan SPP; untuk tahunan sistem memakai Januari–Desember pada tahun terpilih.</li>
+        <li><strong>Pilih bulan dan tahun periode:</strong> gunakan bulan SPP dalam tahun ajaran Juli–Juni; pembayaran harus mengikuti urutan periode.</li>
         <li><strong>Pilih sistem pembayaran:</strong> Tunai, VA, atau QRIS sesuai bukti penerimaan.</li>
         <li><strong>Cari siswa:</strong> ketik nama atau nomor induk, lalu pilih hasil yang tepat.</li>
         <li><strong>Verifikasi identitas otomatis:</strong> cocokkan NIS, nama, dan kelas sebelum mengisi nominal.</li>
@@ -263,7 +264,7 @@
   </section>
 
   <section class="page">
-    <header class="letterhead"><img src="../assets/img/school-logo.png" alt="Logo" /><div class="head-copy"><strong>SEKOLAH DASAR AL-QUR’AN (SDA)<br>MUTIARA HIKMAH</strong><span>Standar Operasional Prosedur SistemSPP</span></div><div class="head-code">SOP-KSR-01<br>Versi 1.0</div></header>
+    <header class="letterhead"><img src="../assets/img/school-logo.png" alt="Logo" /><div class="head-copy"><strong>SEKOLAH DASAR AL-QUR’AN (SDA)<br>MUTIARA HIKMAH</strong><span>Standar Operasional Prosedur SistemSPP</span></div><div class="head-code">SOP-KSR-01<br>Versi 1.1</div></header>
     <img class="watermark" src="../assets/img/school-logo.png" alt="" />
     <div class="content">
       <div class="eyebrow">04 · Rincian Pembayaran</div><h2>Mengisi Komponen dan Membaca Kolom Tagihan</h2>
@@ -278,10 +279,10 @@
         <div class="card"><h3>SPP dan Komite</h3><p>Terikat pada bulan/tahun. SPP yang sudah tercatat pada periode yang sama tidak dapat dimasukkan lagi.</p></div>
         <div class="card"><h3>Daftar Ulang</h3><p>Dapat dicicil sampai total master kelas/tahun ajaran. Cicilan muncul otomatis di Riwayat Daftar Ulang.</p></div>
         <div class="card"><h3>Pangkal/Bangunan/Seragam/Kegiatan</h3><p>Komponen nonbulanan mengikuti total tagihan siswa dan akumulasi pembayaran sebelumnya.</p></div>
-        <div class="card"><h3>Potongan dan Tabungan Wajib</h3><p>Potongan mengurangi jumlah tunai SPP; tabungan wajib membuat jurnal tabungan yang terhubung ke transaksi.</p></div>
+        <div class="card"><h3>Potongan dan Tabungan</h3><p>Potongan mengurangi jumlah tunai SPP. Setoran tabungan dicatat terpisah melalui menu Tabungan Masuk; field Tabungan Wajib pada POST lama ditolak.</p></div>
       </div>
       <h3 style="margin-top:5mm">Urutan input yang disarankan</h3>
-      <div class="flow"><div class="flow-box">SPP / Komite</div><div class="flow-arrow">›</div><div class="flow-box">Daftar Ulang</div><div class="flow-arrow">›</div><div class="flow-box">Komponen Lain</div><div class="flow-arrow">›</div><div class="flow-box">Potongan / Tabungan</div></div>
+      <div class="flow"><div class="flow-box">SPP / Komite</div><div class="flow-arrow">›</div><div class="flow-box">Daftar Ulang</div><div class="flow-arrow">›</div><div class="flow-box">Komponen Lain</div><div class="flow-arrow">›</div><div class="flow-box">Potongan</div></div>
       <div class="callout info"><strong>Total Jumlah</strong> dihitung otomatis. Kasir wajib mencocokkan angka ini dengan uang tunai atau bukti VA/QRIS sebelum menekan Simpan.</div>
       <div class="callout danger"><strong>Dilarang:</strong> memecah pembayaran SPP bulan yang sama menjadi dua transaksi. Jika transaksi pertama salah, gunakan Edit—jangan membuat transaksi kedua.</div>
     </div>
@@ -289,7 +290,7 @@
   </section>
 
   <section class="page">
-    <header class="letterhead"><img src="../assets/img/school-logo.png" alt="Logo" /><div class="head-copy"><strong>SEKOLAH DASAR AL-QUR’AN (SDA)<br>MUTIARA HIKMAH</strong><span>Standar Operasional Prosedur SistemSPP</span></div><div class="head-code">SOP-KSR-01<br>Versi 1.0</div></header>
+    <header class="letterhead"><img src="../assets/img/school-logo.png" alt="Logo" /><div class="head-copy"><strong>SEKOLAH DASAR AL-QUR’AN (SDA)<br>MUTIARA HIKMAH</strong><span>Standar Operasional Prosedur SistemSPP</span></div><div class="head-code">SOP-KSR-01<br>Versi 1.1</div></header>
     <img class="watermark" src="../assets/img/school-logo.png" alt="" />
     <div class="content">
       <div class="eyebrow">05 · Biaya Lain dan Daftar Ulang</div><h2>Aturan Pelunasan, Duplikasi, dan Cicilan</h2>
@@ -315,30 +316,30 @@
   </section>
 
   <section class="page">
-    <header class="letterhead"><img src="../assets/img/school-logo.png" alt="Logo" /><div class="head-copy"><strong>SEKOLAH DASAR AL-QUR’AN (SDA)<br>MUTIARA HIKMAH</strong><span>Standar Operasional Prosedur SistemSPP</span></div><div class="head-code">SOP-KSR-01<br>Versi 1.0</div></header>
+    <header class="letterhead"><img src="../assets/img/school-logo.png" alt="Logo" /><div class="head-copy"><strong>SEKOLAH DASAR AL-QUR’AN (SDA)<br>MUTIARA HIKMAH</strong><span>Standar Operasional Prosedur SistemSPP</span></div><div class="head-code">SOP-KSR-01<br>Versi 1.1</div></header>
     <img class="watermark" src="../assets/img/school-logo.png" alt="" />
     <div class="content">
-      <div class="eyebrow">06 · Bulanan dan Tahunan</div><h2>Perbedaan Alur dan Hasil Struk</h2>
+      <div class="eyebrow">06 · Bulanan dan Legacy Tahunan</div><h2>Perbedaan Alur dan Hasil Struk</h2>
       <div class="grid-2">
         <div class="card"><h3>Pembayaran Bulanan — 1 Struk</h3><ul><li>Pilih satu bulan dan satu tahun.</li><li>Isi SPP maksimal satu bulan.</li><li>Sistem membuat satu transaksi dan satu nomor struk.</li><li>Periode yang sudah memiliki SPP akan ditolak.</li></ul></div>
-        <div class="card"><h3>Pembayaran Tahunan — 12 Struk</h3><ul><li>Pilih tahun yang sama dengan Tanggal Bayar.</li><li>Nominal SPP otomatis 12 bulan penuh.</li><li>Sistem membuat transaksi Januari–Desember.</li><li>Setiap bulan mempunyai ID/struk berbeda.</li></ul></div>
+        <div class="card"><h3>Mode Tahunan Ditangguhkan</h3><ul><li>Mode annual bukan alur transaksi baru yang didukung.</li><li>Backend menolak <code>payment_plan=annual</code> sebelum mutasi.</li><li>Jangan membuat 12 transaksi manual untuk menggantikan guard.</li><li>Histori batch lama hanya dibaca/cetak sesuai hak akses.</li></ul></div>
       </div>
-      <h3 style="margin-top:6mm">Pemecahan pembayaran tahunan</h3>
-      <div class="flow"><div class="flow-box">Total SPP 12 Bulan</div><div class="flow-arrow">›</div><div class="flow-box">Validasi 12 Periode Kosong</div><div class="flow-arrow">›</div><div class="flow-box">Bagi Nominal</div><div class="flow-arrow">›</div><div class="flow-box">12 Transaksi</div></div>
-      <table><thead><tr><th>Struk</th><th>Periode</th><th>Isi SPP</th><th>Komponen non-SPP</th></tr></thead><tbody>
-        <tr><td>1/12</td><td>Januari</td><td>1/12 total SPP</td><td>Masuk di struk pertama agar tidak terduplikasi.</td></tr>
-        <tr><td>2/12–11/12</td><td>Februari–November</td><td>Masing-masing 1/12 total SPP</td><td>Tidak diulang.</td></tr>
-        <tr><td>12/12</td><td>Desember</td><td>Sisa pembagian nominal</td><td>Tidak diulang.</td></tr>
+      <h3 style="margin-top:6mm">Penanganan permintaan pembayaran tahunan</h3>
+      <div class="flow"><div class="flow-box">Request Annual</div><div class="flow-arrow">›</div><div class="flow-box">Guard Backend</div><div class="flow-arrow">›</div><div class="flow-box">Rollback Tanpa Mutasi</div><div class="flow-arrow">›</div><div class="flow-box">Gunakan Bulanan</div></div>
+      <table><thead><tr><th>Kondisi</th><th>Respons sistem</th><th>Perubahan database</th><th>Tindakan kasir</th></tr></thead><tbody>
+        <tr><td>Transaksi baru memakai mode annual</td><td>Ditolak sebelum penyimpanan.</td><td>Tidak ada header, claim, child, atau audit finansial baru.</td><td>Kembali ke form dan pilih satu periode bulanan.</td></tr>
+        <tr><td>Pembayaran beberapa bulan sekaligus diminta</td><td>Tidak dipecah otomatis.</td><td>Tidak ada batch baru.</td><td>Ikuti kebijakan sekolah dan catat per bulan secara berurutan.</td></tr>
+        <tr><td>Batch tahunan lama ditemukan</td><td>Read-only.</td><td>Histori tidak ditebak atau ditulis ulang.</td><td>Baca/cetak sesuai hak akses; koreksi melalui rekonsiliasi manual.</td></tr>
       </tbody></table>
-      <div class="callout danger"><strong>Pembayaran tahunan ditolak seluruhnya</strong> apabila satu saja dari Januari–Desember sudah memiliki pembayaran SPP. Gunakan transaksi bulanan untuk periode yang belum terbayar, jangan memaksa paket tahunan.</div>
+      <div class="callout danger"><strong>Mode tahunan baru selalu ditolak.</strong> Guard tidak bergantung pada apakah Januari–Desember kosong. Jangan mengirim ulang request annual atau membuat batch secara paksa.</div>
       <h3>Pencetakan</h3>
-      <p>Setelah Simpan, popup menawarkan <strong>“Cetak 12 struk pembayaran?”</strong>. Tombol cetak membuka satu dokumen berisi 12 halaman A5 landscape. Kasir dapat mencetak semuanya sekaligus atau mencetak satu struk dari masing-masing baris Riwayat Pembayaran.</p>
+      <p>Setelah Simpan, popup menawarkan cetak satu struk transaksi. Histori batch tahunan lama, bila ada, hanya dicetak dari riwayat sesuai hak akses dan tidak dapat diedit/hapus otomatis.</p>
     </div>
     <footer class="footer"><span>SOP Alur Kasir SistemSPP · Pembayaran Tahunan</span><span class="page-no">Halaman 7 dari 12</span></footer>
   </section>
 
   <section class="page">
-    <header class="letterhead"><img src="../assets/img/school-logo.png" alt="Logo" /><div class="head-copy"><strong>SEKOLAH DASAR AL-QUR’AN (SDA)<br>MUTIARA HIKMAH</strong><span>Standar Operasional Prosedur SistemSPP</span></div><div class="head-code">SOP-KSR-01<br>Versi 1.0</div></header>
+    <header class="letterhead"><img src="../assets/img/school-logo.png" alt="Logo" /><div class="head-copy"><strong>SEKOLAH DASAR AL-QUR’AN (SDA)<br>MUTIARA HIKMAH</strong><span>Standar Operasional Prosedur SistemSPP</span></div><div class="head-code">SOP-KSR-01<br>Versi 1.1</div></header>
     <img class="watermark" src="../assets/img/school-logo.png" alt="" />
     <div class="content">
       <div class="eyebrow">07 · Validasi</div><h2>Kapan Transaksi Dilanjutkan atau Ditolak</h2>
@@ -361,15 +362,15 @@
   </section>
 
   <section class="page">
-    <header class="letterhead"><img src="../assets/img/school-logo.png" alt="Logo" /><div class="head-copy"><strong>SEKOLAH DASAR AL-QUR’AN (SDA)<br>MUTIARA HIKMAH</strong><span>Standar Operasional Prosedur SistemSPP</span></div><div class="head-code">SOP-KSR-01<br>Versi 1.0</div></header>
+    <header class="letterhead"><img src="../assets/img/school-logo.png" alt="Logo" /><div class="head-copy"><strong>SEKOLAH DASAR AL-QUR’AN (SDA)<br>MUTIARA HIKMAH</strong><span>Standar Operasional Prosedur SistemSPP</span></div><div class="head-code">SOP-KSR-01<br>Versi 1.1</div></header>
     <img class="watermark" src="../assets/img/school-logo.png" alt="" />
     <div class="content">
       <div class="eyebrow">08 · Simpan dan Cetak</div><h2>Penyelesaian Transaksi dan Penyerahan Struk</h2>
       <ol>
         <li>Periksa kembali siswa, periode, metode, rincian, dan Total Jumlah.</li>
-        <li>Tekan <strong>Simpan</strong> atau <strong>Simpan & Buat 12 Struk</strong>.</li>
+        <li>Tekan <strong>Simpan</strong> untuk satu transaksi bulanan.</li>
         <li>Tunggu pesan berhasil. Jangan refresh atau menutup tab saat proses penyimpanan berjalan.</li>
-        <li>Pada popup, pilih <strong>Ya, cetak struk</strong> atau <strong>Ya, cetak 12 struk</strong>.</li>
+        <li>Pada popup, pilih <strong>Ya, cetak struk</strong>. Batch tahunan lama hanya dicetak dari riwayat.</li>
         <li>Periksa preview: nama, NIS, kelas, periode, nominal, metode, tanggal, dan petugas.</li>
         <li>Cetak dan serahkan kepada pembayar. Simpan salinan sesuai kebijakan sekolah.</li>
       </ol>
@@ -381,22 +382,22 @@
         <div class="card"><h3>Otorisasi</h3><p>Tanggal penerimaan dan nama petugas bagian keuangan.</p></div>
       </div>
       <h3 style="margin-top:6mm">Jika kasir memilih “Tidak, nanti”</h3>
-      <p>Transaksi tetap tersimpan. Buka <strong>Riwayat Pembayaran</strong>, cari siswa/periode, lalu pilih Cetak. Untuk paket tahunan gunakan tombol <strong>12 Struk</strong> atau cetak tiap periode secara individual.</p>
+      <p>Transaksi tetap tersimpan. Buka <strong>Riwayat Pembayaran</strong>, cari siswa/periode, lalu pilih Cetak. Histori batch tahunan lama hanya dapat dibaca/cetak, bukan diedit atau dihapus dari aplikasi.</p>
       <div class="callout danger"><strong>Sebelum menyerahkan struk:</strong> jangan hanya memeriksa total. Pastikan periode bulan/tahun benar karena periode tersebut akan dikunci setelah SPP tersimpan.</div>
     </div>
     <footer class="footer"><span>SOP Alur Kasir SistemSPP · Simpan & Cetak</span><span class="page-no">Halaman 9 dari 12</span></footer>
   </section>
 
   <section class="page">
-    <header class="letterhead"><img src="../assets/img/school-logo.png" alt="Logo" /><div class="head-copy"><strong>SEKOLAH DASAR AL-QUR’AN (SDA)<br>MUTIARA HIKMAH</strong><span>Standar Operasional Prosedur SistemSPP</span></div><div class="head-code">SOP-KSR-01<br>Versi 1.0</div></header>
+    <header class="letterhead"><img src="../assets/img/school-logo.png" alt="Logo" /><div class="head-copy"><strong>SEKOLAH DASAR AL-QUR’AN (SDA)<br>MUTIARA HIKMAH</strong><span>Standar Operasional Prosedur SistemSPP</span></div><div class="head-code">SOP-KSR-01<br>Versi 1.1</div></header>
     <img class="watermark" src="../assets/img/school-logo.png" alt="" />
     <div class="content">
       <div class="eyebrow">09 · Koreksi Transaksi</div><h2>Edit, Hapus, dan Riwayat Daftar Ulang</h2>
       <h3>Edit pembayaran</h3>
       <ol><li>Buka Riwayat Pembayaran atau Riwayat Daftar Ulang.</li><li>Pilih transaksi yang salah, lalu tekan Edit.</li><li>Perbaiki tanggal/periode/nominal/metode/rincian.</li><li>Tekan Update dan cetak ulang struk.</li></ol>
-      <div class="callout info"><strong>Efek edit:</strong> header pembayaran diperbarui; klaim periode SPP dipindah atau dihapus sesuai nominal; detail biaya lain dibuat ulang; daftar ulang dan jurnal tabungan milik transaksi diselaraskan.</div>
+      <div class="callout info"><strong>Efek edit:</strong> wajib isi alasan koreksi. Sistem hanya mengambil child dengan <code>bayar_id</code> pembayaran tersebut; setoran Tabungan Masuk manual pada tanggal sama tetap utuh. Pembayaran legacy v0 ditolak dan harus direkonsiliasi manual.</div>
       <h3>Hapus pembayaran</h3>
-      <ol><li>Pastikan transaksi memang harus dibatalkan dan bukti koreksi tersedia.</li><li>Tekan Hapus pada baris transaksi dan konfirmasi.</li><li>Sistem membalik tabungan terkait terlebih dahulu.</li><li>Header dihapus; detail biaya lain, daftar ulang, dan klaim periode ikut terhapus melalui relasi database.</li></ol>
+      <ol><li>Pastikan transaksi aman (versi relasi 1) memang harus dibatalkan dan bukti koreksi tersedia.</li><li>Tekan Hapus, isi alasan, lalu konfirmasi.</li><li>Sistem memeriksa saldo/lock child terkait; bila pembalikan berisiko negatif, seluruh transaksi ditolak.</li><li>Header dan child miliknya dihapus atomik. Legacy v0 tidak dapat dihapus dari aplikasi.</li></ol>
       <div class="decision"><div class="branch"><strong>Edit</strong><br>Dipakai ketika transaksi benar-benar terjadi tetapi datanya salah.</div><div class="diamond"><span>Edit atau hapus?</span></div><div class="branch"><strong>Hapus</strong><br>Dipakai ketika transaksi batal/tidak pernah terjadi. Wajib ada otorisasi.</div></div>
       <h3>Riwayat daftar ulang</h3>
       <table><thead><tr><th>Fitur</th><th>Penggunaan</th></tr></thead><tbody>
@@ -410,25 +411,25 @@
   </section>
 
   <section class="page">
-    <header class="letterhead"><img src="../assets/img/school-logo.png" alt="Logo" /><div class="head-copy"><strong>SEKOLAH DASAR AL-QUR’AN (SDA)<br>MUTIARA HIKMAH</strong><span>Standar Operasional Prosedur SistemSPP</span></div><div class="head-code">SOP-KSR-01<br>Versi 1.0</div></header>
+    <header class="letterhead"><img src="../assets/img/school-logo.png" alt="Logo" /><div class="head-copy"><strong>SEKOLAH DASAR AL-QUR’AN (SDA)<br>MUTIARA HIKMAH</strong><span>Standar Operasional Prosedur SistemSPP</span></div><div class="head-code">SOP-KSR-01<br>Versi 1.1</div></header>
     <img class="watermark" src="../assets/img/school-logo.png" alt="" />
     <div class="content">
       <div class="eyebrow">10 · Integrasi Database</div><h2>Data yang Berubah pada Setiap Operasi</h2>
       <dl class="db-map">
-        <dt>bayar</dt><dd>Header utama: siswa, kelas, komponen, tanggal, bulan, tahun, metode, total, petugas, serta identitas paket tahunan.</dd>
+        <dt>bayar</dt><dd>Header utama: siswa, kelas, komponen, tanggal, bulan, tahun, metode, total, petugas, serta versi relasi pembayaran. Batch tahunan lama hanya histori baca/cetak.</dd>
         <dt>bayar_spp_periode</dt><dd>Klaim unik SPP per siswa/bulan/tahun. Mencegah pembayaran periode yang sama dua kali dan terhapus otomatis ketika header dihapus.</dd>
         <dt>bayar_du</dt><dd>Nominal daftar ulang, kelas, dan tahun ajaran yang terhubung langsung ke satu pembayaran.</dd>
         <dt>bayar_biaya_lain</dt><dd>Detail jenis biaya lain, snapshot nama/nominal, keterangan, serta urutan baris.</dd>
-        <dt>transaksi_m</dt><dd>Jurnal tabungan wajib yang mempunyai referensi pembayaran.</dd>
-        <dt>tabungan</dt><dd>Saldo siswa bertambah saat setoran terkait disimpan dan dikurangi kembali saat transaksi dihapus/diedit.</dd>
+        <dt>transaksi_m</dt><dd>Jurnal Tabungan Masuk manual; transaksi baru dari pembayaran tidak membuat linked saving. Kolom <code>bayar_id</code> hanya kompatibilitas histori.</dd>
+        <dt>tabungan</dt><dd>Saldo siswa hanya berubah melalui modul Tabungan Masuk/Keluar. Edit atau hapus pembayaran tidak boleh mengubah setoran manual.</dd>
         <dt>master_biaya_lain</dt><dd>Sumber jenis dan total biaya lain. Riwayat memakai snapshot agar perubahan master tidak mengubah transaksi lama.</dd>
         <dt>Daftar_ulang</dt><dd>Master total daftar ulang per kelas dan tahun ajaran.</dd>
       </dl>
       <h3 style="margin-top:5mm">Matriks operasi</h3>
       <table><thead><tr><th>Operasi</th><th>Header</th><th>SPP Periode</th><th>DU/Biaya Lain</th><th>Tabungan</th></tr></thead><tbody>
-        <tr><td>Tambah</td><td>INSERT 1 atau 12 baris</td><td>INSERT jika SPP &gt; 0</td><td>INSERT pada transaksi pertama</td><td>Tambah jurnal dan saldo</td></tr>
-        <tr><td>Edit</td><td>UPDATE baris</td><td>Hapus lalu buat klaim baru</td><td>Hapus/buat ulang detail milik transaksi</td><td>Balikkan lalu buat ulang</td></tr>
-        <tr><td>Hapus</td><td>DELETE baris</td><td>CASCADE</td><td>CASCADE</td><td>Saldo dibalik, jurnal terhapus</td></tr>
+        <tr><td>Tambah</td><td>INSERT 1 baris bulanan</td><td>INSERT jika SPP &gt; 0</td><td>INSERT child dengan <code>bayar_id</code></td><td>Tidak berubah</td></tr>
+        <tr><td>Edit</td><td>UPDATE baris</td><td>Sinkronkan claim milik ID</td><td>Sinkronkan child milik ID</td><td>Setoran manual tetap utuh</td></tr>
+        <tr><td>Hapus</td><td>DELETE baris aman</td><td>CASCADE</td><td>CASCADE child milik ID</td><td>Setoran manual tetap utuh</td></tr>
       </tbody></table>
       <div class="callout info"><strong>Transaksi database:</strong> seluruh langkah dijalankan dalam satu transaksi MySQL. Perintah COMMIT hanya dilakukan jika semua tabel berhasil diperbarui; jika ada kegagalan, ROLLBACK mengembalikan kondisi sebelumnya.</div>
       <div class="callout warn"><strong>Migrasi SQL:</strong> perubahan struktur disimpan pada folder <code>sql/</code> di repository agar komputer lain tidak perlu meminta file terpisah. Database di tiap komputer tetap perlu menjalankan migrasi yang baru.</div>
@@ -437,7 +438,7 @@
   </section>
 
   <section class="page compact-page">
-    <header class="letterhead"><img src="../assets/img/school-logo.png" alt="Logo" /><div class="head-copy"><strong>SEKOLAH DASAR AL-QUR’AN (SDA)<br>MUTIARA HIKMAH</strong><span>Standar Operasional Prosedur SistemSPP</span></div><div class="head-code">SOP-KSR-01<br>Versi 1.0</div></header>
+    <header class="letterhead"><img src="../assets/img/school-logo.png" alt="Logo" /><div class="head-copy"><strong>SEKOLAH DASAR AL-QUR’AN (SDA)<br>MUTIARA HIKMAH</strong><span>Standar Operasional Prosedur SistemSPP</span></div><div class="head-code">SOP-KSR-01<br>Versi 1.1</div></header>
     <img class="watermark" src="../assets/img/school-logo.png" alt="" />
     <div class="content">
       <div class="eyebrow">11 · Checklist Harian</div><h2>Kontrol Kasir dan Penanganan Masalah</h2>

@@ -20,3 +20,7 @@ documentation/_flow_preview_*.png
 
 # Composer dependencies
 vendor/
+
+# Local runtime configuration and generated audit artifacts
+config/app.local.php
+audit-artifacts/

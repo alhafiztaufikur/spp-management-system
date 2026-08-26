@@ -1,11 +1,12 @@
 <?php
-session_start();
+require_once __DIR__ . '/includes/security.php';
+security_bootstrap_session();
 require_once 'koneksi.php';
 require_once 'includes/auth.php';
 require_once 'includes/kelas.php';
 requireRole(['admin']);
 
-if (empty($_SESSION['csrf_master_kelas'])) $_SESSION['csrf_master_kelas'] = bin2hex(random_bytes(32));
+$_SESSION['csrf_master_kelas'] = security_csrf_token('master-class');
 
 function class_master_redirect(): void {
     header('Location: master_kelas.php');
@@ -14,14 +15,14 @@ function class_master_redirect(): void {
 
 if ($_SERVER['REQUEST_METHOD'] === 'POST') {
     try {
-        if (!hash_equals($_SESSION['csrf_master_kelas'], (string)($_POST['csrf_token'] ?? ''))) {
+        if (!security_csrf_is_valid('master-class', $_POST['csrf_token'] ?? null)) {
             throw new RuntimeException('Permintaan tidak valid atau sesi telah kedaluwarsa.');
         }
-        $action = (string)($_POST['aksi'] ?? '');
-        $id = (int)($_POST['id'] ?? 0);
+        $action = (string)security_input_scalar($_POST, 'aksi');
+        $id = (int)security_input_scalar($_POST, 'id', 0);
         if (in_array($action, ['tambah', 'update'], true)) {
-            $level = (int)($_POST['tingkat'] ?? 0);
-            $code = strtoupper(trim((string)($_POST['kode_rombel'] ?? '')));
+            $level = (int)security_input_scalar($_POST, 'tingkat', 0);
+            $code = strtoupper(trim((string)security_input_scalar($_POST, 'kode_rombel')));
             $code = preg_replace('/\s+/', '', $code);
             if ($level < 1 || $level > 6) throw new RuntimeException('Tingkat kelas harus 1 sampai 6.');
             if (!preg_match('/^[A-Z0-9]{1,10}$/', $code)) throw new RuntimeException('Kode rombel hanya boleh berisi huruf/angka, maksimal 10 karakter.');
@@ -64,14 +65,14 @@ if ($_SERVER['REQUEST_METHOD'] === 'POST') {
         }
         $_SESSION['flash'] = ['type' => 'success', 'msg' => $message];
     } catch (Throwable $error) {
-        $_SESSION['flash'] = ['type' => 'error', 'msg' => $error->getMessage()];
+        $_SESSION['flash'] = ['type' => 'error', 'msg' => security_exception_message($error, 'Master kelas gagal diproses.', 'master-class')];
     }
     class_master_redirect();
 }
 
 $flash = $_SESSION['flash'] ?? null;
 unset($_SESSION['flash']);
-$editId = (int)($_GET['edit'] ?? 0);
+$editId = (int)security_input_scalar($_GET, 'edit', 0);
 $editClass = $editId > 0 ? class_find($koneksi, $editId) : null;
 $classes = $koneksi->query("SELECT mk.*,
     (SELECT COUNT(*) FROM siswa s WHERE s.master_kelas_id = mk.id AND s.is_active=1) AS siswa_count,

@@ -2,71 +2,112 @@
 // ============================================
 // login.php — Split Layout (referensi myEdlinks)
 // ============================================
-session_start();
+require_once __DIR__ . '/includes/security.php';
+security_bootstrap_session();
+require_once 'koneksi.php';
+require_once __DIR__ . '/includes/auth.php';
+require_once __DIR__ . '/includes/login_rate_limit.php';
+
 if (isset($_SESSION['admin_id'])) {
-    header('Location: dashboard.php');
+    requireRole(['admin', 'bendahara', 'kasir']);
+    $authenticatedRole = (string)($_SESSION['admin_role'] ?? '');
+    header('Location: ' . ($authenticatedRole === 'kasir'
+        ? 'tabungan/masuk.php'
+        : ($authenticatedRole === 'bendahara' ? 'laporan/index.php' : 'dashboard.php')));
     exit;
 }
 
-require_once 'koneksi.php';
-
 $error = '';
+$submittedUsername = '';
+$loginCsrfToken = security_csrf_token('login');
 if ($_SERVER['REQUEST_METHOD'] === 'POST') {
-    $username = trim($_POST['username'] ?? '');
-    $password = $_POST['password'] ?? '';
+    $username = is_string($_POST['username'] ?? null) ? trim($_POST['username']) : '';
+    $password = is_string($_POST['password'] ?? null) ? $_POST['password'] : '';
+    $submittedUsername = $username;
 
-    if ($username && $password) {
-        $stmt = $koneksi->prepare("SELECT id, nama, password, role FROM admin WHERE username = ?");
-        $stmt->bind_param('s', $username);
-        $stmt->execute();
-        $result = $stmt->get_result();
-        $admin  = $result->fetch_assoc();
-        $stmt->close();
+    if (!security_csrf_is_valid('login', $_POST['csrf_token'] ?? null)) {
+        http_response_code(403);
+        $error = 'Permintaan tidak valid atau sesi telah kedaluwarsa.';
+    } elseif ($username !== '' && $password !== '' && strlen($username) <= 50 && strlen($password) <= 72) {
+        try {
+            login_rate_limit_cleanup($koneksi);
+            $rateBuckets = login_rate_limit_buckets($username);
+            $rateState = login_rate_limit_lock($koneksi, $rateBuckets);
 
-        $passwordValid = false;
-        $legacyMd5     = false;
-
-        if ($admin) {
-            $storedPassword = (string)$admin['password'];
-            $passwordInfo   = password_get_info($storedPassword);
-
-            if (!empty($passwordInfo['algo'])) {
-                $passwordValid = password_verify($password, $storedPassword);
-            } elseif (preg_match('/^[a-f0-9]{32}$/i', $storedPassword)) {
-                // Kompatibilitas akun lama. Hash akan langsung ditingkatkan setelah login.
-                $passwordValid = hash_equals(strtolower($storedPassword), md5($password));
-                $legacyMd5     = $passwordValid;
-            }
-        }
-
-        if ($admin && $passwordValid) {
-            if ($legacyMd5 || password_needs_rehash($admin['password'], PASSWORD_DEFAULT)) {
-                $newHash = password_hash($password, PASSWORD_DEFAULT);
-                $update  = $koneksi->prepare("UPDATE admin SET password = ? WHERE id = ?");
-                $update->bind_param('si', $newHash, $admin['id']);
-                $update->execute();
-                $update->close();
-            }
-
-            session_regenerate_id(true);
-            $_SESSION['admin_id']   = $admin['id'];
-            $_SESSION['admin_nama'] = $admin['nama'];
-            $_SESSION['admin_role'] = $admin['role'];
-
-            if ($admin['role'] === 'kasir') {
-                $loginRedirect = 'tabungan/masuk.php';
-            } elseif ($admin['role'] === 'bendahara') {
-                $loginRedirect = 'laporan/index.php';
+            if ((int)$rateState['retry_after'] > 0) {
+                password_verify($password, SPP_LOGIN_DUMMY_HASH);
+                $koneksi->commit();
+                header('Retry-After: ' . (int)$rateState['retry_after']);
+                http_response_code(429);
+                $error = 'Username atau password salah!';
             } else {
-                $loginRedirect = 'dashboard.php';
+                $stmt = $koneksi->prepare("SELECT id, username, nama, password, role, session_version, password_reset_required FROM admin WHERE username = ? LIMIT 1");
+                $stmt->bind_param('s', $username);
+                $stmt->execute();
+                $result = $stmt->get_result();
+                $admin  = $result->fetch_assoc();
+                $stmt->close();
+
+                $passwordValid = false;
+                $storedPassword = $admin ? (string)$admin['password'] : '';
+                $passwordInfo = password_get_info($storedPassword);
+                $modernAccount = $admin
+                    && (int)$admin['password_reset_required'] === 0
+                    && !empty($passwordInfo['algo']);
+                $verified = password_verify($password, $modernAccount ? $storedPassword : SPP_LOGIN_DUMMY_HASH);
+                $passwordValid = $modernAccount && $verified;
+
+                if ($admin && $passwordValid) {
+                    if (password_needs_rehash($admin['password'], PASSWORD_DEFAULT)) {
+                        $newHash = password_hash($password, PASSWORD_DEFAULT);
+                        $update  = $koneksi->prepare("UPDATE admin SET password = ?, password_reset_required = 0, session_version = session_version + 1 WHERE id = ?");
+                        $update->bind_param('si', $newHash, $admin['id']);
+                        $update->execute();
+                        $update->close();
+                        $admin['session_version'] = (int)$admin['session_version'] + 1;
+                    }
+                    login_rate_limit_clear($koneksi, $rateBuckets);
+                    $koneksi->commit();
+
+                    security_rotate_after_login();
+                    $_SESSION['admin_id'] = (int)$admin['id'];
+                    $_SESSION['admin_username'] = (string)$admin['username'];
+                    $_SESSION['admin_nama'] = (string)$admin['nama'];
+                    $_SESSION['admin_role'] = (string)$admin['role'];
+                    $_SESSION['admin_session_version'] = (int)$admin['session_version'];
+
+                    if ($admin['role'] === 'kasir') {
+                        $loginRedirect = 'tabungan/masuk.php';
+                    } elseif ($admin['role'] === 'bendahara') {
+                        $loginRedirect = 'laporan/index.php';
+                    } else {
+                        $loginRedirect = 'dashboard.php';
+                    }
+                    header('Location: ' . $loginRedirect);
+                    exit;
+                } else {
+                    $blocked = login_rate_limit_record_failure($koneksi, $rateState['failure_counts']);
+                    $koneksi->commit();
+                    if ($blocked) {
+                        header('Retry-After: ' . SPP_LOGIN_BLOCK_SECONDS);
+                        http_response_code(429);
+                    }
+                    $error = 'Username atau password salah!';
+                }
             }
-            header('Location: ' . $loginRedirect);
-            exit;
-        } else {
-            $error = 'Username atau password salah!';
+        } catch (Throwable $exception) {
+            try {
+                $koneksi->rollback();
+            } catch (Throwable) {
+                // Tidak ada transaksi aktif.
+            }
+            $error = security_exception_message($exception, 'Login sementara tidak dapat diproses.', 'login');
+            http_response_code(500);
         }
     } else {
-        $error = 'Username dan password wajib diisi!';
+        $error = ($username === '' || $password === '')
+            ? 'Username dan password wajib diisi!'
+            : 'Username atau password salah!';
     }
 }
 
@@ -84,7 +125,7 @@ if ($_SERVER['REQUEST_METHOD'] === 'POST') {
   <!-- Prevent theme flash -->
   <script>(function(){var t=localStorage.getItem('spp_theme')||'dark';document.documentElement.setAttribute('data-theme',t);})();</script>
   <link rel="stylesheet" href="assets/css/style.css?v=4.7" />
-  <link rel="stylesheet" href="assets/css/login.css?v=3.4" />
+  <link rel="stylesheet" href="assets/css/login.css?v=3.5" />
 </head>
 <body class="login-split-body">
 
@@ -158,7 +199,7 @@ if ($_SERVER['REQUEST_METHOD'] === 'POST') {
       <!-- Greeting -->
       <div class="right-greeting">
         <h2>Hai, selamat datang! 👋</h2>
-        <p>Belum punya akun? <a href="#" class="link-accent" onclick="return false">Hubungi Admin</a></p>
+        <p>Belum punya akun? Hubungi administrator sekolah.</p>
       </div>
 
       <!-- Error Alert -->
@@ -171,6 +212,7 @@ if ($_SERVER['REQUEST_METHOD'] === 'POST') {
 
       <!-- Form -->
       <form method="POST" action="login.php" class="right-form" id="form-login">
+        <input type="hidden" name="csrf_token" value="<?= htmlspecialchars($loginCsrfToken, ENT_QUOTES, 'UTF-8') ?>" />
 
         <div class="rfield-group">
           <label class="rfield-label" for="username">Username</label>
@@ -178,7 +220,7 @@ if ($_SERVER['REQUEST_METHOD'] === 'POST') {
             <svg class="rfield-icon" width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><path d="M20 21v-2a4 4 0 0 0-4-4H8a4 4 0 0 0-4 4v2"/><circle cx="12" cy="7" r="4"/></svg>
             <input class="rfield-input" type="text" id="username" name="username"
               placeholder="Contoh: admin@sekolah.com"
-              value="<?= htmlspecialchars($_POST['username'] ?? '') ?>"
+              value="<?= htmlspecialchars($submittedUsername, ENT_QUOTES, 'UTF-8') ?>"
               required autocomplete="username" />
           </div>
         </div>
@@ -186,7 +228,6 @@ if ($_SERVER['REQUEST_METHOD'] === 'POST') {
         <div class="rfield-group">
           <div class="rfield-label-row">
             <label class="rfield-label" for="password">Password</label>
-            <a href="#" class="link-muted" onclick="return false">Lupa kata sandi?</a>
           </div>
           <div class="rfield-wrap">
             <svg class="rfield-icon" width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><rect x="3" y="11" width="18" height="11" rx="2" ry="2"/><path d="M7 11V7a5 5 0 0 1 10 0v4"/></svg>
@@ -200,29 +241,12 @@ if ($_SERVER['REQUEST_METHOD'] === 'POST') {
           </div>
         </div>
 
-        <!-- Remember -->
-        <label class="remember-row" for="remember">
-          <input type="checkbox" id="remember" name="remember" class="remember-chk" />
-          <span class="remember-custom"></span>
-          <span class="remember-label">Ingat perangkat ini</span>
-        </label>
-
         <button type="submit" class="btn-login-main" id="btn-login">
           <span>Masuk</span>
           <svg width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.5" stroke-linecap="round" stroke-linejoin="round"><path d="M5 12h14"/><path d="m12 5 7 7-7 7"/></svg>
         </button>
 
       </form>
-
-      <!-- Terms -->
-      <p class="terms-text">
-        Dengan melanjutkan, kamu menerima
-        <a href="#" class="link-accent" onclick="return false">Syarat Penggunaan</a> dan
-        <a href="#" class="link-accent" onclick="return false">Kebijakan Privasi</a> kami.
-      </p>
-
-      <!-- Hint -->
-      <p class="login-hint-bottom">Default: <code>admin</code> / <code>admin123</code></p>
 
     </div><!-- /right-inner -->
   </div><!-- /login-right -->

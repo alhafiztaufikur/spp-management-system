@@ -18,19 +18,91 @@ CREATE TABLE IF NOT EXISTS `admin` (
   `password`   VARCHAR(255) NOT NULL,
   `nama`       VARCHAR(100) NOT NULL,
   `role`       ENUM('admin','bendahara','kasir') NOT NULL DEFAULT 'admin',
+  `session_version` INT UNSIGNED NOT NULL DEFAULT 1,
+  `password_reset_required` TINYINT(1) NOT NULL DEFAULT 0,
   `created_at` TIMESTAMP DEFAULT CURRENT_TIMESTAMP
 ) ENGINE=InnoDB;
 
--- Default users: admin / bendahara / kasir
-INSERT INTO `admin` (`username`, `password`, `nama`, `role`) VALUES
-('admin',      MD5('admin123'),      'Administrator', 'admin'),
-('bendahara',  MD5('bendahara123'),  'Bendahara TU',  'bendahara'),
-('kasir',      MD5('kasir123'),      'Kasir',         'kasir'),
-('kasir1',     MD5('kasir123'),      'Kasir Loket 1', 'kasir'),
-('kasir2',     MD5('kasir123'),      'Kasir Loket 2', 'kasir'),
-('kasir3',     MD5('kasir123'),      'Kasir Loket 3', 'kasir'),
-('kasir4',     MD5('kasir123'),      'Kasir Loket 4', 'kasir')
-ON DUPLICATE KEY UPDATE `nama`=VALUES(`nama`), `role`=VALUES(`role`);
+-- Telemetri pembatasan login. Bucket account/source/pair disimpan sebagai HMAC;
+-- password, username, dan alamat source tidak disimpan dalam bentuk plaintext.
+CREATE TABLE IF NOT EXISTS `login_rate_limit` (
+  `bucket_hash`       CHAR(64) CHARACTER SET ascii COLLATE ascii_bin PRIMARY KEY,
+  `failure_count`     TINYINT UNSIGNED NOT NULL DEFAULT 0,
+  `window_started_at` DATETIME NOT NULL,
+  `blocked_until`     DATETIME DEFAULT NULL,
+  `updated_at`        TIMESTAMP NOT NULL DEFAULT CURRENT_TIMESTAMP ON UPDATE CURRENT_TIMESTAMP,
+  KEY `idx_login_rate_limit_cleanup` (`updated_at`),
+  KEY `idx_login_rate_limit_blocked` (`blocked_until`)
+) ENGINE=InnoDB;
+
+-- Klaim idempotency ikut commit/rollback bersama mutasi finansial. Token yang
+-- sudah committed tidak dapat dipakai ulang, termasuk dengan payload berbeda.
+CREATE TABLE IF NOT EXISTS `mutation_request` (
+  `id`             BIGINT UNSIGNED NOT NULL AUTO_INCREMENT,
+  `scope`          VARCHAR(40) CHARACTER SET ascii COLLATE ascii_bin NOT NULL,
+  `request_key`    CHAR(64) CHARACTER SET ascii COLLATE ascii_bin NOT NULL,
+  `actor_admin_id` INT DEFAULT NULL,
+  `created_at`     DATETIME(6) NOT NULL DEFAULT CURRENT_TIMESTAMP(6),
+  PRIMARY KEY (`id`),
+  UNIQUE KEY `uk_mutation_request_scope_key` (`scope`, `request_key`),
+  KEY `idx_mutation_request_actor_time` (`actor_admin_id`, `created_at`),
+  KEY `idx_mutation_request_created_at` (`created_at`)
+) ENGINE=InnoDB;
+
+-- actor_admin_id adalah snapshot tanpa FK agar penghapusan akun tidak membuka
+-- kembali token historis.
+
+-- Jejak append-only untuk perubahan finansial dan akun. Password, token,
+-- cookie, dan secret tidak boleh ditulis ke payload JSON.
+CREATE TABLE IF NOT EXISTS `audit_event` (
+  `id`                  BIGINT UNSIGNED NOT NULL AUTO_INCREMENT,
+  `event_type`          VARCHAR(50) NOT NULL,
+  `entity_type`         VARCHAR(40) NOT NULL,
+  `entity_id`           VARCHAR(64) DEFAULT NULL,
+  `action`              VARCHAR(40) NOT NULL,
+  `actor_admin_id`      INT DEFAULT NULL,
+  `actor_name_snapshot` VARCHAR(100) NOT NULL,
+  `request_id`          CHAR(24) CHARACTER SET ascii COLLATE ascii_bin NOT NULL,
+  `reason`              VARCHAR(255) DEFAULT NULL,
+  `before_data`         LONGTEXT CHARACTER SET utf8mb4 COLLATE utf8mb4_bin DEFAULT NULL,
+  `after_data`          LONGTEXT CHARACTER SET utf8mb4 COLLATE utf8mb4_bin DEFAULT NULL,
+  `metadata`            LONGTEXT CHARACTER SET utf8mb4 COLLATE utf8mb4_bin DEFAULT NULL,
+  `created_at`          DATETIME(6) NOT NULL DEFAULT CURRENT_TIMESTAMP(6),
+  PRIMARY KEY (`id`),
+  KEY `idx_audit_event_entity` (`entity_type`, `entity_id`, `created_at`),
+  KEY `idx_audit_event_actor` (`actor_admin_id`, `created_at`),
+  KEY `idx_audit_event_type_time` (`event_type`, `created_at`),
+  CONSTRAINT `chk_audit_event_before_json`
+    CHECK (`before_data` IS NULL OR JSON_VALID(`before_data`)),
+  CONSTRAINT `chk_audit_event_after_json`
+    CHECK (`after_data` IS NULL OR JSON_VALID(`after_data`)),
+  CONSTRAINT `chk_audit_event_metadata_json`
+    CHECK (`metadata` IS NULL OR JSON_VALID(`metadata`))
+) ENGINE=InnoDB;
+
+-- actor_admin_id adalah snapshot historis tanpa FK. Menghapus akun tidak boleh
+-- mengubah event audit lama; nama/username/role juga disimpan sebagai snapshot.
+
+DELIMITER $$
+CREATE OR REPLACE TRIGGER `trg_audit_event_no_update`
+BEFORE UPDATE ON `audit_event`
+FOR EACH ROW
+BEGIN
+  SIGNAL SQLSTATE '45000'
+    SET MESSAGE_TEXT = 'audit_event is append-only';
+END$$
+
+CREATE OR REPLACE TRIGGER `trg_audit_event_no_delete`
+BEFORE DELETE ON `audit_event`
+FOR EACH ROW
+BEGIN
+  SIGNAL SQLSTATE '45000'
+    SET MESSAGE_TEXT = 'audit_event is append-only';
+END$$
+DELIMITER ;
+
+-- Tidak ada akun/password default bersama. Akun administrator pertama wajib
+-- diprovisikan secara out-of-band dengan password_hash() sebelum aplikasi aktif.
 
 -- Master kelas/rombel. Data lama menggunakan placeholder per tingkat sampai
 -- admin memindahkan siswa ke rombel sebenarnya (1A, 1B, dan seterusnya).
