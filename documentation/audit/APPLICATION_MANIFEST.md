@@ -148,7 +148,7 @@ Manifest dianggap tervalidasi hanya apabila:
 
 ## Status setelah remediation lokal (26 Agustus 2026)
 
-Retest 27 Agustus pada commit `a91edab` mengulang disposable regression sebagai `REG-FINAL-005` (18/18 PASS). Ringkasan tersanitasi berada di luar repository; status target client tetap belum terbukti.
+Retest 27 Agustus pada commit `a91edab` mengulang disposable regression sebagai `REG-FINAL-005` (18/18 PASS); concurrency harness kemudian diperbaiki dan diuji ulang pada `b983c67` sebagai `CONC-004` (25/25 PASS). Ringkasan tersanitasi berada di luar repository; status target client tetap belum terbukti.
 
 Bagian inventaris di atas adalah baseline dan sengaja tidak ditulis ulang. Source terbaru menambahkan `audit_event`, `mutation_request`, `includes/security.php`, rate-limit/session controls, dan `.htaccess` deny; `tests/` kini dijalankan melalui guard disposable. Regression terbaru 18/18 pada `regression-20260827_031419-current` (`REG-FINAL-005`, termasuk body JSON/text negatif pada endpoint mutasi, snapshot count bisnis sebelum/sesudah, pagination/protected rekap scalar boundary, rollback claim idempotency saat validation failure, formula/control-character oracle, pemeriksaan CSRF sebelum pembuatan tahun ajaran, atomisitas ensure tahun saat aksi gagal, dan validasi scalar alasan audit) dan HTTP deny/security smoke lulus pada clone audit. Snapshot audit kini memiliki 22 tabel setelah migrasi security, audit, dan idempotency; backup/restore drill disposable juga memverifikasi seluruh 22 tabel. Namun daftar baseline tetap bukan bukti deployment client: virtual host/HTTPS, credential target, browser, dan route-wide DAST masih harus dijalankan.
 

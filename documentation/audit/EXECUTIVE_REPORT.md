@@ -11,7 +11,7 @@ Perbaikan integritas pembayaran, migrasi schema, audit append-only, idempotency 
 
 Status serah-terima client tetap **NO-GO**. Keputusan ini bukan karena test otomatis gagal, tetapi karena gate yang memang membutuhkan lingkungan dan keputusan eksternal belum mempunyai bukti: UAT seluruh route/role dan accessibility, validasi PDF dan Excel pada client target, concurrency/failpoint, restore target dan RPO/RTO, HTTPS/HSTS, privilege/secret target, retensi/approval koreksi, dan keputusan residual risk. Smoke browser lokal untuk login dan enam halaman read-only pada viewport mobile/desktop, keyboard dasar, serta tema sudah lulus, tetapi tidak menggantikan UAT penuh. Sebelas PDF smoke (17 halaman) sudah lulus parse, render, dan inspeksi visual lokal.
 
-Regression disposable terbaru setelah commit dokumentasi `a91edab` adalah `REG-FINAL-005` (18/18 PASS); evidence tersanitasi dan hasil postflight tercatat di execution log. Status NO-GO tidak berubah.
+Regression disposable terbaru setelah commit dokumentasi `a91edab` adalah `REG-FINAL-005` (18/18 PASS), dan concurrency retest pada `b983c67` adalah `CONC-004` (25/25 PASS); evidence tersanitasi dan hasil postflight tercatat di execution log. Status NO-GO tidak berubah.
 
 ## Perubahan yang tervalidasi
 

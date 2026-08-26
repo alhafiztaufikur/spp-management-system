@@ -240,7 +240,7 @@ Regression evidence terbaru yang mencakup seluruh hardening dan oracle (termasuk
 
 Postflight 27 Agustus 2026 mengulang verifier pada snapshot audit dengan identity probe eksplisit: schema 87/87 requirement tersedia dan data 17/17 invariant PASS. Artefak cookie/session uji nonvendor di evidence root juga telah dimusnahkan terkontrol; detailnya tercatat sebagai `DBPOST-003`, `DATA-FINAL-002`, dan `OPS-002` di `documentation/audit/AUDIT_EXECUTION_LOG.md`.
 
-Retest pasca-commit `a91edab` menambahkan `REG-FINAL-005`, `DBM-004`, `DEP-REHEARSAL-009`, dan `DBPOST-004`; seluruhnya PASS pada environment disposable/snapshot dengan database utama `db_spp` tetap tidak disentuh.
+Retest pasca-commit `a91edab` menambahkan `REG-FINAL-005`, `DBM-004`, `DEP-REHEARSAL-009`, dan `DBPOST-004`; commit `b983c67` memperbaiki harness concurrency dan menambahkan `CONC-004` (25/25 PASS). Seluruhnya PASS pada environment disposable/snapshot dengan database utama `db_spp` tetap tidak disentuh.
 
 Smoke browser lokal terbaru (`UI-BROWSER-001`/`UI-BROWSER-002`) tidak mengubah status NO-GO: bukti mencakup halaman login serta enam halaman read-only pada viewport 390px/1440px, keyboard dasar, pergantian tema, overflow, dan console smoke. Discovery browser resmi untuk UAT penuh tetap tidak menyediakan runtime.
 

@@ -1,6 +1,6 @@
 # Matriks Coverage Test SistemSPP
 
-Dokumen ini memetakan tepat 40 test case pada bagian 17 `RENCANA_AUDIT_FINAL_SISTEMSPP.md` ke artefak dan command yang benar-benar tersedia. Snapshot pemetaan: 27 Agustus 2026, Git HEAD `a91edab` setelah seluruh artefak audit masuk commit. Status di sini adalah status **acceptance lengkap**, bukan penilaian bahwa beberapa assertion parsial sudah ada. Retest terbaru pada commit `a91edab` (`REG-FINAL-005`) lulus 18/18 pada clone disposable; fixture mentah dipurge dan hanya ringkasan tersanitasi dipertahankan.
+Dokumen ini memetakan tepat 40 test case pada bagian 17 `RENCANA_AUDIT_FINAL_SISTEMSPP.md` ke artefak dan command yang benar-benar tersedia. Snapshot pemetaan: 27 Agustus 2026, Git HEAD `b983c67` setelah seluruh artefak audit masuk commit. Status di sini adalah status **acceptance lengkap**, bukan penilaian bahwa beberapa assertion parsial sudah ada. Retest `REG-FINAL-005` pada `a91edab` lulus 18/18 dan concurrency `CONC-004` pada `b983c67` lulus 25/25; fixture mentah dipurge dan hanya ringkasan tersanitasi dipertahankan.
 
 ## Arti status
 

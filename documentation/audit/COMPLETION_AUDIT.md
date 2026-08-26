@@ -6,7 +6,7 @@ Aturan status: `TERBUKTI`, `PARSIAL`, `BELUM DIUJI`, `PENDING CLIENT`, atau `TID
 
 Dokumen ini adalah pemeriksaan requirement-by-requirement. Status **NO-GO** tetap berlaku bila satu saja gate kritis pada bagian 21 rencana belum terbukti. Bukti lokal tidak dipromosikan menjadi bukti target client.
 
-Koreksi evidence terbaru: pada commit `a91edab`, regression disposable dijalankan ulang sebagai `REG-FINAL-005` dan lulus 18/18 pada clone `db_spp_audit_20260827_031419_suite_1786`; ringkasan tersanitasi disimpan di luar repository. Referensi run sebelumnya tetap dipertahankan sebagai histori.
+Koreksi evidence terbaru: pada commit `a91edab`, regression disposable dijalankan ulang sebagai `REG-FINAL-005` dan lulus 18/18 pada clone `db_spp_audit_20260827_031419_suite_1786`; pada `b983c67`, concurrency retest `CONC-004` lulus 25/25. Ringkasan tersanitasi disimpan di luar repository; referensi run sebelumnya tetap dipertahankan sebagai histori.
 
 ## A. Empat belas artefak wajib
 
