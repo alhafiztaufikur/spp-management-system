@@ -237,6 +237,22 @@ File ini mencatat perubahan proyek secara reverse chronological. Baca [PROJECT_C
 
 **Catatan tindak lanjut:** Sediakan browser runtime/in-app browser atau host client. Jangan mengganti bukti UAT dengan HTTP smoke/standalone automation.
 
+## 2026-08-27 - Sinkronisasi PROGRESS Browser Blocker
+
+**AI/Aktor:** Codex berbasis GPT-5
+
+**Tujuan:** Menyelaraskan ringkasan progres dengan retest browser resmi terbaru.
+
+**Perubahan fitur dan perilaku:** `documentation/PROGRESS.md` menambahkan bukti `UI-BROWSER-006` dan mempertahankan status UAT sebagai blocker environment.
+
+**Database dan migrasi:** Tidak ada.
+
+**Kompatibilitas dan data lama:** Tidak ada perubahan runtime/data.
+
+**Verifikasi:** Review silang execution log; discovery browser tetap `[]` dan tidak ada sesi/tab dibuat.
+
+**Catatan tindak lanjut:** Jalankan UAT penuh hanya setelah runtime browser atau host client tersedia.
+
 ## 2026-08-27 - Probe Time-based SQLi Terfokus
 
 **AI/Aktor:** Codex berbasis GPT-5

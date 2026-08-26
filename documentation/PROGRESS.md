@@ -246,6 +246,8 @@ Retest pasca-commit `a91edab` menambahkan `REG-FINAL-005`, `DBM-004`, `DEP-REHEA
 
 Smoke browser lokal terbaru (`UI-BROWSER-001`/`UI-BROWSER-002`) tidak mengubah status NO-GO: bukti mencakup halaman login serta enam halaman read-only pada viewport 390px/1440px, keyboard dasar, pergantian tema, overflow, dan console smoke. Retest discovery browser resmi (`UI-BROWSER-005`) kembali menghasilkan daftar browser kosong, sehingga UAT penuh tetap belum dapat dijalankan.
 
+Retest berikutnya (`UI-BROWSER-006`) mengulang setup dan discovery resmi; hasil tetap `agent.browsers.list()=[]`. Troubleshooting resmi telah dibaca, tidak ada sesi/tab dibuat, dan UAT penuh tetap menunggu browser runtime atau host client.
+
 ### Temuan dan keputusan rilis
 
 - Histori pembayaran legacy tetap `payment_link_version=0` dan tidak dihubungkan otomatis berdasarkan NIS, tanggal, atau tahun ajaran.
