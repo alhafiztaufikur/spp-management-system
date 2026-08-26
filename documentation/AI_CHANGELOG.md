@@ -13,6 +13,22 @@ File ini mencatat perubahan proyek secara reverse chronological. Baca [PROJECT_C
 - Jangan menghapus atau menulis ulang entri lama. Tambahkan entri koreksi bila diperlukan.
 - Perubahan implementasi dan entri changelog wajib masuk commit yang sama.
 
+## 2026-08-27 - Sinkronisasi Inventaris Test Wave 7
+
+**AI/Aktor:** Codex berbasis GPT-5
+
+**Tujuan:** Memisahkan jumlah test pada snapshot baseline dari inventaris test current agar dokumentasi dead-code tidak lagi menyiratkan hanya delapan script yang tersedia.
+
+**Perubahan fitur dan perilaku:** Tidak ada perubahan runtime. `DEAD_CODE_INVENTORY.md` kini menandai delapan script sebagai hitungan baseline dan mencatat 18 test current yang semuanya guarded/test-only.
+
+**Database dan migrasi:** Tidak ada mutasi database.
+
+**Kompatibilitas dan data lama:** Histori baseline dipertahankan; tidak ada file test yang dihapus.
+
+**Verifikasi:** Inventory source menunjukkan 18 test PHP guarded; regression disposable `REG-FINAL-005` tetap 18/18 PASS.
+
+**Catatan tindak lanjut:** Runtime coverage dan persetujuan owner masih dibutuhkan sebelum kandidat dead code dihapus.
+
 ## 2026-08-27 - Normalisasi ID Temuan PROGRESS
 
 **AI/Aktor:** Codex berbasis GPT-5

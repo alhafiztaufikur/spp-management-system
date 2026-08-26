@@ -58,9 +58,11 @@ Selector global yang dipakai halaman protected—misalnya sidebar, theme, `.main
 | `laporan/cetak_struk_tahunan.php` | compatibility | receipt batch lama masih dibaca berdasarkan `payment_batch_token` (`cetak_struk_tahunan.php:132-194`) walaupun input tahunan baru ditangguhkan |
 | `laporan/rekap_kelas.php`, `detail_siswa.php` | dilindungi | lihat allowlist; tidak boleh dinilai dead |
 | `includes/*.php` | aktif/dinamis | library internal, bukan direct route; petakan call graph per function sebelum cleanup |
-| `tests/*_test.php` | test-only | delapan script regresi mandiri; tidak boleh dianggap route produksi |
+| `tests/*_test.php` | test-only | delapan script regresi mandiri pada snapshot baseline; inventaris current mencakup runner audit tambahan dan seluruhnya tetap bukan route produksi |
 
 Tidak ditemukan file PHP aplikasi dengan nol referensi literal eksternal pada pass awal. Hasil ini bukan bukti semua route dibutuhkan secara bisnis; direct URL, redirect dinamis, form action, dan compatibility tetap harus diuji.
+
+Catatan current (27 Agustus 2026): seluruh 18 test PHP yang terlihat pada worktree telah memiliki guard CLI/database audit dan tercakup dalam regression disposable; tidak ada item yang dihapus atau dinyatakan `mati terkonfirmasi`. Browser/runtime coverage dan keputusan owner tetap menjadi syarat klasifikasi final.
 
 ### 3.2 Tumpang tindih yang aktif, bukan dead code
 
