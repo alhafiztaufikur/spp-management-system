@@ -141,6 +141,22 @@ File ini mencatat perubahan proyek secara reverse chronological. Baca [PROJECT_C
 
 **Catatan tindak lanjut:** Infra/DBA dan pemilik sistem harus menjalankan prosedur pada target client dan mencatat hasil tersanitasi sebelum GO.
 
+## 2026-08-27 - Sinkronisasi PROGRESS dengan Temuan Credential
+
+**AI/Aktor:** Codex berbasis GPT-5
+
+**Tujuan:** Memastikan ringkasan progres utama menampilkan status `DBSEC-004` dan batasan rotasi credential target.
+
+**Perubahan fitur dan perilaku:** `documentation/PROGRESS.md` diperbarui untuk menautkan bukti grant stale, credential reuse lokal, dan kewajiban secret terpisah pada target.
+
+**Database dan migrasi:** Tidak ada; hanya dokumentasi.
+
+**Kompatibilitas dan data lama:** Tidak ada perubahan runtime atau data.
+
+**Verifikasi:** Review silang terhadap execution log, dependency report, runbook, completion audit, dan security findings; `git diff --check` dijalankan.
+
+**Catatan tindak lanjut:** Pertahankan status NO-GO sampai rotasi target, verifikasi grant, dan gate deployment/client selesai.
+
 ## 2026-08-27 - Probe Time-based SQLi Terfokus
 
 **AI/Aktor:** Codex berbasis GPT-5
