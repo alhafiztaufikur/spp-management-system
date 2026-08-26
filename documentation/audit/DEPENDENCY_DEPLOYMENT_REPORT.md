@@ -78,6 +78,12 @@ Stylesheet dan beberapa halaman memuat Google Fonts. Saat koneksi internet terpu
 
 `.htaccess` memperbaiki exposure pada Apache lokal, tetapi kontrol yang lebih kuat adalah document root khusus public serta package allowlist. Nginx/IIS/PHP built-in server tidak otomatis membaca `.htaccess`; masing-masing membutuhkan konfigurasi ekuivalen dan test deny.
 
+### DEPLOY-006 - Redirect HTTPS dan HSTS belum aktif pada Apache lokal
+
+Smoke header `TLS-LOCAL-001` menemukan virtual host lokal dapat menjawab HTTPS, tetapi HTTP masih mengembalikan 200 tanpa redirect dan `Strict-Transport-Security` tidak dikirim. Ini adalah gap konfigurasi deployment, bukan perubahan yang dipaksakan ke `.htaccess` aplikasi karena lingkungan development/test masih membutuhkan HTTP.
+
+Acceptance target: redirect HTTP→HTTPS, sertifikat valid, dan HSTS opt-in setelah seluruh hostname/subdomain siap; ulangi smoke pada semua route publik, redirect, error, HTML, JSON, print, dan download.
+
 ## Bukti command lokal
 
 ```text

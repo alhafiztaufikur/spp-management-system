@@ -77,6 +77,22 @@ File ini mencatat perubahan proyek secara reverse chronological. Baca [PROJECT_C
 
 **Catatan tindak lanjut:** Hash harus dibuat ulang pada tag/package final dan diverifikasi bersama document root serta signing client.
 
+## 2026-08-27 - Konfirmasi Gap Redirect HTTPS Lokal
+
+**AI/Aktor:** Codex berbasis GPT-5
+
+**Tujuan:** Menguji perilaku HTTP/HTTPS dan cache header lokal sebagai bagian gate deployment.
+
+**Perubahan fitur dan perilaku:** Tidak ada perubahan runtime; evidence `TLS-LOCAL-001` ditambahkan pada execution log.
+
+**Database dan migrasi:** Tidak ada. Smoke `curl` bersifat read-only.
+
+**Kompatibilitas dan data lama:** Tidak ada perubahan aplikasi/data.
+
+**Verifikasi:** HTTPS lokal merespons 200 dengan security/cache headers; HTTP juga 200 tanpa redirect HTTPS dan HSTS tidak dikirim. Artefak internal merespons 403; export anonim 302 dengan `no-store`.
+
+**Catatan tindak lanjut:** Redirect HTTP→HTTPS, sertifikat, dan HSTS harus dikonfigurasi serta diuji pada virtual host target; tidak dipaksakan pada `.htaccess` lokal dev/test.
+
 ## 2026-08-27 - Retest Verifier Snapshot Audit
 
 **AI/Aktor:** Codex berbasis GPT-5
