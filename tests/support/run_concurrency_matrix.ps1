@@ -632,7 +632,7 @@ SELECT 'RELEASED';
     @(
         "RUN_WIB=$((Get-Date).ToString('yyyy-MM-ddTHH:mm:sszzz'))",
         "GIT_COMMIT=$((& git -C $workspace rev-parse HEAD).Trim())",
-        "GIT_WORKTREE_DIRTY=$([int]((& git -C $workspace status --porcelain).Count -gt 0))",
+        "GIT_WORKTREE_DIRTY=$([int](@(& git -C $workspace status --porcelain).Count -gt 0))",
         "SOURCE_DATABASE=$SourceDatabase",
         "SUITE_DATABASE=$SuiteDatabase",
         "SOURCE_DUMP_SHA256=$dumpHash",

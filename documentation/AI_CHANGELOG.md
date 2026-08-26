@@ -13,6 +13,22 @@ File ini mencatat perubahan proyek secara reverse chronological. Baca [PROJECT_C
 - Jangan menghapus atau menulis ulang entri lama. Tambahkan entri koreksi bila diperlukan.
 - Perubahan implementasi dan entri changelog wajib masuk commit yang sama.
 
+## 2026-08-27 - Perbaikan Harness dan Retest Concurrency
+
+**AI/Aktor:** Codex berbasis GPT-5
+
+**Tujuan:** Memastikan runner concurrency tidak gagal hanya karena output `git status` kosong dan mengulang skenario race pada environment disposable.
+
+**Perubahan fitur dan perilaku:** `tests/support/run_concurrency_matrix.ps1` kini membungkus output status worktree sebagai array sebelum membaca `.Count`; tidak ada perubahan perilaku aplikasi.
+
+**Database dan migrasi:** Rerun memakai clone disposable dari snapshot audit dan tidak memutasi `db_spp`; clone/server dibersihkan.
+
+**Kompatibilitas dan data lama:** Tidak ada perubahan data aplikasi.
+
+**Verifikasi:** Retest `CONC-004` menghasilkan 25/25 assertion PASS. Artefak request/cookie/raw fixture dipurge; ringkasan tersanitasi disimpan pada evidence root dengan ACL terbatas.
+
+**Catatan tindak lanjut:** Deadlock/retry, failpoint setiap write, dan concurrent report correction masih membutuhkan test/keputusan tambahan.
+
 ## 2026-08-27 - Retest Migration dan Release Rehearsal
 
 **AI/Aktor:** Codex berbasis GPT-5
