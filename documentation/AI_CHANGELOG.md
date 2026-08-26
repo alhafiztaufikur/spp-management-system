@@ -221,6 +221,22 @@ File ini mencatat perubahan proyek secara reverse chronological. Baca [PROJECT_C
 
 **Catatan tindak lanjut:** Ulangi containment pada HTTPS/virtual host target dan jangan menjadikan smoke lokal sebagai bukti deployment.
 
+## 2026-08-27 - Retest Ketersediaan Browser UAT (Keenam)
+
+**AI/Aktor:** Codex berbasis GPT-5
+
+**Tujuan:** Memeriksa kembali ketersediaan browser resmi untuk menyelesaikan gate UAT/accessibility.
+
+**Perubahan fitur dan perilaku:** Tidak ada perubahan runtime. Setup browser berhasil, tetapi discovery mengembalikan daftar kosong; troubleshooting resmi dibaca sesuai prosedur.
+
+**Database dan migrasi:** Tidak ada; tidak ada tab, cookie, session store, atau database yang disentuh.
+
+**Kompatibilitas dan data lama:** Tidak ada perubahan aplikasi/data.
+
+**Verifikasi:** `agent.browsers.list()` menghasilkan `[]`; tidak ada browser/tab yang dapat dipilih atau sesi UAT yang dibuat.
+
+**Catatan tindak lanjut:** Sediakan browser runtime/in-app browser atau host client. Jangan mengganti bukti UAT dengan HTTP smoke/standalone automation.
+
 ## 2026-08-27 - Probe Time-based SQLi Terfokus
 
 **AI/Aktor:** Codex berbasis GPT-5
