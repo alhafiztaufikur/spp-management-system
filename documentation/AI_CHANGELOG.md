@@ -125,6 +125,22 @@ File ini mencatat perubahan proyek secara reverse chronological. Baca [PROJECT_C
 
 **Catatan tindak lanjut:** Jangan menerbitkan tag produksi sebelum seluruh baris PARSIAL/BELUM DIUJI/PENDING CLIENT memperoleh evidence target atau risk acceptance tertulis.
 
+## 2026-08-27 - Prosedur Rotasi Credential DB pada Runbook
+
+**AI/Aktor:** Codex berbasis GPT-5
+
+**Tujuan:** Menyediakan langkah operasional yang dapat diulang untuk menutup gap `DBSEC-004` tanpa mencatat secret.
+
+**Perubahan fitur dan perilaku:** `OPERATIONS_RUNBOOK.md` menambahkan prosedur dua-person untuk membuat secret berbeda, memperbarui account/config, memeriksa grant/host, menjalankan smoke dan regression, lalu mencabut secret lama.
+
+**Database dan migrasi:** Tidak ada migrasi atau perubahan database; prosedur belum dieksekusi pada target.
+
+**Kompatibilitas dan data lama:** Tidak ada perubahan runtime/data.
+
+**Verifikasi:** Review dokumen memastikan langkah melarang command history/log/repository secret dan mewajibkan probe `SHOW GRANTS`, verifier, serta regression setelah rotasi.
+
+**Catatan tindak lanjut:** Infra/DBA dan pemilik sistem harus menjalankan prosedur pada target client dan mencatat hasil tersanitasi sebelum GO.
+
 ## 2026-08-27 - Probe Time-based SQLi Terfokus
 
 **AI/Aktor:** Codex berbasis GPT-5

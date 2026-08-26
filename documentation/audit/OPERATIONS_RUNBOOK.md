@@ -91,6 +91,18 @@ Target RPO/RTO wajib ditetapkan client sebelum GO; run audit lokal hanya membukt
 - Review akun aktif dan role berkala; catat pembuat, approver, alasan, dan tanggal.
 - Untuk kehilangan akses admin, gunakan prosedur DBA out-of-band yang menghasilkan hash modern; jangan mengaktifkan default credential dari schema/history.
 
+### 6.1 Rotasi credential DB dan pemisahan secret (`DBSEC-004`)
+
+Temuan lokal menunjukkan akun runtime aplikasi dan audit dapat berbagi secret bila provisioning tidak dipisahkan. Pada target, jalankan prosedur berikut melalui dua-person check:
+
+1. Buat dua secret acak berbeda pada secret store; jangan menaruh nilainya di command history, tiket, repository, atau log.
+2. Ubah password account runtime dan account audit secara terpisah menggunakan account DBA/migrasi yang disetujui; pertahankan host scope dan grant least-privilege.
+3. Perbarui `config/app.local.php`/environment service dan credential test secara atomik, lalu restart service terkontrol.
+4. Probe koneksi aplikasi, audit read-only, `SHOW GRANTS`, dan host wildcard; pastikan tidak ada `GRANT OPTION` atau schema wildcard.
+5. Jalankan smoke login, verifier, dan regression pada database disposable. Setelah bukti lulus, cabut secret lama dari secret store dan catat waktu rotasi tanpa nilai secret.
+
+Status saat ini: prosedur siap, tetapi rotasi target belum dijalankan atau diterima client.
+
 ## 7. Closing dan rekonsiliasi harian
 
 1. Kasir menutup input pada cutoff yang disepakati.
