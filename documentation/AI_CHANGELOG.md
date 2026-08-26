@@ -317,6 +317,22 @@ File ini mencatat perubahan proyek secara reverse chronological. Baca [PROJECT_C
 
 **Catatan tindak lanjut:** Jalankan checker lagi pada tag final dan setelah perubahan artefak handover.
 
+## 2026-08-27 - Tambahan Status Checker pada PROGRESS
+
+**AI/Aktor:** Codex berbasis GPT-5
+
+**Tujuan:** Membuat hasil checker handover terlihat pada ringkasan progres utama.
+
+**Perubahan fitur dan perilaku:** `documentation/PROGRESS.md` menambahkan hasil `verify_audit_artifacts.ps1` dan aturan menjalankannya pada setiap tag release.
+
+**Database dan migrasi:** Tidak ada.
+
+**Kompatibilitas dan data lama:** Tidak ada perubahan runtime/data.
+
+**Verifikasi:** Nilai dicocokkan dengan run checker (`22` artefak, `29` route, `25` SQL, `63` PHP, migrasi missing `0`, status PASS); `git diff --check` lulus.
+
+**Catatan tindak lanjut:** Pertahankan checker sebagai gate handover sebelum release final.
+
 ## 2026-08-27 - Probe Time-based SQLi Terfokus
 
 **AI/Aktor:** Codex berbasis GPT-5

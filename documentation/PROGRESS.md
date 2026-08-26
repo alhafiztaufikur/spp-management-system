@@ -254,4 +254,5 @@ Retest berikutnya (`UI-BROWSER-006`) mengulang setup dan discovery resmi; hasil 
 - `audit_event` menyimpan actor sebagai snapshot tanpa FK; trigger menolak update/delete sehingga penghapusan akun tidak mengubah histori.
 - CSRF, rate limit login, session revalidation, request ID, dan redaksi secret sudah diuji pada clone disposable. CSP masih staged (`unsafe-inline`/Google Fonts) dan harus diperlakukan sebagai residual.
 - `DBSEC-004`: pemeriksaan metadata read-only menemukan `spp_app_local` dan `spp_audit_local` berbagi fingerprint credential non-kosong; tidak ada hash/password yang dicatat. Rotasi terpisah melalui secret store target masih wajib.
+- Checker handover `tests/support/verify_audit_artifacts.ps1` lulus (`22` artefak wajib, `29` route, `25` SQL, `63` PHP tracked, seluruh migrasi terdaftar); jalankan ulang pada setiap tag release.
 - Status keseluruhan untuk serah-terima client adalah **NO-GO** sampai browser UAT, PDF/Excel validation pada client target, keputusan koreksi/retensi/RPO-RTO, backup target, dan konfigurasi HTTPS production dibuktikan. Daftar lengkap ada di `documentation/audit/EXECUTIVE_REPORT.md` dan `KNOWN_LIMITATIONS.md`.
