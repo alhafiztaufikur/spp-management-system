@@ -285,6 +285,22 @@ File ini mencatat perubahan proyek secara reverse chronological. Baca [PROJECT_C
 
 **Catatan tindak lanjut:** Jalankan secret scan CI dan DAST Cartesian pada target release/client.
 
+## 2026-08-27 - Checker Kelengkapan Artefak Audit
+
+**AI/Aktor:** Codex berbasis GPT-5
+
+**Tujuan:** Mencegah artefak audit, route, SQL, atau migrasi baru terlewat dari paket handover.
+
+**Perubahan fitur dan perilaku:** Menambahkan `tests/support/verify_audit_artifacts.ps1`, pemeriksaan read-only yang memvalidasi 22 file wajib, 29 route PHP, 25 SQL, 63 PHP tracked, dan seluruh migrasi `add_*.sql` terhadap manifest.
+
+**Database dan migrasi:** Tidak ada; checker tidak membuka atau memutasi database.
+
+**Kompatibilitas dan data lama:** Tidak ada perubahan runtime/data.
+
+**Verifikasi:** Checker menghasilkan `REQUIRED_AUDIT_ARTIFACTS=22`, `MISSING_AUDIT_ARTIFACTS=0`, `ROUTE_FILES=29`, `SQL_FILES=25`, `TRACKED_PHP_FILES=63`, `MIGRATIONS_MISSING_FROM_MANIFEST=0`, `AUDIT_ARTIFACT_CHECK=PASS`.
+
+**Catatan tindak lanjut:** Jalankan checker pada setiap tag release dan setelah perubahan route, migrasi, atau dokumentasi.
+
 ## 2026-08-27 - Probe Time-based SQLi Terfokus
 
 **AI/Aktor:** Codex berbasis GPT-5
