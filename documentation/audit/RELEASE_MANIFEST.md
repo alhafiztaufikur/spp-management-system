@@ -19,6 +19,7 @@ Release harus dipisah menjadi dua artefak yang tidak boleh dicampur:
 
 - Source PHP/CSS/JS dan SQL dari worktree yang telah melalui lint/static checks.
 - Enam test/helper PHP dan satu migrasi SQL yang sebelumnya untracked sudah masuk commit `a91edab`; harness concurrency diperbaiki pada `b983c67`, dan fixture password dibuat acak pada `2c88ab0`. `config/app.local.php` tetap ignored dan dilarang masuk package. Allowlist/checksum masih wajib diregenerasi pada tag release. Bukti lokal terbaru `DEP-PACKAGE-001` menghitung SHA-256 arsip runtime `0A4C35521E5213DEEE34B5F7351B08C09D5DF8951DD3C2EC7BC8A965A4D76C82` dari HEAD `8a213641cea540e64e63b3ef6d8c75adb6a12e06`; hash ini bukan pengganti checksum tag final.
+- Checker handover `tests/support/verify_audit_artifacts.ps1` ditambahkan pada commit `a1d4dbe`; checker ini berada di bundle audit terbatas, bukan paket runtime publik, dan wajib dijalankan sebelum tag final.
 - `sql/schema.sql` untuk instalasi baru saja; upgrade memakai urutan 19 migrasi pada `MIGRATION_MANIFEST.md`.
 - `documentation/` termasuk evidence summary, runbook, UAT, decision log, dan known limitations; diserahkan sebagai bundle terbatas, bukan public package.
 - `documentation/audit/SBOM.md` sebagai inventaris dependency PHP produksi dari lockfile.

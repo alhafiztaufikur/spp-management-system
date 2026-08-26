@@ -301,6 +301,22 @@ File ini mencatat perubahan proyek secara reverse chronological. Baca [PROJECT_C
 
 **Catatan tindak lanjut:** Jalankan checker pada setiap tag release dan setelah perubahan route, migrasi, atau dokumentasi.
 
+## 2026-08-27 - Sinkronisasi Release Manifest dengan Checker Audit
+
+**AI/Aktor:** Codex berbasis GPT-5
+
+**Tujuan:** Memastikan manifest release menyebut tooling kelengkapan handover yang baru ditambahkan.
+
+**Perubahan fitur dan perilaku:** `RELEASE_MANIFEST.md` kini mencatat `verify_audit_artifacts.ps1` (commit `a1d4dbe`) sebagai tooling bundle audit terbatas, bukan runtime publik.
+
+**Database dan migrasi:** Tidak ada.
+
+**Kompatibilitas dan data lama:** Tidak ada perubahan aplikasi/data.
+
+**Verifikasi:** Review silang manifest dengan file aktual dan run `AUDIT_ARTIFACT_CHECK=PASS`; `git diff --check` lulus.
+
+**Catatan tindak lanjut:** Jalankan checker lagi pada tag final dan setelah perubahan artefak handover.
+
 ## 2026-08-27 - Probe Time-based SQLi Terfokus
 
 **AI/Aktor:** Codex berbasis GPT-5
