@@ -205,6 +205,22 @@ File ini mencatat perubahan proyek secara reverse chronological. Baca [PROJECT_C
 
 **Catatan tindak lanjut:** Bukti dependency lokal tetap tidak menggantikan verifikasi host/client target.
 
+## 2026-08-27 - Retest Web Containment Lokal
+
+**AI/Aktor:** Codex berbasis GPT-5
+
+**Tujuan:** Memastikan aturan deny artefak internal tetap aktif setelah pembaruan dokumentasi.
+
+**Perubahan fitur dan perilaku:** Tidak ada perubahan runtime. HTTP smoke read-only memeriksa login dan lima path internal.
+
+**Database dan migrasi:** Tidak ada; database tidak disentuh.
+
+**Kompatibilitas dan data lama:** Login tetap HTTP 200; path internal tetap ditolak.
+
+**Verifikasi:** `login.php` 200; `.git/HEAD`, `sql/schema.sql`, `tests/security_regression_test.php`, `documentation/PROJECT_CONTEXT.md`, dan `config/app.local.php` masing-masing 403.
+
+**Catatan tindak lanjut:** Ulangi containment pada HTTPS/virtual host target dan jangan menjadikan smoke lokal sebagai bukti deployment.
+
 ## 2026-08-27 - Probe Time-based SQLi Terfokus
 
 **AI/Aktor:** Codex berbasis GPT-5
