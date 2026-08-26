@@ -13,6 +13,22 @@ File ini mencatat perubahan proyek secara reverse chronological. Baca [PROJECT_C
 - Jangan menghapus atau menulis ulang entri lama. Tambahkan entri koreksi bila diperlukan.
 - Perubahan implementasi dan entri changelog wajib masuk commit yang sama.
 
+## 2026-08-27 - Regression Disposable Final pada HEAD Terkini
+
+**AI/Aktor:** Codex berbasis GPT-5
+
+**Tujuan:** Memastikan sinkronisasi username pada login dan revalidasi sesi tidak merusak regression suite atau integritas database audit.
+
+**Perubahan fitur dan perilaku:** Tidak ada perubahan runtime pada sesi ini; hanya verifikasi ulang terhadap source yang sudah committed.
+
+**Database dan migrasi:** Clone disposable `db_spp_audit_20260827_033642_suite_4402` dibuat dari snapshot audit, diuji, lalu dihapus. `db_spp` dan snapshot audit tidak dimutasi.
+
+**Kompatibilitas dan data lama:** 18/18 test lulus, termasuk payment/savings, audit append-only, session lifecycle, input corpus, laporan/export, dan legacy guard. Fixture bisnis dibersihkan sebelum clone di-drop.
+
+**Verifikasi:** `REG-FINAL-006` menghasilkan `TEST_COUNT=18`, `FAILURE_COUNT=0`, `REGRESSION_SUITE=PASS`; PHP lint 64 file, Node syntax, Composer checks, route contract, coverage matrix, data verifier 17/17, schema verifier 87/87, dan `git diff --check` juga lulus. Bukti mentah dipurge; ringkasan tersanitasi disimpan di luar repository.
+
+**Catatan tindak lanjut:** DAST penuh, browser/UAT client, failpoint/deadlock, target HTTPS/backup/ACL, serta keputusan owner tetap terbuka sehingga status serah-terima tetap NO-GO.
+
 ## 2026-08-27 - Sinkronisasi Inventaris Test Wave 7
 
 **AI/Aktor:** Codex berbasis GPT-5
