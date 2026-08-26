@@ -57,6 +57,8 @@ Register di atas mempertahankan kondisi baseline 20 Agustus agar histori temuan 
 
 Regression keamanan direct terbaru (`SEC-REG-FINAL-002`) mengulang request ID, header/cookie/HSTS, CSRF, POST-only, revocation, blokir MD5, throttling multi-bucket, guard admin terakhir, dan logout pada snapshot audit setelah sinkronisasi `admin_username` pada login dan revalidasi sesi. Baseline/after identik (`audit_event=0`, fixture legacy=0, rate-limit rows=0, `session_version=1`), dan server uji dihentikan. Ini memperkuat bukti lokal saja; tidak menutup verifikasi TLS/ACL/credential atau UAT pada deployment client.
 
+Koreksi bukti regression umum: `REG-FINAL-005` pada commit `a91edab` mengulang suite disposable lengkap dan lulus 18/18; referensi `REG-FINAL-003`/`004` di bagian historis tetap dipertahankan untuk jejak audit.
+
 ## 3. Temuan terkonfirmasi
 
 ### FULLSEC-001 — Source dan artefak internal terekspos

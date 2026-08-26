@@ -6,13 +6,15 @@ Aturan status: `TERBUKTI`, `PARSIAL`, `BELUM DIUJI`, `PENDING CLIENT`, atau `TID
 
 Dokumen ini adalah pemeriksaan requirement-by-requirement. Status **NO-GO** tetap berlaku bila satu saja gate kritis pada bagian 21 rencana belum terbukti. Bukti lokal tidak dipromosikan menjadi bukti target client.
 
+Koreksi evidence terbaru: pada commit `a91edab`, regression disposable dijalankan ulang sebagai `REG-FINAL-005` dan lulus 18/18 pada clone `db_spp_audit_20260827_031419_suite_1786`; ringkasan tersanitasi disimpan di luar repository. Referensi run sebelumnya tetap dipertahankan sebagai histori.
+
 ## A. Empat belas artefak wajib
 
 | No. | Artefak | File/bukti | Status | Gap tepat |
 |---:|---|---|---|---|
 | 1 | Laporan eksekutif | `EXECUTIVE_REPORT.md` | TERBUKTI | Keputusan GO baru dapat ditulis setelah gate eksternal selesai |
 | 2 | Register temuan | `SECURITY_FINDINGS.md`, `PROGRESS.md`, `AUDIT_EXECUTION_LOG.md` | TERBUKTI | Status baseline dan remediation dipisahkan; retest target masih pending |
-| 3 | Manifest aplikasi | `APPLICATION_MANIFEST.md` (63 PHP terlihat, 25 SQL, 8 asset; 29 route produksi; seluruh artefak saat ini committed pada `dbef925`) | PARSIAL | Commit sudah tercatat, tetapi tag/package allowlist final dan graph pemanggilan fungsi/selector runtime belum memiliki coverage penuh |
+| 3 | Manifest aplikasi | `APPLICATION_MANIFEST.md` (63 PHP terlihat, 25 SQL, 8 asset; 29 route produksi; seluruh artefak saat ini committed pada `a91edab`) | PARSIAL | Commit sudah tercatat, tetapi tag/package allowlist final dan graph pemanggilan fungsi/selector runtime belum memiliki coverage penuh |
 | 4 | Route × role × method | `ROUTE_ROLE_MATRIX.md`, `run_route_role_http_matrix.ps1` | PARSIAL | Direct matrix 168/168 lulus untuk anonymous/invalid/A/B/K dan method/CSRF utama; corpus JSON/text pada endpoint mutasi lulus di `regression-content-type-20260826_183000`, tetapi Cartesian product seluruh method/content-type/parameter/session belum lengkap dan DEC-001 pending |
 | 5 | Kontrak sumber data | `DATA_CONTRACT.md` | TERBUKTI lokal | Keputusan DEC-002/003/008/009 masih membutuhkan owner |
 | 6 | Query rekonsiliasi read-only | `verify_data_integrity.sql`, `run_data_verifier.ps1`, `RECONCILIATION_REPORT.md` | TERBUKTI pada snapshot audit | Target release harus diprobe dan diverifikasi ulang |

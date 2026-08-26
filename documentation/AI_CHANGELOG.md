@@ -13,6 +13,38 @@ File ini mencatat perubahan proyek secara reverse chronological. Baca [PROJECT_C
 - Jangan menghapus atau menulis ulang entri lama. Tambahkan entri koreksi bila diperlukan.
 - Perubahan implementasi dan entri changelog wajib masuk commit yang sama.
 
+## 2026-08-27 - Retest Migration dan Release Rehearsal
+
+**AI/Aktor:** Codex berbasis GPT-5
+
+**Tujuan:** Memverifikasi ulang chain migrasi dan clean-package rehearsal setelah commit audit terbaru.
+
+**Perubahan fitur dan perilaku:** Tidak ada perubahan runtime.
+
+**Database dan migrasi:** `run_migration_matrix.ps1 -AllowEmptyPassword` lulus 19 migrasi pada fresh/pass 1/pass 2 dengan verifier dan fingerprint logis; `run_release_rehearsal.ps1 -AllowEmptyPassword` juga lulus pada database disposable. Tidak ada mutasi pada `db_spp`.
+
+**Kompatibilitas dan data lama:** Tidak ada backfill pada database sumber; database disposable dibersihkan setelah run.
+
+**Verifikasi:** `MIGRATION_MATRIX_STATUS=PASS`, `RELEASE_REHEARSAL=PASS`, schema/data verifier lulus, allowlist package dan deny artefak internal lulus. Hasil dicatat sebagai `DBM-004` dan `DEP-REHEARSAL-009`.
+
+**Catatan tindak lanjut:** Snapshot histori client, HTTPS/ACL target, backup terenkripsi/rollback, PDF/Excel client, UAT, dan sign-off masih terbuka.
+
+## 2026-08-27 - Regression Disposable Pasca-Commit
+
+**AI/Aktor:** Codex berbasis GPT-5
+
+**Tujuan:** Memastikan source pada commit `a91edab` tetap lulus regression setelah sinkronisasi manifest dan dokumentasi.
+
+**Perubahan fitur dan perilaku:** Tidak ada perubahan runtime atau schema.
+
+**Database dan migrasi:** Regression memakai clone disposable; database sumber `db_spp_audit_20260820_090000` tidak dimutasi.
+
+**Kompatibilitas dan data lama:** Tidak ada perubahan.
+
+**Verifikasi:** `run_disposable_regression.ps1 -GenerateTemporaryAdmin` lulus 18/18 (`REG-FINAL-005`); postflight menyisakan hanya snapshot audit, seluruh port audit bebas, dan ringkasan tersanitasi tanpa pola secret/cookie/token.
+
+**Catatan tindak lanjut:** Bukti target client, browser UAT, deployment HTTPS, backup terenkripsi/rollback, dan sign-off tetap terbuka.
+
 ## 2026-08-27 - Rekonsiliasi Referensi Commit dan Evidence Terbaru
 
 **AI/Aktor:** Codex berbasis GPT-5
