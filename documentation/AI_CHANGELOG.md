@@ -13,6 +13,22 @@ File ini mencatat perubahan proyek secara reverse chronological. Baca [PROJECT_C
 - Jangan menghapus atau menulis ulang entri lama. Tambahkan entri koreksi bila diperlukan.
 - Perubahan implementasi dan entri changelog wajib masuk commit yang sama.
 
+## 2026-08-27 - Normalisasi ID Temuan PROGRESS
+
+**AI/Aktor:** Codex berbasis GPT-5
+
+**Tujuan:** Menghilangkan duplikasi ID temuan pada ringkasan progres sesuai aturan audit.
+
+**Perubahan fitur dan perilaku:** Tidak ada perubahan runtime. Dua baris historis yang sebelumnya memakai `PAY-006` dan `PAY-007` kedua kalinya diberi ID unik `PAY-015` dan `PAY-016`.
+
+**Database dan migrasi:** Tidak ada mutasi database atau migrasi.
+
+**Kompatibilitas dan data lama:** Isi temuan dan status tetap sama; hanya identifier yang dinormalisasi.
+
+**Verifikasi:** Parser ID pada `documentation/PROGRESS.md` menemukan 34 ID dan `DUPLICATE_IDS=0`; `git diff --check` lulus.
+
+**Catatan tindak lanjut:** Pertahankan pemeriksaan uniqueness ID setiap pembaruan progres.
+
 ## 2026-08-27 - Benchmark Laporan Berulang
 
 **AI/Aktor:** Codex berbasis GPT-5
