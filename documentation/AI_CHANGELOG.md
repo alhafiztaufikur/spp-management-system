@@ -77,6 +77,22 @@ File ini mencatat perubahan proyek secara reverse chronological. Baca [PROJECT_C
 
 **Catatan tindak lanjut:** Hash harus dibuat ulang pada tag/package final dan diverifikasi bersama document root serta signing client.
 
+## 2026-08-27 - Retest Verifier Snapshot Audit
+
+**AI/Aktor:** Codex berbasis GPT-5
+
+**Tujuan:** Memastikan hardening/test terbaru tidak mengubah integritas schema atau data snapshot audit.
+
+**Perubahan fitur dan perilaku:** Tidak ada perubahan runtime; evidence `DBPOST-005` ditambahkan pada execution log.
+
+**Database dan migrasi:** Verifier dijalankan read-only terhadap `db_spp_audit_20260820_090000`; tidak ada migrasi atau update.
+
+**Kompatibilitas dan data lama:** Tidak ada perubahan data.
+
+**Verifikasi:** Identity probe cocok; data verifier menghasilkan 17/17 invariant PASS dan schema verifier menghasilkan 87 requirement `OK`.
+
+**Catatan tindak lanjut:** Ulangi verifier pada target client setelah backup dan migrasi produksi disetujui.
+
 ## 2026-08-27 - Scan Sink Request dan SQL Statis
 
 **AI/Aktor:** Codex berbasis GPT-5
