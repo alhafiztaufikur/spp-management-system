@@ -253,6 +253,22 @@ File ini mencatat perubahan proyek secara reverse chronological. Baca [PROJECT_C
 
 **Catatan tindak lanjut:** Jalankan UAT penuh hanya setelah runtime browser atau host client tersedia.
 
+## 2026-08-27 - Snapshot Triage Secret Histori Terbaru
+
+**AI/Aktor:** Codex berbasis GPT-5
+
+**Tujuan:** Memastikan penambahan dokumentasi audit tidak memperkenalkan path kandidat secret baru.
+
+**Perubahan fitur dan perilaku:** Tidak ada perubahan runtime. Scanner metadata-only memeriksa 90 commit/511 kandidat pada 12 path; path review tetap sama, dan nilai kandidat tidak dicetak.
+
+**Database dan migrasi:** Tidak ada.
+
+**Kompatibilitas dan data lama:** Tidak ada perubahan aplikasi/data. Kenaikan hit diperlakukan sebagai noise checksum/teks audit sampai triage manual, bukan bukti secret aktif.
+
+**Verifikasi:** `tests/support/scan_git_history_secrets.ps1` selesai tanpa error; output hanya commit/path metadata.
+
+**Catatan tindak lanjut:** Ulangi pada tag final, triage owner, dan rotasi credential historis sebelum deployment.
+
 ## 2026-08-27 - Probe Time-based SQLi Terfokus
 
 **AI/Aktor:** Codex berbasis GPT-5
