@@ -2,7 +2,7 @@
 
 Status: **NO-GO pending client gates**  
 Tanggal dibuat: 27 Agustus 2026  
-Source baseline audit: commit `a446af3fbb89cb0933870443be5aedd85d34eaa3` dengan worktree perubahan audit yang belum menjadi tag release
+Source audit terkini: commit `dbef925` (`Audit dan hardening keamanan SistemSPP`); tag produksi belum dibuat
 
 ## Bentuk artefak release
 
@@ -14,7 +14,7 @@ Release harus dipisah menjadi dua artefak yang tidak boleh dicampur:
 ## Isi handover bundle
 
 - Source PHP/CSS/JS dan SQL dari worktree yang telah melalui lint/static checks.
-- Inventory worktree saat ini mencakup 6 PHP dan 1 migrasi SQL untracked; artefak tersebut belum menjadi commit/tag dan wajib dipastikan masuk atau dikeluarkan melalui allowlist sebelum packaging.
+- Enam test/helper PHP dan satu migrasi SQL yang sebelumnya untracked sudah masuk commit `dbef925`; `config/app.local.php` tetap ignored dan dilarang masuk package. Allowlist/checksum masih wajib diregenerasi pada tag release.
 - `sql/schema.sql` untuk instalasi baru saja; upgrade memakai urutan 19 migrasi pada `MIGRATION_MANIFEST.md`.
 - `documentation/` termasuk evidence summary, runbook, UAT, decision log, dan known limitations; diserahkan sebagai bundle terbatas, bukan public package.
 - `documentation/audit/SBOM.md` sebagai inventaris dependency PHP produksi dari lockfile.
@@ -32,7 +32,7 @@ Paket runtime publik hasil rehearsal mengecualikan `sql/`, `tests/`, `documentat
 - `node --check assets/js/app.js`: PASS.
 - `git diff --check`: PASS; warning line ending Windows bukan error.
 - Migration matrix 19 file, fresh + dua pass: PASS; database dibuat harness telah di-drop.
-- Disposable regression: 18/18 PASS (`REG-FINAL-003`) termasuk session idle/absolute-timeout lifecycle, focused SQLi boolean/error/encoding/duplicate/array/XSS corpus pada 26 route GET termasuk export, array/scalar boundary endpoint tabungan, histori pembayaran, laporan, receipt, export, POST seluruh handler utama dengan CSRF valid, body JSON/text pada endpoint mutasi dengan snapshot count bisnis sebelum/sesudah, pagination dan protected rekap scalar boundary, rollback claim idempotency pada validation failure, formula prefix/control-character oracle, replay/legacy payment guard, isolasi child Daftar Ulang timestamp identik, lifecycle NIS + arsip/restore siswa, focused SQLi filter NIS, snapshot/cap Biaya Lain, pemeriksaan CSRF sebelum pembuatan tahun ajaran, atomisitas ensure tahun saat aksi gagal, validasi scalar alasan audit, dan seluruh target publish Biaya Lain; evidence terbaru `regression-20260827_023858`, clone di-drop setelah evidence.
+- Disposable regression: 18/18 PASS (`REG-FINAL-004`) pada clone `db_spp_audit_20260827_025835_suite_9725`; ringkasan tersanitasi berada di `regression-20260827_025835-current/sanitized-summary.txt`. Run mencakup session idle/absolute-timeout lifecycle, focused SQLi boolean/error/encoding/duplicate/array/XSS corpus pada route GET/export, array/scalar boundary, POST dengan CSRF, body JSON/text, pagination/protected rekap, idempotency rollback/replay, formula/control-character oracle, legacy payment guard, isolasi child DU timestamp identik, lifecycle siswa, snapshot/cap Biaya Lain, pemeriksaan CSRF sebelum pembuatan tahun ajaran, atomisitas ensure tahun, validasi scalar alasan audit, dan seluruh target publish Biaya Lain.
 - Clean deploy rehearsal terbaru: `release-rehearsal-20260827_024610` (`DEP-REHEARSAL-008`) PASS pada schema kosong + 19 migrasi, verifier, privilege runtime, auth smoke, Composer, filesystem allowlist, dan deny artefak internal; target host/HTTPS/PDF/UAT tetap terbuka.
 - Concurrency matrix: 25/25 PASS termasuk withdrawal/replay tabungan, race pembayaran periode SPP, publish DU, publish Biaya Lain, dan last-admin; clone di-drop setelah evidence.
 - Report HTTP smoke: 34/34 PASS; PDF artefak lulus parser/render lokal, dan seluruh 11 `.xls` dibuka read-only pada Excel lokal tanpa formula native; viewer/print/PDF dan Excel client target belum diuji.

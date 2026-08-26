@@ -13,6 +13,22 @@ File ini mencatat perubahan proyek secara reverse chronological. Baca [PROJECT_C
 - Jangan menghapus atau menulis ulang entri lama. Tambahkan entri koreksi bila diperlukan.
 - Perubahan implementasi dan entri changelog wajib masuk commit yang sama.
 
+## 2026-08-27 - Rekonsiliasi Referensi Commit dan Evidence Terbaru
+
+**AI/Aktor:** Codex berbasis GPT-5
+
+**Tujuan:** Menyelaraskan manifest dan ringkasan progres dengan commit audit yang sudah dibuat serta regression disposable terbaru.
+
+**Perubahan fitur dan perilaku:** Tidak ada perubahan runtime. Manifest aplikasi, release manifest, completion audit, executive report, coverage matrix, dan PROGRESS kini menunjuk commit `dbef925` serta `REG-FINAL-004`; status parsial dan gate eksternal tetap dipertahankan.
+
+**Database dan migrasi:** Tidak ada mutasi database atau migrasi.
+
+**Kompatibilitas dan data lama:** Referensi baseline historis tetap dipertahankan dan diberi konteks; tidak ada backfill atau perubahan data aplikasi.
+
+**Verifikasi:** `git status` bersih setelah commit sebelumnya; ringkasan `REG-FINAL-004` ada dan berisi 18 test dengan failure count 0, source database tidak dimutasi, serta port dilepas. Lint/Node/coverage/route checks tetap PASS.
+
+**Catatan tindak lanjut:** Tag release, allowlist/checksum final, UAT browser/client, dan gate deployment tetap belum disetujui.
+
 ## 2026-08-27 - Sinkronisasi Bukti Dokumentasi Audit
 
 **AI/Aktor:** Codex berbasis GPT-5
