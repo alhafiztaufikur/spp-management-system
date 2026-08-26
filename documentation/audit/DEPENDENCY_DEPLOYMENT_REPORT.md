@@ -8,7 +8,7 @@ Baseline pemeriksaan: 20 Agustus 2026, commit sumber `a446af3fbb89cb0933870443be
 | --- | --- | --- |
 | Dependency PHP | Instalasi dari lockfile berhasil; platform requirement dan audit Composer lulus. | Siap retest target |
 | Ekstensi PHP | `mysqli`, `mbstring`, `gd`, `dom`, `fileinfo`, `openssl`, dan `zip` tersedia pada CLI. | Apache belum direload/dibuktikan |
-| Database runtime | User aplikasi least-privilege berhasil dipakai pada schema lokal. | Credential target belum dibuat/dirotasi |
+| Database runtime | User aplikasi least-privilege berhasil dipakai pada schema lokal; `spp_app_local` hanya DML pada `db_spp`, dan grant stale akun audit dibersihkan melalui `DBSEC-002`. | Credential target belum dibuat/dirotasi; inventory grant target belum diverifikasi |
 | Web containment | Deny terhadap source/internal artifact dan header dasar lulus di Apache lokal. | Virtual host/HTTPS target belum diuji |
 | Build reproducible | `composer.lock` tersedia dan `composer install --no-dev --prefer-dist --optimize-autoloader` lulus; clean package rehearsal memprovision schema + 19 migrasi, verifier, login/dashboard smoke, dan deny artifact. | Tag/package final dan host client tetap perlu direhearsal |
 | PDF | Dompdf terpasang; GD aktif pada CLI. | Render lewat Apache dan inspeksi output final belum lulus |

@@ -77,6 +77,22 @@ File ini mencatat perubahan proyek secara reverse chronological. Baca [PROJECT_C
 
 **Catatan tindak lanjut:** Hash harus dibuat ulang pada tag/package final dan diverifikasi bersama document root serta signing client.
 
+## 2026-08-27 - Bersihkan Grant Schema Audit Stale
+
+**AI/Aktor:** Codex berbasis GPT-5
+
+**Tujuan:** Menghapus privilege yang tertinggal pada akun runtime audit agar least-privilege dapat diverifikasi.
+
+**Perubahan fitur dan perilaku:** Grant `spp_audit_local` ke schema disposable lama dicabut secara spesifik; grant aplikasi `spp_app_local` tidak diubah.
+
+**Database dan migrasi:** Tidak ada perubahan tabel/data. Hanya grant akun audit lokal yang disesuaikan; `db_spp` tidak disentuh.
+
+**Kompatibilitas dan data lama:** Runtime aplikasi tidak berubah.
+
+**Verifikasi:** Schema stale tidak ada, revoke berhasil, dan `SHOW GRANTS` akhir membatasi `spp_audit_local` ke `db_spp_audit_20260820_090000`; `spp_app_local` tetap hanya DML pada `db_spp`.
+
+**Catatan tindak lanjut:** Ulangi inventory grant pada host target dan pastikan tidak ada wildcard privilege atau grant option.
+
 ## 2026-08-27 - Konfirmasi Gap Redirect HTTPS Lokal
 
 **AI/Aktor:** Codex berbasis GPT-5
