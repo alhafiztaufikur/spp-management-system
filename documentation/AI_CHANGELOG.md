@@ -77,6 +77,22 @@ File ini mencatat perubahan proyek secara reverse chronological. Baca [PROJECT_C
 
 **Catatan tindak lanjut:** Hash harus dibuat ulang pada tag/package final dan diverifikasi bersama document root serta signing client.
 
+## 2026-08-27 - Scan Sink Request dan SQL Statis
+
+**AI/Aktor:** Codex berbasis GPT-5
+
+**Tujuan:** Menambah bukti static analysis untuk output request langsung, include/path berbasis input, dan interpolasi SQL pada route produksi.
+
+**Perubahan fitur dan perilaku:** Tidak ada perubahan runtime; evidence `STATIC-006` ditambahkan pada execution log.
+
+**Database dan migrasi:** Tidak ada. Pemeriksaan hanya membaca source.
+
+**Kompatibilitas dan data lama:** Tidak ada perubahan aplikasi atau data.
+
+**Verifikasi:** Heuristik source tidak menemukan output langsung dari superglobal request, include/file sink berbasis request, atau SQL yang menggabungkan superglobal secara langsung. Dynamic SQL yang terdeteksi memakai cast/whitelist/placeholder.
+
+**Catatan tindak lanjut:** Hasil ini terfokus dan tidak menggantikan DAST Cartesian, browser sink, atau pengujian renderer pada target.
+
 ## 2026-08-27 - Koreksi Hasil Scanner Secret Historis
 
 **AI/Aktor:** Codex berbasis GPT-5
