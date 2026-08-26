@@ -69,6 +69,8 @@ Bukti lokal terkuat:
 4. Sebelas PDF laporan aplikasi (17 halaman) serta PDF dokumentasi SOP/flow sudah diparse, dirender, dan diperiksa lokal; clean deploy provisioning schema + 19 migrasi juga lulus secara lokal. Viewer/print target, Excel client, PDF HTTP pada paket, dan browser matrix tetap memerlukan lingkungan target.
 5. Performance/load test memerlukan volume dan budget yang disetujui client agar hasil mempunyai acceptance.
 
+Benchmark bounded terbaru (`REP-PERF-002`) menambah 70 sampel read-only dengan p95 1,573–3,094 ms/template; hasil ini tidak menggantikan pengujian volume dan SLA client.
+
 ## E. Putusan completion
 
 Audit belum memenuhi Definition of Done penuh. Status yang benar adalah **NO-GO / goal tetap aktif**, dengan progress lokal terdokumentasi dan database utama `db_spp` tidak dimutasi. Goal hanya boleh ditutup setelah seluruh baris PARSIAL/BELUM DIUJI/PENDING CLIENT yang relevan memperoleh evidence atau risk acceptance yang memenuhi gate bagian 21.

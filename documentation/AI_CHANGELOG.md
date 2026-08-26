@@ -13,6 +13,22 @@ File ini mencatat perubahan proyek secara reverse chronological. Baca [PROJECT_C
 - Jangan menghapus atau menulis ulang entri lama. Tambahkan entri koreksi bila diperlukan.
 - Perubahan implementasi dan entri changelog wajib masuk commit yang sama.
 
+## 2026-08-27 - Benchmark Laporan Berulang
+
+**AI/Aktor:** Codex berbasis GPT-5
+
+**Tujuan:** Menambah bukti latency bounded tanpa menyamarkan keterbatasan ukuran dataset.
+
+**Perubahan fitur dan perilaku:** Tidak ada perubahan runtime.
+
+**Database dan migrasi:** 70 query/report build read-only pada snapshot audit; tidak ada mutasi database.
+
+**Kompatibilitas dan data lama:** Tidak ada perubahan data aplikasi.
+
+**Verifikasi:** 10 pengulangan untuk tujuh template, process failures 0; p95 wall time 1,573–3,094 ms/template dan maksimum 2–4 SELECT. Hasil dicatat sebagai `REP-PERF-002`.
+
+**Catatan tindak lanjut:** Hasil belum merupakan SLA; perlu volume 1×/3×/worst allowed, p99, RAM, rows examined, lock budget, dan persetujuan owner.
+
 ## 2026-08-27 - Retest Containment Apache Lokal
 
 **AI/Aktor:** Codex berbasis GPT-5

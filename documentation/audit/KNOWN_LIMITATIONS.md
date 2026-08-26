@@ -16,6 +16,8 @@ Dokumen ini membedakan fakta yang sudah diuji dari hal yang belum dapat dibuktik
 | Formula injection | Sanitasi helper tersedia, tetapi opening nyata pada spreadsheet client belum dibuktikan untuk semua export | Fixture `=`, `+`, `-`, `@`, tab, CR di semua kolom bebas; inspeksi file | `SECURITY_FINDINGS.md` FULLSEC-014 |
 | Resource/performance | Benchmark bounded lokal sudah mencatat 2–4 SELECT dan 1.987–3.567 ms/report pada tujuh template, tetapi belum ada volume client, p95/p99, rows examined, RAM/lock budget, ukuran export, atau acceptance budget yang disetujui | Data generator anonim worst-case, load/concurrency test, EXPLAIN, rows examined/temp/filesort, response size, dan budget owner | `SECURITY_FINDINGS.md` FULLSEC-016, `AUDIT_EXECUTION_LOG.md:REP-PERF-001` |
 
+Catatan performa terbaru (`REP-PERF-002`): benchmark read-only diulang 10 kali untuk tujuh template (70 sampel), dengan p95 wall time 1,573–3,094 ms per template dan 2–4 SELECT. Angka ini tetap hanya baseline dataset kecil; p99, volume client, rows examined, RAM/lock budget, ukuran export, dan SLA resmi belum tersedia.
+
 ## Batas data legacy
 
 Pembayaran lama dengan `payment_link_version=0`, child tanpa `bayar_id`, operator teks ambigu, dan histori yang tidak punya konteks cukup tidak dicocokkan otomatis. Rekonsiliasi manual harus menghasilkan keputusan, bukti, dan audit reason sebelum perubahan. Tidak ada tombol force-edit yang melewati guard aplikasi.
