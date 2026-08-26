@@ -45,6 +45,22 @@ File ini mencatat perubahan proyek secara reverse chronological. Baca [PROJECT_C
 
 **Catatan tindak lanjut:** Regenerasi checksum/manifest pada tag release final setelah secret store, host HTTPS, dan gate client tersedia.
 
+## 2026-08-27 - Rekonsiliasi Inventory Manifest Route dan SQL
+
+**AI/Aktor:** Codex berbasis GPT-5
+
+**Tujuan:** Memastikan angka dan daftar artefak pada manifest aplikasi mencerminkan filesystem/worktree saat ini.
+
+**Perubahan fitur dan perilaku:** Tidak ada perubahan runtime. `APPLICATION_MANIFEST.md` diselaraskan menjadi 63 PHP tracked, 25 SQL, 8 asset, 29 route produksi, 11 helper include, dan 18 test PHP; pemeriksaan read-only mencocokkan seluruh route dengan filesystem.
+
+**Database dan migrasi:** Tidak ada. Daftar migrasi hanya dibandingkan dengan `MIGRATION_MANIFEST.md`; database tidak disentuh.
+
+**Kompatibilitas dan data lama:** Tidak ada perubahan aplikasi atau data. Baseline historis tetap dipertahankan dan dibedakan dari inventory terkini.
+
+**Verifikasi:** Enumerasi filesystem menghasilkan `ROUTE_FILES=29`, `SQL_FILES=25`, `INCLUDE_PHP=11`, `TEST_PHP=18`, dan `git ls-files '*.php'=63`; seluruh tautan relatif dokumentasi diperiksa tanpa broken link.
+
+**Catatan tindak lanjut:** Regenerasi inventory/checksum sekali lagi pada tag release final dan setelah perubahan arsitektur.
+
 ## 2026-08-27 - Probe Time-based SQLi Terfokus
 
 **AI/Aktor:** Codex berbasis GPT-5
