@@ -77,6 +77,22 @@ File ini mencatat perubahan proyek secara reverse chronological. Baca [PROJECT_C
 
 **Catatan tindak lanjut:** Hash harus dibuat ulang pada tag/package final dan diverifikasi bersama document root serta signing client.
 
+## 2026-08-27 - Inventory Akun MySQL Pasca-Audit
+
+**AI/Aktor:** Codex berbasis GPT-5
+
+**Tujuan:** Memastikan cleanup rehearsal tidak meninggalkan akun MySQL fixture atau akun sementara.
+
+**Perubahan fitur dan perilaku:** Tidak ada perubahan runtime; evidence `DBSEC-003` ditambahkan pada execution log.
+
+**Database dan migrasi:** Query metadata `mysql.user` bersifat read-only; tidak ada data/schema aplikasi yang diubah.
+
+**Kompatibilitas dan data lama:** Tidak ada perubahan aplikasi.
+
+**Verifikasi:** Hanya `spp_audit_local` yang muncul dari namespace audit/test; tidak ada akun `release_runner_*`, `legacy_audit_*`, atau `session_*` tertinggal.
+
+**Catatan tindak lanjut:** Ulangi inventory akun pada host client sebelum dan sesudah rehearsal deployment.
+
 ## 2026-08-27 - Bersihkan Grant Schema Audit Stale
 
 **AI/Aktor:** Codex berbasis GPT-5
