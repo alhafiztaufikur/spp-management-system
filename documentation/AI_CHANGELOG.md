@@ -93,6 +93,22 @@ File ini mencatat perubahan proyek secara reverse chronological. Baca [PROJECT_C
 
 **Catatan tindak lanjut:** Jalankan kembali pada tag final, review kandidat dengan owner, dan rotasi seluruh credential yang pernah aktif sebelum deployment.
 
+## 2026-08-27 - Retest Verifier Integritas Snapshot Audit
+
+**AI/Aktor:** Codex berbasis GPT-5
+
+**Tujuan:** Memastikan pembaruan dokumentasi tidak diikuti perubahan tak sengaja pada snapshot audit.
+
+**Perubahan fitur dan perilaku:** Tidak ada perubahan runtime atau source.
+
+**Database dan migrasi:** Tidak ada migrasi. `run_data_verifier.ps1` dijalankan read-only pada `db_spp_audit_20260820_090000` dengan flag eksplisit untuk instance lokal tanpa password.
+
+**Kompatibilitas dan data lama:** Tidak ada perubahan data, saldo, jurnal, pembayaran, atau histori legacy.
+
+**Verifikasi:** Probe database eksplisit, `INVARIANT_ROWS=17`, `INVARIANT_FAIL=0`, dan `DATA_INTEGRITY=PASS`.
+
+**Catatan tindak lanjut:** Jalankan ulang verifier dengan credential target non-kosong setelah backup/migrasi deployment disetujui.
+
 ## 2026-08-27 - Probe Time-based SQLi Terfokus
 
 **AI/Aktor:** Codex berbasis GPT-5
