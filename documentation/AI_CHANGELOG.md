@@ -77,6 +77,22 @@ File ini mencatat perubahan proyek secara reverse chronological. Baca [PROJECT_C
 
 **Catatan tindak lanjut:** Hash harus dibuat ulang pada tag/package final dan diverifikasi bersama document root serta signing client.
 
+## 2026-08-27 - Koreksi Hasil Scanner Secret Historis
+
+**AI/Aktor:** Codex berbasis GPT-5
+
+**Tujuan:** Memastikan hasil scanner secret terbaru mencakup commit hardening password fixture yang baru dibuat.
+
+**Perubahan fitur dan perilaku:** Tidak ada perubahan runtime; evidence `SECRET-004` ditambahkan pada execution log.
+
+**Database dan migrasi:** Tidak ada. Scanner bersifat metadata-only dan read-only.
+
+**Kompatibilitas dan data lama:** Tidak ada perubahan aplikasi atau data.
+
+**Verifikasi:** Scanner pada HEAD `2c88ab0` memeriksa 67 commit dan 304 kandidat revisi pada 12 path review; output tidak mencetak nilai credential dan tidak menemukan path baru di luar daftar triage.
+
+**Catatan tindak lanjut:** Kandidat historis/default tetap harus ditriase dan credential target dirotasi sebelum deployment.
+
 ## 2026-08-27 - Hilangkan Password Fixture Statis pada Test
 
 **AI/Aktor:** Codex berbasis GPT-5
