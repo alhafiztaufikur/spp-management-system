@@ -61,6 +61,22 @@ File ini mencatat perubahan proyek secara reverse chronological. Baca [PROJECT_C
 
 **Catatan tindak lanjut:** Regenerasi inventory/checksum sekali lagi pada tag release final dan setelah perubahan arsitektur.
 
+## 2026-08-27 - Retest Static dan Coverage Gate
+
+**AI/Aktor:** Codex berbasis GPT-5
+
+**Tujuan:** Mengulang pemeriksaan sintaks, kontrak keamanan route, dan pemetaan test setelah sinkronisasi dokumentasi audit.
+
+**Perubahan fitur dan perilaku:** Tidak ada perubahan runtime atau source.
+
+**Database dan migrasi:** Tidak ada; semua pemeriksaan bersifat read-only.
+
+**Kompatibilitas dan data lama:** Tidak ada perubahan aplikasi maupun data.
+
+**Verifikasi:** Lint 64 file PHP PASS, `node --check assets/js/app.js` PASS, route contract `29/29` PASS, coverage `40/40` terpetakan (13 PASS, 0 FAIL, 22 NOT TESTED, 5 PENDING DECISION), dan `git diff --check` PASS.
+
+**Catatan tindak lanjut:** Coverage parsial dan gate target client tetap tidak boleh dipromosikan menjadi status GO; ulangi pada tag release dan environment target.
+
 ## 2026-08-27 - Probe Time-based SQLi Terfokus
 
 **AI/Aktor:** Codex berbasis GPT-5
