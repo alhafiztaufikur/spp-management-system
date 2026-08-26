@@ -29,6 +29,22 @@ File ini mencatat perubahan proyek secara reverse chronological. Baca [PROJECT_C
 
 **Catatan tindak lanjut:** Probe ini tetap terfokus dan tidak menggantikan DAST Cartesian penuh, mutating-route/failpoint, browser sink, atau validasi target client.
 
+## 2026-08-27 - Validasi Tautan Dokumentasi Audit
+
+**AI/Aktor:** Codex berbasis GPT-5
+
+**Tujuan:** Memastikan paket dokumentasi audit tidak memiliki tautan relatif yang rusak setelah rangkaian pembaruan evidence.
+
+**Perubahan fitur dan perilaku:** Tidak ada perubahan runtime; hanya menambahkan catatan evidence `DOC-LINK-001` pada execution log.
+
+**Database dan migrasi:** Tidak ada. Pemeriksaan bersifat read-only dan tidak menyentuh `db_spp` maupun snapshot audit.
+
+**Kompatibilitas dan data lama:** Tidak ada perubahan perilaku aplikasi atau data.
+
+**Verifikasi:** 28 file Markdown di bawah `documentation/` diperiksa; seluruh tautan relatif valid (`BROKEN_RELATIVE_LINKS=0`) dan 14 artefak audit wajib ditemukan.
+
+**Catatan tindak lanjut:** Pemeriksaan tautan tidak menggantikan review isi, approval client, atau validasi target deployment.
+
 ## 2026-08-27 - Regression Disposable Final pada HEAD Terkini
 
 **AI/Aktor:** Codex berbasis GPT-5
