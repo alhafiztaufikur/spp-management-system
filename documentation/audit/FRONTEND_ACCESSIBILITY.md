@@ -2,7 +2,7 @@
 
 > Snapshot read-only: 20 Agustus 2026 WIB  
 > Commit sumber: `a446af3fbb89cb0933870443be5aedd85d34eaa3`  
-> Status: baseline statis Wave 6; remediation FE-001/007/008/013 dan semantics dasar modal dilakukan pada source. Smoke browser lokal terbatas untuk login dan enam halaman read-only (viewport 390px/1440px, keyboard dasar, dan toggle tema) lulus pada 27 Agustus 2026 (`UI-BROWSER-001`/`UI-BROWSER-002`). Browser skill runtime resmi tetap terblokir karena discovery mengembalikan daftar browser kosong; pengujian seluruh route, accessibility tree, dan runtime coverage belum dijalankan.
+> Status: baseline statis Wave 6; remediation FE-001/007/008/013 dan semantics dasar modal dilakukan pada source. Smoke browser lokal terbatas untuk login dan enam halaman read-only (viewport 390px/1440px, keyboard dasar, dan toggle tema) lulus pada 27 Agustus 2026 (`UI-BROWSER-001`/`UI-BROWSER-002`). Retest discovery Browser resmi (`UI-BROWSER-005`) kembali mengembalikan daftar browser kosong; pengujian seluruh route, accessibility tree, dan runtime coverage belum dijalankan.
 
 ## 1. Tujuan dan batas audit
 

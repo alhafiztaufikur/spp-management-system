@@ -45,6 +45,22 @@ File ini mencatat perubahan proyek secara reverse chronological. Baca [PROJECT_C
 
 **Catatan tindak lanjut:** Pemeriksaan tautan tidak menggantikan review isi, approval client, atau validasi target deployment.
 
+## 2026-08-27 - Retest Ketersediaan Browser UAT
+
+**AI/Aktor:** Codex berbasis GPT-5
+
+**Tujuan:** Memverifikasi ulang apakah runtime Browser resmi tersedia untuk memenuhi gate UAT frontend/accessibility.
+
+**Perubahan fitur dan perilaku:** Tidak ada perubahan runtime; hanya menambahkan evidence `UI-BROWSER-005` pada execution log.
+
+**Database dan migrasi:** Tidak ada. Discovery browser bersifat read-only dan tidak mengakses cookie, session store, atau database.
+
+**Kompatibilitas dan data lama:** Tidak ada perubahan aplikasi atau data.
+
+**Verifikasi:** Discovery resmi mengembalikan daftar browser kosong (`[]`), sehingga tidak ada sesi UAT interaktif yang dapat dijalankan.
+
+**Catatan tindak lanjut:** Gate browser/accessibility, screenshot regression, dan seluruh route/role/state tetap pending sampai runtime resmi atau host client tersedia.
+
 ## 2026-08-27 - Regression Disposable Final pada HEAD Terkini
 
 **AI/Aktor:** Codex berbasis GPT-5
