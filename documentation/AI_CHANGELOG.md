@@ -173,6 +173,22 @@ File ini mencatat perubahan proyek secara reverse chronological. Baca [PROJECT_C
 
 **Catatan tindak lanjut:** Ulangi postflight pada tag final dan host client; status NO-GO tetap sampai gate eksternal selesai.
 
+## 2026-08-27 - Retest Dependency Composer
+
+**AI/Aktor:** Codex berbasis GPT-5
+
+**Tujuan:** Memastikan dependency lock dan platform requirement tetap valid pada worktree saat ini.
+
+**Perubahan fitur dan perilaku:** Tidak ada perubahan runtime atau dependency.
+
+**Database dan migrasi:** Tidak ada; database tidak disentuh.
+
+**Kompatibilitas dan data lama:** Tidak ada perubahan aplikasi/data.
+
+**Verifikasi:** `composer validate --strict` PASS, `composer audit --locked --no-dev` melaporkan 0 advisory, dan `composer check-platform-reqs --no-dev` PASS (PHP 8.3.31; dom/gd/iconv/mbstring tersedia).
+
+**Catatan tindak lanjut:** Ulangi pada tag/package final dan Apache target; hasil lokal tidak menggantikan verifikasi platform client.
+
 ## 2026-08-27 - Probe Time-based SQLi Terfokus
 
 **AI/Aktor:** Codex berbasis GPT-5
