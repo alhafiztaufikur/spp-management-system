@@ -77,6 +77,22 @@ File ini mencatat perubahan proyek secara reverse chronological. Baca [PROJECT_C
 
 **Catatan tindak lanjut:** Coverage parsial dan gate target client tetap tidak boleh dipromosikan menjadi status GO; ulangi pada tag release dan environment target.
 
+## 2026-08-27 - Retest Scanner Secret Histori Git
+
+**AI/Aktor:** Codex berbasis GPT-5
+
+**Tujuan:** Memeriksa ulang histori Git setelah penambahan catatan audit, dengan output metadata saja.
+
+**Perubahan fitur dan perilaku:** Tidak ada perubahan runtime. Scanner membaca 79 commit dan 412 kandidat revisi pada 12 path; nilai kandidat sengaja tidak pernah dicetak. Konfigurasi contoh saat ini hanya memakai placeholder secret.
+
+**Database dan migrasi:** Tidak ada; pemeriksaan tidak menyentuh database.
+
+**Kompatibilitas dan data lama:** Tidak ada perubahan aplikasi. Kandidat historis tetap memerlukan triage dan rotasi out-of-band.
+
+**Verifikasi:** `tests/support/scan_git_history_secrets.ps1` selesai tanpa error dan hanya mengeluarkan metadata path; `git diff --check` tetap lulus.
+
+**Catatan tindak lanjut:** Jalankan kembali pada tag final, review kandidat dengan owner, dan rotasi seluruh credential yang pernah aktif sebelum deployment.
+
 ## 2026-08-27 - Probe Time-based SQLi Terfokus
 
 **AI/Aktor:** Codex berbasis GPT-5
