@@ -13,6 +13,22 @@ File ini mencatat perubahan proyek secara reverse chronological. Baca [PROJECT_C
 - Jangan menghapus atau menulis ulang entri lama. Tambahkan entri koreksi bila diperlukan.
 - Perubahan implementasi dan entri changelog wajib masuk commit yang sama.
 
+## 2026-08-27 - Konfirmasi Credential Database Berbagi Secret
+
+**AI/Aktor:** Codex berbasis GPT-5
+
+**Tujuan:** Memverifikasi apakah akun database runtime lokal memakai credential yang terpisah sebelum deployment.
+
+**Perubahan fitur dan perilaku:** Tidak ada perubahan runtime atau source. Pemeriksaan read-only terhadap metadata `mysql.user` menemukan `spp_app_local` dan `spp_audit_local` memiliki fingerprint credential non-kosong yang identik; nilai credential sengaja tidak dicetak.
+
+**Database dan migrasi:** Tidak ada migrasi, DDL, perubahan grant, atau mutasi data.
+
+**Kompatibilitas dan data lama:** Tidak ada perubahan perilaku aplikasi. Temuan dicatat sebagai gap deployment `DBSEC-004`; target wajib memakai secret acak yang berbeda untuk akun aplikasi dan akun audit.
+
+**Verifikasi:** Query fingerprint boolean pada `mysql.user` menghasilkan `SAME_NONEMPTY`; tidak ada hash/password, cookie, atau token yang masuk log/repository.
+
+**Catatan tindak lanjut:** Rotasi kedua credential secara terkoordinasi melalui secret store target, perbarui konfigurasi, lalu ulangi inventory grant dan regression. Ini tetap di luar scope perubahan kode saat ini.
+
 ## 2026-08-27 - Probe Time-based SQLi Terfokus
 
 **AI/Aktor:** Codex berbasis GPT-5
