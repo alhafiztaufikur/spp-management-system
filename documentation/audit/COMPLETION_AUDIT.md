@@ -10,6 +10,8 @@ Koreksi evidence terbaru: regression disposable diulang sebagai `REG-FINAL-009` 
 
 Retest containment Apache lokal `WEB-CONTAINMENT-002` juga lulus: route publik login 200, artefak internal/tests 403, dan security headers aktif. Ini belum membuktikan virtual host HTTPS target.
 
+Pemeriksaan lanjutan 27 Agustus mencocokkan inventory filesystem dengan manifest (29 route produksi, 25 SQL, 11 helper include, 18 test PHP), mengulang lint/route contract/coverage, dan memverifikasi snapshot data. Credential fingerprint lokal `DBSEC-004` tetap sama antara akun aplikasi dan audit; rotasi target belum dilakukan sehingga gate deployment tetap terbuka.
+
 ## A. Empat belas artefak wajib
 
 | No. | Artefak | File/bukti | Status | Gap tepat |
@@ -42,7 +44,7 @@ Retest containment Apache lokal `WEB-CONTAINMENT-002` juga lulus: route publik l
 | 7 | Seluruh halaman melewati UX/a11y/browser | `UI-BROWSER-001/002` membuktikan login dan enam halaman read-only pada mobile/desktop, keyboard/tema secara terbatas; browser runtime resmi untuk UAT penuh tetap tidak tersedia | PARSIAL |
 | 8 | Semua kandidat dead code diputuskan | Kandidat diklasifikasikan konservatif; keputusan owner/runtime coverage belum ada | PENDING CLIENT |
 | 9 | Dokumen operasional/client-facing sinkron | Markdown/HTML diselaraskan; SOP 12 halaman dan flowchart 4 halaman diekspor ulang, text-contract PASS, dan seluruh halaman diperiksa melalui contact sheet | TERBUKTI lokal |
-| 10 | Backup/restore, clean deploy, rollback, UAT, sign-off selesai | Restore drill lokal terbaru: 22 tabel row-count cocok, schema/data verifier PASS; release rehearsal lokal juga memprovision schema + 19 migrasi dan login/dashboard smoke lulus. Evidence root lokal kini memiliki ACL terbatas (`OPS-003`). Target deploy terenkripsi, rollback, UAT, RPO/RTO, dan sign-off belum | PARSIAL |
+| 10 | Backup/restore, clean deploy, rollback, UAT, sign-off selesai | Restore drill lokal terbaru: 22 tabel row-count cocok, schema/data verifier PASS; release rehearsal lokal juga memprovision schema + 19 migrasi dan login/dashboard smoke lulus. Evidence root lokal kini memiliki ACL terbatas (`OPS-003`). Target deploy terenkripsi, credential terpisah (`DBSEC-004`), rollback, UAT, RPO/RTO, dan sign-off belum | PARSIAL |
 | 11 | Tidak ada Critical/High tanpa perlakuan gate | Remediation lokal tersedia, tetapi High target/browser/DAST/deployment belum diterima/ditutup | PARSIAL / NO-GO |
 | 12 | Completion audit tidak menemukan scope/test/bukti/keputusan hilang | Dokumen ini masih menemukan gap eksplisit | BELUM TERCAPAI |
 
@@ -60,6 +62,7 @@ Bukti lokal terkuat:
 - route-role HTTP matrix: 168/168 PASS; 19 tabel domain count/checksum identik sebelum clone di-drop;
 - concurrency matrix: 25/25 PASS untuk withdrawal/replay tabungan, payment periode SPP yang sama, publish DU, publish Biaya Lain, dan delete last-admin melalui dua server + row-lock barrier;
 - source lint 64 file, Node syntax, coverage-matrix checker, link checker, dan diff check PASS.
+- inventory read-only mencocokkan 29 route filesystem dengan manifest, 25 file SQL, dan 18 test PHP; scanner histori metadata-only memeriksa 79 commit/412 kandidat tanpa mencetak nilai secret.
 
 ## D. Pekerjaan lokal yang masih dapat ditambahkan
 
