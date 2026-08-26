@@ -269,6 +269,22 @@ File ini mencatat perubahan proyek secara reverse chronological. Baca [PROJECT_C
 
 **Catatan tindak lanjut:** Ulangi pada tag final, triage owner, dan rotasi credential historis sebelum deployment.
 
+## 2026-08-27 - Static Source Credential dan SQL Sink Scan
+
+**AI/Aktor:** Codex berbasis GPT-5
+
+**Tujuan:** Mencari indikasi baru default credential/MD5 runtime atau query yang menggabungkan request superglobal secara langsung.
+
+**Perubahan fitur dan perilaku:** Tidak ada perubahan runtime. Scan source mengecualikan dokumentasi dan vendor; hasil hanya kontrol yang diharapkan dan tidak ada sink query langsung.
+
+**Database dan migrasi:** Tidak ada.
+
+**Kompatibilitas dan data lama:** Tidak ada perubahan aplikasi/data.
+
+**Verifikasi:** `rg` source scan selesai tanpa temuan baru; placeholder config, hashing modern, marker MD5 legacy, dan fixture test acak diklasifikasikan sebagai expected. Heuristik dicatat sebagai bukti terfokus, bukan DAST penuh.
+
+**Catatan tindak lanjut:** Jalankan secret scan CI dan DAST Cartesian pada target release/client.
+
 ## 2026-08-27 - Probe Time-based SQLi Terfokus
 
 **AI/Aktor:** Codex berbasis GPT-5
