@@ -12,6 +12,8 @@ Retest containment Apache lokal `WEB-CONTAINMENT-002` juga lulus: route publik l
 
 Pemeriksaan lanjutan 27 Agustus mencocokkan inventory filesystem dengan manifest (29 route produksi, 25 SQL, 11 helper include, 18 test PHP), mengulang lint/route contract/coverage, dan memverifikasi snapshot data. Credential fingerprint lokal `DBSEC-004` tetap sama antara akun aplikasi dan audit; rotasi target belum dilakukan sehingga gate deployment tetap terbuka.
 
+Dependency gate juga diretest sebagai `DEP-RECHECK-001`: Composer manifest valid, advisory produksi 0, dan platform requirement lokal lulus. Postflight `POSTFLIGHT-002` memastikan port audit tidak listening, tidak ada database suite disposable, serta worktree bersih.
+
 ## A. Empat belas artefak wajib
 
 | No. | Artefak | File/bukti | Status | Gap tepat |

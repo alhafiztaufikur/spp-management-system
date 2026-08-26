@@ -41,6 +41,7 @@ Pemeriksaan metadata MySQL lokal (`DBSEC-004`) menemukan akun `spp_app_local` da
 | Clean deploy rehearsal | PASS lokal pada `release-rehearsal-20260827_024610`: package bersih, schema + 19 migrasi, verifier, grant runtime disposable, login/dashboard smoke, filesystem allowlist, HTTP deny, dan Composer checks; target HTTPS/Apache/PDF/client tetap terbuka |
 | Browser smoke lokal | `UI-BROWSER-001`: Playwright + Chrome headless viewport 390x844, `scrollWidth=390`, keyboard Tab, dark→light tanpa overflow; screenshot tersanitasi di luar repo |
 | Static checks | PHP lint 64 file, Node check, `git diff --check` PASS |
+| Dependency retest | `composer validate --strict`, `composer audit --locked --no-dev` (0 advisory), dan `composer check-platform-reqs --no-dev` PASS pada PHP 8.3.31; bukti `DEP-RECHECK-001` |
 
 ## Gate sebelum GO
 
