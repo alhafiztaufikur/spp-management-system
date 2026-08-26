@@ -229,7 +229,7 @@ Checklist bukti Wave 5:
 | PHP lint file report/test | PASS |
 | `git diff --check` file report/test | PASS |
 | Oracle transaksi/rollback | PASS; tujuh template, snapshot/claim, cicilan, boundary tanggal, filter, ordering, tabungan, setoran, limit, formula export, dan default filter; seluruh probe fixture sesudah rollback = 0. `REP-FORMULA-001` menambah coverage prefix `=`, `+`, `-`, `@`, whitespace Unicode, CR/LF/tab, dan NUL pada helper spreadsheet |
-| Seluruh regression runner | TERBATAS namun final tercatat; run lintas wave sempat 10/11 karena assertion placeholder kelas yang stale, assertion diperbaiki, dan disposable runner terbaru `regression-20260827_035115-time-sqli-final` (`REG-FINAL-008`) lulus 18/18; run sebelumnya dipertahankan sebagai histori |
+| Seluruh regression runner | TERBATAS namun final tercatat; run lintas wave sempat 10/11 karena assertion placeholder kelas yang stale, assertion diperbaiki, dan disposable runner terbaru `regression-20260827_040945` (`REG-FINAL-009`) lulus 18/18; run sebelumnya dipertahankan sebagai histori |
 | HTTP role/format | PASS terbatas untuk admin: 34/34 pemeriksaan utama web/print/Excel/PDF/struk/empty redirect/logout; 68 request pada log, 0 respons 500/fatal. Belum merupakan matriks role lengkap |
 | PDF binary dapat dibuka | PASS pada 11 artefak tersimpan; parser membuka seluruh file dan menghitung 17 halaman; general batch mempunyai 4 halaman |
 | PDF render seluruh halaman | PASS terbatas artefak; PyMuPDF merender 17/17 halaman ke PNG dan contact sheet kecil diinspeksi tanpa halaman kosong, clipping, atau overlap yang terlihat |

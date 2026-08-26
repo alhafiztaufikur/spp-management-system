@@ -89,7 +89,7 @@ function session_lifecycle_age(string $sessionId, string $field, int $secondsAgo
 }
 
 $baseUrl = rtrim((string)getenv('SPP_TEST_BASE_URL'), '/');
-$auditPassword = 'Lifecycle-Audit-2026!';
+$auditPassword = 'Lifecycle-' . bin2hex(random_bytes(16)) . '-Aa9!';
 $firstUsername = 'session_audit_' . bin2hex(random_bytes(5));
 $secondUsername = 'session_timeout_' . bin2hex(random_bytes(5));
 $thirdUsername = 'session_absolute_' . bin2hex(random_bytes(5));

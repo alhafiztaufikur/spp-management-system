@@ -99,7 +99,7 @@ $auditId = (int)$auditAccount['id'];
 $originalSessionVersion = (int)$auditAccount['session_version'];
 
 $legacyUsername = 'legacy_audit_' . bin2hex(random_bytes(5));
-$legacyPassword = 'LegacyAudit-Only-2026!';
+$legacyPassword = 'Legacy-' . bin2hex(random_bytes(16)) . '-Aa9!';
 $legacyHash = md5($legacyPassword);
 $legacyId = 0;
 $ratePrefix = 'rate_audit_' . bin2hex(random_bytes(5));

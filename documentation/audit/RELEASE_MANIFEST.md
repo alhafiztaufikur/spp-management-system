@@ -4,7 +4,7 @@ Status: **NO-GO pending client gates**
 Tanggal dibuat: 27 Agustus 2026  
 Source audit terkini: commit `b983c67` (`Perbaiki harness concurrency dan catat retest`); tag produksi belum dibuat
 
-Catatan evidence: regression terakhir berjalan pada HEAD saat ini dan lulus 18/18 (`REG-FINAL-008`) setelah koreksi field probe time-based SQLi; concurrency retest lulus 25/25 (`CONC-004`).
+Catatan evidence: regression terakhir berjalan pada HEAD saat ini dan lulus 18/18 (`REG-FINAL-009`) setelah password fixture test dibuat acak; concurrency retest lulus 25/25 (`CONC-004`).
 
 Containment Apache lokal diretest sebagai `WEB-CONTAINMENT-002` (login 200; `.git`, SQL, tests, documentation, includes, config, dotfiles, dan bootstrap 403); HTTPS/HSTS client tetap pending.
 
@@ -36,7 +36,7 @@ Paket runtime publik hasil rehearsal mengecualikan `sql/`, `tests/`, `documentat
 - `node --check assets/js/app.js`: PASS.
 - `git diff --check`: PASS; warning line ending Windows bukan error.
 - Migration matrix 19 file, fresh + dua pass: PASS; database dibuat harness telah di-drop.
-- Disposable regression: 18/18 PASS (`REG-FINAL-008`) pada clone `db_spp_audit_20260827_035115_suite_5476`; ringkasan tersanitasi berada di `regression-20260827_035115-time-sqli-final/sanitized-summary.txt`. Run mencakup session idle/absolute-timeout lifecycle, focused SQLi boolean/error/encoding/time-based/duplicate/array/XSS corpus pada route GET/export, array/scalar boundary, POST dengan CSRF, body JSON/text, pagination/protected rekap, idempotency rollback/replay, formula/control-character oracle, legacy payment guard, isolasi child DU timestamp identik, lifecycle siswa, snapshot/cap Biaya Lain, pemeriksaan CSRF sebelum pembuatan tahun ajaran, atomisitas ensure tahun, validasi scalar alasan audit, dan seluruh target publish Biaya Lain.
+- Disposable regression: 18/18 PASS (`REG-FINAL-009`) pada clone `db_spp_audit_20260827_040945_suite_5871`; ringkasan tersanitasi berada di `regression-20260827_040945/sanitized-summary.txt`. Run mencakup session idle/absolute-timeout lifecycle, focused SQLi boolean/error/encoding/time-based/duplicate/array/XSS corpus pada route GET/export, array/scalar boundary, POST dengan CSRF, body JSON/text, pagination/protected rekap, idempotency rollback/replay, formula/control-character oracle, legacy payment guard, isolasi child DU timestamp identik, lifecycle siswa, snapshot/cap Biaya Lain, pemeriksaan CSRF sebelum pembuatan tahun ajaran, atomisitas ensure tahun, validasi scalar alasan audit, dan seluruh target publish Biaya Lain.
 - Clean deploy rehearsal terbaru: `release-rehearsal-20260827_024610` (`DEP-REHEARSAL-008`) PASS pada schema kosong + 19 migrasi, verifier, privilege runtime, auth smoke, Composer, filesystem allowlist, dan deny artefak internal; target host/HTTPS/PDF/UAT tetap terbuka.
 - Concurrency matrix: 25/25 PASS termasuk withdrawal/replay tabungan, race pembayaran periode SPP, publish DU, publish Biaya Lain, dan last-admin; clone di-drop setelah evidence.
 - Report HTTP smoke: 34/34 PASS; PDF artefak lulus parser/render lokal, dan seluruh 11 `.xls` dibuka read-only pada Excel lokal tanpa formula native; viewer/print/PDF dan Excel client target belum diuji.

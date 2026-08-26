@@ -77,6 +77,22 @@ File ini mencatat perubahan proyek secara reverse chronological. Baca [PROJECT_C
 
 **Catatan tindak lanjut:** Hash harus dibuat ulang pada tag/package final dan diverifikasi bersama document root serta signing client.
 
+## 2026-08-27 - Hilangkan Password Fixture Statis pada Test
+
+**AI/Aktor:** Codex berbasis GPT-5
+
+**Tujuan:** Menghapus kredensial fixture tetap dari source test agar test disposable tidak menyimpan password yang dapat digunakan ulang.
+
+**Perubahan fitur dan perilaku:** `tests/session_lifecycle_test.php` dan `tests/security_regression_test.php` kini menghasilkan password fixture acak dengan `random_bytes` setiap run; alur assertion tidak berubah.
+
+**Database dan migrasi:** Tidak ada migrasi. Regression berjalan pada clone disposable dan database utama tidak disentuh.
+
+**Kompatibilitas dan data lama:** Tidak ada perubahan aplikasi produksi; hash MD5 pada test keamanan tetap hanya fixture legacy sintetis untuk menguji guard.
+
+**Verifikasi:** PHP lint kedua file lulus; `REG-FINAL-009` menjalankan 18/18 test dengan `FAILURE_COUNT=0`, clone/server dibersihkan. Scanner metadata-only memeriksa 66 commit dan 295 kandidat tanpa mencetak nilai password.
+
+**Catatan tindak lanjut:** Kandidat credential historis/default yang terdeteksi scanner tetap memerlukan triage dan rotasi oleh owner/infra sebelum deployment.
+
 ## 2026-08-27 - Retest PDF Dokumentasi Operasional
 
 **AI/Aktor:** Codex berbasis GPT-5
