@@ -61,6 +61,22 @@ File ini mencatat perubahan proyek secara reverse chronological. Baca [PROJECT_C
 
 **Catatan tindak lanjut:** Gate browser/accessibility, screenshot regression, dan seluruh route/role/state tetap pending sampai runtime resmi atau host client tersedia.
 
+## 2026-08-27 - Hash Paket Runtime Lokal
+
+**AI/Aktor:** Codex berbasis GPT-5
+
+**Tujuan:** Menambah bukti checksum dan exclusion artefak internal untuk paket runtime pada release rehearsal lokal.
+
+**Perubahan fitur dan perilaku:** Tidak ada perubahan runtime; evidence `DEP-PACKAGE-001` ditambahkan ke execution log.
+
+**Database dan migrasi:** Tidak ada. Arsip dibuat dari staging lokal tanpa koneksi atau mutasi database.
+
+**Kompatibilitas dan data lama:** Tidak ada perubahan aplikasi/data.
+
+**Verifikasi:** Arsip runtime dari HEAD `8a213641cea540e64e63b3ef6d8c75adb6a12e06` berisi 569 file, tidak memuat artefak terlarang (`FORBIDDEN_ARTIFACTS=0`), dan memiliki SHA-256 `0A4C35521E5213DEEE34B5F7351B08C09D5DF8951DD3C2EC7BC8A965A4D76C82`; staging dihapus setelah pemeriksaan.
+
+**Catatan tindak lanjut:** Hash harus dibuat ulang pada tag/package final dan diverifikasi bersama document root serta signing client.
+
 ## 2026-08-27 - Regression Disposable Final pada HEAD Terkini
 
 **AI/Aktor:** Codex berbasis GPT-5
