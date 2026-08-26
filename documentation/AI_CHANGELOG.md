@@ -77,6 +77,22 @@ File ini mencatat perubahan proyek secara reverse chronological. Baca [PROJECT_C
 
 **Catatan tindak lanjut:** Hash harus dibuat ulang pada tag/package final dan diverifikasi bersama document root serta signing client.
 
+## 2026-08-27 - Retest PDF Dokumentasi Operasional
+
+**AI/Aktor:** Codex berbasis GPT-5
+
+**Tujuan:** Memverifikasi ulang PDF SOP dan flowchart terhadap gate render/inspeksi visual dokumentasi.
+
+**Perubahan fitur dan perilaku:** Tidak ada perubahan runtime atau isi PDF; evidence `DOC-PDF-002` ditambahkan pada execution log.
+
+**Database dan migrasi:** Tidak ada. Pemeriksaan PDF bersifat read-only.
+
+**Kompatibilitas dan data lama:** Hash kedua PDF tetap sama dengan `DOC-PDF-001`.
+
+**Verifikasi:** SOP 12 halaman dan flowchart 4 halaman berhasil diparse dan dirender dengan PyMuPDF; seluruh halaman memiliki teks nonkosong, tidak ada placeholder umum, dan inspeksi visual contact sheet tidak menunjukkan halaman kosong, clipping, atau overlap yang terlihat. Intermediate PNG QA dihapus setelah pemeriksaan.
+
+**Catatan tindak lanjut:** Pemeriksaan bahasa dan pencetakan pada viewer/printer client tetap menjadi gate UAT.
+
 ## 2026-08-27 - Regression Disposable Final pada HEAD Terkini
 
 **AI/Aktor:** Codex berbasis GPT-5
