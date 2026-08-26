@@ -84,6 +84,14 @@ Smoke header `TLS-LOCAL-001` menemukan virtual host lokal dapat menjawab HTTPS, 
 
 Acceptance target: redirect HTTP→HTTPS, sertifikat valid, dan HSTS opt-in setelah seluruh hostname/subdomain siap; ulangi smoke pada semua route publik, redirect, error, HTML, JSON, print, dan download.
 
+### DBSEC-004 - Credential akun runtime lokal tidak terpisah
+
+Pada 27 Agustus 2026, query metadata read-only terhadap `mysql.user` mengembalikan status `SAME_NONEMPTY` untuk `spp_app_local` dan `spp_audit_local`: kedua akun ada dan fingerprint credential-nya identik. Query hanya mengembalikan boolean status; hash/password tidak pernah dicetak. Tidak ada DDL, perubahan grant, atau mutasi data.
+
+Dampaknya adalah blast radius yang lebih besar bila secret salah satu akun bocor, walaupun grant kedua akun tetap dibatasi pada schema masing-masing. Ini adalah gap konfigurasi lokal/deployment, bukan alasan untuk menyalin secret yang sama ke target.
+
+Acceptance target: buat dua secret acak yang berbeda pada secret store, rotasi akun secara terkoordinasi, perbarui konfigurasi runtime dan kredensial migrasi bila ada, lalu ulangi inventory `mysql.user`, `SHOW GRANTS`, clean-deploy rehearsal, dan regression tanpa menulis secret ke log atau repository.
+
 ## Bukti command lokal
 
 ```text

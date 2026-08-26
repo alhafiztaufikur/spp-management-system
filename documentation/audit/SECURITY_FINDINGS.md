@@ -38,6 +38,7 @@ Status `Terkonfirmasi` berarti bukti source/runtime saat ini membuktikan kondisi
 | FULLSEC-019 | Upload/path/renderer tidak menunjukkan sink aktif, tetapi perlu gate regresi | Sedang | Coverage gap |
 | FULLSEC-020 | Hardening TLS, backup, log, dan deployment client belum dibuktikan | Tinggi | Coverage gap deployment |
 | FULLSEC-021 | Submit ulang/replay mutasi tabungan/pembayaran tidak memiliki idempotency key dan dapat menggandakan saldo/jurnal/audit | Tinggi | Terkonfirmasi, remediation savings/payment selesai |
+| DBSEC-004 | Credential akun aplikasi dan audit lokal berbagi secret | Tinggi | Terkonfirmasi lokal, rotasi target pending |
 
 ### Status remediation per 27 Agustus 2026
 
@@ -53,7 +54,7 @@ Register di atas mempertahankan kondisi baseline 20 Agustus agar histori temuan 
 | FULLSEC-011 | `audit_event` append-only, actor snapshot tanpa FK, redaksi, reason, before/after, dan integrasi pembayaran/tabungan/akun | PASS pada regression disposable terbaru 18/18; retensi/approval koreksi masih keputusan owner |
 | FULLSEC-012/013 | Last-admin locking dan role guards dipertahankan; test konkurensi savings/last-admin sudah lulus | Parsial; keputusan role/object dan skenario domain lain pending |
 | FULLSEC-021 | Form tabungan dan pembayaran memakai key acak 64-hex; `mutation_request` unique per scope/key diklaim di transaksi bisnis yang sama; replay probe payment + savings dan withdrawal/payment-period/DU/fee publish concurrency | Selesai untuk mutasi finansial yang diuji pada disposable; deadlock/retry dan failpoint masih terbuka |
-| FULLSEC-015/016/017/018/020 | Dependency check lokal (`composer validate`, `composer check-platform-reqs`, `composer audit --locked --no-dev`), prepared statement audit, dan static controls tersedia | FULLSEC-015 selesai lokal dengan 0 advisory/platform PASS; target deployment/PDF HTTP, load, DAST, dan browser gate tetap terbuka sesuai `KNOWN_LIMITATIONS.md` |
+| FULLSEC-015/016/017/018/020/DBSEC-004 | Dependency check lokal (`composer validate`, `composer check-platform-reqs`, `composer audit --locked --no-dev`), prepared statement audit, dan static controls tersedia; fingerprint query read-only menemukan secret lokal aplikasi/audit identik tanpa mencetak nilainya | FULLSEC-015 selesai lokal dengan 0 advisory/platform PASS; target deployment/PDF HTTP, load, DAST, browser gate, dan rotasi credential terpisah tetap terbuka sesuai `KNOWN_LIMITATIONS.md` |
 
 Regression keamanan direct terbaru (`SEC-REG-FINAL-002`) mengulang request ID, header/cookie/HSTS, CSRF, POST-only, revocation, blokir MD5, throttling multi-bucket, guard admin terakhir, dan logout pada snapshot audit setelah sinkronisasi `admin_username` pada login dan revalidasi sesi. Baseline/after identik (`audit_event=0`, fixture legacy=0, rate-limit rows=0, `session_version=1`), dan server uji dihentikan. Ini memperkuat bukti lokal saja; tidak menutup verifikasi TLS/ACL/credential atau UAT pada deployment client.
 

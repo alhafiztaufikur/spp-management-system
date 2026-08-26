@@ -15,6 +15,8 @@ Regression disposable terbaru adalah `REG-FINAL-009` (18/18 PASS) pada clone `db
 
 Containment Apache lokal juga diretest sebagai `WEB-CONTAINMENT-002`: login 200, artefak internal/tests 403, header keamanan aktif; HSTS masih kosong karena HTTPS target belum tersedia.
 
+Pemeriksaan metadata MySQL lokal (`DBSEC-004`) menemukan akun `spp_app_local` dan `spp_audit_local` berbagi fingerprint credential non-kosong yang sama. Tidak ada secret yang dicetak atau diubah; target deployment wajib memakai secret acak terpisah dan melakukan rotasi terkoordinasi sebelum status dapat dinaikkan dari NO-GO.
+
 ## Perubahan yang tervalidasi
 
 - Child Daftar Ulang dan jurnal tabungan yang dibuat oleh pembayaran memiliki relasi `bayar_id`; histori lama tetap legacy dan tidak ditebak relasinya.

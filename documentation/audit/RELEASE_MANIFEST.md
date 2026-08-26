@@ -2,7 +2,7 @@
 
 Status: **NO-GO pending client gates**  
 Tanggal dibuat: 27 Agustus 2026  
-Source audit terkini: commit `b983c67` (`Perbaiki harness concurrency dan catat retest`); tag produksi belum dibuat
+Source runtime untuk evidence terkini: commit `2c88ab0` (`Hilangkan password fixture statis dari test`); dokumentasi audit memiliki commit lanjutan; tag produksi belum dibuat
 
 Catatan evidence: regression terakhir berjalan pada HEAD saat ini dan lulus 18/18 (`REG-FINAL-009`) setelah password fixture test dibuat acak; concurrency retest lulus 25/25 (`CONC-004`).
 
@@ -18,7 +18,7 @@ Release harus dipisah menjadi dua artefak yang tidak boleh dicampur:
 ## Isi handover bundle
 
 - Source PHP/CSS/JS dan SQL dari worktree yang telah melalui lint/static checks.
-- Enam test/helper PHP dan satu migrasi SQL yang sebelumnya untracked sudah masuk commit `a91edab`; harness concurrency diperbaiki pada `b983c67`. `config/app.local.php` tetap ignored dan dilarang masuk package. Allowlist/checksum masih wajib diregenerasi pada tag release. Bukti lokal terbaru `DEP-PACKAGE-001` menghitung SHA-256 arsip runtime `0A4C35521E5213DEEE34B5F7351B08C09D5DF8951DD3C2EC7BC8A965A4D76C82` dari HEAD `8a213641cea540e64e63b3ef6d8c75adb6a12e06`; hash ini bukan pengganti checksum tag final.
+- Enam test/helper PHP dan satu migrasi SQL yang sebelumnya untracked sudah masuk commit `a91edab`; harness concurrency diperbaiki pada `b983c67`, dan fixture password dibuat acak pada `2c88ab0`. `config/app.local.php` tetap ignored dan dilarang masuk package. Allowlist/checksum masih wajib diregenerasi pada tag release. Bukti lokal terbaru `DEP-PACKAGE-001` menghitung SHA-256 arsip runtime `0A4C35521E5213DEEE34B5F7351B08C09D5DF8951DD3C2EC7BC8A965A4D76C82` dari HEAD `8a213641cea540e64e63b3ef6d8c75adb6a12e06`; hash ini bukan pengganti checksum tag final.
 - `sql/schema.sql` untuk instalasi baru saja; upgrade memakai urutan 19 migrasi pada `MIGRATION_MANIFEST.md`.
 - `documentation/` termasuk evidence summary, runbook, UAT, decision log, dan known limitations; diserahkan sebagai bundle terbatas, bukan public package.
 - `documentation/audit/SBOM.md` sebagai inventaris dependency PHP produksi dari lockfile.

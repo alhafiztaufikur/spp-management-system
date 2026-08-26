@@ -29,6 +29,22 @@ File ini mencatat perubahan proyek secara reverse chronological. Baca [PROJECT_C
 
 **Catatan tindak lanjut:** Rotasi kedua credential secara terkoordinasi melalui secret store target, perbarui konfigurasi, lalu ulangi inventory grant dan regression. Ini tetap di luar scope perubahan kode saat ini.
 
+## 2026-08-27 - Sinkronisasi Register dan Manifest Evidence DBSEC-004
+
+**AI/Aktor:** Codex berbasis GPT-5
+
+**Tujuan:** Menjaga laporan completion, manifest release, dan register keamanan tetap menunjuk commit runtime/evidence yang benar setelah temuan credential lokal dicatat.
+
+**Perubahan fitur dan perilaku:** Tidak ada perubahan runtime. `COMPLETION_AUDIT.md`, `RELEASE_MANIFEST.md`, `EXECUTIVE_REPORT.md`, `SECURITY_FINDINGS.md`, dan `DEPENDENCY_DEPLOYMENT_REPORT.md` kini menyebut `DBSEC-004`, source evidence `2c88ab0`, serta status NO-GO dan rotasi target secara konsisten.
+
+**Database dan migrasi:** Tidak ada. Pemeriksaan dan perubahan hanya dokumentasi.
+
+**Kompatibilitas dan data lama:** Tidak ada perubahan aplikasi, schema, grant, atau data.
+
+**Verifikasi:** `git diff --check` dan pemeriksaan status worktree dijalankan; postflight port audit dan database suite tetap kosong. Nilai credential tidak dicetak.
+
+**Catatan tindak lanjut:** Regenerasi checksum/manifest pada tag release final setelah secret store, host HTTPS, dan gate client tersedia.
+
 ## 2026-08-27 - Probe Time-based SQLi Terfokus
 
 **AI/Aktor:** Codex berbasis GPT-5
