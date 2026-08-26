@@ -13,6 +13,22 @@ File ini mencatat perubahan proyek secara reverse chronological. Baca [PROJECT_C
 - Jangan menghapus atau menulis ulang entri lama. Tambahkan entri koreksi bila diperlukan.
 - Perubahan implementasi dan entri changelog wajib masuk commit yang sama.
 
+## 2026-08-27 - Retest Containment Apache Lokal
+
+**AI/Aktor:** Codex berbasis GPT-5
+
+**Tujuan:** Memastikan aturan deny artefak internal benar-benar aktif pada Apache lokal, bukan hanya lulus secara statis.
+
+**Perubahan fitur dan perilaku:** Tidak ada perubahan runtime pada source; hanya verifikasi HTTP read-only.
+
+**Database dan migrasi:** Tidak ada akses mutasi database.
+
+**Kompatibilitas dan data lama:** Endpoint login publik tetap merespons 200; artefak internal ditolak.
+
+**Verifikasi:** Pada `http://127.0.0.1/spp-management-system`, `/login.php` 200 dengan security headers; `.git`, SQL, tests, documentation, includes, config, `.env`, dan `koneksi.php` 403; test PHP tidak dapat dieksekusi via HTTP. HSTS belum ada karena listener masih HTTP.
+
+**Catatan tindak lanjut:** Ulangi pada virtual host HTTPS client dan validasi certificate/HSTS.
+
 ## 2026-08-27 - Perbaikan Harness dan Retest Concurrency
 
 **AI/Aktor:** Codex berbasis GPT-5

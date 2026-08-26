@@ -6,6 +6,8 @@ Source audit terkini: commit `b983c67` (`Perbaiki harness concurrency dan catat 
 
 Catatan evidence: regression terakhir setelah sinkronisasi dokumentasi berjalan pada commit `a91edab` dan lulus 18/18 (`REG-FINAL-005`); concurrency retest pada `b983c67` lulus 25/25 (`CONC-004`).
 
+Containment Apache lokal diretest sebagai `WEB-CONTAINMENT-002` (login 200; `.git`, SQL, tests, documentation, includes, config, dotfiles, dan bootstrap 403); HTTPS/HSTS client tetap pending.
+
 ## Bentuk artefak release
 
 Release harus dipisah menjadi dua artefak yang tidak boleh dicampur:

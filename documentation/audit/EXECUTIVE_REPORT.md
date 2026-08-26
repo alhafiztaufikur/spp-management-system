@@ -13,6 +13,8 @@ Status serah-terima client tetap **NO-GO**. Keputusan ini bukan karena test otom
 
 Regression disposable terbaru setelah commit dokumentasi `a91edab` adalah `REG-FINAL-005` (18/18 PASS), dan concurrency retest pada `b983c67` adalah `CONC-004` (25/25 PASS); evidence tersanitasi dan hasil postflight tercatat di execution log. Status NO-GO tidak berubah.
 
+Containment Apache lokal juga diretest sebagai `WEB-CONTAINMENT-002`: login 200, artefak internal/tests 403, header keamanan aktif; HSTS masih kosong karena HTTPS target belum tersedia.
+
 ## Perubahan yang tervalidasi
 
 - Child Daftar Ulang dan jurnal tabungan yang dibuat oleh pembayaran memiliki relasi `bayar_id`; histori lama tetap legacy dan tidak ditebak relasinya.

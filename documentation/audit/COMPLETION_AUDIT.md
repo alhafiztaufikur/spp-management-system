@@ -8,6 +8,8 @@ Dokumen ini adalah pemeriksaan requirement-by-requirement. Status **NO-GO** teta
 
 Koreksi evidence terbaru: pada commit `a91edab`, regression disposable dijalankan ulang sebagai `REG-FINAL-005` dan lulus 18/18 pada clone `db_spp_audit_20260827_031419_suite_1786`; pada `b983c67`, concurrency retest `CONC-004` lulus 25/25. Ringkasan tersanitasi disimpan di luar repository; referensi run sebelumnya tetap dipertahankan sebagai histori.
 
+Retest containment Apache lokal `WEB-CONTAINMENT-002` juga lulus: route publik login 200, artefak internal/tests 403, dan security headers aktif. Ini belum membuktikan virtual host HTTPS target.
+
 ## A. Empat belas artefak wajib
 
 | No. | Artefak | File/bukti | Status | Gap tepat |
