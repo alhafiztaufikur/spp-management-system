@@ -5946,6 +5946,98 @@ button.du-page-link {
   color: #111827 !important;
 }
 
+/* Final UX guards for report filters and master dropdowns */
+.recap-report-shell,
+.report-template-shell,
+.report-general-shell,
+.history-recap-shell,
+.master-modern-card,
+.student-master-shell {
+  overflow: visible;
+}
+
+.report-date-range-control,
+.student-combobox,
+.class-picker,
+.payment-year-picker {
+  position: relative;
+  z-index: 30;
+}
+
+.report-date-range-control:has(.report-date-range-popover:not([hidden])),
+.student-combobox:has(.student-search-panel:not([hidden])),
+.class-picker.is-open,
+.payment-year-picker.is-open {
+  z-index: 7000;
+}
+
+.report-date-range-popover,
+.student-search-panel,
+.payment-year-options,
+.class-picker-panel {
+  z-index: 7001 !important;
+}
+
+.student-master-shell + .master-modern-form .class-picker-panel {
+  position: absolute !important;
+  top: calc(100% + 6px) !important;
+  left: 0 !important;
+  width: 100% !important;
+  max-height: 260px !important;
+}
+
+.report-template-table-wrap {
+  isolation: isolate;
+}
+
+.report-template-table th:first-child,
+.report-template-table td:first-child {
+  position: sticky;
+  left: 0;
+  z-index: 5;
+  min-width: 58px;
+}
+
+.report-template-table th:nth-child(2),
+.report-template-table td:nth-child(2) {
+  position: sticky;
+  left: 58px;
+  z-index: 5;
+  min-width: 150px;
+}
+
+.report-template-table th:nth-child(3),
+.report-template-table td:nth-child(3) {
+  position: sticky;
+  left: 208px;
+  z-index: 5;
+  min-width: 220px;
+}
+
+.report-template-table th:first-child,
+.report-template-table th:nth-child(2),
+.report-template-table th:nth-child(3) {
+  z-index: 7;
+}
+
+.report-template-table td:first-child,
+.report-template-table td:nth-child(2),
+.report-template-table td:nth-child(3) {
+  background: var(--card-bg);
+}
+
+.dashboard-action-strip .quick-btn-soft {
+  background: #ffffff;
+  color: #0f8f4f;
+  border: 1px solid rgba(16, 137, 82, .26);
+}
+
+[data-theme="dark"] .dashboard-action-strip .quick-btn-soft {
+  background: rgba(255,255,255,.08);
+  color: #d7ffe9;
+  border-color: rgba(134,239,172,.28);
+}
+
 /* Fix Data Siswa class dropdown visibility */
 .student-master-shell + .master-modern-form,
 .student-master-shell + .master-modern-form form,
@@ -5999,4 +6091,41 @@ button.du-page-link {
 .student-master-shell + .master-modern-form .class-picker-option.is-selected {
   background: #e5f0ff !important;
   color: #111827 !important;
+}
+
+.student-master-shell + .master-modern-form .class-picker.is-open .class-picker-panel {
+  position: absolute !important;
+  top: calc(100% + 6px) !important;
+  left: 0 !important;
+  width: 100% !important;
+  max-height: 220px !important;
+  margin-top: 6px !important;
+  border-radius: 8px !important;
+  box-shadow: 0 18px 34px rgba(15,23,42,.16) !important;
+}
+
+.student-master-shell + .master-modern-form .class-picker.is-open {
+  z-index: 8100 !important;
+}
+
+.student-master-shell + .master-modern-form:has(.class-picker.is-open) {
+  position: relative !important;
+  z-index: 8000 !important;
+}
+
+.report-date-range-icon svg {
+  display: block;
+}
+
+.du-history-filter .field-row.full-span {
+  grid-column: 1 / -1;
+  display: grid;
+  gap: 6px;
+}
+
+.du-history-filter .field-row.full-span .search-box {
+  height: 42px !important;
+  min-height: 42px !important;
+  max-height: 42px !important;
+  align-self: start;
 }

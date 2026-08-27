@@ -53,8 +53,16 @@ function payment_was_updated($createdAt, $updatedAt): bool {
 
 // Filter
 $search     = trim($_GET['search'] ?? '');
-$filter_bln = $_GET['bulan']  ?? '';
-$filter_thn = $_GET['tahun']  ?? '';
+$dateParam = static function (string $key): string {
+    $value = trim((string)($_GET[$key] ?? ''));
+    return preg_match('/^\d{4}-\d{2}-\d{2}$/', $value) ? $value : '';
+};
+$filter_tanggal = $dateParam('tanggal');
+$filter_tanggal_awal = $dateParam('tanggal_awal') ?: ($filter_tanggal ?: date('Y-m-01'));
+$filter_tanggal_akhir = $dateParam('tanggal_akhir') ?: ($filter_tanggal ?: date('Y-m-d'));
+if ($filter_tanggal_awal > $filter_tanggal_akhir) {
+    [$filter_tanggal_awal, $filter_tanggal_akhir] = [$filter_tanggal_akhir, $filter_tanggal_awal];
+}
 $allowedPageSizes = [10, 25, 50];
 $perPage = page_size_param('per_page', $allowedPageSizes, 10);
 $page = page_int_param('page');
@@ -62,25 +70,15 @@ $page = page_int_param('page');
 $where = "WHERE 1=1";
 $params = [];
 $types  = '';
+$where .= " AND p.TGL_BYR >= ? AND p.TGL_BYR < ?";
+$params[] = $filter_tanggal_awal . ' 00:00:00';
+$params[] = date('Y-m-d H:i:s', strtotime($filter_tanggal_akhir . ' +1 day'));
+$types .= 'ss';
 if ($search) {
     $like = "%$search%";
     $where .= " AND (s.NAMA LIKE ? OR s.NO_INDUK LIKE ? OR s.NO_induk_diknas LIKE ?)";
     $params[] = $like; $params[] = $like; $params[] = $like;
     $types .= 'sss';
-}
-if ($filter_bln) {
-    $month_names = [
-        '01' => 'Januari', '02' => 'Februari', '03' => 'Maret', '04' => 'April',
-        '05' => 'Mei', '06' => 'Juni', '07' => 'Juli', '08' => 'Agustus',
-        '09' => 'September', '10' => 'Oktober', '11' => 'November', '12' => 'Desember'
-    ];
-    $where .= " AND (p.BULAN = ? OR p.BULAN = ?)";
-    $params[] = $filter_bln; $types .= 's';
-    $params[] = $month_names[$filter_bln] ?? $filter_bln; $types .= 's';
-}
-if ($filter_thn) {
-    $where .= " AND p.TAHUN = ?";
-    $params[] = $filter_thn; $types .= 's';
 }
 
 $countSql = "SELECT COUNT(*) AS total FROM bayar p
@@ -117,7 +115,17 @@ $bln_list = [
 ];
 $firstShown = $totalPayments > 0 ? $offset + 1 : 0;
 $lastShown = $totalPayments > 0 ? min($offset + $perPage, $totalPayments) : 0;
-$periodLabel = ($filter_bln ? ($bln_list[$filter_bln] ?? $filter_bln) : 'Semua bulan') . ($filter_thn ? ' ' . $filter_thn : '');
+$periodLabel = $filter_tanggal_awal === $filter_tanggal_akhir
+    ? date('d/m/Y', strtotime($filter_tanggal_awal))
+    : date('d/m/Y', strtotime($filter_tanggal_awal)) . ' - ' . date('d/m/Y', strtotime($filter_tanggal_akhir));
+$studentOptions = $koneksi->query("SELECT s.NO_INDUK,s.NO_induk_diknas,s.NAMA,s.KELAS FROM siswa s WHERE s.is_active=1 ORDER BY s.NAMA")->fetch_all(MYSQLI_ASSOC);
+$studentSearchDisplay = $search;
+foreach ($studentOptions as $studentOption) {
+    if ($search !== '' && ($search === $studentOption['NO_INDUK'] || $search === (string)($studentOption['NO_induk_diknas'] ?? ''))) {
+        $studentSearchDisplay = $studentOption['NAMA'];
+        break;
+    }
+}
 ?>
 <!DOCTYPE html>
 <html lang="id">
@@ -194,23 +202,35 @@ $periodLabel = ($filter_bln ? ($bln_list[$filter_bln] ?? $filter_bln) : 'Semua b
         <!-- Filter Bar -->
         <form method="GET" action="lihat.php" class="recap-header-controls history-recap-filter filter-bar">
           <span class="recap-filter-label">Filter Riwayat</span>
-          <div class="search-box">
-            <svg width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><circle cx="11" cy="11" r="8"/><line x1="21" y1="21" x2="16.65" y2="16.65"/></svg>
-            <input type="text" id="search-lihat" name="search" placeholder="Cari nama / NIS / NIS Diknas..."
-              value="<?= htmlspecialchars($search) ?>" />
+          <div class="field-row report-date-range-field">
+            <label class="field-label">Tanggal Transaksi</label>
+            <div class="report-date-range-control report-date-range-picker" data-range-picker data-empty-label="<?= htmlspecialchars($periodLabel) ?>">
+              <input type="hidden" name="tanggal_awal" value="<?= htmlspecialchars($filter_tanggal_awal) ?>">
+              <input type="hidden" name="tanggal_akhir" value="<?= htmlspecialchars($filter_tanggal_akhir) ?>">
+              <button type="button" class="report-date-range-button" aria-expanded="false">
+                <span class="report-date-range-icon">📅</span>
+                <span class="report-date-range-value"><?= htmlspecialchars($periodLabel) ?></span>
+              </button>
+              <div class="report-date-range-popover" hidden>
+                <label><span>Mulai</span><input type="date" value="<?= htmlspecialchars($filter_tanggal_awal) ?>" data-range-start></label>
+                <label><span>Sampai</span><input type="date" value="<?= htmlspecialchars($filter_tanggal_akhir) ?>" data-range-end></label>
+                <div class="report-date-range-popover-actions"><button type="button" class="btn btn-primary btn-sm" data-range-apply>Terapkan</button></div>
+              </div>
+            </div>
           </div>
-          <select class="field-input field-select filter-sel month-code-select" name="bulan" id="filter-bulan">
-            <option value="">Semua Bulan</option>
-            <?php foreach ($bln_list as $code => $label): ?>
-            <option value="<?=$code?>" data-label="<?=$label?>" <?= $filter_bln === $code ? 'selected' : '' ?>><?=$label?></option>
-            <?php endforeach; ?>
-          </select>
-          <select class="field-input field-select filter-sel" name="tahun" id="filter-tahun">
-            <option value="">Semua Tahun</option>
-            <?php for ($y = date('Y'); $y >= date('Y') - 3; $y--): ?>
-            <option value="<?=$y?>" <?= $filter_thn == $y ? 'selected' : '' ?>><?=$y?></option>
-            <?php endfor; ?>
-          </select>
+          <div class="field-row full-span">
+            <label class="field-label" for="search-lihat">Cari Siswa (Nama / NIS / NIS Diknas)</label>
+            <div class="search-box">
+              <svg width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.5" stroke-linecap="round" stroke-linejoin="round"><circle cx="11" cy="11" r="8"/><line x1="21" y1="21" x2="16.65" y2="16.65"/></svg>
+              <input type="text" id="search-lihat" data-student-search data-student-list="payment-history-siswa-list" data-student-select-callback="selectReportStudentSearchOption" data-student-query-target="payment-history-student-query" placeholder="Ketik nama, NIS, atau NIS Diknas..." value="<?= htmlspecialchars($studentSearchDisplay) ?>" autocomplete="off">
+              <input type="hidden" id="payment-history-student-query" name="search" value="<?= htmlspecialchars($search) ?>">
+            </div>
+            <datalist id="payment-history-siswa-list">
+              <?php foreach ($studentOptions as $studentOption): ?>
+              <option value="<?= htmlspecialchars($studentOption['NAMA']) ?>" data-nis="<?= htmlspecialchars($studentOption['NO_INDUK']) ?>" data-diknas="<?= htmlspecialchars((string)($studentOption['NO_induk_diknas'] ?? '')) ?>" data-nama="<?= htmlspecialchars($studentOption['NAMA']) ?>" data-kelas="<?= htmlspecialchars($studentOption['KELAS']) ?>"></option>
+              <?php endforeach; ?>
+            </datalist>
+          </div>
           <select class="field-input field-select filter-sel" name="per_page" aria-label="Jumlah pembayaran per halaman">
             <?php foreach ($allowedPageSizes as $pageSize): ?>
             <option value="<?= $pageSize ?>" <?= $perPage === $pageSize ? 'selected' : '' ?>><?= $pageSize ?> / halaman</option>

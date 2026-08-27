@@ -11,6 +11,7 @@ $flash = $_SESSION['flash'] ?? null;
 unset($_SESSION['flash']);
 
 $prefill_nis = preg_replace('/[^\w.-]/', '', trim($_GET['nis'] ?? ''));
+$today = date('Y-m-d');
 $siswa_list = $koneksi->query("SELECT id, NO_INDUK, NO_induk_diknas, NAMA, KELAS FROM siswa WHERE is_active = 1 ORDER BY NAMA ASC");
 ?>
 <!DOCTYPE html>
@@ -84,7 +85,7 @@ $siswa_list = $koneksi->query("SELECT id, NO_INDUK, NO_induk_diknas, NAMA, KELAS
                 </div>
                 <datalist id="siswa-list">
                   <?php while ($s = $siswa_list->fetch_assoc()): ?>
-                  <option value="<?= htmlspecialchars($s['NO_INDUK']) ?> — <?= htmlspecialchars($s['NAMA']) ?>"
+                  <option value="<?= htmlspecialchars($s['NAMA']) ?>"
                     data-nis="<?= htmlspecialchars($s['NO_INDUK']) ?>"
                     data-diknas="<?= htmlspecialchars((string)($s['NO_induk_diknas'] ?? '')) ?>"
                     data-nama="<?= htmlspecialchars($s['NAMA']) ?>"
@@ -120,7 +121,7 @@ $siswa_list = $koneksi->query("SELECT id, NO_INDUK, NO_induk_diknas, NAMA, KELAS
             <div class="fields-grid">
               <div class="field-row">
                 <label class="field-label" for="tgl-keluar">Tanggal</label>
-                <input class="field-input" type="date" id="tgl-keluar" name="tanggal" required />
+                <input class="field-input" type="date" id="tgl-keluar" name="tanggal" value="<?= htmlspecialchars($today) ?>" readonly required />
               </div>
               <div class="field-row">
                 <label class="field-label" for="nominal-keluar">Nominal Keluar (Rp)</label>

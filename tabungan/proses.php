@@ -3,6 +3,7 @@
 // tabungan/proses.php — Handler Tabungan Masuk/Keluar
 // ============================================
 session_start();
+date_default_timezone_set('Asia/Jakarta');
 require_once '../koneksi.php';
 require_once '../includes/auth.php';
 requireRole(['admin', 'kasir']);
@@ -14,7 +15,7 @@ if ($_SERVER['REQUEST_METHOD'] !== 'POST') {
 
 $aksi      = $_POST['aksi'] ?? '';
 $no_induk  = trim($_POST['no_induk'] ?? '');
-$tanggal   = $_POST['tanggal'] ?? date('Y-m-d');
+$tanggal   = date('Y-m-d');
 $nominal   = (float)($_POST['nominal'] ?? 0);
 $keterangan = trim($_POST['keterangan'] ?? '');
 $user_id   = (string)($_SESSION['admin_id'] ?? '');

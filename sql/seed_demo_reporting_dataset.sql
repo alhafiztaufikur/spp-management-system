@@ -1,7 +1,8 @@
 -- =========================================================
 -- Seeder dataset demo laporan SistemSPP
 -- Destructive untuk data operasional demo/dev.
--- Mengisi 24 rombel (1A-6D), 144 siswa, dan transaksi Juli-Agustus 2026.
+-- Mengisi template rombel 1A-6J, 144 siswa demo pada rombel A-D,
+-- dan transaksi Juli-Agustus 2026.
 -- =========================================================
 
 USE `db_spp`;
@@ -48,6 +49,8 @@ FROM (
 ) t
 CROSS JOIN (
   SELECT 'A' AS `kode_rombel` UNION ALL SELECT 'B' UNION ALL SELECT 'C' UNION ALL SELECT 'D'
+  UNION ALL SELECT 'E' UNION ALL SELECT 'F' UNION ALL SELECT 'G' UNION ALL SELECT 'H'
+  UNION ALL SELECT 'I' UNION ALL SELECT 'J'
 ) r
 ORDER BY t.`tingkat`, r.`kode_rombel`;
 

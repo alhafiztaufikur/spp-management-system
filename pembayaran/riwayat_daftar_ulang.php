@@ -3,6 +3,7 @@ session_start();
 if (!isset($_SESSION['admin_id'])) { header('Location: ../login.php'); exit; }
 require_once '../koneksi.php';
 require_once '../includes/auth.php';
+require_once '../includes/kelas.php';
 requireRole(['admin', 'kasir']);
 
 function du_e($value): string {
@@ -39,14 +40,36 @@ $requestedPageSize = (int)($_GET['per_page'] ?? 10);
 $perPage = in_array($requestedPageSize, $allowedPageSizes, true) ? $requestedPageSize : 10;
 $page = max(1, $requestedPage);
 $allowedClasses = ['1', '2', '3', '4', '5', '6'];
+$classRows = class_all($koneksi, true);
+$validClassFilters = [''];
+foreach ($allowedClasses as $class) $validClassFilters[] = 'tingkat:' . $class;
+foreach ($classRows as $classRow) $validClassFilters[] = 'rombel:' . (int)$classRow['id'];
 $allowedStatuses = ['', 'lunas', 'cicilan'];
-if (!in_array($filterClass, array_merge([''], $allowedClasses), true)) $filterClass = '';
+if (in_array($filterClass, $allowedClasses, true)) $filterClass = 'tingkat:' . $filterClass;
+if (!in_array($filterClass, $validClassFilters, true)) $filterClass = '';
 if (!in_array($filterStatus, $allowedStatuses, true)) $filterStatus = '';
 if ($filterYear !== '' && !preg_match('/^\d{4}\/\d{4}$/', $filterYear)) $filterYear = '';
 
 $academicYears = [];
 $yearResult = $koneksi->query("SELECT label FROM tahun_ajaran WHERE status IN ('published','closed') ORDER BY label DESC");
 while ($year = $yearResult->fetch_row()) $academicYears[] = $year[0];
+
+$studentOptions = $koneksi->query("
+    SELECT DISTINCT s.NO_INDUK, s.NO_induk_diknas, s.NAMA, s.KELAS,
+           s.master_kelas_id, mk.tingkat AS master_tingkat, mk.kode_rombel, mk.is_placeholder
+    FROM tagihan_daftar_ulang tdu
+    JOIN siswa s ON s.NO_INDUK = tdu.no_induk
+    LEFT JOIN master_kelas mk ON mk.id = s.master_kelas_id
+    WHERE tdu.status = 'open'
+    ORDER BY s.NAMA
+")->fetch_all(MYSQLI_ASSOC);
+$studentSearchDisplay = $search;
+foreach ($studentOptions as $studentOption) {
+    if ($search !== '' && ($search === $studentOption['NO_INDUK'] || $search === (string)($studentOption['NO_induk_diknas'] ?? ''))) {
+        $studentSearchDisplay = $studentOption['NAMA'];
+        break;
+    }
+}
 
 $where = ["tdu.status = 'open'"];
 $params = [];
@@ -56,9 +79,12 @@ if ($search !== '') {
     $where[] = '(tdu.no_induk LIKE ? OR s.NAMA LIKE ? OR s.NO_induk_diknas LIKE ?)';
     $params[] = $like; $params[] = $like; $params[] = $like; $types .= 'sss';
 }
-if ($filterClass !== '') {
-    $where[] = 'tdu.kelas_snapshot = ?';
-    $params[] = $filterClass; $types .= 's';
+if (str_starts_with($filterClass, 'tingkat:')) {
+    $where[] = 'COALESCE(mk.tingkat, s.KELAS, tdu.kelas_snapshot) = ?';
+    $params[] = substr($filterClass, 8); $types .= 's';
+} elseif (str_starts_with($filterClass, 'rombel:')) {
+    $where[] = 's.master_kelas_id = ?';
+    $params[] = (int)substr($filterClass, 7); $types .= 'i';
 }
 if ($filterYear !== '') {
     $where[] = 'ta.label = ?';
@@ -76,6 +102,7 @@ $aggregateSql = "
     FROM tagihan_daftar_ulang tdu
     JOIN tahun_ajaran ta ON ta.id = tdu.tahun_ajaran_id
     JOIN siswa s ON s.NO_INDUK = tdu.no_induk
+    LEFT JOIN master_kelas mk ON mk.id = s.master_kelas_id
     LEFT JOIN bayar_du bd ON bd.tagihan_daftar_ulang_id = tdu.id
     WHERE " . implode(' AND ', $where) . "
     GROUP BY tdu.id, tdu.no_induk, tdu.kelas_snapshot, ta.label, s.NAMA, s.NO_induk_diknas,
@@ -209,8 +236,27 @@ unset($_SESSION['flash']);
 
         <form method="GET" class="recap-header-controls history-recap-filter filter-bar du-history-filter">
           <span class="recap-filter-label">Filter Riwayat</span>
-          <div class="search-box"><svg width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><circle cx="11" cy="11" r="8"/><line x1="21" y1="21" x2="16.65" y2="16.65"/></svg><input type="text" name="q" value="<?= du_e($search) ?>" placeholder="Cari nama / NIS / NIS Diknas..." /></div>
-          <select class="field-input field-select filter-sel" name="kelas"><option value="">Kelas 1–6</option><?php foreach ($allowedClasses as $class): ?><option value="<?= $class ?>" <?= $filterClass === $class ? 'selected' : '' ?>>Kelas <?= $class ?></option><?php endforeach; ?></select>
+          <div class="field-row full-span">
+            <label class="field-label" for="du-history-student">Cari Siswa (Nama / NIS / NIS Diknas)</label>
+            <div class="search-box">
+              <svg width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.5" stroke-linecap="round" stroke-linejoin="round"><circle cx="11" cy="11" r="8"/><line x1="21" y1="21" x2="16.65" y2="16.65"/></svg>
+              <input type="text" id="du-history-student" data-student-search data-student-list="du-history-student-list" data-student-select-callback="selectReportStudentSearchOption" data-student-query-target="du-history-student-query" value="<?= du_e($studentSearchDisplay) ?>" placeholder="Ketik nama, NIS, atau NIS Diknas..." autocomplete="off" />
+              <input type="hidden" id="du-history-student-query" name="q" value="<?= du_e($search) ?>" />
+            </div>
+            <datalist id="du-history-student-list">
+              <?php foreach ($studentOptions as $studentOption): ?>
+              <?php $studentClassLabel = class_label(['tingkat' => $studentOption['master_tingkat'] ?: $studentOption['KELAS'], 'kode_rombel' => $studentOption['kode_rombel'] ?? 'BELUM', 'is_placeholder' => $studentOption['is_placeholder'] ?? 1]); ?>
+              <option value="<?= du_e($studentOption['NAMA']) ?>"
+                data-nis="<?= du_e($studentOption['NO_INDUK']) ?>"
+                data-diknas="<?= du_e((string)($studentOption['NO_induk_diknas'] ?? '')) ?>"
+                data-nama="<?= du_e($studentOption['NAMA']) ?>"
+                data-kelas="<?= du_e($studentClassLabel) ?>">
+                <?= du_e($studentOption['NAMA']) ?> (<?= du_e($studentClassLabel) ?>)
+              </option>
+              <?php endforeach; ?>
+            </datalist>
+          </div>
+          <select class="field-input field-select filter-sel" name="kelas"><option value="">Semua Kelas</option><?php foreach ($allowedClasses as $class): ?><option value="tingkat:<?= $class ?>" <?= $filterClass === 'tingkat:'.$class ? 'selected' : '' ?>>Semua Kelas <?= $class ?></option><?php endforeach; ?><?php foreach ($classRows as $classRow): ?><option value="rombel:<?= (int)$classRow['id'] ?>" <?= $filterClass === 'rombel:'.((int)$classRow['id']) ? 'selected' : '' ?>><?= du_e(class_label($classRow)) ?></option><?php endforeach; ?></select>
           <select class="field-input field-select filter-sel" name="tahun_ajaran"><option value="">Semua Tahun Ajaran</option><?php foreach ($academicYears as $year): ?><option value="<?= du_e($year) ?>" <?= $filterYear === $year ? 'selected' : '' ?>><?= du_e($year) ?></option><?php endforeach; ?></select>
           <select class="field-input field-select filter-sel" name="status"><option value="">Semua Status</option><option value="cicilan" <?= $filterStatus === 'cicilan' ? 'selected' : '' ?>>Belum Lunas</option><option value="lunas" <?= $filterStatus === 'lunas' ? 'selected' : '' ?>>Lunas</option></select>
           <select class="field-input field-select filter-sel du-page-size" name="per_page" aria-label="Jumlah data per halaman"><?php foreach ($allowedPageSizes as $pageSize): ?><option value="<?= $pageSize ?>" <?= $perPage === $pageSize ? 'selected' : '' ?>><?= $pageSize ?> / halaman</option><?php endforeach; ?></select>

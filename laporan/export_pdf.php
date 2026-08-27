@@ -200,6 +200,41 @@ if ($rows) {
     $stmt_details->close();
 }
 
+if (!$selected_mode) {
+    $totalRows = count($rows);
+    $grandTotal = array_sum(array_map(static fn($row) => (float)($row['total_jumlah'] ?? 0), $rows));
+    $htmlRows = '';
+    foreach ($rows as $index => $row) {
+        $htmlRows .= '<tr>'
+            . '<td>' . ($index + 1) . '</td>'
+            . '<td>' . e($row['NO_INDUK'] ?? '') . (!empty($row['NO_induk_diknas']) ? '<br><small>Diknas ' . e($row['NO_induk_diknas']) . '</small>' : '') . '</td>'
+            . '<td>' . e($row['NAMA'] ?? '') . '</td>'
+            . '<td>' . e($row['kelas_rombel_snapshot'] ?: ($row['KELAS_SISWA'] ?? '')) . '</td>'
+            . '<td>' . e(trim(($row['BULAN'] ?? '') . ' ' . ($row['TAHUN'] ?? ''))) . '</td>'
+            . '<td>' . e($row['sistem_pembayaran'] ?? '') . '</td>'
+            . '<td>' . e(date('d/m/Y H:i', strtotime($row['TGL_BYR'] ?? 'now'))) . '</td>'
+            . '<td class="num">Rp ' . money_total($row['total_jumlah'] ?? 0) . '</td>'
+            . '</tr>';
+    }
+    if ($htmlRows === '') {
+        $htmlRows = '<tr><td colspan="8" class="empty">Tidak ada data pembayaran pada filter ini.</td></tr>';
+    }
+    $html = '<!DOCTYPE html><html><head><meta charset="UTF-8"><style>'
+        . '@page{margin:20px 18px}body{font-family:DejaVu Sans,Arial,sans-serif;color:#18281f;font-size:10px}h1{font-size:18px;margin:0 0 4px}p{margin:0 0 12px;color:#66766d}.summary{display:table;width:100%;margin:12px 0;border:1px solid #cfe9dc;border-radius:8px}.summary div{display:table-cell;padding:10px;border-right:1px solid #e1f1e8}.summary div:last-child{border-right:0}.summary span{display:block;color:#708078;font-size:9px;text-transform:uppercase;font-weight:700}.summary strong{font-size:13px}table{width:100%;border-collapse:collapse}th{background:#eaf7f0;color:#0b8d4b;text-align:left;font-size:9px;text-transform:uppercase;padding:8px;border:1px solid #cfe9dc}td{padding:7px;border:1px solid #e3f0e9;vertical-align:top}tbody tr:nth-child(even){background:#f8fcfa}.num{text-align:right;font-weight:700;color:#0b8d4b}.empty{text-align:center;color:#718078;padding:24px}small{color:#708078}'
+        . '</style></head><body><h1>Rekap Laporan Keuangan</h1><p>Periode ' . e($periode) . '</p><div class="summary"><div><span>Total Transaksi</span><strong>' . number_format($totalRows) . '</strong></div><div><span>Total Pembayaran</span><strong>Rp ' . money_total($grandTotal) . '</strong></div></div><table><thead><tr><th>No</th><th>NIS</th><th>Nama</th><th>Kelas</th><th>Periode Bayar</th><th>Sistem</th><th>Tanggal</th><th>Total</th></tr></thead><tbody>'
+        . $htmlRows
+        . '</tbody></table></body></html>';
+    $options = new \Dompdf\Options();
+    $options->set('isRemoteEnabled', false);
+    $options->set('isHtml5ParserEnabled', true);
+    $dompdf = new \Dompdf\Dompdf($options);
+    $dompdf->loadHtml($html);
+    $dompdf->setPaper('A4', 'landscape');
+    $dompdf->render();
+    $dompdf->stream('rekap-laporan-keuangan.pdf', ['Attachment' => false]);
+    exit;
+}
+
 if (!$rows && !$selected_mode) {
     $preview_mode = true;
     $rows[] = [

@@ -479,8 +479,6 @@ $canEditOpening = !$editStudent || (int)($editStudent['history_count'] ?? 0) ===
           </div>
           <div class="master-modern-stats">
             <div><span>Hasil Filter</span><strong><?= number_format($totalStudents) ?></strong></div>
-            <div><span>Per Halaman</span><strong><?= number_format($perPage) ?></strong></div>
-            <div><span>Halaman</span><strong><?= number_format($page) ?>/<?= number_format($totalPages) ?></strong></div>
           </div>
         </div>
       </section>
@@ -645,6 +643,7 @@ $canEditOpening = !$editStudent || (int)($editStudent['history_count'] ?? 0) ===
             <?php endforeach; ?>
           </select>
           <button class="btn btn-primary" type="submit">Filter</button>
+          <a class="btn btn-ghost" href="export_excel.php?<?= htmlspecialchars(http_build_query($_GET), ENT_QUOTES, 'UTF-8') ?>">Export Excel</a>
         </form>
         <div class="table-container">
           <table class="payment-table responsive-table">

@@ -229,7 +229,6 @@ $activeStudents = $koneksi->query("SELECT s.NO_INDUK,s.NAMA,s.KELAS,s.master_kel
           <div>
             <span class="recap-class-overline">Data Master</span>
             <h1>Master Biaya Lain</h1>
-            <p>Kelola item biaya tambahan, nominal, status aktif, dan penerbitan tagihan siswa.</p>
           </div>
           <div class="master-modern-stats">
             <div><span>Biaya Aktif</span><strong><?= number_format(count($activeMasters)) ?></strong></div>
@@ -271,7 +270,7 @@ $activeStudents = $koneksi->query("SELECT s.NO_INDUK,s.NAMA,s.KELAS,s.master_kel
       </div>
 
       <div class="main-card master-modern-card" style="margin-top:0">
-        <div class="card-title-row"><div><div class="card-title">Terbitkan Tagihan Biaya Lain</div><p class="payment-auto-note">Tagihan memakai snapshot nama dan nominal saat diterbitkan. Penerbitan ulang tidak membuat duplikasi.</p></div></div>
+        <div class="card-title-row"><div><div class="card-title">Terbitkan Tagihan Biaya Lain</div></div></div>
         <?php if (!$activeMasters): ?>
           <div class="empty-state"><p>Belum ada master biaya aktif</p><span>Aktifkan atau tambahkan master biaya terlebih dahulu.</span></div>
         <?php else: ?>
@@ -279,11 +278,11 @@ $activeStudents = $koneksi->query("SELECT s.NO_INDUK,s.NAMA,s.KELAS,s.master_kel
           <input type="hidden" name="csrf_token" value="<?= htmlspecialchars($_SESSION['csrf_master_biaya_lain']) ?>">
           <input type="hidden" name="aksi" value="terbitkan_tagihan">
           <div class="report-filter-grid">
-            <div class="field-row"><label class="field-label">Item Biaya</label><select class="field-input field-select" name="master_id" id="publish-fee" required><?php foreach($activeMasters as $master): ?><option value="<?= (int)$master['id'] ?>" data-nominal="<?= (float)$master['nominal'] ?>"><?= htmlspecialchars($master['nama']) ?> — Rp <?= number_format((float)$master['nominal'],0,',','.') ?></option><?php endforeach; ?></select></div>
+            <div class="field-row"><label class="field-label">Item Biaya</label><select class="field-input field-select" name="master_id" id="publish-fee" required><?php foreach($activeMasters as $master): ?><option value="<?= (int)$master['id'] ?>" data-nominal="<?= (float)$master['nominal'] ?>"><?= htmlspecialchars($master['nama']) ?> (Rp <?= number_format((float)$master['nominal'],0,',','.') ?>)</option><?php endforeach; ?></select></div>
             <div class="field-row"><label class="field-label">Target</label><select class="field-input field-select" name="target" id="publish-target"><option value="all">Semua siswa aktif</option><option value="tingkat">Tingkat kelas</option><option value="rombel">Rombel tertentu</option><option value="siswa">Pilih siswa</option></select></div>
             <div class="field-row publish-target-field" data-target="tingkat" hidden><label class="field-label">Tingkat</label><select class="field-input field-select" name="tingkat" id="publish-level"><?php for($i=1;$i<=6;$i++): ?><option value="<?= $i ?>">Kelas <?= $i ?></option><?php endfor; ?></select></div>
             <div class="field-row publish-target-field" data-target="rombel" hidden><label class="field-label">Rombel</label><select class="field-input field-select" name="master_kelas_id" id="publish-class"><?php foreach($activeClasses as $class): ?><option value="<?= (int)$class['id'] ?>"><?= htmlspecialchars(class_label($class)) ?></option><?php endforeach; ?></select></div>
-            <div class="field-row publish-target-field" data-target="siswa" hidden><label class="field-label">Siswa (bisa lebih dari satu)</label><select class="field-input field-select" name="no_induk[]" id="publish-students" multiple size="6"><?php foreach($activeStudents as $student): ?><option value="<?= htmlspecialchars($student['NO_INDUK']) ?>"><?= htmlspecialchars($student['NO_INDUK'].' — '.$student['NAMA'].' — '.class_label($student)) ?></option><?php endforeach; ?></select></div>
+            <div class="field-row publish-target-field" data-target="siswa" hidden><label class="field-label">Siswa (bisa lebih dari satu)</label><select class="field-input field-select" name="no_induk[]" id="publish-students" multiple size="6"><?php foreach($activeStudents as $student): ?><option value="<?= htmlspecialchars($student['NO_INDUK']) ?>"><?= htmlspecialchars($student['NAMA'].' (NIS '.$student['NO_INDUK'].', '.class_label($student).')') ?></option><?php endforeach; ?></select></div>
           </div>
           <div class="report-summary-grid" style="margin-top:16px"><div class="report-summary-card"><span>Pratinjau Siswa</span><strong id="publish-preview-count">0</strong></div><div class="report-summary-card"><span>Total Nominal</span><strong id="publish-preview-total">Rp 0</strong></div></div>
           <div class="action-bar" style="margin-top:16px"><button class="btn btn-primary" type="submit">Terbitkan Tagihan</button></div>

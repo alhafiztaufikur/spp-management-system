@@ -262,7 +262,7 @@ unset($_SESSION['flash']);
               </div>
               <datalist id="siswa-list">
                 <?php while ($s = $siswa_list->fetch_assoc()): ?>
-                <option value="<?= htmlspecialchars($s['NO_INDUK']) ?> — <?= htmlspecialchars($s['NAMA']) ?>"
+                <option value="<?= htmlspecialchars($s['NAMA']) ?>"
                   data-nis="<?= htmlspecialchars($s['NO_INDUK']) ?>"
                   data-diknas="<?= htmlspecialchars((string)($s['NO_induk_diknas'] ?? '')) ?>"
                   data-nama="<?= htmlspecialchars($s['NAMA']) ?>"

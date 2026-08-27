@@ -83,12 +83,10 @@ $bln_names = [
     '09' => 'September', '10' => 'Oktober', '11' => 'November', '12' => 'Desember',
 ];
 
-$filter_bulan = report_month_code($_GET['bulan'] ?? date('m'));
-$filter_tahun = preg_match('/^\d{4}$/', (string)($_GET['tahun'] ?? '')) ? (string)$_GET['tahun'] : date('Y');
 $filter_q = mb_substr(trim((string)($_GET['q'] ?? '')), 0, 100);
 $filter_tanggal = report_date_param('tanggal');
-$filter_tanggal_awal = report_date_param('tanggal_awal') ?: $filter_tanggal;
-$filter_tanggal_akhir = report_date_param('tanggal_akhir') ?: $filter_tanggal;
+$filter_tanggal_awal = report_date_param('tanggal_awal') ?: ($filter_tanggal ?: date('Y-m-01'));
+$filter_tanggal_akhir = report_date_param('tanggal_akhir') ?: ($filter_tanggal ?: date('Y-m-d'));
 if ($filter_tanggal_awal !== '' && $filter_tanggal_akhir === '') {
     $filter_tanggal_akhir = $filter_tanggal_awal;
 }
@@ -98,6 +96,9 @@ if ($filter_tanggal_akhir !== '' && $filter_tanggal_awal === '') {
 if ($filter_tanggal_awal !== '' && $filter_tanggal_akhir !== '' && strtotime($filter_tanggal_awal) > strtotime($filter_tanggal_akhir)) {
     [$filter_tanggal_awal, $filter_tanggal_akhir] = [$filter_tanggal_akhir, $filter_tanggal_awal];
 }
+$periodReferenceTs = strtotime($filter_tanggal_akhir ?: date('Y-m-d'));
+$filter_bulan = report_month_code($_GET['bulan'] ?? date('m', $periodReferenceTs));
+$filter_tahun = preg_match('/^\d{4}$/', (string)($_GET['tahun'] ?? '')) ? (string)$_GET['tahun'] : date('Y', $periodReferenceTs);
 
 $reportTypes = [
     'semua' => 'Semua transaksi',
@@ -152,7 +153,7 @@ $studentOptions = $koneksi->query("
 $studentSearchDisplay = $filter_q;
 foreach ($studentOptions as $studentOption) {
     if ($filter_q !== '' && ($filter_q === $studentOption['NO_INDUK'] || $filter_q === (string)($studentOption['NO_induk_diknas'] ?? ''))) {
-        $studentSearchDisplay = $studentOption['NO_INDUK'] . ' - ' . $studentOption['NAMA'];
+        $studentSearchDisplay = $studentOption['NAMA'];
         break;
     }
 }
@@ -451,30 +452,6 @@ $exportQuery = http_build_query([
             </div>
           </div>
           <div class="field-row">
-            <label class="field-label">Bulan periode</label>
-            <select class="field-input field-select" name="bulan">
-              <?php foreach ($bln_names as $num => $nama): ?>
-              <option value="<?= $num ?>" <?= $filter_bulan === $num ? 'selected' : '' ?>><?= report_e($nama) ?></option>
-              <?php endforeach; ?>
-            </select>
-          </div>
-          <div class="field-row">
-            <label class="field-label">Tahun</label>
-            <?php
-              $selectedReportYear = (int)$filter_tahun;
-              $reportYearStart = min((int)date('Y'), $selectedReportYear);
-              $reportYearEnd = max((int)date('Y') + 10, $selectedReportYear);
-            ?>
-            <div class="payment-year-picker report-year-picker">
-              <input class="field-input payment-year-select" type="text" name="tahun" inputmode="numeric" pattern="\d{4}" maxlength="4" value="<?= report_e($filter_tahun) ?>" autocomplete="off">
-              <div class="payment-year-options" role="listbox" aria-label="Pilihan tahun laporan">
-                <?php for ($y = $reportYearStart; $y <= $reportYearEnd; $y++): ?>
-                <button type="button" class="payment-year-option" data-year="<?= $y ?>" role="option"><?= $y ?></button>
-                <?php endfor; ?>
-              </div>
-            </div>
-          </div>
-          <div class="field-row">
             <label class="field-label">Jenis laporan</label>
             <select class="field-input field-select" name="jenis_laporan">
               <?php foreach ($reportTypes as $key => $label): ?>
@@ -508,7 +485,7 @@ $exportQuery = http_build_query([
             <datalist id="report-siswa-list">
               <?php foreach ($studentOptions as $studentOption): ?>
               <?php $studentClassLabel = class_label(['tingkat' => $studentOption['master_tingkat'] ?: $studentOption['KELAS'], 'kode_rombel' => $studentOption['kode_rombel'] ?? 'BELUM', 'is_placeholder' => $studentOption['is_placeholder'] ?? 1]); ?>
-              <option value="<?= report_e($studentOption['NO_INDUK']) ?> - <?= report_e($studentOption['NAMA']) ?>"
+              <option value="<?= report_e($studentOption['NAMA']) ?>"
                 data-nis="<?= report_e($studentOption['NO_INDUK']) ?>"
                 data-diknas="<?= report_e((string)($studentOption['NO_induk_diknas'] ?? '')) ?>"
                 data-nama="<?= report_e($studentOption['NAMA']) ?>"
@@ -627,7 +604,7 @@ $exportQuery = http_build_query([
           </table>
         </div>
         <?php else: ?>
-        <form method="GET" action="export_pdf.php" id="print-selected-form">
+        <form method="GET" action="export_pdf.php" id="print-selected-form" target="_blank" rel="noopener">
           <input type="hidden" name="bulan" value="<?= report_e($filter_bulan) ?>">
           <input type="hidden" name="tahun" value="<?= report_e($filter_tahun) ?>">
           <input type="hidden" name="tanggal_awal" value="<?= report_e($filter_tanggal_awal) ?>">

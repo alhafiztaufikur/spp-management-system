@@ -19,7 +19,19 @@ if ($_SERVER['REQUEST_METHOD'] === 'POST') {
         }
         $action = (string)($_POST['aksi'] ?? '');
         $id = (int)($_POST['id'] ?? 0);
-        if (in_array($action, ['tambah', 'update'], true)) {
+        if ($action === 'template_aj') {
+            $created = class_ensure_rombel_templates($koneksi);
+            $message = $created > 0 ? $created . ' rombel template A-J berhasil ditambahkan.' : 'Template rombel A-J sudah lengkap.';
+        } elseif ($action === 'promosi_tahun') {
+            $targetYear = (string)($_POST['target_tahun_ajaran'] ?? class_next_academic_year_label(du_current_academic_year()));
+            $koneksi->begin_transaction();
+            $result = class_process_year_promotion($koneksi, $targetYear);
+            $koneksi->commit();
+            $message = 'Kenaikan tahun ajaran ' . $result['target_year'] . ' selesai: ' . $result['promoted'] . ' siswa naik, ' . $result['graduated'] . ' siswa lulus, ' . $result['skipped'] . ' siswa dilewati.';
+        } elseif ($action === 'nonaktifkan_kosong') {
+            $affected = class_disable_empty_rombel($koneksi);
+            $message = $affected > 0 ? $affected . ' rombel kosong berhasil dinonaktifkan.' : 'Tidak ada rombel kosong aktif yang perlu dinonaktifkan.';
+        } elseif (in_array($action, ['tambah', 'update'], true)) {
             $level = (int)($_POST['tingkat'] ?? 0);
             $code = strtoupper(trim((string)($_POST['kode_rombel'] ?? '')));
             $code = preg_replace('/\s+/', '', $code);
@@ -64,6 +76,7 @@ if ($_SERVER['REQUEST_METHOD'] === 'POST') {
         }
         $_SESSION['flash'] = ['type' => 'success', 'msg' => $message];
     } catch (Throwable $error) {
+        try { $koneksi->rollback(); } catch (Throwable $ignored) {}
         $_SESSION['flash'] = ['type' => 'error', 'msg' => $error->getMessage()];
     }
     class_master_redirect();
@@ -71,6 +84,7 @@ if ($_SERVER['REQUEST_METHOD'] === 'POST') {
 
 $flash = $_SESSION['flash'] ?? null;
 unset($_SESSION['flash']);
+$nextAcademicYear = class_next_academic_year_label(du_current_academic_year());
 $editId = (int)($_GET['edit'] ?? 0);
 $editClass = $editId > 0 ? class_find($koneksi, $editId) : null;
 $classes = $koneksi->query("SELECT mk.*,
@@ -123,6 +137,28 @@ $classes = $koneksi->query("SELECT mk.*,
         <div class="field-row"><label class="field-label">Kode Rombel</label><input class="field-input" name="kode_rombel" maxlength="10" required placeholder="Contoh: A" value="<?= htmlspecialchars((string)($editClass['kode_rombel'] ?? '')) ?>" <?= $editClass && (int)$editClass['is_placeholder']===1?'disabled':'' ?>></div>
         <div class="report-filter-actions"><button class="btn btn-primary" type="submit" <?= $editClass && (int)$editClass['is_placeholder']===1?'disabled':'' ?>><?= $editClass?'Simpan Perubahan':'Tambah Rombel' ?></button><?php if($editClass): ?><a class="btn btn-ghost" href="master_kelas.php">Batal</a><?php endif; ?></div>
       </form>
+    </div>
+
+    <div class="main-card master-modern-card">
+      <div class="card-title-row"><div><div class="card-title">Proses Tahun Ajaran</div><p class="payment-auto-note">Kenaikan dijalankan manual oleh admin. Rombel siswa tetap mengikuti huruf rombel yang sama.</p></div></div>
+      <div class="action-bar">
+        <form method="post" onsubmit="return confirm('Lengkapi template rombel A sampai J untuk kelas 1 sampai 6?')">
+          <input type="hidden" name="csrf_token" value="<?= htmlspecialchars($_SESSION['csrf_master_kelas']) ?>">
+          <input type="hidden" name="aksi" value="template_aj">
+          <button class="btn btn-ghost" type="submit">Lengkapi Template A-J</button>
+        </form>
+        <form method="post" onsubmit="return confirm('Proses kenaikan ke tahun ajaran <?= htmlspecialchars($nextAcademicYear) ?>? Siswa kelas 6 akan diarsipkan sebagai lulus.')">
+          <input type="hidden" name="csrf_token" value="<?= htmlspecialchars($_SESSION['csrf_master_kelas']) ?>">
+          <input type="hidden" name="aksi" value="promosi_tahun">
+          <input type="hidden" name="target_tahun_ajaran" value="<?= htmlspecialchars($nextAcademicYear) ?>">
+          <button class="btn btn-primary" type="submit">Proses Kenaikan Tahun Ajaran</button>
+        </form>
+        <form method="post" onsubmit="return confirm('Nonaktifkan rombel kosong yang sedang aktif? Histori lama tetap aman.')">
+          <input type="hidden" name="csrf_token" value="<?= htmlspecialchars($_SESSION['csrf_master_kelas']) ?>">
+          <input type="hidden" name="aksi" value="nonaktifkan_kosong">
+          <button class="btn btn-warning" type="submit">Nonaktifkan Rombel Kosong</button>
+        </form>
+      </div>
     </div>
 
     <div class="main-card master-modern-card master-modern-list">

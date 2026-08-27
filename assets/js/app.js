@@ -141,7 +141,7 @@ function pilihSiswaDatalist(input) {
     const nama = opt.dataset.nama;
     
     // Match if exact match or if user is backspacing but NIS is still at the beginning
-    if (val === opt.value || val === nis || val.startsWith(nis + ' —') || val.startsWith(nis)) {
+    if (val === opt.value || val === nis || val === nama || val.startsWith(nis)) {
       document.getElementById('disp-nis').value = nis || '';
       document.getElementById('disp-nama').value = nama || '';
       document.getElementById('disp-kelas').value = opt.dataset.kelas || '';
@@ -174,18 +174,33 @@ function studentSearchText(opt) {
 function studentSearchOptionLabel(opt) {
   const nis = opt.dataset.nis || '';
   const nama = opt.dataset.nama || opt.textContent.trim() || opt.value || '';
-  return nis && nama ? nis + ' - ' + nama : (opt.value || nama);
+  return nama || opt.value || nis;
 }
 
 function studentSearchClassFilter(input) {
   const selector = input?.dataset.studentClassFilter || '';
-  if (!selector) return { value: '', label: '' };
+  if (!selector) return { value: '', label: '', type: 'all' };
   const select = document.querySelector(selector);
-  if (!select) return { value: '', label: '' };
+  if (!select) return { value: '', label: '', type: 'all' };
   const value = String(select.value || '');
   const selected = select.options?.[select.selectedIndex];
+  let type = 'rombel';
+  let id = value;
+  let level = '';
+  if (!value || value === '0') {
+    type = 'all';
+    id = '';
+  } else if (value.startsWith('tingkat:')) {
+    type = 'tingkat';
+    level = value.slice(8);
+    id = level;
+  } else if (value.startsWith('rombel:')) {
+    id = value.slice(7);
+  }
   return {
-    value: value === '0' ? '' : value,
+    value: type === 'all' ? '' : id,
+    type,
+    level,
     label: selected ? selected.textContent.trim() : ''
   };
 }
@@ -193,6 +208,14 @@ function studentSearchClassFilter(input) {
 function studentSearchOptionsForClass(input, options) {
   const filter = studentSearchClassFilter(input);
   if (!filter.value) return options;
+  if (filter.type === 'tingkat') {
+    return options.filter(opt => {
+      const level = String(opt.dataset.tingkat || '').match(/[1-6]/)?.[0]
+        || String(opt.dataset.kelas || '').match(/[1-6]/)?.[0]
+        || '';
+      return level === filter.level;
+    });
+  }
   return options.filter(opt => String(opt.dataset.kelasId || '') === filter.value);
 }
 
@@ -281,7 +304,8 @@ function renderStudentSearchPanel(input, forceAll) {
       + (opt.dataset.diknas ? ' · NIS Diknas ' + opt.dataset.diknas : '');
     const classBadge = document.createElement('span');
     classBadge.className = 'student-search-class';
-    classBadge.textContent = 'Kelas ' + (opt.dataset.kelas || '-');
+    const classText = opt.dataset.kelas || '-';
+    classBadge.textContent = /^kelas\s/i.test(classText) ? classText : 'Kelas ' + classText;
     main.appendChild(name);
     main.appendChild(nis);
     button.appendChild(main);
@@ -1335,13 +1359,13 @@ function refreshBiayaLainAvailability() {
 
     Array.from(select.options).forEach(option => {
       if (!option.value) return;
-      const baseLabel = option.dataset.baseLabel || option.textContent.replace(/\s+—\s+(Lunas|Sudah dipilih)$/u, '');
+      const baseLabel = option.dataset.baseLabel || option.textContent.replace(/\s+\((Lunas|Sudah dipilih)\)$/u, '');
       option.dataset.baseLabel = baseLabel;
       const fullyPaid = paidBiayaLainForSelectedStudent(option.value) >= parseNumber(option.dataset.nominal || 0) - 0.001;
       const usedByOtherRow = rows.some(otherRow => otherRow !== row
         && otherRow.querySelector('.biaya-lain-select')?.value === option.value);
       option.disabled = option.value !== selectedId && (fullyPaid || usedByOtherRow);
-      option.textContent = baseLabel + (fullyPaid ? ' — Lunas' : (usedByOtherRow ? ' — Sudah dipilih' : ''));
+      option.textContent = baseLabel + (fullyPaid ? ' (Lunas)' : (usedByOtherRow ? ' (Sudah dipilih)' : ''));
     });
 
     const selectedOption = select.options[select.selectedIndex];
