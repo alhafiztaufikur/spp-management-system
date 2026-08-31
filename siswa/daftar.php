@@ -471,8 +471,8 @@ $canEditOpening = !$editStudent || (int)($editStudent['history_count'] ?? 0) ===
 
       <section class="main-card master-modern-shell student-master-shell">
         <div class="master-modern-hero">
-          <div><span class="recap-class-overline">Data Siswa</span><h1>Kelola Siswa</h1><p>Kelola identitas, rombel, tarif, dan status aktif siswa.</p></div>
-          <div class="master-modern-stats"><div><span>Hasil Filter</span><strong><?= number_format($totalStudents) ?></strong></div></div>
+          <div><span class="recap-class-overline">Data Master</span><h1>Data Siswa</h1><p>Kelola identitas siswa, rombel, tarif, saldo awal legacy, dan status aktif siswa.</p></div>
+          <div class="master-modern-stats"><div><span>Hasil Filter</span><strong><?= number_format($totalStudents) ?></strong></div><div><span>Per Halaman</span><strong><?= number_format($perPage) ?></strong></div></div>
         </div>
       </section>
 

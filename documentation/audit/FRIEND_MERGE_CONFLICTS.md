@@ -6,10 +6,10 @@ Dokumen ini mencatat perbandingan perubahan dari laptop teman terhadap branch ke
 
 | Referensi | Commit |
 |---|---|
-| Branch keamanan lokal | `a5ac4ffe0d2c4f19c1c51d766cf0e80245de9835` |
-| `origin/main` teman | `95bdb9b117564180ccb6c8de225205e7c4369d94` |
+| Branch keamanan/integrasi | `e08f1f7c18783e0161476f32ae26d429b95e63e0` |
+| `origin/main` teman terbaru | `def1b44f2eb009ff1f4684d567891d9c667ec4c9` |
 | Merge base | `a446af3fbb89cb0933870443be5aedd85d34eaa3` |
-| Commit remote yang diperiksa | `5623529`, `95bdb9b` |
+| Commit remote yang diperiksa | `5623529`, `95bdb9b`, `def1b44` |
 
 `main` lokal tetap dipertahankan sebagai baseline keamanan. Pekerjaan integrasi dilakukan pada branch `safety-branch`; tidak ada force-push atau rewrite history.
 
@@ -64,3 +64,9 @@ Alasannya adalah perubahan tersebut menyentuh promosi/pengarsipan siswa, export 
 ## Status
 
 Register ini diperbarui setiap kali satu kelompok konflik ditinjau. Perubahan yang ditunda tidak dianggap aman hanya karena Git dapat melakukan auto-merge.
+
+## Pembaruan `def1b44` — 2026-08-31
+
+Commit terbaru menambahkan sistem tagihan tahunan melalui `includes/tagihan_tahunan.php` dan `sql/add_annual_student_fees.sql`, mengubah laporan/receipt, serta mengubah `pembayaran/proses.php`. Perubahan tersebut ditunda seluruhnya. Pemeriksaan menunjukkan versi remote menghapus atau melewati bootstrap security, CSRF, idempotency, audit snapshot, dan validasi scalar lokal, serta melakukan pencocokan pembayaran lama ke tagihan tahunan. Tidak ada backfill, migrasi, seed, atau perubahan handler annual fee yang diterapkan pada `safety-branch`.
+
+Perubahan aman yang diambil dari delta terbaru hanya penyempurnaan label/statistik UI dan metadata NIS Diknas pada halaman master; handler POST dan kontrak finansial tetap berasal dari branch keamanan.

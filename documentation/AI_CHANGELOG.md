@@ -13,6 +13,22 @@ File ini mencatat perubahan proyek secara reverse chronological. Baca [PROJECT_C
 - Jangan menghapus atau menulis ulang entri lama. Tambahkan entri koreksi bila diperlukan.
 - Perubahan implementasi dan entri changelog wajib masuk commit yang sama.
 
+## 2026-08-31 - Penyesuaian Delta `origin/main` `def1b44`
+
+**AI/Aktor:** Codex berbasis GPT-5
+
+**Tujuan:** Meninjau push teman terbaru tanpa mengorbankan hardening pada `safety-branch`.
+
+**Perubahan fitur dan perilaku:** Hanya statistik/label UI pada `siswa/daftar.php` dan metadata NIS Diknas pada pemilih siswa `master_biaya_lain.php` yang diambil secara manual. Sistem tagihan tahunan, perubahan handler pembayaran, laporan, receipt, serta seed/backfill tidak diambil.
+
+**Database dan migrasi:** Tidak ada migrasi atau mutasi database. `sql/add_annual_student_fees.sql`, perubahan schema/verifier, repair saldo, dan seed demo tetap pending.
+
+**Kompatibilitas dan data lama:** Tidak ada pencocokan otomatis pembayaran legacy. Bootstrap security, CSRF, idempotency, audit, prepared statement, dan kontrak ledger tetap berasal dari branch keamanan.
+
+**Verifikasi:** Perbandingan `e08f1f7..def1b44`, pemeriksaan konflik `git merge-tree`, PHP lint, `node --check assets/js/app.js`, security bootstrap scan, dan `git diff --check`. Regression disposable belum dijalankan karena MySQL lokal tidak aktif.
+
+**Catatan tindak lanjut:** Konflik terbaru dan alasan penundaan dicatat di `documentation/audit/FRIEND_MERGE_CONFLICTS.md`. Branch hasil tetap `safety-branch`; `main` tidak diubah.
+
 ## 2026-08-31 - Integrasi Aman Perubahan Teman
 
 **AI/Aktor:** Codex berbasis GPT-5

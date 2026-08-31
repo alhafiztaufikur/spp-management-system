@@ -264,3 +264,9 @@ Branch integrasi: `safety-branch` (dibuat dari `main` lokal `a5ac4ff`). Backup k
 Perubahan UI/JavaScript berisiko rendah diambil secara manual tanpa menimpa bootstrap keamanan, CSRF, idempotency, audit, validasi input, dan kontrak ledger. Register keputusan dan seluruh konflik manual ada di `documentation/audit/FRIEND_MERGE_CONFLICTS.md`.
 
 Perubahan laporan, tabungan, pembayaran, CSS global, promosi/pengarsipan rombel, export baru, schema, repair saldo, dan seed demo ditunda sampai review manual serta pengujian disposable selesai. Tidak ada migrasi atau perubahan database produksi pada tahap ini.
+
+## Penyesuaian terhadap `origin/main` terbaru — 2026-08-31
+
+`origin/main` telah maju ke `def1b44` dan menambahkan fitur tagihan tahunan beserta migrasi, backfill pembayaran lama, perubahan laporan/receipt, dan perubahan besar pada handler pembayaran. Fitur annual fee dan seluruh perubahan finansial tersebut ditunda; tidak ada pencocokan histori legacy atau migrasi yang dijalankan.
+
+Delta aman yang diterapkan ke `safety-branch` hanya penyempurnaan statistik/label UI pada `siswa/daftar.php` dan metadata NIS Diknas pada pemilih siswa `master_biaya_lain.php`. Bootstrap security, CSRF, idempotency, audit, validasi input, dan kontrak ledger tetap dipertahankan. Detail konflik terbaru ada di `documentation/audit/FRIEND_MERGE_CONFLICTS.md`.
