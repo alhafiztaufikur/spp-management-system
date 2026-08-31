@@ -371,6 +371,54 @@ CREATE TABLE `bayar_du` (
   CONSTRAINT `fk_bayar_du_tagihan` FOREIGN KEY (`tagihan_daftar_ulang_id`) REFERENCES `tagihan_daftar_ulang`(`id`) ON DELETE RESTRICT ON UPDATE CASCADE
 ) ENGINE=InnoDB;
 
+DROP TABLE IF EXISTS `bayar_tahunan_siswa`;
+DROP TABLE IF EXISTS `tagihan_tahunan_siswa`;
+CREATE TABLE `tagihan_tahunan_siswa` (
+  `id` BIGINT AUTO_INCREMENT PRIMARY KEY,
+  `tahun_ajaran_id` INT NOT NULL,
+  `penempatan_id` BIGINT DEFAULT NULL,
+  `no_induk` VARCHAR(10) NOT NULL,
+  `komponen` VARCHAR(30) NOT NULL,
+  `nama_snapshot` VARCHAR(100) NOT NULL,
+  `kelas_snapshot` CHAR(1) NOT NULL,
+  `kelas_rombel_snapshot` VARCHAR(30) DEFAULT NULL,
+  `tahun_ajaran_snapshot` CHAR(9) NOT NULL,
+  `nominal_awal` DECIMAL(15,2) NOT NULL DEFAULT 0,
+  `potongan` DECIMAL(15,2) NOT NULL DEFAULT 0,
+  `nominal_tagihan` DECIMAL(15,2) NOT NULL DEFAULT 0,
+  `status` ENUM('open','cancelled') NOT NULL DEFAULT 'open',
+  `created_by` VARCHAR(100) DEFAULT NULL,
+  `created_at` TIMESTAMP NOT NULL DEFAULT CURRENT_TIMESTAMP,
+  `updated_at` TIMESTAMP NOT NULL DEFAULT CURRENT_TIMESTAMP ON UPDATE CURRENT_TIMESTAMP,
+  UNIQUE KEY `uk_tagihan_tahunan_siswa` (`tahun_ajaran_id`,`no_induk`,`komponen`),
+  KEY `idx_tagihan_tahunan_penempatan` (`penempatan_id`,`komponen`),
+  KEY `idx_tagihan_tahunan_siswa_status` (`no_induk`,`tahun_ajaran_id`,`status`),
+  KEY `idx_tagihan_tahunan_component` (`tahun_ajaran_id`,`komponen`,`status`),
+  CONSTRAINT `fk_tagihan_tahunan_tahun` FOREIGN KEY (`tahun_ajaran_id`) REFERENCES `tahun_ajaran`(`id`) ON DELETE RESTRICT ON UPDATE CASCADE,
+  CONSTRAINT `fk_tagihan_tahunan_penempatan` FOREIGN KEY (`penempatan_id`) REFERENCES `siswa_tahun_ajaran`(`id`) ON DELETE SET NULL ON UPDATE CASCADE,
+  CONSTRAINT `fk_tagihan_tahunan_siswa` FOREIGN KEY (`no_induk`) REFERENCES `siswa`(`NO_INDUK`) ON DELETE RESTRICT ON UPDATE CASCADE,
+  CONSTRAINT `chk_tagihan_tahunan_nominal` CHECK (`nominal_awal` >= 0 AND `potongan` >= 0 AND `nominal_tagihan` >= 0),
+  CONSTRAINT `chk_tagihan_tahunan_kelas` CHECK (`kelas_snapshot` IN ('1','2','3','4','5','6'))
+) ENGINE=InnoDB;
+
+CREATE TABLE `bayar_tahunan_siswa` (
+  `id` BIGINT AUTO_INCREMENT PRIMARY KEY,
+  `bayar_id` INT NOT NULL,
+  `tagihan_tahunan_id` BIGINT NOT NULL,
+  `no_induk` VARCHAR(10) NOT NULL,
+  `komponen` VARCHAR(30) NOT NULL,
+  `th_ajaran` CHAR(9) NOT NULL,
+  `jumlah` DECIMAL(15,2) NOT NULL DEFAULT 0,
+  `created_at` TIMESTAMP NOT NULL DEFAULT CURRENT_TIMESTAMP,
+  UNIQUE KEY `uk_bayar_tahunan_bayar_component` (`bayar_id`,`komponen`),
+  KEY `idx_bayar_tahunan_tagihan` (`tagihan_tahunan_id`),
+  KEY `idx_bayar_tahunan_siswa` (`no_induk`,`th_ajaran`,`komponen`),
+  CONSTRAINT `fk_bayar_tahunan_bayar` FOREIGN KEY (`bayar_id`) REFERENCES `bayar`(`id`) ON DELETE CASCADE ON UPDATE CASCADE,
+  CONSTRAINT `fk_bayar_tahunan_tagihan` FOREIGN KEY (`tagihan_tahunan_id`) REFERENCES `tagihan_tahunan_siswa`(`id`) ON DELETE RESTRICT ON UPDATE CASCADE,
+  CONSTRAINT `fk_bayar_tahunan_siswa` FOREIGN KEY (`no_induk`) REFERENCES `siswa`(`NO_INDUK`) ON DELETE CASCADE ON UPDATE CASCADE,
+  CONSTRAINT `chk_bayar_tahunan_jumlah` CHECK (`jumlah` >= 0)
+) ENGINE=InnoDB;
+
 INSERT INTO `tahun_ajaran` (`label`, `tanggal_mulai`, `tanggal_selesai`, `status`, `published_at`) VALUES
 ('2026/2027', '2026-07-01', '2027-06-30', 'published', NOW());
 
@@ -403,6 +451,29 @@ FROM siswa s
 JOIN tahun_ajaran ta ON ta.label = '2026/2027'
 JOIN siswa_tahun_ajaran sta ON sta.tahun_ajaran_id = ta.id AND sta.no_induk = s.NO_INDUK
 LEFT JOIN Daftar_ulang du ON du.tahun_ajaran_id = ta.id AND du.kelas = s.KELAS;
+
+INSERT INTO `tagihan_tahunan_siswa` (
+  `tahun_ajaran_id`, `penempatan_id`, `no_induk`, `komponen`, `nama_snapshot`,
+  `kelas_snapshot`, `kelas_rombel_snapshot`, `tahun_ajaran_snapshot`,
+  `nominal_awal`, `potongan`, `nominal_tagihan`, `status`, `created_by`
+)
+SELECT ta.id, sta.id, s.NO_INDUK, fees.komponen, s.NAMA, sta.kelas,
+       sta.kelas_rombel_snapshot, ta.label, fees.nominal_awal, fees.potongan,
+       fees.nominal_tagihan, 'open', 'schema'
+FROM siswa s
+JOIN tahun_ajaran ta ON ta.label = '2026/2027'
+JOIN siswa_tahun_ajaran sta ON sta.tahun_ajaran_id = ta.id AND sta.no_induk = s.NO_INDUK
+JOIN (
+  SELECT 'pangkal' AS komponen, sf.`NO_INDUK`, sf.`PANGKAL` AS nominal_awal, sf.`potong_pangkal` AS potongan,
+         IF(sf.`tot_pangkal` > 0, sf.`tot_pangkal`, GREATEST(sf.`PANGKAL` - sf.`potong_pangkal`, 0)) AS nominal_tagihan FROM `siswa` sf
+  UNION ALL SELECT 'bangunan', sf.`NO_INDUK`, sf.`BANGUNAN`, 0, sf.`BANGUNAN` FROM `siswa` sf
+  UNION ALL SELECT 'seragam', sf.`NO_INDUK`, sf.`SERAGAM`, 0, sf.`SERAGAM` FROM `siswa` sf
+  UNION ALL SELECT 'kegiatan', sf.`NO_INDUK`, sf.`KEGIATAN`, 0, sf.`KEGIATAN` FROM `siswa` sf
+  UNION ALL SELECT 'komite', sf.`NO_INDUK`, sf.`POMG`, 0, sf.`POMG` FROM `siswa` sf
+  UNION ALL SELECT 'makan', sf.`NO_INDUK`, sf.`MAKAN`, 0, sf.`MAKAN` FROM `siswa` sf
+  UNION ALL SELECT 'sorga', sf.`NO_INDUK`, sf.`SORGA`, 0, sf.`SORGA` FROM `siswa` sf
+  UNION ALL SELECT 'infaq', sf.`NO_INDUK`, sf.`INFAQ`, 0, sf.`INFAQ` FROM `siswa` sf
+) fees ON fees.NO_INDUK = s.NO_INDUK;
 
 -- Tabel Tabungan
 DROP TABLE IF EXISTS `tabungan`;

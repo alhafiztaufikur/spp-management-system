@@ -8,6 +8,7 @@ require_once '../includes/auth.php';
 require_once '../includes/pagination.php';
 require_once '../includes/daftar_ulang.php';
 require_once '../includes/kelas.php';
+require_once '../includes/tagihan_tahunan.php';
 requireRole(['admin', 'bendahara']);
 
 $flash = $_SESSION['flash'] ?? null;
@@ -297,9 +298,9 @@ if (!$isUnpaidReport) {
         default => 'CAST(KELAS AS UNSIGNED) ASC, NAMA ASC',
     };
 
-    if ($report_type === 'belum_spp' || $report_type === 'belum_komite') {
-        $studentBillColumn = $report_type === 'belum_spp' ? 'SPP_PERBULAN' : 'POMG';
-        $paymentColumn = $report_type === 'belum_spp' ? 'U_SPP' : 'U_KOMITE';
+    if ($report_type === 'belum_spp') {
+        $studentBillColumn = 'SPP_PERBULAN';
+        $paymentColumn = 'U_SPP';
         $stmtUnpaid = $koneksi->prepare("
             SELECT *
             FROM (
@@ -319,6 +320,29 @@ if (!$isUnpaidReport) {
             ORDER BY $orderUnpaid
         ");
         report_bind($stmtUnpaid, 'ssss' . str_repeat('s', count($studentSearchParams)), array_merge([$filter_tahun, $periodMonthCode, $periodMonthName, $periodMonthLegacy], $studentSearchParams));
+    } elseif ($report_type === 'belum_komite') {
+        $stmtUnpaid = $koneksi->prepare("
+            SELECT *
+            FROM (
+                SELECT s.NO_INDUK, s.NO_induk_diknas, s.NAMA, s.KELAS,
+                       t.nominal_tagihan AS tagihan,
+                       COALESCE(SUM(d.jumlah), 0) AS sudah_bayar,
+                       GREATEST(t.nominal_tagihan - COALESCE(SUM(d.jumlah), 0), 0) AS sisa
+                FROM tagihan_tahunan_siswa t
+                JOIN siswa s ON s.NO_INDUK = t.no_induk
+                LEFT JOIN bayar_tahunan_siswa d ON d.tagihan_tahunan_id = t.id
+                WHERE s.is_active = 1
+                  AND t.status = 'open'
+                  AND t.komponen = 'komite'
+                  AND t.tahun_ajaran_snapshot = ?
+                  AND t.nominal_tagihan > 0
+                  $studentSearchSql
+                GROUP BY s.NO_INDUK, s.NO_induk_diknas, s.NAMA, s.KELAS, t.nominal_tagihan
+            ) unpaid
+            WHERE sisa > 0
+            ORDER BY $orderUnpaid
+        ");
+        report_bind($stmtUnpaid, 's' . str_repeat('s', count($studentSearchParams)), array_merge([$academicYear], $studentSearchParams));
     } elseif ($report_type === 'belum_du') {
         $stmtUnpaid = $koneksi->prepare("
             SELECT *

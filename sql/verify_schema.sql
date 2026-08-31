@@ -119,6 +119,10 @@ FROM (
   UNION ALL
   SELECT 'table.tagihan_daftar_ulang', EXISTS(SELECT 1 FROM information_schema.TABLES WHERE TABLE_SCHEMA=DATABASE() AND TABLE_NAME='tagihan_daftar_ulang')
   UNION ALL
+  SELECT 'table.tagihan_tahunan_siswa', EXISTS(SELECT 1 FROM information_schema.TABLES WHERE TABLE_SCHEMA=DATABASE() AND TABLE_NAME='tagihan_tahunan_siswa')
+  UNION ALL
+  SELECT 'table.bayar_tahunan_siswa', EXISTS(SELECT 1 FROM information_schema.TABLES WHERE TABLE_SCHEMA=DATABASE() AND TABLE_NAME='bayar_tahunan_siswa')
+  UNION ALL
   SELECT 'table.daftar_ulang_audit_log', EXISTS(SELECT 1 FROM information_schema.TABLES WHERE TABLE_SCHEMA=DATABASE() AND TABLE_NAME='daftar_ulang_audit_log')
   UNION ALL
   SELECT 'bayar_du.tagihan_daftar_ulang_id', EXISTS(SELECT 1 FROM information_schema.COLUMNS WHERE TABLE_SCHEMA=DATABASE() AND TABLE_NAME='bayar_du' AND COLUMN_NAME='tagihan_daftar_ulang_id')
@@ -265,6 +269,16 @@ FROM (
       AND TABLE_NAME='tagihan_daftar_ulang' AND INDEX_NAME='uk_tagihan_du_siswa_tahun' AND NON_UNIQUE=0
   )
   UNION ALL
+  SELECT 'uk_tagihan_tahunan_siswa', EXISTS(
+    SELECT 1 FROM information_schema.STATISTICS WHERE TABLE_SCHEMA=DATABASE()
+      AND TABLE_NAME='tagihan_tahunan_siswa' AND INDEX_NAME='uk_tagihan_tahunan_siswa' AND NON_UNIQUE=0
+  )
+  UNION ALL
+  SELECT 'uk_bayar_tahunan_bayar_component', EXISTS(
+    SELECT 1 FROM information_schema.STATISTICS WHERE TABLE_SCHEMA=DATABASE()
+      AND TABLE_NAME='bayar_tahunan_siswa' AND INDEX_NAME='uk_bayar_tahunan_bayar_component' AND NON_UNIQUE=0
+  )
+  UNION ALL
   SELECT 'chk_tahun_ajaran_dates', EXISTS(
     SELECT 1 FROM information_schema.CHECK_CONSTRAINTS WHERE CONSTRAINT_SCHEMA=DATABASE()
       AND CONSTRAINT_NAME='chk_tahun_ajaran_dates'
@@ -285,6 +299,16 @@ FROM (
       AND CONSTRAINT_NAME='chk_tagihan_du_kelas'
   )
   UNION ALL
+  SELECT 'chk_tagihan_tahunan_nominal', EXISTS(
+    SELECT 1 FROM information_schema.CHECK_CONSTRAINTS WHERE CONSTRAINT_SCHEMA=DATABASE()
+      AND CONSTRAINT_NAME='chk_tagihan_tahunan_nominal'
+  )
+  UNION ALL
+  SELECT 'chk_bayar_tahunan_jumlah', EXISTS(
+    SELECT 1 FROM information_schema.CHECK_CONSTRAINTS WHERE CONSTRAINT_SCHEMA=DATABASE()
+      AND CONSTRAINT_NAME='chk_bayar_tahunan_jumlah'
+  )
+  UNION ALL
   SELECT 'chk_tabungan_saldo_nonnegative', EXISTS(
     SELECT 1 FROM information_schema.CHECK_CONSTRAINTS WHERE CONSTRAINT_SCHEMA=DATABASE()
       AND CONSTRAINT_NAME='chk_tabungan_saldo_nonnegative'
@@ -293,6 +317,16 @@ FROM (
   SELECT 'fk_bayar_du_tagihan', EXISTS(
     SELECT 1 FROM information_schema.TABLE_CONSTRAINTS WHERE CONSTRAINT_SCHEMA=DATABASE()
       AND TABLE_NAME='bayar_du' AND CONSTRAINT_NAME='fk_bayar_du_tagihan' AND CONSTRAINT_TYPE='FOREIGN KEY'
+  )
+  UNION ALL
+  SELECT 'fk_bayar_tahunan_bayar', EXISTS(
+    SELECT 1 FROM information_schema.TABLE_CONSTRAINTS WHERE CONSTRAINT_SCHEMA=DATABASE()
+      AND TABLE_NAME='bayar_tahunan_siswa' AND CONSTRAINT_NAME='fk_bayar_tahunan_bayar' AND CONSTRAINT_TYPE='FOREIGN KEY'
+  )
+  UNION ALL
+  SELECT 'fk_bayar_tahunan_tagihan', EXISTS(
+    SELECT 1 FROM information_schema.TABLE_CONSTRAINTS WHERE CONSTRAINT_SCHEMA=DATABASE()
+      AND TABLE_NAME='bayar_tahunan_siswa' AND CONSTRAINT_NAME='fk_bayar_tahunan_tagihan' AND CONSTRAINT_TYPE='FOREIGN KEY'
   )
   UNION ALL
   SELECT 'table.master_kelas', EXISTS(SELECT 1 FROM information_schema.TABLES WHERE TABLE_SCHEMA=DATABASE() AND TABLE_NAME='master_kelas')

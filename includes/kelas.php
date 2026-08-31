@@ -1,6 +1,7 @@
 <?php
 
 require_once __DIR__ . '/daftar_ulang.php';
+require_once __DIR__ . '/tagihan_tahunan.php';
 
 function class_label(array $class): string {
     $level = (int)($class['tingkat'] ?? 0);
@@ -84,7 +85,7 @@ function class_process_year_promotion(mysqli $db, string $targetYear): array {
         VALUES (?,?,?,?,?,?,?,?)
         ON DUPLICATE KEY UPDATE kelas=VALUES(kelas),master_kelas_id=VALUES(master_kelas_id),
           kelas_rombel_snapshot=VALUES(kelas_rombel_snapshot),spp_perbulan_snapshot=VALUES(spp_perbulan_snapshot),
-          komite_snapshot=VALUES(komite_snapshot),status=VALUES(status)");
+          komite_snapshot=VALUES(komite_snapshot),status=VALUES(status),id=LAST_INSERT_ID(id)");
     foreach ($students as $student) {
         $level = (int)($student['tingkat'] ?: $student['KELAS']);
         $code = strtoupper(trim((string)($student['kode_rombel'] ?? '')));
@@ -126,6 +127,10 @@ function class_process_year_promotion(mysqli $db, string $targetYear): array {
         $updateStudent->execute();
         $insertPlacement->bind_param('issisdds', $yearId, $noInduk, $classText, $nextClassId, $snapshot, $spp, $komite, $status);
         $insertPlacement->execute();
+        $placementId = (int)$db->insert_id;
+        if ($placementId > 0) {
+            annual_fee_sync_for_placement($db, $placementId, 'promotion');
+        }
         $promoted++;
     }
     $selectNext->close(); $updateStudent->close(); $archiveStudent->close(); $insertPlacement->close();
@@ -188,8 +193,20 @@ function class_validate_tariff_snapshot_change(
     if (abs($oldSpp - $newSpp) > .001 && class_component_paid_in_academic_year($db, $noInduk, $label, 'spp') > 0) {
         throw new RuntimeException('Tarif SPP tahun ajaran ' . $label . ' sudah memiliki pembayaran dan tidak dapat diubah. Koreksi transaksi terlebih dahulu.');
     }
-    if (abs($oldKomite - $newKomite) > .001 && class_component_paid_in_academic_year($db, $noInduk, $label, 'komite') > 0) {
-        throw new RuntimeException('Tarif Komite tahun ajaran ' . $label . ' sudah memiliki pembayaran dan tidak dapat diubah. Koreksi transaksi terlebih dahulu.');
+    $paidKomite = 0.0;
+    $yearId = annual_fee_year_id($db, $label, false);
+    if ($yearId) {
+        $stmt = $db->prepare("SELECT COALESCE(SUM(bts.jumlah), 0) AS paid
+            FROM tagihan_tahunan_siswa t
+            JOIN bayar_tahunan_siswa bts ON bts.tagihan_tahunan_id = t.id
+            WHERE t.tahun_ajaran_id = ? AND t.no_induk = ? AND t.komponen = 'komite'");
+        $stmt->bind_param('is', $yearId, $noInduk);
+        $stmt->execute();
+        $paidKomite = (float)($stmt->get_result()->fetch_assoc()['paid'] ?? 0);
+        $stmt->close();
+    }
+    if (abs($oldKomite - $newKomite) > .001 && $newKomite + .001 < $paidKomite) {
+        throw new RuntimeException('Tarif Komite tahun ajaran ' . $label . ' tidak boleh lebih kecil dari yang sudah dibayar, yaitu Rp ' . number_format($paidKomite, 0, ',', '.') . '.');
     }
 }
 
@@ -244,6 +261,9 @@ function class_sync_student_current_year(
         $stmt->execute();
         $placementId = (int)($stmt->get_result()->fetch_assoc()['id'] ?? 0);
         $stmt->close();
+    }
+    if ($placementId > 0 && $status === 'aktif') {
+        annual_fee_sync_for_placement($db, $placementId, 'system');
     }
     return $placementId > 0 ? $placementId : null;
 }

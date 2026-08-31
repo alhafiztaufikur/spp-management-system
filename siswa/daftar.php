@@ -39,12 +39,14 @@ function student_history_count(mysqli $db, string $noInduk): int {
 }
 
 function student_optional_fee_payments(mysqli $db, string $noInduk): array {
-    $stmt = $db->prepare('SELECT
-        COALESCE(SUM(U_MAKAN), 0) AS MAKAN,
-        COALESCE(SUM(U_SORGA), 0) AS SORGA,
-        COALESCE(SUM(U_INFAQ), 0) AS INFAQ
-        FROM bayar WHERE NO_INDUK = ?');
-    $stmt->bind_param('s', $noInduk);
+    $year = du_current_academic_year();
+    $stmt = $db->prepare("SELECT
+        COALESCE(SUM(CASE WHEN bts.komponen = 'makan' THEN bts.jumlah ELSE 0 END), 0) AS MAKAN,
+        COALESCE(SUM(CASE WHEN bts.komponen = 'sorga' THEN bts.jumlah ELSE 0 END), 0) AS SORGA,
+        COALESCE(SUM(CASE WHEN bts.komponen = 'infaq' THEN bts.jumlah ELSE 0 END), 0) AS INFAQ
+        FROM bayar_tahunan_siswa bts
+        WHERE bts.no_induk = ? AND bts.th_ajaran = ?");
+    $stmt->bind_param('ss', $noInduk, $year);
     $stmt->execute();
     $paid = $stmt->get_result()->fetch_assoc() ?: [];
     $stmt->close();
@@ -479,6 +481,7 @@ $canEditOpening = !$editStudent || (int)($editStudent['history_count'] ?? 0) ===
           </div>
           <div class="master-modern-stats">
             <div><span>Hasil Filter</span><strong><?= number_format($totalStudents) ?></strong></div>
+            <div><span>Per Halaman</span><strong><?= number_format($perPage) ?></strong></div>
           </div>
         </div>
       </section>

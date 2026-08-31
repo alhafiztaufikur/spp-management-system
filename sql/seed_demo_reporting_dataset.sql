@@ -14,6 +14,7 @@ SET FOREIGN_KEY_CHECKS = 0;
 START TRANSACTION;
 
 DELETE FROM `bayar_biaya_lain`;
+DELETE FROM `bayar_tahunan_siswa`;
 DELETE FROM `bayar_spp_periode`;
 DELETE FROM `bayar_du`;
 DELETE FROM `transaksi_m`;
@@ -25,6 +26,7 @@ DELETE FROM `tagihan_biaya_lain`;
 DELETE FROM `master_biaya_lain`;
 DELETE FROM `daftar_ulang_audit_log`;
 DELETE FROM `tagihan_daftar_ulang`;
+DELETE FROM `tagihan_tahunan_siswa`;
 DELETE FROM `Daftar_ulang`;
 DELETE FROM `siswa_tahun_ajaran`;
 DELETE FROM `siswa_audit_log`;
@@ -236,6 +238,30 @@ JOIN `siswa` siswa ON siswa.`NO_INDUK` = s.`no_induk`
 JOIN `tahun_ajaran` ta ON ta.`label` = '2026/2027'
 JOIN `siswa_tahun_ajaran` sta ON sta.`tahun_ajaran_id` = ta.`id` AND sta.`no_induk` = s.`no_induk`
 JOIN `Daftar_ulang` du ON du.`tahun_ajaran_id` = ta.`id` AND du.`kelas` = CAST(s.`tingkat` AS CHAR);
+
+INSERT INTO `tagihan_tahunan_siswa` (
+  `tahun_ajaran_id`, `penempatan_id`, `no_induk`, `komponen`, `nama_snapshot`,
+  `kelas_snapshot`, `kelas_rombel_snapshot`, `tahun_ajaran_snapshot`,
+  `nominal_awal`, `potongan`, `nominal_tagihan`, `status`, `created_by`
+)
+SELECT
+  ta.`id`, sta.`id`, s.`no_induk`, fees.`komponen`, siswa.`NAMA`,
+  CAST(s.`tingkat` AS CHAR), CONCAT(s.`tingkat`, s.`rombel`), ta.`label`,
+  fees.`nominal_awal`, fees.`potongan`, fees.`nominal_tagihan`, 'open', 'seed'
+FROM `seed_students` s
+JOIN `siswa` siswa ON siswa.`NO_INDUK` = s.`no_induk`
+JOIN `tahun_ajaran` ta ON ta.`label` = '2026/2027'
+JOIN `siswa_tahun_ajaran` sta ON sta.`tahun_ajaran_id` = ta.`id` AND sta.`no_induk` = s.`no_induk`
+JOIN (
+  SELECT 'pangkal' AS `komponen`, sf.`NO_INDUK`, sf.`PANGKAL` AS `nominal_awal`, sf.`potong_pangkal` AS `potongan`, sf.`tot_pangkal` AS `nominal_tagihan` FROM `siswa` sf
+  UNION ALL SELECT 'bangunan', sf.`NO_INDUK`, sf.`BANGUNAN`, 0, sf.`BANGUNAN` FROM `siswa` sf
+  UNION ALL SELECT 'seragam', sf.`NO_INDUK`, sf.`SERAGAM`, 0, sf.`SERAGAM` FROM `siswa` sf
+  UNION ALL SELECT 'kegiatan', sf.`NO_INDUK`, sf.`KEGIATAN`, 0, sf.`KEGIATAN` FROM `siswa` sf
+  UNION ALL SELECT 'komite', sf.`NO_INDUK`, sf.`POMG`, 0, sf.`POMG` FROM `siswa` sf
+  UNION ALL SELECT 'makan', sf.`NO_INDUK`, sf.`MAKAN`, 0, sf.`MAKAN` FROM `siswa` sf
+  UNION ALL SELECT 'sorga', sf.`NO_INDUK`, sf.`SORGA`, 0, sf.`SORGA` FROM `siswa` sf
+  UNION ALL SELECT 'infaq', sf.`NO_INDUK`, sf.`INFAQ`, 0, sf.`INFAQ` FROM `siswa` sf
+) fees ON fees.`NO_INDUK` = s.`no_induk`;
 
 INSERT INTO `tagihan_biaya_lain` (
   `master_biaya_lain_id`, `no_induk`, `master_kelas_id`, `nama_snapshot`,
@@ -523,17 +549,34 @@ LEFT JOIN (
   GROUP BY `NO_INDUK`
 ) k ON k.`NO_INDUK` = s.`no_induk`;
 
+INSERT INTO `bayar_tahunan_siswa` (`bayar_id`, `tagihan_tahunan_id`, `no_induk`, `komponen`, `th_ajaran`, `jumlah`)
+SELECT legacy.`bayar_id`, t.`id`, legacy.`NO_INDUK`, legacy.`komponen`, t.`tahun_ajaran_snapshot`, legacy.`jumlah`
+FROM (
+  SELECT `id` AS `bayar_id`, `NO_INDUK`, 'pangkal' AS `komponen`, `U_PANGKAL` AS `jumlah` FROM `bayar` WHERE `U_PANGKAL` > 0
+  UNION ALL SELECT `id`, `NO_INDUK`, 'bangunan', `U_BANGUNAN` FROM `bayar` WHERE `U_BANGUNAN` > 0
+  UNION ALL SELECT `id`, `NO_INDUK`, 'seragam', `U_SERAGAM` FROM `bayar` WHERE `U_SERAGAM` > 0
+  UNION ALL SELECT `id`, `NO_INDUK`, 'kegiatan', `U_KEGIATAN` FROM `bayar` WHERE `U_KEGIATAN` > 0
+  UNION ALL SELECT `id`, `NO_INDUK`, 'komite', `U_KOMITE` FROM `bayar` WHERE `U_KOMITE` > 0
+  UNION ALL SELECT `id`, `NO_INDUK`, 'makan', `U_MAKAN` FROM `bayar` WHERE `U_MAKAN` > 0
+  UNION ALL SELECT `id`, `NO_INDUK`, 'sorga', `U_SORGA` FROM `bayar` WHERE `U_SORGA` > 0
+  UNION ALL SELECT `id`, `NO_INDUK`, 'infaq', `U_INFAQ` FROM `bayar` WHERE `U_INFAQ` > 0
+) legacy
+JOIN `tagihan_tahunan_siswa` t ON t.`no_induk` = legacy.`NO_INDUK`
+  AND t.`komponen` = legacy.`komponen`
+  AND t.`tahun_ajaran_snapshot` = '2026/2027';
+
 UPDATE `siswa` s
 LEFT JOIN (
   SELECT
-    `NO_INDUK`,
-    COALESCE(SUM(`U_PANGKAL`), 0) AS `pangkal_bayar`,
-    COALESCE(SUM(`U_BANGUNAN`), 0) AS `bangunan_bayar`,
-    COALESCE(SUM(`U_SERAGAM`), 0) AS `seragam_bayar`,
-    COALESCE(SUM(`U_KEGIATAN`), 0) AS `kegiatan_bayar`
-  FROM `bayar`
-  GROUP BY `NO_INDUK`
-) p ON p.`NO_INDUK` = s.`NO_INDUK`
+    `no_induk`,
+    COALESCE(SUM(CASE WHEN `komponen` = 'pangkal' THEN `jumlah` ELSE 0 END), 0) AS `pangkal_bayar`,
+    COALESCE(SUM(CASE WHEN `komponen` = 'bangunan' THEN `jumlah` ELSE 0 END), 0) AS `bangunan_bayar`,
+    COALESCE(SUM(CASE WHEN `komponen` = 'seragam' THEN `jumlah` ELSE 0 END), 0) AS `seragam_bayar`,
+    COALESCE(SUM(CASE WHEN `komponen` = 'kegiatan' THEN `jumlah` ELSE 0 END), 0) AS `kegiatan_bayar`
+  FROM `bayar_tahunan_siswa`
+  WHERE `th_ajaran` = '2026/2027'
+  GROUP BY `no_induk`
+) p ON p.`no_induk` = s.`NO_INDUK`
 SET
   s.`PANGKAL_BAYAR` = COALESCE(p.`pangkal_bayar`, 0),
   s.`BANGUNAN_BAYAR` = COALESCE(p.`bangunan_bayar`, 0),

@@ -4709,6 +4709,63 @@ button.du-page-link {
   }
 }
 
+/* Compact Rekap Laporan Keuangan header */
+.report-general-shell .recap-report-header {
+  grid-template-columns: minmax(250px, .58fr) minmax(760px, 1.42fr) !important;
+  gap: 28px;
+  padding-block: 24px;
+}
+.report-general-shell .report-general-filter {
+  grid-template-columns: minmax(200px, 1fr) minmax(190px, .9fr) minmax(160px, .75fr) minmax(115px, .5fr) !important;
+  gap: 9px !important;
+}
+.report-general-shell .report-general-filter .field-row.full-span {
+  grid-column: 1 / 3 !important;
+}
+.report-general-shell .report-general-filter .report-filter-actions {
+  grid-column: 3 / 5 !important;
+  grid-template-columns: 1fr .72fr .95fr !important;
+  align-self: end;
+}
+.report-general-shell .report-general-filter .report-export-actions {
+  grid-column: 3 / 5 !important;
+  grid-template-columns: repeat(2, minmax(0, 1fr)) !important;
+  justify-self: stretch;
+  padding: 0;
+  background: transparent;
+}
+.report-general-shell .report-general-filter .report-export-actions .btn {
+  min-height: 36px;
+}
+.report-general-shell .report-general-filter .btn {
+  min-width: 0;
+  padding-inline: 10px !important;
+  font-size: 12px;
+  white-space: nowrap;
+}
+.report-general-shell .report-general-filter .field-input,
+.report-general-shell .report-general-filter .field-select,
+.report-general-shell .report-general-filter .report-date-range-button,
+.report-general-shell .report-general-filter .search-box {
+  height: 40px;
+  min-height: 40px;
+}
+@media(max-width:1260px) {
+  .report-general-shell .recap-report-header {
+    grid-template-columns: 1fr !important;
+  }
+}
+@media(max-width:900px) {
+  .report-general-shell .report-general-filter {
+    grid-template-columns: repeat(2, minmax(0, 1fr)) !important;
+  }
+  .report-general-shell .report-general-filter .field-row.full-span,
+  .report-general-shell .report-general-filter .report-filter-actions,
+  .report-general-shell .report-general-filter .report-export-actions {
+    grid-column: 1 / -1 !important;
+  }
+}
+
 /* Unified history pages: payment, daftar ulang, savings */
 .history-recap-shell {
   margin: 24px 28px 28px;
@@ -6128,4 +6185,565 @@ button.du-page-link {
   min-height: 42px !important;
   max-height: 42px !important;
   align-self: start;
+}
+
+/* Compact polish for requested dashboard, history, and student master screens */
+.dashboard-action-strip {
+  grid-template-columns: 1.08fr 1fr 1fr .92fr .92fr !important;
+  gap: 8px;
+  align-items: center;
+}
+.dashboard-action-strip .quick-btn {
+  width: 100%;
+  white-space: nowrap;
+}
+.dashboard-action-strip .quick-btn-soft {
+  justify-content: center;
+  font-weight: 850;
+}
+
+.payment-history-shell .history-recap-filter {
+  grid-template-columns: minmax(210px, .72fr) minmax(270px, 1fr) minmax(130px, .38fr);
+  row-gap: 10px;
+}
+.payment-history-shell .report-date-range-field {
+  grid-column: 1 / 2;
+}
+.payment-history-shell .field-row.full-span {
+  grid-column: 2 / 4;
+}
+.payment-history-shell .filter-sel {
+  grid-column: 1 / 2;
+}
+.payment-history-shell .history-recap-actions {
+  grid-column: 2 / 4;
+}
+
+.du-history-filter {
+  grid-template-columns: minmax(260px, 1.12fr) minmax(160px, .68fr) minmax(170px, .72fr) minmax(150px, .62fr) !important;
+  row-gap: 10px;
+}
+.du-history-filter .field-row.full-span {
+  grid-column: 1 / 3 !important;
+}
+.du-history-filter .field-row.full-span,
+.du-history-filter .student-combobox,
+.du-history-filter .field-row.full-span .search-box {
+  height: 42px !important;
+  min-height: 42px !important;
+  max-height: 42px !important;
+}
+.du-history-filter select[name="kelas"] {
+  grid-column: 3 / 4;
+}
+.du-history-filter select[name="tahun_ajaran"] {
+  grid-column: 4 / 5;
+}
+.du-history-filter select[name="status"] {
+  grid-column: 1 / 2;
+}
+.du-history-filter .du-page-size {
+  grid-column: 2 / 3;
+}
+.du-history-filter .history-recap-actions {
+  grid-column: 3 / 5;
+}
+
+.savings-history-shell .tabungan-filter-form {
+  grid-template-columns: minmax(240px, .75fr) minmax(320px, 1fr) minmax(135px, .4fr) minmax(320px, 1.05fr) !important;
+  row-gap: 10px;
+}
+.savings-history-shell .report-date-range-field {
+  grid-column: 1 / 2;
+}
+.savings-history-shell .tabungan-filter-nis {
+  grid-column: 2 / 5 !important;
+}
+.savings-history-shell .tabungan-filter-page {
+  grid-column: 1 / 2;
+}
+.savings-history-shell .history-recap-actions {
+  grid-column: 2 / 5;
+  grid-template-columns: repeat(5, minmax(0, 1fr)) !important;
+}
+.savings-history-shell .history-recap-actions .btn {
+  white-space: nowrap;
+}
+
+.master-modern-card .student-filter-bar {
+  grid-template-columns: minmax(280px, 1fr) minmax(150px, 180px) minmax(140px, 170px) minmax(120px, 150px) auto auto !important;
+}
+.master-modern-card .student-filter-bar .btn {
+  min-width: 112px;
+  width: auto;
+  justify-content: center;
+  white-space: nowrap;
+}
+.master-modern-card .student-filter-bar a.btn[href*="export_excel"] {
+  min-width: 132px;
+  padding-inline: 16px !important;
+}
+.student-master-shell .master-modern-stats {
+  grid-template-columns: repeat(2, minmax(120px, 1fr));
+  max-width: 420px;
+  justify-self: end;
+}
+.student-master-shell + .master-modern-form .class-picker-panel,
+.student-master-shell + .master-modern-form .class-picker.is-open .class-picker-panel {
+  top: calc(100% + 4px) !important;
+  max-height: 190px !important;
+  margin-top: 0 !important;
+  border-radius: 10px !important;
+  box-shadow: 0 16px 30px rgba(15,23,42,.16) !important;
+}
+
+@media(max-width:1180px) {
+  .dashboard-action-strip {
+    grid-template-columns: repeat(3, minmax(0, 1fr)) !important;
+  }
+  .payment-history-shell .history-recap-filter,
+  .du-history-filter,
+  .savings-history-shell .tabungan-filter-form,
+  .master-modern-card .student-filter-bar {
+    grid-template-columns: repeat(2, minmax(0, 1fr)) !important;
+  }
+  .payment-history-shell .report-date-range-field,
+  .payment-history-shell .field-row.full-span,
+  .payment-history-shell .filter-sel,
+  .payment-history-shell .history-recap-actions,
+  .du-history-filter .field-row.full-span,
+  .du-history-filter select[name="kelas"],
+  .du-history-filter select[name="tahun_ajaran"],
+  .du-history-filter select[name="status"],
+  .du-history-filter .du-page-size,
+  .du-history-filter .history-recap-actions,
+  .savings-history-shell .report-date-range-field,
+  .savings-history-shell .tabungan-filter-nis,
+  .savings-history-shell .tabungan-filter-page,
+  .savings-history-shell .history-recap-actions {
+    grid-column: auto !important;
+  }
+  .payment-history-shell .field-row.full-span,
+  .du-history-filter .field-row.full-span,
+  .savings-history-shell .tabungan-filter-nis {
+    grid-column: 1 / -1 !important;
+  }
+  .payment-history-shell .history-recap-actions,
+  .du-history-filter .history-recap-actions,
+  .savings-history-shell .history-recap-actions {
+    grid-column: 1 / -1 !important;
+  }
+  .savings-history-shell .history-recap-actions {
+    grid-template-columns: repeat(3, minmax(0, 1fr)) !important;
+  }
+}
+@media(max-width:760px) {
+  .dashboard-action-strip,
+  .payment-history-shell .history-recap-filter,
+  .du-history-filter,
+  .savings-history-shell .tabungan-filter-form,
+  .payment-history-shell .history-recap-actions,
+  .du-history-filter .history-recap-actions,
+  .savings-history-shell .history-recap-actions,
+  .master-modern-card .student-filter-bar {
+    grid-template-columns: 1fr !important;
+  }
+  .student-master-shell .master-modern-stats {
+    justify-self: stretch;
+    max-width: none;
+  }
+}
+
+/* Tighten Daftar Ulang and Tabungan history filters after visual review */
+.du-history-card .recap-report-header {
+  grid-template-columns: minmax(260px, .62fr) minmax(760px, 1.38fr) !important;
+  gap: 28px;
+}
+.du-history-filter {
+  grid-template-columns: repeat(4, minmax(0, 1fr)) !important;
+  gap: 9px !important;
+}
+.du-history-filter .field-row.full-span {
+  grid-column: 1 / -1 !important;
+}
+.du-history-filter select[name="kelas"] {
+  grid-column: 1 / 2 !important;
+}
+.du-history-filter select[name="tahun_ajaran"] {
+  grid-column: 2 / 3 !important;
+}
+.du-history-filter select[name="status"] {
+  grid-column: 3 / 4 !important;
+}
+.du-history-filter .du-page-size {
+  grid-column: 4 / 5 !important;
+}
+.du-history-filter .history-recap-actions {
+  grid-column: 1 / -1 !important;
+  grid-template-columns: 1fr .7fr 1fr !important;
+}
+.du-history-filter .field-select,
+.du-history-filter .btn {
+  min-width: 0 !important;
+  font-size: 12px !important;
+}
+
+.savings-history-shell .recap-report-header {
+  grid-template-columns: minmax(260px, .74fr) minmax(760px, 1.26fr) !important;
+  gap: 28px;
+}
+.savings-history-shell .tabungan-filter-form {
+  grid-template-columns: minmax(200px, 220px) minmax(250px, 1fr) minmax(250px, 1fr) !important;
+  gap: 9px !important;
+  max-width: 100%;
+  overflow: visible;
+}
+.savings-history-shell .report-date-range-field {
+  grid-column: 1 / 2 !important;
+}
+.savings-history-shell .tabungan-filter-nis {
+  grid-column: 2 / 4 !important;
+}
+.savings-history-shell .tabungan-filter-page {
+  grid-column: 1 / 2 !important;
+}
+.savings-history-shell .history-recap-actions {
+  grid-column: 2 / 4 !important;
+  grid-template-columns: .98fr .72fr 1fr 1fr .86fr !important;
+  gap: 7px !important;
+}
+.savings-history-shell .history-recap-actions .btn {
+  min-width: 0 !important;
+  padding-inline: 5px !important;
+  font-size: 10.8px !important;
+  letter-spacing: 0 !important;
+}
+.savings-history-shell .report-date-range-button,
+.savings-history-shell .search-box,
+.savings-history-shell .field-select {
+  min-width: 0 !important;
+}
+
+@media(max-width:1260px) {
+  .du-history-card .recap-report-header,
+  .savings-history-shell .recap-report-header {
+    grid-template-columns: 1fr !important;
+  }
+}
+@media(max-width:900px) {
+  .du-history-filter,
+  .savings-history-shell .tabungan-filter-form {
+    grid-template-columns: repeat(2, minmax(0, 1fr)) !important;
+  }
+  .du-history-filter .field-row.full-span,
+  .du-history-filter select[name="kelas"],
+  .du-history-filter select[name="tahun_ajaran"],
+  .du-history-filter select[name="status"],
+  .du-history-filter .du-page-size,
+  .du-history-filter .history-recap-actions,
+  .savings-history-shell .report-date-range-field,
+  .savings-history-shell .tabungan-filter-nis,
+  .savings-history-shell .tabungan-filter-page,
+  .savings-history-shell .history-recap-actions {
+    grid-column: auto !important;
+  }
+  .du-history-filter .field-row.full-span,
+  .du-history-filter .history-recap-actions,
+  .savings-history-shell .tabungan-filter-nis,
+  .savings-history-shell .history-recap-actions {
+    grid-column: 1 / -1 !important;
+  }
+}
+
+/* Fix overlap: the Daftar Ulang search row contains label + input, so only the input gets fixed height */
+.du-history-filter {
+  align-items: start !important;
+}
+.du-history-filter .field-row.full-span {
+  height: auto !important;
+  min-height: 0 !important;
+  max-height: none !important;
+  display: grid !important;
+  gap: 6px !important;
+}
+.du-history-filter .field-row.full-span .student-combobox,
+.du-history-filter .field-row.full-span .search-box {
+  height: 42px !important;
+  min-height: 42px !important;
+  max-height: 42px !important;
+}
+.du-history-filter select.field-select {
+  align-self: end !important;
+}
+
+/* Rekap Laporan Keuangan: restore previous layout, only place student search beside Per Halaman */
+.report-general-shell .recap-report-header {
+  grid-template-columns: minmax(280px, .88fr) minmax(650px, 1.12fr) !important;
+  gap: 22px !important;
+  padding-block: 28px !important;
+}
+.report-general-shell .report-general-filter {
+  grid-template-columns: repeat(3, minmax(0, 1fr)) !important;
+  gap: 9px !important;
+}
+.report-general-shell .report-general-filter .field-row.full-span {
+  grid-column: 1 / 3 !important;
+  grid-row: 2 !important;
+}
+.report-general-shell .report-general-filter .field-row:has(select[name="per_page"]) {
+  grid-column: 3 / 4 !important;
+  grid-row: 2 !important;
+}
+.report-general-shell .report-general-filter .report-filter-actions,
+.report-general-shell .report-general-filter .report-export-actions {
+  grid-column: 1 / -1 !important;
+  padding: 4px !important;
+  border-radius: 13px !important;
+  background: rgba(148, 163, 184, .11) !important;
+}
+.report-general-shell .report-general-filter .report-filter-actions {
+  grid-template-columns: repeat(3, minmax(0, 1fr)) !important;
+}
+.report-general-shell .report-general-filter .report-export-actions {
+  grid-template-columns: repeat(2, minmax(0, 1fr)) !important;
+}
+.report-general-shell .report-general-filter .field-input,
+.report-general-shell .report-general-filter .field-select,
+.report-general-shell .report-general-filter .report-date-range-button,
+.report-general-shell .report-general-filter .search-box {
+  height: 42px !important;
+  min-height: 42px !important;
+  border-radius: 11px !important;
+}
+.report-general-shell .report-general-filter .btn {
+  min-height: 38px !important;
+  padding-inline: 12px !important;
+  font-size: 12.5px !important;
+}
+@media(max-width:1100px) {
+  .report-general-shell .recap-report-header {
+    grid-template-columns: 1fr !important;
+  }
+  .report-general-shell .report-general-filter {
+    grid-template-columns: repeat(2, minmax(0, 1fr)) !important;
+  }
+  .report-general-shell .report-general-filter .field-row.full-span {
+    grid-column: 1 / -1 !important;
+  }
+}
+@media(max-width:700px) {
+  .report-general-shell .report-general-filter,
+  .report-general-shell .report-general-filter .report-filter-actions,
+  .report-general-shell .report-general-filter .report-export-actions {
+    grid-template-columns: 1fr !important;
+  }
+}
+
+/* Slightly larger, more readable action buttons across reports and forms */
+.btn,
+button.btn,
+a.btn {
+  font-size: 14.5px;
+  font-weight: 750;
+}
+.quick-btn,
+.dashboard-action-strip .quick-btn {
+  font-size: 14px !important;
+  font-weight: 850;
+}
+.history-recap-actions .btn,
+.du-history-filter .btn,
+.savings-history-shell .history-recap-actions .btn,
+.report-general-shell .report-general-filter .btn,
+.report-template-shell .report-filter-actions .btn,
+.report-template-shell .report-export-actions .btn,
+.master-modern-card .report-filter-actions .btn,
+.master-modern-card .action-bar .btn,
+.master-modern-card .filter-bar .btn,
+.tabungan-filter-actions .btn,
+.tabungan-card-actions .btn {
+  font-size: 13.4px !important;
+  font-weight: 850 !important;
+  letter-spacing: 0 !important;
+}
+.btn-sm {
+  font-size: 13px !important;
+}
+.btn-tbl {
+  font-size: 12px !important;
+  font-weight: 850 !important;
+}
+
+/* Master Biaya Lain: tidy student target picker without changing behavior */
+#form-terbit-biaya .report-filter-grid {
+  grid-template-columns: minmax(260px, 1fr) minmax(210px, 260px) minmax(210px, 280px);
+  align-items: end;
+}
+
+#form-terbit-biaya .publish-students-field {
+  grid-column: 1 / -1;
+  padding: 14px;
+  border: 1px solid rgba(16, 139, 91, .16);
+  border-radius: 16px;
+  background: linear-gradient(135deg, rgba(16, 185, 129, .055), rgba(255, 255, 255, .56));
+}
+
+[data-theme="dark"] #form-terbit-biaya .publish-students-field {
+  background: rgba(15, 23, 42, .18);
+}
+
+#form-terbit-biaya .publish-native-select {
+  display: none;
+}
+
+#form-terbit-biaya .publish-student-toolbar {
+  display: grid;
+  grid-template-columns: minmax(240px, 1fr) auto;
+  gap: 10px;
+  align-items: center;
+  margin-top: 6px;
+}
+
+#form-terbit-biaya .publish-student-search input {
+  min-height: 42px;
+}
+
+#form-terbit-biaya .publish-student-actions {
+  display: flex;
+  gap: 8px;
+  justify-content: flex-end;
+}
+
+#form-terbit-biaya .publish-student-list {
+  display: grid;
+  grid-template-columns: repeat(auto-fill, minmax(320px, 1fr));
+  gap: 10px;
+  max-height: 360px;
+  margin-top: 12px;
+  padding: 4px 6px 4px 2px;
+  overflow: auto;
+  scrollbar-gutter: stable;
+}
+
+#form-terbit-biaya .publish-student-card {
+  display: grid;
+  grid-template-columns: auto minmax(0, 1fr);
+  grid-template-areas:
+    "check main"
+    ". badge";
+  align-items: start;
+  gap: 6px 10px;
+  min-height: 76px;
+  padding: 10px 12px;
+  border: 1px solid rgba(16, 139, 91, .13);
+  border-radius: 14px;
+  background: rgba(255, 255, 255, .78);
+  cursor: pointer;
+  transition: border-color .15s ease, background .15s ease, box-shadow .15s ease;
+}
+
+#form-terbit-biaya .publish-student-card[hidden] {
+  display: none !important;
+}
+
+#form-terbit-biaya .publish-student-card:hover {
+  border-color: rgba(16, 139, 91, .35);
+  box-shadow: 0 8px 20px rgba(16, 139, 91, .08);
+}
+
+#form-terbit-biaya .publish-student-card.is-selected {
+  border-color: rgba(16, 139, 91, .5);
+  background: rgba(220, 252, 231, .65);
+}
+
+#form-terbit-biaya .publish-student-check {
+  grid-area: check;
+  margin-top: 3px;
+  width: 18px;
+  height: 18px;
+  accent-color: var(--green);
+}
+
+#form-terbit-biaya .publish-student-main {
+  grid-area: main;
+  display: grid;
+  gap: 4px;
+  min-width: 0;
+}
+
+#form-terbit-biaya .publish-student-card .kelas-badge {
+  grid-area: badge;
+  justify-self: start;
+  max-width: 100%;
+  min-width: 0;
+  padding-inline: 10px;
+  overflow: hidden;
+  text-overflow: ellipsis;
+  white-space: nowrap;
+}
+
+#form-terbit-biaya .publish-student-main strong,
+#form-terbit-biaya .publish-student-main small {
+  overflow: hidden;
+  text-overflow: ellipsis;
+  white-space: nowrap;
+}
+
+#form-terbit-biaya .publish-student-main strong {
+  color: var(--text-primary);
+  font-size: 13.5px;
+  font-weight: 850;
+}
+
+#form-terbit-biaya .publish-student-main small {
+  color: var(--text-muted);
+  font-size: 11.5px;
+  font-weight: 650;
+}
+
+#form-terbit-biaya .publish-student-empty {
+  margin-top: 12px;
+  padding: 18px;
+  border: 1px dashed rgba(16, 139, 91, .26);
+  border-radius: 14px;
+  background: rgba(255, 255, 255, .68);
+  color: var(--text-muted);
+  font-size: 13px;
+  font-weight: 750;
+  text-align: center;
+}
+
+#form-terbit-biaya .publish-student-empty[hidden] {
+  display: none !important;
+}
+
+#form-terbit-biaya .publish-student-hint {
+  display: block;
+  margin-top: 8px;
+  color: var(--text-muted);
+  font-size: 11.5px;
+  font-weight: 650;
+}
+
+#form-terbit-biaya .report-summary-grid {
+  grid-template-columns: repeat(2, minmax(180px, 1fr));
+}
+
+@media (max-width: 860px) {
+  #form-terbit-biaya .report-filter-grid,
+  #form-terbit-biaya .report-summary-grid {
+    grid-template-columns: 1fr;
+  }
+
+  #form-terbit-biaya .publish-student-toolbar {
+    grid-template-columns: 1fr;
+  }
+
+  #form-terbit-biaya .publish-student-actions {
+    justify-content: stretch;
+  }
+
+  #form-terbit-biaya .publish-student-actions .btn {
+    flex: 1;
+  }
 }

@@ -578,12 +578,38 @@ function academicYearPeriodKeys() {
 function paidForAcademicYear(opt, key) {
   if (!opt) return 0;
   try {
-    const datasetKey = key === 'komite' ? 'paidKomitePeriods' : 'paidSppPeriods';
-    const periods = JSON.parse(opt.dataset[datasetKey] || '{}');
+    const periods = JSON.parse(opt.dataset.paidSppPeriods || '{}');
     return academicYearPeriodKeys().reduce((sum, period) => sum + parseNumber(periods[period] || 0), 0);
   } catch (_) {
     return 0;
   }
+}
+
+function selectedAnnualFeeRecord(opt, key) {
+  if (!opt) return null;
+  const year = academicYearFromPaymentPeriod();
+  if (!year) return null;
+  try {
+    const fees = JSON.parse(opt.dataset.annualFees || '{}');
+    return fees?.[key]?.[year] || null;
+  } catch (_) {
+    return null;
+  }
+}
+
+function hasAnnualFeeDataset(opt) {
+  return !!opt?.dataset?.annualFees && opt.dataset.annualFees !== '{}';
+}
+
+function totalAnnualFeeForContext(opt, key) {
+  const record = selectedAnnualFeeRecord(opt, key);
+  return record ? parseNumber(record.total || 0) : datasetNumber(opt, 'total', key);
+}
+
+function paidAnnualFeeForContext(opt, key) {
+  const record = selectedAnnualFeeRecord(opt, key);
+  if (!record && hasAnnualFeeDataset(opt)) return 0;
+  return record ? parseNumber(record.paid || 0) : datasetNumber(opt, 'paid', key);
 }
 
 function selectedPaymentMonthLabel() {
@@ -633,8 +659,7 @@ function paidForPeriod(opt, key) {
   if (!opt) return 0;
   if (key === 'spp' && isAnnualPaymentPlan()) return annualPaidForYear(opt, key);
   try {
-    const datasetKey = key === 'komite' ? 'paidKomitePeriods' : 'paidSppPeriods';
-    const periods = JSON.parse(opt.dataset[datasetKey] || '{}');
+    const periods = JSON.parse(opt.dataset.paidSppPeriods || '{}');
     return parseNumber(periods[selectedPaymentPeriod()] || 0);
   } catch (_) {
     return 0;
@@ -762,14 +787,12 @@ function refreshAcademicYearSummary() {
     return;
   }
 
-  const oneTimeKeys = ['pangkal','bangunan','seragam','kegiatan','makan','sorga','infaq'];
-  let total = oneTimeKeys.reduce((sum, key) => sum + datasetNumber(opt, 'total', key), 0);
-  let paid = oneTimeKeys.reduce((sum, key) => sum + datasetNumber(opt, 'paid', key), 0);
+  const annualKeys = ['pangkal','bangunan','seragam','kegiatan','komite','makan','sorga','infaq'];
+  let total = annualKeys.reduce((sum, key) => sum + totalAnnualFeeForContext(opt, key), 0);
+  let paid = annualKeys.reduce((sum, key) => sum + paidAnnualFeeForContext(opt, key), 0);
 
   total += datasetNumber(opt, 'total', 'spp') * 12;
-  total += datasetNumber(opt, 'total', 'komite') * 12;
   paid += paidForAcademicYear(opt, 'spp');
-  paid += paidForAcademicYear(opt, 'komite');
 
   const daftarUlang = selectedDaftarUlangBill(opt);
   total += parseNumber(daftarUlang?.total || 0);
@@ -797,10 +820,12 @@ function applyStudentPaymentDetails(opt) {
   ['pangkal','bangunan','seragam','kegiatan','spp','komite','makan','sorga','infaq','du'].forEach(key => {
     const total = key === 'du'
       ? totalDaftarUlangForContext(opt)
-      : datasetNumber(opt, 'total', key) * (key === 'spp' && isAnnualPaymentPlan() ? 12 : 1);
+      : (key === 'spp'
+          ? datasetNumber(opt, 'total', key) * (isAnnualPaymentPlan() ? 12 : 1)
+          : totalAnnualFeeForContext(opt, key));
     const paid = key === 'du'
       ? paidDaftarUlangForContext(opt)
-      : (['spp', 'komite'].includes(key) ? paidForPeriod(opt, key) : datasetNumber(opt, 'paid', key));
+      : (key === 'spp' ? paidForPeriod(opt, key) : paidAnnualFeeForContext(opt, key));
     setPaymentComponent(key, total, paid);
   });
   refreshAnnualPaymentState(opt);
@@ -839,7 +864,7 @@ const paymentComponentLabels = {
 
 function refreshOptionalOneTimeFeeAvailability() {
   const hasStudent = !!document.getElementById('disp-nis')?.value;
-  ['makan', 'sorga', 'infaq'].forEach(key => {
+  ['pangkal', 'bangunan', 'seragam', 'kegiatan', 'komite', 'makan', 'sorga', 'infaq'].forEach(key => {
     const total = parseNumber(document.getElementById(key + '-total')?.value || 0);
     const paid = parseNumber(document.getElementById(key + '-bayar')?.value || 0);
     const inputEl = document.getElementById(key + '-input');
@@ -862,7 +887,7 @@ function refreshOptionalOneTimeFeeAvailability() {
       inputEl.removeAttribute('title');
     }
     if (contextEl) {
-      contextEl.textContent = locked ? message : 'Tagihan satu kali · dapat dicicil';
+      contextEl.textContent = locked ? message : 'Tagihan tahunan · dapat dicicil';
     }
     hitungSisa(key);
   });

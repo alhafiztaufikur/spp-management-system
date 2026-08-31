@@ -3,6 +3,7 @@ session_start();
 if (!isset($_SESSION['admin_id'])) { header('Location: ../login.php'); exit; }
 require_once '../koneksi.php';
 require_once '../includes/auth.php';
+require_once '../includes/tagihan_tahunan.php';
 requireRole(['admin', 'bendahara', 'kasir']);
 
 header('Cache-Control: no-store, no-cache, must-revalidate, max-age=0');
@@ -117,9 +118,22 @@ function annual_receipt_add_remaining_line(array &$lines, string $label, float $
 
 function annual_receipt_remaining_lines(mysqli $db, array $payment, array $otherDetails): array {
     $lines = [];
-
-    $psbBill = (float)$payment['tot_pangkal'] > 0 ? (float)$payment['tot_pangkal'] : max(0, (float)$payment['PANGKAL'] - (float)$payment['potong_pangkal']);
-    annual_receipt_add_remaining_line($lines, 'Sisa PSB', (float)$payment['U_PANGKAL'], $psbBill, (float)$payment['PANGKAL_BAYAR']);
+    $annualRemaining = annual_fee_remaining_for_payment($db, (int)$payment['id']);
+    $annualLabels = [
+        'pangkal' => ['Sisa PSB', 'U_PANGKAL'],
+        'bangunan' => ['Sisa Bangunan', 'U_BANGUNAN'],
+        'seragam' => ['Sisa Seragam', 'U_SERAGAM'],
+        'kegiatan' => ['Sisa Kegiatan', 'U_KEGIATAN'],
+        'komite' => ['Sisa Komite', 'U_KOMITE'],
+        'makan' => ['Sisa Makan', 'U_MAKAN'],
+        'sorga' => ['Sisa Sorga', 'U_SORGA'],
+        'infaq' => ['Sisa Infaq', 'U_INFAQ'],
+    ];
+    foreach ($annualLabels as $component => [$label, $field]) {
+        if (abs((float)($payment[$field] ?? 0)) >= 0.005 && isset($annualRemaining[$component])) {
+            $lines[] = [$label, $annualRemaining[$component]];
+        }
+    }
 
     $duBillId = (int)($payment['tagihan_daftar_ulang_id'] ?? 0);
     $duTotal = (float)($payment['du_nominal_tagihan'] ?? 0);

@@ -193,7 +193,7 @@ $masterList = $koneksi->query("
 ");
 $activeMasters = $koneksi->query("SELECT id,nama,nominal FROM master_biaya_lain WHERE is_active=1 ORDER BY nama")->fetch_all(MYSQLI_ASSOC);
 $activeClasses = class_all($koneksi, true);
-$activeStudents = $koneksi->query("SELECT s.NO_INDUK,s.NAMA,s.KELAS,s.master_kelas_id,mk.tingkat,mk.kode_rombel,mk.is_placeholder FROM siswa s LEFT JOIN master_kelas mk ON mk.id=s.master_kelas_id WHERE s.is_active=1 ORDER BY s.NAMA")->fetch_all(MYSQLI_ASSOC);
+$activeStudents = $koneksi->query("SELECT s.NO_INDUK,s.NO_induk_diknas,s.NAMA,s.KELAS,s.master_kelas_id,mk.tingkat,mk.kode_rombel,mk.is_placeholder FROM siswa s LEFT JOIN master_kelas mk ON mk.id=s.master_kelas_id WHERE s.is_active=1 ORDER BY s.NAMA")->fetch_all(MYSQLI_ASSOC);
 ?>
 <!DOCTYPE html>
 <html lang="id">
@@ -282,7 +282,36 @@ $activeStudents = $koneksi->query("SELECT s.NO_INDUK,s.NAMA,s.KELAS,s.master_kel
             <div class="field-row"><label class="field-label">Target</label><select class="field-input field-select" name="target" id="publish-target"><option value="all">Semua siswa aktif</option><option value="tingkat">Tingkat kelas</option><option value="rombel">Rombel tertentu</option><option value="siswa">Pilih siswa</option></select></div>
             <div class="field-row publish-target-field" data-target="tingkat" hidden><label class="field-label">Tingkat</label><select class="field-input field-select" name="tingkat" id="publish-level"><?php for($i=1;$i<=6;$i++): ?><option value="<?= $i ?>">Kelas <?= $i ?></option><?php endfor; ?></select></div>
             <div class="field-row publish-target-field" data-target="rombel" hidden><label class="field-label">Rombel</label><select class="field-input field-select" name="master_kelas_id" id="publish-class"><?php foreach($activeClasses as $class): ?><option value="<?= (int)$class['id'] ?>"><?= htmlspecialchars(class_label($class)) ?></option><?php endforeach; ?></select></div>
-            <div class="field-row publish-target-field" data-target="siswa" hidden><label class="field-label">Siswa (bisa lebih dari satu)</label><select class="field-input field-select" name="no_induk[]" id="publish-students" multiple size="6"><?php foreach($activeStudents as $student): ?><option value="<?= htmlspecialchars($student['NO_INDUK']) ?>"><?= htmlspecialchars($student['NAMA'].' (NIS '.$student['NO_INDUK'].', '.class_label($student).')') ?></option><?php endforeach; ?></select></div>
+            <div class="field-row publish-target-field publish-students-field" data-target="siswa" hidden>
+              <label class="field-label">Siswa (bisa lebih dari satu)</label>
+              <select class="publish-native-select" name="no_induk[]" id="publish-students" multiple aria-hidden="true" tabindex="-1">
+                <?php foreach($activeStudents as $student): ?><option value="<?= htmlspecialchars($student['NO_INDUK']) ?>"><?= htmlspecialchars($student['NAMA']) ?></option><?php endforeach; ?>
+              </select>
+              <div class="publish-student-toolbar">
+                <div class="search-box publish-student-search">
+                  <svg width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.5" stroke-linecap="round" stroke-linejoin="round"><circle cx="11" cy="11" r="8"/><line x1="21" y1="21" x2="16.65" y2="16.65"/></svg>
+                  <input type="text" id="publish-student-search" placeholder="Cari nama, NIS, atau NIS Diknas..." autocomplete="off">
+                </div>
+                <div class="publish-student-actions">
+                  <button class="btn btn-ghost btn-sm" type="button" id="publish-select-visible">Pilih yang tampil</button>
+                  <button class="btn btn-ghost btn-sm" type="button" id="publish-clear-students">Bersihkan</button>
+                </div>
+              </div>
+              <div class="publish-student-list" id="publish-student-list">
+                <?php foreach($activeStudents as $student): $studentClassLabel = class_label($student); $studentBadgeLabel = trim(preg_replace('/\s*\(Belum Ditentukan\)$/', '', $studentClassLabel)); $studentDiknas = (string)($student['NO_induk_diknas'] ?? ''); $studentSearch = strtolower(trim($student['NAMA'].' '.$student['NO_INDUK'].' '.$studentDiknas.' '.$studentClassLabel)); ?>
+                <label class="publish-student-card" data-search="<?= htmlspecialchars($studentSearch) ?>" data-nis="<?= htmlspecialchars($student['NO_INDUK']) ?>">
+                  <input type="checkbox" class="publish-student-check" value="<?= htmlspecialchars($student['NO_INDUK']) ?>">
+                  <span class="publish-student-main">
+                    <strong><?= htmlspecialchars($student['NAMA']) ?></strong>
+                    <small>NIS <?= htmlspecialchars($student['NO_INDUK']) ?><?= $studentDiknas !== '' ? ' &middot; NIS Diknas ' . htmlspecialchars($studentDiknas) : '' ?></small>
+                  </span>
+                  <span class="kelas-badge"><?= htmlspecialchars($studentBadgeLabel !== '' ? $studentBadgeLabel : $studentClassLabel) ?></span>
+                </label>
+                <?php endforeach; ?>
+              </div>
+              <div class="publish-student-empty" id="publish-student-empty" hidden>Tidak ada siswa yang cocok dengan pencarian.</div>
+              <small class="publish-student-hint"><span id="publish-visible-count"><?= number_format(count($activeStudents)) ?></span> siswa tampil. Centang siswa yang ingin diterbitkan tagihannya.</small>
+            </div>
           </div>
           <div class="report-summary-grid" style="margin-top:16px"><div class="report-summary-card"><span>Pratinjau Siswa</span><strong id="publish-preview-count">0</strong></div><div class="report-summary-card"><span>Total Nominal</span><strong id="publish-preview-total">Rp 0</strong></div></div>
           <div class="action-bar" style="margin-top:16px"><button class="btn btn-primary" type="submit">Terbitkan Tagihan</button></div>
@@ -344,18 +373,88 @@ $activeStudents = $koneksi->query("SELECT s.NO_INDUK,s.NAMA,s.KELAS,s.master_kel
       var level = document.getElementById('publish-level');
       var classSelect = document.getElementById('publish-class');
       var studentSelect = document.getElementById('publish-students');
+      var studentList = document.getElementById('publish-student-list');
+      var studentSearch = document.getElementById('publish-student-search');
+      var visibleCount = document.getElementById('publish-visible-count');
+      var studentEmpty = document.getElementById('publish-student-empty');
+      var selectVisible = document.getElementById('publish-select-visible');
+      var clearStudents = document.getElementById('publish-clear-students');
+      function publishStudentCards() {
+        return Array.from(studentList?.querySelectorAll('.publish-student-card') || []);
+      }
+      function normalizePublishStudentText(value) {
+        return String(value || '').normalize('NFD').replace(/[\u0300-\u036f]/g, '').toLowerCase();
+      }
+      function matchPublishStudent(card, term) {
+        if (term === '') return { match: true, score: 0 };
+        var search = normalizePublishStudentText(card.dataset.search || '');
+        var words = search.split(/\s+/).filter(Boolean);
+        var parts = term.split(/\s+/).filter(Boolean);
+        var matched = parts.every(function(part) {
+          return search.includes(part) || words.some(function(word){ return word.startsWith(part); });
+        });
+        if (!matched) return { match: false, score: 99 };
+        if (search.startsWith(term)) return { match: true, score: 0 };
+        if (words.some(function(word){ return word.startsWith(term); })) return { match: true, score: 1 };
+        return { match: true, score: 2 };
+      }
+      function syncPublishStudents() {
+        if (!studentSelect) return;
+        var selected = new Set(Array.from(studentList?.querySelectorAll('.publish-student-check:checked') || []).map(function(input){ return input.value; }));
+        Array.from(studentSelect.options).forEach(function(option){ option.selected = selected.has(option.value); });
+      }
+      function filterPublishStudents() {
+        var term = normalizePublishStudentText((studentSearch?.value || '').trim());
+        var shown = 0;
+        publishStudentCards().forEach(function(card) {
+          var result = matchPublishStudent(card, term);
+          card.hidden = !result.match;
+          card.style.order = String(result.score);
+          if (result.match) shown++;
+        });
+        if (studentList) studentList.scrollTop = 0;
+        if (visibleCount) visibleCount.textContent = shown.toLocaleString('id-ID');
+        if (studentEmpty) studentEmpty.hidden = shown > 0;
+      }
       function updatePublishPreview() {
         if (!target || !fee) return;
         document.querySelectorAll('.publish-target-field').forEach(function(field){ field.hidden = field.dataset.target !== target.value; });
         var count = students.length;
         if (target.value === 'tingkat') count = students.filter(function(s){ return s.tingkat === Number(level.value); }).length;
         if (target.value === 'rombel') count = students.filter(function(s){ return s.kelas_id === Number(classSelect.value); }).length;
-        if (target.value === 'siswa') count = Array.from(studentSelect.selectedOptions).length;
+        if (target.value === 'siswa') count = Array.from(studentSelect?.selectedOptions || []).length;
         var amount = Number(fee.options[fee.selectedIndex]?.dataset.nominal || 0);
         document.getElementById('publish-preview-count').textContent = count.toLocaleString('id-ID') + ' siswa';
         document.getElementById('publish-preview-total').textContent = 'Rp ' + (count * amount).toLocaleString('id-ID');
       }
       [target,fee,level,classSelect,studentSelect].forEach(function(el){ el?.addEventListener('change',updatePublishPreview); });
+      studentList?.addEventListener('change', function(event) {
+        if (!event.target.classList.contains('publish-student-check')) return;
+        event.target.closest('.publish-student-card')?.classList.toggle('is-selected', event.target.checked);
+        syncPublishStudents();
+        updatePublishPreview();
+      });
+      studentSearch?.addEventListener('input', filterPublishStudents);
+      selectVisible?.addEventListener('click', function() {
+        publishStudentCards().forEach(function(card) {
+          if (card.hidden) return;
+          var input = card.querySelector('.publish-student-check');
+          if (input) input.checked = true;
+          card.classList.add('is-selected');
+        });
+        syncPublishStudents();
+        updatePublishPreview();
+      });
+      clearStudents?.addEventListener('click', function() {
+        publishStudentCards().forEach(function(card) {
+          var input = card.querySelector('.publish-student-check');
+          if (input) input.checked = false;
+          card.classList.remove('is-selected');
+        });
+        syncPublishStudents();
+        updatePublishPreview();
+      });
+      filterPublishStudents();
       updatePublishPreview();
       autoHideFlash();
     });

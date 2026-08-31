@@ -8,6 +8,7 @@ require_once '../koneksi.php';
 require_once '../includes/auth.php';
 require_once '../includes/daftar_ulang.php';
 require_once '../includes/biaya_lain.php';
+require_once '../includes/tagihan_tahunan.php';
 requireRole(['admin', 'kasir']);
 
 $siswa_sql = "
@@ -76,6 +77,7 @@ while ($bill = $du_bill_result->fetch_assoc()) {
 }
 
 $activeAcademicYear = du_current_academic_year();
+$annual_fee_payload = annual_fee_payload_for_options($koneksi);
 
 $biaya_lain_bills = [];
 $billResult = $koneksi->query("SELECT t.id,t.no_induk,t.master_biaya_lain_id,t.nama_snapshot nama,
@@ -285,6 +287,7 @@ unset($_SESSION['flash']);
                   data-paid-makan="<?= money_attr($s['paid_makan']) ?>"
                   data-paid-sorga="<?= money_attr($s['paid_sorga']) ?>"
                   data-paid-infaq="<?= money_attr($s['paid_infaq']) ?>"
+                  data-annual-fees="<?= htmlspecialchars(json_encode($annual_fee_payload[$s['NO_INDUK']] ?? [], JSON_UNESCAPED_UNICODE), ENT_QUOTES, 'UTF-8') ?>"
                   data-du-bills="<?= htmlspecialchars(json_encode($du_bills[$s['NO_INDUK']] ?? []), ENT_QUOTES, 'UTF-8') ?>"
                   data-biaya-lain-bills="<?= htmlspecialchars(json_encode($biaya_lain_bills[$s['NO_INDUK']] ?? [], JSON_UNESCAPED_UNICODE), ENT_QUOTES, 'UTF-8') ?>">
                   <?= htmlspecialchars($s['NAMA']) ?> (<?= htmlspecialchars(class_label(['tingkat'=>$s['master_tingkat']?:$s['KELAS'],'kode_rombel'=>$s['kode_rombel']??'BELUM','is_placeholder'=>$s['is_placeholder']??1])) ?>)
@@ -340,7 +343,7 @@ unset($_SESSION['flash']);
                   [$key, $label, $name] = $k;
                 ?>
                 <tr class="<?= $i % 2 === 0 ? 'row-highlight' : '' ?>">
-                  <td><span class="comp-label"<?= $key === 'spp' ? ' id="spp-component-label"' : '' ?>><?= $label ?><?= $key === 'spp' ? ' (' . htmlspecialchars($month_labels[$cur]) . ')' : '' ?></span><?php if($key==='spp'): ?><small class="du-inline-context du-context-label" id="spp-context-label">Tagihan bulanan · dapat dicicil</small><?php endif; ?><?php if(in_array($key,['makan','sorga','infaq'],true)): ?><small class="du-inline-context du-context-label" id="<?= $key ?>-context-label">Tagihan satu kali · dapat dicicil</small><?php endif; ?><?php if($key==='du'): ?><small class="du-inline-context du-context-label" id="du-context-label">Pilih siswa, bulan, dan tahun pembayaran.</small><small class="du-inline-context du-master-warning" id="du-master-warning" hidden></small><?php endif; ?></td>
+                  <td><span class="comp-label"<?= $key === 'spp' ? ' id="spp-component-label"' : '' ?>><?= $label ?><?= $key === 'spp' ? ' (' . htmlspecialchars($month_labels[$cur]) . ')' : '' ?></span><?php if($key==='spp'): ?><small class="du-inline-context du-context-label" id="spp-context-label">Tagihan bulanan · dapat dicicil</small><?php endif; ?><?php if(in_array($key,['komite','makan','sorga','infaq'],true)): ?><small class="du-inline-context du-context-label" id="<?= $key ?>-context-label">Tagihan tahunan · dapat dicicil</small><?php endif; ?><?php if($key==='du'): ?><small class="du-inline-context du-context-label" id="du-context-label">Pilih siswa, bulan, dan tahun pembayaran.</small><small class="du-inline-context du-master-warning" id="du-master-warning" hidden></small><?php endif; ?></td>
                   <td data-label="Total Tagihan"><input class="tbl-input tbl-system" type="text" value="0" id="<?=$key?>-total" readonly tabindex="-1" aria-readonly="true" /></td>
                   <td data-label="Sudah Terbayar"><input class="tbl-input tbl-system" type="text" value="0" id="<?=$key?>-bayar" readonly tabindex="-1" aria-readonly="true" /></td>
                   <td data-label="Sisa"><input class="tbl-input tbl-system tbl-system-sisa" type="text" value="0" id="<?=$key?>-sisa" readonly tabindex="-1" aria-readonly="true" /></td>
