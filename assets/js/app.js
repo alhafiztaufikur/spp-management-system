@@ -150,7 +150,7 @@ function pilihSiswaDatalist(input) {
     const nama = opt.dataset.nama;
     
     // Match if exact match or if user is backspacing but NIS is still at the beginning
-    if (val === opt.value || val === nis || val.startsWith(nis + ' —') || val.startsWith(nis)) {
+    if (val === opt.value || val === nis || val === nama || val.startsWith(nis + ' —') || val.startsWith(nis)) {
       document.getElementById('disp-nis').value = nis || '';
       document.getElementById('disp-nama').value = nama || '';
       document.getElementById('disp-kelas').value = opt.dataset.kelas || '';
@@ -186,12 +186,53 @@ function studentSearchOptionLabel(opt) {
   return nis && nama ? nis + ' - ' + nama : (opt.value || nama);
 }
 
+function studentSearchClassFilter(input) {
+  const selector = input?.dataset.studentClassFilter || '';
+  if (!selector) return { value: '', label: '', type: 'all' };
+  const select = document.querySelector(selector);
+  if (!select) return { value: '', label: '', type: 'all' };
+  const value = String(select.value || '');
+  const selected = select.options?.[select.selectedIndex];
+  let type = 'rombel';
+  let id = value;
+  let level = '';
+  if (!value || value === '0') {
+    type = 'all';
+    id = '';
+  } else if (value.startsWith('tingkat:')) {
+    type = 'tingkat';
+    level = value.slice(8);
+    id = level;
+  } else if (value.startsWith('rombel:')) {
+    id = value.slice(7);
+  }
+  return { value: type === 'all' ? '' : id, type, level, label: selected ? selected.textContent.trim() : '' };
+}
+
+function studentSearchOptionsForClass(input, options) {
+  const filter = studentSearchClassFilter(input);
+  if (!filter.value) return options;
+  if (filter.type === 'tingkat') {
+    return options.filter(opt => {
+      const level = String(opt.dataset.tingkat || '').match(/[1-6]/)?.[0]
+        || String(opt.dataset.kelas || '').match(/[1-6]/)?.[0] || '';
+      return level === filter.level;
+    });
+  }
+  return options.filter(opt => String(opt.dataset.kelasId || '') === filter.value);
+}
+
 function selectStudentSearchOption(input, opt) {
   input.value = opt.value || studentSearchOptionLabel(opt);
   input.dataset.studentSelected = '1';
   input.dataset.studentSuppressPanel = '1';
   try {
-    window.pilihSiswaDatalist(input);
+    const callbackName = input.dataset.studentSelectCallback || '';
+    if (callbackName && typeof window[callbackName] === 'function') {
+      window[callbackName](input, opt);
+    } else if (typeof window.pilihSiswaDatalist === 'function') {
+      window.pilihSiswaDatalist(input);
+    }
   } finally {
     closeStudentSearchPanel(input);
   }
@@ -216,11 +257,13 @@ function renderStudentSearchPanel(input, forceAll) {
 
   const query = input.value.trim().toLowerCase();
   const allOptions = Array.from(list.options);
+  const classFilter = studentSearchClassFilter(input);
+  const scopedOptions = studentSearchOptionsForClass(input, allOptions);
   const showAll = !!forceAll || !query || input.dataset.studentSelected === '1';
 
   const matches = (!showAll
-    ? allOptions.filter(opt => studentSearchText(opt).includes(query))
-    : allOptions
+    ? scopedOptions.filter(opt => studentSearchText(opt).includes(query))
+    : scopedOptions
   ).slice(0, showAll ? 12 : 8);
 
   input.setAttribute('aria-expanded', 'true');
@@ -238,9 +281,15 @@ function renderStudentSearchPanel(input, forceAll) {
   if (showAll) {
     const hint = document.createElement('div');
     hint.className = 'student-search-hint';
-    hint.textContent = allOptions.length > matches.length
-      ? 'Menampilkan ' + matches.length + ' siswa pertama. Ketik nama atau NIS untuk mencari lebih spesifik.'
-      : 'Pilih siswa dari daftar.';
+    if (classFilter.value) {
+      hint.textContent = scopedOptions.length > matches.length
+        ? 'Menampilkan ' + matches.length + ' siswa pertama dari ' + classFilter.label + '. Ketik nama atau NIS untuk mencari lebih spesifik.'
+        : 'Menampilkan siswa dari ' + classFilter.label + '.';
+    } else {
+      hint.textContent = allOptions.length > matches.length
+        ? 'Menampilkan ' + matches.length + ' siswa pertama. Ketik nama atau NIS untuk mencari lebih spesifik.'
+        : 'Pilih siswa dari daftar.';
+    }
     panel.appendChild(hint);
   }
 
@@ -258,7 +307,8 @@ function renderStudentSearchPanel(input, forceAll) {
       + (opt.dataset.diknas ? ' · NIS Diknas ' + opt.dataset.diknas : '');
     const classBadge = document.createElement('span');
     classBadge.className = 'student-search-class';
-    classBadge.textContent = 'Kelas ' + (opt.dataset.kelas || '-');
+    const classText = opt.dataset.kelas || '-';
+    classBadge.textContent = /^kelas\s/i.test(classText) ? classText : 'Kelas ' + classText;
     main.appendChild(name);
     main.appendChild(nis);
     button.appendChild(main);
@@ -272,9 +322,15 @@ function renderStudentSearchPanel(input, forceAll) {
 }
 
 function initStudentSearchCombobox() {
-  const input = document.getElementById('siswa-search');
-  const list = document.getElementById('siswa-list');
-  if (!input || !list || input.dataset.studentComboboxReady === '1') return;
+  const inputs = Array.from(document.querySelectorAll('input[data-student-search], #siswa-search'));
+  inputs.forEach(initStudentSearchInput);
+}
+
+function initStudentSearchInput(input) {
+  if (!input) return;
+  const listId = input.dataset.studentList || input.getAttribute('list') || 'siswa-list';
+  const list = document.getElementById(listId);
+  if (!list || input.dataset.studentComboboxReady === '1') return;
 
   const box = input.closest('.search-box');
   if (!box) return;
@@ -295,6 +351,7 @@ function initStudentSearchCombobox() {
   input.addEventListener('input', function () {
     delete input.dataset.studentSelected;
     delete input.dataset.studentSuppressPanel;
+    syncStudentSearchQueryTarget(input, input.value);
     renderStudentSearchPanel(input);
   });
   input.addEventListener('focus', function () {
@@ -304,6 +361,25 @@ function initStudentSearchCombobox() {
     delete input.dataset.studentSuppressPanel;
     renderStudentSearchPanel(input, true);
   });
+  const classFilterSelector = input.dataset.studentClassFilter || '';
+  const classFilter = classFilterSelector ? document.querySelector(classFilterSelector) : null;
+  if (classFilter) {
+    classFilter.addEventListener('change', function () {
+      const current = input.value.trim();
+      const options = Array.from(list.options);
+      const selected = options.find(opt => current === opt.value || current === studentSearchOptionLabel(opt));
+      if (selected && studentSearchOptionsForClass(input, [selected]).length === 0) {
+        input.value = '';
+        delete input.dataset.studentSelected;
+        delete input.dataset.studentSuppressPanel;
+        syncStudentSearchQueryTarget(input, '');
+      }
+      if (document.activeElement === input) {
+        delete input.dataset.studentSuppressPanel;
+        renderStudentSearchPanel(input, true);
+      }
+    });
+  }
   input.addEventListener('keydown', function (event) {
     if (event.key === 'Escape') {
       closeStudentSearchPanel(input);
@@ -318,6 +394,23 @@ function initStudentSearchCombobox() {
   document.addEventListener('mousedown', function (event) {
     if (!box.contains(event.target)) closeStudentSearchPanel(input);
   });
+}
+
+function syncStudentSearchQueryTarget(input, value) {
+  const targetId = input.dataset.studentQueryTarget || '';
+  if (!targetId) return;
+  const target = document.getElementById(targetId);
+  if (!target) return;
+  const listId = input.dataset.studentList || input.getAttribute('list') || '';
+  const list = listId ? document.getElementById(listId) : null;
+  const typed = value || '';
+  const exact = list ? Array.from(list.options).find(opt => typed === opt.value || typed === studentSearchOptionLabel(opt)) : null;
+  target.value = exact ? (exact.dataset.nis || exact.dataset.diknas || typed) : typed;
+}
+
+function selectReportStudentSearchOption(input, opt) {
+  input.value = studentSearchOptionLabel(opt);
+  syncStudentSearchQueryTarget(input, opt.dataset.nis || opt.dataset.diknas || input.value);
 }
 
 function applyDefaultDaftarUlangClass(opt) {

@@ -13,6 +13,22 @@ File ini mencatat perubahan proyek secara reverse chronological. Baca [PROJECT_C
 - Jangan menghapus atau menulis ulang entri lama. Tambahkan entri koreksi bila diperlukan.
 - Perubahan implementasi dan entri changelog wajib masuk commit yang sama.
 
+## 2026-08-31 - Integrasi Aman Perubahan Teman
+
+**AI/Aktor:** Codex berbasis GPT-5
+
+**Tujuan:** Mengambil perubahan tampilan/JavaScript berisiko rendah dari `origin/main` tanpa menimpa hardening keamanan lokal.
+
+**Perubahan fitur dan perilaku:** Penyatuan aman helper pencarian siswa pada `assets/js/app.js` serta penyegaran markup non-mutatif pada beberapa halaman master/pembayaran. Bootstrap session, CSRF, idempotency, audit, validasi input, dan kontrak ledger tetap dipertahankan.
+
+**Database dan migrasi:** Tidak ada. SQL schema, repair saldo, dan seed demo ditunda.
+
+**Kompatibilitas dan data lama:** Tidak ada perubahan data atau relasi pembayaran/tabungan. Konflik laporan, tabungan, pembayaran, CSS global, dan promosi rombel dicatat di `documentation/audit/FRIEND_MERGE_CONFLICTS.md` untuk port manual berikutnya.
+
+**Verifikasi:** Lint dan regression suite dijalankan setelah perubahan selesai; hasil rinci dicatat pada handoff branch `safety-branch`.
+
+**Catatan tindak lanjut:** Branch ini akan dipush sebagai `origin/safety-branch`; `main` tidak diubah. SQL repair hanya boleh dilanjutkan sebagai rekonsiliasi eksplisit dengan backup dan audit.
+
 ## 2026-08-27 - Konfirmasi Credential Database Berbagi Secret
 
 **AI/Aktor:** Codex berbasis GPT-5

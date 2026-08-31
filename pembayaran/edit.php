@@ -316,13 +316,13 @@ $selectedPaymentMethod = $d['sistem_pembayaran'] ?? 'VA';
               <label class="field-label" for="siswa-search">Cari Siswa (Nama / NIS / NIS Diknas)</label>
               <div class="search-box">
                 <svg width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.5" stroke-linecap="round" stroke-linejoin="round"><circle cx="11" cy="11" r="8"/><line x1="21" y1="21" x2="16.65" y2="16.65"/></svg>
-                <input type="text" id="siswa-search" list="siswa-list" 
-                  value="<?= htmlspecialchars($d['NO_INDUK']) ?> — <?= htmlspecialchars($d['NAMA']) ?>" 
+                <input type="text" id="siswa-search" list="siswa-list"
+                  value="<?= htmlspecialchars($d['NAMA']) ?>"
                   placeholder="Ketik nama, NIS, atau NIS Diknas..." oninput="pilihSiswaDatalist(this)" autocomplete="off" />
               </div>
               <datalist id="siswa-list">
                 <?php while ($s = $siswa_list->fetch_assoc()): ?>
-                <option value="<?= htmlspecialchars($s['NO_INDUK']) ?> — <?= htmlspecialchars($s['NAMA']) ?>"
+                <option value="<?= htmlspecialchars($s['NAMA']) ?>"
                   data-nis="<?= htmlspecialchars($s['NO_INDUK']) ?>"
                   data-diknas="<?= htmlspecialchars((string)($s['NO_induk_diknas'] ?? '')) ?>"
                   data-nama="<?= htmlspecialchars($s['NAMA']) ?>"

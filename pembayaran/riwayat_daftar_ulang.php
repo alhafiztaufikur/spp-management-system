@@ -184,7 +184,7 @@ unset($_SESSION['flash']);
   <meta name="description" content="Rekap pembayaran dan cicilan daftar ulang siswa." />
   <link rel="preconnect" href="https://fonts.googleapis.com" />
   <link href="https://fonts.googleapis.com/css2?family=Inter:wght@300;400;500;600;700;800&display=swap" rel="stylesheet" />
-  <link rel="stylesheet" href="../assets/css/style.css?v=5.7" />
+  <link rel="stylesheet" href="../assets/css/style.css?v=8.1" />
   <script>(function(){var t=localStorage.getItem('spp_theme')||'dark';document.documentElement.setAttribute('data-theme',t);})();</script>
 </head>
 <body>
@@ -200,7 +200,7 @@ unset($_SESSION['flash']);
 
       <?php if ($flash): ?><div class="alert alert-<?= du_e($flash['type'] ?? 'error') ?>" id="flash-msg"><?= du_e($flash['msg'] ?? '') ?></div><?php endif; ?>
 
-      <div class="main-card du-history-card">
+      <div class="main-card master-modern-card du-history-card">
         <div class="card-title-row">
           <div class="card-title"><svg width="18" height="18" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><path d="M4 19.5A2.5 2.5 0 0 1 6.5 17H20"/><path d="M4 4.5A2.5 2.5 0 0 1 6.5 2H20v20H6.5A2.5 2.5 0 0 1 4 19.5z"/><path d="M9 7h6M9 11h6"/></svg>Rekap Daftar Ulang Siswa</div>
           <a href="form.php" class="btn btn-primary">+ Input Pembayaran</a>

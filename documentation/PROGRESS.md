@@ -256,3 +256,11 @@ Retest berikutnya (`UI-BROWSER-006`) mengulang setup dan discovery resmi; hasil 
 - `DBSEC-004`: pemeriksaan metadata read-only menemukan `spp_app_local` dan `spp_audit_local` berbagi fingerprint credential non-kosong; tidak ada hash/password yang dicatat. Rotasi terpisah melalui secret store target masih wajib.
 - Checker handover `tests/support/verify_audit_artifacts.ps1` lulus (`22` artefak wajib, `29` route, `25` SQL, `63` PHP tracked, seluruh migrasi terdaftar); jalankan ulang pada setiap tag release.
 - Status keseluruhan untuk serah-terima client adalah **NO-GO** sampai browser UAT, PDF/Excel validation pada client target, keputusan koreksi/retensi/RPO-RTO, backup target, dan konfigurasi HTTPS production dibuktikan. Daftar lengkap ada di `documentation/audit/EXECUTIVE_REPORT.md` dan `KNOWN_LIMITATIONS.md`.
+
+## Integrasi aman perubahan teman — 2026-08-31
+
+Branch integrasi: `safety-branch` (dibuat dari `main` lokal `a5ac4ff`). Backup keamanan: `security-before-friend-integration-20260831`.
+
+Perubahan UI/JavaScript berisiko rendah diambil secara manual tanpa menimpa bootstrap keamanan, CSRF, idempotency, audit, validasi input, dan kontrak ledger. Register keputusan dan seluruh konflik manual ada di `documentation/audit/FRIEND_MERGE_CONFLICTS.md`.
+
+Perubahan laporan, tabungan, pembayaran, CSS global, promosi/pengarsipan rombel, export baru, schema, repair saldo, dan seed demo ditunda sampai review manual serta pengujian disposable selesai. Tidak ada migrasi atau perubahan database produksi pada tahap ini.

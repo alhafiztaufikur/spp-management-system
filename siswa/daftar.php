@@ -449,7 +449,7 @@ $canEditOpening = !$editStudent || (int)($editStudent['history_count'] ?? 0) ===
   <link rel="icon" type="image/png" href="../assets/img/favicon.png" />
   <link rel="preconnect" href="https://fonts.googleapis.com" />
   <link href="https://fonts.googleapis.com/css2?family=Inter:wght@300;400;500;600;700;800&display=swap" rel="stylesheet" />
-  <link rel="stylesheet" href="../assets/css/style.css?v=4.7" />
+  <link rel="stylesheet" href="../assets/css/style.css?v=8.1" />
   <script>(function(){var t=localStorage.getItem('spp_theme')||'dark';document.documentElement.setAttribute('data-theme',t);})();</script>
 </head>
 <body>
@@ -469,7 +469,14 @@ $canEditOpening = !$editStudent || (int)($editStudent['history_count'] ?? 0) ===
       <div class="alert alert-<?= htmlspecialchars($flash['type']) ?>" id="flash-msg"><?= htmlspecialchars($flash['msg']) ?></div>
       <?php endif; ?>
 
-      <div class="main-card">
+      <section class="main-card master-modern-shell student-master-shell">
+        <div class="master-modern-hero">
+          <div><span class="recap-class-overline">Data Siswa</span><h1>Kelola Siswa</h1><p>Kelola identitas, rombel, tarif, dan status aktif siswa.</p></div>
+          <div class="master-modern-stats"><div><span>Hasil Filter</span><strong><?= number_format($totalStudents) ?></strong></div></div>
+        </div>
+      </section>
+
+      <div class="main-card master-modern-card">
         <div class="card-title-row">
           <div class="card-title"><?= $editStudent ? 'Edit Siswa' : 'Tambah Siswa Baru' ?></div>
           <?php if ($editStudent): ?><span class="master-status <?= $editStudent['is_active'] ? 'is-active' : 'is-inactive' ?>"><?= $editStudent['is_active'] ? 'Aktif' : 'Diarsipkan' ?></span><?php endif; ?>
@@ -584,7 +591,7 @@ $canEditOpening = !$editStudent || (int)($editStudent['history_count'] ?? 0) ===
         </form>
       </div>
 
-      <div class="main-card" style="margin-top:0">
+      <div class="main-card master-modern-card master-modern-list" style="margin-top:0">
         <div class="card-title-row"><div class="card-title">Daftar Siswa (<?= number_format($totalStudents) ?>)</div></div>
         <form method="GET" action="daftar.php" class="filter-bar student-filter-bar">
           <div class="search-box">
