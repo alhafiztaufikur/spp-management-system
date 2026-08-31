@@ -25,7 +25,7 @@ File ini mencatat perubahan proyek secara reverse chronological. Baca [PROJECT_C
 
 **Kompatibilitas dan data lama:** Tidak ada perubahan data atau relasi pembayaran/tabungan. Konflik laporan, tabungan, pembayaran, CSS global, dan promosi rombel dicatat di `documentation/audit/FRIEND_MERGE_CONFLICTS.md` untuk port manual berikutnya.
 
-**Verifikasi:** Lint dan regression suite dijalankan setelah perubahan selesai; hasil rinci dicatat pada handoff branch `safety-branch`.
+**Verifikasi:** PHP lint seluruh file, `node --check assets/js/app.js`, bootstrap security check, dan `git diff --check` lulus. Regression disposable belum dijalankan karena MySQL lokal tidak aktif (`localhost:3306` menolak koneksi); tidak ada database yang dimutasi.
 
 **Catatan tindak lanjut:** Branch ini akan dipush sebagai `origin/safety-branch`; `main` tidak diubah. SQL repair hanya boleh dilanjutkan sebagai rekonsiliasi eksplisit dengan backup dan audit.
 
