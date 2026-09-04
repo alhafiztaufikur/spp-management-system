@@ -85,6 +85,9 @@ function annual_fee_find_or_create_placement(mysqli $db, string $noInduk, string
     $stmt->close();
     if (!$student) throw new RuntimeException('Data siswa tidak ditemukan.');
     if ((int)$student['is_active'] !== 1) throw new RuntimeException('Siswa yang diarsipkan tidak dapat dibuatkan tagihan tahun ajaran baru.');
+    if ((int)($student['tingkat'] ?? 0) === 0 || strtoupper((string)($student['kode_rombel'] ?? '')) === 'PSB') {
+        throw new RuntimeException('Siswa PSB belum memiliki tagihan tahunan. Pindahkan siswa ke rombel reguler terlebih dahulu.');
+    }
 
     $level = (string)($student['tingkat'] ?: $student['KELAS']);
     $classId = (int)($student['master_kelas_id'] ?? 0);
@@ -124,6 +127,7 @@ function annual_fee_sync_for_placement(mysqli $db, int $placementId, string $cre
     $row = $stmt->get_result()->fetch_assoc();
     $stmt->close();
     if (!$row || ($row['status'] ?? '') === 'lulus') return;
+    if ((string)($row['kelas'] ?? '') === '0' || strtoupper((string)($row['kelas_rombel_snapshot'] ?? '')) === 'PSB') return;
 
     foreach (annual_fee_components() as $component => $cfg) {
         [$nominalAwal, $potongan, $tagihan] = annual_fee_amount_from_student($row, $component);

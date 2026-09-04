@@ -222,7 +222,7 @@ WHERE NOT EXISTS (
   WHERE t.`master_biaya_lain_id` = m.`id` AND t.`no_induk` = s.`no_induk`
 );
 
--- SPP Juli dan Agustus, termasuk cicilan untuk sebagian siswa.
+-- SPP Juli dan Agustus. SPP mengikuti aturan baru: wajib full per bulan.
 INSERT INTO `bayar` (
   `NO_INDUK`, `KELAS`, `master_kelas_id`, `kelas_rombel_snapshot`,
   `U_SPP`, `KETERANGAN`, `TGL_BYR`, `BULAN`, `TAHUN`, `user_id`, `sistem_pembayaran`,
@@ -239,10 +239,7 @@ FROM (
   SELECT
     s.*,
     CASE WHEN s.`rombel` <> '' THEN CONCAT(LEFT(s.`kelas`, 1), s.`rombel`) ELSE CONCAT('Kelas ', LEFT(s.`kelas`, 1)) END AS `kelas_rombel_snapshot`,
-    LEAST(
-      GREATEST(s.`spp` - COALESCE(p.`paid`, 0), 0),
-      CASE WHEN MOD(s.`n`, 6) = 5 THEN ROUND(s.`spp` * 0.5, 0) ELSE s.`spp` END
-    ) AS `amount`
+    CASE WHEN COALESCE(p.`paid`, 0) > 0 THEN 0 ELSE s.`spp` END AS `amount`
   FROM `seed_current_students` s
   LEFT JOIN (
     SELECT bsp.`no_induk`, COALESCE(SUM(b.`U_SPP`), 0) AS `paid`
@@ -271,15 +268,7 @@ FROM (
   SELECT
     s.*,
     CASE WHEN s.`rombel` <> '' THEN CONCAT(LEFT(s.`kelas`, 1), s.`rombel`) ELSE CONCAT('Kelas ', LEFT(s.`kelas`, 1)) END AS `kelas_rombel_snapshot`,
-    LEAST(
-      GREATEST(s.`spp` - COALESCE(p.`paid`, 0), 0),
-      CASE MOD(s.`n`, 5)
-        WHEN 1 THEN 100000
-        WHEN 2 THEN s.`spp`
-        WHEN 3 THEN FLOOR(s.`spp` / 2)
-        ELSE s.`spp`
-      END
-    ) AS `amount`
+    CASE WHEN COALESCE(p.`paid`, 0) > 0 THEN 0 ELSE s.`spp` END AS `amount`
   FROM `seed_current_students` s
   LEFT JOIN (
     SELECT bsp.`no_induk`, COALESCE(SUM(b.`U_SPP`), 0) AS `paid`
@@ -292,42 +281,13 @@ FROM (
 WHERE q.`amount` > 0
   AND NOT EXISTS (SELECT 1 FROM `bayar` b WHERE b.`KETERANGAN` = CONCAT('SEED:FILL:SPP:AUG-A:', q.`no_induk`));
 
-INSERT INTO `bayar` (
-  `NO_INDUK`, `KELAS`, `master_kelas_id`, `kelas_rombel_snapshot`,
-  `U_SPP`, `KETERANGAN`, `TGL_BYR`, `BULAN`, `TAHUN`, `user_id`, `sistem_pembayaran`,
-  `th_ajaran`, `total_jumlah`, `payment_link_version`
-)
-SELECT
-  q.`no_induk`, q.`kelas`, q.`master_kelas_id`, q.`kelas_rombel_snapshot`,
-  q.`amount`, CONCAT('SEED:FILL:SPP:AUG-B:', q.`no_induk`),
-  DATE_ADD('2026-08-01 13:30:00', INTERVAL MOD(q.`n` + 7, 20) DAY),
-  '08', '2026', CONCAT('kasir', MOD(q.`n` + 2, 4) + 1),
-  ELT(MOD(q.`n` + 2, 3) + 1, 'Tunai', 'VA', 'Qris'),
-  @seed_year, q.`amount`, 1
-FROM (
-  SELECT
-    s.*,
-    CASE WHEN s.`rombel` <> '' THEN CONCAT(LEFT(s.`kelas`, 1), s.`rombel`) ELSE CONCAT('Kelas ', LEFT(s.`kelas`, 1)) END AS `kelas_rombel_snapshot`,
-    GREATEST(s.`spp` - COALESCE(p.`paid`, 0), 0) AS `amount`
-  FROM `seed_current_students` s
-  LEFT JOIN (
-    SELECT bsp.`no_induk`, COALESCE(SUM(b.`U_SPP`), 0) AS `paid`
-    FROM `bayar_spp_periode` bsp
-    JOIN `bayar` b ON b.`id` = bsp.`bayar_id`
-    WHERE bsp.`bulan` = '08' AND bsp.`tahun` = '2026'
-    GROUP BY bsp.`no_induk`
-  ) p ON p.`no_induk` = s.`no_induk`
-  WHERE MOD(s.`n`, 5) = 3
-) q
-WHERE q.`amount` > 0
-  AND NOT EXISTS (SELECT 1 FROM `bayar` b WHERE b.`KETERANGAN` = CONCAT('SEED:FILL:SPP:AUG-B:', q.`no_induk`));
-
 INSERT INTO `bayar_spp_periode` (`bayar_id`, `no_induk`, `bulan`, `tahun`)
 SELECT b.`id`, b.`NO_INDUK`, b.`BULAN`, b.`TAHUN`
 FROM `bayar` b
 WHERE b.`KETERANGAN` LIKE 'SEED:FILL:SPP:%'
   AND b.`U_SPP` > 0
-  AND NOT EXISTS (SELECT 1 FROM `bayar_spp_periode` p WHERE p.`bayar_id` = b.`id`);
+  AND NOT EXISTS (SELECT 1 FROM `bayar_spp_periode` p WHERE p.`bayar_id` = b.`id`)
+  AND NOT EXISTS (SELECT 1 FROM `bayar_spp_periode` p WHERE p.`no_induk` = b.`NO_INDUK` AND p.`bulan` = b.`BULAN` AND p.`tahun` = b.`TAHUN`);
 
 -- Pembayaran komponen tahunan: pangkal, bangunan, seragam, kegiatan, komite, makan, sorga, infaq.
 DROP TEMPORARY TABLE IF EXISTS `seed_annual_due`;

@@ -398,7 +398,7 @@ $selectedPaymentMethod = $d['sistem_pembayaran'] ?? 'VA';
                 foreach ($komp as $i => [$key,$label,$col,$inputName]):
                 ?>
                 <tr class="<?= $i%2===0?'row-highlight':'' ?>">
-                  <td><span class="comp-label"><?=$label?></span><?php if(in_array($key,['komite','makan','sorga','infaq'],true)): ?><small class="du-inline-context du-context-label" id="<?= $key ?>-context-label">Tagihan tahunan · dapat dicicil</small><?php endif; ?><?php if($key==='du'): ?><small class="du-inline-context du-context-label" id="du-context-label">Pilih siswa, bulan, dan tahun pembayaran.</small><small class="du-inline-context du-master-warning" id="du-master-warning" hidden></small><?php endif; ?></td>
+                  <td><span class="comp-label"<?= $key === 'spp' ? ' id="spp-component-label"' : '' ?>><?=$label?></span><?php if($key==='spp'): ?><small class="du-inline-context du-context-label" id="spp-context-label">SPP wajib dibayar penuh</small><?php endif; ?><?php if(in_array($key,['komite','makan','sorga','infaq'],true)): ?><small class="du-inline-context du-context-label" id="<?= $key ?>-context-label">Tagihan tahunan bisa dicicil</small><?php endif; ?><?php if($key==='du'): ?><small class="du-inline-context du-context-label" id="du-context-label">Pilih siswa, bulan, dan tahun pembayaran.</small><small class="du-inline-context du-master-warning" id="du-master-warning" hidden></small><?php endif; ?></td>
                   <td data-label="Total Tagihan"><input class="tbl-input tbl-system" type="text" value="0" id="<?=$key?>-total" readonly tabindex="-1" aria-readonly="true" /></td>
                   <td data-label="Sudah Terbayar"><input class="tbl-input tbl-system" type="text" value="0" id="<?=$key?>-bayar" readonly tabindex="-1" aria-readonly="true" /></td>
                   <td data-label="Sisa"><input class="tbl-input tbl-system tbl-system-sisa" type="text" value="0" id="<?=$key?>-sisa" readonly tabindex="-1" aria-readonly="true" /></td>
@@ -501,10 +501,33 @@ $selectedPaymentMethod = $d['sistem_pembayaran'] ?? 'VA';
             </div>
           </div>
 
-          <!-- Catatan -->
-          <div class="section-divider"><span>Catatan</span></div>
-          <textarea class="field-input field-textarea" name="catatan" maxlength="255"
-            placeholder="Catatan..."><?= htmlspecialchars($d['KETERANGAN'] ?? '') ?></textarea>
+          <input type="hidden" name="catatan" value="<?= htmlspecialchars($d['KETERANGAN'] ?? '') ?>">
+          <div class="section-divider"><span>History Transaksi Siswa</span></div>
+          <div class="payment-history-panel" id="payment-history-panel">
+            <div class="payment-history-head">
+              <div>
+                <strong>Riwayat pembayaran siswa</strong>
+                <span id="payment-history-period">Memuat history transaksi siswa.</span>
+              </div>
+            </div>
+            <div class="table-container payment-history-table-wrap">
+              <table class="payment-table payment-history-table">
+                <thead>
+                  <tr>
+                    <th>Tanggal</th>
+                    <th>Periode</th>
+                    <th>Komponen</th>
+                    <th>Metode</th>
+                    <th>Operator</th>
+                    <th>Total</th>
+                  </tr>
+                </thead>
+                <tbody id="payment-history-body">
+                  <tr><td colspan="6">Memuat data.</td></tr>
+                </tbody>
+              </table>
+            </div>
+          </div>
 
           <!-- Action Buttons -->
           <div class="action-bar">
@@ -525,8 +548,9 @@ $selectedPaymentMethod = $d['sistem_pembayaran'] ?? 'VA';
   <script>
     window.sppDaftarUlangMasters = {};
     window.sppDaftarUlangHasMasters = true;
+    window.sppPaymentHistoryUrl = 'history_siswa.php';
   </script>
-  <script src="../assets/js/app.js?v=6.4"></script>
+  <script src="../assets/js/app.js?v=6.6"></script>
 </body>
 </html>
 

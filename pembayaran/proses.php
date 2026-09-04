@@ -258,6 +258,30 @@ function validate_student_and_komite(
     return $student;
 }
 
+function validate_spp_full_payment(
+    mysqli $db,
+    string $noInduk,
+    string $bulan,
+    string $tahun,
+    float $monthlyBill,
+    float $uangSpp,
+    int $excludePaymentId = 0
+): void {
+    if ($uangSpp <= 0.001) return;
+    if ($monthlyBill <= 0.001) {
+        throw new RuntimeException('Tarif SPP bulanan siswa belum diatur.');
+    }
+    $periodLabel = payment_month_label($bulan) . ' ' . $tahun;
+    if (abs($uangSpp - $monthlyBill) > 0.001) {
+        throw new RuntimeException('SPP ' . $periodLabel . ' wajib dibayar penuh sebesar Rp ' . number_format($monthlyBill, 0, ',', '.') . '. Pembayaran sebagian tidak diperbolehkan.');
+    }
+    $paid = spp_paid_for_period($db, $noInduk, $bulan, $tahun, $excludePaymentId);
+    if ($paid > 0.001) {
+        throw new RuntimeException('SPP ' . $periodLabel . ' sudah dibayar. Pembayaran SPP kedua pada bulan yang sama tidak diperbolehkan.');
+    }
+    validate_spp_sequence($db, $noInduk, $bulan, $tahun, $monthlyBill, $excludePaymentId);
+}
+
 function payable_total(float $total, float $discount = 0, float $derivedTotal = 0): float {
     return $derivedTotal > 0 ? $derivedTotal : max(0, $total - $discount);
 }
@@ -274,11 +298,13 @@ function validate_component_remaining(
     int $excludePaymentId = 0
 ): void {
     $stmt = $db->prepare('
-        SELECT PANGKAL, potong_pangkal, tot_pangkal, BANGUNAN, SERAGAM, KEGIATAN,
+        SELECT s.PANGKAL, s.potong_pangkal, s.tot_pangkal, s.BANGUNAN, s.SERAGAM, s.KEGIATAN,
                MAKAN, SORGA, INFAQ, SPP_PERBULAN, POMG, DAFTAR_ULANG, potong_du, tot_du,
-               PANGKAL_BAYAR, BANGUNAN_BAYAR, SERAGAM_BAYAR, KEGIATAN_BAYAR
-        FROM siswa
-        WHERE NO_INDUK = ?
+               PANGKAL_BAYAR, BANGUNAN_BAYAR, SERAGAM_BAYAR, KEGIATAN_BAYAR,
+               COALESCE(mk.tingkat, CAST(s.KELAS AS UNSIGNED)) AS tingkat, mk.kode_rombel
+        FROM siswa s
+        LEFT JOIN master_kelas mk ON mk.id=s.master_kelas_id
+        WHERE s.NO_INDUK = ?
         FOR UPDATE
     ');
     $stmt->bind_param('s', $noInduk);
@@ -313,18 +339,17 @@ function validate_component_remaining(
     }
 
     $sppInput = (float)($components['spp'] ?? 0);
+    $isPsb = (int)($student['tingkat'] ?? 0) === 0 || strtoupper((string)($student['kode_rombel'] ?? '')) === 'PSB';
+    $annualInputTotal = 0.0;
+    foreach (annual_fee_components() as $component => $cfg) {
+        $annualInputTotal += (float)($components[$component] ?? 0);
+    }
+    if ($isPsb && ($sppInput > 0.001 || $annualInputTotal > 0.001 || $uangDu > 0.001)) {
+        throw new RuntimeException('Siswa PSB belum dapat membayar SPP, Daftar Ulang, atau tagihan tahunan. Pindahkan siswa ke rombel reguler terlebih dahulu.');
+    }
+
     if ($sppInput > 0) {
-        validate_spp_sequence($db, $noInduk, $bulan, $tahun, (float)$student['SPP_PERBULAN'], $excludePaymentId);
-        validate_spp_period_not_breaking_future(
-            $db,
-            $noInduk,
-            $bulan,
-            $tahun,
-            (float)$student['SPP_PERBULAN'],
-            (float)($paid['spp'] ?? 0) + $sppInput,
-            $excludePaymentId,
-            'dicicil sebagian'
-        );
+        validate_spp_full_payment($db, $noInduk, $bulan, $tahun, (float)$student['SPP_PERBULAN'], $sppInput, $excludePaymentId);
     }
 
     $limits = [

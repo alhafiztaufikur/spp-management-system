@@ -25,6 +25,8 @@ function report_registry(): array {
         'spp-tahunan' => ['label'=>'Rekap SPP Tahun Ajaran per Kelas','description'=>'Memudahkan pengecekan SPP Juli sampai Juni untuk melihat bulan yang sudah lunas dan yang masih tertunggak.','icon'=>'SPP','orientation'=>'landscape'],
         'per-item' => ['label'=>'Rekap Pembayaran per Item','description'=>'Menampilkan kondisi satu jenis pembayaran agar admin cepat mengecek tagihan, pembayaran, dan sisa per siswa.','icon'=>'ITEM','orientation'=>'landscape'],
         'tabungan-siswa' => ['label'=>'Rekap Transaksi Tabungan Siswa','description'=>'Daftar transaksi tabungan masuk dan keluar sesuai tanggal, siswa, rombel, dan kasir yang dipilih.','icon'=>'TAB','orientation'=>'portrait'],
+        'saldo-tabungan' => ['label'=>'Rekap Saldo Tabungan','description'=>'Menampilkan saldo tabungan terkini setiap siswa agar admin dapat mengecek saldo tanpa membuka riwayat transaksi.','icon'=>'SAL','orientation'=>'portrait'],
+        'riwayat-tagihan' => ['label'=>'Riwayat Tagihan Siswa','description'=>'Menampilkan seluruh tagihan SPP, biaya tahunan, daftar ulang, dan biaya lain beserta status pembayarannya.','icon'=>'TAG','orientation'=>'landscape'],
         'setoran' => ['label'=>'Rekap Setoran Kas Harian','description'=>'Ringkasan penerimaan pembayaran dan mutasi tabungan untuk membantu pengecekan kas harian kasir.','icon'=>'KAS','orientation'=>'portrait'],
     ];
 }
@@ -37,10 +39,12 @@ function report_filters(mysqli $db, array $source): array {
     $start = report_date_value($source['tanggal_awal'] ?? '', $today);
     $end = report_date_value($source['tanggal_akhir'] ?? '', $start);
     if ($start > $end) [$start,$end]=[$end,$start];
-    $allowedStatus = ['','tidak_ditagihkan','belum_bayar','cicilan','lunas','rekonsiliasi','ada_pembayaran','tunggakan'];
+    $allowedStatus = ['','tidak_ditagihkan','belum_bayar','cicilan','lunas','rekonsiliasi','ada_pembayaran','tunggakan','dibatalkan'];
     $allowedMethods = ['','Tunai','VA','Qris'];
     $allowedModes = ['harian','bulanan','buku','transaksi'];
     $allowedStudentStatus = ['active','archived','all'];
+    $allowedMutasi = ['','masuk','keluar'];
+    $allowedSaldoStatus = ['','ada_saldo','saldo_nol'];
     $requestedStudentStatus = (string)($source['siswa_status'] ?? 'active');
     $requestedPerPage = (int)($source['per_page'] ?? 25);
     $perPage = in_array($requestedPerPage, [25,50,100], true) ? $requestedPerPage : 25;
@@ -55,12 +59,18 @@ function report_filters(mysqli $db, array $source): array {
         'bulan_awal'=>report_month_code($source['bulan_awal'] ?? date('m')),
         'bulan_akhir'=>report_month_code($source['bulan_akhir'] ?? ($source['bulan_awal'] ?? date('m'))),
         'tahun'=>(int)($source['tahun'] ?? date('Y')),
+        'tahun_awal'=>(int)($source['tahun_awal'] ?? ($source['tahun'] ?? date('Y'))),
+        'tahun_akhir'=>(int)($source['tahun_akhir'] ?? ($source['tahun_awal'] ?? ($source['tahun'] ?? date('Y')))),
+        'tahun_tagihan'=>preg_match('/^\d{4}\/\d{4}$/', (string)($source['tahun_tagihan'] ?? '')) ? (string)$source['tahun_tagihan'] : '',
         'kelas'=>report_class_filter_value($source['kelas'] ?? ''),
         'kategori'=>trim((string)($source['kategori'] ?? 'spp')),
+        'komponen_tagihan'=>mb_substr(trim((string)($source['komponen_tagihan'] ?? '')),0,100),
         'status'=>in_array((string)($source['status'] ?? ''),$allowedStatus,true)?(string)($source['status']??''):'',
         'siswa_status'=>in_array($requestedStudentStatus,$allowedStudentStatus,true)?$requestedStudentStatus:'active',
         'operator'=>$operator,
         'metode'=>in_array((string)($source['metode'] ?? ''),$allowedMethods,true)?(string)($source['metode']??''):'',
+        'mutasi'=>in_array((string)($source['mutasi'] ?? ''),$allowedMutasi,true)?(string)($source['mutasi']??''):'',
+        'saldo_status'=>in_array((string)($source['saldo_status'] ?? ''),$allowedSaldoStatus,true)?(string)($source['saldo_status']??''):'',
         'q'=>mb_substr(trim((string)($source['q'] ?? '')),0,100),
         'mode'=>in_array((string)($source['mode'] ?? 'harian'),$allowedModes,true)?(string)($source['mode']??'harian'):'harian',
         'page'=>max(1,(int)($source['page']??1)),'per_page'=>$perPage,
@@ -158,7 +168,7 @@ function report_status_name(float $bill, float $paid): string {
     if ($paid > $bill + .001) return 'Perlu Rekonsiliasi';
     return 'Lunas';
 }
-function report_status_key(string $status): string { return ['Tidak Ditagihkan'=>'tidak_ditagihkan','Belum Bayar'=>'belum_bayar','Cicilan'=>'cicilan','Lunas'=>'lunas','Perlu Rekonsiliasi'=>'rekonsiliasi'][$status] ?? ''; }
+function report_status_key(string $status): string { return ['Tidak Ditagihkan'=>'tidak_ditagihkan','Belum Bayar'=>'belum_bayar','Cicilan'=>'cicilan','Lunas'=>'lunas','Perlu Rekonsiliasi'=>'rekonsiliasi','Dibatalkan'=>'dibatalkan'][$status] ?? ''; }
 function report_row_search_text(array $row): string {
     return implode(' ', array_filter([
         $row['nis'] ?? $row['no_induk'] ?? $row['NO_INDUK'] ?? '',
@@ -188,6 +198,9 @@ function report_filter_rows(array $rows, array $filters): array {
         if (!report_row_matches_query($row, $filters['q'])) return false;
         return true;
     }));
+}
+function report_billing_status(float $bill, float $paid, string $billStatus='open'): string {
+    return $billStatus === 'cancelled' ? 'Dibatalkan' : report_status_name($bill, $paid);
 }
 function report_period_from_academic(string $academicYear, string $month): array {
     [$start,$end]=array_map('intval',explode('/',$academicYear)); $m=(int)$month;
@@ -326,29 +339,87 @@ function report_item_month_period_label(int $startMonth, int $endMonth, int $yea
     $end = $months[sprintf('%02d', $endMonth)] ?? (string)$endMonth;
     return ($startMonth === $endMonth ? $start : $start . ' s.d. ' . $end) . ' ' . $year;
 }
+function report_month_range(int $startMonth, int $startYear, int $endMonth, int $endYear): array {
+    $startKey = ($startYear * 12) + max(1, min(12, $startMonth));
+    $endKey = ($endYear * 12) + max(1, min(12, $endMonth));
+    if ($startKey > $endKey) [$startKey, $endKey] = [$endKey, $startKey];
+    $endKey = min($endKey, $startKey + 35);
+    $months = [];
+    for ($key = $startKey; $key <= $endKey; $key++) {
+        $year = intdiv($key - 1, 12);
+        $month = (($key - 1) % 12) + 1;
+        $months[] = [$month, $year];
+    }
+    return $months;
+}
+function report_month_range_label(array $months): string {
+    if (!$months) return '';
+    $names = report_months();
+    [$firstMonth, $firstYear] = $months[0];
+    [$lastMonth, $lastYear] = $months[count($months) - 1];
+    $first = ($names[sprintf('%02d', $firstMonth)] ?? $firstMonth) . ' ' . $firstYear;
+    $last = ($names[sprintf('%02d', $lastMonth)] ?? $lastMonth) . ' ' . $lastYear;
+    return $first === $last ? $first : $first . ' s.d. ' . $last;
+}
 function report_item_date_period_label(array $f): string {
     return $f['tanggal_awal'] === $f['tanggal_akhir']
         ? report_date_label($f['tanggal_awal'])
         : report_date_label($f['tanggal_awal']) . ' s.d. ' . report_date_label($f['tanggal_akhir']);
 }
 function report_item_data(mysqli $db,array $f):array{
-    $category=$f['kategori'];$categories=report_categories($db);$label=$categories[$category]??'SPP';
-    $startMonth=min((int)$f['bulan_awal'],(int)$f['bulan_akhir']);$endMonth=max((int)$f['bulan_awal'],(int)$f['bulan_akhir']);$year=max(2000,$f['tahun']);
-    $periodLabel=report_item_month_period_label($startMonth,$endMonth,$year);$subtitle='Periode tagihan: '.$periodLabel;
+    $category=$f['kategori'];$categories=report_categories($db);$label=$categories[$category]??'SPP';$rows=[];
     if(report_item_is_monthly_category($category)){
-        $field=$category==='spp'?'U_SPP':'U_KOMITE';$rateField=$category==='spp'?'SPP_PERBULAN':'POMG';
-        $monthExpr=report_sql_month_expr('b.BULAN');
-        $sql="SELECT s.NO_INDUK nis,s.NO_induk_diknas nis_diknas,s.NAMA nama,mk.kode_rombel,COALESCE(mk.tingkat,s.KELAS) tingkat,mk.is_placeholder,
-          s.$rateField*? tagihan,COALESCE(SUM(CASE WHEN b.TAHUN=? AND $monthExpr BETWEEN ? AND ? THEN b.$field ELSE 0 END),0) terbayar
-          FROM siswa s LEFT JOIN master_kelas mk ON mk.id=s.master_kelas_id LEFT JOIN bayar b ON b.NO_INDUK=s.NO_INDUK WHERE s.is_active=1".report_class_where($f,'s','KELAS')." GROUP BY s.id ORDER BY tingkat,mk.kode_rombel,s.NAMA";
-        $count=$endMonth-$startMonth+1;$yearText=(string)$year;$stmt=$db->prepare($sql);$stmt->bind_param('isii',$count,$yearText,$startMonth,$endMonth);$stmt->execute();$data=$stmt->get_result()->fetch_all(MYSQLI_ASSOC);$stmt->close();
-        foreach($data as $item){$bill=(float)$item['tagihan'];$paid=(float)$item['terbayar'];$status=report_status_name($bill,$paid);$rows[]=['nis'=>$item['nis'],'nis_diknas'=>$item['nis_diknas']??'','nama'=>$item['nama'],'kelas'=>class_label($item)?:'Belum diatur','periode'=>$periodLabel,'tagihan'=>$bill,'terbayar'=>$paid,'sisa'=>max(0,$bill-$paid),'status'=>$status,'_status'=>$status];}
-    } elseif (array_key_exists($category, annual_fee_components())) {
+        $months=report_month_range((int)$f['bulan_awal'],max(2000,(int)$f['tahun_awal']),(int)$f['bulan_akhir'],max(2000,(int)$f['tahun_akhir']));
+        $periodLabel=report_month_range_label($months);
+        $stmt=$db->prepare("SELECT s.NO_INDUK nis,s.NO_induk_diknas nis_diknas,s.NAMA nama,s.SPP_PERBULAN tarif,
+            mk.kode_rombel,COALESCE(mk.tingkat,s.KELAS) tingkat,mk.is_placeholder,s.master_kelas_id
+          FROM siswa s
+          LEFT JOIN master_kelas mk ON mk.id=s.master_kelas_id
+          WHERE s.is_active=1 AND COALESCE(mk.tingkat, CAST(s.KELAS AS UNSIGNED)) BETWEEN 1 AND 6".report_class_where($f,'s','KELAS')."
+          ORDER BY tingkat,mk.kode_rombel,s.NAMA");
+        $stmt->execute();$students=$stmt->get_result()->fetch_all(MYSQLI_ASSOC);$stmt->close();
+
+        $startKey=min(array_map(static fn($m)=>$m[1]*100+$m[0],$months));
+        $endKey=max(array_map(static fn($m)=>$m[1]*100+$m[0],$months));
+        $paid=[];
+        $stmt=$db->prepare("SELECT bsp.no_induk,bsp.bulan,bsp.tahun,SUM(b.U_SPP) paid
+          FROM bayar_spp_periode bsp
+          JOIN bayar b ON b.id=bsp.bayar_id
+          WHERE (CAST(bsp.tahun AS UNSIGNED)*100+CAST(bsp.bulan AS UNSIGNED)) BETWEEN ? AND ?
+          GROUP BY bsp.no_induk,bsp.bulan,bsp.tahun");
+        $stmt->bind_param('ii',$startKey,$endKey);$stmt->execute();
+        foreach($stmt->get_result()->fetch_all(MYSQLI_ASSOC) as $p){
+            $paid[$p['no_induk']][sprintf('%04d-%02d',(int)$p['tahun'],(int)$p['bulan'])]=(float)$p['paid'];
+        }
+        $stmt->close();
+
+        $columns=[['nis','NIS'],['nama','Nama Siswa'],['kelas','Kelas']];
+        foreach($months as [$m,$y])$columns[]=['m'.sprintf('%04d_%02d',$y,$m),(report_months()[sprintf('%02d',$m)]??$m).' '.$y,'html'];
+        $columns=array_merge($columns,[['total_tagihan','Total Tagihan','money'],['total_bayar','Total Bayar','money'],['tunggakan','Tunggakan','money'],['status','Status','status']]);
+        foreach($students as $student){
+            $row=['nis'=>$student['nis'],'nis_diknas'=>$student['nis_diknas']??'','nama'=>$student['nama'],'kelas'=>class_label($student)?:'Belum diatur'];
+            $totalBill=0.0;$totalPaid=0.0;
+            foreach($months as [$m,$y]){
+                $code=sprintf('%04d-%02d',$y,$m);$key='m'.sprintf('%04d_%02d',$y,$m);
+                $bill=(float)$student['tarif'];$amount=(float)($paid[$student['nis']][$code]??0);
+                $status=report_status_name($bill,$amount);
+                $row[$key]=['text'=>$status,'sub'=>report_money($amount),'status'=>report_status_key($status)];
+                $totalBill+=$bill;$totalPaid+=$amount;
+            }
+            $row['total_tagihan']=$totalBill;$row['total_bayar']=$totalPaid;$row['tunggakan']=max(0,$totalBill-$totalPaid);
+            $row['status']=$row['tunggakan']<=0.001?'Lunas':($totalPaid>0.001?'Cicilan':'Belum Bayar');
+            $row['_status']=$row['status'];
+            $rows[]=$row;
+        }
+        $rows=report_filter_rows($rows,$f);
+        return ['title'=>'Rekap Pembayaran per Item: '.$label,'subtitle'=>'Periode tagihan: '.$periodLabel,'columns'=>$columns,'rows'=>$rows];
+    }
+
+    if (array_key_exists($category, annual_fee_components())) {
         $subtitle = 'Tahun ajaran: ' . $f['tahun_ajaran'];
         $statusFilters = $f;
         $statusFilters['status'] = '';
         $statusData = report_status_data($db, $statusFilters);
-        $rows = [];
         foreach ($statusData['rows'] as $row) {
             $row['periode'] = $f['tahun_ajaran'];
             if (($row['kelas'] ?? '') === '' || ($row['kelas'] ?? '') === '-') $row['kelas'] = 'Belum diatur';
@@ -357,9 +428,9 @@ function report_item_data(mysqli $db,array $f):array{
     } else {
         $periodLabel=report_item_date_period_label($f);$subtitle='Tanggal transaksi: '.$periodLabel;$components=report_payment_components($db,$f);
         $wanted=$category;$paid=[];foreach($components as $component)if($component['kategori_key']===$wanted)$paid[$component['nis']]=($paid[$component['nis']]??0)+(float)$component['nominal'];
-        $statusFilters=$f;$statusFilters['status']='';$statusData=report_status_data($db,$statusFilters);$rows=[];foreach($statusData['rows'] as $row){$row['terbayar']=$paid[$row['nis']]??0;$row['sisa']=max(0,(float)$row['tagihan']-$row['terbayar']);$row['status']=report_status_name((float)$row['tagihan'],(float)$row['terbayar']);$row['_status']=$row['status'];$row['periode']=$periodLabel;if(($row['kelas']??'')===''||($row['kelas']??'')==='-')$row['kelas']='Belum diatur';$rows[]=$row;}
+        $statusFilters=$f;$statusFilters['status']='';$statusData=report_status_data($db,$statusFilters);foreach($statusData['rows'] as $row){$row['terbayar']=$paid[$row['nis']]??0;$row['sisa']=max(0,(float)$row['tagihan']-$row['terbayar']);$row['status']=report_status_name((float)$row['tagihan'],(float)$row['terbayar']);$row['_status']=$row['status'];$row['periode']=$periodLabel;if(($row['kelas']??'')===''||($row['kelas']??'')==='-')$row['kelas']='Belum diatur';$rows[]=$row;}
     }
-    $rows=report_filter_rows($rows??[],$f);return ['title'=>'Rekap Pembayaran per Item: '.$label,'subtitle'=>$subtitle,'columns'=>[['nis','NIS'],['nama','Nama Siswa'],['kelas','Kelas'],['periode','Periode'],['tagihan','Tagihan','money'],['terbayar','Dibayar','money'],['sisa','Sisa','money'],['status','Status','status']],'rows'=>$rows];
+    $rows=report_filter_rows($rows,$f);return ['title'=>'Rekap Pembayaran per Item: '.$label,'subtitle'=>$subtitle,'columns'=>[['nis','NIS'],['nama','Nama Siswa'],['kelas','Kelas'],['periode','Periode'],['tagihan','Tagihan','money'],['terbayar','Dibayar','money'],['sisa','Sisa','money'],['status','Status','status']],'rows'=>$rows];
 }
 
 function report_savings_transactions(mysqli $db,string $start,string $end,array $f):array{
@@ -387,6 +458,10 @@ function report_savings_last_dates(mysqli $db,array $studentIds,string $before):
     $sql="SELECT x.NO_INDUK,MAX(x.tanggal) terakhir FROM (SELECT NO_INDUK,TANGGAL tanggal FROM transaksi_m WHERE TANGGAL<? UNION ALL SELECT NO_INDUK,TANGGAL FROM transaksi_k WHERE TANGGAL<?) x WHERE x.NO_INDUK IN ($placeholders) GROUP BY x.NO_INDUK";
     $stmt=$db->prepare($sql);$types='ss'.str_repeat('s',count($studentIds));$params=array_merge([$before,$before],$studentIds);$stmt->bind_param($types,...$params);$stmt->execute();$result=[];foreach($stmt->get_result()->fetch_all(MYSQLI_ASSOC) as $row)$result[$row['NO_INDUK']]=$row['terakhir'];$stmt->close();return $result;
 }
+function report_savings_current_balances(mysqli $db,array $studentIds):array{
+    $studentIds=array_values(array_unique(array_filter($studentIds)));if(!$studentIds)return [];$placeholders=implode(',',array_fill(0,count($studentIds),'?'));
+    $stmt=$db->prepare("SELECT NO_INDUK,COALESCE(SALDO,0) saldo FROM tabungan WHERE NO_INDUK IN ($placeholders)");$types=str_repeat('s',count($studentIds));$stmt->bind_param($types,...$studentIds);$stmt->execute();$balances=[];foreach($stmt->get_result()->fetch_all(MYSQLI_ASSOC) as $row)$balances[$row['NO_INDUK']]=(float)$row['saldo'];$stmt->close();return $balances;
+}
 function report_savings_class_data(mysqli $db,array $f):array{
     $mode=in_array($f['mode'],['harian','bulanan'],true)?$f['mode']:'harian';$year=max(2000,$f['tahun']);$month=(int)$f['bulan_awal'];
     if($mode==='harian'){$periodStart=sprintf('%04d-%02d-01',$year,$month);$periodEnd=date('Y-m-d',strtotime($periodStart.' +1 month'));$parts=[];for($d=1;$d<=(int)date('t',strtotime($periodStart));$d++)$parts[]=sprintf('%04d-%02d-%02d',$year,$month,$d);}else{$periodStart="$year-01-01";$periodEnd=($year+1).'-01-01';$parts=[];for($m=1;$m<=12;$m++)$parts[]=sprintf('%04d-%02d',$year,$m);}
@@ -398,14 +473,39 @@ function report_savings_class_data(mysqli $db,array $f):array{
     return ['title'=>'Rekap Mutasi Tabungan per Kelas','subtitle'=>($mode==='harian'?(report_months()[sprintf('%02d',$month)]??$month).' ':'Tahun ').$year,'columns'=>$columns,'rows'=>$rows];
 }
 function report_savings_student_data(mysqli $db,array $f):array{
-    $start=$f['tanggal_awal'].' 00:00:00';$end=date('Y-m-d H:i:s',strtotime($f['tanggal_akhir'].' +1 day'));$transactions=report_savings_transactions($db,$start,$end,$f);$rows=[];
-    foreach($transactions as $t){if(!report_class_matches_row($f,$t))continue;$candidate=['nis'=>$t['NO_INDUK'],'nis_diknas'=>$t['NO_induk_diknas']??'','nama'=>$t['NAMA'],'kelas'=>$t['kelas_label']?:class_label($t)];if(!report_row_matches_query($candidate,$f['q']))continue;$rows[]=$candidate+['tanggal'=>$t['tanggal'],'jenis'=>$t['jenis'],'masuk'=>(float)$t['masuk'],'keluar'=>(float)$t['keluar'],'operator'=>$t['user_id']?:'-'];}
-    return ['title'=>'Rekap Transaksi Tabungan Siswa','subtitle'=>$f['tanggal_awal'].' s/d '.$f['tanggal_akhir'],'columns'=>[['tanggal','Tanggal/Waktu'],['nis','NIS'],['nama','Nama Siswa'],['kelas','Kelas'],['jenis','Mutasi'],['masuk','Masuk','money'],['keluar','Keluar','money'],['operator','Operator']],'rows'=>$rows];
+    $start=$f['tanggal_awal'].' 00:00:00';$end=date('Y-m-d H:i:s',strtotime($f['tanggal_akhir'].' +1 day'));$transactions=report_savings_transactions($db,$start,$end,$f);$rows=[];$balances=report_savings_current_balances($db,array_column($transactions,'NO_INDUK'));
+    foreach($transactions as $t){if($f['mutasi']==='masuk'&&$t['jenis']!=='Masuk')continue;if($f['mutasi']==='keluar'&&$t['jenis']!=='Keluar')continue;if(!report_class_matches_row($f,$t))continue;$candidate=['nis'=>$t['NO_INDUK'],'nis_diknas'=>$t['NO_induk_diknas']??'','nama'=>$t['NAMA'],'kelas'=>$t['kelas_label']?:class_label($t)];if(!report_row_matches_query($candidate,$f['q']))continue;$rows[]=$candidate+['tanggal'=>$t['tanggal'],'jenis'=>$t['jenis'],'masuk'=>(float)$t['masuk'],'keluar'=>(float)$t['keluar'],'saldo_saat_ini'=>(float)($balances[$t['NO_INDUK']]??0),'operator'=>$t['user_id']?:'-'];}
+    return ['title'=>'Rekap Transaksi Tabungan Siswa','subtitle'=>$f['tanggal_awal'].' s/d '.$f['tanggal_akhir'],'columns'=>[['tanggal','Tanggal/Waktu'],['nis','NIS'],['nama','Nama Siswa'],['kelas','Kelas'],['jenis','Mutasi'],['masuk','Masuk','money'],['keluar','Keluar','money'],['saldo_saat_ini','Saldo Saat Ini','money'],['operator','Operator']],'rows'=>$rows];
 }
 function report_savings_student_data_legacy(mysqli $db,array $f):array{
     $start=$f['tanggal_awal'].' 00:00:00';$end=date('Y-m-d H:i:s',strtotime($f['tanggal_akhir'].' +1 day'));$transactions=report_savings_transactions($db,$start,$end,$f);$rows=[];$running=report_savings_openings($db,array_column($transactions,'NO_INDUK'),$start);
     foreach($transactions as $t){if(!report_class_matches_row($f,$t))continue;if($f['q']!==''&&stripos($t['NO_INDUK'].' '.$t['NAMA'],$f['q'])===false)continue;$opening=$running[$t['NO_INDUK']]??0;$running[$t['NO_INDUK']]=$opening+(float)$t['masuk']-(float)$t['keluar'];$rows[]=['tanggal'=>$t['tanggal'],'nis'=>$t['NO_INDUK'],'nama'=>$t['NAMA'],'kelas'=>$t['kelas_label']?:class_label($t),'jenis'=>$t['jenis'],'masuk'=>(float)$t['masuk'],'keluar'=>(float)$t['keluar'],'saldo_awal'=>$opening,'saldo'=>$running[$t['NO_INDUK']],'operator'=>$t['user_id']?:'-'];}
     $mode=in_array($f['mode'],['buku','transaksi'],true)?$f['mode']:'buku';$columns=$mode==='buku'?[['tanggal','Tanggal/Waktu'],['nis','NIS'],['nama','Nama Siswa'],['jenis','Mutasi'],['masuk','Masuk','money'],['keluar','Keluar','money'],['saldo','Saldo Berjalan','money'],['operator','Operator']]:[['tanggal','Tanggal/Waktu'],['nis','NIS'],['nama','Nama Siswa'],['kelas','Kelas'],['jenis','Mutasi'],['masuk','Masuk','money'],['keluar','Keluar','money'],['operator','Operator']];return ['title'=>'Laporan Tabungan Siswa — '.($mode==='buku'?'Buku Saldo':'Daftar Transaksi'),'subtitle'=>$f['tanggal_awal'].' s/d '.$f['tanggal_akhir'],'columns'=>$columns,'rows'=>$rows];
+}
+function report_savings_balance_data(mysqli $db,array $f):array{
+    $studentWhere=$f['siswa_status']==='archived'?' AND s.is_active=0':($f['siswa_status']==='all'?'':' AND s.is_active=1');
+    $sql="SELECT s.NO_INDUK nis,s.NO_induk_diknas nis_diknas,s.NAMA nama,s.master_kelas_id,mk.tingkat,mk.kode_rombel,mk.is_placeholder,COALESCE(t.SALDO,0) saldo_saat_ini FROM siswa s LEFT JOIN tabungan t ON t.NO_INDUK=s.NO_INDUK LEFT JOIN master_kelas mk ON mk.id=s.master_kelas_id WHERE 1=1$studentWhere".report_class_where($f,'s','KELAS')." ORDER BY mk.tingkat,mk.kode_rombel,s.NAMA";
+    $rows=[];foreach($db->query($sql)->fetch_all(MYSQLI_ASSOC) as $student){$saldo=(float)$student['saldo_saat_ini'];if($f['saldo_status']==='ada_saldo'&&$saldo<=0.001)continue;if($f['saldo_status']==='saldo_nol'&&$saldo>0.001)continue;$row=['nis'=>$student['nis'],'nis_diknas'=>$student['nis_diknas']??'','nama'=>$student['nama'],'kelas'=>class_label($student)?:'Belum diatur','saldo_saat_ini'=>$saldo,'master_kelas_id'=>$student['master_kelas_id']??0,'tingkat'=>$student['tingkat']??''];if(report_row_matches_query($row,$f['q']))$rows[]=$row;}
+    return ['title'=>'Rekap Saldo Tabungan','subtitle'=>'Saldo tabungan terkini siswa','columns'=>[['nis','NIS','nis'],['nama','Nama Siswa'],['kelas','Kelas','kelas'],['saldo_saat_ini','Saldo Saat Ini','money']],'rows'=>$rows];
+}
+function report_billing_categories(mysqli $db):array{
+    $categories=['spp'=>'SPP','pangkal'=>'Uang Pangkal','bangunan'=>'Uang Bangunan','seragam'=>'Uang Seragam','kegiatan'=>'Uang Kegiatan','komite'=>'Uang Komite','makan'=>'Uang Makan','sorga'=>'Uang Sorga','infaq'=>'Uang Infaq','daftar_ulang'=>'Daftar Ulang'];
+    foreach($db->query('SELECT id,nama FROM master_biaya_lain ORDER BY nama')->fetch_all(MYSQLI_ASSOC) as $item)$categories['biaya_lain:'.(int)$item['id']]=$item['nama'];return $categories;
+}
+function report_billing_history_data(mysqli $db,array $f):array{
+    $rows=[];$studentWhere=$f['siswa_status']==='archived'?' AND s.is_active=0':($f['siswa_status']==='all'?'':' AND s.is_active=1');
+    $append=static function(array $row)use(&$rows,$f):void{if($f['tahun_tagihan']!==''&&$row['tahun_ajaran']!==$f['tahun_tagihan'])return;if($f['komponen_tagihan']!==''&&$row['komponen_key']!==$f['komponen_tagihan'])return;if(!report_class_matches_row($f,$row))return;$row['_status']=$row['status'];if(report_filter_rows([$row],$f))$rows[]=$row;};
+    $annualSql="SELECT t.no_induk nis,s.NO_induk_diknas nis_diknas,s.NAMA nama,t.kelas_rombel_snapshot kelas,COALESCE(sta.master_kelas_id,s.master_kelas_id) master_kelas_id,COALESCE(mk.tingkat,t.kelas_snapshot) tingkat,t.komponen,t.tahun_ajaran_snapshot tahun_ajaran,t.nominal_tagihan tagihan,t.status bill_status,COALESCE(SUM(d.jumlah),0) terbayar FROM tagihan_tahunan_siswa t JOIN siswa s ON s.NO_INDUK=t.no_induk LEFT JOIN siswa_tahun_ajaran sta ON sta.id=t.penempatan_id LEFT JOIN master_kelas mk ON mk.id=COALESCE(sta.master_kelas_id,s.master_kelas_id) LEFT JOIN bayar_tahunan_siswa d ON d.tagihan_tahunan_id=t.id WHERE 1=1$studentWhere GROUP BY t.id,s.NO_induk_diknas,s.NAMA,sta.master_kelas_id,s.master_kelas_id,mk.tingkat";
+    foreach($db->query($annualSql)->fetch_all(MYSQLI_ASSOC) as $item){$bill=(float)$item['tagihan'];$paid=(float)$item['terbayar'];$component=(string)$item['komponen'];$componentConfig=annual_fee_components()[$component]??['label'=>$component];$append(['nis'=>$item['nis'],'nis_diknas'=>$item['nis_diknas']??'','nama'=>$item['nama'],'kelas'=>$item['kelas']?:'Belum diatur','master_kelas_id'=>$item['master_kelas_id']??0,'tingkat'=>$item['tingkat']??'','komponen'=>$componentConfig['label'],'komponen_key'=>$component,'periode'=>$item['tahun_ajaran'],'tahun_ajaran'=>$item['tahun_ajaran'],'tagihan'=>$bill,'terbayar'=>$paid,'sisa'=>max(0,$bill-$paid),'status'=>report_billing_status($bill,$paid,$item['bill_status'])]);}
+    $duSql="SELECT t.no_induk nis,s.NO_induk_diknas nis_diknas,s.NAMA nama,sta.kelas_rombel_snapshot kelas,COALESCE(sta.master_kelas_id,s.master_kelas_id) master_kelas_id,COALESCE(mk.tingkat,t.kelas_snapshot) tingkat,t.tahun_ajaran_snapshot tahun_ajaran,t.nominal_tagihan tagihan,t.status bill_status,COALESCE(SUM(d.jumlah),0) terbayar FROM tagihan_daftar_ulang t JOIN siswa s ON s.NO_INDUK=t.no_induk LEFT JOIN siswa_tahun_ajaran sta ON sta.id=t.penempatan_id LEFT JOIN master_kelas mk ON mk.id=COALESCE(sta.master_kelas_id,s.master_kelas_id) LEFT JOIN bayar_du d ON d.tagihan_daftar_ulang_id=t.id WHERE 1=1$studentWhere GROUP BY t.id,s.NO_induk_diknas,s.NAMA,sta.master_kelas_id,s.master_kelas_id,mk.tingkat";
+    foreach($db->query($duSql)->fetch_all(MYSQLI_ASSOC) as $item){$bill=(float)$item['tagihan'];$paid=(float)$item['terbayar'];$append(['nis'=>$item['nis'],'nis_diknas'=>$item['nis_diknas']??'','nama'=>$item['nama'],'kelas'=>$item['kelas']?:'Belum diatur','master_kelas_id'=>$item['master_kelas_id']??0,'tingkat'=>$item['tingkat']??'','komponen'=>'Daftar Ulang','komponen_key'=>'daftar_ulang','periode'=>$item['tahun_ajaran'],'tahun_ajaran'=>$item['tahun_ajaran'],'tagihan'=>$bill,'terbayar'=>$paid,'sisa'=>max(0,$bill-$paid),'status'=>report_billing_status($bill,$paid,$item['bill_status'])]);}
+    $otherSql="SELECT t.no_induk nis,s.NO_induk_diknas nis_diknas,s.NAMA nama,t.kelas_rombel_snapshot kelas,t.master_kelas_id,mk.tingkat,t.master_biaya_lain_id,t.nama_snapshot,t.nominal_tagihan tagihan,t.status bill_status,t.created_at,COALESCE(SUM(d.nominal_snapshot),0) terbayar FROM tagihan_biaya_lain t JOIN siswa s ON s.NO_INDUK=t.no_induk LEFT JOIN master_kelas mk ON mk.id=t.master_kelas_id LEFT JOIN bayar_biaya_lain d ON d.tagihan_biaya_lain_id=t.id WHERE 1=1$studentWhere GROUP BY t.id,s.NO_induk_diknas,s.NAMA,mk.tingkat";
+    foreach($db->query($otherSql)->fetch_all(MYSQLI_ASSOC) as $item){$time=strtotime((string)$item['created_at']);$yearLabel=$time?du_academic_year_label((int)date('m',$time),(int)date('Y',$time)):'';$bill=(float)$item['tagihan'];$paid=(float)$item['terbayar'];$append(['nis'=>$item['nis'],'nis_diknas'=>$item['nis_diknas']??'','nama'=>$item['nama'],'kelas'=>$item['kelas']?:class_label($item),'master_kelas_id'=>$item['master_kelas_id']??0,'tingkat'=>$item['tingkat']??'','komponen'=>$item['nama_snapshot'],'komponen_key'=>'biaya_lain:'.(int)$item['master_biaya_lain_id'],'periode'=>$time?'Diterbitkan '.report_date_label(date('Y-m-d',$time)):'Diterbitkan','tahun_ajaran'=>$yearLabel,'tagihan'=>$bill,'terbayar'=>$paid,'sisa'=>max(0,$bill-$paid),'status'=>report_billing_status($bill,$paid,$item['bill_status'])]);}
+    $paid=[];foreach($db->query('SELECT bsp.no_induk,bsp.bulan,bsp.tahun,COALESCE(SUM(b.U_SPP),0) terbayar FROM bayar_spp_periode bsp JOIN bayar b ON b.id=bsp.bayar_id GROUP BY bsp.no_induk,bsp.bulan,bsp.tahun')->fetch_all(MYSQLI_ASSOC) as $item)$paid[$item['no_induk']][sprintf('%04d-%02d',(int)$item['tahun'],(int)$item['bulan'])]=(float)$item['terbayar'];
+    $sppSql="SELECT sta.no_induk nis,s.NO_induk_diknas nis_diknas,s.NAMA nama,sta.kelas_rombel_snapshot kelas,sta.master_kelas_id,sta.kelas tingkat,sta.spp_perbulan_snapshot tarif,ta.label tahun_ajaran FROM siswa_tahun_ajaran sta JOIN tahun_ajaran ta ON ta.id=sta.tahun_ajaran_id JOIN siswa s ON s.NO_INDUK=sta.no_induk WHERE sta.kelas<>'PSB'$studentWhere";
+    foreach($db->query($sppSql)->fetch_all(MYSQLI_ASSOC) as $student){[$startYear,$endYear]=array_map('intval',explode('/',$student['tahun_ajaran']));for($index=0;$index<12;$index++){$month=(($index+6)%12)+1;$year=$index<6?$startYear:$endYear;$code=sprintf('%04d-%02d',$year,$month);$bill=(float)$student['tarif'];$amount=(float)($paid[$student['nis']][$code]??0);$append(['nis'=>$student['nis'],'nis_diknas'=>$student['nis_diknas']??'','nama'=>$student['nama'],'kelas'=>$student['kelas']?:'Belum diatur','master_kelas_id'=>$student['master_kelas_id']??0,'tingkat'=>$student['tingkat']??'','komponen'=>'SPP','komponen_key'=>'spp','periode'=>(report_months()[sprintf('%02d',$month)]??$month).' '.$year,'tahun_ajaran'=>$student['tahun_ajaran'],'tagihan'=>$bill,'terbayar'=>$amount,'sisa'=>max(0,$bill-$amount),'status'=>report_billing_status($bill,$amount)]);}}
+    usort($rows,static fn($a,$b)=>[$a['tahun_ajaran'],$a['kelas'],$a['nama'],$a['komponen'],$a['periode']]<=>[$b['tahun_ajaran'],$b['kelas'],$b['nama'],$b['komponen'],$b['periode']]);
+    return ['title'=>'Riwayat Tagihan Siswa','subtitle'=>'Seluruh histori tagihan siswa','columns'=>[['nis','NIS','nis'],['nama','Nama Siswa'],['kelas','Kelas','kelas'],['komponen','Komponen'],['periode','Periode/Tahun Ajaran'],['tagihan','Tagihan','money'],['terbayar','Sudah Dibayar','money'],['sisa','Sisa','money'],['status','Status','status']],'rows'=>$rows];
 }
 function report_settlement_data(mysqli $db,array $f):array{
     $components=array_values(array_filter(report_payment_components($db,$f), static fn($row)=>($row['kategori_key']??'') !== 'potongan'));
@@ -428,7 +528,7 @@ function report_settlement_data(mysqli $db,array $f):array{
     return ['title'=>'Rekap Setoran Kas Harian','subtitle'=>$f['tanggal_awal'].' s/d '.$f['tanggal_akhir'].' - ringkasan penerimaan kasir','columns'=>[['bagian','Komponen'],['nominal','Nominal','money']],'rows'=>$rows,'details'=>$components,'settlement'=>['cash'=>$cash,'payment_count'=>count(array_unique(array_column($components,'id')))]];
 }
 function report_build(mysqli $db,string $template,array $filters):array{
-    return match($template){'status'=>report_status_data($db,$filters),'penerimaan'=>report_receipt_data($db,$filters),'spp-tahunan'=>report_spp_year_data($db,$filters),'per-item'=>report_item_data($db,$filters),'tabungan-siswa'=>report_savings_student_data($db,$filters),'setoran'=>report_settlement_data($db,$filters),default=>throw new InvalidArgumentException('Template laporan tidak dikenali.')};
+    return match($template){'status'=>report_status_data($db,$filters),'penerimaan'=>report_receipt_data($db,$filters),'spp-tahunan'=>report_spp_year_data($db,$filters),'per-item'=>report_item_data($db,$filters),'tabungan-siswa'=>report_savings_student_data($db,$filters),'saldo-tabungan'=>report_savings_balance_data($db,$filters),'riwayat-tagihan'=>report_billing_history_data($db,$filters),'setoran'=>report_settlement_data($db,$filters),default=>throw new InvalidArgumentException('Template laporan tidak dikenali.')};
 }
 function report_savings_transaction_totals(array $rows): array {
     $masuk=0;$keluar=0;foreach($rows as $row){$masuk+=(float)($row['masuk']??0);$keluar+=(float)($row['keluar']??0);}return ['total_masuk'=>$masuk,'total_keluar'=>$keluar,'selisih'=>$masuk-$keluar];
@@ -456,6 +556,7 @@ function report_money_totals(array $report, string $template=''): array {
     foreach($report['columns']??[] as $column){
         $key=$column[0]??'';$label=$column[1]??$key;$type=$column[2]??'text';
         if(!in_array($type,['money','money_optional'],true)||$key==='')continue;
+        if($template==='tabungan-siswa'&&$key==='saldo_saat_ini')continue;
         $sum=0;$found=false;
         foreach($report['rows']??[] as $row){
             if(!array_key_exists($key,$row)||$row[$key]===null||$row[$key]==='')continue;

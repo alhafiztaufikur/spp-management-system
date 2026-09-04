@@ -4,7 +4,7 @@ require_once '../koneksi.php'; require_once '../includes/auth.php'; require_once
 requireRole(['admin','bendahara','kasir']);
 $registry=report_registry();$template=(string)($_GET['template']??'');if(!isset($registry[$template])){http_response_code(404);exit('Template tidak ditemukan.');}
 $format=(string)($_GET['format']??'print');if(!in_array($format,['print','pdf','excel'],true))$format='print';
-$filters=report_filters($koneksi,$_GET);if(!isset($_GET['kategori'])&&$template==='penerimaan')$filters['kategori']='semua';
+$filters=report_filters($koneksi,$_GET);if($template==='riwayat-tagihan'&&!isset($_GET['siswa_status']))$filters['siswa_status']='all';if(!isset($_GET['kategori'])&&$template==='penerimaan')$filters['kategori']='semua';
 $report=report_build($koneksi,$template,$filters);$generated=date('d-m-Y H:i:s');$operator=(string)($_SESSION['admin_nama']??$_SESSION['admin_username']??'Pengguna');
 $moneyTotals=report_money_totals($report,$template);
 function export_cell($value,string $type,array $row=[],string $key=''):string{if($type==='money')return report_e(report_money($value));if($type==='money_optional')return $value===null||$value===''?'-':report_e(report_money($value));if($type==='html'&&is_array($value))return report_e(($value['text']??'').(($value['sub']??'')!==''?' · '.$value['sub']:''));if($type==='nis'||$key==='nis'){$diknas=$row['diknas']??$row['nis_diknas']??$row['NO_induk_diknas']??'';return report_e($value).($diknas!==''?'<br><small>Diknas '.report_e($diknas).'</small>':'');}return report_e($value);}
@@ -23,7 +23,9 @@ ob_start(); ?>
 <?php if($moneyTotals): ?><table class="data total-table"><caption>Total Rupiah</caption><tbody><?php foreach($moneyTotals as $total): ?><tr><th><?= report_e($total['label']) ?></th><td class="money <?= (float)$total['value']<0?'negative':'' ?>"><?= report_money($total['value']) ?></td></tr><?php endforeach; ?></tbody></table><?php endif; ?>
 <?php if($template==='setoran'&&!empty($report['details'])): ?><h3>Rincian Penerimaan Pembayaran</h3><table class="data"><thead><tr><th>Waktu</th><th>No. Transaksi</th><th>Siswa</th><th>Komponen</th><th>Metode</th><th>Nominal</th></tr></thead><tbody><?php foreach($report['details'] as $detail): ?><tr><td><?= report_e($detail['tanggal']) ?></td><td><?= report_e($detail['nomor']) ?></td><td><?= report_e($detail['nis'].' · '.$detail['nama']) ?></td><td><?= report_e($detail['komponen']) ?></td><td><?= report_e($detail['metode']) ?></td><td class="money"><?= report_money($detail['nominal']) ?></td></tr><?php endforeach; ?></tbody></table><?php endif; ?>
 <?php if($template==='setoran'): ?><table class="signatures"><tr><td>Kasir/Petugas,<br><br><br><br>(________________________)</td><td>Bagian Keuangan,<br><br><br><br>(________________________)</td></tr></table><?php endif; ?><div class="footer">SistemSPP · Data laporan bersifat live dan mengikuti koreksi transaksi sampai saat laporan dibuat.</div></body></html>
-<?php $html=ob_get_clean();$safeName=preg_replace('/[^a-z0-9_-]+/i','-',strtolower($template)).'-'.date('Ymd-His');
+<?php $html=ob_get_clean();
+if($template==='setoran'&&$format!=='excel')$html=preg_replace('~<h3>Rincian Penerimaan Pembayaran</h3><table class="data">.*?</table>~s','',$html,1);
+$safeName=preg_replace('/[^a-z0-9_-]+/i','-',strtolower($template)).'-'.date('Ymd-His');
 if($format==='excel'){header('Content-Type: application/vnd.ms-excel; charset=UTF-8');header('Content-Disposition: attachment; filename="'.$safeName.'.xls"');echo "\xEF\xBB\xBF".$html;exit;}
 if($format==='pdf'){require_once '../vendor/autoload.php';$options=new \Dompdf\Options();$options->set('isRemoteEnabled',false);$options->set('isHtml5ParserEnabled',true);$dompdf=new \Dompdf\Dompdf($options);$dompdf->loadHtml($html,'UTF-8');$dompdf->setPaper('A4',$registry[$template]['orientation']);$dompdf->render();$dompdf->stream($safeName.'.pdf',['Attachment'=>true]);exit;}
 echo $html;

@@ -1,5 +1,13 @@
 // ============================================
 // SistemSPP - app.js
+function escapeHtml(value) {
+  return String(value ?? '')
+    .replace(/&/g, '&amp;')
+    .replace(/</g, '&lt;')
+    .replace(/>/g, '&gt;')
+    .replace(/"/g, '&quot;')
+    .replace(/'/g, '&#039;');
+}
 // ============================================
 
 /* ── Theme Init (run ASAP to avoid flash) ─── */
@@ -131,6 +139,7 @@ function pilihSiswaDatalist(input) {
     document.getElementById('disp-nama').value = '';
     document.getElementById('disp-kelas').value = '';
     clearPaymentDetails();
+    refreshPaymentHistory('');
     return;
   }
   
@@ -147,7 +156,9 @@ function pilihSiswaDatalist(input) {
       document.getElementById('disp-kelas').value = opt.dataset.kelas || '';
       applyDefaultDaftarUlangClass(opt);
       refreshBiayaLainOptions();
+      refreshBiayaLainBillsFromServer(nis || '');
       applyStudentPaymentDetails(opt);
+      refreshPaymentHistory(nis || '');
       found = true;
       break;
     }
@@ -158,8 +169,49 @@ function pilihSiswaDatalist(input) {
     document.getElementById('disp-nama').value = '';
     document.getElementById('disp-kelas').value = '';
     clearPaymentDetails();
+    refreshPaymentHistory('');
   }
 }
+
+function refreshPaymentHistory(noInduk) {
+  const body = document.getElementById('payment-history-body');
+  const period = document.getElementById('payment-history-period');
+  const url = window.sppPaymentHistoryUrl || '';
+  if (!body || !url) return;
+  if (!noInduk) {
+    body.innerHTML = '<tr><td colspan="6">Belum ada siswa dipilih.</td></tr>';
+    if (period) period.textContent = 'Pilih siswa untuk melihat transaksi.';
+    return;
+  }
+  body.innerHTML = '<tr><td colspan="6">Memuat history transaksi.</td></tr>';
+  fetch(url + '?no_induk=' + encodeURIComponent(noInduk), { headers: { 'Accept': 'application/json' } })
+    .then(response => response.json())
+    .then(payload => {
+      if (!payload.ok) throw new Error(payload.message || 'Gagal memuat history.');
+      if (period) period.textContent = payload.period || '';
+      const rows = Array.isArray(payload.rows) ? payload.rows : [];
+      if (!rows.length) {
+        body.innerHTML = '<tr><td colspan="6">Belum ada transaksi pembayaran untuk siswa ini.</td></tr>';
+        return;
+      }
+      body.innerHTML = rows.map(row => '<tr>' +
+        '<td>' + escapeHtml(row.tanggal || '') + '</td>' +
+        '<td>' + escapeHtml(row.periode || '') + '</td>' +
+        '<td>' + escapeHtml(row.komponen || '') + '</td>' +
+        '<td>' + escapeHtml(row.metode || '') + '</td>' +
+        '<td>' + escapeHtml(row.operator || '') + '</td>' +
+        '<td><strong>' + escapeHtml(row.total || 'Rp 0') + '</strong></td>' +
+      '</tr>').join('');
+    })
+    .catch(error => {
+      body.innerHTML = '<tr><td colspan="6">' + escapeHtml(error.message || 'Gagal memuat history.') + '</td></tr>';
+    });
+}
+
+document.addEventListener('DOMContentLoaded', function () {
+  const noInduk = document.getElementById('disp-nis')?.value || '';
+  if (noInduk) refreshPaymentHistory(noInduk);
+});
 
 function studentSearchText(opt) {
   return [
@@ -404,7 +456,9 @@ function syncStudentSearchQueryTarget(input, value) {
   const exact = list
     ? Array.from(list.options).find(opt => typed === opt.value || typed === studentSearchOptionLabel(opt))
     : null;
-  target.value = exact ? (exact.dataset.nis || exact.dataset.diknas || typed) : typed;
+  target.value = exact
+    ? (exact.dataset.nis || exact.dataset.diknas || typed)
+    : (input.dataset.studentQueryExact === '1' ? '' : typed);
 }
 
 function selectReportStudentSearchOption(input, opt) {
@@ -887,7 +941,7 @@ function refreshOptionalOneTimeFeeAvailability() {
       inputEl.removeAttribute('title');
     }
     if (contextEl) {
-      contextEl.textContent = locked ? message : 'Tagihan tahunan · dapat dicicil';
+      contextEl.textContent = locked ? message : 'Tagihan tahunan bisa dicicil';
     }
     hitungSisa(key);
   });
@@ -916,8 +970,6 @@ function refreshSppInstallmentAvailability() {
     }
   }
 
-  const paidFollowing = firstPaidFollowingSppPeriod(opt);
-  const mustSettleCurrent = !lockedMessage && !!paidFollowing && remaining > 0.001;
   const inputValue = parseNumber(input.value || 0);
   const locked = lockedMessage !== '';
   input.readOnly = locked;
@@ -928,8 +980,8 @@ function refreshSppInstallmentAvailability() {
     input.setCustomValidity('');
   } else {
     input.removeAttribute('title');
-    if (mustSettleCurrent && inputValue > 0.001 && inputValue + 0.001 < remaining) {
-      input.setCustomValidity('SPP ' + monthLabel + ' ' + year + ' harus dilunasi karena ' + paidFollowing.label + ' sudah memiliki pembayaran.');
+    if (inputValue > 0.001 && Math.abs(inputValue - total) > 0.001) {
+      input.setCustomValidity('SPP ' + monthLabel + ' ' + year + ' wajib dibayar penuh sebesar Rp ' + formatRupiah(total) + '.');
     } else {
       input.setCustomValidity('');
     }
@@ -937,11 +989,7 @@ function refreshSppInstallmentAvailability() {
 
   if (context) {
     if (lockedMessage) context.textContent = lockedMessage;
-    else if (paid > 0) context.textContent = 'Cicilan ' + monthLabel + ' ' + year + ' · sisa Rp ' + formatRupiah(remaining);
-    else context.textContent = 'Tagihan bulanan · dapat dicicil';
-  }
-  if (context && !lockedMessage && mustSettleCurrent) {
-    context.textContent = 'Harus dilunasi sebelum ' + paidFollowing.label + ' tetap valid · sisa Rp ' + formatRupiah(remaining);
+    else context.textContent = 'SPP ' + monthLabel + ' ' + year + ' wajib dibayar penuh Rp ' + formatRupiah(total);
   }
   hitungSisa('spp');
 }
@@ -1008,12 +1056,15 @@ function refreshPaymentInputOverlimitWarnings() {
     const input = parseNumber(inputEl.value || 0);
     const remainingBeforeInput = Math.max(0, total - paid);
     const isTooMuch = input > remainingBeforeInput + 0.001;
+    const isInvalidFullSpp = key === 'spp' && input > 0.001 && Math.abs(input - total) > 0.001;
 
-    row?.classList.toggle('row-input-overlimit', isTooMuch);
-    inputEl.classList.toggle('is-input-overlimit', isTooMuch);
+    row?.classList.toggle('row-input-overlimit', isTooMuch || isInvalidFullSpp);
+    inputEl.classList.toggle('is-input-overlimit', isTooMuch || isInvalidFullSpp);
 
-    if (isTooMuch) {
-      const message = paymentComponentLabels[key] + ' melebihi sisa tagihan. Sisa Rp ' + formatRupiah(remainingBeforeInput) + ', input Rp ' + formatRupiah(input) + '.';
+    if (isTooMuch || isInvalidFullSpp) {
+      const message = isInvalidFullSpp
+        ? 'Uang SPP wajib dibayar penuh sebesar Rp ' + formatRupiah(total) + '.'
+        : paymentComponentLabels[key] + ' melebihi sisa tagihan. Sisa Rp ' + formatRupiah(remainingBeforeInput) + ', input Rp ' + formatRupiah(input) + '.';
       inputEl.setCustomValidity(message);
       inputEl.title = message;
       warnings.push(message);
@@ -1310,7 +1361,9 @@ function refreshBiayaLainOptions() {
     select.innerHTML = '';
     const placeholder = document.createElement('option');
     placeholder.value = '';
-    placeholder.textContent = legacyPlaceholder?.textContent || '-- Pilih Tagihan --';
+    placeholder.textContent = legacyPlaceholder?.textContent || (selectedStudentOption()
+      ? (bills.length ? 'Pilih tagihan' : 'Belum ada tagihan. Publish dari Master Biaya Lain')
+      : 'Pilih siswa dulu');
     if (legacyPlaceholder) {
       placeholder.dataset.legacy = '1';
       placeholder.dataset.nominal = legacyPlaceholder.dataset.nominal || '0';
@@ -1329,6 +1382,35 @@ function refreshBiayaLainOptions() {
     if (current && Array.from(select.options).some(option => option.value === current)) select.value = current;
   });
   refreshBiayaLainAvailability();
+}
+
+let biayaLainBillsRequestId = 0;
+function refreshBiayaLainBillsFromServer(noInduk) {
+  const url = window.sppOtherFeeBillsUrl || '';
+  if (!url || !noInduk) return;
+  const requestId = ++biayaLainBillsRequestId;
+  fetch(url + '?no_induk=' + encodeURIComponent(noInduk), {
+    headers: { 'Accept': 'application/json' },
+    cache: 'no-store'
+  })
+    .then(response => response.json())
+    .then(payload => {
+      if (requestId !== biayaLainBillsRequestId) return;
+      if (!payload.ok) throw new Error(payload.message || 'Gagal memuat tagihan biaya lain.');
+      const opt = selectedStudentOption();
+      if (!opt || String(opt.dataset.nis || '') !== String(noInduk)) return;
+      opt.dataset.biayaLainBills = JSON.stringify(Array.isArray(payload.rows) ? payload.rows : []);
+      refreshBiayaLainOptions();
+      document.querySelectorAll('.biaya-lain-row').forEach(row => refreshBiayaLainRow(row, true));
+    })
+    .catch(error => {
+      if (requestId !== biayaLainBillsRequestId) return;
+      const alertEl = document.getElementById('biaya-lain-overpaid-alert');
+      if (alertEl) {
+        alertEl.hidden = false;
+        alertEl.textContent = error.message || 'Gagal memuat tagihan biaya lain terbaru.';
+      }
+    });
 }
 
 function refreshAnnualPaymentState(opt) {
@@ -1677,16 +1759,155 @@ function initReportDateRangePickers() {
   });
 }
 
+function closeReportMonthRangePicker(picker) {
+  const popover = picker?.querySelector('.report-month-range-popover');
+  const button = picker?.querySelector('.report-month-range-button');
+  if (!popover || !button) return;
+  popover.hidden = true;
+  picker.classList.remove('is-open');
+  button.setAttribute('aria-expanded', 'false');
+}
+
+function closeReportYearRangePicker(picker) {
+  const popover = picker?.querySelector('.report-year-range-popover');
+  const button = picker?.querySelector('.report-year-range-button');
+  if (!popover || !button) return;
+  popover.hidden = true;
+  picker.classList.remove('is-open');
+  button.setAttribute('aria-expanded', 'false');
+}
+
+function closeAllReportRangePickers() {
+  document.querySelectorAll('[data-range-picker]').forEach(closeReportDateRangePicker);
+  document.querySelectorAll('[data-month-range-picker]').forEach(closeReportMonthRangePicker);
+  document.querySelectorAll('[data-year-range-picker]').forEach(closeReportYearRangePicker);
+}
+
+function initReportMonthRangePickers() {
+  document.querySelectorAll('[data-month-range-picker]').forEach(picker => {
+    if (picker.dataset.monthRangePickerReady === '1') return;
+    picker.dataset.monthRangePickerReady = '1';
+    const button = picker.querySelector('.report-month-range-button');
+    const valueLabel = picker.querySelector('.report-month-range-value');
+    const popover = picker.querySelector('.report-month-range-popover');
+    const hiddenStart = picker.querySelector('input[type="hidden"][name="bulan_awal"]');
+    const hiddenEnd = picker.querySelector('input[type="hidden"][name="bulan_akhir"]');
+    const startInput = picker.querySelector('[data-month-range-start]');
+    const endInput = picker.querySelector('[data-month-range-end]');
+    const applyButton = picker.querySelector('[data-month-range-apply]');
+    if (!button || !valueLabel || !popover || !hiddenStart || !hiddenEnd || !startInput || !endInput) return;
+
+    const syncLabel = () => {
+      const start = paymentMonthLabelByCode(parseNumber(hiddenStart.value));
+      const end = paymentMonthLabelByCode(parseNumber(hiddenEnd.value));
+      valueLabel.textContent = hiddenStart.value && hiddenEnd.value ? start + ' sampai ' + end : (picker.dataset.emptyLabel || 'Pilih bulan tagihan');
+    };
+    const syncInputs = () => {
+      startInput.value = hiddenStart.value;
+      endInput.value = hiddenEnd.value;
+    };
+    const applyRange = () => {
+      hiddenStart.value = startInput.value;
+      hiddenEnd.value = endInput.value;
+      syncInputs();
+      syncLabel();
+      closeReportMonthRangePicker(picker);
+    };
+
+    syncInputs();
+    syncLabel();
+    button.addEventListener('click', () => {
+      const willOpen = popover.hidden;
+      closeAllReportRangePickers();
+      popover.hidden = !willOpen;
+      picker.classList.toggle('is-open', willOpen);
+      button.setAttribute('aria-expanded', willOpen ? 'true' : 'false');
+      if (willOpen) setTimeout(() => startInput.focus(), 0);
+    });
+    [startInput, endInput].forEach(input => input.addEventListener('keydown', event => {
+      if (event.key === 'Enter') {
+        event.preventDefault();
+        applyRange();
+      }
+    }));
+    applyButton?.addEventListener('click', applyRange);
+  });
+}
+
+function initReportYearRangePickers() {
+  document.querySelectorAll('[data-year-range-picker]').forEach(picker => {
+    if (picker.dataset.yearRangePickerReady === '1') return;
+    picker.dataset.yearRangePickerReady = '1';
+    const button = picker.querySelector('.report-year-range-button');
+    const valueLabel = picker.querySelector('.report-year-range-value');
+    const popover = picker.querySelector('.report-year-range-popover');
+    const hiddenStart = picker.querySelector('input[type="hidden"][name="tahun_awal"]');
+    const hiddenEnd = picker.querySelector('input[type="hidden"][name="tahun_akhir"]');
+    const startInput = picker.querySelector('[data-year-range-start]');
+    const endInput = picker.querySelector('[data-year-range-end]');
+    const applyButton = picker.querySelector('[data-year-range-apply]');
+    if (!button || !valueLabel || !popover || !hiddenStart || !hiddenEnd || !startInput || !endInput) return;
+
+    const syncLabel = () => {
+      valueLabel.textContent = hiddenStart.value && hiddenEnd.value
+        ? hiddenStart.value + ' sampai ' + hiddenEnd.value
+        : (picker.dataset.emptyLabel || 'Pilih tahun tagihan');
+    };
+    const syncInputs = () => {
+      startInput.value = hiddenStart.value;
+      endInput.value = hiddenEnd.value;
+    };
+    const applyRange = () => {
+      const start = parseNumber(startInput.value);
+      const end = parseNumber(endInput.value);
+      if (!start || !end) return;
+      hiddenStart.value = String(Math.min(start, end));
+      hiddenEnd.value = String(Math.max(start, end));
+      syncInputs();
+      syncLabel();
+      closeReportYearRangePicker(picker);
+    };
+
+    syncInputs();
+    syncLabel();
+    button.addEventListener('click', () => {
+      const willOpen = popover.hidden;
+      closeAllReportRangePickers();
+      popover.hidden = !willOpen;
+      picker.classList.toggle('is-open', willOpen);
+      button.setAttribute('aria-expanded', willOpen ? 'true' : 'false');
+      if (willOpen) setTimeout(() => startInput.focus(), 0);
+    });
+    [startInput, endInput].forEach(input => input.addEventListener('keydown', event => {
+      if (event.key === 'Enter') {
+        event.preventDefault();
+        applyRange();
+      }
+    }));
+    applyButton?.addEventListener('click', applyRange);
+  });
+}
+
 document.addEventListener('DOMContentLoaded', function () {
   initReportDateRangePickers();
+  initReportMonthRangePickers();
+  initReportYearRangePickers();
   document.addEventListener('mousedown', function (event) {
     document.querySelectorAll('[data-range-picker]').forEach(picker => {
       if (!picker.contains(event.target)) closeReportDateRangePicker(picker);
+    });
+    document.querySelectorAll('[data-month-range-picker]').forEach(picker => {
+      if (!picker.contains(event.target)) closeReportMonthRangePicker(picker);
+    });
+    document.querySelectorAll('[data-year-range-picker]').forEach(picker => {
+      if (!picker.contains(event.target)) closeReportYearRangePicker(picker);
     });
   });
   document.addEventListener('keydown', function (event) {
     if (event.key !== 'Escape') return;
     document.querySelectorAll('[data-range-picker]').forEach(closeReportDateRangePicker);
+    document.querySelectorAll('[data-month-range-picker]').forEach(closeReportMonthRangePicker);
+    document.querySelectorAll('[data-year-range-picker]').forEach(closeReportYearRangePicker);
   });
 });
 
@@ -1771,6 +1992,7 @@ function resetForm() {
   }
   clearOverpaidUiState();
   refreshAnnualPaymentState(null);
+  refreshPaymentHistory('');
   updateTotal();
 }
 

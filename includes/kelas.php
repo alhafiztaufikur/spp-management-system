@@ -5,10 +5,14 @@ require_once __DIR__ . '/tagihan_tahunan.php';
 
 function class_label(array $class): string {
     $level = (int)($class['tingkat'] ?? 0);
+    $code = strtoupper(trim((string)($class['kode_rombel'] ?? '')));
+    if ($level === 0 || $code === 'PSB') {
+        return 'PSB';
+    }
     if ((int)($class['is_placeholder'] ?? 0) === 1) {
         return 'Kelas ' . $level . ' (Belum Ditentukan)';
     }
-    return $level . strtoupper(trim((string)($class['kode_rombel'] ?? '')));
+    return $level . $code;
 }
 
 function class_find(mysqli $db, int $classId, bool $activeOnly = false): ?array {
@@ -30,15 +34,23 @@ function class_all(mysqli $db, bool $activeOnly = true, bool $includePlaceholder
     if (!$includePlaceholder) $where[] = 'is_placeholder = 0';
     $sql = 'SELECT id, tingkat, kode_rombel, is_placeholder, is_active FROM master_kelas';
     if ($where) $sql .= ' WHERE ' . implode(' AND ', $where);
-    $sql .= ' ORDER BY tingkat, is_placeholder, kode_rombel';
+    $sql .= " ORDER BY CASE WHEN tingkat=0 THEN 0 ELSE 1 END, tingkat, is_placeholder, kode_rombel";
     $rows = $db->query($sql)->fetch_all(MYSQLI_ASSOC);
     foreach ($rows as &$row) $row['label'] = class_label($row);
     unset($row);
     return $rows;
 }
 
+function class_ensure_psb(mysqli $db): int {
+    $stmt = $db->prepare("INSERT IGNORE INTO master_kelas (tingkat, kode_rombel, is_placeholder, is_active) VALUES (0, 'PSB', 0, 1)");
+    $stmt->execute();
+    $created = $stmt->affected_rows > 0 ? 1 : 0;
+    $stmt->close();
+    return $created;
+}
+
 function class_ensure_rombel_templates(mysqli $db): int {
-    $created = 0;
+    $created = class_ensure_psb($db);
     $stmt = $db->prepare("INSERT IGNORE INTO master_kelas (tingkat, kode_rombel, is_placeholder, is_active) VALUES (?, ?, 0, 1)");
     foreach (range(1, 6) as $level) {
         foreach (range('A', 'J') as $code) {
@@ -49,6 +61,138 @@ function class_ensure_rombel_templates(mysqli $db): int {
     }
     $stmt->close();
     return $created;
+}
+
+function class_highest_active_regular_level(mysqli $db): int {
+    $row = $db->query("SELECT COALESCE(MAX(COALESCE(mk.tingkat, CAST(s.KELAS AS UNSIGNED))), 0) AS level
+        FROM siswa s
+        LEFT JOIN master_kelas mk ON mk.id = s.master_kelas_id
+        WHERE s.is_active = 1
+          AND COALESCE(mk.tingkat, CAST(s.KELAS AS UNSIGNED)) BETWEEN 1 AND 6")->fetch_assoc();
+    return (int)($row['level'] ?? 0);
+}
+
+function class_students_for_manual_step(mysqli $db, int $level): array {
+    if ($level < 1 || $level > 6) return [];
+    $stmt = $db->prepare("SELECT s.NO_INDUK, s.NAMA, s.KELAS, s.master_kelas_id,
+        s.SPP_PERBULAN, s.POMG, mk.tingkat, mk.kode_rombel, mk.is_placeholder
+        FROM siswa s
+        LEFT JOIN master_kelas mk ON mk.id = s.master_kelas_id
+        WHERE s.is_active = 1
+          AND COALESCE(mk.tingkat, CAST(s.KELAS AS UNSIGNED)) = ?
+        ORDER BY mk.kode_rombel, s.NAMA");
+    $stmt->bind_param('i', $level);
+    $stmt->execute();
+    $rows = $stmt->get_result()->fetch_all(MYSQLI_ASSOC);
+    $stmt->close();
+    foreach ($rows as &$row) $row['kelas_label'] = class_label($row);
+    unset($row);
+    return $rows;
+}
+
+function class_target_rombel_options(mysqli $db, int $level): array {
+    if ($level < 1 || $level > 6) return [];
+    $stmt = $db->prepare("SELECT id, tingkat, kode_rombel, is_placeholder, is_active
+        FROM master_kelas
+        WHERE tingkat = ? AND is_placeholder = 0 AND is_active = 1
+        ORDER BY kode_rombel");
+    $stmt->bind_param('i', $level);
+    $stmt->execute();
+    $rows = $stmt->get_result()->fetch_all(MYSQLI_ASSOC);
+    $stmt->close();
+    foreach ($rows as &$row) $row['label'] = class_label($row);
+    unset($row);
+    return $rows;
+}
+
+function class_manual_graduate_student(mysqli $db, string $noInduk, string $targetYear): array {
+    $targetYear = du_normalize_academic_year($targetYear);
+    $currentStep = class_highest_active_regular_level($db);
+    if ($currentStep !== 6) {
+        throw new RuntimeException('Kelas 6 harus diselesaikan terlebih dahulu sebelum tahap kelas lain diproses.');
+    }
+    $yearId = class_ensure_academic_year($db, $targetYear);
+    $stmt = $db->prepare("SELECT s.NO_INDUK, s.NAMA, s.KELAS, s.master_kelas_id, s.SPP_PERBULAN, s.POMG,
+        mk.tingkat, mk.kode_rombel, mk.is_placeholder
+        FROM siswa s LEFT JOIN master_kelas mk ON mk.id=s.master_kelas_id
+        WHERE s.NO_INDUK=? AND s.is_active=1 FOR UPDATE");
+    $stmt->bind_param('s', $noInduk);
+    $stmt->execute();
+    $student = $stmt->get_result()->fetch_assoc();
+    $stmt->close();
+    if (!$student) throw new RuntimeException('Siswa tidak ditemukan atau sudah tidak aktif.');
+    $level = (int)($student['tingkat'] ?: $student['KELAS']);
+    if ($level !== 6) throw new RuntimeException('Pada tahap ini hanya siswa kelas 6 yang boleh diluluskan.');
+
+    $snapshot = class_label($student);
+    $status = 'lulus';
+    $classText = '6';
+    $classId = (int)($student['master_kelas_id'] ?? 0);
+    $spp = (float)$student['SPP_PERBULAN'];
+    $komite = (float)$student['POMG'];
+    $stmt = $db->prepare("INSERT INTO siswa_tahun_ajaran
+        (tahun_ajaran_id,no_induk,kelas,master_kelas_id,kelas_rombel_snapshot,spp_perbulan_snapshot,komite_snapshot,status)
+        VALUES (?,?,?,?,?,?,?,?)
+        ON DUPLICATE KEY UPDATE kelas=VALUES(kelas),master_kelas_id=VALUES(master_kelas_id),
+          kelas_rombel_snapshot=VALUES(kelas_rombel_snapshot),spp_perbulan_snapshot=VALUES(spp_perbulan_snapshot),
+          komite_snapshot=VALUES(komite_snapshot),status=VALUES(status)");
+    $stmt->bind_param('issisdds', $yearId, $noInduk, $classText, $classId, $snapshot, $spp, $komite, $status);
+    $stmt->execute();
+    $stmt->close();
+    $stmt = $db->prepare('UPDATE siswa SET is_active=0 WHERE NO_INDUK=?');
+    $stmt->bind_param('s', $noInduk);
+    $stmt->execute();
+    $stmt->close();
+    return ['student' => (string)$student['NAMA'], 'target_year' => $targetYear, 'action' => 'lulus'];
+}
+
+function class_manual_promote_student(mysqli $db, string $noInduk, int $targetClassId, string $targetYear): array {
+    $targetYear = du_normalize_academic_year($targetYear);
+    $currentStep = class_highest_active_regular_level($db);
+    if ($currentStep < 1 || $currentStep > 5) {
+        throw new RuntimeException($currentStep === 6
+            ? 'Selesaikan kelulusan kelas 6 terlebih dahulu.'
+            : 'Tidak ada siswa reguler aktif yang perlu dinaikkan.');
+    }
+    $target = class_find($db, $targetClassId, true);
+    if (!$target || (int)$target['is_placeholder'] === 1) throw new RuntimeException('Pilih rombel target yang aktif.');
+    if ((int)$target['tingkat'] !== $currentStep + 1) {
+        throw new RuntimeException('Tahap saat ini adalah kelas ' . $currentStep . ', jadi target wajib kelas ' . ($currentStep + 1) . '.');
+    }
+    $stmt = $db->prepare("SELECT s.NO_INDUK, s.NAMA, s.KELAS, s.master_kelas_id, s.SPP_PERBULAN, s.POMG,
+        mk.tingkat, mk.kode_rombel, mk.is_placeholder
+        FROM siswa s LEFT JOIN master_kelas mk ON mk.id=s.master_kelas_id
+        WHERE s.NO_INDUK=? AND s.is_active=1 FOR UPDATE");
+    $stmt->bind_param('s', $noInduk);
+    $stmt->execute();
+    $student = $stmt->get_result()->fetch_assoc();
+    $stmt->close();
+    if (!$student) throw new RuntimeException('Siswa tidak ditemukan atau sudah tidak aktif.');
+    $level = (int)($student['tingkat'] ?: $student['KELAS']);
+    if ($level !== $currentStep) throw new RuntimeException('Siswa ini tidak berada pada tahap kenaikan kelas yang sedang aktif.');
+
+    $yearId = class_ensure_academic_year($db, $targetYear);
+    $newLevel = (string)$target['tingkat'];
+    $snapshot = class_label($target);
+    $spp = (float)$student['SPP_PERBULAN'];
+    $komite = (float)$student['POMG'];
+    $status = 'aktif';
+    $stmt = $db->prepare('UPDATE siswa SET KELAS=?, master_kelas_id=?, is_active=1 WHERE NO_INDUK=?');
+    $stmt->bind_param('sis', $newLevel, $targetClassId, $noInduk);
+    $stmt->execute();
+    $stmt->close();
+    $stmt = $db->prepare("INSERT INTO siswa_tahun_ajaran
+        (tahun_ajaran_id,no_induk,kelas,master_kelas_id,kelas_rombel_snapshot,spp_perbulan_snapshot,komite_snapshot,status)
+        VALUES (?,?,?,?,?,?,?,?)
+        ON DUPLICATE KEY UPDATE id=LAST_INSERT_ID(id), kelas=VALUES(kelas),master_kelas_id=VALUES(master_kelas_id),
+          kelas_rombel_snapshot=VALUES(kelas_rombel_snapshot),spp_perbulan_snapshot=VALUES(spp_perbulan_snapshot),
+          komite_snapshot=VALUES(komite_snapshot),status=VALUES(status)");
+    $stmt->bind_param('issisdds', $yearId, $noInduk, $newLevel, $targetClassId, $snapshot, $spp, $komite, $status);
+    $stmt->execute();
+    $placementId = (int)$db->insert_id;
+    $stmt->close();
+    if ($placementId > 0) annual_fee_sync_for_placement($db, $placementId, 'manual-promotion');
+    return ['student' => (string)$student['NAMA'], 'target_year' => $targetYear, 'action' => 'naik', 'target' => $snapshot];
 }
 
 function class_next_academic_year_label(string $label): string {
@@ -149,6 +293,17 @@ function class_disable_empty_rombel(mysqli $db): int {
     return max(0, $affected);
 }
 
+function class_enable_all_rombel(mysqli $db): int {
+    $stmt = $db->prepare("UPDATE master_kelas
+        SET is_active = 1
+        WHERE is_placeholder = 0
+          AND is_active = 0");
+    $stmt->execute();
+    $affected = $stmt->affected_rows;
+    $stmt->close();
+    return max(0, $affected);
+}
+
 function class_current_academic_year_id(mysqli $db, bool $forUpdate = false): ?int {
     $label = du_current_academic_year();
     $stmt = $db->prepare('SELECT id FROM tahun_ajaran WHERE label = ? LIMIT 1' . ($forUpdate ? ' FOR UPDATE' : ''));
@@ -220,6 +375,9 @@ function class_sync_student_current_year(
 ): ?int {
     $class = class_find($db, $classId);
     if (!$class) throw new RuntimeException('Master kelas/rombel siswa tidak ditemukan.');
+    if ((int)$class['tingkat'] === 0) {
+        return null;
+    }
     $yearId = class_current_academic_year_id($db, true);
     if (!$yearId) return null;
 

@@ -133,11 +133,11 @@ FROM (
            WHERE TABLE_SCHEMA = DATABASE() AND TABLE_NAME = 'bayar_spp_periode'
          )
   UNION ALL
-  SELECT 'idx_bayar_spp_siswa_periode',
+  SELECT 'uk_bayar_spp_siswa_periode',
          EXISTS(
            SELECT 1 FROM information_schema.STATISTICS
            WHERE TABLE_SCHEMA = DATABASE() AND TABLE_NAME = 'bayar_spp_periode'
-             AND INDEX_NAME = 'idx_bayar_spp_siswa_periode' AND NON_UNIQUE = 1
+             AND INDEX_NAME = 'uk_bayar_spp_siswa_periode' AND NON_UNIQUE = 0
          )
   UNION ALL
   SELECT 'uk_siswa_no_induk_diknas', EXISTS(
@@ -330,6 +330,8 @@ FROM (
   )
   UNION ALL
   SELECT 'table.master_kelas', EXISTS(SELECT 1 FROM information_schema.TABLES WHERE TABLE_SCHEMA=DATABASE() AND TABLE_NAME='master_kelas')
+  UNION ALL
+  SELECT 'master_kelas.psb', EXISTS(SELECT 1 FROM master_kelas WHERE tingkat=0 AND kode_rombel='PSB' AND is_active=1)
   UNION ALL
   SELECT 'siswa.master_kelas_id', EXISTS(SELECT 1 FROM information_schema.COLUMNS WHERE TABLE_SCHEMA=DATABASE() AND TABLE_NAME='siswa' AND COLUMN_NAME='master_kelas_id')
   UNION ALL

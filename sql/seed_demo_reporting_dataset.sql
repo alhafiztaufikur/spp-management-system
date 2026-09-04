@@ -279,7 +279,7 @@ WHERE
   OR (m.`nama` = 'Modul/Ujian' AND s.`tingkat` >= 4)
   OR (m.`nama` = 'Ekskul' AND MOD(s.`n`, 3) = 0);
 
--- Pembayaran SPP Juli.
+-- Pembayaran SPP Juli. SPP demo mengikuti aturan baru: wajib full per bulan.
 INSERT INTO `bayar` (
   `NO_INDUK`, `KELAS`, `master_kelas_id`, `kelas_rombel_snapshot`,
   `U_SPP`, `U_KOMITE`, `KETERANGAN`, `TGL_BYR`, `BULAN`, `TAHUN`, `user_id`, `sistem_pembayaran`,
@@ -287,15 +287,14 @@ INSERT INTO `bayar` (
 )
 SELECT
   s.`no_induk`, CAST(s.`tingkat` AS CHAR), s.`master_kelas_id`, CONCAT(s.`tingkat`, s.`rombel`),
-  CASE WHEN MOD(s.`n`, 6) = 5 THEN ROUND(s.`spp` * 0.5, 0) ELSE s.`spp` END,
+  s.`spp`,
   CASE WHEN MOD(s.`n`, 3) = 0 THEN s.`komite` ELSE 0 END,
   CONCAT('SEED:SPP:JUL:', s.`no_induk`),
   DATE_ADD('2026-07-01 08:00:00', INTERVAL MOD(s.`n` - 1, 31) DAY),
   '07', '2026', CONCAT('kasir', MOD(s.`n` - 1, 4) + 1),
   ELT(MOD(s.`n` - 1, 3) + 1, 'Tunai', 'VA', 'Qris'),
   '2026/2027',
-  CASE WHEN MOD(s.`n`, 6) = 5 THEN ROUND(s.`spp` * 0.5, 0) ELSE s.`spp` END
-    + CASE WHEN MOD(s.`n`, 3) = 0 THEN s.`komite` ELSE 0 END,
+  s.`spp` + CASE WHEN MOD(s.`n`, 3) = 0 THEN s.`komite` ELSE 0 END,
   1
 FROM `seed_students` s
 WHERE MOD(s.`n`, 6) <> 0;
@@ -305,7 +304,7 @@ SELECT b.`id`, b.`NO_INDUK`, '07', '2026'
 FROM `bayar` b
 WHERE b.`KETERANGAN` LIKE 'SEED:SPP:JUL:%' AND b.`U_SPP` > 0;
 
--- Pembayaran SPP Agustus, termasuk cicilan kedua untuk sebagian siswa.
+-- Pembayaran SPP Agustus.
 INSERT INTO `bayar` (
   `NO_INDUK`, `KELAS`, `master_kelas_id`, `kelas_rombel_snapshot`,
   `U_SPP`, `U_KOMITE`, `KETERANGAN`, `TGL_BYR`, `BULAN`, `TAHUN`, `user_id`, `sistem_pembayaran`,
@@ -313,45 +312,17 @@ INSERT INTO `bayar` (
 )
 SELECT
   s.`no_induk`, CAST(s.`tingkat` AS CHAR), s.`master_kelas_id`, CONCAT(s.`tingkat`, s.`rombel`),
-  CASE MOD(s.`n`, 5)
-    WHEN 1 THEN 100000
-    WHEN 2 THEN s.`spp`
-    WHEN 3 THEN FLOOR(s.`spp` / 2)
-    ELSE s.`spp`
-  END,
+  s.`spp`,
   CASE WHEN MOD(s.`n`, 4) = 0 THEN s.`komite` ELSE 0 END,
   CONCAT('SEED:SPP:AUG-A:', s.`no_induk`),
   DATE_ADD('2026-08-01 08:30:00', INTERVAL MOD(s.`n` - 1, 20) DAY),
   '08', '2026', CONCAT('kasir', MOD(s.`n`, 4) + 1),
   ELT(MOD(s.`n`, 3) + 1, 'Tunai', 'VA', 'Qris'),
   '2026/2027',
-  CASE MOD(s.`n`, 5)
-    WHEN 1 THEN 100000
-    WHEN 2 THEN s.`spp`
-    WHEN 3 THEN FLOOR(s.`spp` / 2)
-    ELSE s.`spp`
-  END + CASE WHEN MOD(s.`n`, 4) = 0 THEN s.`komite` ELSE 0 END,
+  s.`spp` + CASE WHEN MOD(s.`n`, 4) = 0 THEN s.`komite` ELSE 0 END,
   1
 FROM `seed_students` s
 WHERE MOD(s.`n`, 5) <> 0;
-
-INSERT INTO `bayar` (
-  `NO_INDUK`, `KELAS`, `master_kelas_id`, `kelas_rombel_snapshot`,
-  `U_SPP`, `KETERANGAN`, `TGL_BYR`, `BULAN`, `TAHUN`, `user_id`, `sistem_pembayaran`,
-  `th_ajaran`, `total_jumlah`, `payment_link_version`
-)
-SELECT
-  s.`no_induk`, CAST(s.`tingkat` AS CHAR), s.`master_kelas_id`, CONCAT(s.`tingkat`, s.`rombel`),
-  s.`spp` - FLOOR(s.`spp` / 2),
-  CONCAT('SEED:SPP:AUG-B:', s.`no_induk`),
-  DATE_ADD('2026-08-01 13:30:00', INTERVAL MOD(s.`n` + 7, 20) DAY),
-  '08', '2026', CONCAT('kasir', MOD(s.`n` + 1, 4) + 1),
-  ELT(MOD(s.`n` + 1, 3) + 1, 'Tunai', 'VA', 'Qris'),
-  '2026/2027',
-  s.`spp` - FLOOR(s.`spp` / 2),
-  1
-FROM `seed_students` s
-WHERE MOD(s.`n`, 5) = 3;
 
 INSERT INTO `bayar_spp_periode` (`bayar_id`, `no_induk`, `bulan`, `tahun`)
 SELECT b.`id`, b.`NO_INDUK`, '08', '2026'

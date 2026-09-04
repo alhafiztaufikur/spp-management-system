@@ -57,7 +57,7 @@ if ($_SERVER['REQUEST_METHOD'] === 'POST') {
                 $targetValue = implode(',', $students);
             }
 
-            $sql = "SELECT s.NO_INDUK,s.master_kelas_id,s.KELAS,mk.tingkat,mk.kode_rombel,mk.is_placeholder
+            $sql = "SELECT s.NO_INDUK,s.NAMA,s.master_kelas_id,s.KELAS,mk.tingkat,mk.kode_rombel,mk.is_placeholder
                 FROM siswa s LEFT JOIN master_kelas mk ON mk.id=s.master_kelas_id WHERE " . implode(' AND ', $where) . ' ORDER BY s.NAMA';
             $stmt = $koneksi->prepare($sql);
             if ($types !== '') $stmt->bind_param($types, ...$params);
@@ -65,10 +65,25 @@ if ($_SERVER['REQUEST_METHOD'] === 'POST') {
             if (!$students) throw new RuntimeException('Tidak ada siswa aktif pada target yang dipilih.');
 
             $inserted = 0;
+            $updated = 0;
+            $republished = 0;
+            $skipped = 0;
+            $conflicts = 0;
             $adminId = (int)($_SESSION['admin_id'] ?? 0);
-            $insert = $koneksi->prepare("INSERT IGNORE INTO tagihan_biaya_lain
+            $findBill = $koneksi->prepare("SELECT t.id,t.status,t.nominal_tagihan,
+                    COALESCE(SUM(d.nominal_snapshot),0) AS paid
+                FROM tagihan_biaya_lain t
+                LEFT JOIN bayar_biaya_lain d ON d.tagihan_biaya_lain_id=t.id
+                WHERE t.master_biaya_lain_id=? AND t.no_induk=?
+                GROUP BY t.id,t.status,t.nominal_tagihan
+                LIMIT 1 FOR UPDATE");
+            $insert = $koneksi->prepare("INSERT INTO tagihan_biaya_lain
                 (master_biaya_lain_id,no_induk,master_kelas_id,nama_snapshot,nominal_tagihan,kelas_rombel_snapshot,status,created_by)
                 VALUES (?,?,NULLIF(?,0),?,?,?,'open',NULLIF(?,0))");
+            $update = $koneksi->prepare("UPDATE tagihan_biaya_lain
+                SET master_kelas_id=NULLIF(?,0), nama_snapshot=?, nominal_tagihan=?,
+                    kelas_rombel_snapshot=?, status='open', cancel_reason=NULL, created_by=NULLIF(?,0)
+                WHERE id=?");
             foreach ($students as $student) {
                 $noInduk = (string)$student['NO_INDUK'];
                 $classId = (int)($student['master_kelas_id'] ?? 0);
@@ -78,15 +93,64 @@ if ($_SERVER['REQUEST_METHOD'] === 'POST') {
                     'is_placeholder' => $student['is_placeholder'] ?? 1,
                 ]);
                 $name = (string)$master['nama']; $amount = (float)$master['nominal'];
-                $insert->bind_param('isisdsi', $masterId, $noInduk, $classId, $name, $amount, $classSnapshot, $adminId);
-                $insert->execute(); $inserted += $insert->affected_rows > 0 ? 1 : 0;
+                $findBill->bind_param('is', $masterId, $noInduk);
+                $findBill->execute();
+                $existingBill = $findBill->get_result()->fetch_assoc();
+                if (!$existingBill) {
+                    $insert->bind_param('isisdsi', $masterId, $noInduk, $classId, $name, $amount, $classSnapshot, $adminId);
+                    $insert->execute();
+                    $inserted += $insert->affected_rows > 0 ? 1 : 0;
+                    continue;
+                }
+
+                $paid = (float)($existingBill['paid'] ?? 0);
+                $currentTotal = (float)($existingBill['nominal_tagihan'] ?? 0);
+                $remaining = max(0, $currentTotal - $paid);
+                $billId = (int)$existingBill['id'];
+
+                if ($existingBill['status'] !== 'open') {
+                    $newTotal = $paid >= $currentTotal - 0.001
+                        ? $paid + $amount
+                        : max($amount, $paid);
+                    $update->bind_param('isdsii', $classId, $name, $newTotal, $classSnapshot, $adminId, $billId);
+                    $update->execute();
+                    $updated += $update->affected_rows >= 0 ? 1 : 0;
+                    continue;
+                }
+
+                if ($remaining <= 0.001) {
+                    $newTotal = $paid + $amount;
+                    $update->bind_param('isdsii', $classId, $name, $newTotal, $classSnapshot, $adminId, $billId);
+                    $update->execute();
+                    $republished += $update->affected_rows >= 0 ? 1 : 0;
+                    continue;
+                }
+
+                if (abs($currentTotal - $amount) > 0.001) {
+                    if ($amount + 0.001 < $paid) {
+                        $conflicts++;
+                        continue;
+                    }
+                    $update->bind_param('isdsii', $classId, $name, $amount, $classSnapshot, $adminId, $billId);
+                    $update->execute();
+                    $updated += $update->affected_rows >= 0 ? 1 : 0;
+                } else {
+                    $skipped++;
+                }
             }
-            $insert->close();
-            other_fee_write_audit($koneksi, $masterId, $target, $targetValue, $inserted, $inserted * (float)$master['nominal']);
+            $findBill->close(); $insert->close(); $update->close();
+            $affected = $inserted + $updated + $republished;
+            other_fee_write_audit($koneksi, $masterId, $target, $targetValue, $affected, $affected * (float)$master['nominal']);
             $koneksi->commit();
-            $_SESSION['flash'] = ['type' => 'success', 'msg' => $inserted > 0
-                ? $inserted . ' tagihan ' . $master['nama'] . ' berhasil diterbitkan.'
-                : 'Semua siswa pada target tersebut sudah memiliki tagihan. Tidak ada duplikasi dibuat.'];
+            $parts = [
+                $inserted . ' dibuat',
+                $updated . ' diperbarui/dibuka lagi',
+                $republished . ' diterbitkan ulang setelah lunas',
+                $skipped . ' masih memiliki tagihan aktif',
+            ];
+            if ($conflicts > 0) $parts[] = $conflicts . ' dilewati karena pembayaran sudah lebih besar dari nominal master';
+            $flashType = $conflicts > 0 || ($affected === 0 && $skipped > 0) ? 'warning' : 'success';
+            $_SESSION['flash'] = ['type' => $flashType, 'msg' => 'Penerbitan ' . $master['nama'] . ': ' . implode(', ', $parts) . '.'];
         } catch (Throwable $error) {
             if ($koneksi->errno || $koneksi->thread_id) { try { $koneksi->rollback(); } catch (Throwable $ignored) {} }
             $_SESSION['flash'] = ['type' => 'error', 'msg' => $error->getMessage()];
@@ -284,7 +348,7 @@ $activeStudents = $koneksi->query("SELECT s.NO_INDUK,s.NO_induk_diknas,s.NAMA,s.
             <div class="field-row publish-target-field" data-target="rombel" hidden><label class="field-label">Rombel</label><select class="field-input field-select" name="master_kelas_id" id="publish-class"><?php foreach($activeClasses as $class): ?><option value="<?= (int)$class['id'] ?>"><?= htmlspecialchars(class_label($class)) ?></option><?php endforeach; ?></select></div>
             <div class="field-row publish-target-field publish-students-field" data-target="siswa" hidden>
               <label class="field-label">Siswa (bisa lebih dari satu)</label>
-              <select class="publish-native-select" name="no_induk[]" id="publish-students" multiple aria-hidden="true" tabindex="-1">
+              <select class="publish-native-select" id="publish-students" multiple aria-hidden="true" tabindex="-1">
                 <?php foreach($activeStudents as $student): ?><option value="<?= htmlspecialchars($student['NO_INDUK']) ?>"><?= htmlspecialchars($student['NAMA']) ?></option><?php endforeach; ?>
               </select>
               <div class="publish-student-toolbar">
@@ -300,7 +364,7 @@ $activeStudents = $koneksi->query("SELECT s.NO_INDUK,s.NO_induk_diknas,s.NAMA,s.
               <div class="publish-student-list" id="publish-student-list">
                 <?php foreach($activeStudents as $student): $studentClassLabel = class_label($student); $studentBadgeLabel = trim(preg_replace('/\s*\(Belum Ditentukan\)$/', '', $studentClassLabel)); $studentDiknas = (string)($student['NO_induk_diknas'] ?? ''); $studentSearch = strtolower(trim($student['NAMA'].' '.$student['NO_INDUK'].' '.$studentDiknas.' '.$studentClassLabel)); ?>
                 <label class="publish-student-card" data-search="<?= htmlspecialchars($studentSearch) ?>" data-nis="<?= htmlspecialchars($student['NO_INDUK']) ?>">
-                  <input type="checkbox" class="publish-student-check" value="<?= htmlspecialchars($student['NO_INDUK']) ?>">
+                  <input type="checkbox" class="publish-student-check" name="no_induk[]" value="<?= htmlspecialchars($student['NO_INDUK']) ?>">
                   <span class="publish-student-main">
                     <strong><?= htmlspecialchars($student['NAMA']) ?></strong>
                     <small>NIS <?= htmlspecialchars($student['NO_INDUK']) ?><?= $studentDiknas !== '' ? ' &middot; NIS Diknas ' . htmlspecialchars($studentDiknas) : '' ?></small>
@@ -356,7 +420,7 @@ $activeStudents = $koneksi->query("SELECT s.NO_INDUK,s.NO_induk_diknas,s.NAMA,s.
       </div>
     </main>
   </div>
-  <script src="assets/js/app.js?v=3.1"></script>
+  <script src="assets/js/app.js?v=3.2"></script>
   <script>
     document.addEventListener('DOMContentLoaded', function () {
       var nominal = document.getElementById('nominal-biaya');
@@ -453,6 +517,10 @@ $activeStudents = $koneksi->query("SELECT s.NO_INDUK,s.NO_induk_diknas,s.NAMA,s.
         });
         syncPublishStudents();
         updatePublishPreview();
+      });
+      document.getElementById('form-terbit-biaya')?.addEventListener('submit', function() {
+        // Checkbox membawa nilai POST; select tersembunyi hanya menjaga state pratinjau tetap konsisten.
+        syncPublishStudents();
       });
       filterPublishStudents();
       updatePublishPreview();
