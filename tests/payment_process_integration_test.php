@@ -1,4 +1,9 @@
 <?php
+
+/**
+ * Tes HTTP ini sengaja memutasi database. Jalankan hanya pada database
+ * disposable dengan SPP_TEST_ALLOW_MUTATION=1 dan kredensial admin test.
+ */
 require_once __DIR__ . '/../koneksi.php';
 
 function payment_process_assert(bool $condition, string $message): void {
@@ -12,404 +17,205 @@ function payment_process_request(string $url, array $data, array &$cookies): arr
         foreach ($cookies as $name => $value) $pairs[] = $name . '=' . $value;
         $headers[] = 'Cookie: ' . implode('; ', $pairs);
     }
-    $context = stream_context_create([
-        'http' => [
-            'method' => $data ? 'POST' : 'GET',
-            'header' => implode("\r\n", $headers),
-            'content' => $data ? http_build_query($data) : '',
-            'ignore_errors' => true,
-            'follow_location' => 0,
-            'timeout' => 10,
-        ],
-    ]);
+    $context = stream_context_create(['http' => [
+        'method' => $data ? 'POST' : 'GET',
+        'header' => implode("\r\n", $headers),
+        'content' => $data ? http_build_query($data) : '',
+        'ignore_errors' => true,
+        'follow_location' => 0,
+        'timeout' => 10,
+    ]]);
     $body = file_get_contents($url, false, $context);
     if ($body === false) throw new RuntimeException('HTTP request ke aplikasi gagal.');
 
     $status = 0;
     foreach ($http_response_header ?? [] as $header) {
         if (preg_match('/^HTTP\/\S+\s+(\d+)/i', $header, $match)) $status = (int)$match[1];
-        if (preg_match('/^Set-Cookie:\s*([^=]+)=([^;]*)/i', $header, $match)) {
-            $cookies[$match[1]] = $match[2];
-        }
+        if (preg_match('/^Set-Cookie:\s*([^=]+)=([^;]*)/i', $header, $match)) $cookies[$match[1]] = $match[2];
     }
     return ['status' => $status, 'body' => $body];
 }
 
-do {
-    $noInduk = (string)random_int(9900000000, 9999999999);
-    $stmtCheck = $koneksi->prepare('SELECT 1 FROM siswa WHERE NO_INDUK = ?');
-    $stmtCheck->bind_param('s', $noInduk);
-    $stmtCheck->execute();
-    $exists = (bool)$stmtCheck->get_result()->fetch_row();
-    $stmtCheck->close();
-} while ($exists);
-do {
-    $targetNoInduk = (string)random_int(9900000000, 9999999999);
-    $stmtTargetCheck = $koneksi->prepare('SELECT 1 FROM siswa WHERE NO_INDUK = ?');
-    $stmtTargetCheck->bind_param('s', $targetNoInduk);
-    $stmtTargetCheck->execute();
-    $targetExists = $targetNoInduk === $noInduk || (bool)$stmtTargetCheck->get_result()->fetch_row();
-    $stmtTargetCheck->close();
-} while ($targetExists);
+function payment_process_flash(string $baseUrl, array &$cookies): string {
+    $page = payment_process_request($baseUrl . '/pembayaran/form.php', [], $cookies);
+    if (preg_match('/id="flash-msg"[^>]*>(.*?)<\/div>/s', $page['body'], $match)) {
+        return trim(html_entity_decode(strip_tags($match[1])));
+    }
+    return '';
+}
 
+function payment_process_unique_nis(mysqli $db): string {
+    do {
+        $nis = (string)random_int(9900000000, 9999999999);
+        $stmt = $db->prepare('SELECT 1 FROM siswa WHERE NO_INDUK = ?');
+        $stmt->bind_param('s', $nis);
+        $stmt->execute();
+        $exists = (bool)$stmt->get_result()->fetch_row();
+        $stmt->close();
+    } while ($exists);
+    return $nis;
+}
+
+if (getenv('SPP_TEST_ALLOW_MUTATION') !== '1') {
+    fwrite(STDERR, "SKIPPED: set SPP_TEST_ALLOW_MUTATION=1 hanya pada database disposable.\n");
+    exit(0);
+}
+if (!(string)getenv('SPP_TEST_ADMIN_PASSWORD')) {
+    fwrite(STDERR, "FAILED: SPP_TEST_ADMIN_PASSWORD wajib diisi untuk akun admin database test.\n");
+    exit(1);
+}
+
+$baseUrl = getenv('SPP_TEST_BASE_URL') ?: 'http://127.0.0.1/sppaman/spp-management-system';
+$password = (string)getenv('SPP_TEST_ADMIN_PASSWORD');
+$testNis = [payment_process_unique_nis($koneksi), payment_process_unique_nis($koneksi), payment_process_unique_nis($koneksi), payment_process_unique_nis($koneksi)];
+$createdYearIds = [];
 $failure = null;
-$otherFeeMasterIds = [];
-$otherFeeBillIds = [];
+
 try {
-    $name = 'UJI INTEGRASI CICILAN';
-    $class = '1';
-    $monthlyFee = 250000.0;
-    $classId=(int)$koneksi->query("SELECT id FROM master_kelas WHERE tingkat=1 AND is_placeholder=1 LIMIT 1")->fetch_assoc()['id'];
-    $stmtStudent = $koneksi->prepare('INSERT INTO siswa (NO_INDUK, NAMA, KELAS, master_kelas_id, SPP_PERBULAN) VALUES (?, ?, ?, ?, ?)');
-    $stmtStudent->bind_param('sssid', $noInduk, $name, $class, $classId, $monthlyFee);
-    $stmtStudent->execute();
+    $currentYear = (int)date('Y');
+    $startYear = 0;
+    for ($candidate = $currentYear + 2; $candidate <= $currentYear + 9; $candidate++) {
+        $labels = [($candidate - 2) . '/' . ($candidate - 1), ($candidate - 1) . '/' . $candidate, $candidate . '/' . ($candidate + 1)];
+        $placeholders = implode(',', array_fill(0, count($labels), '?'));
+        $stmt = $koneksi->prepare("SELECT COUNT(*) AS total FROM tahun_ajaran WHERE label IN ($placeholders)");
+        $types = str_repeat('s', count($labels));
+        $stmt->bind_param($types, ...$labels);
+        $stmt->execute();
+        $exists = (int)$stmt->get_result()->fetch_assoc()['total'];
+        $stmt->close();
+        if ($exists === 0) { $startYear = $candidate; break; }
+    }
+    payment_process_assert($startYear > 0, 'Tidak menemukan tiga tahun ajaran kosong untuk tes disposable.');
+
+    $labels = [($startYear - 2) . '/' . ($startYear - 1), ($startYear - 1) . '/' . $startYear, $startYear . '/' . ($startYear + 1)];
+    $stmtYear = $koneksi->prepare("INSERT INTO tahun_ajaran (label, tanggal_mulai, tanggal_selesai, status) VALUES (?, ?, ?, 'published')");
+    foreach ($labels as $label) {
+        [$start, $end] = array_map('intval', explode('/', $label));
+        $dateStart = $start . '-07-01';
+        $dateEnd = $end . '-06-30';
+        $stmtYear->bind_param('sss', $label, $dateStart, $dateEnd);
+        $stmtYear->execute();
+        $createdYearIds[$label] = (int)$koneksi->insert_id;
+    }
+    $stmtYear->close();
+
+    $classId = (int)$koneksi->query("SELECT id FROM master_kelas WHERE tingkat=1 AND is_placeholder=1 LIMIT 1")->fetch_assoc()['id'];
+    payment_process_assert($classId > 0, 'Kelas placeholder tingkat 1 tidak tersedia untuk tes.');
+    $stmtStudent = $koneksi->prepare('INSERT INTO siswa (NO_INDUK, NAMA, KELAS, master_kelas_id, SPP_PERBULAN) VALUES (?, ?, \'1\', ?, 275000)');
+    foreach (['UJI SPP LINTAS', 'UJI SPP HISTORI', 'UJI SPP PINDAH', 'UJI SPP BARU'] as $index => $name) {
+        $stmtStudent->bind_param('ssi', $testNis[$index], $name, $classId);
+        $stmtStudent->execute();
+    }
     $stmtStudent->close();
-    $targetName = 'UJI TARGET CICILAN';
-    $stmtTarget = $koneksi->prepare('INSERT INTO siswa (NO_INDUK, NAMA, KELAS, master_kelas_id, SPP_PERBULAN) VALUES (?, ?, ?, ?, ?)');
-    $stmtTarget->bind_param('sssid', $targetNoInduk, $targetName, $class, $classId, $monthlyFee);
-    $stmtTarget->execute();
-    $stmtTarget->close();
 
-    $stmtOtherFee = $koneksi->prepare('INSERT INTO master_biaya_lain (nama, nominal, is_active) VALUES (?, ?, 1)');
-    for ($index = 1; $index <= 5; $index++) {
-        $otherFeeName = 'UJI BIAYA LEGACY ' . $noInduk . ' #' . $index;
-        $otherFeeLimit = 100000.0;
-        $stmtOtherFee->bind_param('sd', $otherFeeName, $otherFeeLimit);
-        $stmtOtherFee->execute();
-        $otherFeeMasterIds[] = (int)$koneksi->insert_id;
+    $stmtPlacement = $koneksi->prepare('INSERT INTO siswa_tahun_ajaran (tahun_ajaran_id, no_induk, kelas, master_kelas_id, kelas_rombel_snapshot, spp_perbulan_snapshot, komite_snapshot, status) VALUES (?, ?, \'1\', ?, \'Kelas 1 (Belum Ditentukan)\', ?, 0, ?)');
+    $addPlacement = static function (int $yearId, string $nis, float $tariff, string $status) use ($stmtPlacement, $classId): void {
+        $stmtPlacement->bind_param('isids', $yearId, $nis, $classId, $tariff, $status);
+        $stmtPlacement->execute();
+    };
+
+    $addPlacement($createdYearIds[$labels[1]], $testNis[0], 250000, 'aktif');
+    $addPlacement($createdYearIds[$labels[2]], $testNis[0], 275000, 'aktif');
+    foreach ($labels as $label) $addPlacement($createdYearIds[$label], $testNis[1], 250000, 'aktif');
+    $addPlacement($createdYearIds[$labels[1]], $testNis[2], 250000, 'pindah');
+    $addPlacement($createdYearIds[$labels[2]], $testNis[2], 275000, 'aktif');
+    $addPlacement($createdYearIds[$labels[2]], $testNis[3], 275000, 'aktif');
+    $stmtPlacement->close();
+
+    $stmtPaid = $koneksi->prepare('INSERT INTO bayar (NO_INDUK, KELAS, U_SPP, TGL_BYR, BULAN, TAHUN, total_jumlah, payment_link_version) VALUES (?, \'1\', 250000, ?, ?, ?, 250000, 1)');
+    for ($month = 7; $month <= 12; $month++) {
+        $date = ($startYear - 1) . '-' . str_pad((string)$month, 2, '0', STR_PAD_LEFT) . '-10 10:00:00';
+        $code = str_pad((string)$month, 2, '0', STR_PAD_LEFT);
+        $year = (string)($startYear - 1);
+        $stmtPaid->bind_param('ssss', $testNis[0], $date, $code, $year);
+        $stmtPaid->execute();
     }
-    $stmtOtherFee->close();
+    for ($month = 1; $month <= 5; $month++) {
+        $date = $startYear . '-' . str_pad((string)$month, 2, '0', STR_PAD_LEFT) . '-10 10:00:00';
+        $code = str_pad((string)$month, 2, '0', STR_PAD_LEFT);
+        $year = (string)$startYear;
+        $stmtPaid->bind_param('ssss', $testNis[0], $date, $code, $year);
+        $stmtPaid->execute();
+    }
+    $stmtPaid->close();
 
-    $stmtBill=$koneksi->prepare("INSERT INTO tagihan_biaya_lain (master_biaya_lain_id,no_induk,master_kelas_id,nama_snapshot,nominal_tagihan,kelas_rombel_snapshot,status) SELECT id,?,?,nama,nominal,'Kelas 1 (Belum Ditentukan)','open' FROM master_biaya_lain WHERE id=?");
-    foreach($otherFeeMasterIds as $masterId){$stmtBill->bind_param('sii',$noInduk,$classId,$masterId);$stmtBill->execute();$otherFeeBillIds[]=(int)$koneksi->insert_id;}$stmtBill->close();
-
-    $baseUrl = getenv('SPP_TEST_BASE_URL') ?: 'http://127.0.0.1/spp-management-system';
-    $password = getenv('SPP_TEST_ADMIN_PASSWORD') ?: 'admin123';
     $cookies = [];
-    $login = payment_process_request($baseUrl . '/login.php', [
-        'username' => 'admin',
-        'password' => $password,
-    ], $cookies);
-    payment_process_assert($login['status'] === 302 && isset($cookies['PHPSESSID']), 'Login admin untuk tes integrasi gagal.');
+    $login = payment_process_request($baseUrl . '/login.php', ['username' => 'admin', 'password' => $password], $cookies);
+    payment_process_assert($login['status'] === 302 && isset($cookies['PHPSESSID']), 'Login admin database test gagal.');
 
-    $common = [
-        'aksi' => 'input',
-        'payment_plan' => 'monthly',
-        'no_induk' => $noInduk,
-        'tanggal_bayar' => '2000-01-01',
-        'bulan_bayar' => '08',
-        'tahun_bayar' => '2026',
-        'sistem_pembayaran' => 'Tunai',
-    ];
-    $legacySavingsResponse = payment_process_request($baseUrl . '/pembayaran/proses.php', $common + [
-        'uang_spp' => 100000,
-        'tabungan_wajib' => 20000,
-    ], $cookies);
-    payment_process_assert($legacySavingsResponse['status'] === 302, 'POST tabungan legacy tidak mengembalikan redirect yang diharapkan.');
-    $legacySavingsFeedback = payment_process_request($baseUrl . '/pembayaran/form.php', [], $cookies);
-    payment_process_assert(str_contains($legacySavingsFeedback['body'], 'Input tabungan lewat pembayaran sudah dinonaktifkan'), 'POST tabungan legacy tidak ditolak backend.');
-    payment_process_assert(!str_contains($legacySavingsFeedback['body'], 'name="tabungan_wajib"'), 'Form input masih memiliki field tabungan pembayaran.');
-    payment_process_assert(!str_contains($legacySavingsFeedback['body'], 'id="tab-wajib"'), 'Form input masih memiliki kontrol tabungan pembayaran.');
+    $payment = static function (string $nis, string $month, string $year, float $amount) use ($baseUrl, &$cookies): array {
+        return payment_process_request($baseUrl . '/pembayaran/proses.php', [
+            'aksi' => 'input', 'payment_plan' => 'monthly', 'no_induk' => $nis,
+            'bulan_bayar' => $month, 'tahun_bayar' => $year,
+            'sistem_pembayaran' => 'Tunai', 'uang_spp' => $amount,
+        ], $cookies);
+    };
 
-    $blockedAugust = payment_process_request($baseUrl . '/pembayaran/proses.php', array_merge($common, [
-        'no_induk' => $targetNoInduk,
-        'uang_spp' => 50000,
-    ]), $cookies);
-    payment_process_assert($blockedAugust['status'] === 302, 'POST SPP Agustus tanpa Juli lunas tidak mengembalikan redirect.');
-    $blockedFeedback = payment_process_request($baseUrl . '/pembayaran/form.php', [], $cookies);
-    payment_process_assert(
-        str_contains($blockedFeedback['body'], 'belum bisa dibayar karena Juli 2026 belum lunas'),
-        'SPP Agustus tidak ditolak saat Juli belum lunas.'
-    );
+    $blockedJuly = $payment($testNis[0], '07', (string)$startYear, 275000);
+    payment_process_assert($blockedJuly['status'] === 302, 'SPP Juli lintas tahun tidak mengembalikan redirect.');
+    payment_process_assert(str_contains(payment_process_flash($baseUrl, $cookies), 'Juni ' . $startYear . ' belum lunas'), 'SPP Juli tahun baru tidak ditolak saat Juni tahun sebelumnya menunggak.');
 
-    $julyResponse = payment_process_request($baseUrl . '/pembayaran/proses.php', array_merge($common, [
-        'bulan_bayar' => '07',
-        'uang_spp' => 250000,
-    ]), $cookies);
-    payment_process_assert($julyResponse['status'] === 302, 'Pelunasan SPP Juli sebagai prasyarat Agustus gagal.');
+    payment_process_assert($payment($testNis[0], '06', (string)$startYear, 250000)['status'] === 302, 'Pelunasan Juni tahun sebelumnya gagal.');
+    payment_process_assert($payment($testNis[0], '07', (string)$startYear, 275000)['status'] === 302, 'SPP Juli setelah Juni lunas gagal.');
 
-    $response = payment_process_request($baseUrl . '/pembayaran/proses.php', $common + [
-        'uang_spp' => 100000,
-        'biaya_lain_detail_id' => [0, 0, 0, 0, 0],
-        'biaya_lain_tagihan_id' => $otherFeeBillIds,
-        'biaya_lain_nominal' => [11000, 12000, 13000, 14000, 15000],
-        'biaya_lain_keterangan' => ['', '', '', '', ''],
-    ], $cookies);
-    payment_process_assert($response['status'] === 302, 'Endpoint pembayaran tidak mengembalikan redirect yang diharapkan.');
-    foreach ([150000, 10000] as $amount) {
-        $response = payment_process_request($baseUrl . '/pembayaran/proses.php', $common + ['uang_spp' => $amount], $cookies);
-        payment_process_assert($response['status'] === 302, 'Endpoint pembayaran tidak mengembalikan redirect yang diharapkan.');
-    }
-
-    $stmtResult = $koneksi->prepare("
-        SELECT COUNT(*) AS payment_count, COALESCE(SUM(U_SPP), 0) AS paid,
-               MIN(DATE(TGL_BYR)) AS payment_date
-        FROM bayar
-        WHERE NO_INDUK = ? AND TAHUN = '2026'
-          AND (BULAN = '08' OR BULAN = '8' OR BULAN = 'Agustus')
-    ");
-    $stmtResult->bind_param('s', $noInduk);
-    $stmtResult->execute();
-    $result = $stmtResult->get_result()->fetch_assoc();
-    $stmtResult->close();
-    payment_process_assert((int)$result['payment_count'] === 2, 'Pembayaran ketiga setelah lunas tidak ditolak.');
-    payment_process_assert(abs((float)$result['paid'] - 250000.0) < 0.001, 'Dua cicilan tidak berjumlah Rp250.000.');
-    payment_process_assert($result['payment_date'] === date('Y-m-d'), 'Tanggal manipulasi dari browser tidak diabaikan backend.');
-
-    $stmtClaims = $koneksi->prepare("SELECT COUNT(*) AS total FROM bayar_spp_periode WHERE no_induk = ? AND tahun = '2026' AND bulan = '08'");
-    $stmtClaims->bind_param('s', $noInduk);
-    $stmtClaims->execute();
-    $claimCount = (int)$stmtClaims->get_result()->fetch_assoc()['total'];
-    $stmtClaims->close();
-    payment_process_assert($claimCount === 2, 'Dua cicilan tidak memiliki dua pemetaan periode.');
-
-    $form = payment_process_request($baseUrl . '/pembayaran/form.php', [], $cookies);
-    payment_process_assert(str_contains($form['body'], 'melebihi sisa tagihan'), 'Pesan penolakan pembayaran setelah lunas tidak tampil.');
-
-    $stmtJuly = $koneksi->prepare("
-        SELECT MIN(id) AS id
-        FROM bayar
-        WHERE NO_INDUK = ? AND TAHUN = '2026'
-          AND (BULAN = '07' OR BULAN = '7' OR BULAN = 'Juli')
-    ");
-    $stmtJuly->bind_param('s', $noInduk);
+    $stmtJuly = $koneksi->prepare("SELECT id, U_SPP FROM bayar WHERE NO_INDUK=? AND BULAN='07' AND TAHUN=? ORDER BY id DESC LIMIT 1");
+    $targetYear = (string)$startYear;
+    $stmtJuly->bind_param('ss', $testNis[0], $targetYear);
     $stmtJuly->execute();
-    $julyPaymentId = (int)$stmtJuly->get_result()->fetch_assoc()['id'];
+    $julyPayment = $stmtJuly->get_result()->fetch_assoc();
     $stmtJuly->close();
-    $deleteJuly = payment_process_request($baseUrl . '/pembayaran/proses.php?aksi=hapus&id=' . $julyPaymentId, [], $cookies);
-    payment_process_assert($deleteJuly['status'] === 302, 'Hapus SPP Juli yang menjadi prasyarat tidak mengembalikan redirect.');
-    $deleteJulyFeedback = payment_process_request($baseUrl . '/pembayaran/lihat.php', [], $cookies);
-    payment_process_assert(
-        str_contains($deleteJulyFeedback['body'], 'tidak bisa dihapus karena Agustus 2026 sudah memiliki pembayaran'),
-        'Hapus SPP Juli tidak ditolak saat Agustus sudah memiliki pembayaran.'
-    );
+    payment_process_assert(abs((float)($julyPayment['U_SPP'] ?? 0) - 275000) < 0.001, 'SPP Juli tidak memakai tarif snapshot tahun ajaran baru.');
 
-    $stmtFirst = $koneksi->prepare("
-        SELECT MIN(id) AS id
-        FROM bayar
-        WHERE NO_INDUK = ? AND TAHUN = '2026'
-          AND (BULAN = '08' OR BULAN = '8' OR BULAN = 'Agustus')
-    ");
-    $stmtFirst->bind_param('s', $noInduk);
-    $stmtFirst->execute();
-    $firstPaymentId = (int)$stmtFirst->get_result()->fetch_assoc()['id'];
-    $stmtFirst->close();
+    $stmtJune = $koneksi->prepare("SELECT id FROM bayar WHERE NO_INDUK=? AND BULAN='06' AND TAHUN=? ORDER BY id DESC LIMIT 1");
+    $stmtJune->bind_param('ss', $testNis[0], $targetYear);
+    $stmtJune->execute();
+    $junePaymentId = (int)$stmtJune->get_result()->fetch_assoc()['id'];
+    $stmtJune->close();
 
-    $adminId = (string)$koneksi->query("SELECT id FROM admin WHERE username='admin' LIMIT 1")->fetch_assoc()['id'];
-    $stmtOperator = $koneksi->prepare("
-        SELECT b.user_id AS payment_operator,
-               (SELECT COUNT(*) FROM transaksi_m WHERE bayar_id = b.id) AS linked_savings
-        FROM bayar b
-        WHERE b.id = ?
-    ");
-    $stmtOperator->bind_param('i', $firstPaymentId);
-    $stmtOperator->execute();
-    $operatorRow = $stmtOperator->get_result()->fetch_assoc();
-    $stmtOperator->close();
-    payment_process_assert(
-        (string)$operatorRow['payment_operator'] === $adminId
-        && (int)$operatorRow['linked_savings'] === 0,
-        'Transaksi pembayaran belum menyimpan ID kasir atau masih membuat tabungan terkait.'
-    );
+    $editJune = payment_process_request($baseUrl . '/pembayaran/proses.php', [
+        'aksi' => 'update', 'id' => $junePaymentId, 'no_induk' => $testNis[0],
+        'bulan_bayar' => '06', 'tahun_bayar' => (string)$startYear,
+        'sistem_pembayaran' => 'Tunai', 'uang_spp' => 0,
+    ], $cookies);
+    payment_process_assert($editJune['status'] === 302, 'Edit prasyarat lintas tahun tidak mengembalikan redirect.');
+    payment_process_assert(str_contains(payment_process_flash($baseUrl, $cookies), 'tidak bisa dikosongkan karena Juli ' . $startYear . ' sudah memiliki pembayaran'), 'Edit Juni tidak ditolak saat Juli tahun berikutnya sudah dibayar.');
 
-    $stmtLegacyOther = $koneksi->prepare("\n        SELECT U_LAIN, LAIN_LAIN1, JUMLAH1, LAIN_LAIN2, JUMLAH2,\n               LAIN_LAIN3, JUMLAH3, LAIN_LAIN4, JUMLAH4,\n               (SELECT COUNT(*) FROM bayar_biaya_lain WHERE bayar_id = bayar.id) AS detail_count\n        FROM bayar WHERE id = ?\n    ");
-    $stmtLegacyOther->bind_param('i', $firstPaymentId);
-    $stmtLegacyOther->execute();
-    $legacyOther = $stmtLegacyOther->get_result()->fetch_assoc();
-    $stmtLegacyOther->close();
-    payment_process_assert(
-        abs((float)$legacyOther['U_LAIN'] - 65000.0) < 0.001
-        && (int)$legacyOther['detail_count'] === 5
-        && str_ends_with((string)$legacyOther['LAIN_LAIN1'], '#1')
-        && str_ends_with((string)$legacyOther['LAIN_LAIN4'], '#4')
-        && abs((float)$legacyOther['JUMLAH4'] - 14000.0) < 0.001,
-        'Input Biaya Lain tidak mencerminkan total dan empat detail pertama ke kolom legacy.'
-    );
+    $deleteJune = payment_process_request($baseUrl . '/pembayaran/proses.php?aksi=hapus&id=' . $junePaymentId, [], $cookies);
+    payment_process_assert($deleteJune['status'] === 302, 'Hapus prasyarat lintas tahun tidak mengembalikan redirect.');
+    payment_process_assert(str_contains(payment_process_flash($baseUrl, $cookies), 'tidak bisa dihapus karena Juli ' . $startYear . ' sudah memiliki pembayaran'), 'Hapus Juni tidak ditolak saat Juli tahun berikutnya sudah dibayar.');
 
-    $stmtSavings = $koneksi->prepare("
-        SELECT
-            COALESCE((SELECT SALDO FROM tabungan WHERE NO_INDUK = ?), 0) AS saldo,
-            COALESCE((SELECT MASUK FROM transaksi_m WHERE bayar_id = ?), 0) AS linked_saving
-    ");
-    $stmtSavings->bind_param('si', $noInduk, $firstPaymentId);
-    $stmtSavings->execute();
-    $savings = $stmtSavings->get_result()->fetch_assoc();
-    $stmtSavings->close();
-    payment_process_assert(
-        abs((float)$savings['saldo']) < 0.001
-        && abs((float)$savings['linked_saving']) < 0.001,
-        'Pembayaran masih membuat saldo atau jurnal tabungan terkait.'
-    );
+    $blockedHistory = $payment($testNis[1], '07', (string)$startYear, 250000);
+    payment_process_assert($blockedHistory['status'] === 302, 'Tunggakan historis tidak mengembalikan redirect.');
+    payment_process_assert(str_contains(payment_process_flash($baseUrl, $cookies), 'Juli ' . ($startYear - 2) . ' belum lunas'), 'Periode tunggakan aktif paling awal tidak dipilih sebagai penghalang.');
 
-    $receipt = payment_process_request($baseUrl . '/laporan/cetak_struk.php?id=' . $firstPaymentId, [], $cookies);
-    payment_process_assert($receipt['status'] === 200, 'Struk pembayaran tidak dapat dibuka.');
-    payment_process_assert(!str_contains($receipt['body'], 'Tabungan'), 'Struk pembayaran masih menampilkan tabungan.');
-    payment_process_assert(!str_contains($receipt['body'], 'Sisa SPP'), 'Struk masih menampilkan Sisa SPP pada bagian Sisa Pembayaran.');
-    payment_process_assert(str_contains($receipt['body'], 'Administrator'), 'Struk belum menampilkan operator dari ID transaksi.');
-
-    $update = payment_process_request($baseUrl . '/pembayaran/proses.php', array_merge($common, [
-        'aksi' => 'update',
-        'id' => $firstPaymentId,
-        'tanggal_bayar' => date('Y-m-d'),
-        'uang_spp' => 50000,
-        'biaya_lain_detail_id' => [0, 0],
-        'biaya_lain_tagihan_id' => array_slice($otherFeeBillIds, 0, 2),
-        'biaya_lain_nominal' => [21000, 22000],
-        'biaya_lain_keterangan' => ['', ''],
-    ]), $cookies);
-    payment_process_assert($update['status'] === 302, 'Edit cicilan tidak mengembalikan redirect yang diharapkan.');
-
-    $stmtAfterEdit = $koneksi->prepare("
-        SELECT COUNT(*) AS total, COALESCE(SUM(U_SPP), 0) AS paid
-        FROM bayar
-        WHERE NO_INDUK = ? AND TAHUN = '2026'
-          AND (BULAN = '08' OR BULAN = '8' OR BULAN = 'Agustus')
-    ");
-    $stmtAfterEdit->bind_param('s', $noInduk);
-    $stmtAfterEdit->execute();
-    $afterEdit = $stmtAfterEdit->get_result()->fetch_assoc();
-    $stmtAfterEdit->close();
-    payment_process_assert((int)$afterEdit['total'] === 2 && abs((float)$afterEdit['paid'] - 200000.0) < 0.001, 'Edit cicilan tidak menyesuaikan total menjadi Rp200.000.');
-
-    $stmtLegacyEdit = $koneksi->prepare("\n        SELECT U_LAIN, LAIN_LAIN1, JUMLAH1, LAIN_LAIN2, JUMLAH2,\n               LAIN_LAIN3, JUMLAH3, LAIN_LAIN4, JUMLAH4,\n               (SELECT COUNT(*) FROM bayar_biaya_lain WHERE bayar_id = bayar.id) AS detail_count\n        FROM bayar WHERE id = ?\n    ");
-    $stmtLegacyEdit->bind_param('i', $firstPaymentId);
-    $stmtLegacyEdit->execute();
-    $legacyEdit = $stmtLegacyEdit->get_result()->fetch_assoc();
-    $stmtLegacyEdit->close();
-    payment_process_assert(
-        abs((float)$legacyEdit['U_LAIN'] - 43000.0) < 0.001
-        && (int)$legacyEdit['detail_count'] === 2
-        && abs((float)$legacyEdit['JUMLAH2'] - 22000.0) < 0.001
-        && $legacyEdit['LAIN_LAIN3'] === null
-        && abs((float)$legacyEdit['JUMLAH3']) < 0.001
-        && $legacyEdit['LAIN_LAIN4'] === null
-        && abs((float)$legacyEdit['JUMLAH4']) < 0.001,
-        'Edit Biaya Lain tidak memperbarui total atau membersihkan slot legacy yang tidak dipakai.'
-    );
-
-    $stmtSavingsEdit = $koneksi->prepare("
-        SELECT
-            COALESCE((SELECT SALDO FROM tabungan WHERE NO_INDUK = ?), 0) AS saldo,
-            COALESCE((SELECT MASUK FROM transaksi_m WHERE bayar_id = ?), 0) AS linked_saving
-    ");
-    $stmtSavingsEdit->bind_param('si', $noInduk, $firstPaymentId);
-    $stmtSavingsEdit->execute();
-    $savingsEdit = $stmtSavingsEdit->get_result()->fetch_assoc();
-    $stmtSavingsEdit->close();
-    payment_process_assert(
-        abs((float)$savingsEdit['saldo']) < 0.001
-        && abs((float)$savingsEdit['linked_saving']) < 0.001,
-        'Edit pembayaran masih membuat saldo atau jurnal tabungan terkait.'
-    );
-
-    $finalInstallment = payment_process_request($baseUrl . '/pembayaran/proses.php', $common + ['uang_spp' => 50000], $cookies);
-    payment_process_assert($finalInstallment['status'] === 302, 'Pelunasan sisa setelah edit gagal disimpan.');
-    $stmtLast = $koneksi->prepare('SELECT MAX(id) AS id FROM bayar WHERE NO_INDUK = ?');
-    $stmtLast->bind_param('s', $noInduk);
-    $stmtLast->execute();
-    $lastPaymentId = (int)$stmtLast->get_result()->fetch_assoc()['id'];
-    $stmtLast->close();
-
-    $delete = payment_process_request($baseUrl . '/pembayaran/proses.php?aksi=hapus&id=' . $lastPaymentId, [], $cookies);
-    payment_process_assert($delete['status'] === 302, 'Hapus cicilan tidak mengembalikan redirect yang diharapkan.');
-    $stmtAfterDelete = $koneksi->prepare("
-        SELECT COUNT(*) AS total, COALESCE(SUM(U_SPP), 0) AS paid,
-               (SELECT COUNT(*) FROM bayar_spp_periode WHERE no_induk = ? AND tahun = '2026' AND bulan = '08') AS claims
-        FROM bayar
-        WHERE NO_INDUK = ? AND TAHUN = '2026'
-          AND (BULAN = '08' OR BULAN = '8' OR BULAN = 'Agustus')
-    ");
-    $stmtAfterDelete->bind_param('ss', $noInduk, $noInduk);
-    $stmtAfterDelete->execute();
-    $afterDelete = $stmtAfterDelete->get_result()->fetch_assoc();
-    $stmtAfterDelete->close();
-    payment_process_assert(
-        (int)$afterDelete['total'] === 2
-        && abs((float)$afterDelete['paid'] - 200000.0) < 0.001
-        && (int)$afterDelete['claims'] === 2,
-        'Hapus cicilan tidak memulihkan total atau pemetaan periode.'
-    );
-
-    $move = payment_process_request($baseUrl . '/pembayaran/proses.php', array_merge($common, [
-        'aksi' => 'update',
-        'id' => $firstPaymentId,
-        'no_induk' => $targetNoInduk,
-        'tanggal_bayar' => date('Y-m-d'),
-        'bulan_bayar' => '07',
-        'uang_spp' => 50000,
-    ]), $cookies);
-    payment_process_assert($move['status'] === 302, 'Pemindahan cicilan ke siswa atau periode lain gagal.');
-    $moveFeedback = payment_process_request($baseUrl . '/pembayaran/lihat.php', [], $cookies);
-    $moveMessage = '';
-    if (preg_match('/id="flash-msg"[^>]*>(.*?)<\/div>/s', $moveFeedback['body'], $match)) {
-        $moveMessage = trim(html_entity_decode(strip_tags($match[1])));
-    }
-    $stmtMoved = $koneksi->prepare("
-        SELECT
-          (SELECT COALESCE(SUM(U_SPP), 0) FROM bayar WHERE NO_INDUK = ? AND TAHUN = '2026' AND (BULAN = '08' OR BULAN = '8' OR BULAN = 'Agustus')) AS old_paid,
-          (SELECT COALESCE(SUM(U_SPP), 0) FROM bayar WHERE NO_INDUK = ? AND TAHUN = '2026' AND (BULAN = '07' OR BULAN = '7' OR BULAN = 'Juli')) AS new_paid,
-          (SELECT COUNT(*) FROM bayar_spp_periode WHERE no_induk = ? AND bulan = '08') AS old_claims,
-          (SELECT COUNT(*) FROM bayar_spp_periode WHERE no_induk = ? AND bulan = '07') AS new_claims
-    ");
-    $stmtMoved->bind_param('ssss', $noInduk, $targetNoInduk, $noInduk, $targetNoInduk);
-    $stmtMoved->execute();
-    $moved = $stmtMoved->get_result()->fetch_assoc();
-    $stmtMoved->close();
-    payment_process_assert(
-        abs((float)$moved['old_paid'] - 150000.0) < 0.001
-        && abs((float)$moved['new_paid'] - 50000.0) < 0.001
-        && (int)$moved['old_claims'] === 1
-        && (int)$moved['new_claims'] === 1,
-        'Pemindahan cicilan tidak memperbarui siswa lama, siswa baru, atau periode: '
-        . json_encode($moved) . ($moveMessage !== '' ? ' | ' . $moveMessage : '')
-    );
-
-    $deleteMoved = payment_process_request($baseUrl . '/pembayaran/proses.php?aksi=hapus&id=' . $firstPaymentId, [], $cookies);
-    payment_process_assert($deleteMoved['status'] === 302, 'Hapus pembayaran tidak mengembalikan redirect yang diharapkan.');
-    $stmtSavingsDelete = $koneksi->prepare('SELECT COUNT(*) AS linked_count FROM transaksi_m WHERE bayar_id = ?');
-    $stmtSavingsDelete->bind_param('i', $firstPaymentId);
-    $stmtSavingsDelete->execute();
-    $linkedAfterDelete = (int)$stmtSavingsDelete->get_result()->fetch_assoc()['linked_count'];
-    $stmtSavingsDelete->close();
-    payment_process_assert(
-        $linkedAfterDelete === 0,
-        'Hapus pembayaran masih meninggalkan jurnal tabungan terkait.'
-    );
+    payment_process_assert($payment($testNis[2], '07', (string)$startYear, 275000)['status'] === 302, 'Penempatan pindah justru memblokir SPP tahun aktif.');
+    payment_process_assert($payment($testNis[3], '07', (string)$startYear, 275000)['status'] === 302, 'Siswa baru tanpa penempatan aktif sebelumnya justru terblokir.');
+    payment_process_assert($payment($testNis[0], '08', (string)$startYear, 275000)['status'] === 302, 'Urutan setelah Juli tidak dapat diteruskan.');
 } catch (Throwable $error) {
     $failure = $error;
 } finally {
-    $stmtPaymentCleanup=$koneksi->prepare('DELETE FROM bayar WHERE NO_INDUK IN (?,?)');$stmtPaymentCleanup->bind_param('ss',$noInduk,$targetNoInduk);$stmtPaymentCleanup->execute();$stmtPaymentCleanup->close();
-    $stmtBillCleanup=$koneksi->prepare('DELETE FROM tagihan_biaya_lain WHERE no_induk IN (?,?)');$stmtBillCleanup->bind_param('ss',$noInduk,$targetNoInduk);$stmtBillCleanup->execute();$stmtBillCleanup->close();
-    $stmtCleanup = $koneksi->prepare("
-        DELETE FROM siswa
-        WHERE (NO_INDUK = ? AND NAMA = 'UJI INTEGRASI CICILAN')
-           OR (NO_INDUK = ? AND NAMA = 'UJI TARGET CICILAN')
-    ");
-    $stmtCleanup->bind_param('ss', $noInduk, $targetNoInduk);
-    $stmtCleanup->execute();
-    $stmtCleanup->close();
-    if ($otherFeeMasterIds) {
-        $placeholders = implode(',', array_fill(0, count($otherFeeMasterIds), '?'));
-        $types = str_repeat('i', count($otherFeeMasterIds));
-        $stmtMasterCleanup = $koneksi->prepare("DELETE FROM master_biaya_lain WHERE id IN ($placeholders)");
-        $stmtMasterCleanup->bind_param($types, ...$otherFeeMasterIds);
-        $stmtMasterCleanup->execute();
-        $stmtMasterCleanup->close();
+    if ($testNis) {
+        $placeholders = implode(',', array_fill(0, count($testNis), '?'));
+        $types = str_repeat('s', count($testNis));
+        $stmt = $koneksi->prepare("DELETE FROM bayar WHERE NO_INDUK IN ($placeholders)");
+        $stmt->bind_param($types, ...$testNis); $stmt->execute(); $stmt->close();
+        $stmt = $koneksi->prepare("DELETE FROM siswa_tahun_ajaran WHERE no_induk IN ($placeholders)");
+        $stmt->bind_param($types, ...$testNis); $stmt->execute(); $stmt->close();
+        $stmt = $koneksi->prepare("DELETE FROM siswa WHERE NO_INDUK IN ($placeholders)");
+        $stmt->bind_param($types, ...$testNis); $stmt->execute(); $stmt->close();
+    }
+    if ($createdYearIds) {
+        $yearIds = array_values($createdYearIds);
+        $placeholders = implode(',', array_fill(0, count($yearIds), '?'));
+        $types = str_repeat('i', count($yearIds));
+        $stmt = $koneksi->prepare("DELETE FROM tahun_ajaran WHERE id IN ($placeholders)");
+        $stmt->bind_param($types, ...$yearIds); $stmt->execute(); $stmt->close();
     }
 }
 
-$stmtRemaining = $koneksi->prepare('SELECT COUNT(*) AS total FROM siswa WHERE NO_INDUK IN (?, ?)');
-$stmtRemaining->bind_param('ss', $noInduk, $targetNoInduk);
-$stmtRemaining->execute();
-$remaining = (int)$stmtRemaining->get_result()->fetch_assoc()['total'];
-$stmtRemaining->close();
-if ($remaining !== 0) {
-    fwrite(STDERR, "FAILED: data siswa uji tidak terhapus.\n");
-    exit(1);
-}
 if ($failure) {
     fwrite(STDERR, 'FAILED: ' . $failure->getMessage() . PHP_EOL);
     exit(1);
 }
 
-echo "OK: endpoint cicilan menangani input, overlimit, edit, pindah periode/siswa, hapus, tanggal server, penolakan tabungan legacy, Biaya Lain legacy, dan struk.\n";
+echo "OK: endpoint SPP penuh menegakkan urutan lintas tahun, snapshot tarif, dan penempatan aktif.\n";

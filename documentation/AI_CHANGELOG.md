@@ -13,6 +13,35 @@ File ini mencatat perubahan proyek secara reverse chronological. Baca [PROJECT_C
 - Jangan menghapus atau menulis ulang entri lama. Tambahkan entri koreksi bila diperlukan.
 - Perubahan implementasi dan entri changelog wajib masuk commit yang sama.
 
+## 2026-09-09 - Urutan SPP Penuh Lintas Tahun Ajaran
+
+**AI/Aktor:** Codex berbasis GPT-5, bersama pemilik proyek
+
+**Tujuan:** Menutup celah ketika SPP Juli tahun ajaran baru dapat dibayar walaupun ada tunggakan pada penempatan aktif tahun ajaran sebelumnya.
+
+**Perubahan fitur dan perilaku:**
+
+- SPP tetap wajib dibayar penuh satu kali pada setiap periode.
+- Validasi backend dan petunjuk form kini menyusun urutan dari seluruh `siswa_tahun_ajaran` berstatus `aktif`; Juli tidak lagi otomatis dianggap bebas dari prasyarat histori siswa.
+- Tarif tunggakan memakai `spp_perbulan_snapshot` dari tahun ajaran asal, sehingga perubahan tarif siswa saat ini tidak mengubah kewajiban periode lama.
+- Penempatan `pindah` dan `lulus`, waktu sebelum penempatan aktif pertama, serta jeda tanpa penempatan aktif tidak menjadi utang SPP otomatis.
+- Edit atau hapus periode prasyarat ditolak bila menyebabkan pembayaran pada periode sesudahnya, termasuk lintas tahun ajaran, menjadi bolong.
+
+**Database dan migrasi:**
+
+- Tidak ada perubahan schema, migrasi, backfill, maupun perubahan nominal transaksi lama.
+
+**Kompatibilitas dan data lama:**
+
+- Pembayaran legacy tetap dihitung bila periodenya cocok; sistem tidak mencoba merekonstruksi kewajiban sebelum penempatan aktif yang tercatat.
+- Test cicilan SPP yang tidak lagi sesuai diganti dengan test urutan SPP penuh lintas tahun ajaran.
+
+**Verifikasi:**
+
+- PHP lint pada file yang diubah dan `node --check assets/js/app.js` lulus.
+- `php tests/spp_sequence_test.php` lulus tanpa database.
+- Test HTTP integrasi kini menolak berjalan tanpa penanda database disposable eksplisit.
+
 ## 2026-08-20 - Pemulihan Rekap Pembayaran per Kelas
 
 **AI/Aktor:** Codex berbasis GPT-5, bersama pemilik proyek

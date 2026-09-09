@@ -513,8 +513,32 @@ function report_billing_history_data(mysqli $db,array $f):array{
     usort($rows,static fn($a,$b)=>[$a['tahun_ajaran'],$a['kelas'],$a['nama'],$a['komponen'],$a['periode']]<=>[$b['tahun_ajaran'],$b['kelas'],$b['nama'],$b['komponen'],$b['periode']]);
     return ['title'=>'Riwayat Tagihan Siswa','subtitle'=>'Seluruh histori tagihan siswa','columns'=>[['nis','NIS','nis'],['nama','Nama Siswa'],['kelas','Kelas','kelas'],['komponen','Komponen'],['periode','Periode/Tahun Ajaran'],['tagihan','Tagihan','money'],['terbayar','Sudah Dibayar','money'],['sisa','Sisa','money'],['status','Status','status']],'rows'=>$rows];
 }
+function report_settlement_component_summary(array $components): array {
+    $order=['pangkal'=>10,'bangunan'=>20,'seragam'=>30,'kegiatan'=>40,'spp'=>50,'komite'=>60,'makan'=>70,'sorga'=>80,'infaq'=>90,'daftar_ulang'=>100,'potongan'=>900];
+    $summary=[];
+    foreach($components as $component){
+        $key=(string)($component['kategori_key']??'lainnya');
+        $name=(string)($component['komponen']??'Komponen lain');
+        $groupKey=$key.'|'.$name;
+        if(!isset($summary[$groupKey])){
+            $summary[$groupKey]=[
+                'komponen'=>$name,
+                'jenis'=>$key==='potongan'?'Penyesuaian':(str_starts_with($key,'biaya_lain')?'Biaya Lain':'Pembayaran'),
+                'nominal'=>0.0,
+                '_order'=>$order[$key]??(str_starts_with($key,'biaya_lain')?500:700),
+            ];
+        }
+        $summary[$groupKey]['nominal']+=(float)($component['nominal']??0);
+    }
+    $rows=array_values($summary);
+    usort($rows,static fn($a,$b)=>[$a['_order'],$a['komponen']]<=>[$b['_order'],$b['komponen']]);
+    foreach($rows as &$row)unset($row['_order']);
+    unset($row);
+    return $rows;
+}
 function report_settlement_data(mysqli $db,array $f):array{
-    $components=array_values(array_filter(report_payment_components($db,$f), static fn($row)=>($row['kategori_key']??'') !== 'potongan'));
+    $components=report_payment_components($db,$f);
+    $componentSummary=report_settlement_component_summary($components);
     $payByMethod=['Tunai'=>0,'VA'=>0,'Qris'=>0];
     foreach($components as $row)$payByMethod[$row['metode']]=($payByMethod[$row['metode']]??0)+(float)$row['nominal'];
     $start=$f['tanggal_awal'].' 00:00:00';
@@ -522,6 +546,16 @@ function report_settlement_data(mysqli $db,array $f):array{
     $savings=report_savings_transactions($db,$start,$end,$f);
     $savingIn=array_sum(array_column($savings,'masuk'));
     $savingOut=array_sum(array_column($savings,'keluar'));
+    $componentRows=$componentSummary;
+    $componentRows[]=['komponen'=>'Tabungan Masuk','nominal'=>$savingIn];
+    $componentRows[]=['komponen'=>'Tabungan Keluar','nominal'=>-$savingOut];
+    $paymentTotal=array_sum(array_column($componentSummary,'nominal'));
+    $componentTotal=array_sum(array_column($componentRows,'nominal'));
+    $methodSummary=[
+        ['metode'=>'Tunai','nominal'=>$payByMethod['Tunai']??0],
+        ['metode'=>'Virtual Account','nominal'=>$payByMethod['VA']??0],
+        ['metode'=>'QRIS','nominal'=>$payByMethod['Qris']??0],
+    ];
     $cash=($payByMethod['Tunai']??0)+($payByMethod['VA']??0)+($payByMethod['Qris']??0)+$savingIn-$savingOut;
     $rows=[
         ['bagian'=>'Pembayaran Tunai','nominal'=>$payByMethod['Tunai']??0],
@@ -531,7 +565,18 @@ function report_settlement_data(mysqli $db,array $f):array{
         ['bagian'=>'Tabungan Keluar','nominal'=>-$savingOut],
         ['bagian'=>'Total Bersih','nominal'=>$cash],
     ];
-    return ['title'=>'Rekap Setoran Kas Harian','subtitle'=>$f['tanggal_awal'].' s/d '.$f['tanggal_akhir'].' - ringkasan penerimaan kasir','columns'=>[['bagian','Komponen'],['nominal','Nominal','money']],'rows'=>$rows,'details'=>$components,'settlement'=>['cash'=>$cash,'payment_count'=>count(array_unique(array_column($components,'id')))]];
+    return [
+        'title'=>'Rekap Setoran Kas Harian',
+        'subtitle'=>$f['tanggal_awal'].' s/d '.$f['tanggal_akhir'].' - ringkasan penerimaan kasir',
+        'columns'=>[['bagian','Arus Kas'],['nominal','Nominal','money']],
+        'rows'=>$rows,
+        'component_summary'=>$componentSummary,
+        'component_rows'=>$componentRows,
+        'component_total'=>$componentTotal,
+        'total_setoran'=>$cash,
+        'payment_total'=>$paymentTotal,
+        'method_summary'=>$methodSummary,
+        'settlement'=>['cash'=>$cash,'payment_count'=>count(array_unique(array_column($components,'id')))]];
 }
 function report_build(mysqli $db,string $template,array $filters):array{
     return match($template){'status'=>report_status_data($db,$filters),'penerimaan'=>report_receipt_data($db,$filters),'spp-tahunan'=>report_spp_year_data($db,$filters),'per-item'=>report_item_data($db,$filters),'tabungan-siswa'=>report_savings_student_data($db,$filters),'saldo-tabungan'=>report_savings_balance_data($db,$filters),'riwayat-tagihan'=>report_billing_history_data($db,$filters),'setoran'=>report_settlement_data($db,$filters),default=>throw new InvalidArgumentException('Template laporan tidak dikenali.')};

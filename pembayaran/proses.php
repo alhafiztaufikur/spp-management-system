@@ -9,6 +9,7 @@ require_once '../includes/auth.php';
 require_once '../includes/daftar_ulang.php';
 require_once '../includes/biaya_lain.php';
 require_once '../includes/tagihan_tahunan.php';
+require_once '../includes/spp_sequence.php';
 requireRole(['admin', 'kasir']);
 
 $aksi = $_POST['aksi'] ?? $_GET['aksi'] ?? '';
@@ -66,49 +67,33 @@ function payment_month_label(string $bulan): string {
     return $months[$bulan] ?? $bulan;
 }
 
-function spp_prior_periods_in_academic_year(string $bulan, string $tahun): array {
-    $month = (int)$bulan;
-    $year = (int)$tahun;
-    if ($month < 1 || $month > 12 || $year < 1) return [];
-
-    $periods = [];
-    if ($month >= 7) {
-        for ($m = 7; $m < $month; $m++) {
-            $periods[] = ['bulan' => str_pad((string)$m, 2, '0', STR_PAD_LEFT), 'tahun' => (string)$year];
-        }
-        return $periods;
-    }
-
-    $previousYear = $year - 1;
-    for ($m = 7; $m <= 12; $m++) {
-        $periods[] = ['bulan' => str_pad((string)$m, 2, '0', STR_PAD_LEFT), 'tahun' => (string)$previousYear];
-    }
-    for ($m = 1; $m < $month; $m++) {
-        $periods[] = ['bulan' => str_pad((string)$m, 2, '0', STR_PAD_LEFT), 'tahun' => (string)$year];
-    }
-    return $periods;
+function spp_active_placements(mysqli $db, string $noInduk, bool $forUpdate = false): array {
+    $stmt = $db->prepare('SELECT ta.label AS tahun_ajaran, sta.spp_perbulan_snapshot, sta.status
+        FROM siswa_tahun_ajaran sta
+        JOIN tahun_ajaran ta ON ta.id = sta.tahun_ajaran_id
+        WHERE sta.no_induk = ? AND sta.status = \'aktif\'
+        ORDER BY ta.label ASC' . ($forUpdate ? ' FOR UPDATE' : ''));
+    $stmt->bind_param('s', $noInduk);
+    $stmt->execute();
+    $placements = $stmt->get_result()->fetch_all(MYSQLI_ASSOC);
+    $stmt->close();
+    return $placements;
 }
 
-function spp_following_periods_in_academic_year(string $bulan, string $tahun): array {
-    $month = (int)$bulan;
-    $year = (int)$tahun;
-    if ($month < 1 || $month > 12 || $year < 1) return [];
-
-    $periods = [];
-    if ($month >= 7) {
-        for ($m = $month + 1; $m <= 12; $m++) {
-            $periods[] = ['bulan' => str_pad((string)$m, 2, '0', STR_PAD_LEFT), 'tahun' => (string)$year];
-        }
-        for ($m = 1; $m <= 6; $m++) {
-            $periods[] = ['bulan' => str_pad((string)$m, 2, '0', STR_PAD_LEFT), 'tahun' => (string)($year + 1)];
-        }
-        return $periods;
-    }
-
-    for ($m = $month + 1; $m <= 6; $m++) {
-        $periods[] = ['bulan' => str_pad((string)$m, 2, '0', STR_PAD_LEFT), 'tahun' => (string)$year];
-    }
-    return $periods;
+function spp_tariff_for_payment_period(
+    mysqli $db,
+    string $noInduk,
+    string $bulan,
+    string $tahun,
+    float $fallback,
+    bool $forUpdate = false
+): float {
+    return spp_sequence_tariff_for_period(
+        spp_active_placements($db, $noInduk, $forUpdate),
+        $bulan,
+        $tahun,
+        $fallback
+    );
 }
 
 function spp_paid_for_period(mysqli $db, string $noInduk, string $bulan, string $tahun, int $excludePaymentId = 0): float {
@@ -146,13 +131,16 @@ function spp_monthly_bill_for_student(mysqli $db, string $noInduk): float {
 function validate_spp_sequence(mysqli $db, string $noInduk, string $bulan, string $tahun, float $monthlyBill, int $excludePaymentId = 0): void {
     if ($monthlyBill <= 0) return;
 
-    foreach (spp_prior_periods_in_academic_year($bulan, $tahun) as $period) {
+    $placements = spp_active_placements($db, $noInduk, true);
+    foreach (spp_sequence_prior_periods($placements, $bulan, $tahun) as $period) {
+        $periodBill = (float)$period['tarif'];
+        if ($periodBill <= 0.001) continue;
         $paid = spp_paid_for_period($db, $noInduk, $period['bulan'], $period['tahun'], $excludePaymentId);
-        if ($paid + 0.001 >= $monthlyBill) continue;
+        if ($paid + 0.001 >= $periodBill) continue;
 
         $selectedLabel = payment_month_label($bulan) . ' ' . $tahun;
         $missingLabel = payment_month_label($period['bulan']) . ' ' . $period['tahun'];
-        $remaining = max(0, $monthlyBill - $paid);
+        $remaining = max(0, $periodBill - $paid);
         throw new RuntimeException(
             'SPP ' . $selectedLabel . ' belum bisa dibayar karena ' . $missingLabel .
             ' belum lunas. Sisa ' . $missingLabel . ': Rp ' . number_format($remaining, 0, ',', '.') . '.'
@@ -161,7 +149,8 @@ function validate_spp_sequence(mysqli $db, string $noInduk, string $bulan, strin
 }
 
 function first_paid_spp_following_period(mysqli $db, string $noInduk, string $bulan, string $tahun, int $excludePaymentId = 0): ?array {
-    foreach (spp_following_periods_in_academic_year($bulan, $tahun) as $period) {
+    $placements = spp_active_placements($db, $noInduk, true);
+    foreach (spp_sequence_following_periods($placements, $bulan, $tahun) as $period) {
         $paid = spp_paid_for_period($db, $noInduk, $period['bulan'], $period['tahun'], $excludePaymentId);
         if ($paid > 0.001) {
             return ['bulan' => $period['bulan'], 'tahun' => $period['tahun'], 'paid' => $paid];
@@ -348,12 +337,20 @@ function validate_component_remaining(
         throw new RuntimeException('Siswa PSB belum dapat membayar SPP, Daftar Ulang, atau tagihan tahunan. Pindahkan siswa ke rombel reguler terlebih dahulu.');
     }
 
+    $sppTariff = spp_tariff_for_payment_period(
+        $db,
+        $noInduk,
+        $bulan,
+        $tahun,
+        (float)$student['SPP_PERBULAN'],
+        true
+    );
     if ($sppInput > 0) {
-        validate_spp_full_payment($db, $noInduk, $bulan, $tahun, (float)$student['SPP_PERBULAN'], $sppInput, $excludePaymentId);
+        validate_spp_full_payment($db, $noInduk, $bulan, $tahun, $sppTariff, $sppInput, $excludePaymentId);
     }
 
     $limits = [
-        'spp' => ['label' => 'Uang SPP', 'total' => (float)$student['SPP_PERBULAN'], 'paid' => (float)($paid['spp'] ?? 0), 'input' => (float)($components['spp'] ?? 0)],
+        'spp' => ['label' => 'Uang SPP', 'total' => $sppTariff, 'paid' => (float)($paid['spp'] ?? 0), 'input' => (float)($components['spp'] ?? 0)],
         'du' => ['label' => 'Daftar Ulang', 'total' => $duTotal, 'paid' => (float)($paid['du'] ?? 0), 'input' => $uangDu],
     ];
     foreach (annual_fee_components() as $component => $cfg) {
@@ -897,12 +894,20 @@ if ($aksi === 'update') {
             && $oldSppMonth === $bulan_bayar
             && $oldSppYear === (string)$tahun_bayar;
         if ((float)$old_bayar['U_SPP'] > 0 && (!$sameSppContext || $uang_spp <= 0)) {
-            $oldBill = $sameSppContext ? (float)$siswa_data['SPP_PERBULAN'] : spp_monthly_bill_for_student($koneksi, (string)$old_bayar['NO_INDUK']);
-            $oldPaidAfter = spp_paid_for_period($koneksi, (string)$old_bayar['NO_INDUK'], $oldSppMonth, $oldSppYear, $id);
+            $oldNis = (string)$old_bayar['NO_INDUK'];
+            $oldBill = spp_tariff_for_payment_period(
+                $koneksi,
+                $oldNis,
+                $oldSppMonth,
+                $oldSppYear,
+                spp_monthly_bill_for_student($koneksi, $oldNis),
+                true
+            );
+            $oldPaidAfter = spp_paid_for_period($koneksi, $oldNis, $oldSppMonth, $oldSppYear, $id);
             if ($sameSppContext) $oldPaidAfter += $uang_spp;
             validate_spp_period_not_breaking_future(
                 $koneksi,
-                (string)$old_bayar['NO_INDUK'],
+                $oldNis,
                 $oldSppMonth,
                 $oldSppYear,
                 $oldBill,
@@ -1019,13 +1024,21 @@ if ($aksi === 'hapus') {
         if ((float)$old_bayar['U_SPP'] > 0) {
             $oldSppMonth = normalize_month_code((string)$old_bayar['BULAN']);
             $oldSppYear = (string)$old_bayar['TAHUN'];
+            $oldNis = (string)$old_bayar['NO_INDUK'];
             validate_spp_period_not_breaking_future(
                 $koneksi,
-                (string)$old_bayar['NO_INDUK'],
+                $oldNis,
                 $oldSppMonth,
                 $oldSppYear,
-                spp_monthly_bill_for_student($koneksi, (string)$old_bayar['NO_INDUK']),
-                spp_paid_for_period($koneksi, (string)$old_bayar['NO_INDUK'], $oldSppMonth, $oldSppYear, $id),
+                spp_tariff_for_payment_period(
+                    $koneksi,
+                    $oldNis,
+                    $oldSppMonth,
+                    $oldSppYear,
+                    spp_monthly_bill_for_student($koneksi, $oldNis),
+                    true
+                ),
+                spp_paid_for_period($koneksi, $oldNis, $oldSppMonth, $oldSppYear, $id),
                 $id,
                 'dihapus'
             );

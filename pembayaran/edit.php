@@ -111,6 +111,19 @@ while ($paid = $spp_paid_result->fetch_assoc()) {
 }
 $stmt_period->close();
 
+$spp_placements = [];
+$placementResult = $koneksi->query("SELECT sta.no_induk, ta.label AS tahun_ajaran, sta.spp_perbulan_snapshot
+    FROM siswa_tahun_ajaran sta
+    JOIN tahun_ajaran ta ON ta.id = sta.tahun_ajaran_id
+    WHERE sta.status = 'aktif'
+    ORDER BY sta.no_induk, ta.label");
+while ($placement = $placementResult->fetch_assoc()) {
+    $spp_placements[$placement['no_induk']][] = [
+        'tahun_ajaran' => (string)$placement['tahun_ajaran'],
+        'tarif' => (float)$placement['spp_perbulan_snapshot'],
+    ];
+}
+
 $currentPeriodKey = month_code($d['BULAN']) . '-' . $d['TAHUN'];
 $d['kewajiban_spp'] = max(0, (float)$d['SPP_PERBULAN'] - (float)($period_payments[$d['NO_INDUK']]['spp'][$currentPeriodKey] ?? 0));
 
@@ -339,6 +352,7 @@ $selectedPaymentMethod = $d['sistem_pembayaran'] ?? 'VA';
                   data-paid-seragam="<?= money_attr($s['paid_seragam']) ?>"
                   data-paid-kegiatan="<?= money_attr($s['paid_kegiatan']) ?>"
                   data-paid-spp-periods="<?= htmlspecialchars(json_encode($period_payments[$s['NO_INDUK']]['spp'] ?? []), ENT_QUOTES, 'UTF-8') ?>"
+                  data-spp-placements="<?= htmlspecialchars(json_encode($spp_placements[$s['NO_INDUK']] ?? [], JSON_UNESCAPED_UNICODE), ENT_QUOTES, 'UTF-8') ?>"
                   data-paid-komite-periods="<?= htmlspecialchars(json_encode($period_payments[$s['NO_INDUK']]['komite'] ?? []), ENT_QUOTES, 'UTF-8') ?>"
                   data-paid-makan="<?= money_attr($s['paid_makan']) ?>"
                   data-paid-sorga="<?= money_attr($s['paid_sorga']) ?>"

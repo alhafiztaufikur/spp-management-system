@@ -534,6 +534,45 @@ function followingSppPeriodsInAcademicYear() {
   return periods;
 }
 
+function activeSppPlacementPeriods(opt) {
+  if (!opt) return [];
+  let placements = [];
+  try {
+    placements = JSON.parse(opt.dataset.sppPlacements || '[]');
+  } catch (_) {
+    placements = [];
+  }
+
+  const periods = [];
+  placements.forEach(placement => {
+    const match = String(placement?.tahun_ajaran || '').match(/^(\d{4})\/(\d{4})$/);
+    if (!match || Number(match[2]) !== Number(match[1]) + 1) return;
+    const startYear = Number(match[1]);
+    const tariff = parseNumber(placement?.tarif || 0);
+    [[startYear, 7, 12], [startYear + 1, 1, 6]].forEach(([year, firstMonth, lastMonth]) => {
+      for (let month = firstMonth; month <= lastMonth; month++) {
+        const code = String(month).padStart(2, '0');
+        periods.push({
+          period: code + '-' + year,
+          year,
+          month,
+          tariff,
+          order: (year * 12) + month,
+          label: paymentMonthLabelByCode(code) + ' ' + year
+        });
+      }
+    });
+  });
+
+  return periods.sort((left, right) => left.order - right.order);
+}
+
+function selectedSppTariff(opt) {
+  const selected = selectedPaymentPeriod();
+  const record = activeSppPlacementPeriods(opt).find(period => period.period === selected);
+  return record ? record.tariff : datasetNumber(opt, 'total', 'spp');
+}
+
 function firstUnpaidPriorSppPeriod(opt, monthlyBill) {
   if (!opt || monthlyBill <= 0) return null;
   let periods = {};
@@ -543,14 +582,19 @@ function firstUnpaidPriorSppPeriod(opt, monthlyBill) {
     periods = {};
   }
 
-  for (const period of priorSppPeriodsInAcademicYear()) {
-    const paid = parseNumber(periods[period] || 0);
-    if (paid + 0.001 < monthlyBill) {
+  const selectedOrder = (() => {
+    const [month, year] = selectedPaymentPeriod().split('-').map(Number);
+    return month && year ? (year * 12) + month : 0;
+  })();
+  for (const period of activeSppPlacementPeriods(opt)) {
+    if (period.order >= selectedOrder || period.tariff <= 0.001) continue;
+    const paid = parseNumber(periods[period.period] || 0);
+    if (paid + 0.001 < period.tariff) {
       return {
-        period,
+        period: period.period,
         paid,
-        remaining: Math.max(0, monthlyBill - paid),
-        label: paymentPeriodDisplayLabel(period)
+        remaining: Math.max(0, period.tariff - paid),
+        label: period.label
       };
     }
   }
@@ -566,10 +610,13 @@ function firstPaidFollowingSppPeriod(opt) {
     periods = {};
   }
 
-  for (const period of followingSppPeriodsInAcademicYear()) {
-    const paid = parseNumber(periods[period] || 0);
+  const [month, year] = selectedPaymentPeriod().split('-').map(Number);
+  const selectedOrder = month && year ? (year * 12) + month : 0;
+  for (const period of activeSppPlacementPeriods(opt)) {
+    if (period.order <= selectedOrder) continue;
+    const paid = parseNumber(periods[period.period] || 0);
     if (paid > 0.001) {
-      return { period, paid, label: paymentPeriodDisplayLabel(period) };
+      return { period: period.period, paid, label: period.label };
     }
   }
   return null;
@@ -875,7 +922,7 @@ function applyStudentPaymentDetails(opt) {
     const total = key === 'du'
       ? totalDaftarUlangForContext(opt)
       : (key === 'spp'
-          ? datasetNumber(opt, 'total', key) * (isAnnualPaymentPlan() ? 12 : 1)
+          ? selectedSppTariff(opt) * (isAnnualPaymentPlan() ? 12 : 1)
           : totalAnnualFeeForContext(opt, key));
     const paid = key === 'du'
       ? paidDaftarUlangForContext(opt)

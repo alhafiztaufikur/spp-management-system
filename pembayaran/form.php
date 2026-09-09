@@ -59,6 +59,19 @@ while ($paid = $spp_paid_result->fetch_assoc()) {
         ($period_payments[$paid['NO_INDUK']]['komite'][$periodKey] ?? 0) + (float)$paid['paid_komite'];
 }
 
+$spp_placements = [];
+$placementResult = $koneksi->query("SELECT sta.no_induk, ta.label AS tahun_ajaran, sta.spp_perbulan_snapshot
+    FROM siswa_tahun_ajaran sta
+    JOIN tahun_ajaran ta ON ta.id = sta.tahun_ajaran_id
+    WHERE sta.status = 'aktif'
+    ORDER BY sta.no_induk, ta.label");
+while ($placement = $placementResult->fetch_assoc()) {
+    $spp_placements[$placement['no_induk']][] = [
+        'tahun_ajaran' => (string)$placement['tahun_ajaran'],
+        'tarif' => (float)$placement['spp_perbulan_snapshot'],
+    ];
+}
+
 $du_bills = [];
 $du_bill_result = $koneksi->query("SELECT tdu.id, tdu.no_induk, tdu.kelas_snapshot, tdu.tahun_ajaran_snapshot,
         tdu.nominal_tagihan, tdu.status, ta.status AS tahun_status,
@@ -127,7 +140,7 @@ unset($_SESSION['flash']);
   <meta name="description" content="Form input transaksi pembayaran siswa." />
   <link rel="preconnect" href="https://fonts.googleapis.com" />
   <link href="https://fonts.googleapis.com/css2?family=Inter:wght@300;400;500;600;700;800&display=swap" rel="stylesheet" />
-  <link rel="stylesheet" href="../assets/css/style.css?v=8.7" />
+  <link rel="stylesheet" href="../assets/css/style.css?v=8.8" />
   <!-- Prevent theme flash -->
   <script>(function(){var t=localStorage.getItem('spp_theme')||'dark';document.documentElement.setAttribute('data-theme',t);})();</script>
 </head>
@@ -283,6 +296,7 @@ unset($_SESSION['flash']);
                   data-paid-seragam="<?= money_attr($s['paid_seragam']) ?>"
                   data-paid-kegiatan="<?= money_attr($s['paid_kegiatan']) ?>"
                   data-paid-spp-periods="<?= htmlspecialchars(json_encode($period_payments[$s['NO_INDUK']]['spp'] ?? []), ENT_QUOTES, 'UTF-8') ?>"
+                  data-spp-placements="<?= htmlspecialchars(json_encode($spp_placements[$s['NO_INDUK']] ?? [], JSON_UNESCAPED_UNICODE), ENT_QUOTES, 'UTF-8') ?>"
                   data-paid-komite-periods="<?= htmlspecialchars(json_encode($period_payments[$s['NO_INDUK']]['komite'] ?? []), ENT_QUOTES, 'UTF-8') ?>"
                   data-paid-makan="<?= money_attr($s['paid_makan']) ?>"
                   data-paid-sorga="<?= money_attr($s['paid_sorga']) ?>"

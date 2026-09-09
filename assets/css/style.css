@@ -7407,3 +7407,321 @@ a.btn {
 .report-table-report-filter-penerimaan .report-template-table th:nth-child(3),.report-table-report-filter-spp-tahunan .report-template-table th:nth-child(3),.report-table-report-filter-per-item .report-template-table th:nth-child(3){border-right:1px solid rgba(201,230,216,.65)}
 .report-table-report-filter-penerimaan .report-template-table td:nth-child(3),.report-table-report-filter-spp-tahunan .report-template-table td:nth-child(3),.report-table-report-filter-per-item .report-template-table td:nth-child(3){border-right:1px solid rgba(20,130,80,.18)}
 @media(max-width:700px){.report-table-report-filter-penerimaan .report-template-table th:nth-child(2),.report-table-report-filter-spp-tahunan .report-template-table th:nth-child(2),.report-table-report-filter-per-item .report-template-table th:nth-child(2),.report-table-report-filter-penerimaan .report-template-table td:nth-child(2),.report-table-report-filter-spp-tahunan .report-template-table td:nth-child(2),.report-table-report-filter-per-item .report-template-table td:nth-child(2){width:132px;min-width:132px;max-width:132px}.report-table-report-filter-penerimaan .report-template-table th:nth-child(3),.report-table-report-filter-spp-tahunan .report-template-table th:nth-child(3),.report-table-report-filter-per-item .report-template-table th:nth-child(3),.report-table-report-filter-penerimaan .report-template-table td:nth-child(3),.report-table-report-filter-spp-tahunan .report-template-table td:nth-child(3),.report-table-report-filter-per-item .report-template-table td:nth-child(3){left:190px!important;width:190px;min-width:190px;max-width:190px}}
+
+/* Rekap setoran: pisahkan sumber penerimaan dari arus kas agar angka mudah dibaca. */
+.report-settlement-component-card,.report-settlement-flow-section{margin-top:18px;border:1px solid rgba(20,130,80,.18);border-radius:16px;background:var(--bg-card,#fff);overflow:hidden}.report-settlement-section-head{display:flex;align-items:center;justify-content:space-between;gap:18px;padding:21px 22px 18px;background:linear-gradient(115deg,rgba(232,247,239,.95),rgba(255,252,240,.92))}.report-settlement-section-head>div:first-child>span,.report-settlement-flow-copy>span{display:block;margin-bottom:5px;color:var(--primary,#138a53);font-size:.72rem;font-weight:850;letter-spacing:.08em;text-transform:uppercase}.report-settlement-section-head h3,.report-settlement-flow-copy h3{margin:0;color:var(--text-main,#17231d);font-size:1.04rem;line-height:1.35}.report-settlement-section-head p,.report-settlement-flow-copy p{max-width:680px;margin:6px 0 0;color:var(--text-secondary,#64756c);font-size:.84rem;line-height:1.5}.report-settlement-component-total{flex:0 0 auto;min-width:184px;padding:12px 15px;border:1px solid rgba(16,137,82,.2);border-radius:12px;background:#fff;text-align:right}.report-settlement-component-total span{display:block;color:var(--text-secondary,#64756c);font-size:.7rem;font-weight:800;letter-spacing:.04em;text-transform:uppercase}.report-settlement-component-total strong{display:block;margin-top:4px;color:var(--primary,#138a53);font-size:1.08rem}.report-settlement-component-table{margin:0;border:0;border-radius:0}.report-settlement-component-table table{min-width:580px}.report-settlement-component-table tfoot th{background:rgba(16,137,82,.09);color:var(--text-main,#17231d);font-weight:850}.report-component-kind{display:inline-flex;align-items:center;padding:4px 8px;border-radius:999px;background:rgba(16,137,82,.1);color:var(--primary,#138a53);font-size:.72rem;font-weight:800}.report-component-kind.kind-biaya-lain{background:rgba(184,120,0,.11);color:#8a5a00}.report-component-kind.kind-penyesuaian{background:rgba(180,35,24,.1);color:#b42318}.report-negative{color:#b42318!important;font-weight:800}.report-settlement-flow-section{padding:20px 22px 22px;background:linear-gradient(180deg,rgba(245,250,247,.8),var(--bg-card,#fff))}.report-settlement-flow-copy{margin-bottom:14px}.report-settlement-flow-section .report-template-table-wrap{margin:0}.report-settlement-flow-section .report-total-section{padding-top:0}.report-settlement-flow-section .report-summary-grid{grid-template-columns:repeat(4,minmax(0,1fr))}
+@media(max-width:700px){.report-settlement-component-card,.report-settlement-flow-section{margin-top:14px;border-radius:13px}.report-settlement-section-head{align-items:stretch;flex-direction:column;padding:17px}.report-settlement-component-total{min-width:0;text-align:left}.report-settlement-flow-section{padding:17px}.report-settlement-flow-section .report-summary-grid{grid-template-columns:1fr 1fr}.report-settlement-component-table{overflow-x:auto}.report-settlement-component-table table{min-width:560px}}
+
+/* Tampilan ringkas rekap setoran: tabel komponen mengikuti gaya arus kas lama. */
+.report-table-report-filter-setoran .report-settlement-component-card{margin-top:0;border-color:rgba(20,130,80,.15);border-radius:14px;box-shadow:0 8px 24px rgba(20,80,50,.06)}
+.report-table-report-filter-setoran .report-settlement-section-head{padding:17px 20px;background:linear-gradient(115deg,rgba(232,247,239,.9),rgba(255,255,255,.98))}
+.report-table-report-filter-setoran .report-settlement-section-head h3{font-size:1rem}
+.report-table-report-filter-setoran .report-settlement-component-total{min-width:170px;padding:10px 14px}
+.report-table-report-filter-setoran .report-settlement-component-table{overflow-x:auto}
+.report-table-report-filter-setoran .report-settlement-component-table table{min-width:0;width:100%;border-collapse:collapse}
+.report-table-report-filter-setoran .report-settlement-component-table thead th{background:#12503a!important;color:#fff!important;border-color:#12503a!important;text-transform:uppercase;font-size:.73rem;font-weight:850;letter-spacing:.02em}
+.report-table-report-filter-setoran .report-settlement-component-table th,.report-table-report-filter-setoran .report-settlement-component-table td{padding:12px 14px}
+.report-table-report-filter-setoran .report-settlement-component-table th:first-child,.report-table-report-filter-setoran .report-settlement-component-table td:first-child{width:86px}
+.report-table-report-filter-setoran .report-settlement-component-table th:last-child,.report-table-report-filter-setoran .report-settlement-component-table td:last-child{text-align:right;white-space:nowrap}
+.report-table-report-filter-setoran .report-settlement-component-table tbody tr:nth-child(even){background:rgba(148,163,184,.035)}
+.report-table-report-filter-setoran .report-settlement-component-table tbody tr:hover{background:rgba(16,137,82,.055)}
+.report-table-report-filter-setoran .report-settlement-component-table tfoot th{background:#e5f3ec!important;color:#138a53!important;border-color:#c7e4d4!important;text-transform:uppercase;font-size:.75rem}
+.report-table-report-filter-setoran .report-settlement-component-table .empty-state{padding:18px 8px}
+.report-table-report-filter-setoran .report-settlement-component-card+.report-settlement-flow-section{display:none}
+.report-table-report-filter-setoran .recap-report-copy p{display:none}
+.report-table-report-filter-setoran .report-settlement-method-summary{margin:18px 0 0;padding:0 2px}
+.report-table-report-filter-setoran .report-settlement-method-summary h3{margin:0 0 10px;color:var(--text-main,#17231d);font-size:.92rem}
+.report-settlement-method-grid{display:grid;grid-template-columns:repeat(3,minmax(0,1fr));gap:12px}
+.report-settlement-method-card{display:grid;gap:5px;padding:15px 16px;border:1px solid rgba(20,130,80,.16);border-radius:13px;background:var(--bg-card,#fff)}
+.report-settlement-method-card span{color:var(--text-secondary,#64756c);font-size:.75rem;font-weight:800;text-transform:uppercase;letter-spacing:.03em}
+.report-settlement-method-card strong{color:var(--text-main,#17231d);font-size:1rem}
+@media(max-width:700px){.report-table-report-filter-setoran .report-settlement-method-summary{margin-top:14px}.report-settlement-method-grid{grid-template-columns:1fr}.report-settlement-method-card{padding:13px 14px}}
+.report-table-report-filter-setoran .report-settlement-total-card{display:flex;align-items:center;justify-content:space-between;gap:18px;margin:18px 0 0;padding:18px 20px;border:1px solid rgba(16,137,82,.25);border-radius:14px;background:linear-gradient(110deg,#e3f5eb,#f6fbf8);box-shadow:0 8px 24px rgba(20,80,50,.06)}
+.report-table-report-filter-setoran .report-settlement-total-card span{display:block;color:#087c4a;font-size:.78rem;font-weight:900;letter-spacing:.08em}
+.report-table-report-filter-setoran .report-settlement-total-card>strong{color:#087c4a;font-size:1.45rem;line-height:1}
+@media(max-width:700px){.report-table-report-filter-setoran .report-settlement-total-card{align-items:flex-start;flex-direction:column;gap:10px;margin-top:14px;padding:16px}.report-table-report-filter-setoran .report-settlement-total-card>strong{font-size:1.25rem}}
+@media(max-width:700px){.report-table-report-filter-setoran .report-settlement-section-head{padding:15px}.report-table-report-filter-setoran .report-settlement-component-total{min-width:0}.report-table-report-filter-setoran .report-settlement-component-table table{min-width:430px}}
+
+/* Responsive corrections for 14-inch laptops with the desktop sidebar open. */
+.payment-input-top,
+.payment-settings-group,
+.payment-settings-grid,
+.payment-overview-panel,
+.du-history-card .recap-report-header,
+.du-history-filter,
+.du-history-filter > *,
+.savings-history-shell .recap-report-header,
+.savings-history-shell .tabungan-filter-form,
+.savings-history-shell .tabungan-filter-form > *,
+.du-master-hero .master-modern-hero,
+.du-master-hero .master-modern-stats,
+.du-master-hero .du-master-year-tools {
+  min-width: 0;
+}
+
+.du-history-card .recap-report-header {
+  grid-template-columns: minmax(280px, .78fr) minmax(0, 1.22fr) !important;
+}
+
+.savings-history-shell .recap-report-header {
+  grid-template-columns: minmax(260px, .74fr) minmax(0, 1.26fr) !important;
+}
+
+.du-master-hero .master-modern-stats {
+  grid-template-columns: minmax(95px, .8fr) minmax(105px, .9fr) minmax(185px, 1.35fr);
+}
+
+.du-master-hero .master-modern-stats strong {
+  overflow-wrap: normal;
+  word-break: normal;
+}
+
+.du-master-hero .master-modern-stats > div:last-child strong {
+  white-space: nowrap;
+  font-size: clamp(17px, 1.45vw, 20px);
+}
+
+@media (min-width: 1281px) and (max-width: 1440px) {
+  .payment-input-top {
+    grid-template-columns: minmax(0, 2fr) minmax(260px, .72fr);
+    gap: 16px;
+  }
+
+  .payment-settings-grid {
+    grid-template-columns: minmax(140px, .85fr) minmax(220px, 1.35fr) minmax(140px, .85fr);
+  }
+
+  .payment-current-total {
+    align-items: flex-start;
+    flex-direction: column;
+    justify-content: center;
+    gap: 10px;
+    padding: 18px;
+  }
+
+  .payment-current-total strong {
+    align-self: flex-end;
+  }
+}
+
+@media (min-width: 1101px) and (max-width: 1440px) {
+  .du-master-hero .master-modern-hero {
+    grid-template-columns: minmax(0, 1fr) minmax(220px, 260px);
+    gap: 18px;
+  }
+
+  .du-master-hero .master-modern-hero > div:first-child {
+    grid-column: 1;
+    grid-row: 1;
+  }
+
+  .du-master-hero .du-master-year-tools {
+    grid-column: 2;
+    grid-row: 1;
+    justify-self: stretch;
+  }
+
+  .du-master-hero .master-modern-stats {
+    grid-column: 1 / -1;
+    grid-row: 2;
+    grid-template-columns: repeat(3, minmax(0, 1fr));
+    width: 100%;
+  }
+}
+
+@media (max-width: 1440px) {
+  .du-history-card .recap-report-header,
+  .savings-history-shell .recap-report-header {
+    grid-template-columns: minmax(0, 1fr) !important;
+    gap: 22px !important;
+  }
+
+  .du-history-filter {
+    grid-template-columns: repeat(4, minmax(0, 1fr)) !important;
+  }
+
+  .du-history-filter .field-row.full-span,
+  .du-history-filter .history-recap-actions {
+    grid-column: 1 / -1 !important;
+  }
+
+  .du-history-filter select[name="kelas"] {
+    grid-column: 1 / 2 !important;
+  }
+
+  .du-history-filter select[name="tahun_ajaran"] {
+    grid-column: 2 / 3 !important;
+  }
+
+  .du-history-filter select[name="status"] {
+    grid-column: 3 / 4 !important;
+  }
+
+  .du-history-filter .du-page-size {
+    grid-column: 4 / 5 !important;
+  }
+
+  .du-history-filter .history-recap-actions {
+    grid-template-columns: minmax(0, 1fr) minmax(0, .7fr) minmax(0, 1fr) !important;
+  }
+
+  .savings-history-shell .tabungan-filter-form {
+    grid-template-columns: repeat(12, minmax(0, 1fr)) !important;
+    gap: 10px !important;
+  }
+
+  .savings-history-shell .report-date-range-field {
+    grid-column: span 4 !important;
+  }
+
+  .savings-history-shell .tabungan-filter-nis {
+    grid-column: span 8 !important;
+  }
+
+  .savings-history-shell .tabungan-filter-page {
+    grid-column: span 3 !important;
+  }
+
+  .savings-history-shell .history-recap-actions {
+    grid-column: span 9 !important;
+    grid-template-columns: repeat(auto-fit, minmax(130px, 1fr)) !important;
+    gap: 8px !important;
+  }
+
+  .savings-history-shell .history-recap-actions .btn {
+    min-width: 0 !important;
+    min-height: 42px;
+    padding: 9px 12px !important;
+    font-size: 12.5px !important;
+    line-height: 1.2;
+    letter-spacing: 0 !important;
+    white-space: nowrap;
+  }
+}
+
+@media (max-width: 1280px) {
+  .payment-input-top {
+    grid-template-columns: minmax(0, 1fr);
+  }
+}
+
+@media (max-width: 1100px) {
+  .payment-settings-grid {
+    grid-template-columns: repeat(2, minmax(0, 1fr));
+  }
+
+  .payment-period-card {
+    grid-column: 1 / -1;
+  }
+
+  .du-master-hero .master-modern-hero {
+    grid-template-columns: minmax(0, 1fr);
+  }
+
+  .du-master-hero .master-modern-hero > div:first-child,
+  .du-master-hero .master-modern-stats,
+  .du-master-hero .du-master-year-tools {
+    grid-column: auto;
+    grid-row: auto;
+  }
+
+  .du-master-hero .master-modern-stats {
+    grid-template-columns: repeat(2, minmax(0, 1fr));
+  }
+
+  .du-master-hero .master-modern-stats > div:last-child {
+    grid-column: 1 / -1;
+  }
+}
+
+@media (max-width: 900px) {
+  .du-history-filter {
+    grid-template-columns: repeat(2, minmax(0, 1fr)) !important;
+  }
+
+  .du-history-filter select[name="kelas"],
+  .du-history-filter select[name="tahun_ajaran"],
+  .du-history-filter select[name="status"],
+  .du-history-filter .du-page-size {
+    grid-column: auto !important;
+  }
+
+  .du-history-filter .field-row.full-span,
+  .du-history-filter .history-recap-actions {
+    grid-column: 1 / -1 !important;
+  }
+
+  .savings-history-shell .tabungan-filter-form {
+    grid-template-columns: repeat(2, minmax(0, 1fr)) !important;
+  }
+
+  .savings-history-shell .report-date-range-field {
+    grid-column: 1 !important;
+    grid-row: 2;
+  }
+
+  .savings-history-shell .tabungan-filter-page {
+    grid-column: 2 !important;
+    grid-row: 2;
+  }
+
+  .savings-history-shell .tabungan-filter-nis {
+    grid-column: 1 / -1 !important;
+    grid-row: 3;
+  }
+
+  .savings-history-shell .history-recap-actions {
+    grid-column: 1 / -1 !important;
+    grid-row: 4;
+    grid-template-columns: repeat(2, minmax(0, 1fr)) !important;
+  }
+}
+
+@media (max-width: 700px) {
+  .payment-settings-grid {
+    grid-template-columns: repeat(2, minmax(0, 1fr));
+  }
+
+  .payment-period-card {
+    grid-column: 1 / -1;
+  }
+
+  .du-history-filter,
+  .du-history-filter .history-recap-actions,
+  .savings-history-shell .tabungan-filter-form,
+  .savings-history-shell .history-recap-actions {
+    grid-template-columns: minmax(0, 1fr) !important;
+  }
+
+  .du-history-filter .field-row.full-span,
+  .du-history-filter select[name="kelas"],
+  .du-history-filter select[name="tahun_ajaran"],
+  .du-history-filter select[name="status"],
+  .du-history-filter .du-page-size,
+  .du-history-filter .history-recap-actions,
+  .savings-history-shell .report-date-range-field,
+  .savings-history-shell .tabungan-filter-nis,
+  .savings-history-shell .tabungan-filter-page,
+  .savings-history-shell .history-recap-actions {
+    grid-column: 1 / -1 !important;
+    grid-row: auto;
+  }
+
+  .du-master-hero .master-modern-stats {
+    grid-template-columns: minmax(0, 1fr);
+  }
+
+  .du-master-hero .master-modern-stats > div:last-child {
+    grid-column: auto;
+  }
+}
+
+@media (max-width: 560px) {
+  .payment-settings-grid {
+    grid-template-columns: minmax(0, 1fr);
+  }
+
+  .payment-period-card {
+    grid-column: auto;
+  }
+}
