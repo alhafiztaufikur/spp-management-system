@@ -113,7 +113,7 @@ $roleAvatar = $roleAvatars[$role] ?? 'US';
 <aside class="sidebar" id="sidebar">
   <div class="sidebar-brand">
     <div class="brand-icon brand-logo-wrap">
-      <img src="<?= $root ?>assets/img/school-logo.png" alt="Logo SD MH" class="brand-logo-img" />
+      <img src="<?= $root ?>assets/img/school-logo.png" alt="Logo Mutiara Hikmah" class="brand-logo-img" />
     </div>
     <span class="brand-name">SistemSPP</span>
   </div>

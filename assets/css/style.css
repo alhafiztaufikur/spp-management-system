@@ -465,8 +465,8 @@ h1, h2, h3, h4, h5, h6, .card-title, .topbar-title h2, .sidebar-brand-name {
 .brand-logo-wrap {
   padding: 3px;
   overflow: hidden;
-  background: rgba(255,255,255,0.96);
-  border: 1px solid rgba(255,255,255,0.3);
+  background: transparent;
+  border: 1px solid transparent;
 }
 .brand-logo-img {
   display: block;
@@ -1973,7 +1973,7 @@ h1, h2, h3, h4, h5, h6, .card-title, .topbar-title h2, .sidebar-brand-name {
   justify-content: flex-end;
 }
 
-/* Keep the separate month and year pickers compact inside their own columns. */
+/* Keep the separate month and year pickers clear, readable, and above the filter grid. */
 .report-template-shell .report-filter-per-item .report-month-range-field:has(.report-month-range-popover:not([hidden])),
 .report-template-shell .report-filter-per-item .report-year-range-field:has(.report-year-range-popover:not([hidden])) {
   z-index: 7200;
@@ -1981,9 +1981,13 @@ h1, h2, h3, h4, h5, h6, .card-title, .topbar-title h2, .sidebar-brand-name {
 .report-template-shell .report-filter-per-item .report-month-range-popover,
 .report-template-shell .report-filter-per-item .report-year-range-popover {
   box-sizing: border-box;
-  width: 100%;
-  min-width: 0;
+  width: min(360px, calc(100vw - 48px));
+  min-width: min(340px, calc(100vw - 48px));
   border-radius: 14px;
+}
+.report-template-shell .report-filter-per-item .report-year-range-popover {
+  left: auto;
+  right: 0;
 }
 .report-template-shell .report-filter-per-item .report-month-range-popover select,
 .report-template-shell .report-filter-per-item .report-year-range-popover input {
@@ -4714,22 +4718,24 @@ button.du-page-link {
   max-height: none !important;
   overflow-x: auto;
   overflow-y: visible;
-  contain: paint;
-  transform: translateZ(0);
+  overscroll-behavior-x: contain;
+  scrollbar-gutter: stable;
+  contain: none;
+  transform: none;
   -webkit-overflow-scrolling: touch;
 }
 .report-template-shell .report-template-table {
   border-collapse: separate;
   border-spacing: 0;
 }
-.report-template-shell .report-wide-table th:nth-child(1),
-.report-template-shell .report-wide-table td:nth-child(1),
-.report-template-shell .report-wide-table th:nth-child(2),
-.report-template-shell .report-wide-table td:nth-child(2),
-.report-template-shell .class-recap-table tbody td:nth-child(1),
-.report-template-shell .class-recap-table tbody td:nth-child(2),
-.report-template-shell .class-recap-table tbody td:nth-child(3),
-.report-template-shell .class-recap-table thead .recap-identity-head {
+.report-template-shell:not(.report-table-report-filter-penerimaan):not(.report-table-report-filter-spp-tahunan):not(.report-table-report-filter-per-item) .report-wide-table th:nth-child(1),
+.report-template-shell:not(.report-table-report-filter-penerimaan):not(.report-table-report-filter-spp-tahunan):not(.report-table-report-filter-per-item) .report-wide-table td:nth-child(1),
+.report-template-shell:not(.report-table-report-filter-penerimaan):not(.report-table-report-filter-spp-tahunan):not(.report-table-report-filter-per-item) .report-wide-table th:nth-child(2),
+.report-template-shell:not(.report-table-report-filter-penerimaan):not(.report-table-report-filter-spp-tahunan):not(.report-table-report-filter-per-item) .report-wide-table td:nth-child(2),
+.report-template-shell:not(.report-table-report-filter-penerimaan):not(.report-table-report-filter-spp-tahunan):not(.report-table-report-filter-per-item) .class-recap-table tbody td:nth-child(1),
+.report-template-shell:not(.report-table-report-filter-penerimaan):not(.report-table-report-filter-spp-tahunan):not(.report-table-report-filter-per-item) .class-recap-table tbody td:nth-child(2),
+.report-template-shell:not(.report-table-report-filter-penerimaan):not(.report-table-report-filter-spp-tahunan):not(.report-table-report-filter-per-item) .class-recap-table tbody td:nth-child(3),
+.report-template-shell:not(.report-table-report-filter-penerimaan):not(.report-table-report-filter-spp-tahunan):not(.report-table-report-filter-per-item) .class-recap-table thead .recap-identity-head {
   position: static !important;
   left: auto !important;
   z-index: auto !important;
@@ -7138,6 +7144,24 @@ a.btn {
   grid-column: span 4 !important;
 }
 
+.report-template-shell .report-filter-per-item .field-row:has(select[name="kelas"]) {
+  order: 3;
+}
+.report-template-shell .report-filter-per-item .field-row:has(select[name="status"]) {
+  order: 4;
+}
+.report-template-shell .report-filter-per-item .field-row:has(select[name="per_page"]) {
+  order: 5;
+  grid-column: span 4 !important;
+}
+.report-template-shell .report-filter-per-item .field-row:has(#global-siswa-search) {
+  order: 6;
+  grid-column: 1 / -1 !important;
+}
+.report-template-shell .report-filter-per-item .report-filter-actions {
+  order: 7;
+}
+
 .report-template-shell .report-filter-tabungan-siswa .report-date-range-field,
 .report-template-shell .report-filter-tabungan-siswa .field-row:has(select[name="kelas"]),
 .report-template-shell .report-filter-tabungan-siswa .field-row:has(select[name="operator"]),
@@ -7380,6 +7404,6 @@ a.btn {
 .report-table-report-filter-penerimaan .report-template-table td:nth-child(-n+3),.report-table-report-filter-spp-tahunan .report-template-table td:nth-child(-n+3),.report-table-report-filter-per-item .report-template-table td:nth-child(-n+3){z-index:8;background:var(--card-bg,#fff)}
 .report-table-report-filter-penerimaan .report-template-table tbody tr:nth-child(even) td:nth-child(-n+3),.report-table-report-filter-spp-tahunan .report-template-table tbody tr:nth-child(even) td:nth-child(-n+3),.report-table-report-filter-per-item .report-template-table tbody tr:nth-child(even) td:nth-child(-n+3){background:rgba(148,163,184,.035)}
 .report-table-report-filter-penerimaan .report-template-table th:nth-child(-n+3),.report-table-report-filter-spp-tahunan .report-template-table th:nth-child(-n+3),.report-table-report-filter-per-item .report-template-table th:nth-child(-n+3){z-index:12;background:#114d39!important}
-.report-table-report-filter-penerimaan .report-template-table th:nth-child(3),.report-table-report-filter-spp-tahunan .report-template-table th:nth-child(3),.report-table-report-filter-per-item .report-template-table th:nth-child(3){box-shadow:10px 0 14px rgba(5,44,29,.2)}
-.report-table-report-filter-penerimaan .report-template-table td:nth-child(3),.report-table-report-filter-spp-tahunan .report-template-table td:nth-child(3),.report-table-report-filter-per-item .report-template-table td:nth-child(3){box-shadow:10px 0 14px rgba(21,61,43,.1)}
+.report-table-report-filter-penerimaan .report-template-table th:nth-child(3),.report-table-report-filter-spp-tahunan .report-template-table th:nth-child(3),.report-table-report-filter-per-item .report-template-table th:nth-child(3){border-right:1px solid rgba(201,230,216,.65)}
+.report-table-report-filter-penerimaan .report-template-table td:nth-child(3),.report-table-report-filter-spp-tahunan .report-template-table td:nth-child(3),.report-table-report-filter-per-item .report-template-table td:nth-child(3){border-right:1px solid rgba(20,130,80,.18)}
 @media(max-width:700px){.report-table-report-filter-penerimaan .report-template-table th:nth-child(2),.report-table-report-filter-spp-tahunan .report-template-table th:nth-child(2),.report-table-report-filter-per-item .report-template-table th:nth-child(2),.report-table-report-filter-penerimaan .report-template-table td:nth-child(2),.report-table-report-filter-spp-tahunan .report-template-table td:nth-child(2),.report-table-report-filter-per-item .report-template-table td:nth-child(2){width:132px;min-width:132px;max-width:132px}.report-table-report-filter-penerimaan .report-template-table th:nth-child(3),.report-table-report-filter-spp-tahunan .report-template-table th:nth-child(3),.report-table-report-filter-per-item .report-template-table th:nth-child(3),.report-table-report-filter-penerimaan .report-template-table td:nth-child(3),.report-table-report-filter-spp-tahunan .report-template-table td:nth-child(3),.report-table-report-filter-per-item .report-template-table td:nth-child(3){left:190px!important;width:190px;min-width:190px;max-width:190px}}

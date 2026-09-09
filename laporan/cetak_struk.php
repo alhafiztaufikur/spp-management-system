@@ -260,7 +260,7 @@ $signer = $payment['operator_name'] ?: ($_SESSION['admin_nama'] ?? 'Bagian Keuan
   <meta charset="UTF-8" />
   <meta name="viewport" content="width=device-width, initial-scale=1.0" />
   <title>Struk #<?= $paymentId ?> - <?= receipt_e($payment['NAMA']) ?></title>
-  <link rel="icon" type="image/png" href="../assets/img/favicon.png" />
+  <link rel="icon" type="image/png" href="../assets/img/favicon.png?v=2" />
   <style>
     @page { size: A5 landscape; margin: 0; }
     * { box-sizing: border-box; }

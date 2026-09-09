@@ -77,14 +77,14 @@ if ($_SERVER['REQUEST_METHOD'] === 'POST') {
   <meta charset="UTF-8" />
   <meta name="viewport" content="width=device-width, initial-scale=1.0" />
   <title>Login | SistemSPP</title>
-  <link rel="icon" type="image/png" href="assets/img/favicon.png" />
+  <link rel="icon" type="image/png" href="assets/img/favicon.png?v=2" />
   <meta name="description" content="Login admin sistem pembayaran SPP sekolah — kelola pembayaran siswa dengan mudah." />
   <link rel="preconnect" href="https://fonts.googleapis.com" />
   <link href="https://fonts.googleapis.com/css2?family=Inter:wght@300;400;500;600;700;800;900&display=swap" rel="stylesheet" />
   <!-- Prevent theme flash -->
   <script>(function(){var t=localStorage.getItem('spp_theme')||'dark';document.documentElement.setAttribute('data-theme',t);})();</script>
-  <link rel="stylesheet" href="assets/css/style.css?v=4.7" />
-  <link rel="stylesheet" href="assets/css/login.css?v=3.4" />
+  <link rel="stylesheet" href="assets/css/style.css?v=8.7" />
+  <link rel="stylesheet" href="assets/css/login.css?v=3.5" />
 </head>
 <body class="login-split-body">
 
@@ -98,7 +98,7 @@ if ($_SERVER['REQUEST_METHOD'] === 'POST') {
     <div class="left-topbar">
       <div class="left-brand">
         <div class="brand-icon brand-logo-wrap">
-          <img src="assets/img/school-logo.png" alt="Logo SD MH" class="brand-logo-img" />
+          <img src="assets/img/school-logo.png" alt="Logo Mutiara Hikmah" class="brand-logo-img" />
         </div>
         <span class="brand-name-left">SistemSPP</span>
       </div>
@@ -124,7 +124,7 @@ if ($_SERVER['REQUEST_METHOD'] === 'POST') {
       </div>
 
       <div class="left-school-card">
-        <img src="assets/img/school-logo.png" alt="" class="left-school-logo" />
+        <img src="assets/img/school-logo.png" alt="Logo Mutiara Hikmah" class="left-school-logo" />
         <div>
           <strong>SistemSPP</strong>
           <span>Portal administrasi sekolah</span>
@@ -150,7 +150,7 @@ if ($_SERVER['REQUEST_METHOD'] === 'POST') {
       <!-- Brand (mobile only) -->
       <div class="right-brand-mobile">
         <div class="brand-icon brand-logo-wrap">
-          <img src="assets/img/school-logo.png" alt="Logo SD MH" class="brand-logo-img" />
+          <img src="assets/img/school-logo.png" alt="Logo Mutiara Hikmah" class="brand-logo-img" />
         </div>
         <span class="brand-name">SistemSPP</span>
       </div>

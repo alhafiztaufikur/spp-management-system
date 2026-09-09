@@ -217,7 +217,7 @@ $otherStmt->close();
   <meta charset="UTF-8" />
   <meta name="viewport" content="width=device-width, initial-scale=1.0" />
   <title>12 Struk Tahunan - <?= annual_receipt_e($receipts[0]['NAMA'] ?? '') ?></title>
-  <link rel="icon" type="image/png" href="../assets/img/favicon.png" />
+  <link rel="icon" type="image/png" href="../assets/img/favicon.png?v=2" />
   <style>
     @page { size: A5 landscape; margin: 0; }
     * { box-sizing: border-box; }

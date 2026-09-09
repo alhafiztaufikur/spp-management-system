@@ -141,8 +141,8 @@ $classFilterQuery = ['q_kelas' => $classSearch, 'tingkat_kelas' => $classLevelFi
 <head>
   <meta charset="UTF-8"><meta name="viewport" content="width=device-width,initial-scale=1.0">
   <title>Master Kelas | SistemSPP</title>
-  <link rel="icon" type="image/png" href="assets/img/favicon.png">
-  <link rel="stylesheet" href="assets/css/style.css?v=8.2">
+  <link rel="icon" type="image/png" href="assets/img/favicon.png?v=2">
+  <link rel="stylesheet" href="assets/css/style.css?v=8.7">
   <script>(function(){var t=localStorage.getItem('spp_theme')||'dark';document.documentElement.setAttribute('data-theme',t);})();</script>
 </head>
 <body>

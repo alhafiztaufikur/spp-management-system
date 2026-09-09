@@ -323,7 +323,7 @@ ob_start();
 <head>
   <meta charset="UTF-8" />
   <title>Slip Pembayaran</title>
-  <link rel="icon" type="image/png" href="../assets/img/favicon.png" />
+  <link rel="icon" type="image/png" href="../assets/img/favicon.png?v=2" />
   <style>
     @page { size: 210mm 148mm; margin: 0; }
     * { box-sizing: border-box; }
