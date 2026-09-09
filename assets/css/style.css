@@ -7481,6 +7481,11 @@ a.btn {
   font-size: clamp(17px, 1.45vw, 20px);
 }
 
+/* Keep the year menu above the student search combobox while it is open. */
+.payment-input-top:has(.payment-year-picker.is-open) {
+  z-index: 7100;
+}
+
 @media (min-width: 1281px) and (max-width: 1440px) {
   .payment-input-top {
     grid-template-columns: minmax(0, 2fr) minmax(260px, .72fr);
