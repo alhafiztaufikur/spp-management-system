@@ -166,6 +166,76 @@ function du_apply_current_student_override(mysqli $db, string $noInduk): void {
     );
 }
 
+/**
+ * Menyelaraskan tagihan Daftar Ulang tahun berjalan dengan tarif siswa hanya
+ * ketika tagihan tersebut belum pernah dibayar.
+ *
+ * @return array{tahun_ajaran:string,status:string,label:string}
+ */
+function du_reconcile_current_student_override(mysqli $db, string $noInduk): array {
+    $label = du_current_academic_year();
+    $result = ['tahun_ajaran' => $label, 'status' => 'unchanged', 'label' => 'Daftar Ulang'];
+    $stmt = $db->prepare("SELECT tdu.id,tdu.tahun_ajaran_id,tdu.master_daftar_ulang_id,
+            tdu.nominal_awal,tdu.nominal_tagihan,tdu.status,ta.status AS year_status,
+            COALESCE(du.Jumlah,0) AS class_amount,s.DAFTAR_ULANG,s.potong_du,s.tot_du,
+            COALESCE(SUM(bd.jumlah),0) AS paid
+        FROM siswa s
+        JOIN tagihan_daftar_ulang tdu ON tdu.no_induk=s.NO_INDUK
+        JOIN tahun_ajaran ta ON ta.id=tdu.tahun_ajaran_id AND ta.label=?
+        LEFT JOIN Daftar_ulang du ON du.id=tdu.master_daftar_ulang_id
+        LEFT JOIN bayar_du bd ON bd.tagihan_daftar_ulang_id=tdu.id
+        WHERE s.NO_INDUK=?
+        GROUP BY tdu.id,tdu.tahun_ajaran_id,tdu.master_daftar_ulang_id,
+                 tdu.nominal_awal,tdu.nominal_tagihan,tdu.status,ta.status,du.Jumlah,
+                 s.DAFTAR_ULANG,s.potong_du,s.tot_du
+        LIMIT 1 FOR UPDATE");
+    $stmt->bind_param('ss', $label, $noInduk);
+    $stmt->execute();
+    $bill = $stmt->get_result()->fetch_assoc();
+    $stmt->close();
+    if (!$bill) return $result;
+
+    $amounts = du_student_legacy_amounts($bill, (float)$bill['class_amount']);
+    if ($amounts['initial'] <= 0) return $result;
+    $different = abs((float)$bill['nominal_awal'] - $amounts['initial']) > .001
+        || abs((float)$bill['nominal_tagihan'] - $amounts['total']) > .001;
+    if (!$different) return $result;
+    if ((float)$bill['paid'] > .001 || $bill['status'] !== 'open' || $bill['year_status'] === 'closed') {
+        $result['status'] = 'locked';
+        return $result;
+    }
+
+    $billId = (int)$bill['id'];
+    $initial = (float)$amounts['initial'];
+    $total = (float)$amounts['total'];
+    $stmt = $db->prepare('UPDATE tagihan_daftar_ulang SET nominal_awal=?,nominal_tagihan=? WHERE id=?');
+    $stmt->bind_param('ddi', $initial, $total, $billId);
+    $stmt->execute();
+    $stmt->close();
+
+    $stmt = $db->prepare('SELECT nominal_awal,nominal_tagihan FROM tagihan_daftar_ulang WHERE id=? LIMIT 1');
+    $stmt->bind_param('i', $billId);
+    $stmt->execute();
+    $verified = $stmt->get_result()->fetch_assoc();
+    $stmt->close();
+    if (!$verified
+        || abs((float)$verified['nominal_awal'] - $initial) > .001
+        || abs((float)$verified['nominal_tagihan'] - $total) > .001) {
+        throw new RuntimeException('Verifikasi sinkronisasi Daftar Ulang gagal. Tidak ada perubahan yang disimpan.');
+    }
+
+    du_write_audit(
+        $db,
+        (int)$bill['tahun_ajaran_id'],
+        $bill['master_daftar_ulang_id'] === null ? null : (int)$bill['master_daftar_ulang_id'],
+        'sinkronisasi_siswa',
+        ['no_induk'=>$noInduk,'nominal_awal'=>(float)$bill['nominal_awal'],'nominal_tagihan'=>(float)$bill['nominal_tagihan']],
+        ['no_induk'=>$noInduk,'nominal_awal'=>$initial,'nominal_tagihan'=>$total]
+    );
+    $result['status'] = 'synced';
+    return $result;
+}
+
 function du_sync_open_bills_for_master_rate(
     mysqli $db,
     int $masterId,
@@ -220,7 +290,7 @@ function du_sync_open_bills_for_master_rate(
     return $affected;
 }
 
-function du_create_bill_for_placement(mysqli $db, int $placementId): ?int {
+function du_create_bill_for_placement(mysqli $db, int $placementId, bool $syncLegacy = true): ?int {
     $stmt = $db->prepare("SELECT sta.id, sta.tahun_ajaran_id, sta.no_induk, sta.kelas, sta.status AS placement_status,
                                 ta.label, ta.status AS year_status, du.id AS master_id, du.Jumlah,
                                 s.DAFTAR_ULANG,s.potong_du,s.tot_du
@@ -256,7 +326,7 @@ function du_create_bill_for_placement(mysqli $db, int $placementId): ?int {
     $stmt->execute();
     $id = (int)$db->insert_id;
     $stmt->close();
-    if ($id > 0 && $label === du_current_academic_year()) du_sync_student_legacy_from_bill($db, $id);
+    if ($syncLegacy && $id > 0 && $label === du_current_academic_year()) du_sync_student_legacy_from_bill($db, $id);
     return $id ?: null;
 }
 

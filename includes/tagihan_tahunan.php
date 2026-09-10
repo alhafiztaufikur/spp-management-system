@@ -64,6 +64,38 @@ function annual_fee_paid_for_bill(mysqli $db, int $billId, int $excludePaymentId
     return $paid;
 }
 
+function annual_fee_historical_paid_for_bill(mysqli $db, int $billId, int $excludePaymentId = 0): float {
+    $stmt = $db->prepare('SELECT no_induk,komponen,tahun_ajaran_snapshot FROM tagihan_tahunan_siswa WHERE id=? LIMIT 1');
+    $stmt->bind_param('i', $billId);
+    $stmt->execute();
+    $bill = $stmt->get_result()->fetch_assoc();
+    $stmt->close();
+    if (!$bill) return 0.0;
+
+    $cfg = annual_fee_component((string)$bill['komponen']);
+    $column = $cfg['payment'];
+    $academicYear = du_normalize_academic_year((string)$bill['tahun_ajaran_snapshot']);
+    $startYear = (int)substr($academicYear, 0, 4);
+    $endYear = $startYear + 1;
+    $monthSql = "CASE LOWER(BULAN)
+      WHEN 'januari' THEN 1 WHEN 'februari' THEN 2 WHEN 'maret' THEN 3 WHEN 'april' THEN 4
+      WHEN 'mei' THEN 5 WHEN 'juni' THEN 6 WHEN 'juli' THEN 7 WHEN 'agustus' THEN 8
+      WHEN 'september' THEN 9 WHEN 'oktober' THEN 10 WHEN 'november' THEN 11 WHEN 'desember' THEN 12
+      ELSE CAST(BULAN AS UNSIGNED) END";
+    $stmt = $db->prepare("SELECT COALESCE(SUM($column),0) AS paid FROM bayar
+        WHERE NO_INDUK=? AND id<>? AND (
+          th_ajaran=? OR ((th_ajaran IS NULL OR th_ajaran='') AND (
+            (CAST(TAHUN AS UNSIGNED)=? AND $monthSql BETWEEN 7 AND 12)
+            OR (CAST(TAHUN AS UNSIGNED)=? AND $monthSql BETWEEN 1 AND 6)
+          ))
+        )");
+    $stmt->bind_param('sisii', $bill['no_induk'], $excludePaymentId, $academicYear, $startYear, $endYear);
+    $stmt->execute();
+    $paid = (float)($stmt->get_result()->fetch_assoc()['paid'] ?? 0);
+    $stmt->close();
+    return $paid;
+}
+
 function annual_fee_find_or_create_placement(mysqli $db, string $noInduk, string $academicYear, bool $forUpdate = false): array {
     $yearId = annual_fee_year_id($db, $academicYear, true, $forUpdate);
     if (!$yearId) throw new RuntimeException('Tahun ajaran tidak ditemukan.');
@@ -170,6 +202,111 @@ function annual_fee_sync_for_placement(mysqli $db, int $placementId, string $cre
         $stmt->execute();
         $stmt->close();
     }
+}
+
+/**
+ * Menyelaraskan tagihan tahunan pada satu penempatan tanpa mengubah komponen
+ * yang sudah memiliki pembayaran. Fungsi ini harus dipanggil di dalam
+ * transaksi yang juga mengunci data siswa/penempatan terkait.
+ *
+ * @return array{tahun_ajaran:string,synced:array<int,string>,locked:array<int,string>,unchanged:array<int,string>,metadata_synced:array<int,string>,metadata_locked:array<int,string>}
+ */
+function annual_fee_reconcile_for_placement(mysqli $db, int $placementId, string $createdBy = ''): array {
+    $result = [
+        'tahun_ajaran' => '', 'synced' => [], 'locked' => [], 'unchanged' => [],
+        'metadata_synced' => [], 'metadata_locked' => [],
+    ];
+    $stmt = $db->prepare("SELECT sta.id AS penempatan_id,sta.tahun_ajaran_id,sta.no_induk,sta.kelas,
+            sta.kelas_rombel_snapshot,sta.status AS penempatan_status,ta.label AS tahun_ajaran,
+            s.NAMA,s.PANGKAL,s.potong_pangkal,s.tot_pangkal,s.BANGUNAN,s.SERAGAM,s.KEGIATAN,
+            s.POMG,s.MAKAN,s.SORGA,s.INFAQ
+        FROM siswa_tahun_ajaran sta
+        JOIN tahun_ajaran ta ON ta.id=sta.tahun_ajaran_id
+        JOIN siswa s ON s.NO_INDUK=sta.no_induk
+        WHERE sta.id=? LIMIT 1 FOR UPDATE");
+    $stmt->bind_param('i', $placementId);
+    $stmt->execute();
+    $row = $stmt->get_result()->fetch_assoc();
+    $stmt->close();
+    if (!$row || $row['penempatan_status'] !== 'aktif') return $result;
+    if ((string)$row['kelas'] === '0' || strtoupper((string)$row['kelas_rombel_snapshot']) === 'PSB') return $result;
+
+    $result['tahun_ajaran'] = (string)$row['tahun_ajaran'];
+    foreach (annual_fee_components() as $component => $cfg) {
+        [$nominalAwal, $potongan, $tagihan] = annual_fee_amount_from_student($row, $component);
+        $stmt = $db->prepare('SELECT id,penempatan_id,nama_snapshot,kelas_snapshot,kelas_rombel_snapshot,nominal_awal,potongan,nominal_tagihan,status FROM tagihan_tahunan_siswa WHERE tahun_ajaran_id=? AND no_induk=? AND komponen=? LIMIT 1 FOR UPDATE');
+        $stmt->bind_param('iss', $row['tahun_ajaran_id'], $row['no_induk'], $component);
+        $stmt->execute();
+        $bill = $stmt->get_result()->fetch_assoc();
+        $stmt->close();
+
+        if ($bill) {
+            $metadataDifferent = (int)$bill['penempatan_id'] !== $placementId
+                || (string)$bill['nama_snapshot'] !== (string)$row['NAMA']
+                || (string)$bill['kelas_snapshot'] !== (string)$row['kelas']
+                || (string)$bill['kelas_rombel_snapshot'] !== (string)$row['kelas_rombel_snapshot'];
+            $amountDifferent = abs((float)$bill['nominal_awal'] - $nominalAwal) > .001
+                || abs((float)$bill['potongan'] - $potongan) > .001
+                || abs((float)$bill['nominal_tagihan'] - $tagihan) > .001;
+            if (!$metadataDifferent && !$amountDifferent) {
+                $result['unchanged'][] = $component;
+                continue;
+            }
+            $paid = max(
+                annual_fee_paid_for_bill($db, (int)$bill['id']),
+                annual_fee_historical_paid_for_bill($db, (int)$bill['id'])
+            );
+            if ($paid > .001 || $bill['status'] !== 'open') {
+                $result[$amountDifferent ? 'locked' : 'metadata_locked'][] = $component;
+                continue;
+            }
+            $billId = (int)$bill['id'];
+            $stmt = $db->prepare('UPDATE tagihan_tahunan_siswa SET penempatan_id=?,nama_snapshot=?,kelas_snapshot=?,kelas_rombel_snapshot=?,nominal_awal=?,potongan=?,nominal_tagihan=? WHERE id=?');
+            $stmt->bind_param('isssdddi', $placementId, $row['NAMA'], $row['kelas'], $row['kelas_rombel_snapshot'], $nominalAwal, $potongan, $tagihan, $billId);
+            $stmt->execute();
+            $stmt->close();
+        } else {
+            $stmt = $db->prepare("INSERT INTO tagihan_tahunan_siswa
+                (tahun_ajaran_id,penempatan_id,no_induk,komponen,nama_snapshot,kelas_snapshot,kelas_rombel_snapshot,
+                 tahun_ajaran_snapshot,nominal_awal,potongan,nominal_tagihan,status,created_by)
+                VALUES (?,?,?,?,?,?,?,?,?,?,?,'open',?)");
+            $stmt->bind_param(
+                'iissssssddds',
+                $row['tahun_ajaran_id'],
+                $placementId,
+                $row['no_induk'],
+                $component,
+                $row['NAMA'],
+                $row['kelas'],
+                $row['kelas_rombel_snapshot'],
+                $row['tahun_ajaran'],
+                $nominalAwal,
+                $potongan,
+                $tagihan,
+                $createdBy
+            );
+            $stmt->execute();
+            $stmt->close();
+        }
+
+        $stmt = $db->prepare('SELECT penempatan_id,nama_snapshot,kelas_snapshot,kelas_rombel_snapshot,nominal_awal,potongan,nominal_tagihan FROM tagihan_tahunan_siswa WHERE tahun_ajaran_id=? AND no_induk=? AND komponen=? LIMIT 1');
+        $stmt->bind_param('iss', $row['tahun_ajaran_id'], $row['no_induk'], $component);
+        $stmt->execute();
+        $verified = $stmt->get_result()->fetch_assoc();
+        $stmt->close();
+        if (!$verified
+            || (int)$verified['penempatan_id'] !== $placementId
+            || (string)$verified['nama_snapshot'] !== (string)$row['NAMA']
+            || (string)$verified['kelas_snapshot'] !== (string)$row['kelas']
+            || (string)$verified['kelas_rombel_snapshot'] !== (string)$row['kelas_rombel_snapshot']
+            || abs((float)$verified['nominal_awal'] - $nominalAwal) > .001
+            || abs((float)$verified['potongan'] - $potongan) > .001
+            || abs((float)$verified['nominal_tagihan'] - $tagihan) > .001) {
+            throw new RuntimeException('Verifikasi sinkronisasi ' . $cfg['label'] . ' gagal. Tidak ada perubahan yang disimpan.');
+        }
+        $result[!$bill || $amountDifferent ? 'synced' : 'metadata_synced'][] = $component;
+    }
+    return $result;
 }
 
 function annual_fee_require_bill(mysqli $db, string $noInduk, string $component, int $month, int $year, bool $forUpdate = false): array {

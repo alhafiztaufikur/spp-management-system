@@ -163,6 +163,7 @@ Tabel `Daftar_ulang` dipakai sebagai template tarif per kombinasi `kelas + th_aj
 - Switch `Advance` membuka NIS Diknas, tarif, Komite, potongan, total turunan, dan saldo awal.
 - Tarif Makan, Sorga, dan Infaq di Advance disimpan per siswa. Nilai Rp0 berarti belum diatur dan tidak dapat dibayar.
 - Menutup Advance saat edit tidak boleh menimpa field lanjutan dengan nol.
+- Backend menolak nilai tarif/data lanjutan yang berubah ketika `Advance` tidak aktif; perubahan tidak boleh diabaikan sambil menampilkan status berhasil.
 - NIS Diknas harus tepat 10 digit bila diisi.
 - Nominal tidak boleh negatif dan potongan tidak boleh melebihi tagihan.
 - Saldo awal hanya dapat diedit sebelum ada histori pada pembayaran, daftar ulang, tabungan masuk, atau tabungan keluar.
@@ -171,6 +172,9 @@ Tabel `Daftar_ulang` dipakai sebagai template tarif per kombinasi `kelas + th_aj
 - Siswa arsip tetap tersedia untuk histori dan laporan, tetapi tidak boleh dipakai pada transaksi baru.
 - Tambah, edit, perubahan tarif, perubahan nomor induk, arsip, dan pemulihan dicatat pada audit log.
 - Tarif Makan, Sorga, atau Infaq tidak boleh diturunkan di bawah akumulasi transaksi yang sudah dibayar.
+- Tarif master siswa menjadi default penerbitan berikutnya. Untuk tahun berjalan, penguncian berlaku per komponen: snapshot yang sudah mempunyai pembayaran dipertahankan, sedangkan komponen tanpa pembayaran diselaraskan saat siswa disimpan.
+- Perbedaan kelas master dan kelas historis tidak boleh menghentikan sinkronisasi tarif yang masih aman. Kelas penempatan berbayar tetap dipertahankan sebagai histori.
+- Penyimpanan siswa otomatis memperbaiki ketidaksinkronan snapshot tahun berjalan yang belum memiliki pembayaran dan mencatat hasil sinkronisasi pada audit JSON.
 
 ### Pembayaran
 

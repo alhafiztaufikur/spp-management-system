@@ -6,20 +6,11 @@ require_once '../includes/auth.php';
 require_once '../includes/daftar_ulang.php';
 require_once '../includes/kelas.php';
 require_once '../includes/pagination.php';
+require_once '../includes/student_tariff_consistency.php';
 requireRole(['admin']);
 
 if (empty($_SESSION['csrf_student'])) {
     $_SESSION['csrf_student'] = bin2hex(random_bytes(32));
-}
-
-function student_amount($value): float {
-    if ($value === null || $value === '') return 0.0;
-    $normalized = str_replace(['.', ','], ['', '.'], trim((string)$value));
-    $amount = is_numeric($normalized) ? (float)$normalized : NAN;
-    if (!is_finite($amount) || $amount < 0 || $amount > 9999999999999.99) {
-        throw new RuntimeException('Nominal harus berupa angka positif atau nol.');
-    }
-    return $amount;
 }
 
 function student_history_count(mysqli $db, string $noInduk): int {
@@ -36,25 +27,6 @@ function student_history_count(mysqli $db, string $noInduk): int {
     $count = (int)$stmt->get_result()->fetch_assoc()['jumlah'];
     $stmt->close();
     return $count;
-}
-
-function student_optional_fee_payments(mysqli $db, string $noInduk): array {
-    $year = du_current_academic_year();
-    $stmt = $db->prepare("SELECT
-        COALESCE(SUM(CASE WHEN bts.komponen = 'makan' THEN bts.jumlah ELSE 0 END), 0) AS MAKAN,
-        COALESCE(SUM(CASE WHEN bts.komponen = 'sorga' THEN bts.jumlah ELSE 0 END), 0) AS SORGA,
-        COALESCE(SUM(CASE WHEN bts.komponen = 'infaq' THEN bts.jumlah ELSE 0 END), 0) AS INFAQ
-        FROM bayar_tahunan_siswa bts
-        WHERE bts.no_induk = ? AND bts.th_ajaran = ?");
-    $stmt->bind_param('ss', $noInduk, $year);
-    $stmt->execute();
-    $paid = $stmt->get_result()->fetch_assoc() ?: [];
-    $stmt->close();
-    return [
-        'MAKAN' => (float)($paid['MAKAN'] ?? 0),
-        'SORGA' => (float)($paid['SORGA'] ?? 0),
-        'INFAQ' => (float)($paid['INFAQ'] ?? 0),
-    ];
 }
 
 function find_student(mysqli $db, int $id, bool $forUpdate = false): ?array {
@@ -162,6 +134,16 @@ if ($_SERVER['REQUEST_METHOD'] === 'POST') {
                 'DAFTAR_ULANG' => 'daftar_ulang', 'potong_pangkal' => 'potong_pangkal',
                 'potong_du' => 'potong_du'
             ];
+            $openingMap = [
+                'PANGKAL_BAYAR' => 'pangkal_bayar', 'BANGUNAN_BAYAR' => 'bangunan_bayar',
+                'SERAGAM_BAYAR' => 'seragam_bayar', 'KEGIATAN_BAYAR' => 'kegiatan_bayar'
+            ];
+            if (!$advanced) {
+                $ignoredChanges = student_advanced_change_attempts($_POST, $oldStudent, $postMap, $openingMap);
+                if ($ignoredChanges) {
+                    throw new RuntimeException('Perubahan tarif atau data lanjutan terdeteksi. Aktifkan Advance sebelum menyimpan.');
+                }
+            }
             $values = [];
             foreach ($advancedColumns as $column) {
                 $values[$column] = $advanced
@@ -191,20 +173,6 @@ if ($_SERVER['REQUEST_METHOD'] === 'POST') {
             $values['tot_pangkal'] = max(0, $values['PANGKAL'] - $values['potong_pangkal']);
             $values['tot_du'] = max(0, $values['DAFTAR_ULANG'] - $values['potong_du']);
 
-            if ($advanced && $oldStudent) {
-                $paidOptional = student_optional_fee_payments($koneksi, (string)$oldStudent['NO_INDUK']);
-                $optionalLabels = ['MAKAN'=>'Uang Makan', 'SORGA'=>'Uang Sorga', 'INFAQ'=>'Uang Infaq'];
-                foreach ($optionalLabels as $column => $label) {
-                    if ($values[$column] + .001 < $paidOptional[$column]) {
-                        throw new RuntimeException($label . ' tidak boleh lebih kecil dari total yang sudah dibayar, yaitu Rp ' . number_format($paidOptional[$column], 0, ',', '.') . '.');
-                    }
-                }
-            }
-
-            $openingMap = [
-                'PANGKAL_BAYAR' => 'pangkal_bayar', 'BANGUNAN_BAYAR' => 'bangunan_bayar',
-                'SERAGAM_BAYAR' => 'seragam_bayar', 'KEGIATAN_BAYAR' => 'kegiatan_bayar'
-            ];
             $canEditOpening = !$oldStudent || (int)$oldStudent['history_count'] === 0;
             foreach ($openingMap as $column => $postName) {
                 $oldValue = (float)($oldStudent[$column] ?? 0);
@@ -223,8 +191,10 @@ if ($_SERVER['REQUEST_METHOD'] === 'POST') {
                 'SERAGAM_BAYAR' => $values['SERAGAM'],
                 'KEGIATAN_BAYAR' => $values['KEGIATAN']
             ];
-            foreach ($openingLimits as $column => $limit) {
-                if ($values[$column] > $limit) throw new RuntimeException('Saldo awal tidak boleh melebihi nilai tagihan.');
+            if (!$oldStudent || $canEditOpening) {
+                foreach ($openingLimits as $column => $limit) {
+                    if ($values[$column] > $limit) throw new RuntimeException('Saldo awal tidak boleh melebihi nilai tagihan.');
+                }
             }
 
             $spp = $values['SPP_PERBULAN'];
@@ -246,17 +216,6 @@ if ($_SERVER['REQUEST_METHOD'] === 'POST') {
             $totDu = $values['tot_du'];
             $potongDu = $values['potong_du'];
             $active = (int)($oldStudent['is_active'] ?? 1);
-
-            if ($oldStudent) {
-                class_validate_tariff_snapshot_change(
-                    $koneksi,
-                    (string)$oldStudent['NO_INDUK'],
-                    (float)$oldStudent['SPP_PERBULAN'],
-                    $spp,
-                    (float)$oldStudent['POMG'],
-                    $pomg
-                );
-            }
 
             if ($action === 'tambah') {
                 $stmt = $koneksi->prepare("
@@ -283,10 +242,13 @@ if ($_SERVER['REQUEST_METHOD'] === 'POST') {
                 $stmt->close();
                 $stmtClass = $koneksi->prepare('UPDATE siswa SET master_kelas_id = ? WHERE id = ?');
                 $stmtClass->bind_param('ii', $classId, $id); $stmtClass->execute(); $stmtClass->close();
-                $placementId = class_sync_student_current_year($koneksi, $noInduk, $classId, $spp, $pomg, true);
+                $tariffSync = null;
+                $placementId = class_sync_student_current_year($koneksi, $noInduk, $classId, $spp, $pomg, true, $tariffSync);
                 if ($placementId) du_create_bill_for_placement($koneksi, $placementId);
                 $after = find_student($koneksi, $id);
-                write_student_audit($koneksi, $id, $noInduk, 'tambah', null, student_snapshot($after));
+                $afterAudit = student_snapshot($after);
+                $afterAudit['_tariff_sync'] = $tariffSync;
+                write_student_audit($koneksi, $id, $noInduk, 'tambah', null, $afterAudit);
                 $successMessage = "Siswa $name berhasil ditambahkan.";
             } else {
                 $before = student_snapshot($oldStudent);
@@ -309,19 +271,73 @@ if ($_SERVER['REQUEST_METHOD'] === 'POST') {
                 $stmt->close();
                 $stmtClass = $koneksi->prepare('UPDATE siswa SET master_kelas_id = ? WHERE id = ?');
                 $stmtClass->bind_param('ii', $classId, $id); $stmtClass->execute(); $stmtClass->close();
-                $placementId = class_sync_student_current_year($koneksi, $noInduk, $classId, $spp, $pomg, $active === 1);
-                if ($placementId) du_create_bill_for_placement($koneksi, $placementId);
-                $duChanged =
-                    abs((float)$oldStudent['DAFTAR_ULANG'] - $daftarUlang) > .001 ||
-                    abs((float)$oldStudent['potong_du'] - $potongDu) > .001 ||
-                    abs((float)$oldStudent['tot_du'] - $totDu) > .001;
-                if ($duChanged) du_apply_current_student_override($koneksi, $noInduk);
+                $tariffSync = null;
+                $placementId = class_sync_student_current_year($koneksi, $noInduk, $classId, $spp, $pomg, $active === 1, $tariffSync);
+                $duBillBefore = du_find_bill($koneksi, $noInduk, (int)date('n'), (int)date('Y'), true);
+                $duBillId = $placementId ? du_create_bill_for_placement($koneksi, $placementId, false) : null;
+                $duSync = du_reconcile_current_student_override($koneksi, $noInduk);
+                if (!$duBillBefore && $duBillId) $duSync['status'] = 'synced';
                 $after = find_student($koneksi, $id);
-                write_student_audit($koneksi, $id, $noInduk, 'update', $before, student_snapshot($after));
-                $successMessage = "Data siswa $name berhasil diperbarui.";
+                $afterSnapshot = student_snapshot($after);
+                $requestedComponents = student_tariff_component_changes($before, $afterSnapshot);
+                $syncedComponents = $tariffSync['synced'] ?? [];
+                $lockedComponents = $tariffSync['locked'] ?? [];
+                if ($duSync['status'] === 'synced') $syncedComponents[] = 'daftar_ulang';
+                if ($duSync['status'] === 'locked') $lockedComponents[] = 'daftar_ulang';
+                $syncedComponents = array_values(array_unique($syncedComponents));
+                $lockedComponents = array_values(array_unique($lockedComponents));
+                $updatedComponents = array_values(array_intersect($syncedComponents, $requestedComponents));
+                $repairedComponents = array_values(array_diff($syncedComponents, $requestedComponents));
+                $lockedRequested = array_values(array_intersect($lockedComponents, $requestedComponents));
+                $masterChanged = student_snapshots_differ($before, $afterSnapshot);
+                $hasEffectiveChange = $masterChanged || count($syncedComponents) > 0;
+
+                if (!$hasEffectiveChange) {
+                    $koneksi->commit();
+                    $noChangeMessage = 'Tidak ada perubahan yang disimpan.';
+                    if ($lockedComponents) {
+                        $noChangeMessage .= ' ' . student_tariff_labels($lockedComponents) . ' tahun ' . ($tariffSync['tahun_ajaran'] ?? $duSync['tahun_ajaran']) . ' tetap terkunci karena sudah memiliki pembayaran.';
+                    }
+                    $_SESSION['flash'] = ['type' => 'warning', 'msg' => $noChangeMessage];
+                    student_redirect('daftar.php');
+                }
+
+                $syncAudit = [
+                    'tahun_ajaran' => $tariffSync['tahun_ajaran'] ?? $duSync['tahun_ajaran'],
+                    'diperbarui' => $updatedComponents,
+                    'diperbaiki_otomatis' => $repairedComponents,
+                    'terkunci' => $lockedComponents,
+                    'kelas_dipertahankan' => (bool)($tariffSync['kelas_dipertahankan'] ?? false),
+                ];
+                $afterAudit = $afterSnapshot;
+                $afterAudit['_tariff_sync'] = $syncAudit;
+                $auditAction = $masterChanged ? 'update' : 'rekonsiliasi_tarif';
+                write_student_audit($koneksi, $id, $noInduk, $auditAction, $before, $afterAudit);
+
+                $messageParts = [];
+                if ($masterChanged) $messageParts[] = "Data siswa $name berhasil diperbarui.";
+                if ($updatedComponents) {
+                    $messageParts[] = count($updatedComponents) . ' komponen tagihan tahun ' . $syncAudit['tahun_ajaran'] . ' ikut diperbarui.';
+                }
+                if ($repairedComponents) {
+                    $messageParts[] = 'Ketidaksinkronan ' . student_tariff_labels($repairedComponents) . ' diperbaiki otomatis.';
+                }
+                if ($lockedRequested) {
+                    $messageParts[] = student_tariff_labels($lockedRequested) . ' tahun ' . $syncAudit['tahun_ajaran'] . ' tetap karena sudah memiliki pembayaran; tarif baru berlaku untuk penerbitan tahun berikutnya.';
+                }
+                $lockedExisting = array_values(array_diff($lockedComponents, $lockedRequested));
+                if ($lockedExisting) {
+                    $messageParts[] = 'Snapshot yang tetap terkunci: ' . student_tariff_labels($lockedExisting) . '.';
+                }
+                $classChanged = (int)($before['master_kelas_id'] ?? 0) !== (int)($afterSnapshot['master_kelas_id'] ?? 0);
+                if ($classChanged && $syncAudit['kelas_dipertahankan']) {
+                    $messageParts[] = 'Kelas penempatan tahun berjalan dipertahankan untuk menjaga histori transaksi.';
+                }
+                $successMessage = implode(' ', $messageParts);
+                $successType = ($lockedComponents || ($classChanged && $syncAudit['kelas_dipertahankan'])) ? 'warning' : 'success';
             }
             $koneksi->commit();
-            $_SESSION['flash'] = ['type' => 'success', 'msg' => $successMessage];
+            $_SESSION['flash'] = ['type' => $successType ?? 'success', 'msg' => $successMessage];
             student_redirect('daftar.php');
         }
 
@@ -542,7 +558,7 @@ $canEditOpening = !$editStudent || (int)($editStudent['history_count'] ?? 0) ===
           </div>
 
           <label class="advanced-switch" for="advanced-enabled">
-            <span><strong>Advance</strong><small>Data tarif dan saldo awal siswa</small></span>
+            <span><strong>Advance</strong><small>Tarif siswa dan saldo awal; tagihan berbayar tetap terkunci</small></span>
             <input type="checkbox" id="advanced-enabled" name="advanced_enabled" value="1" <?= $advancedOpen ? 'checked' : '' ?> />
             <span class="advanced-switch-track"><span></span></span>
           </label>
@@ -692,6 +708,8 @@ $canEditOpening = !$editStudent || (int)($editStudent['history_count'] ?? 0) ===
     document.addEventListener('DOMContentLoaded', function () {
       const toggle = document.getElementById('advanced-enabled');
       const panel = document.getElementById('student-advanced-panel');
+      const advancedFields = Array.from(document.querySelectorAll('.advanced-field'));
+      const initialAdvancedValues = new Map(advancedFields.map(input => [input, input.value]));
       const moneyInputs = Array.from(document.querySelectorAll('.rupiah-input:not(:disabled)'));
       const format = value => {
         const clean = String(value || '').replace(/\D/g, '');
@@ -738,7 +756,21 @@ $canEditOpening = !$editStudent || (int)($editStudent['history_count'] ?? 0) ===
         if (event.key === 'Escape') closeClassPicker();
       });
       const syncPanel = () => panel.classList.toggle('is-open', toggle.checked);
-      toggle.addEventListener('change', syncPanel);
+      toggle.addEventListener('change', function () {
+        if (!toggle.checked) {
+          const dirty = advancedFields.some(input => input.value !== initialAdvancedValues.get(input));
+          if (dirty && !window.confirm('Perubahan pada data Advance belum disimpan. Batalkan perubahan tersebut?')) {
+            toggle.checked = true;
+            syncPanel();
+            return;
+          }
+          if (dirty) {
+            advancedFields.forEach(input => { input.value = initialAdvancedValues.get(input); });
+            updateDerived();
+          }
+        }
+        syncPanel();
+      });
       moneyInputs.forEach(input => input.addEventListener('input', function () { this.value = format(this.value); updateDerived(); }));
       document.getElementById('form-master-siswa').addEventListener('submit', function (event) {
         if (!classInput.value) {

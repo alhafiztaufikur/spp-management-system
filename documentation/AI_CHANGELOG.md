@@ -13,6 +13,41 @@ File ini mencatat perubahan proyek secara reverse chronological. Baca [PROJECT_C
 - Jangan menghapus atau menulis ulang entri lama. Tambahkan entri koreksi bila diperlukan.
 - Perubahan implementasi dan entri changelog wajib masuk commit yang sama.
 
+## 2026-09-10 - Proteksi Konsistensi Tarif Siswa dan Tagihan
+
+**AI/Aktor:** Codex berbasis GPT-5, bersama pemilik proyek
+
+**Tujuan:** Mencegah edit tarif siswa dilaporkan berhasil ketika tarif tidak tersimpan atau snapshot tagihan tahun berjalan tidak ikut diproses.
+
+**Perubahan fitur dan perilaku:**
+
+- Perubahan field Advance ditolak bila switch Advance tidak aktif; browser juga meminta konfirmasi sebelum membuang perubahan panel.
+- Sinkronisasi kelas dipisahkan dari tarif. Kelas penempatan berbayar tetap menjadi histori, tetapi tidak lagi menghentikan sinkronisasi komponen lain.
+- SPP, komponen tahunan, dan Daftar Ulang dikunci per komponen yang sudah dibayar. Tarif master baru tetap tersimpan untuk penerbitan berikutnya.
+- Snapshot tanpa pembayaran direkonsiliasi otomatis saat siswa disimpan, diverifikasi sebelum commit, dan hasilnya dicatat dalam JSON audit siswa.
+- Alert membedakan tidak ada perubahan, sinkronisasi, perbaikan otomatis, tarif terkunci, dan kelas historis yang dipertahankan.
+
+**Database dan migrasi:**
+
+- Tidak ada perubahan schema atau migrasi database.
+
+**Kompatibilitas dan data lama:**
+
+- Pembayaran, nominal, dan kelas historis tidak diubah. Pembayaran legacy pada tabel `bayar` ikut diperiksa sebelum snapshot dianggap aman untuk diperbarui.
+- Anomali lama diperbaiki hanya ketika siswa terkait disimpan dan hanya untuk komponen tanpa pembayaran.
+
+**Verifikasi:**
+
+- PHP lint pada 52 file dan pemeriksaan sintaks `assets/js/app.js` serta skrip inline Data Siswa lulus.
+- `php tests/student_tariff_consistency_test.php` dan `php tests/class_snapshot_test.php` lulus.
+- Simulasi rekonsiliasi Hafizz dijalankan dalam transaksi rollback: kelas historis tetap, sedangkan komponen tanpa pembayaran tersinkron.
+- Test lain lulus, kecuali `modular_reports_test.php` yang terhenti karena database lokal tidak memiliki enam placeholder kelas aktif; integration test pembayaran tetap melewati dirinya karena database disposable dan kredensial test tidak disediakan.
+- Endpoint Data Siswa merespons redirect autentikasi normal. Smoke test interaktif tidak dijalankan karena browser kontrol tidak tersedia pada sesi verifikasi.
+
+**Catatan tindak lanjut:**
+
+- Test suite database penuh tetap harus dijalankan pada database disposable yang memenuhi seluruh fixture laporan.
+
 ## 2026-09-09 - Urutan SPP Penuh Lintas Tahun Ajaran
 
 **AI/Aktor:** Codex berbasis GPT-5, bersama pemilik proyek

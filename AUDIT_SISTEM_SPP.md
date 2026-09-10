@@ -49,6 +49,8 @@ Kontrak implementasi yang harus dipertahankan pada perubahan berikutnya:
 - Mutasi finansial memakai transaction dan penguncian baris yang relevan.
 - Pembayaran legacy tidak diedit atau dihapus otomatis.
 - Riwayat kelas/tarif menggunakan snapshot tahun ajaran, bukan hanya data siswa terkini.
+- Perubahan tarif siswa tidak boleh mengubah snapshot tahun berjalan untuk komponen yang sudah dibayar. Komponen tanpa pembayaran boleh diselaraskan secara atomik, termasuk ketika kelas master berbeda dari kelas histori.
+- Status berhasil pada master siswa harus mencerminkan perubahan yang benar-benar tersimpan; submit tanpa perubahan atau nilai Advance yang diabaikan tidak boleh dilaporkan sebagai keberhasilan umum.
 - Perbaikan data finansial selalu membutuhkan backup dan database disposable untuk regression test.
 
 ## Aturan SPP terkini
