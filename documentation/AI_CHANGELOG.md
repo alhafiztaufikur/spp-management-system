@@ -13,6 +13,67 @@ File ini mencatat perubahan proyek secara reverse chronological. Baca [PROJECT_C
 - Jangan menghapus atau menulis ulang entri lama. Tambahkan entri koreksi bila diperlukan.
 - Perubahan implementasi dan entri changelog wajib masuk commit yang sama.
 
+## 2026-09-10 - Rekap Riwayat Tagihan per Siswa
+
+**AI/Aktor:** Codex berbasis GPT-5, bersama pemilik proyek
+
+**Tujuan:** Merapikan Riwayat Tagihan ketika laporan difilter berdasarkan rombel atau tingkat tanpa mengubah sumber dan nominal tagihan.
+
+**Perubahan fitur dan perilaku:**
+
+- Filter rombel dan tingkat menampilkan satu baris per siswa dengan total tagihan, terbayar, sisa, serta seluruh rincian yang lolos filter.
+- Pagination pada mode kelompok menghitung siswa. Pemilihan satu siswa melalui NIS/NIS Diknas tetap memakai tabel detail satu tagihan per baris.
+- Komponen memakai urutan bisnis tetap dan SPP memakai kode periode `YYYY-MM`, sehingga bulan tampil kronologis dalam kalender tahun ajaran.
+- Cetak, PDF, dan Excel memakai representasi kelompok yang sama, sementara total laporan tetap dihitung dari data tagihan datar.
+- Tampilan kelompok dibuat responsif untuk desktop, tablet, ponsel, serta mode terang dan gelap.
+
+**Database dan migrasi:**
+
+- Tidak ada perubahan schema, migrasi, transaksi, atau nominal tagihan.
+
+**Kompatibilitas dan data lama:**
+
+- Filter Semua Kelas dan pencarian satu siswa mempertahankan format detail sebelumnya.
+- Data historis hanya dibaca dan diurutkan; tidak ada backfill atau perubahan snapshot.
+
+**Verifikasi:**
+
+- PHP lint seluruh 59 file, pemeriksaan sintaks `assets/js/app.js`, dan `git diff --check` lulus.
+- Unit test pengelompokan, total, pemilihan mode, pagination siswa, dan urutan SPP lulus.
+- Integration test database lokal secara read-only membuktikan jumlah rincian dan seluruh total tidak berubah setelah pengelompokan.
+- Smoke test render HTML web dan cetak membuktikan mode kelompok, label pagination siswa, versi stylesheet, dan kolom ekspor tersedia.
+- `modular_reports_test.php` tidak dapat diselesaikan karena database lokal tidak memiliki enam placeholder kelas aktif yang menjadi prasyarat test lama. Pengujian visual interaktif tidak dijalankan karena browser pengujian tidak tersedia.
+
+## 2026-09-10 - Popup Peringatan Status SPP
+
+**AI/Aktor:** Codex berbasis GPT-5, bersama pemilik proyek
+
+**Tujuan:** Memberi peringatan singkat dan mudah dipahami sebelum kasir mencoba membayar SPP yang terblokir.
+
+**Perubahan fitur dan perilaku:**
+
+- Input dan Edit Pembayaran memeriksa status SPP terbaru melalui endpoint read-only setelah siswa serta bulan/tahun lengkap dipilih.
+- Popup hanya muncul untuk penghalang pembayaran, termasuk tunggakan pertama, periode lunas, pembayaran lama sebagian, tarif kosong, siswa belum memenuhi syarat, nominal tidak penuh, dan proteksi perubahan transaksi lama.
+- Kolom SPP dikunci saat pemeriksaan atau saat terblokir. Pembayaran komponen lain tetap dapat disimpan bila SPP tidak diisi.
+- Endpoint dan proses simpan memakai layanan status yang sama; penolakan backend setelah perubahan data bersamaan dikembalikan sebagai popup yang seragam.
+- Dialog mendukung mode terang/gelap, layar kecil, keyboard, pengembalian fokus, dan reduced motion.
+
+**Database dan migrasi:**
+
+- Tidak ada perubahan schema, migrasi, transaksi, atau nominal historis.
+
+**Kompatibilitas dan data lama:**
+
+- Pembayaran legacy sebagian tidak ditambah sebagai cicilan baru; kasir diarahkan untuk mengoreksi transaksi lama.
+- Aturan SPP penuh, urutan lintas tahun ajaran, serta pengecualian penempatan `pindah`/`lulus` tetap dipertahankan.
+
+**Verifikasi:**
+
+- PHP lint seluruh 56 file dan pemeriksaan sintaks `assets/js/app.js` lulus.
+- `spp_payment_status_test.php`, `spp_sequence_test.php`, `class_snapshot_test.php`, dan `student_tariff_consistency_test.php` lulus.
+- Endpoint tanpa sesi mengembalikan HTTP 401 dengan JSON singkat dan header `no-store`.
+- Integration test mutasi tidak dijalankan karena database disposable dan kredensial test tidak tersedia. Smoke test visual interaktif tidak dijalankan karena browser kontrol tidak tersedia pada sesi verifikasi.
+
 ## 2026-09-10 - Proteksi Konsistensi Tarif Siswa dan Tagihan
 
 **AI/Aktor:** Codex berbasis GPT-5, bersama pemilik proyek

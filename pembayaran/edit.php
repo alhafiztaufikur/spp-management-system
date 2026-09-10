@@ -11,6 +11,9 @@ require_once '../includes/biaya_lain.php';
 require_once '../includes/tagihan_tahunan.php';
 requireRole(['admin', 'kasir']);
 
+$flash = $_SESSION['flash'] ?? null;
+unset($_SESSION['flash']);
+
 $id = (int)($_GET['id'] ?? 0);
 if ($id <= 0) { header('Location: lihat.php'); exit; }
 
@@ -226,7 +229,7 @@ $selectedPaymentMethod = $d['sistem_pembayaran'] ?? 'VA';
   <meta name="description" content="Edit data transaksi pembayaran siswa." />
   <link rel="preconnect" href="https://fonts.googleapis.com" />
   <link href="https://fonts.googleapis.com/css2?family=Inter:wght@300;400;500;600;700;800&display=swap" rel="stylesheet" />
-  <link rel="stylesheet" href="../assets/css/style.css?v=8.7" />
+  <link rel="stylesheet" href="../assets/css/style.css?v=8.9" />
   <!-- Prevent theme flash -->
   <script>(function(){var t=localStorage.getItem('spp_theme')||'dark';document.documentElement.setAttribute('data-theme',t);})();</script>
 </head>
@@ -250,6 +253,15 @@ $selectedPaymentMethod = $d['sistem_pembayaran'] ?? 'VA';
         </div>
         <div class="clock-badge" id="liveClock">--:--:--</div>
       </div>
+
+      <?php if ($flash && ($flash['scope'] ?? '') !== 'spp'): ?>
+      <div class="alert alert-<?= htmlspecialchars((string)($flash['type'] ?? 'error')) ?>" id="flash-msg">
+        <svg width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round">
+          <circle cx="12" cy="12" r="10"/><line x1="12" y1="8" x2="12" y2="12"/><line x1="12" y1="16" x2="12.01" y2="16"/>
+        </svg>
+        <?= htmlspecialchars((string)($flash['msg'] ?? 'Terjadi kesalahan.')) ?>
+      </div>
+      <?php endif; ?>
 
       <div class="main-card">
         <div class="card-title-row">
@@ -559,12 +571,26 @@ $selectedPaymentMethod = $d['sistem_pembayaran'] ?? 'VA';
     </main>
   </div>
 
+  <?php include '../includes/spp_warning_modal.php'; ?>
+
   <script>
     window.sppDaftarUlangMasters = {};
     window.sppDaftarUlangHasMasters = true;
     window.sppPaymentHistoryUrl = 'history_siswa.php';
+    window.sppPaymentStatusUrl = 'status_spp.php';
+    window.sppEditPaymentId = <?= (int)$d['id'] ?>;
+    window.sppEditOriginal = <?= json_encode([
+      'no_induk' => (string)$d['NO_INDUK'],
+      'bulan' => month_code((string)$d['BULAN']),
+      'tahun' => (string)$d['TAHUN'],
+      'amount' => (float)$d['U_SPP'],
+    ], JSON_UNESCAPED_UNICODE | JSON_UNESCAPED_SLASHES | JSON_HEX_TAG | JSON_HEX_APOS | JSON_HEX_AMP | JSON_HEX_QUOT) ?>;
+    window.sppFlashWarning = <?= json_encode(
+      ($flash['scope'] ?? '') === 'spp' ? ($flash['spp_status'] ?? null) : null,
+      JSON_UNESCAPED_UNICODE | JSON_UNESCAPED_SLASHES | JSON_HEX_TAG | JSON_HEX_APOS | JSON_HEX_AMP | JSON_HEX_QUOT
+    ) ?>;
   </script>
-  <script src="../assets/js/app.js?v=6.6"></script>
+  <script src="../assets/js/app.js?v=6.7"></script>
 </body>
 </html>
 

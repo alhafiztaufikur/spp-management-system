@@ -140,7 +140,7 @@ unset($_SESSION['flash']);
   <meta name="description" content="Form input transaksi pembayaran siswa." />
   <link rel="preconnect" href="https://fonts.googleapis.com" />
   <link href="https://fonts.googleapis.com/css2?family=Inter:wght@300;400;500;600;700;800&display=swap" rel="stylesheet" />
-  <link rel="stylesheet" href="../assets/css/style.css?v=8.8" />
+  <link rel="stylesheet" href="../assets/css/style.css?v=8.9" />
   <!-- Prevent theme flash -->
   <script>(function(){var t=localStorage.getItem('spp_theme')||'dark';document.documentElement.setAttribute('data-theme',t);})();</script>
 </head>
@@ -167,7 +167,7 @@ unset($_SESSION['flash']);
         <div class="clock-badge" id="liveClock">--:--:--</div>
       </div>
 
-      <?php if ($flash): ?>
+      <?php if ($flash && ($flash['scope'] ?? '') !== 'spp'): ?>
       <div class="alert alert-<?= $flash['type'] ?>" id="flash-msg">
         <svg width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round">
           <?php if ($flash['type'] === 'success'): ?>
@@ -486,13 +486,20 @@ unset($_SESSION['flash']);
     </main>
   </div>
 
+  <?php include '../includes/spp_warning_modal.php'; ?>
+
   <script>
     window.sppDaftarUlangMasters = {};
     window.sppDaftarUlangHasMasters = true;
     window.sppPaymentHistoryUrl = 'history_siswa.php';
     window.sppOtherFeeBillsUrl = 'biaya_lain_siswa.php';
+    window.sppPaymentStatusUrl = 'status_spp.php';
+    window.sppFlashWarning = <?= json_encode(
+      ($flash['scope'] ?? '') === 'spp' ? ($flash['spp_status'] ?? null) : null,
+      JSON_UNESCAPED_UNICODE | JSON_UNESCAPED_SLASHES | JSON_HEX_TAG | JSON_HEX_APOS | JSON_HEX_AMP | JSON_HEX_QUOT
+    ) ?>;
   </script>
-  <script src="../assets/js/app.js?v=6.6"></script>
+  <script src="../assets/js/app.js?v=6.7"></script>
 </body>
 </html>
 

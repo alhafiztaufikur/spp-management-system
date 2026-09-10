@@ -61,6 +61,14 @@ Kontrak implementasi yang harus dipertahankan pada perubahan berikutnya:
 4. Sebelum membayar periode pilihan, seluruh periode aktif terdahulu yang tercatat harus lunas berdasarkan `spp_perbulan_snapshot` tahun asalnya.
 5. Penempatan `pindah` atau `lulus`, periode sebelum penempatan aktif pertama, dan jeda tanpa penempatan aktif tidak membentuk utang otomatis.
 6. Edit atau hapus periode prasyarat ditolak apabila sudah ada pembayaran pada periode sesudahnya, termasuk lintas tahun ajaran.
+7. Form Input dan Edit memeriksa status SPP terbaru ke server ketika siswa atau periode berubah. Popup hanya membantu kasir; proses simpan tetap memvalidasi ulang di dalam transaksi database.
+
+## Perilaku laporan riwayat tagihan
+
+- Filter satu rombel atau tingkat menyajikan satu kelompok per NIS, dengan total tagihan, terbayar, sisa, dan seluruh rincian yang lolos filter.
+- Pemilihan satu siswa melalui NIS atau NIS Diknas mempertahankan format detail satu tagihan per baris.
+- SPP diurutkan memakai periode numerik `YYYY-MM` dalam urutan kalender tahun ajaran; pengelompokan hanya mengubah presentasi dan tidak menjadi sumber perhitungan baru.
+- Pagination web menghitung siswa pada mode kelompok. Cetak, PDF, dan Excel menggunakan pengelompokan yang sama tanpa membatasi hasil ke halaman web aktif.
 
 ## Risiko dan utang teknis yang masih terbuka
 
@@ -86,6 +94,7 @@ Prioritas menengah:
 ```powershell
 php -l pembayaran/proses.php
 php tests/spp_sequence_test.php
+php tests/spp_payment_status_test.php
 node --check assets/js/app.js
 ```
 

@@ -41,6 +41,10 @@ function payment_process_flash(string $baseUrl, array &$cookies): string {
     if (preg_match('/id="flash-msg"[^>]*>(.*?)<\/div>/s', $page['body'], $match)) {
         return trim(html_entity_decode(strip_tags($match[1])));
     }
+    if (preg_match('/window\.sppFlashWarning\s*=\s*([^\r\n]+);/', $page['body'], $match)) {
+        $warning = json_decode(trim($match[1]), true);
+        if (is_array($warning)) return (string)($warning['message'] ?? '');
+    }
     return '';
 }
 
@@ -153,9 +157,20 @@ try {
 
     $blockedJuly = $payment($testNis[0], '07', (string)$startYear, 275000);
     payment_process_assert($blockedJuly['status'] === 302, 'SPP Juli lintas tahun tidak mengembalikan redirect.');
-    payment_process_assert(str_contains(payment_process_flash($baseUrl, $cookies), 'Juni ' . $startYear . ' belum lunas'), 'SPP Juli tahun baru tidak ditolak saat Juni tahun sebelumnya menunggak.');
+    payment_process_assert(str_contains(payment_process_flash($baseUrl, $cookies), 'tunggakan Juni ' . $startYear), 'SPP Juli tahun baru tidak ditolak saat Juni tahun sebelumnya menunggak.');
+
+    $statusUrl = $baseUrl . '/pembayaran/status_spp.php?' . http_build_query([
+        'no_induk' => $testNis[0], 'bulan' => '07', 'tahun' => (string)$startYear,
+    ]);
+    $liveBlocked = payment_process_request($statusUrl, [], $cookies);
+    $liveBlockedPayload = json_decode($liveBlocked['body'], true);
+    payment_process_assert($liveBlocked['status'] === 200 && ($liveBlockedPayload['status'] ?? '') === 'arrears', 'Endpoint status tidak melaporkan tunggakan Juli.');
+    payment_process_assert(($liveBlockedPayload['blocking_period']['label'] ?? '') === 'Juni ' . $startYear, 'Endpoint status tidak memilih tunggakan pertama yang tepat.');
 
     payment_process_assert($payment($testNis[0], '06', (string)$startYear, 250000)['status'] === 302, 'Pelunasan Juni tahun sebelumnya gagal.');
+    $livePayable = payment_process_request($statusUrl, [], $cookies);
+    $livePayablePayload = json_decode($livePayable['body'], true);
+    payment_process_assert($livePayable['status'] === 200 && ($livePayablePayload['status'] ?? '') === 'payable', 'Endpoint status belum berubah menjadi dapat dibayar setelah Juni lunas.');
     payment_process_assert($payment($testNis[0], '07', (string)$startYear, 275000)['status'] === 302, 'SPP Juli setelah Juni lunas gagal.');
 
     $stmtJuly = $koneksi->prepare("SELECT id, U_SPP FROM bayar WHERE NO_INDUK=? AND BULAN='07' AND TAHUN=? ORDER BY id DESC LIMIT 1");
@@ -178,15 +193,15 @@ try {
         'sistem_pembayaran' => 'Tunai', 'uang_spp' => 0,
     ], $cookies);
     payment_process_assert($editJune['status'] === 302, 'Edit prasyarat lintas tahun tidak mengembalikan redirect.');
-    payment_process_assert(str_contains(payment_process_flash($baseUrl, $cookies), 'tidak bisa dikosongkan karena Juli ' . $startYear . ' sudah memiliki pembayaran'), 'Edit Juni tidak ditolak saat Juli tahun berikutnya sudah dibayar.');
+    payment_process_assert(str_contains(payment_process_flash($baseUrl, $cookies), 'tidak bisa dikosongkan karena Juli ' . $startYear . ' sudah dibayar'), 'Edit Juni tidak ditolak saat Juli tahun berikutnya sudah dibayar.');
 
     $deleteJune = payment_process_request($baseUrl . '/pembayaran/proses.php?aksi=hapus&id=' . $junePaymentId, [], $cookies);
     payment_process_assert($deleteJune['status'] === 302, 'Hapus prasyarat lintas tahun tidak mengembalikan redirect.');
-    payment_process_assert(str_contains(payment_process_flash($baseUrl, $cookies), 'tidak bisa dihapus karena Juli ' . $startYear . ' sudah memiliki pembayaran'), 'Hapus Juni tidak ditolak saat Juli tahun berikutnya sudah dibayar.');
+    payment_process_assert(str_contains(payment_process_flash($baseUrl, $cookies), 'tidak bisa dihapus karena Juli ' . $startYear . ' sudah dibayar'), 'Hapus Juni tidak ditolak saat Juli tahun berikutnya sudah dibayar.');
 
     $blockedHistory = $payment($testNis[1], '07', (string)$startYear, 250000);
     payment_process_assert($blockedHistory['status'] === 302, 'Tunggakan historis tidak mengembalikan redirect.');
-    payment_process_assert(str_contains(payment_process_flash($baseUrl, $cookies), 'Juli ' . ($startYear - 2) . ' belum lunas'), 'Periode tunggakan aktif paling awal tidak dipilih sebagai penghalang.');
+    payment_process_assert(str_contains(payment_process_flash($baseUrl, $cookies), 'tunggakan Juli ' . ($startYear - 2)), 'Periode tunggakan aktif paling awal tidak dipilih sebagai penghalang.');
 
     payment_process_assert($payment($testNis[2], '07', (string)$startYear, 275000)['status'] === 302, 'Penempatan pindah justru memblokir SPP tahun aktif.');
     payment_process_assert($payment($testNis[3], '07', (string)$startYear, 275000)['status'] === 302, 'Siswa baru tanpa penempatan aktif sebelumnya justru terblokir.');

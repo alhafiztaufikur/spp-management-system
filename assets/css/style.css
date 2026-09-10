@@ -2860,6 +2860,98 @@ input[list]::-webkit-calendar-picker-indicator { display: none !important; }
 .modal-actions { display: flex; gap: 10px; justify-content: center; }
 .modal-actions .btn { min-width: 110px; justify-content: center; }
 
+/* Peringatan status SPP */
+body.spp-warning-open { overflow: hidden; }
+.spp-warning-overlay {
+  position: fixed;
+  inset: 0;
+  z-index: 10020;
+  display: grid;
+  place-items: center;
+  padding: 20px;
+  background: rgba(4, 15, 10, 0.68);
+  backdrop-filter: blur(7px);
+  opacity: 0;
+  visibility: hidden;
+  pointer-events: none;
+  transition: opacity 0.2s ease, visibility 0.2s ease;
+}
+.spp-warning-overlay.show {
+  opacity: 1;
+  visibility: visible;
+  pointer-events: auto;
+}
+.spp-warning-dialog {
+  width: min(430px, 100%);
+  padding: 28px;
+  border: 1px solid rgba(245, 158, 11, 0.32);
+  border-radius: 22px;
+  background:
+    radial-gradient(circle at 100% 0, rgba(245, 158, 11, 0.11), transparent 42%),
+    var(--bg-elevated);
+  box-shadow: 0 28px 80px rgba(0, 0, 0, 0.34);
+  transform: translateY(12px) scale(0.975);
+  transition: transform 0.22s cubic-bezier(0.22, 1, 0.36, 1);
+}
+.spp-warning-overlay.show .spp-warning-dialog { transform: translateY(0) scale(1); }
+.spp-warning-icon {
+  display: grid;
+  place-items: center;
+  width: 52px;
+  height: 52px;
+  margin-bottom: 18px;
+  border: 1px solid rgba(245, 158, 11, 0.3);
+  border-radius: 16px;
+  color: #f59e0b;
+  background: rgba(245, 158, 11, 0.12);
+}
+.spp-warning-kicker {
+  display: block;
+  margin-bottom: 6px;
+  color: #f59e0b;
+  font-size: 11px;
+  font-weight: 800;
+  letter-spacing: 0.09em;
+  text-transform: uppercase;
+}
+.spp-warning-title {
+  margin: 0;
+  color: var(--text-primary);
+  font-size: clamp(20px, 2vw, 24px);
+  line-height: 1.25;
+}
+.spp-warning-message {
+  margin: 10px 0 0;
+  color: var(--text-secondary);
+  font-size: 14px;
+  line-height: 1.65;
+}
+.spp-warning-amount {
+  margin-top: 16px;
+  padding: 11px 13px;
+  border: 1px solid rgba(245, 158, 11, 0.24);
+  border-radius: 12px;
+  color: #fbbf24;
+  background: rgba(245, 158, 11, 0.09);
+  font-size: 13px;
+  font-weight: 750;
+}
+.spp-warning-actions {
+  display: flex;
+  justify-content: flex-end;
+  gap: 10px;
+  margin-top: 24px;
+}
+.spp-warning-actions .btn {
+  min-width: 120px;
+  justify-content: center;
+}
+.spp-warning-overlay[data-status-code="status_unavailable"] .spp-warning-icon {
+  color: #ef4444;
+  border-color: rgba(239, 68, 68, 0.28);
+  background: rgba(239, 68, 68, 0.1);
+}
+
 /* Class payment recap */
 .class-recap-card { overflow: hidden; }
 .recap-kicker {
@@ -3252,6 +3344,15 @@ input[list]::-webkit-calendar-picker-indicator { display: none !important; }
 [data-theme="light"] .modal-title { color: #17261e; }
 [data-theme="light"] .modal-body  { color: #40564a; }
 [data-theme="light"] .modal-overlay { background: rgba(30,41,59,0.5); }
+[data-theme="light"] .spp-warning-overlay { background: rgba(15, 35, 25, 0.46); }
+[data-theme="light"] .spp-warning-dialog {
+  border-color: rgba(217, 119, 6, 0.25);
+  background:
+    radial-gradient(circle at 100% 0, rgba(245, 158, 11, 0.1), transparent 42%),
+    #ffffff;
+  box-shadow: 0 28px 70px rgba(19, 86, 48, 0.16);
+}
+[data-theme="light"] .spp-warning-amount { color: #a15c05; }
 
 /* Empty state */
 [data-theme="light"] .empty-state { color: #8aa095; }
@@ -3770,6 +3871,347 @@ input[list]::-webkit-calendar-picker-indicator { display: none !important; }
 @media (min-width: 769px) {
   .bottom-nav {
     display: none !important;
+  }
+}
+
+@media (max-width: 520px) {
+  .spp-warning-overlay { padding: 16px; }
+  .spp-warning-dialog {
+    padding: 22px 18px 18px;
+    border-radius: 18px;
+  }
+  .spp-warning-icon {
+    width: 46px;
+    height: 46px;
+    margin-bottom: 15px;
+    border-radius: 14px;
+  }
+  .spp-warning-actions { flex-direction: column-reverse; }
+  .spp-warning-actions .btn { width: 100%; }
+}
+
+@media (prefers-reduced-motion: reduce) {
+  .spp-warning-overlay,
+  .spp-warning-dialog {
+    transition: none;
+  }
+}
+
+/* Riwayat tagihan: satu baris utuh per siswa untuk filter rombel/tingkat. */
+.report-billing-group-wrap {
+  width: 100%;
+  overflow-x: auto;
+  border-top: 1px solid var(--border);
+  overscroll-behavior-x: contain;
+  -webkit-overflow-scrolling: touch;
+}
+
+.report-billing-group-table {
+  width: 100%;
+  min-width: 980px;
+  table-layout: fixed;
+  border-collapse: separate;
+  border-spacing: 0;
+}
+
+.report-billing-group-table th {
+  background: #12503a;
+  color: #fff;
+  font-size: .72rem;
+  font-weight: 850;
+  letter-spacing: .035em;
+  text-transform: uppercase;
+}
+
+.report-billing-group-table th:nth-child(1) { width: 54px; }
+.report-billing-group-table th:nth-child(2) { width: 185px; }
+.report-billing-group-table th:nth-child(3) { width: 105px; }
+.report-billing-group-table th:nth-child(4) { width: 190px; }
+
+.report-billing-group-table td {
+  height: auto;
+  padding: 16px 14px;
+  vertical-align: top;
+}
+
+.report-billing-student-row:nth-child(even) > td {
+  background: rgba(148, 163, 184, .035);
+}
+
+.report-billing-student {
+  text-align: left;
+}
+
+.report-billing-student > strong {
+  display: block;
+  margin-bottom: 7px;
+  color: var(--text-main);
+  font-size: .96rem;
+  line-height: 1.35;
+}
+
+.report-billing-student > small {
+  display: block;
+  margin-top: 7px;
+  color: var(--text-secondary);
+  font-size: .72rem;
+  line-height: 1.4;
+  white-space: normal;
+}
+
+.report-billing-class .kelas-badge {
+  max-width: 100%;
+  white-space: normal;
+  text-align: center;
+}
+
+.report-billing-summary {
+  text-align: left;
+}
+
+.report-billing-summary-item {
+  display: grid;
+  gap: 3px;
+  padding: 9px 10px;
+  border: 1px solid rgba(20, 130, 80, .14);
+  border-radius: 10px;
+  background: var(--bg-surface);
+}
+
+.report-billing-summary-item + .report-billing-summary-item {
+  margin-top: 8px;
+}
+
+.report-billing-summary-item span {
+  color: var(--text-secondary);
+  font-size: .66rem;
+  font-weight: 800;
+  letter-spacing: .04em;
+  text-transform: uppercase;
+}
+
+.report-billing-summary-item strong {
+  color: var(--text-main);
+  font-size: .84rem;
+  line-height: 1.3;
+  white-space: nowrap;
+}
+
+.report-billing-summary-item.is-primary {
+  border-color: rgba(16, 137, 82, .25);
+  background: rgba(16, 137, 82, .075);
+}
+
+.report-billing-summary-item.is-primary strong {
+  color: var(--primary);
+}
+
+.report-billing-item-list {
+  display: grid;
+  gap: 8px;
+}
+
+.report-billing-item {
+  display: grid;
+  grid-template-columns: minmax(150px, 1fr) auto;
+  align-items: start;
+  gap: 9px 12px;
+  padding: 11px 12px;
+  border: 1px solid rgba(20, 130, 80, .13);
+  border-radius: 11px;
+  background: var(--bg-card);
+}
+
+.report-billing-item-copy {
+  display: grid;
+  gap: 3px;
+  min-width: 0;
+}
+
+.report-billing-item-copy strong {
+  color: var(--text-main);
+  font-size: .82rem;
+  line-height: 1.35;
+}
+
+.report-billing-item-copy span {
+  color: var(--text-secondary);
+  font-size: .7rem;
+  line-height: 1.4;
+}
+
+.report-billing-item-values {
+  display: grid;
+  grid-column: 1 / -1;
+  grid-template-columns: repeat(3, minmax(0, 1fr));
+  gap: 6px;
+}
+
+.report-billing-item-values > span {
+  display: grid;
+  gap: 2px;
+  min-width: 0;
+  padding-top: 7px;
+  border-top: 1px solid rgba(20, 130, 80, .11);
+}
+
+.report-billing-item-values small {
+  margin: 0;
+  color: var(--text-secondary);
+  font-size: .62rem;
+  font-weight: 750;
+  letter-spacing: .025em;
+  text-transform: uppercase;
+  white-space: normal;
+}
+
+.report-billing-item-values strong {
+  color: var(--text-main);
+  font-size: .74rem;
+  line-height: 1.35;
+  white-space: nowrap;
+}
+
+[data-theme="dark"] .report-billing-student-row:nth-child(even) > td {
+  background: rgba(255, 255, 255, .018);
+}
+
+[data-theme="dark"] .report-billing-summary-item,
+[data-theme="dark"] .report-billing-item {
+  border-color: rgba(111, 207, 151, .16);
+}
+
+[data-theme="dark"] .report-billing-summary-item.is-primary {
+  background: rgba(35, 180, 103, .1);
+}
+
+@media (max-width: 1100px) {
+  .report-billing-group-table {
+    min-width: 900px;
+  }
+
+  .report-billing-group-table th:nth-child(2) { width: 165px; }
+  .report-billing-group-table th:nth-child(3) { width: 96px; }
+  .report-billing-group-table th:nth-child(4) { width: 170px; }
+}
+
+@media (max-width: 700px) {
+  .report-billing-group-wrap {
+    overflow: visible;
+    padding: 12px 12px 2px;
+    border-top: 0;
+  }
+
+  .report-billing-group-table,
+  .report-billing-group-table tbody,
+  .report-billing-group-table tr,
+  .report-billing-group-table td {
+    display: block;
+    width: 100%;
+    min-width: 0;
+  }
+
+  .report-billing-group-table thead {
+    display: none;
+  }
+
+  .report-billing-group-table tbody {
+    display: grid;
+    gap: 14px;
+  }
+
+  .report-billing-group-table .report-billing-student-row {
+    position: relative;
+    overflow: hidden;
+    border: 1px solid rgba(20, 130, 80, .17);
+    border-radius: 14px;
+    background: var(--bg-card);
+  }
+
+  .report-billing-group-table .report-billing-student-row > td {
+    position: static !important;
+    padding: 12px 14px;
+    border: 0;
+    border-bottom: 1px solid rgba(20, 130, 80, .1);
+    background: transparent;
+  }
+
+  .report-billing-group-table .report-billing-student-row > td:last-child {
+    border-bottom: 0;
+  }
+
+  .report-billing-number {
+    position: absolute !important;
+    top: 13px;
+    right: 13px;
+    z-index: 2;
+    width: 28px !important;
+    height: 28px !important;
+    padding: 0 !important;
+    border: 0 !important;
+    border-radius: 999px;
+    background: rgba(16, 137, 82, .11) !important;
+    color: var(--primary);
+    font-weight: 850;
+    line-height: 28px;
+    text-align: center;
+  }
+
+  .report-billing-student {
+    padding-right: 52px !important;
+  }
+
+  .report-billing-class::before,
+  .report-billing-summary::before,
+  .report-billing-details::before {
+    content: attr(data-label);
+    display: block;
+    margin-bottom: 8px;
+    color: var(--text-secondary);
+    font-size: .66rem;
+    font-weight: 850;
+    letter-spacing: .05em;
+    text-transform: uppercase;
+  }
+
+  .report-billing-summary {
+    display: grid !important;
+    grid-template-columns: 1fr 1fr;
+    gap: 8px;
+  }
+
+  .report-billing-summary-item + .report-billing-summary-item {
+    margin-top: 0;
+  }
+
+  .report-billing-summary::before,
+  .report-billing-summary-item.is-primary {
+    grid-column: 1 / -1;
+  }
+
+  .report-billing-item {
+    grid-template-columns: minmax(0, 1fr) auto;
+    padding: 10px;
+  }
+}
+
+@media (max-width: 430px) {
+  .report-billing-item {
+    grid-template-columns: 1fr;
+  }
+
+  .report-billing-item > .report-status {
+    justify-self: start;
+  }
+
+  .report-billing-item-values {
+    grid-column: 1;
+    grid-template-columns: 1fr;
+  }
+
+  .report-billing-item-values > span {
+    grid-template-columns: 82px 1fr;
+    align-items: baseline;
   }
 }
 

@@ -498,6 +498,105 @@ function report_billing_categories(mysqli $db):array{
     $categories=['spp'=>'SPP','pangkal'=>'Uang Pangkal','bangunan'=>'Uang Bangunan','seragam'=>'Uang Seragam','kegiatan'=>'Uang Kegiatan','komite'=>'Uang Komite','makan'=>'Uang Makan','sorga'=>'Uang Sorga','infaq'=>'Uang Infaq','daftar_ulang'=>'Daftar Ulang'];
     foreach($db->query('SELECT id,nama FROM master_biaya_lain ORDER BY nama')->fetch_all(MYSQLI_ASSOC) as $item)$categories['biaya_lain:'.(int)$item['id']]=$item['nama'];return $categories;
 }
+function report_billing_history_component_order(string $key): int {
+    return match($key){
+        'daftar_ulang'=>10,
+        'pangkal'=>20,
+        'bangunan'=>30,
+        'seragam'=>40,
+        'kegiatan'=>50,
+        'komite'=>60,
+        'makan'=>70,
+        'sorga'=>80,
+        'infaq'=>90,
+        'spp'=>200,
+        default=>str_starts_with($key,'biaya_lain:')?100:150,
+    };
+}
+function report_billing_history_compare_items(array $a,array $b): int {
+    $yearComparison=(string)($a['tahun_ajaran']??'')<=>(string)($b['tahun_ajaran']??'');
+    if($yearComparison!==0)return $yearComparison;
+    $componentComparison=report_billing_history_component_order((string)($a['komponen_key']??''))<=>report_billing_history_component_order((string)($b['komponen_key']??''));
+    if($componentComparison!==0)return $componentComparison;
+    if(($a['komponen_key']??'')==='spp'&&($b['komponen_key']??'')==='spp'){
+        $periodComparison=(string)($a['periode_code']??'')<=>(string)($b['periode_code']??'');
+        if($periodComparison!==0)return $periodComparison;
+    }
+    return [mb_strtolower((string)($a['komponen']??'')),(string)($a['periode']??'')]<=>[
+        mb_strtolower((string)($b['komponen']??'')),(string)($b['periode']??''),
+    ];
+}
+function report_billing_history_sort_rows(array &$rows): void {
+    usort($rows,static function(array $a,array $b):int{
+        $studentComparison=[
+            (int)($a['tingkat']??0),
+            (string)($a['kelas']??''),
+            mb_strtolower((string)($a['nama']??'')),
+            (string)($a['nis']??''),
+        ]<=>[
+            (int)($b['tingkat']??0),
+            (string)($b['kelas']??''),
+            mb_strtolower((string)($b['nama']??'')),
+            (string)($b['nis']??''),
+        ];
+        return $studentComparison!==0?$studentComparison:report_billing_history_compare_items($a,$b);
+    });
+}
+function report_billing_history_has_exact_student_filter(array $filters,array $rows): bool {
+    $query=trim((string)($filters['q']??''));
+    if($query==='')return false;
+    foreach($rows as $row){
+        $isNis=$query===(string)($row['nis']??'');
+        $isDiknas=($row['nis_diknas']??'')!==''&&$query===(string)$row['nis_diknas'];
+        if($isNis||$isDiknas)return true;
+    }
+    return false;
+}
+function report_billing_history_uses_grouped_view(array $filters,array $rows): bool {
+    $hasClassScope=report_class_filter_rombel_id($filters)>0||report_class_filter_level($filters)>0;
+    return $hasClassScope&&!report_billing_history_has_exact_student_filter($filters,$rows);
+}
+function report_billing_history_group_students(array $rows): array {
+    $groups=[];
+    foreach($rows as $row){
+        $nis=(string)($row['nis']??'');
+        if($nis==='')continue;
+        if(!isset($groups[$nis])){
+            $groups[$nis]=[
+                'nis'=>$nis,
+                'nis_diknas'=>(string)($row['nis_diknas']??''),
+                'nama'=>(string)($row['nama']??''),
+                'kelas'=>(string)($row['kelas']??'Belum diatur'),
+                'tingkat'=>(int)($row['tingkat']??0),
+                'kelas_list'=>[],
+                'total_tagihan'=>0.0,
+                'total_terbayar'=>0.0,
+                'total_sisa'=>0.0,
+                'item_count'=>0,
+                'items'=>[],
+            ];
+        }
+        $classLabel=trim((string)($row['kelas']??''));
+        if($classLabel!==''&&!in_array($classLabel,$groups[$nis]['kelas_list'],true))$groups[$nis]['kelas_list'][]=$classLabel;
+        $groups[$nis]['total_tagihan']+=(float)($row['tagihan']??0);
+        $groups[$nis]['total_terbayar']+=(float)($row['terbayar']??0);
+        $groups[$nis]['total_sisa']+=(float)($row['sisa']??0);
+        $groups[$nis]['item_count']++;
+        $groups[$nis]['items'][]=$row;
+    }
+    $result=array_values($groups);
+    foreach($result as &$group){
+        usort($group['items'],'report_billing_history_compare_items');
+        $group['kelas']=implode(', ',$group['kelas_list'])?:'Belum diatur';
+    }
+    unset($group);
+    usort($result,static fn($a,$b)=>[
+        (int)$a['tingkat'],mb_strtolower((string)$a['kelas']),mb_strtolower((string)$a['nama']),(string)$a['nis'],
+    ]<=>[
+        (int)$b['tingkat'],mb_strtolower((string)$b['kelas']),mb_strtolower((string)$b['nama']),(string)$b['nis'],
+    ]);
+    return $result;
+}
 function report_billing_history_data(mysqli $db,array $f):array{
     $rows=[];$studentWhere=$f['siswa_status']==='archived'?' AND s.is_active=0':($f['siswa_status']==='all'?'':' AND s.is_active=1');
     $append=static function(array $row)use(&$rows,$f):void{if($f['tahun_tagihan']!==''&&$row['tahun_ajaran']!==$f['tahun_tagihan'])return;if($f['komponen_tagihan']!==''&&$row['komponen_key']!==$f['komponen_tagihan'])return;if(!report_class_matches_row($f,$row))return;$row['_status']=$row['status'];if(report_filter_rows([$row],$f))$rows[]=$row;};
@@ -509,8 +608,8 @@ function report_billing_history_data(mysqli $db,array $f):array{
     foreach($db->query($otherSql)->fetch_all(MYSQLI_ASSOC) as $item){$time=strtotime((string)$item['created_at']);$yearLabel=$time?du_academic_year_label((int)date('m',$time),(int)date('Y',$time)):'';$bill=(float)$item['tagihan'];$paid=(float)$item['terbayar'];$append(['nis'=>$item['nis'],'nis_diknas'=>$item['nis_diknas']??'','nama'=>$item['nama'],'kelas'=>$item['kelas']?:class_label($item),'master_kelas_id'=>$item['master_kelas_id']??0,'tingkat'=>$item['tingkat']??'','komponen'=>$item['nama_snapshot'],'komponen_key'=>'biaya_lain:'.(int)$item['master_biaya_lain_id'],'periode'=>$time?'Diterbitkan '.report_date_label(date('Y-m-d',$time)):'Diterbitkan','tahun_ajaran'=>$yearLabel,'tagihan'=>$bill,'terbayar'=>$paid,'sisa'=>max(0,$bill-$paid),'status'=>report_billing_status($bill,$paid,$item['bill_status'])]);}
     $paid=[];foreach($db->query('SELECT bsp.no_induk,bsp.bulan,bsp.tahun,COALESCE(SUM(b.U_SPP),0) terbayar FROM bayar_spp_periode bsp JOIN bayar b ON b.id=bsp.bayar_id GROUP BY bsp.no_induk,bsp.bulan,bsp.tahun')->fetch_all(MYSQLI_ASSOC) as $item)$paid[$item['no_induk']][sprintf('%04d-%02d',(int)$item['tahun'],(int)$item['bulan'])]=(float)$item['terbayar'];
     $sppSql="SELECT sta.no_induk nis,s.NO_induk_diknas nis_diknas,s.NAMA nama,sta.kelas_rombel_snapshot kelas,sta.master_kelas_id,sta.kelas tingkat,sta.spp_perbulan_snapshot tarif,ta.label tahun_ajaran FROM siswa_tahun_ajaran sta JOIN tahun_ajaran ta ON ta.id=sta.tahun_ajaran_id JOIN siswa s ON s.NO_INDUK=sta.no_induk WHERE sta.kelas<>'PSB'$studentWhere";
-    foreach($db->query($sppSql)->fetch_all(MYSQLI_ASSOC) as $student){[$startYear,$endYear]=array_map('intval',explode('/',$student['tahun_ajaran']));for($index=0;$index<12;$index++){$month=(($index+6)%12)+1;$year=$index<6?$startYear:$endYear;$code=sprintf('%04d-%02d',$year,$month);$bill=(float)$student['tarif'];$amount=(float)($paid[$student['nis']][$code]??0);$append(['nis'=>$student['nis'],'nis_diknas'=>$student['nis_diknas']??'','nama'=>$student['nama'],'kelas'=>$student['kelas']?:'Belum diatur','master_kelas_id'=>$student['master_kelas_id']??0,'tingkat'=>$student['tingkat']??'','komponen'=>'SPP','komponen_key'=>'spp','periode'=>(report_months()[sprintf('%02d',$month)]??$month).' '.$year,'tahun_ajaran'=>$student['tahun_ajaran'],'tagihan'=>$bill,'terbayar'=>$amount,'sisa'=>max(0,$bill-$amount),'status'=>report_billing_status($bill,$amount)]);}}
-    usort($rows,static fn($a,$b)=>[$a['tahun_ajaran'],$a['kelas'],$a['nama'],$a['komponen'],$a['periode']]<=>[$b['tahun_ajaran'],$b['kelas'],$b['nama'],$b['komponen'],$b['periode']]);
+    foreach($db->query($sppSql)->fetch_all(MYSQLI_ASSOC) as $student){[$startYear,$endYear]=array_map('intval',explode('/',$student['tahun_ajaran']));for($index=0;$index<12;$index++){$month=(($index+6)%12)+1;$year=$index<6?$startYear:$endYear;$code=sprintf('%04d-%02d',$year,$month);$bill=(float)$student['tarif'];$amount=(float)($paid[$student['nis']][$code]??0);$append(['nis'=>$student['nis'],'nis_diknas'=>$student['nis_diknas']??'','nama'=>$student['nama'],'kelas'=>$student['kelas']?:'Belum diatur','master_kelas_id'=>$student['master_kelas_id']??0,'tingkat'=>$student['tingkat']??'','komponen'=>'SPP','komponen_key'=>'spp','periode'=>(report_months()[sprintf('%02d',$month)]??$month).' '.$year,'periode_code'=>$code,'tahun_ajaran'=>$student['tahun_ajaran'],'tagihan'=>$bill,'terbayar'=>$amount,'sisa'=>max(0,$bill-$amount),'status'=>report_billing_status($bill,$amount)]);}}
+    report_billing_history_sort_rows($rows);
     return ['title'=>'Riwayat Tagihan Siswa','subtitle'=>'Seluruh histori tagihan siswa','columns'=>[['nis','NIS','nis'],['nama','Nama Siswa'],['kelas','Kelas','kelas'],['komponen','Komponen'],['periode','Periode/Tahun Ajaran'],['tagihan','Tagihan','money'],['terbayar','Sudah Dibayar','money'],['sisa','Sisa','money'],['status','Status','status']],'rows'=>$rows];
 }
 function report_settlement_component_summary(array $components): array {

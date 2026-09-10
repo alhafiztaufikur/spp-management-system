@@ -192,6 +192,8 @@ Tabel `Daftar_ulang` dipakai sebagai template tarif per kombinasi `kelas + th_aj
 - Tarif setiap periode historis memakai `spp_perbulan_snapshot` pada penempatan tahun ajaran terkait. Sistem tidak memakai tarif siswa terkini untuk menyatakan tunggakan periode lama.
 - Penempatan berstatus `pindah` atau `lulus` tidak menjadi sumber tunggakan lintas tahun. Sistem juga tidak membuat utang untuk waktu sebelum penempatan aktif pertama siswa atau pada jeda tahun ajaran tanpa penempatan aktif.
 - Edit atau hapus SPP prasyarat tidak boleh membuat periode sesudahnya yang sudah memiliki pembayaran menjadi tidak valid, termasuk saat periode sesudahnya berada pada tahun ajaran berikutnya.
+- Input dan Edit Pembayaran memeriksa status SPP terbaru ke server setelah siswa serta bulan/tahun lengkap dipilih. Kolom SPP dikunci selama pemeriksaan atau ketika status terblokir, sedangkan komponen lain tetap dapat dibayar bila nominal SPP nol.
+- Popup SPP hanya muncul untuk kondisi yang menghalangi pembayaran: tunggakan paling awal, periode sudah lunas, pembayaran legacy sebagian, tarif belum tersedia, siswa belum memenuhi syarat, nominal tidak penuh, atau perubahan Edit yang merusak urutan periode berikutnya. Backend mengulang pemeriksaan saat submit dan tetap menjadi sumber keputusan akhir.
 - Form pembayaran menampilkan alert bila `Sudah Terbayar` lebih besar dari `Total Tagihan`; sisa ditampilkan sebagai nol dan input bayar pada komponen tersebut dikunci.
 - Form pembayaran juga menampilkan alert inline bila `Input Bayar` lebih besar dari sisa tagihan sebelum submit; input tersebut diberi invalid state dan browser menahan submit melalui custom validity.
 - Simpan, edit, dan hapus transaksi utama, daftar ulang, serta detail biaya lain dijalankan dalam transaction.
@@ -250,6 +252,9 @@ Tabel `Daftar_ulang` dipakai sebagai template tarif per kombinasi `kelas + th_aj
 
 - Rekap web, PDF, dan Excel mengambil data transaksi berdasarkan periode tanggal bayar.
 - Filter tanggal laporan ditampilkan sebagai satu kontrol date-range custom lokal dengan popover `Mulai` dan `Sampai`. Backend tetap menerima `tanggal_awal` dan `tanggal_akhir` agar URL lama dan export tetap kompatibel.
+- Riwayat Tagihan memakai satu baris terkelompok per siswa ketika satu rombel atau tingkat dipilih. Pagination pada mode ini menghitung siswa, sedangkan pencarian siswa spesifik tetap memakai detail satu tagihan per baris.
+- Total kelompok dihitung dari rincian yang lolos seluruh filter. Urutan komponen bersifat tetap dan periode SPP diurutkan memakai kode `YYYY-MM`, sehingga kalender tahun ajaran selalu terbaca Juli sampai Juni.
+- Cetak, PDF, dan Excel mengikuti mode terkelompok yang sama; data tagihan datar tetap menjadi sumber perhitungan agar pengelompokan tidak menggandakan nominal.
 - Rekap komponen tetap mencakup Uang Komite.
 - Biaya lain diagregasi berdasarkan `nama_biaya_snapshot`, bukan nama master saat ini.
 - Siswa arsip tidak dikeluarkan dari histori laporan.
@@ -317,8 +322,8 @@ Cakupan CSRF saat ini belum merata. Master Siswa, Role Management, Master Kelas,
 - `siswa.KELAS` tetap menjadi tingkat kompatibilitas, sedangkan `siswa.master_kelas_id` menjadi kelas aktif. `siswa_tahun_ajaran` menyimpan snapshot label rombel, tarif SPP, dan tarif Komite agar laporan historis tidak mengikuti perubahan tarif/kelas berikutnya.
 - Transaksi baru menyimpan `master_kelas_id` dan `kelas_rombel_snapshot`. Perpindahan kelas aktif tidak menulis ulang snapshot transaksi maupun penempatan yang sudah mempunyai pembayaran.
 - Biaya Lain baru dapat dibayar setelah `tagihan_biaya_lain` diterbitkan dari Master Biaya Lain kepada semua siswa, tingkat, rombel, atau siswa terpilih. Nominal tagihan adalah snapshot dan pembayaran dapat dicicil sampai lunas.
-- `laporan/global.php` hanya berisi katalog tujuh template. Query dan aturan laporan berada di `includes/reports.php`, halaman web di `laporan/template.php`, serta cetak/PDF/Excel di `laporan/export_global.php`.
-- Tujuh template terdiri dari Status Pembayaran, Penerimaan Harian, SPP Tahun Ajaran per Kelas, Pembayaran per Item, Mutasi Tabungan per Kelas, Tabungan Siswa, dan Setoran Kas Harian.
+- `laporan/global.php` hanya berisi katalog delapan template. Query dan aturan laporan berada di `includes/reports.php`, halaman web di `laporan/template.php`, serta cetak/PDF/Excel di `laporan/export_global.php`.
+- Delapan template terdiri dari Status Pembayaran, Penerimaan Harian, SPP Tahun Ajaran per Kelas, Pembayaran per Item, Mutasi Tabungan per Kelas, Tabungan Siswa, Riwayat Tagihan Siswa, dan Setoran Kas Harian.
 - Laporan Umum (`laporan/index.php`) tetap khusus admin/bendahara. Seluruh template Laporan Global dapat dibuka admin, bendahara, dan kasir. Halaman mandiri `laporan/rekap_kelas.php` tersedia kembali untuk admin/bendahara sebagai rekap pembayaran bulanan per tingkat kelas 1–6, berdampingan dengan template Per Item pada Laporan Global.
 - Tahun ajaran selalu Juli–Juni. Laporan transaksi memakai `TGL_BYR`, sedangkan laporan SPP memakai periode `bayar_spp_periode`; kedua konsep tidak boleh dipertukarkan.
 - PDF memerlukan Composer dependency dan ekstensi GD untuk menampilkan logo PNG. XAMPP menyediakan `php_gd.dll`; aktifkan `extension=gd` lalu restart Apache.

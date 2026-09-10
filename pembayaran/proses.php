@@ -9,7 +9,7 @@ require_once '../includes/auth.php';
 require_once '../includes/daftar_ulang.php';
 require_once '../includes/biaya_lain.php';
 require_once '../includes/tagihan_tahunan.php';
-require_once '../includes/spp_sequence.php';
+require_once '../includes/spp_payment_status.php';
 requireRole(['admin', 'kasir']);
 
 $aksi = $_POST['aksi'] ?? $_GET['aksi'] ?? '';
@@ -22,6 +22,18 @@ function parse_amount($value) {
 
 function current_operator_id(): string {
     return (string)($_SESSION['admin_id'] ?? '');
+}
+
+function payment_failure_flash(Throwable $error, string $fallbackPrefix): array {
+    if ($error instanceof SppPaymentException) {
+        return [
+            'type' => 'error',
+            'scope' => 'spp',
+            'msg' => $error->getMessage(),
+            'spp_status' => $error->status(),
+        ];
+    }
+    return ['type' => 'error', 'msg' => $fallbackPrefix . $error->getMessage()];
 }
 
 function validate_payment_amounts(array $amounts): void {
@@ -56,130 +68,6 @@ function validate_payment_context(string $tanggal, string $bulan, string $tahun)
     if ($periodYear > $paymentYear + 10) {
         throw new RuntimeException('Tahun pembayaran maksimal 10 tahun dari tanggal bayar, yaitu ' . ($paymentYear + 10) . '.');
     }
-}
-
-function payment_month_label(string $bulan): string {
-    $months = [
-        '01' => 'Januari', '02' => 'Februari', '03' => 'Maret', '04' => 'April',
-        '05' => 'Mei', '06' => 'Juni', '07' => 'Juli', '08' => 'Agustus',
-        '09' => 'September', '10' => 'Oktober', '11' => 'November', '12' => 'Desember'
-    ];
-    return $months[$bulan] ?? $bulan;
-}
-
-function spp_active_placements(mysqli $db, string $noInduk, bool $forUpdate = false): array {
-    $stmt = $db->prepare('SELECT ta.label AS tahun_ajaran, sta.spp_perbulan_snapshot, sta.status
-        FROM siswa_tahun_ajaran sta
-        JOIN tahun_ajaran ta ON ta.id = sta.tahun_ajaran_id
-        WHERE sta.no_induk = ? AND sta.status = \'aktif\'
-        ORDER BY ta.label ASC' . ($forUpdate ? ' FOR UPDATE' : ''));
-    $stmt->bind_param('s', $noInduk);
-    $stmt->execute();
-    $placements = $stmt->get_result()->fetch_all(MYSQLI_ASSOC);
-    $stmt->close();
-    return $placements;
-}
-
-function spp_tariff_for_payment_period(
-    mysqli $db,
-    string $noInduk,
-    string $bulan,
-    string $tahun,
-    float $fallback,
-    bool $forUpdate = false
-): float {
-    return spp_sequence_tariff_for_period(
-        spp_active_placements($db, $noInduk, $forUpdate),
-        $bulan,
-        $tahun,
-        $fallback
-    );
-}
-
-function spp_paid_for_period(mysqli $db, string $noInduk, string $bulan, string $tahun, int $excludePaymentId = 0): float {
-    $monthLabel = payment_month_label($bulan);
-    $legacyMonth = (string)(int)$bulan;
-    $stmt = $db->prepare('
-        SELECT U_SPP
-        FROM bayar
-        WHERE NO_INDUK = ?
-          AND TAHUN = ?
-          AND (BULAN = ? OR BULAN = ? OR BULAN = ?)
-          AND id <> ?
-        FOR UPDATE
-    ');
-    $stmt->bind_param('sssssi', $noInduk, $tahun, $bulan, $monthLabel, $legacyMonth, $excludePaymentId);
-    $stmt->execute();
-    $paid = 0.0;
-    $result = $stmt->get_result();
-    while ($row = $result->fetch_assoc()) {
-        $paid += (float)$row['U_SPP'];
-    }
-    $stmt->close();
-    return $paid;
-}
-
-function spp_monthly_bill_for_student(mysqli $db, string $noInduk): float {
-    $stmt = $db->prepare('SELECT SPP_PERBULAN FROM siswa WHERE NO_INDUK = ? FOR UPDATE');
-    $stmt->bind_param('s', $noInduk);
-    $stmt->execute();
-    $row = $stmt->get_result()->fetch_assoc();
-    $stmt->close();
-    return (float)($row['SPP_PERBULAN'] ?? 0);
-}
-
-function validate_spp_sequence(mysqli $db, string $noInduk, string $bulan, string $tahun, float $monthlyBill, int $excludePaymentId = 0): void {
-    if ($monthlyBill <= 0) return;
-
-    $placements = spp_active_placements($db, $noInduk, true);
-    foreach (spp_sequence_prior_periods($placements, $bulan, $tahun) as $period) {
-        $periodBill = (float)$period['tarif'];
-        if ($periodBill <= 0.001) continue;
-        $paid = spp_paid_for_period($db, $noInduk, $period['bulan'], $period['tahun'], $excludePaymentId);
-        if ($paid + 0.001 >= $periodBill) continue;
-
-        $selectedLabel = payment_month_label($bulan) . ' ' . $tahun;
-        $missingLabel = payment_month_label($period['bulan']) . ' ' . $period['tahun'];
-        $remaining = max(0, $periodBill - $paid);
-        throw new RuntimeException(
-            'SPP ' . $selectedLabel . ' belum bisa dibayar karena ' . $missingLabel .
-            ' belum lunas. Sisa ' . $missingLabel . ': Rp ' . number_format($remaining, 0, ',', '.') . '.'
-        );
-    }
-}
-
-function first_paid_spp_following_period(mysqli $db, string $noInduk, string $bulan, string $tahun, int $excludePaymentId = 0): ?array {
-    $placements = spp_active_placements($db, $noInduk, true);
-    foreach (spp_sequence_following_periods($placements, $bulan, $tahun) as $period) {
-        $paid = spp_paid_for_period($db, $noInduk, $period['bulan'], $period['tahun'], $excludePaymentId);
-        if ($paid > 0.001) {
-            return ['bulan' => $period['bulan'], 'tahun' => $period['tahun'], 'paid' => $paid];
-        }
-    }
-    return null;
-}
-
-function validate_spp_period_not_breaking_future(
-    mysqli $db,
-    string $noInduk,
-    string $bulan,
-    string $tahun,
-    float $monthlyBill,
-    float $paidAfterChange,
-    int $excludePaymentId = 0,
-    string $action = 'diubah'
-): void {
-    if ($monthlyBill <= 0 || $paidAfterChange + 0.001 >= $monthlyBill) return;
-
-    $future = first_paid_spp_following_period($db, $noInduk, $bulan, $tahun, $excludePaymentId);
-    if (!$future) return;
-
-    $currentLabel = payment_month_label($bulan) . ' ' . $tahun;
-    $futureLabel = payment_month_label($future['bulan']) . ' ' . $future['tahun'];
-    throw new RuntimeException(
-        'SPP ' . $currentLabel . ' tidak bisa ' . $action . ' karena ' . $futureLabel .
-        ' sudah memiliki pembayaran. Lunaskan kembali ' . $currentLabel . ' atau koreksi transaksi bulan setelahnya terlebih dahulu.'
-    );
 }
 
 function split_payment_amount(float $amount, int $parts): array {
@@ -247,30 +135,6 @@ function validate_student_and_komite(
     return $student;
 }
 
-function validate_spp_full_payment(
-    mysqli $db,
-    string $noInduk,
-    string $bulan,
-    string $tahun,
-    float $monthlyBill,
-    float $uangSpp,
-    int $excludePaymentId = 0
-): void {
-    if ($uangSpp <= 0.001) return;
-    if ($monthlyBill <= 0.001) {
-        throw new RuntimeException('Tarif SPP bulanan siswa belum diatur.');
-    }
-    $periodLabel = payment_month_label($bulan) . ' ' . $tahun;
-    if (abs($uangSpp - $monthlyBill) > 0.001) {
-        throw new RuntimeException('SPP ' . $periodLabel . ' wajib dibayar penuh sebesar Rp ' . number_format($monthlyBill, 0, ',', '.') . '. Pembayaran sebagian tidak diperbolehkan.');
-    }
-    $paid = spp_paid_for_period($db, $noInduk, $bulan, $tahun, $excludePaymentId);
-    if ($paid > 0.001) {
-        throw new RuntimeException('SPP ' . $periodLabel . ' sudah dibayar. Pembayaran SPP kedua pada bulan yang sama tidak diperbolehkan.');
-    }
-    validate_spp_sequence($db, $noInduk, $bulan, $tahun, $monthlyBill, $excludePaymentId);
-}
-
 function payable_total(float $total, float $discount = 0, float $derivedTotal = 0): float {
     return $derivedTotal > 0 ? $derivedTotal : max(0, $total - $discount);
 }
@@ -333,7 +197,17 @@ function validate_component_remaining(
     foreach (annual_fee_components() as $component => $cfg) {
         $annualInputTotal += (float)($components[$component] ?? 0);
     }
-    if ($isPsb && ($sppInput > 0.001 || $annualInputTotal > 0.001 || $uangDu > 0.001)) {
+    if ($isPsb && $sppInput > 0.001) {
+        throw new SppPaymentException(spp_payment_status_from_state(
+            ['exists' => true, 'is_active' => 1, 'tingkat' => $student['tingkat'] ?? 0, 'kode_rombel' => $student['kode_rombel'] ?? 'PSB'],
+            $bulan,
+            $tahun,
+            (float)($student['SPP_PERBULAN'] ?? 0),
+            0,
+            []
+        ));
+    }
+    if ($isPsb && ($annualInputTotal > 0.001 || $uangDu > 0.001)) {
         throw new RuntimeException('Siswa PSB belum dapat membayar SPP, Daftar Ulang, atau tagihan tahunan. Pindahkan siswa ke rombel reguler terlebih dahulu.');
     }
 
@@ -797,9 +671,9 @@ if ($aksi === 'input') {
         ];
         header('Location: lihat.php');
         exit;
-    } catch (Exception $e) {
+    } catch (Throwable $e) {
         $koneksi->rollback();
-        $_SESSION['flash'] = ['type' => 'error', 'msg' => 'Gagal menyimpan: ' . $e->getMessage()];
+        $_SESSION['flash'] = payment_failure_flash($e, 'Gagal menyimpan: ');
         header('Location: form.php');
         exit;
     }
@@ -1003,9 +877,9 @@ if ($aksi === 'update') {
         ];
         header('Location: lihat.php');
         exit;
-    } catch (Exception $e) {
+    } catch (Throwable $e) {
         $koneksi->rollback();
-        $_SESSION['flash'] = ['type' => 'error', 'msg' => 'Gagal memperbarui: ' . $e->getMessage()];
+        $_SESSION['flash'] = payment_failure_flash($e, 'Gagal memperbarui: ');
         header('Location: edit.php?id=' . $id);
         exit;
     }

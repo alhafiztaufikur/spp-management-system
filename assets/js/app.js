@@ -140,6 +140,7 @@ function pilihSiswaDatalist(input) {
     document.getElementById('disp-kelas').value = '';
     clearPaymentDetails();
     refreshPaymentHistory('');
+    resetSppStatusState();
     return;
   }
   
@@ -159,6 +160,7 @@ function pilihSiswaDatalist(input) {
       refreshBiayaLainBillsFromServer(nis || '');
       applyStudentPaymentDetails(opt);
       refreshPaymentHistory(nis || '');
+      scheduleSppStatusCheck(sppStatusUiReady);
       found = true;
       break;
     }
@@ -170,6 +172,7 @@ function pilihSiswaDatalist(input) {
     document.getElementById('disp-kelas').value = '';
     clearPaymentDetails();
     refreshPaymentHistory('');
+    resetSppStatusState();
   }
 }
 
@@ -994,6 +997,196 @@ function refreshOptionalOneTimeFeeAvailability() {
   });
 }
 
+let sppStatusUiReady = false;
+let sppStatusTimer = null;
+let sppStatusRequestId = 0;
+let sppStatusAbortController = null;
+let sppWarningRestoreFocus = null;
+const sppStatusState = {
+  contextKey: '',
+  pending: false,
+  payload: null,
+  lastShownKey: ''
+};
+
+function currentSppStatusContext() {
+  const noInduk = document.getElementById('disp-nis')?.value.trim() || '';
+  const bulan = document.getElementById('bulan-bayar')?.value || '';
+  const tahun = document.getElementById('tahun-bayar')?.value.trim() || '';
+  if (!noInduk || !/^\d{2}$/.test(bulan) || !/^\d{4}$/.test(tahun)) return null;
+  const editId = parseInt(window.sppEditPaymentId || 0, 10) || 0;
+  return {
+    noInduk,
+    bulan,
+    tahun,
+    editId,
+    key: [noInduk, bulan, tahun, editId].join('|')
+  };
+}
+
+function resetSppStatusState() {
+  if (sppStatusTimer) window.clearTimeout(sppStatusTimer);
+  sppStatusTimer = null;
+  if (sppStatusAbortController) sppStatusAbortController.abort();
+  sppStatusAbortController = null;
+  sppStatusRequestId += 1;
+  sppStatusState.contextKey = '';
+  sppStatusState.pending = false;
+  sppStatusState.payload = null;
+  sppStatusState.lastShownKey = '';
+}
+
+function unavailableSppStatus() {
+  return {
+    ok: false,
+    status: 'status_unavailable',
+    code: 'status_unavailable',
+    lock_spp: true,
+    title: 'Status belum tersedia',
+    message: 'Status SPP belum dapat diperiksa. Coba lagi.',
+    amount_label: ''
+  };
+}
+
+function closeSppWarning() {
+  const overlay = document.getElementById('spp-warning-overlay');
+  if (!overlay) return;
+  overlay.classList.remove('show');
+  overlay.setAttribute('aria-hidden', 'true');
+  document.body.classList.remove('spp-warning-open');
+  const focusTarget = sppWarningRestoreFocus;
+  sppWarningRestoreFocus = null;
+  if (focusTarget && typeof focusTarget.focus === 'function') focusTarget.focus();
+}
+
+function showSppWarning(status, sourceElement = null, force = false) {
+  const overlay = document.getElementById('spp-warning-overlay');
+  const title = document.getElementById('spp-warning-title');
+  const message = document.getElementById('spp-warning-message');
+  const amount = document.getElementById('spp-warning-amount');
+  const retry = document.getElementById('spp-warning-retry');
+  const close = document.getElementById('spp-warning-close');
+  if (!overlay || !title || !message || !amount || !retry || !close || !status) return;
+
+  const context = currentSppStatusContext();
+  const warningKey = (context?.key || 'flash') + '|' + (status.code || 'blocked');
+  if (!force && sppStatusState.lastShownKey === warningKey) return;
+  sppStatusState.lastShownKey = warningKey;
+  sppWarningRestoreFocus = sourceElement || document.activeElement;
+
+  title.textContent = status.title || 'SPP belum bisa dibayar';
+  message.textContent = status.message || 'Pembayaran SPP belum dapat diproses.';
+  amount.textContent = status.amount_label || '';
+  amount.hidden = !status.amount_label;
+  retry.hidden = status.code !== 'status_unavailable';
+  overlay.dataset.statusCode = status.code || 'blocked';
+  overlay.classList.add('show');
+  overlay.setAttribute('aria-hidden', 'false');
+  document.body.classList.add('spp-warning-open');
+  window.setTimeout(() => (retry.hidden ? close : retry).focus(), 0);
+}
+
+function sppEditDependencyBlocks(dependency, proposedAmount = null) {
+  if (!dependency?.original) return false;
+  const context = currentSppStatusContext();
+  if (!context) return false;
+  const original = dependency.original;
+  const contextMoved = context.noInduk !== String(original.no_induk || '')
+    || context.bulan !== String(original.bulan || '')
+    || context.tahun !== String(original.tahun || '');
+  if (contextMoved) return true;
+  if (proposedAmount === null) return false;
+  return proposedAmount + 0.001 < parseNumber(original.tariff || 0);
+}
+
+function applySppStatusPayload(payload) {
+  const selected = payload?.selected;
+  if (selected && Number.isFinite(Number(selected.tariff)) && Number.isFinite(Number(selected.paid))) {
+    setPaymentComponent('spp', Number(selected.tariff), Number(selected.paid));
+  }
+  updateTotal();
+}
+
+async function requestSppStatus(options = {}) {
+  const context = currentSppStatusContext();
+  const interactive = options.interactive === true;
+  const force = options.force === true;
+  const sourceElement = options.sourceElement || document.activeElement;
+  const urlValue = window.sppPaymentStatusUrl || '';
+  if (!context || !urlValue) {
+    resetSppStatusState();
+    refreshSppInstallmentAvailability();
+    return null;
+  }
+
+  if (!force && sppStatusState.contextKey === context.key && sppStatusState.payload && !sppStatusState.pending) {
+    const cached = sppStatusState.payload;
+    if (interactive && sppEditDependencyBlocks(cached.edit_dependency)) {
+      showSppWarning(cached.edit_dependency, sourceElement);
+    } else if (interactive && cached.status !== 'payable') {
+      showSppWarning(cached, sourceElement);
+    }
+    return cached;
+  }
+
+  if (sppStatusAbortController) sppStatusAbortController.abort();
+  sppStatusAbortController = new AbortController();
+  const requestId = ++sppStatusRequestId;
+  if (sppStatusState.contextKey !== context.key) sppStatusState.lastShownKey = '';
+  sppStatusState.contextKey = context.key;
+  sppStatusState.pending = true;
+  sppStatusState.payload = null;
+  refreshSppInstallmentAvailability();
+
+  try {
+    const url = new URL(urlValue, window.location.href);
+    url.searchParams.set('no_induk', context.noInduk);
+    url.searchParams.set('bulan', context.bulan);
+    url.searchParams.set('tahun', context.tahun);
+    if (context.editId > 0) url.searchParams.set('edit_id', String(context.editId));
+    const response = await fetch(url.toString(), {
+      headers: { 'Accept': 'application/json' },
+      cache: 'no-store',
+      signal: sppStatusAbortController.signal
+    });
+    const payload = await response.json().catch(() => null);
+    if (requestId !== sppStatusRequestId) return null;
+    if (!response.ok || !payload?.ok) throw new Error(payload?.message || 'Status SPP belum dapat diperiksa.');
+
+    sppStatusState.pending = false;
+    sppStatusState.payload = payload;
+    applySppStatusPayload(payload);
+    if (interactive && sppEditDependencyBlocks(payload.edit_dependency)) {
+      showSppWarning(payload.edit_dependency, sourceElement, force);
+    } else if (interactive && payload.status !== 'payable') {
+      showSppWarning(payload, sourceElement, force);
+    }
+    return payload;
+  } catch (error) {
+    if (error?.name === 'AbortError' || requestId !== sppStatusRequestId) return null;
+    const payload = unavailableSppStatus();
+    sppStatusState.pending = false;
+    sppStatusState.payload = payload;
+    refreshSppInstallmentAvailability();
+    if (interactive) showSppWarning(payload, sourceElement, force);
+    return payload;
+  }
+}
+
+function scheduleSppStatusCheck(interactive = true, sourceElement = null) {
+  if (sppStatusTimer) window.clearTimeout(sppStatusTimer);
+  const context = currentSppStatusContext();
+  if (!context) {
+    resetSppStatusState();
+    refreshSppInstallmentAvailability();
+    return;
+  }
+  sppStatusTimer = window.setTimeout(() => {
+    sppStatusTimer = null;
+    requestSppStatus({ interactive, sourceElement });
+  }, 220);
+}
+
 function refreshSppInstallmentAvailability() {
   const input = document.getElementById('spp-input');
   if (!input) return;
@@ -1005,24 +1198,45 @@ function refreshSppInstallmentAvailability() {
   const monthLabel = selectedPaymentMonthLabel();
   const year = document.getElementById('tahun-bayar')?.value || '';
 
+  const contextKey = currentSppStatusContext()?.key || '';
+  const hasLiveContext = contextKey && sppStatusState.contextKey === contextKey;
+  const liveStatus = hasLiveContext ? sppStatusState.payload : null;
   let lockedMessage = '';
-  if (!opt) lockedMessage = 'Pilih siswa terlebih dahulu';
-  else if (total <= 0) lockedMessage = 'Tarif SPP belum diatur';
-  else if (remaining <= 0.001) lockedMessage = 'Lunas untuk ' + monthLabel + ' ' + year;
-  else {
+  let locked = false;
+
+  if (hasLiveContext && sppStatusState.pending) {
+    locked = true;
+    lockedMessage = 'Memeriksa status SPP…';
+  } else if (liveStatus) {
+    locked = liveStatus.lock_spp === true;
+    lockedMessage = locked ? (liveStatus.message || 'Pembayaran SPP belum dapat diproses.') : '';
+    if (lockedMessage && liveStatus.amount_label) lockedMessage += ' ' + liveStatus.amount_label + '.';
+  } else if (!opt) {
+    locked = true;
+    lockedMessage = 'Pilih siswa terlebih dahulu';
+  } else if (!contextKey) {
+    locked = true;
+    lockedMessage = 'Lengkapi bulan dan tahun pembayaran';
+  } else if (total <= 0) {
+    locked = true;
+    lockedMessage = 'Tarif SPP belum diatur';
+  } else if (remaining <= 0.001) {
+    locked = true;
+    lockedMessage = 'Lunas untuk ' + monthLabel + ' ' + year;
+  } else {
     const unpaidPrior = firstUnpaidPriorSppPeriod(opt, total);
     if (unpaidPrior) {
+      locked = true;
       lockedMessage = 'SPP ' + monthLabel + ' ' + year + ' belum bisa dibayar karena ' + unpaidPrior.label + ' belum lunas';
       if (unpaidPrior.remaining > 0) lockedMessage += ' (sisa Rp ' + formatRupiah(unpaidPrior.remaining) + ')';
     }
   }
 
   const inputValue = parseNumber(input.value || 0);
-  const locked = lockedMessage !== '';
   input.readOnly = locked;
   input.classList.toggle('tbl-readonly', locked);
   if (locked) {
-    input.value = '0';
+    if (liveStatus?.lock_spp && !window.sppEditPaymentId) input.value = '0';
     input.title = lockedMessage;
     input.setCustomValidity('');
   } else {
@@ -1249,9 +1463,13 @@ document.addEventListener('DOMContentLoaded', function () {
   }
 
   document.querySelectorAll('#bulan-bayar, #tahun-bayar').forEach(el => {
-    el.addEventListener('change', refreshSelectedStudentPaymentDetails);
+    const handlePeriodChange = () => {
+      refreshSelectedStudentPaymentDetails();
+      scheduleSppStatusCheck(sppStatusUiReady, el);
+    };
+    el.addEventListener('change', handlePeriodChange);
     if (el.id === 'tahun-bayar') {
-      el.addEventListener('input', refreshSelectedStudentPaymentDetails);
+      el.addEventListener('input', handlePeriodChange);
     }
   });
 
@@ -1322,6 +1540,7 @@ document.addEventListener('DOMContentLoaded', function () {
         }
       }
       refreshSelectedStudentPaymentDetails();
+      scheduleSppStatusCheck(sppStatusUiReady, this);
     });
   }
 
@@ -1345,13 +1564,117 @@ document.addEventListener('DOMContentLoaded', function () {
     bindNumericInput(input);
   });
 
+  const sppInput = document.getElementById('spp-input');
+  if (sppInput) {
+    sppInput.addEventListener('blur', function () {
+      if (this.readOnly) return;
+      const amount = parseNumber(this.value || 0);
+      if (amount <= 0.001) return;
+      const tariff = parseNumber(document.getElementById('spp-total')?.value || 0);
+      if (tariff > 0.001 && Math.abs(amount - tariff) > 0.001) {
+        const context = currentSppStatusContext();
+        showSppWarning({
+          code: 'amount_mismatch',
+          title: 'Nominal SPP belum sesuai',
+          message: 'SPP ' + (context ? paymentPeriodLabel(context.bulan + '-' + context.tahun) : '') + ' harus dibayar penuh Rp ' + formatRupiah(tariff) + '.',
+          amount_label: 'Tagihan Rp ' + formatRupiah(tariff)
+        }, this, true);
+        return;
+      }
+      const dependency = sppStatusState.payload?.edit_dependency;
+      if (sppEditDependencyBlocks(dependency, amount)) showSppWarning(dependency, this, true);
+    });
+  }
+
+  const warningClose = document.getElementById('spp-warning-close');
+  const warningRetry = document.getElementById('spp-warning-retry');
+  warningClose?.addEventListener('click', closeSppWarning);
+  warningRetry?.addEventListener('click', function () {
+    closeSppWarning();
+    requestSppStatus({ interactive: true, force: true, sourceElement: document.getElementById('spp-input') });
+  });
+  document.addEventListener('keydown', function (event) {
+    const overlay = document.getElementById('spp-warning-overlay');
+    if (!overlay?.classList.contains('show')) return;
+    if (event.key === 'Escape') {
+      event.preventDefault();
+      closeSppWarning();
+      return;
+    }
+    if (event.key === 'Tab') {
+      const actions = Array.from(overlay.querySelectorAll('button:not([hidden]):not([disabled])'));
+      if (!actions.length) return;
+      const first = actions[0];
+      const last = actions[actions.length - 1];
+      if (event.shiftKey && document.activeElement === first) {
+        event.preventDefault();
+        last.focus();
+      } else if (!event.shiftKey && document.activeElement === last) {
+        event.preventDefault();
+        first.focus();
+      }
+    }
+  });
+
   // Clean all formatted numeric inputs right before form submission so the backend gets raw numbers
   const form = document.getElementById('form-bayar');
   if (form) {
-    form.addEventListener('submit', function () {
+    const normalizePaymentInputs = () => {
       document.querySelectorAll('.tbl-input, #potongan-spp, #kewajiban-spp, .biaya-lain-nominal').forEach(input => {
         input.value = input.value.replace(/\./g, '');
       });
+    };
+    form.addEventListener('submit', async function (event) {
+      if (form.dataset.sppSubmitting === '1') {
+        normalizePaymentInputs();
+        return;
+      }
+
+      const amount = parseNumber(document.getElementById('spp-input')?.value || 0);
+      const editOriginal = window.sppEditOriginal || null;
+      const context = currentSppStatusContext();
+      const originalChanged = !!editOriginal && !!context && (
+        context.noInduk !== String(editOriginal.no_induk || '')
+        || context.bulan !== String(editOriginal.bulan || '')
+        || context.tahun !== String(editOriginal.tahun || '')
+        || Math.abs(amount - parseNumber(editOriginal.amount || 0)) > 0.001
+      );
+      const needsFinalSppCheck = amount > 0.001 || originalChanged;
+      if (!needsFinalSppCheck) {
+        normalizePaymentInputs();
+        return;
+      }
+
+      event.preventDefault();
+      const status = await requestSppStatus({ interactive: false, force: true, sourceElement: document.getElementById('spp-input') });
+      if (!status || status.code === 'status_unavailable') {
+        showSppWarning(status || unavailableSppStatus(), document.getElementById('spp-input'), true);
+        return;
+      }
+      if (amount > 0.001 && status.status !== 'payable') {
+        showSppWarning(status, document.getElementById('spp-input'), true);
+        return;
+      }
+
+      const tariff = parseNumber(status.selected?.tariff || document.getElementById('spp-total')?.value || 0);
+      if (amount > 0.001 && Math.abs(amount - tariff) > 0.001) {
+        showSppWarning({
+          code: 'amount_mismatch',
+          title: 'Nominal SPP belum sesuai',
+          message: 'SPP ' + (status.selected?.label || '') + ' harus dibayar penuh Rp ' + formatRupiah(tariff) + '.',
+          amount_label: 'Tagihan Rp ' + formatRupiah(tariff)
+        }, document.getElementById('spp-input'), true);
+        return;
+      }
+
+      if (sppEditDependencyBlocks(status.edit_dependency, amount)) {
+        showSppWarning(status.edit_dependency, document.getElementById('spp-input'), true);
+        return;
+      }
+
+      form.dataset.sppSubmitting = '1';
+      normalizePaymentInputs();
+      form.submit();
     });
     form.addEventListener('reset', function () {
       window.setTimeout(resetForm, 0);
@@ -1360,6 +1683,10 @@ document.addEventListener('DOMContentLoaded', function () {
 
   updateTotal();
   autoHideFlash();
+  sppStatusUiReady = true;
+  if (window.sppFlashWarning) {
+    window.setTimeout(() => showSppWarning(window.sppFlashWarning, document.getElementById('spp-input'), true), 80);
+  }
 });
 
 function renumberBiayaLainRows() {
@@ -2013,6 +2340,8 @@ function formatRupiah(num) {
 
 /* ── Reset Form ──────────────────────────── */
 function resetForm() {
+  closeSppWarning();
+  resetSppStatusState();
   clearOverpaidUiState();
   const totalEl = document.getElementById('totalJumlah');
   if (totalEl) totalEl.textContent = 'Rp 0';
