@@ -7730,3 +7730,68 @@ a.btn {
     grid-column: auto;
   }
 }
+
+/* Dashboard action buttons: clean links with a restrained hover interaction. */
+.dashboard-action-strip .quick-btn {
+  position: relative;
+  isolation: isolate;
+  overflow: hidden;
+  text-decoration: none !important;
+  transition: transform .2s ease, box-shadow .2s ease, filter .2s ease, border-color .2s ease, background-color .2s ease;
+}
+
+.dashboard-action-strip .quick-btn::before {
+  position: absolute;
+  inset: 0;
+  z-index: -1;
+  content: '';
+  background: linear-gradient(112deg, transparent 20%, rgba(255, 255, 255, .18) 48%, transparent 76%);
+  pointer-events: none;
+  transform: translateX(-130%);
+  transition: transform .45s ease;
+}
+
+.dashboard-action-strip .quick-btn:hover {
+  filter: brightness(1.04);
+  transform: translateY(-2px);
+  box-shadow: 0 10px 22px rgba(15, 23, 42, .14);
+}
+
+.dashboard-action-strip .quick-btn:hover::before {
+  transform: translateX(130%);
+}
+
+.dashboard-action-strip .quick-btn svg {
+  transition: transform .2s ease;
+}
+
+.dashboard-action-strip .quick-btn:hover svg {
+  transform: translateX(2px) scale(1.04);
+}
+
+.dashboard-action-strip .quick-btn:focus-visible {
+  outline: 3px solid var(--accent-glow);
+  outline-offset: 3px;
+}
+
+.dashboard-action-strip .quick-btn:active {
+  transform: translateY(0) scale(.985);
+}
+
+@media (prefers-reduced-motion: reduce) {
+  .dashboard-action-strip .quick-btn,
+  .dashboard-action-strip .quick-btn::before,
+  .dashboard-action-strip .quick-btn svg {
+    transition: none;
+  }
+
+  .dashboard-action-strip .quick-btn:hover,
+  .dashboard-action-strip .quick-btn:active,
+  .dashboard-action-strip .quick-btn:hover svg {
+    transform: none;
+  }
+
+  .dashboard-action-strip .quick-btn::before {
+    display: none;
+  }
+}
