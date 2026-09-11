@@ -1445,9 +1445,117 @@ function bindNumericInput(input) {
   });
 }
 
+function initPromotionBatchSelector() {
+  const form = document.getElementById('promotion-batch-form');
+  if (!form || form.dataset.promotionReady === '1') return;
+
+  const search = document.getElementById('promotion-batch-search');
+  const sourceFilter = document.getElementById('promotion-source-filter');
+  const rows = Array.from(form.querySelectorAll('[data-promotion-student]'));
+  const emptyState = document.getElementById('promotion-empty-filter');
+  const visibleCount = document.getElementById('promotion-visible-count');
+  const selectedCount = document.getElementById('promotion-selected-count');
+  const submitSummary = document.getElementById('promotion-submit-summary');
+  const submitButton = document.getElementById('promotion-submit-button');
+  const selectVisible = document.getElementById('promotion-select-visible');
+  const selectAll = document.getElementById('promotion-select-all');
+  const clearSelection = document.getElementById('promotion-clear-selection');
+  const actionLabel = form.dataset.promotionAction || 'Proses';
+  form.dataset.promotionReady = '1';
+
+  const normalize = value => (value || '').toLocaleLowerCase('id-ID').trim();
+  const checkboxFor = row => row.querySelector('input[type="checkbox"][name="selected_students[]"]');
+  const selectedRows = () => rows.filter(row => checkboxFor(row)?.checked);
+
+  const updateSelection = () => {
+    const selected = selectedRows();
+    rows.forEach(row => {
+      const isSelected = !!checkboxFor(row)?.checked;
+      const target = row.querySelector('select[name^="target_master_kelas_id"]');
+      row.classList.toggle('is-selected', isSelected);
+      if (target) target.disabled = !isSelected;
+    });
+    if (selectedCount) selectedCount.textContent = selected.length + ' siswa dipilih';
+    if (submitSummary) {
+      submitSummary.textContent = selected.length > 0
+        ? selected.length + ' siswa siap diproses'
+        : 'Belum ada siswa dipilih';
+    }
+    if (submitButton) {
+      submitButton.disabled = selected.length === 0;
+      submitButton.textContent = actionLabel + ' ' + selected.length + ' Siswa';
+    }
+  };
+
+  const filterRows = () => {
+    const query = normalize(search?.value);
+    const source = sourceFilter?.value || '';
+    let shown = 0;
+    rows.forEach(row => {
+      const matchesSearch = !query || normalize(row.dataset.search).includes(query);
+      const matchesSource = !source || row.dataset.sourceRombel === source;
+      const visible = matchesSearch && matchesSource;
+      row.hidden = !visible;
+      if (visible) shown++;
+    });
+    if (visibleCount) visibleCount.textContent = shown + ' siswa ditampilkan';
+    if (emptyState) emptyState.hidden = shown !== 0;
+  };
+
+  search?.addEventListener('input', filterRows);
+  sourceFilter?.addEventListener('change', filterRows);
+  rows.forEach(row => checkboxFor(row)?.addEventListener('change', updateSelection));
+  selectVisible?.addEventListener('click', function () {
+    rows.filter(row => !row.hidden).forEach(row => {
+      const checkbox = checkboxFor(row);
+      if (checkbox) checkbox.checked = true;
+    });
+    updateSelection();
+  });
+  selectAll?.addEventListener('click', function () {
+    rows.forEach(row => {
+      const checkbox = checkboxFor(row);
+      if (checkbox) checkbox.checked = true;
+    });
+    updateSelection();
+  });
+  clearSelection?.addEventListener('click', function () {
+    rows.forEach(row => {
+      const checkbox = checkboxFor(row);
+      if (checkbox) checkbox.checked = false;
+    });
+    updateSelection();
+  });
+
+  form.addEventListener('submit', function (event) {
+    const selected = selectedRows();
+    if (selected.length === 0) {
+      event.preventDefault();
+      return;
+    }
+    const missingTargets = selected.filter(row => {
+      const target = row.querySelector('select[name^="target_master_kelas_id"]');
+      return target && !target.value;
+    }).length;
+    let message = actionLabel + ' ' + selected.length + ' siswa untuk tahun ajaran yang dituju?';
+    if (missingTargets > 0) {
+      message += '\n\n' + missingTargets + ' siswa belum memiliki rombel tujuan dan akan dilewati.';
+    }
+    if (!window.confirm(message)) {
+      event.preventDefault();
+      return;
+    }
+    if (submitButton) submitButton.disabled = true;
+  });
+
+  filterRows();
+  updateSelection();
+}
+
 // Auto-fill on page load (edit page) & bind number formatting
 document.addEventListener('DOMContentLoaded', function () {
   initStudentSearchCombobox();
+  initPromotionBatchSelector();
 
   const sel = document.getElementById('siswa-select');
   if (sel && sel.value) pilihSiswa(sel);
@@ -2174,7 +2282,7 @@ function initReportMonthRangePickers() {
     const syncLabel = () => {
       const start = paymentMonthLabelByCode(parseNumber(hiddenStart.value));
       const end = paymentMonthLabelByCode(parseNumber(hiddenEnd.value));
-      valueLabel.textContent = hiddenStart.value && hiddenEnd.value ? start + ' sampai ' + end : (picker.dataset.emptyLabel || 'Pilih bulan tagihan');
+      valueLabel.textContent = hiddenStart.value && hiddenEnd.value ? start + ' - ' + end : (picker.dataset.emptyLabel || 'Pilih bulan tagihan');
     };
     const syncInputs = () => {
       startInput.value = hiddenStart.value;
@@ -2224,7 +2332,7 @@ function initReportYearRangePickers() {
 
     const syncLabel = () => {
       valueLabel.textContent = hiddenStart.value && hiddenEnd.value
-        ? hiddenStart.value + ' sampai ' + hiddenEnd.value
+        ? hiddenStart.value + ' - ' + hiddenEnd.value
         : (picker.dataset.emptyLabel || 'Pilih tahun tagihan');
     };
     const syncInputs = () => {

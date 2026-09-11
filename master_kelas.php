@@ -20,9 +20,27 @@ if ($_SERVER['REQUEST_METHOD'] === 'POST') {
         }
         $action = (string)($_POST['aksi'] ?? '');
         $id = (int)($_POST['id'] ?? 0);
+        $flashType = 'success';
         if ($action === 'template_aj') {
             $created = class_ensure_rombel_templates($koneksi);
             $message = $created > 0 ? $created . ' kelas/template PSB dan rombel A-J berhasil ditambahkan.' : 'Kelas PSB dan template rombel A-J sudah lengkap.';
+        } elseif ($action === 'proses_siswa_batch') {
+            $targetYear = (string)($_POST['target_tahun_ajaran'] ?? class_next_academic_year_label(du_current_academic_year()));
+            $expectedLevel = (int)($_POST['expected_level'] ?? 0);
+            $selectedStudents = is_array($_POST['selected_students'] ?? null) ? $_POST['selected_students'] : [];
+            $targetClassIds = is_array($_POST['target_master_kelas_id'] ?? null) ? $_POST['target_master_kelas_id'] : [];
+            $koneksi->begin_transaction();
+            $batchResult = class_process_students_batch($koneksi, $selectedStudents, $targetClassIds, $targetYear, $expectedLevel);
+            $koneksi->commit();
+            $_SESSION['promotion_batch_result'] = $batchResult;
+            $successCount = count($batchResult['successes']);
+            $failureCount = count($batchResult['failures']);
+            $verb = $expectedLevel === 6 ? 'diluluskan' : 'dinaikkan';
+            $message = $successCount . ' siswa berhasil ' . $verb . '.';
+            if ($failureCount > 0) {
+                $message .= ' ' . $failureCount . ' siswa belum berhasil diproses.';
+                $flashType = $successCount > 0 ? 'warning' : 'error';
+            }
         } elseif ($action === 'luluskan_siswa') {
             $targetYear = (string)($_POST['target_tahun_ajaran'] ?? class_next_academic_year_label(du_current_academic_year()));
             $koneksi->begin_transaction();
@@ -85,7 +103,7 @@ if ($_SERVER['REQUEST_METHOD'] === 'POST') {
         } else {
             throw new RuntimeException('Aksi Master Kelas tidak dikenali.');
         }
-        $_SESSION['flash'] = ['type' => 'success', 'msg' => $message];
+        $_SESSION['flash'] = ['type' => $flashType, 'msg' => $message];
     } catch (Throwable $error) {
         try { $koneksi->rollback(); } catch (Throwable $ignored) {}
         $_SESSION['flash'] = ['type' => 'error', 'msg' => $error->getMessage()];
@@ -95,6 +113,8 @@ if ($_SERVER['REQUEST_METHOD'] === 'POST') {
 
 $flash = $_SESSION['flash'] ?? null;
 unset($_SESSION['flash']);
+$promotionBatchResult = $_SESSION['promotion_batch_result'] ?? null;
+unset($_SESSION['promotion_batch_result']);
 $nextAcademicYear = class_next_academic_year_label(du_current_academic_year());
 $editId = (int)($_GET['edit'] ?? 0);
 $editClass = $editId > 0 ? class_find($koneksi, $editId) : null;
@@ -103,6 +123,21 @@ $promotionStudents = class_students_for_manual_step($koneksi, $currentPromotionL
 $promotionTargets = $currentPromotionLevel >= 1 && $currentPromotionLevel <= 5
     ? class_target_rombel_options($koneksi, $currentPromotionLevel + 1)
     : [];
+$promotionSourceRombels = [];
+foreach ($promotionStudents as &$promotionStudent) {
+    $sourceClassId = (int)($promotionStudent['master_kelas_id'] ?? 0);
+    $sourceKey = $sourceClassId > 0 ? 'id:' . $sourceClassId : 'label:' . $promotionStudent['kelas_label'];
+    $promotionStudent['source_key'] = $sourceKey;
+    if (!isset($promotionSourceRombels[$sourceKey])) {
+        $promotionSourceRombels[$sourceKey] = ['label' => $promotionStudent['kelas_label'], 'count' => 0];
+    }
+    $promotionSourceRombels[$sourceKey]['count']++;
+}
+unset($promotionStudent);
+$promotionTargetByCode = [];
+foreach ($promotionTargets as $target) {
+    $promotionTargetByCode[strtoupper((string)$target['kode_rombel'])] = (int)$target['id'];
+}
 $classes = $koneksi->query("SELECT mk.*,
     (SELECT COUNT(*) FROM siswa s WHERE s.master_kelas_id = mk.id AND s.is_active=1) AS siswa_count,
     (SELECT COUNT(*) FROM siswa_tahun_ajaran sta WHERE sta.master_kelas_id = mk.id) AS history_count
@@ -142,7 +177,7 @@ $classFilterQuery = ['q_kelas' => $classSearch, 'tingkat_kelas' => $classLevelFi
   <meta charset="UTF-8"><meta name="viewport" content="width=device-width,initial-scale=1.0">
   <title>Master Kelas | SistemSPP</title>
   <link rel="icon" type="image/png" href="assets/img/favicon.png?v=2">
-  <link rel="stylesheet" href="assets/css/style.css?v=8.7">
+  <link rel="stylesheet" href="assets/css/style.css?v=9.6">
   <script>(function(){var t=localStorage.getItem('spp_theme')||'dark';document.documentElement.setAttribute('data-theme',t);})();</script>
 </head>
 <body>
@@ -185,25 +220,58 @@ $classFilterQuery = ['q_kelas' => $classSearch, 'tingkat_kelas' => $classLevelFi
 
     <div class="main-card master-modern-card">
       <div class="card-title-row"><div><div class="card-title">Proses Tahun Ajaran</div><p class="payment-auto-note">Kenaikan dijalankan manual per siswa. Sistem mengunci urutan dari kelas tertinggi lebih dulu.</p></div></div>
-      <div class="action-bar master-promotion-actions">
-        <?php if($currentPromotionLevel === 6): ?>
-        <form method="post" class="report-filter-grid" onsubmit="return confirm('Luluskan siswa kelas 6 yang dipilih untuk tahun ajaran <?= htmlspecialchars($nextAcademicYear) ?>?')">
+      <?php if ($promotionBatchResult): ?>
+      <div class="promotion-batch-result <?= count($promotionBatchResult['failures']) > 0 ? 'has-failures' : '' ?>">
+        <div><strong><?= number_format(count($promotionBatchResult['successes'])) ?> berhasil</strong><span>dari <?= number_format((int)$promotionBatchResult['attempted']) ?> siswa yang dipilih.</span></div>
+        <?php if ($promotionBatchResult['failures']): ?>
+        <details><summary>Lihat <?= number_format(count($promotionBatchResult['failures'])) ?> siswa yang belum berhasil</summary><ul><?php foreach ($promotionBatchResult['failures'] as $failure): ?><li><strong><?= htmlspecialchars($failure['student']) ?></strong><span><?= htmlspecialchars($failure['reason']) ?></span></li><?php endforeach; ?></ul></details>
+        <?php endif; ?>
+      </div>
+      <?php endif; ?>
+      <div class="master-promotion-actions">
+        <?php if($currentPromotionLevel >= 1 && $currentPromotionLevel <= 6): ?>
+        <form method="post" id="promotion-batch-form" class="promotion-batch-form" data-promotion-action="<?= $currentPromotionLevel === 6 ? 'Luluskan' : 'Naikkan' ?>">
           <input type="hidden" name="csrf_token" value="<?= htmlspecialchars($_SESSION['csrf_master_kelas']) ?>">
-          <input type="hidden" name="aksi" value="luluskan_siswa">
+          <input type="hidden" name="aksi" value="proses_siswa_batch">
           <input type="hidden" name="target_tahun_ajaran" value="<?= htmlspecialchars($nextAcademicYear) ?>">
-          <div class="field-row"><label class="field-label">Tahap Aktif</label><input class="field-input" value="Luluskan kelas 6 terlebih dahulu" readonly></div>
-          <?php $defaultPromotionStudent=$promotionStudents[0]??null; ?><div class="field-row master-promotion-student"><label class="field-label" for="promotion-student-search">Siswa Kelas 6</label><div class="search-box"><svg width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.5" stroke-linecap="round" stroke-linejoin="round"><circle cx="11" cy="11" r="8"/><line x1="21" y1="21" x2="16.65" y2="16.65"/></svg><input type="text" id="promotion-student-search" data-student-search data-student-list="promotion-student-list" data-student-select-callback="selectPromotionStudent" data-student-query-target="promotion-student-value" data-student-query-exact="1" value="<?= htmlspecialchars((string)($defaultPromotionStudent['NAMA']??'')) ?>" placeholder="Cari nama atau NIS siswa..." autocomplete="off"><input type="hidden" id="promotion-student-value" name="no_induk" value="<?= htmlspecialchars((string)($defaultPromotionStudent['NO_INDUK']??'')) ?>" required></div><datalist id="promotion-student-list"><?php foreach($promotionStudents as $student): ?><option value="<?= htmlspecialchars($student['NAMA']) ?>" data-nis="<?= htmlspecialchars($student['NO_INDUK']) ?>" data-nama="<?= htmlspecialchars($student['NAMA']) ?>" data-kelas="<?= htmlspecialchars($student['kelas_label']) ?>"><?= htmlspecialchars($student['NAMA']) ?></option><?php endforeach; ?></datalist></div>
-          <button class="btn btn-primary" type="submit">Luluskan Siswa</button>
-        </form>
-        <?php elseif($currentPromotionLevel >= 1 && $currentPromotionLevel <= 5): ?>
-        <form method="post" class="report-filter-grid" onsubmit="return confirm('Naikkan siswa yang dipilih ke rombel target untuk tahun ajaran <?= htmlspecialchars($nextAcademicYear) ?>?')">
-          <input type="hidden" name="csrf_token" value="<?= htmlspecialchars($_SESSION['csrf_master_kelas']) ?>">
-          <input type="hidden" name="aksi" value="naikkan_siswa">
-          <input type="hidden" name="target_tahun_ajaran" value="<?= htmlspecialchars($nextAcademicYear) ?>">
-          <div class="field-row"><label class="field-label">Tahap Aktif</label><input class="field-input" value="Naikkan kelas <?= (int)$currentPromotionLevel ?> ke kelas <?= (int)$currentPromotionLevel + 1 ?>" readonly></div>
-          <?php $defaultPromotionStudent=$promotionStudents[0]??null; ?><div class="field-row master-promotion-student"><label class="field-label" for="promotion-student-search">Siswa</label><div class="search-box"><svg width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.5" stroke-linecap="round" stroke-linejoin="round"><circle cx="11" cy="11" r="8"/><line x1="21" y1="21" x2="16.65" y2="16.65"/></svg><input type="text" id="promotion-student-search" data-student-search data-student-list="promotion-student-list" data-student-select-callback="selectPromotionStudent" data-student-query-target="promotion-student-value" data-student-query-exact="1" value="<?= htmlspecialchars((string)($defaultPromotionStudent['NAMA']??'')) ?>" placeholder="Cari nama atau NIS siswa..." autocomplete="off"><input type="hidden" id="promotion-student-value" name="no_induk" value="<?= htmlspecialchars((string)($defaultPromotionStudent['NO_INDUK']??'')) ?>" required></div><datalist id="promotion-student-list"><?php foreach($promotionStudents as $student): ?><option value="<?= htmlspecialchars($student['NAMA']) ?>" data-nis="<?= htmlspecialchars($student['NO_INDUK']) ?>" data-nama="<?= htmlspecialchars($student['NAMA']) ?>" data-kelas="<?= htmlspecialchars($student['kelas_label']) ?>"><?= htmlspecialchars($student['NAMA']) ?></option><?php endforeach; ?></datalist></div>
-          <div class="field-row"><label class="field-label">Rombel Target</label><select class="field-input field-select" name="target_master_kelas_id" required><?php foreach($promotionTargets as $target): ?><option value="<?= (int)$target['id'] ?>"><?= htmlspecialchars($target['label']) ?></option><?php endforeach; ?></select></div>
-          <button class="btn btn-primary" type="submit">Naikkan Siswa</button>
+          <input type="hidden" name="expected_level" value="<?= (int)$currentPromotionLevel ?>">
+
+          <div class="promotion-stage-overview">
+            <div><span>Tahap Aktif</span><strong><?= $currentPromotionLevel === 6 ? 'Kelulusan Kelas 6' : 'Kenaikan Kelas ' . (int)$currentPromotionLevel ?></strong></div>
+            <div><span>Siswa Tersisa</span><strong><?= number_format(count($promotionStudents)) ?> siswa</strong></div>
+            <div><span>Tahun Ajaran Tujuan</span><strong><?= htmlspecialchars($nextAcademicYear) ?></strong></div>
+          </div>
+
+          <div class="promotion-filter-bar">
+            <div class="field-row promotion-search-field"><label class="field-label" for="promotion-batch-search">Cari Siswa</label><div class="search-box"><svg width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.5" stroke-linecap="round" stroke-linejoin="round"><circle cx="11" cy="11" r="8"/><line x1="21" y1="21" x2="16.65" y2="16.65"/></svg><input type="search" id="promotion-batch-search" placeholder="Ketik nama, NIS, atau NIS Diknas..." autocomplete="off"></div></div>
+            <div class="field-row"><label class="field-label" for="promotion-source-filter">Rombel Asal</label><select class="field-input field-select" id="promotion-source-filter"><option value="">Semua Rombel (<?= number_format(count($promotionStudents)) ?>)</option><?php foreach($promotionSourceRombels as $sourceKey => $source): ?><option value="<?= htmlspecialchars($sourceKey) ?>"><?= htmlspecialchars($source['label']) ?> (<?= number_format($source['count']) ?>)</option><?php endforeach; ?></select></div>
+          </div>
+
+          <div class="promotion-selection-toolbar">
+            <div><strong id="promotion-visible-count"><?= number_format(count($promotionStudents)) ?> siswa ditampilkan</strong><span id="promotion-selected-count">0 siswa dipilih</span></div>
+            <div><button class="btn btn-ghost" type="button" id="promotion-select-visible">Pilih yang Tampil</button><button class="btn btn-ghost" type="button" id="promotion-select-all">Pilih Semua Tahap Ini</button><button class="btn btn-ghost" type="button" id="promotion-clear-selection">Kosongkan Pilihan</button></div>
+          </div>
+
+          <div class="promotion-student-list" id="promotion-student-list">
+            <?php foreach($promotionStudents as $index => $student):
+              $studentNis = (string)$student['NO_INDUK'];
+              $studentDiknas = trim((string)($student['NO_induk_diknas'] ?? ''));
+              $defaultTargetId = $currentPromotionLevel < 6 ? ($promotionTargetByCode[strtoupper((string)($student['kode_rombel'] ?? ''))] ?? 0) : 0;
+              $searchText = strtolower(trim($student['NAMA'] . ' ' . $studentNis . ' ' . $studentDiknas . ' ' . $student['kelas_label']));
+            ?>
+            <article class="promotion-student-row" data-promotion-student data-source-rombel="<?= htmlspecialchars($student['source_key']) ?>" data-search="<?= htmlspecialchars($searchText) ?>">
+              <label class="promotion-student-check" for="promotion-student-<?= (int)$index ?>"><input type="checkbox" id="promotion-student-<?= (int)$index ?>" name="selected_students[]" value="<?= htmlspecialchars($studentNis) ?>"><span></span></label>
+              <label class="promotion-student-identity" for="promotion-student-<?= (int)$index ?>"><strong><?= htmlspecialchars($student['NAMA']) ?></strong><small>NIS <?= htmlspecialchars($studentNis) ?><?= $studentDiknas !== '' ? ' · NIS Diknas ' . htmlspecialchars($studentDiknas) : '' ?></small></label>
+              <span class="kelas-badge"><?= htmlspecialchars($student['kelas_label']) ?></span>
+              <?php if($currentPromotionLevel < 6): ?>
+              <div class="promotion-target-field"><label for="promotion-target-<?= (int)$index ?>">Rombel Tujuan</label><select class="field-input field-select" id="promotion-target-<?= (int)$index ?>" name="target_master_kelas_id[<?= htmlspecialchars($studentNis) ?>]" disabled><option value="">Pilih rombel</option><?php foreach($promotionTargets as $target): ?><option value="<?= (int)$target['id'] ?>" <?= $defaultTargetId === (int)$target['id'] ? 'selected' : '' ?>><?= htmlspecialchars($target['label']) ?></option><?php endforeach; ?></select></div>
+              <?php endif; ?>
+            </article>
+            <?php endforeach; ?>
+            <div class="promotion-empty-filter" id="promotion-empty-filter" hidden>Tidak ada siswa yang cocok dengan pencarian atau rombel ini.</div>
+          </div>
+
+          <div class="promotion-submit-bar"><div><strong id="promotion-submit-summary">Belum ada siswa dipilih</strong><span><?= $currentPromotionLevel === 6 ? 'Siswa terpilih akan diarsipkan sebagai lulusan.' : 'Rombel tujuan dapat diatur berbeda untuk setiap siswa.' ?></span></div><button class="btn btn-primary" id="promotion-submit-button" type="submit" disabled><?= $currentPromotionLevel === 6 ? 'Luluskan' : 'Naikkan' ?> 0 Siswa</button></div>
         </form>
         <?php else: ?>
         <div class="alert alert-info" style="margin:0">Tidak ada siswa reguler aktif yang perlu diproses. Siswa PSB tidak ikut kenaikan kelas.</div>
@@ -247,5 +315,5 @@ $classFilterQuery = ['q_kelas' => $classSearch, 'tingkat_kelas' => $classLevelFi
     </div>
   </main>
 </div>
-<script src="assets/js/app.js?v=7.5"></script><script>window.selectPromotionStudent=function(input,opt){input.value=opt.dataset.nama||opt.value||'';var target=document.getElementById('promotion-student-value');if(target)target.value=opt.dataset.nis||'';};document.addEventListener('DOMContentLoaded',function(){autoHideFlash();});</script>
+<script src="assets/js/app.js?v=7.6"></script><script>document.addEventListener('DOMContentLoaded',function(){autoHideFlash();});</script>
 </body></html>

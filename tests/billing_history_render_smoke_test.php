@@ -44,7 +44,7 @@ try {
     if (!str_contains($html, 'rincian tagihan')) {
         throw new RuntimeException('Jumlah rincian tagihan tidak ditampilkan.');
     }
-    if (!str_contains($html, 'assets/css/style.css?v=9.0')) {
+    if (!str_contains($html, 'assets/css/style.css?v=9.6')) {
         throw new RuntimeException('Versi cache stylesheet laporan belum diperbarui.');
     }
 

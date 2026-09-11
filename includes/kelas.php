@@ -74,7 +74,7 @@ function class_highest_active_regular_level(mysqli $db): int {
 
 function class_students_for_manual_step(mysqli $db, int $level): array {
     if ($level < 1 || $level > 6) return [];
-    $stmt = $db->prepare("SELECT s.NO_INDUK, s.NAMA, s.KELAS, s.master_kelas_id,
+    $stmt = $db->prepare("SELECT s.NO_INDUK, s.NO_induk_diknas, s.NAMA, s.KELAS, s.master_kelas_id,
         s.SPP_PERBULAN, s.POMG, mk.tingkat, mk.kode_rombel, mk.is_placeholder
         FROM siswa s
         LEFT JOIN master_kelas mk ON mk.id = s.master_kelas_id
@@ -103,6 +103,88 @@ function class_target_rombel_options(mysqli $db, int $level): array {
     foreach ($rows as &$row) $row['label'] = class_label($row);
     unset($row);
     return $rows;
+}
+
+function class_process_students_batch(
+    mysqli $db,
+    array $selectedStudents,
+    array $targetClassIds,
+    string $targetYear,
+    int $expectedLevel
+): array {
+    $targetYear = du_normalize_academic_year($targetYear);
+    if ($expectedLevel < 1 || $expectedLevel > 6) {
+        throw new RuntimeException('Tahap proses tahun ajaran tidak valid. Muat ulang halaman lalu coba kembali.');
+    }
+
+    $selected = [];
+    foreach ($selectedStudents as $noInduk) {
+        if (!is_scalar($noInduk)) continue;
+        $noInduk = trim((string)$noInduk);
+        if ($noInduk !== '') $selected[$noInduk] = true;
+    }
+    $selected = array_keys($selected);
+    if (!$selected) throw new RuntimeException('Pilih minimal satu siswa yang akan diproses.');
+
+    // Lock siswa reguler aktif agar dua proses tahun ajaran tidak berjalan bersamaan.
+    $lockedStudents = $db->query("SELECT s.NO_INDUK, s.NAMA,
+        COALESCE(mk.tingkat, CAST(s.KELAS AS UNSIGNED)) AS current_level
+        FROM siswa s
+        LEFT JOIN master_kelas mk ON mk.id = s.master_kelas_id
+        WHERE s.is_active = 1
+          AND COALESCE(mk.tingkat, CAST(s.KELAS AS UNSIGNED)) BETWEEN 1 AND 6
+        FOR UPDATE")->fetch_all(MYSQLI_ASSOC);
+
+    $currentLevel = 0;
+    $eligible = [];
+    foreach ($lockedStudents as $student) {
+        $level = (int)$student['current_level'];
+        $currentLevel = max($currentLevel, $level);
+        if ($level === $expectedLevel) $eligible[(string)$student['NO_INDUK']] = $student;
+    }
+    if ($currentLevel !== $expectedLevel) {
+        throw new RuntimeException('Tahap aktif sudah berubah. Muat ulang halaman sebelum melanjutkan proses tahun ajaran.');
+    }
+
+    $successes = [];
+    $failures = [];
+    foreach ($selected as $noInduk) {
+        $student = $eligible[$noInduk] ?? null;
+        $studentName = (string)($student['NAMA'] ?? $noInduk);
+        if (!$student) {
+            $failures[] = ['no_induk' => $noInduk, 'student' => $studentName, 'reason' => 'Siswa tidak berada pada tahap kelas yang sedang aktif.'];
+            continue;
+        }
+
+        $db->query('SAVEPOINT class_batch_student');
+        try {
+            if ($expectedLevel === 6) {
+                $result = class_manual_graduate_student($db, $noInduk, $targetYear);
+            } else {
+                $targetClassId = (int)($targetClassIds[$noInduk] ?? 0);
+                if ($targetClassId <= 0) throw new RuntimeException('Rombel tujuan belum dipilih.');
+                $result = class_manual_promote_student($db, $noInduk, $targetClassId, $targetYear);
+            }
+            $successes[] = $result;
+            $db->query('RELEASE SAVEPOINT class_batch_student');
+        } catch (Throwable $error) {
+            $db->query('ROLLBACK TO SAVEPOINT class_batch_student');
+            $db->query('RELEASE SAVEPOINT class_batch_student');
+            $failures[] = [
+                'no_induk' => $noInduk,
+                'student' => $studentName,
+                'reason' => $error->getMessage(),
+            ];
+        }
+    }
+
+    return [
+        'level' => $expectedLevel,
+        'target_year' => $targetYear,
+        'attempted' => count($selected),
+        'successes' => $successes,
+        'failures' => $failures,
+    ];
 }
 
 function class_manual_graduate_student(mysqli $db, string $noInduk, string $targetYear): array {
