@@ -66,10 +66,6 @@ $allNavItems = [
    '<path d="M3 3v18h18"/><path d="M7 15l3-3 3 2 5-6"/><path d="M7 19h12"/>',
    ['admin', 'bendahara', 'kasir'], 'Laporan'],
 
-  ['laporan/rekap_kelas.php', 'Rekap per Kelas',
-   '<path d="M3 3h18v18H3z"/><path d="M3 9h18M9 3v18"/>',
-   ['admin', 'bendahara'], 'Laporan'],
-
   ['role_management.php', 'Role Management',
    '<path d="M16 21v-2a4 4 0 0 0-4-4H6a4 4 0 0 0-4 4v2"/><circle cx="9" cy="7" r="4"/><line x1="19" y1="8" x2="19" y2="14"/><line x1="22" y1="11" x2="16" y2="11"/>',
    ['admin'], 'Pengaturan'],
@@ -94,7 +90,6 @@ $shortLabels = [
   'Riwayat Tabungan'  => 'Riwayat',
   'Laporan Umum'      => 'Umum',
   'Laporan Global'    => 'Global',
-  'Rekap per Kelas'   => 'Rekap',
 ];
 
 // Role label
@@ -122,8 +117,7 @@ $roleAvatar = $roleAvatars[$role] ?? 'US';
     <?php $lastSection = null; ?>
     <?php foreach ($navItems as [$href, $label, $icon, $roles, $section]):
       $isGlobalDetail = $href === 'laporan/global.php' && in_array($current, ['template.php','export_global.php'], true);
-      $isRecapDetail = $href === 'laporan/rekap_kelas.php' && $current === 'detail_siswa.php';
-      $isActive = (strpos($_SERVER['PHP_SELF'], str_replace('../', '', $href)) !== false || $isGlobalDetail || $isRecapDetail) ? 'active' : '';
+      $isActive = (strpos($_SERVER['PHP_SELF'], str_replace('../', '', $href)) !== false || $isGlobalDetail) ? 'active' : '';
     ?>
     <?php if ($section !== $lastSection): $lastSection = $section; ?>
     <div class="nav-section-label"><?= htmlspecialchars($section) ?></div>
@@ -167,8 +161,7 @@ $roleAvatar = $roleAvatars[$role] ?? 'US';
 <nav class="bottom-nav">
   <?php foreach ($navItems as [$href, $label, $icon, $roles, $section]):
     $isGlobalDetail = $href === 'laporan/global.php' && in_array($current, ['template.php','export_global.php'], true);
-    $isRecapDetail = $href === 'laporan/rekap_kelas.php' && $current === 'detail_siswa.php';
-    $isActive   = (strpos($_SERVER['PHP_SELF'], str_replace('../', '', $href)) !== false || $isGlobalDetail || $isRecapDetail) ? 'active' : '';
+    $isActive   = (strpos($_SERVER['PHP_SELF'], str_replace('../', '', $href)) !== false || $isGlobalDetail) ? 'active' : '';
     $shortLabel = $shortLabels[$label] ?? $label;
   ?>
   <a href="<?= $root . $href ?>" class="bottom-nav-item <?= $isActive ?>">

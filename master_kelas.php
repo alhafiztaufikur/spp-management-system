@@ -129,11 +129,25 @@ foreach ($promotionStudents as &$promotionStudent) {
     $sourceKey = $sourceClassId > 0 ? 'id:' . $sourceClassId : 'label:' . $promotionStudent['kelas_label'];
     $promotionStudent['source_key'] = $sourceKey;
     if (!isset($promotionSourceRombels[$sourceKey])) {
-        $promotionSourceRombels[$sourceKey] = ['label' => $promotionStudent['kelas_label'], 'count' => 0];
+        $promotionSourceRombels[$sourceKey] = [
+            'label' => $promotionStudent['kelas_label'],
+            'code' => strtoupper(trim((string)($promotionStudent['kode_rombel'] ?? ''))),
+            'count' => 0,
+        ];
     }
     $promotionSourceRombels[$sourceKey]['count']++;
 }
 unset($promotionStudent);
+$promotionDefaultSourceKey = '';
+foreach ($promotionSourceRombels as $sourceKey => $source) {
+    if (($source['code'] ?? '') === 'A') {
+        $promotionDefaultSourceKey = (string)$sourceKey;
+        break;
+    }
+}
+if ($promotionDefaultSourceKey === '' && $promotionSourceRombels) {
+    $promotionDefaultSourceKey = (string)array_key_first($promotionSourceRombels);
+}
 $promotionTargetByCode = [];
 foreach ($promotionTargets as $target) {
     $promotionTargetByCode[strtoupper((string)$target['kode_rombel'])] = (int)$target['id'];
@@ -244,12 +258,12 @@ $classFilterQuery = ['q_kelas' => $classSearch, 'tingkat_kelas' => $classLevelFi
 
           <div class="promotion-filter-bar">
             <div class="field-row promotion-search-field"><label class="field-label" for="promotion-batch-search">Cari Siswa</label><div class="search-box"><svg width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.5" stroke-linecap="round" stroke-linejoin="round"><circle cx="11" cy="11" r="8"/><line x1="21" y1="21" x2="16.65" y2="16.65"/></svg><input type="search" id="promotion-batch-search" placeholder="Ketik nama, NIS, atau NIS Diknas..." autocomplete="off"></div></div>
-            <div class="field-row"><label class="field-label" for="promotion-source-filter">Rombel Asal</label><select class="field-input field-select" id="promotion-source-filter"><option value="">Semua Rombel (<?= number_format(count($promotionStudents)) ?>)</option><?php foreach($promotionSourceRombels as $sourceKey => $source): ?><option value="<?= htmlspecialchars($sourceKey) ?>"><?= htmlspecialchars($source['label']) ?> (<?= number_format($source['count']) ?>)</option><?php endforeach; ?></select></div>
+            <div class="field-row"><label class="field-label" for="promotion-source-filter">Rombel Asal</label><select class="field-input field-select" id="promotion-source-filter"><?php if($currentPromotionLevel === 6): ?><option value="">Semua Rombel (<?= number_format(count($promotionStudents)) ?>)</option><?php endif; ?><?php foreach($promotionSourceRombels as $sourceKey => $source): ?><option value="<?= htmlspecialchars($sourceKey) ?>" <?= $promotionDefaultSourceKey === (string)$sourceKey ? 'selected' : '' ?>><?= htmlspecialchars($source['label']) ?> (<?= number_format($source['count']) ?>)</option><?php endforeach; ?></select></div>
           </div>
 
           <div class="promotion-selection-toolbar">
             <div><strong id="promotion-visible-count"><?= number_format(count($promotionStudents)) ?> siswa ditampilkan</strong><span id="promotion-selected-count">0 siswa dipilih</span></div>
-            <div><button class="btn btn-ghost" type="button" id="promotion-select-visible">Pilih yang Tampil</button><button class="btn btn-ghost" type="button" id="promotion-select-all">Pilih Semua Tahap Ini</button><button class="btn btn-ghost" type="button" id="promotion-clear-selection">Kosongkan Pilihan</button></div>
+            <div><button class="btn btn-ghost" type="button" id="promotion-select-visible">Pilih Kelas ini</button><?php if($currentPromotionLevel === 6): ?><button class="btn btn-ghost" type="button" id="promotion-select-all">Pilih Semua Kelas</button><?php endif; ?><button class="btn btn-ghost" type="button" id="promotion-clear-selection">Kosongkan Pilihan</button></div>
           </div>
 
           <div class="promotion-student-list" id="promotion-student-list">
