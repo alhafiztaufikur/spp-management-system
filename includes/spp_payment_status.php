@@ -83,6 +83,17 @@ function spp_payment_status_from_state(
         ]);
     }
 
+    if (!empty($student['spp_covered_by_psb'])) {
+        return array_merge($base, [
+            'status' => 'covered_by_psb',
+            'code' => 'covered_by_psb',
+            'lock_spp' => true,
+            'title' => 'Tercakup Uang PSB',
+            'message' => 'SPP ' . $selectedLabel . ' bernilai Rp0 karena tercakup Uang PSB.',
+            'amount_label' => 'Tercakup Uang PSB',
+        ]);
+    }
+
     if ($tariff <= 0.001) {
         return array_merge($base, [
             'status' => 'tariff_missing',
@@ -163,7 +174,7 @@ function spp_payment_amount_status(string $bulan, string $tahun, float $tariff):
 }
 
 function spp_active_placements(mysqli $db, string $noInduk, bool $forUpdate = false): array {
-    $sql = 'SELECT ta.label AS tahun_ajaran, sta.spp_perbulan_snapshot, sta.status
+    $sql = 'SELECT ta.label AS tahun_ajaran, sta.spp_perbulan_snapshot, sta.spp_covered_by_psb, sta.status
         FROM siswa_tahun_ajaran sta
         JOIN tahun_ajaran ta ON ta.id = sta.tahun_ajaran_id
         WHERE sta.no_induk = ? AND sta.status = \'aktif\'
@@ -175,6 +186,19 @@ function spp_active_placements(mysqli $db, string $noInduk, bool $forUpdate = fa
     $placements = $stmt->get_result()->fetch_all(MYSQLI_ASSOC);
     $stmt->close();
     return $placements;
+}
+
+function spp_period_is_covered_by_psb(array $placements, string $bulan, string $tahun): bool {
+    $month = (int)spp_sequence_month_code($bulan);
+    $year = (int)$tahun;
+    $startYear = $month >= 7 ? $year : $year - 1;
+    $academicYear = $startYear . '/' . ($startYear + 1);
+    foreach ($placements as $placement) {
+        if ((string)($placement['tahun_ajaran'] ?? '') === $academicYear) {
+            return (int)($placement['spp_covered_by_psb'] ?? 0) === 1;
+        }
+    }
+    return false;
 }
 
 function spp_tariff_for_payment_period(
@@ -280,6 +304,7 @@ function spp_payment_status(
     $student['allow_inactive'] = $allowInactive;
 
     $placements = spp_active_placements($db, $noInduk, $forUpdate);
+    $student['spp_covered_by_psb'] = spp_period_is_covered_by_psb($placements, $month, $tahun);
     $tariff = spp_sequence_tariff_for_period($placements, $month, $tahun, (float)$student['SPP_PERBULAN']);
     $paidPeriods = $forUpdate ? null : spp_paid_period_map($db, $noInduk, $excludePaymentId);
     $selectedKey = spp_sequence_period_key($month, $tahun);

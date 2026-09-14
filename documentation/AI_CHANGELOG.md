@@ -13,6 +13,109 @@ File ini mencatat perubahan proyek secara reverse chronological. Baca [PROJECT_C
 - Jangan menghapus atau menulis ulang entri lama. Tambahkan entri koreksi bila diperlukan.
 - Perubahan implementasi dan entri changelog wajib masuk commit yang sama.
 
+## 2026-09-14 - Pemilih Tunggakan Daftar Ulang dan Riwayat Kelas
+
+**AI/Aktor:** Codex berbasis GPT-5, bersama pemilik proyek
+
+**Tujuan:** Memungkinkan kasir memilih tagihan Daftar Ulang lintas tahun secara aman serta menampilkan perjalanan kelas dan tahun kelulusan siswa.
+
+**Perubahan fitur dan perilaku:**
+
+- Baris Daftar Ulang menampilkan dropdown ketika ada tunggakan lama. Tahun berjalan tetap menjadi default; tanpa tagihan tahun berjalan, tunggakan tertua dipilih.
+- Pemilih Daftar Ulang dirapikan mengikuti tema visual pembayaran: label tunggal, panel berstruktur, status dan nominal yang mudah dipindai, serta tampilan responsif desktop/mobile. Aturan `hidden` dipertegas agar label dan dropdown tidak pernah tampil ganda.
+- Opsi memuat tahun ajaran, kelas snapshot, tagihan, terbayar, sisa, dan status Tahun Berjalan/Tunggakan. Pergantian opsi mereset input bayar.
+- Pembayaran Daftar Ulang lama dapat digabung dengan komponen berjalan; struk biasa, struk tahunan, histori ringkas, dan PDF mencantumkan tahun tagihan Daftar Ulang.
+- Lulusan yang masih mempunyai tunggakan Daftar Ulang tetap muncul pada pencarian pembayaran dengan label `LULUS · TA …`; seluruh komponen selain Daftar Ulang dikunci dan juga ditolak backend.
+- Data Siswa memiliki baris expandable Riwayat Kelas dari snapshot yang benar-benar tersimpan. Masa PSB tidak ditampilkan; kelulusan baru dicatat pada tahun kelas 6 diselesaikan dan tidak membuat penempatan palsu pada tahun berikutnya.
+- Penempatan tahun sebelumnya ditandai `pindah` saat kenaikan kelas baru, sementara arsip manual tetap dibedakan dari status lulus.
+
+**Database dan migrasi:**
+
+- Tidak ada tabel, kolom, migrasi, atau perubahan data historis. Implementasi memakai relasi dan unique key yang sudah ada.
+
+**Kompatibilitas dan data lama:**
+
+- Submit Daftar Ulang baru wajib mengirim `tagihan_daftar_ulang_id`; request lama tanpa ID ditolak agar tahun/kelas browser tidak menjadi sumber kebenaran.
+- Transaksi lama tetap dapat dilihat. Tahun kelulusan lama ditampilkan sesuai snapshot yang sudah tersimpan dan tidak dipindahkan otomatis.
+- Admin dapat memindahkan pembayaran Daftar Ulang ke tagihan lain saat edit; saldo asal dan tujuan divalidasi di dalam transaksi yang sama.
+
+**Verifikasi:**
+
+- Lint seluruh PHP dan smoke test JavaScript melalui Chrome headless lulus.
+- Seluruh unit/regression test lulus, termasuk test baru untuk payload tagihan, penolakan ID tanpa pemilik/masa depan, pengembalian saldo saat edit, tahun kelulusan, dan snapshot kelas 6.
+- Integration test database disposable lulus untuk pembayaran gabungan lintas tahun, pemindahan tagihan saat edit, label tahun pada struk, lulusan, role pembayaran, SPP, dan Master Siswa PSB.
+
+## 2026-09-14 - Penyederhanaan Komponen Pembayaran dan Uang PSB
+
+**AI/Aktor:** Codex berbasis GPT-5, bersama pemilik proyek
+
+**Tujuan:** Menghapus komponen pembayaran lama, menerapkan paket Uang PSB, membebaskan SPP tahun pertama kelas 1 bagi siswa asal PSB, dan membatasi mutasi pembayaran ke administrator.
+
+**Perubahan fitur dan perilaku:**
+
+- Master Siswa hanya memuat SPP, Pangkal, PSB, Komite, Daftar Ulang, dan potongan yang masih berlaku; bagian saldo awal legacy dihapus.
+- Siswa yang dibuat di kelas PSB wajib memiliki nominal PSB dan memperoleh penanda `asal_psb` permanen. Siswa non-PSB tidak dapat diberi PSB melalui request.
+- Pangkal dan PSB menjadi tagihan satu kali berbasis seluruh histori siswa, dapat dicicil, dan tidak memakai tagihan tahunan.
+- Siswa kelas PSB hanya dapat membayar Pangkal, PSB, dan Biaya Lain. Sisa PSB tetap dapat dibayar setelah pindah kelas.
+- Penempatan aktif kelas 1 pertama bagi siswa asal PSB menyimpan snapshot SPP Rp0 serta status `Tercakup Uang PSB`; sinkronisasi tidak menimpa snapshot tersebut dan tahun berikutnya kembali memakai tarif normal.
+- Form, proses, histori, laporan, struk, PDF, dan Excel memakai Uang PSB dan tidak lagi memuat Bangunan, Seragam, Kegiatan, Makan, Sorga, atau Infaq sebagai komponen utama.
+- Input, lihat, dan cetak pembayaran tetap tersedia bagi admin dan kasir. Edit/update/hapus hanya tersedia bagi admin; hapus diubah menjadi POST dengan CSRF.
+- Registry sembilan laporan dan pemisahan Rekap Setoran Kas dari Rekap Kas Tabungan tetap dipertahankan.
+
+**Database dan migrasi:**
+
+- Menambahkan `siswa.PSB`, `siswa.asal_psb`, `siswa_tahun_ajaran.spp_covered_by_psb`, serta `bayar.U_PSB` berikut check constraint terkait.
+- Menghapus enam kolom tarif siswa, empat kolom saldo awal/mirror, dan enam kolom transaksi komponen lama.
+- Menambahkan migrasi satu kali `sql/simplify_payment_components_and_add_psb.sql`. Migrasi menghapus seluruh transaksi yang mengandung komponen lama, mengandalkan cascade untuk detail, menghapus tagihan/alokasi tahunan selain Komite, serta menghitung ulang total pembayaran dan saldo tabungan.
+- Pada database pengembangan, 182 dari 400 transaksi terhapus sesuai kriteria; 218 transaksi valid bertahan. Tidak ada tabel arsip dan snapshot SQL lama tidak diubah sesuai keputusan proyek.
+- `sql/schema.sql`, pemeriksaan schema, dan seluruh seed demo aktif disesuaikan dengan kontrak baru.
+
+**Kompatibilitas dan data lama:**
+
+- Backend secara eksplisit menolak nama field siswa maupun pembayaran lama dari cache browser atau request yang dimanipulasi.
+- Uang Pangkal valid yang tidak berada pada transaksi berkandungan komponen lama tetap dipertahankan.
+- Kolom kompatibilitas Biaya Lain tetap tersedia; Makan, Surga, dan Infak tidak dibuat otomatis sebagai Master Biaya Lain.
+- `koneksi.php` mendukung override environment database agar integration test dapat memakai database disposable tanpa mengubah konfigurasi default.
+
+**Verifikasi:**
+
+- PHP lint lulus untuk seluruh 60 file PHP; `git diff --check` tidak menemukan error whitespace.
+- Dua belas unit/regression test lulus, termasuk sembilan template laporan, kategori PSB, rekap kas terpisah, cakupan SPP kelas 1, urutan SPP, dan konsistensi tarif.
+- Tiga integration test mutasi lulus pada database disposable: proses pembayaran, akses role, dan Master Siswa PSB.
+- Schema baru lulus 79 requirement pada `verify_schema.sql`; simulasi migrasi schema lama membuktikan transaksi komponen lama terhapus, Pangkal valid bertahan, dan tidak ada relasi yatim.
+- Database aktif memiliki nol kolom lama, empat kolom baru, tiga check constraint baru, nol selisih total pembayaran, nol selisih saldo tabungan, nol relasi yatim yang diperiksa, dan hanya Komite pada registry tagihan tahunan.
+- Smoke test HTTP menghasilkan halaman web, cetak, Excel, dan PDF valid dari filter PSB yang sama; output non-PDF memuat Uang PSB dan tidak memuat label komponen lama.
+- `node --check assets/js/app.js` lulus memakai binary portable sementara yang telah dibersihkan kembali. Dompdf dipasang dari `composer.lock`; CLI XAMPP masih memerlukan aktivasi ekstensi GD/ZIP untuk instalasi Composer standar dan logo PDF.
+
+## 2026-09-13 - Pemisahan Rekap Kas Pembayaran dan Tabungan
+
+**AI/Aktor:** Codex berbasis GPT-5, bersama pemilik proyek
+
+**Tujuan:** Memisahkan penerimaan pembayaran sekolah dari mutasi tabungan pada rekap kas harian.
+
+**Perubahan fitur dan perilaku:**
+
+- Rekap Setoran Kas Harian hanya memuat komponen dan metode pembayaran; Tabungan Masuk dan Tabungan Keluar tidak lagi masuk ke total setoran.
+- Menambahkan Rekap Kas Tabungan Harian dengan total masuk, total keluar, mutasi bersih, serta jumlah transaksi masuk dan keluar.
+- Kedua rekap memakai filter dan desain ringkas yang konsisten untuk web, cetak, PDF, dan Excel.
+- Katalog Laporan Global sekarang berisi sembilan template dan menempatkan kedua laporan pada kelompok Rekap Kas.
+
+**Database dan migrasi:**
+
+- Tidak ada perubahan schema, migrasi, maupun data transaksi.
+
+**Kompatibilitas dan data lama:**
+
+- URL template `setoran` tetap tersedia dan mempertahankan perhitungan total Tunai + VA + QRIS.
+- Laporan baru memakai jurnal `transaksi_m` dan `transaksi_k` yang sudah ada tanpa mengasumsikan metode pembayaran tabungan.
+
+**Verifikasi:**
+
+- PHP lint pada sumber laporan, halaman web, ekspor, dan test lulus; `git diff --check` lulus.
+- Pengujian agregasi kosong, masuk saja, keluar saja, mutasi negatif, dan data jurnal lokal lulus.
+- Smoke test render web dan cetak memastikan filter, tabel, kartu ringkasan, total, serta tanda tangan tersedia dan laporan pembayaran tidak memuat tabungan.
+- `modular_reports_test.php` masih berhenti pada prasyarat lama karena database lokal tidak memiliki enam placeholder kelas aktif.
+
 ## 2026-09-10 - Rekap Riwayat Tagihan per Siswa
 
 **AI/Aktor:** Codex berbasis GPT-5, bersama pemilik proyek

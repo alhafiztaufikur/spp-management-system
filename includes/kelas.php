@@ -189,11 +189,12 @@ function class_process_students_batch(
 
 function class_manual_graduate_student(mysqli $db, string $noInduk, string $targetYear): array {
     $targetYear = du_normalize_academic_year($targetYear);
+    $graduationYear = class_previous_academic_year_label($targetYear);
     $currentStep = class_highest_active_regular_level($db);
     if ($currentStep !== 6) {
         throw new RuntimeException('Kelas 6 harus diselesaikan terlebih dahulu sebelum tahap kelas lain diproses.');
     }
-    $yearId = class_ensure_academic_year($db, $targetYear);
+    $yearId = class_ensure_academic_year($db, $graduationYear);
     $stmt = $db->prepare("SELECT s.NO_INDUK, s.NAMA, s.KELAS, s.master_kelas_id, s.SPP_PERBULAN, s.POMG,
         mk.tingkat, mk.kode_rombel, mk.is_placeholder
         FROM siswa s LEFT JOIN master_kelas mk ON mk.id=s.master_kelas_id
@@ -225,11 +226,17 @@ function class_manual_graduate_student(mysqli $db, string $noInduk, string $targ
     $stmt->bind_param('s', $noInduk);
     $stmt->execute();
     $stmt->close();
-    return ['student' => (string)$student['NAMA'], 'target_year' => $targetYear, 'action' => 'lulus'];
+    return [
+        'student' => (string)$student['NAMA'],
+        'target_year' => $targetYear,
+        'graduation_year' => $graduationYear,
+        'action' => 'lulus'
+    ];
 }
 
 function class_manual_promote_student(mysqli $db, string $noInduk, int $targetClassId, string $targetYear): array {
     $targetYear = du_normalize_academic_year($targetYear);
+    $sourceYear = class_previous_academic_year_label($targetYear);
     $currentStep = class_highest_active_regular_level($db);
     if ($currentStep < 1 || $currentStep > 5) {
         throw new RuntimeException($currentStep === 6
@@ -259,6 +266,13 @@ function class_manual_promote_student(mysqli $db, string $noInduk, int $targetCl
     $spp = (float)$student['SPP_PERBULAN'];
     $komite = (float)$student['POMG'];
     $status = 'aktif';
+    $stmt = $db->prepare("UPDATE siswa_tahun_ajaran sta
+        JOIN tahun_ajaran ta ON ta.id=sta.tahun_ajaran_id
+        SET sta.status='pindah'
+        WHERE sta.no_induk=? AND ta.label=? AND sta.status='aktif'");
+    $stmt->bind_param('ss', $noInduk, $sourceYear);
+    $stmt->execute();
+    $stmt->close();
     $stmt = $db->prepare('UPDATE siswa SET KELAS=?, master_kelas_id=?, is_active=1 WHERE NO_INDUK=?');
     $stmt->bind_param('sis', $newLevel, $targetClassId, $noInduk);
     $stmt->execute();
@@ -283,6 +297,12 @@ function class_next_academic_year_label(string $label): string {
     return $start . '/' . ($start + 1);
 }
 
+function class_previous_academic_year_label(string $label): string {
+    $label = du_normalize_academic_year($label);
+    $start = (int)substr($label, 0, 4) - 1;
+    return $start . '/' . ($start + 1);
+}
+
 function class_ensure_academic_year(mysqli $db, string $label): int {
     [$startDate, $endDate] = du_year_dates($label);
     $stmt = $db->prepare("INSERT INTO tahun_ajaran (label, tanggal_mulai, tanggal_selesai, status) VALUES (?, ?, ?, 'draft') ON DUPLICATE KEY UPDATE id=LAST_INSERT_ID(id)");
@@ -296,6 +316,8 @@ function class_ensure_academic_year(mysqli $db, string $label): int {
 function class_process_year_promotion(mysqli $db, string $targetYear): array {
     $targetYear = du_normalize_academic_year($targetYear);
     $yearId = class_ensure_academic_year($db, $targetYear);
+    $graduationYear = class_previous_academic_year_label($targetYear);
+    $graduationYearId = class_ensure_academic_year($db, $graduationYear);
     class_ensure_rombel_templates($db);
     $students = $db->query("SELECT s.NO_INDUK,s.NAMA,s.KELAS,s.master_kelas_id,s.SPP_PERBULAN,s.POMG,
         mk.tingkat,mk.kode_rombel,mk.is_placeholder
@@ -304,6 +326,9 @@ function class_process_year_promotion(mysqli $db, string $targetYear): array {
         ORDER BY COALESCE(mk.tingkat,s.KELAS),mk.kode_rombel,s.NAMA")->fetch_all(MYSQLI_ASSOC);
     $promoted = 0; $graduated = 0; $skipped = 0;
     $selectNext = $db->prepare("SELECT id, tingkat, kode_rombel, is_placeholder, is_active FROM master_kelas WHERE tingkat=? AND kode_rombel=? AND is_placeholder=0 LIMIT 1");
+    $sourceYear = class_previous_academic_year_label($targetYear);
+    $markPrevious = $db->prepare("UPDATE siswa_tahun_ajaran sta JOIN tahun_ajaran ta ON ta.id=sta.tahun_ajaran_id
+        SET sta.status='pindah' WHERE sta.no_induk=? AND ta.label=? AND sta.status='aktif'");
     $updateStudent = $db->prepare("UPDATE siswa SET KELAS=?, master_kelas_id=?, is_active=1 WHERE NO_INDUK=?");
     $archiveStudent = $db->prepare("UPDATE siswa SET is_active=0 WHERE NO_INDUK=?");
     $insertPlacement = $db->prepare("INSERT INTO siswa_tahun_ajaran
@@ -327,7 +352,7 @@ function class_process_year_promotion(mysqli $db, string $targetYear): array {
             $classText = (string)$level;
             $spp = (float)$student['SPP_PERBULAN'];
             $komite = (float)$student['POMG'];
-            $insertPlacement->bind_param('issisdds', $yearId, $noInduk, $classText, $classId, $snapshot, $spp, $komite, $status);
+            $insertPlacement->bind_param('issisdds', $graduationYearId, $noInduk, $classText, $classId, $snapshot, $spp, $komite, $status);
             $insertPlacement->execute();
             $archiveStudent->bind_param('s', $noInduk);
             $archiveStudent->execute();
@@ -349,6 +374,8 @@ function class_process_year_promotion(mysqli $db, string $targetYear): array {
         $spp = (float)$student['SPP_PERBULAN'];
         $komite = (float)$student['POMG'];
         $status = 'aktif';
+        $markPrevious->bind_param('ss', $noInduk, $sourceYear);
+        $markPrevious->execute();
         $updateStudent->bind_param('sis', $classText, $nextClassId, $noInduk);
         $updateStudent->execute();
         $insertPlacement->bind_param('issisdds', $yearId, $noInduk, $classText, $nextClassId, $snapshot, $spp, $komite, $status);
@@ -359,7 +386,7 @@ function class_process_year_promotion(mysqli $db, string $targetYear): array {
         }
         $promoted++;
     }
-    $selectNext->close(); $updateStudent->close(); $archiveStudent->close(); $insertPlacement->close();
+    $selectNext->close(); $markPrevious->close(); $updateStudent->close(); $archiveStudent->close(); $insertPlacement->close();
     return ['promoted'=>$promoted,'graduated'=>$graduated,'skipped'=>$skipped,'target_year'=>$targetYear];
 }
 
@@ -452,7 +479,7 @@ function class_sync_student_current_year(
     if (!$yearId) return null;
 
     $academicLabel = du_current_academic_year();
-    $stmt = $db->prepare('SELECT id,kelas,master_kelas_id,kelas_rombel_snapshot,spp_perbulan_snapshot,komite_snapshot,status FROM siswa_tahun_ajaran WHERE tahun_ajaran_id=? AND no_induk=? LIMIT 1 FOR UPDATE');
+    $stmt = $db->prepare('SELECT id,kelas,master_kelas_id,kelas_rombel_snapshot,spp_perbulan_snapshot,spp_covered_by_psb,komite_snapshot,status FROM siswa_tahun_ajaran WHERE tahun_ajaran_id=? AND no_induk=? LIMIT 1 FOR UPDATE');
     $stmt->bind_param('is', $yearId, $noInduk); $stmt->execute();
     $existing = $stmt->get_result()->fetch_assoc(); $stmt->close();
     $preserveClass = false;
@@ -464,26 +491,41 @@ function class_sync_student_current_year(
         $preserveClass = $hasPayment;
     }
 
+    $stmt = $db->prepare('SELECT asal_psb FROM siswa WHERE NO_INDUK=? LIMIT 1 FOR UPDATE');
+    $stmt->bind_param('s', $noInduk); $stmt->execute();
+    $origin = $stmt->get_result()->fetch_assoc(); $stmt->close();
+    $isGradeOne = (int)$class['tingkat'] === 1;
+    $alreadyCovered = false;
+    if ((int)($origin['asal_psb'] ?? 0) === 1) {
+        $stmt = $db->prepare('SELECT EXISTS(SELECT 1 FROM siswa_tahun_ajaran WHERE no_induk=? AND spp_covered_by_psb=1) covered');
+        $stmt->bind_param('s', $noInduk); $stmt->execute();
+        $alreadyCovered = (int)($stmt->get_result()->fetch_assoc()['covered'] ?? 0) === 1; $stmt->close();
+    }
+    $coveredByPsb = (int)(
+        (int)($existing['spp_covered_by_psb'] ?? 0) === 1
+        || ((int)($origin['asal_psb'] ?? 0) === 1 && $isGradeOne && !$alreadyCovered)
+    );
+
     $sppPaid = $existing ? class_component_paid_in_academic_year($db, $noInduk, $academicLabel, 'spp') : 0.0;
     $komitePaid = $existing ? max(
         class_component_paid_in_academic_year($db, $noInduk, $academicLabel, 'komite'),
         class_annual_component_paid_in_academic_year($db, $noInduk, $academicLabel, 'komite')
     ) : 0.0;
-    $sppSnapshot = $existing && $sppPaid > .001 ? (float)$existing['spp_perbulan_snapshot'] : $spp;
+    $sppSnapshot = $coveredByPsb ? 0.0 : ($existing && $sppPaid > .001 ? (float)$existing['spp_perbulan_snapshot'] : $spp);
     $komiteSnapshot = $existing && $komitePaid > .001 ? (float)$existing['komite_snapshot'] : $komite;
     $level = $preserveClass ? (string)$existing['kelas'] : (string)$class['tingkat'];
     $label = $preserveClass ? (string)$existing['kelas_rombel_snapshot'] : (string)$class['label'];
     $placementClassId = $preserveClass ? (int)$existing['master_kelas_id'] : $classId;
     $status = $active ? 'aktif' : 'pindah';
     $stmt = $db->prepare("INSERT INTO siswa_tahun_ajaran
-        (tahun_ajaran_id, no_induk, kelas, master_kelas_id, kelas_rombel_snapshot, spp_perbulan_snapshot, komite_snapshot, status)
-        VALUES (?, ?, ?, ?, ?, ?, ?, ?)
+        (tahun_ajaran_id, no_induk, kelas, master_kelas_id, kelas_rombel_snapshot, spp_perbulan_snapshot, spp_covered_by_psb, komite_snapshot, status)
+        VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?)
         ON DUPLICATE KEY UPDATE
           id = LAST_INSERT_ID(id), kelas = VALUES(kelas), master_kelas_id = VALUES(master_kelas_id),
           kelas_rombel_snapshot = VALUES(kelas_rombel_snapshot),
-          spp_perbulan_snapshot = VALUES(spp_perbulan_snapshot), komite_snapshot = VALUES(komite_snapshot),
+          spp_perbulan_snapshot = VALUES(spp_perbulan_snapshot), spp_covered_by_psb = VALUES(spp_covered_by_psb), komite_snapshot = VALUES(komite_snapshot),
           status = VALUES(status)");
-    $stmt->bind_param('issisdds', $yearId, $noInduk, $level, $placementClassId, $label, $sppSnapshot, $komiteSnapshot, $status);
+    $stmt->bind_param('issisdids', $yearId, $noInduk, $level, $placementClassId, $label, $sppSnapshot, $coveredByPsb, $komiteSnapshot, $status);
     $stmt->execute();
     $placementId = (int)$db->insert_id;
     $stmt->close();
@@ -508,13 +550,15 @@ function class_sync_student_current_year(
     }
 
     if ($placementId > 0) {
-        $stmt = $db->prepare('SELECT spp_perbulan_snapshot,komite_snapshot FROM siswa_tahun_ajaran WHERE id=? LIMIT 1');
+        $stmt = $db->prepare('SELECT spp_perbulan_snapshot,spp_covered_by_psb,komite_snapshot FROM siswa_tahun_ajaran WHERE id=? LIMIT 1');
         $stmt->bind_param('i', $placementId);
         $stmt->execute();
         $verified = $stmt->get_result()->fetch_assoc();
         $stmt->close();
         if (!$verified
-            || ($sppPaid <= .001 && abs((float)$verified['spp_perbulan_snapshot'] - $spp) > .001)
+            || ((int)$verified['spp_covered_by_psb'] !== $coveredByPsb)
+            || (!$coveredByPsb && $sppPaid <= .001 && abs((float)$verified['spp_perbulan_snapshot'] - $spp) > .001)
+            || ($coveredByPsb && abs((float)$verified['spp_perbulan_snapshot']) > .001)
             || ($komitePaid <= .001 && abs((float)$verified['komite_snapshot'] - $komite) > .001)) {
             throw new RuntimeException('Verifikasi sinkronisasi tarif tahun ajaran gagal. Tidak ada perubahan yang disimpan.');
         }

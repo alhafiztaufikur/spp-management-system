@@ -7,7 +7,7 @@
 
 USE `db_spp`;
 
-SET NAMES utf8mb4;
+SET NAMES utf8mb4 COLLATE utf8mb4_unicode_ci;
 START TRANSACTION;
 
 SET @seed_year := '2026/2027';
@@ -68,30 +68,6 @@ SET
     CASE LEFT(`KELAS`, 1) WHEN '1' THEN 1000000 WHEN '2' THEN 1100000 WHEN '3' THEN 1200000 WHEN '4' THEN 1300000 WHEN '5' THEN 1400000 ELSE 1500000 END,
     `PANGKAL`
   ),
-  `BANGUNAN` = IF(COALESCE(`BANGUNAN`, 0) <= 0,
-    CASE LEFT(`KELAS`, 1) WHEN '1' THEN 1500000 WHEN '2' THEN 1550000 WHEN '3' THEN 1600000 WHEN '4' THEN 1650000 WHEN '5' THEN 1700000 ELSE 1750000 END,
-    `BANGUNAN`
-  ),
-  `SERAGAM` = IF(COALESCE(`SERAGAM`, 0) <= 0,
-    CASE LEFT(`KELAS`, 1) WHEN '1' THEN 500000 WHEN '2' THEN 525000 WHEN '3' THEN 550000 WHEN '4' THEN 575000 WHEN '5' THEN 600000 ELSE 625000 END,
-    `SERAGAM`
-  ),
-  `KEGIATAN` = IF(COALESCE(`KEGIATAN`, 0) <= 0,
-    CASE LEFT(`KELAS`, 1) WHEN '1' THEN 300000 WHEN '2' THEN 325000 WHEN '3' THEN 350000 WHEN '4' THEN 375000 WHEN '5' THEN 400000 ELSE 425000 END,
-    `KEGIATAN`
-  ),
-  `MAKAN` = IF(COALESCE(`MAKAN`, 0) <= 0,
-    CASE LEFT(`KELAS`, 1) WHEN '1' THEN 180000 WHEN '2' THEN 185000 WHEN '3' THEN 190000 WHEN '4' THEN 195000 WHEN '5' THEN 200000 ELSE 210000 END,
-    `MAKAN`
-  ),
-  `SORGA` = IF(COALESCE(`SORGA`, 0) <= 0,
-    CASE WHEN CAST(LEFT(`KELAS`, 1) AS UNSIGNED) <= 2 THEN 50000 WHEN CAST(LEFT(`KELAS`, 1) AS UNSIGNED) <= 4 THEN 60000 ELSE 70000 END,
-    `SORGA`
-  ),
-  `INFAQ` = IF(COALESCE(`INFAQ`, 0) <= 0,
-    CASE WHEN CAST(LEFT(`KELAS`, 1) AS UNSIGNED) <= 2 THEN 25000 WHEN CAST(LEFT(`KELAS`, 1) AS UNSIGNED) <= 4 THEN 30000 ELSE 40000 END,
-    `INFAQ`
-  ),
   `DAFTAR_ULANG` = IF(COALESCE(`DAFTAR_ULANG`, 0) <= 0,
     CASE LEFT(`KELAS`, 1) WHEN '1' THEN 1000000 WHEN '2' THEN 1100000 WHEN '3' THEN 1200000 WHEN '4' THEN 1300000 WHEN '5' THEN 1400000 ELSE 1500000 END,
     `DAFTAR_ULANG`
@@ -112,12 +88,6 @@ SELECT
   COALESCE(NULLIF(s.`SPP_PERBULAN`, 0), 250000) AS `spp`,
   COALESCE(NULLIF(s.`POMG`, 0), 100000) AS `komite`,
   COALESCE(NULLIF(s.`PANGKAL`, 0), 1000000) AS `pangkal`,
-  COALESCE(NULLIF(s.`BANGUNAN`, 0), 1500000) AS `bangunan`,
-  COALESCE(NULLIF(s.`SERAGAM`, 0), 500000) AS `seragam`,
-  COALESCE(NULLIF(s.`KEGIATAN`, 0), 300000) AS `kegiatan`,
-  COALESCE(NULLIF(s.`MAKAN`, 0), 180000) AS `makan`,
-  COALESCE(NULLIF(s.`SORGA`, 0), 50000) AS `sorga`,
-  COALESCE(NULLIF(s.`INFAQ`, 0), 25000) AS `infaq`,
   COALESCE(s.`potong_pangkal`, 0) AS `potong_pangkal`,
   COALESCE(s.`potong_du`, 0) AS `potong_du`
 FROM `siswa` s
@@ -129,14 +99,7 @@ CREATE INDEX `idx_seed_current_n` ON `seed_current_students` (`n`);
 
 UPDATE `tagihan_tahunan_siswa` t
 JOIN (
-  SELECT 'pangkal' AS `komponen`, sc.`no_induk`, sc.`pangkal` AS `nominal_awal`, sc.`potong_pangkal` AS `potongan`, GREATEST(sc.`pangkal` - sc.`potong_pangkal`, 0) AS `nominal_tagihan` FROM `seed_current_students` sc
-  UNION ALL SELECT 'bangunan', sc.`no_induk`, sc.`bangunan`, 0, sc.`bangunan` FROM `seed_current_students` sc
-  UNION ALL SELECT 'seragam', sc.`no_induk`, sc.`seragam`, 0, sc.`seragam` FROM `seed_current_students` sc
-  UNION ALL SELECT 'kegiatan', sc.`no_induk`, sc.`kegiatan`, 0, sc.`kegiatan` FROM `seed_current_students` sc
-  UNION ALL SELECT 'komite', sc.`no_induk`, sc.`komite`, 0, sc.`komite` FROM `seed_current_students` sc
-  UNION ALL SELECT 'makan', sc.`no_induk`, sc.`makan`, 0, sc.`makan` FROM `seed_current_students` sc
-  UNION ALL SELECT 'sorga', sc.`no_induk`, sc.`sorga`, 0, sc.`sorga` FROM `seed_current_students` sc
-  UNION ALL SELECT 'infaq', sc.`no_induk`, sc.`infaq`, 0, sc.`infaq` FROM `seed_current_students` sc
+  SELECT 'komite' AS `komponen`, sc.`no_induk`, sc.`komite` AS `nominal_awal`, 0 AS `potongan`, sc.`komite` AS `nominal_tagihan` FROM `seed_current_students` sc
 ) fees ON fees.`no_induk` = t.`no_induk` AND fees.`komponen` = t.`komponen`
 SET
   t.`nominal_awal` = fees.`nominal_awal`,
@@ -191,14 +154,7 @@ SELECT
 FROM `seed_current_students` s
 JOIN `siswa_tahun_ajaran` sta ON sta.`tahun_ajaran_id` = @seed_year_id AND sta.`no_induk` = s.`no_induk`
 JOIN (
-  SELECT 'pangkal' AS `komponen`, sc.`no_induk`, sc.`pangkal` AS `nominal_awal`, sc.`potong_pangkal` AS `potongan`, GREATEST(sc.`pangkal` - sc.`potong_pangkal`, 0) AS `nominal_tagihan` FROM `seed_current_students` sc
-  UNION ALL SELECT 'bangunan', sc.`no_induk`, sc.`bangunan`, 0, sc.`bangunan` FROM `seed_current_students` sc
-  UNION ALL SELECT 'seragam', sc.`no_induk`, sc.`seragam`, 0, sc.`seragam` FROM `seed_current_students` sc
-  UNION ALL SELECT 'kegiatan', sc.`no_induk`, sc.`kegiatan`, 0, sc.`kegiatan` FROM `seed_current_students` sc
-  UNION ALL SELECT 'komite', sc.`no_induk`, sc.`komite`, 0, sc.`komite` FROM `seed_current_students` sc
-  UNION ALL SELECT 'makan', sc.`no_induk`, sc.`makan`, 0, sc.`makan` FROM `seed_current_students` sc
-  UNION ALL SELECT 'sorga', sc.`no_induk`, sc.`sorga`, 0, sc.`sorga` FROM `seed_current_students` sc
-  UNION ALL SELECT 'infaq', sc.`no_induk`, sc.`infaq`, 0, sc.`infaq` FROM `seed_current_students` sc
+  SELECT 'komite' AS `komponen`, sc.`no_induk`, sc.`komite` AS `nominal_awal`, 0 AS `potongan`, sc.`komite` AS `nominal_tagihan` FROM `seed_current_students` sc
 ) fees ON fees.`no_induk` = s.`no_induk`
 WHERE NOT EXISTS (
   SELECT 1 FROM `tagihan_tahunan_siswa` t
@@ -289,23 +245,17 @@ WHERE b.`KETERANGAN` LIKE 'SEED:FILL:SPP:%'
   AND NOT EXISTS (SELECT 1 FROM `bayar_spp_periode` p WHERE p.`bayar_id` = b.`id`)
   AND NOT EXISTS (SELECT 1 FROM `bayar_spp_periode` p WHERE p.`no_induk` = b.`NO_INDUK` AND p.`bulan` = b.`BULAN` AND p.`tahun` = b.`TAHUN`);
 
--- Pembayaran komponen tahunan: pangkal, bangunan, seragam, kegiatan, komite, makan, sorga, infaq.
+-- Pembayaran tahunan hanya Uang Komite.
 DROP TEMPORARY TABLE IF EXISTS `seed_annual_due`;
 CREATE TEMPORARY TABLE `seed_annual_due` AS
 SELECT
   s.`n`, s.`no_induk`, s.`kelas`, s.`master_kelas_id`,
   CASE WHEN s.`rombel` <> '' THEN CONCAT(LEFT(s.`kelas`, 1), s.`rombel`) ELSE CONCAT('Kelas ', LEFT(s.`kelas`, 1)) END AS `kelas_rombel_snapshot`,
   t.`id` AS `tagihan_id`, t.`komponen`, t.`nominal_tagihan`,
-  CASE t.`komponen`
-    WHEN 'pangkal' THEN 1 WHEN 'bangunan' THEN 2 WHEN 'seragam' THEN 3 WHEN 'kegiatan' THEN 4
-    WHEN 'komite' THEN 5 WHEN 'makan' THEN 6 WHEN 'sorga' THEN 7 ELSE 8
-  END AS `komponen_no`,
+  1 AS `komponen_no`,
   LEAST(
     GREATEST(t.`nominal_tagihan` - COALESCE(p.`paid`, 0), 0),
-    CASE MOD(s.`n` + CASE t.`komponen`
-      WHEN 'pangkal' THEN 1 WHEN 'bangunan' THEN 2 WHEN 'seragam' THEN 3 WHEN 'kegiatan' THEN 4
-      WHEN 'komite' THEN 5 WHEN 'makan' THEN 6 WHEN 'sorga' THEN 7 ELSE 8
-    END, 4)
+    CASE MOD(s.`n` + 1, 4)
       WHEN 0 THEN t.`nominal_tagihan`
       WHEN 1 THEN ROUND(t.`nominal_tagihan` * 0.5, 0)
       WHEN 2 THEN ROUND(t.`nominal_tagihan` * 0.35, 0)
@@ -321,14 +271,7 @@ LEFT JOIN (
     COALESCE(SUM(x.`jumlah`), 0) AS `paid`
   FROM `bayar` b
   JOIN (
-    SELECT `id`, 'pangkal' AS `komponen`, `U_PANGKAL` AS `jumlah` FROM `bayar`
-    UNION ALL SELECT `id`, 'bangunan', `U_BANGUNAN` FROM `bayar`
-    UNION ALL SELECT `id`, 'seragam', `U_SERAGAM` FROM `bayar`
-    UNION ALL SELECT `id`, 'kegiatan', `U_KEGIATAN` FROM `bayar`
-    UNION ALL SELECT `id`, 'komite', `U_KOMITE` FROM `bayar`
-    UNION ALL SELECT `id`, 'makan', `U_MAKAN` FROM `bayar`
-    UNION ALL SELECT `id`, 'sorga', `U_SORGA` FROM `bayar`
-    UNION ALL SELECT `id`, 'infaq', `U_INFAQ` FROM `bayar`
+    SELECT `id`, 'komite' AS `komponen`, `U_KOMITE` AS `jumlah` FROM `bayar`
   ) x ON x.`id` = b.`id`
   WHERE b.`th_ajaran` = @seed_year
   GROUP BY b.`NO_INDUK`, x.`komponen`
@@ -339,20 +282,13 @@ ALTER TABLE `seed_annual_due` ADD INDEX `idx_seed_annual_due` (`no_induk`, `komp
 
 INSERT INTO `bayar` (
   `NO_INDUK`, `KELAS`, `master_kelas_id`, `kelas_rombel_snapshot`,
-  `U_PANGKAL`, `U_BANGUNAN`, `U_SERAGAM`, `U_KEGIATAN`, `U_KOMITE`, `U_MAKAN`, `U_SORGA`, `U_INFAQ`,
+  `U_KOMITE`,
   `KETERANGAN`, `TGL_BYR`, `BULAN`, `TAHUN`, `user_id`, `sistem_pembayaran`,
   `th_ajaran`, `total_jumlah`, `payment_link_version`
 )
 SELECT
   d.`no_induk`, d.`kelas`, d.`master_kelas_id`, d.`kelas_rombel_snapshot`,
-  CASE WHEN d.`komponen` = 'pangkal' THEN d.`amount` ELSE 0 END,
-  CASE WHEN d.`komponen` = 'bangunan' THEN d.`amount` ELSE 0 END,
-  CASE WHEN d.`komponen` = 'seragam' THEN d.`amount` ELSE 0 END,
-  CASE WHEN d.`komponen` = 'kegiatan' THEN d.`amount` ELSE 0 END,
-  CASE WHEN d.`komponen` = 'komite' THEN d.`amount` ELSE 0 END,
-  CASE WHEN d.`komponen` = 'makan' THEN d.`amount` ELSE 0 END,
-  CASE WHEN d.`komponen` = 'sorga' THEN d.`amount` ELSE 0 END,
-  CASE WHEN d.`komponen` = 'infaq' THEN d.`amount` ELSE 0 END,
+  d.`amount`,
   CONCAT('SEED:FILL:ANNUAL:', d.`komponen`, ':', d.`no_induk`),
   DATE_ADD('2026-07-03 10:15:00', INTERVAL MOD(d.`n` + d.`komponen_no`, 48) DAY),
   CASE WHEN MOD(d.`n` + d.`komponen_no`, 48) < 29 THEN '07' ELSE '08' END,
@@ -501,14 +437,7 @@ WHERE f.`rn` = 5 AND f.`amount` > 0
 INSERT INTO `bayar_tahunan_siswa` (`bayar_id`, `tagihan_tahunan_id`, `no_induk`, `komponen`, `th_ajaran`, `jumlah`)
 SELECT legacy.`bayar_id`, t.`id`, legacy.`NO_INDUK`, legacy.`komponen`, t.`tahun_ajaran_snapshot`, legacy.`jumlah`
 FROM (
-  SELECT `id` AS `bayar_id`, `NO_INDUK`, 'pangkal' AS `komponen`, `U_PANGKAL` AS `jumlah` FROM `bayar` WHERE `U_PANGKAL` > 0
-  UNION ALL SELECT `id`, `NO_INDUK`, 'bangunan', `U_BANGUNAN` FROM `bayar` WHERE `U_BANGUNAN` > 0
-  UNION ALL SELECT `id`, `NO_INDUK`, 'seragam', `U_SERAGAM` FROM `bayar` WHERE `U_SERAGAM` > 0
-  UNION ALL SELECT `id`, `NO_INDUK`, 'kegiatan', `U_KEGIATAN` FROM `bayar` WHERE `U_KEGIATAN` > 0
-  UNION ALL SELECT `id`, `NO_INDUK`, 'komite', `U_KOMITE` FROM `bayar` WHERE `U_KOMITE` > 0
-  UNION ALL SELECT `id`, `NO_INDUK`, 'makan', `U_MAKAN` FROM `bayar` WHERE `U_MAKAN` > 0
-  UNION ALL SELECT `id`, `NO_INDUK`, 'sorga', `U_SORGA` FROM `bayar` WHERE `U_SORGA` > 0
-  UNION ALL SELECT `id`, `NO_INDUK`, 'infaq', `U_INFAQ` FROM `bayar` WHERE `U_INFAQ` > 0
+  SELECT `id` AS `bayar_id`, `NO_INDUK`, 'komite' AS `komponen`, `U_KOMITE` AS `jumlah` FROM `bayar` WHERE `U_KOMITE` > 0
 ) legacy
 JOIN `tagihan_tahunan_siswa` t ON t.`no_induk` = legacy.`NO_INDUK`
   AND t.`komponen` = legacy.`komponen`
@@ -599,25 +528,6 @@ LEFT JOIN (
   GROUP BY `NO_INDUK`
 ) k ON k.`NO_INDUK` = s.`no_induk`
 ON DUPLICATE KEY UPDATE `SALDO` = VALUES(`SALDO`);
-
-UPDATE `siswa` s
-LEFT JOIN (
-  SELECT
-    `no_induk`,
-    COALESCE(SUM(CASE WHEN `komponen` = 'pangkal' THEN `jumlah` ELSE 0 END), 0) AS `pangkal_bayar`,
-    COALESCE(SUM(CASE WHEN `komponen` = 'bangunan' THEN `jumlah` ELSE 0 END), 0) AS `bangunan_bayar`,
-    COALESCE(SUM(CASE WHEN `komponen` = 'seragam' THEN `jumlah` ELSE 0 END), 0) AS `seragam_bayar`,
-    COALESCE(SUM(CASE WHEN `komponen` = 'kegiatan' THEN `jumlah` ELSE 0 END), 0) AS `kegiatan_bayar`
-  FROM `bayar_tahunan_siswa`
-  WHERE `th_ajaran` = @seed_year
-  GROUP BY `no_induk`
-) p ON p.`no_induk` = s.`NO_INDUK`
-SET
-  s.`PANGKAL_BAYAR` = COALESCE(p.`pangkal_bayar`, 0),
-  s.`BANGUNAN_BAYAR` = COALESCE(p.`bangunan_bayar`, 0),
-  s.`SERAGAM_BAYAR` = COALESCE(p.`seragam_bayar`, 0),
-  s.`KEGIATAN_BAYAR` = COALESCE(p.`kegiatan_bayar`, 0)
-WHERE s.`NO_INDUK` IN (SELECT `no_induk` FROM `seed_current_students`);
 
 COMMIT;
 

@@ -9,28 +9,26 @@ require_once '../includes/auth.php';
 require_once '../includes/daftar_ulang.php';
 require_once '../includes/biaya_lain.php';
 require_once '../includes/tagihan_tahunan.php';
+require_once '../includes/tagihan_sekali.php';
 requireRole(['admin', 'kasir']);
+$activeAcademicYear = du_current_academic_year();
+$activeAcademicYearSql = $koneksi->real_escape_string($activeAcademicYear);
 
 $siswa_sql = "
     SELECT
         s.*,
-        COALESCE(s.PANGKAL_BAYAR, 0) AS paid_pangkal,
-        COALESCE(s.BANGUNAN_BAYAR, 0) AS paid_bangunan,
-        COALESCE(s.SERAGAM_BAYAR, 0) AS paid_seragam,
-        COALESCE(s.KEGIATAN_BAYAR, 0) AS paid_kegiatan,
-        COALESCE(p.paid_makan, 0) AS paid_makan,
-        COALESCE(p.paid_sorga, 0) AS paid_sorga,
-        COALESCE(p.paid_infaq, 0) AS paid_infaq,
+        COALESCE(p.paid_pangkal, 0) AS paid_pangkal,
+        COALESCE(p.paid_psb, 0) AS paid_psb,
         COALESCE(du.paid_du, 0) AS paid_du,
-        mk.tingkat AS master_tingkat, mk.kode_rombel, mk.is_placeholder
+        mk.tingkat AS master_tingkat, mk.kode_rombel, mk.is_placeholder,
+        (SELECT ta_l.label FROM siswa_tahun_ajaran sta_l
+         JOIN tahun_ajaran ta_l ON ta_l.id=sta_l.tahun_ajaran_id
+         WHERE sta_l.no_induk=s.NO_INDUK AND sta_l.status='lulus'
+         ORDER BY ta_l.label DESC LIMIT 1) AS graduation_year
     FROM siswa s
     LEFT JOIN master_kelas mk ON mk.id=s.master_kelas_id
     LEFT JOIN (
-        SELECT
-            NO_INDUK,
-            SUM(U_MAKAN) AS paid_makan,
-            SUM(U_SORGA) AS paid_sorga,
-            SUM(U_INFAQ) AS paid_infaq
+        SELECT NO_INDUK, SUM(U_PANGKAL) AS paid_pangkal, SUM(U_PSB) AS paid_psb
         FROM bayar
         GROUP BY NO_INDUK
     ) p ON p.NO_INDUK = s.NO_INDUK
@@ -39,7 +37,17 @@ $siswa_sql = "
         FROM bayar_du
         GROUP BY no_induk
     ) du ON du.no_induk = s.NO_INDUK
-    WHERE s.is_active = 1
+    WHERE s.is_active = 1 OR (
+        EXISTS(SELECT 1 FROM siswa_tahun_ajaran sta_l WHERE sta_l.no_induk=s.NO_INDUK AND sta_l.status='lulus')
+        AND EXISTS(
+            SELECT 1 FROM tagihan_daftar_ulang tdu_o
+            LEFT JOIN bayar_du bd_o ON bd_o.tagihan_daftar_ulang_id=tdu_o.id
+            WHERE tdu_o.no_induk=s.NO_INDUK AND tdu_o.status='open'
+              AND tdu_o.tahun_ajaran_snapshot<='$activeAcademicYearSql'
+            GROUP BY tdu_o.id,tdu_o.nominal_tagihan
+            HAVING tdu_o.nominal_tagihan-COALESCE(SUM(bd_o.jumlah),0)>.001
+        )
+    )
     ORDER BY s.NAMA ASC
 ";
 $siswa_list = $koneksi->query($siswa_sql);
@@ -60,7 +68,7 @@ while ($paid = $spp_paid_result->fetch_assoc()) {
 }
 
 $spp_placements = [];
-$placementResult = $koneksi->query("SELECT sta.no_induk, ta.label AS tahun_ajaran, sta.spp_perbulan_snapshot
+$placementResult = $koneksi->query("SELECT sta.no_induk, ta.label AS tahun_ajaran, sta.spp_perbulan_snapshot,sta.spp_covered_by_psb
     FROM siswa_tahun_ajaran sta
     JOIN tahun_ajaran ta ON ta.id = sta.tahun_ajaran_id
     WHERE sta.status = 'aktif'
@@ -69,27 +77,12 @@ while ($placement = $placementResult->fetch_assoc()) {
     $spp_placements[$placement['no_induk']][] = [
         'tahun_ajaran' => (string)$placement['tahun_ajaran'],
         'tarif' => (float)$placement['spp_perbulan_snapshot'],
+        'covered_by_psb' => (int)$placement['spp_covered_by_psb'],
     ];
 }
 
-$du_bills = [];
-$du_bill_result = $koneksi->query("SELECT tdu.id, tdu.no_induk, tdu.kelas_snapshot, tdu.tahun_ajaran_snapshot,
-        tdu.nominal_tagihan, tdu.status, ta.status AS tahun_status,
-        COALESCE(SUM(bd.jumlah), 0) AS paid
-    FROM tagihan_daftar_ulang tdu
-    JOIN tahun_ajaran ta ON ta.id = tdu.tahun_ajaran_id
-    LEFT JOIN bayar_du bd ON bd.tagihan_daftar_ulang_id = tdu.id
-    GROUP BY tdu.id, tdu.no_induk, tdu.kelas_snapshot, tdu.tahun_ajaran_snapshot,
-             tdu.nominal_tagihan, tdu.status, ta.status");
-while ($bill = $du_bill_result->fetch_assoc()) {
-    $du_bills[$bill['no_induk']][$bill['tahun_ajaran_snapshot']] = [
-        'id' => (int)$bill['id'], 'kelas' => (string)$bill['kelas_snapshot'],
-        'total' => (float)$bill['nominal_tagihan'], 'paid' => (float)$bill['paid'],
-        'status' => (string)$bill['status'], 'tahun_status' => (string)$bill['tahun_status'],
-    ];
-}
+$du_bills = du_selectable_bills_payload($koneksi);
 
-$activeAcademicYear = du_current_academic_year();
 $annual_fee_payload = annual_fee_payload_for_options($koneksi);
 
 $biaya_lain_bills = [];
@@ -140,7 +133,7 @@ unset($_SESSION['flash']);
   <meta name="description" content="Form input transaksi pembayaran siswa." />
   <link rel="preconnect" href="https://fonts.googleapis.com" />
   <link href="https://fonts.googleapis.com/css2?family=Inter:wght@300;400;500;600;700;800&display=swap" rel="stylesheet" />
-  <link rel="stylesheet" href="../assets/css/style.css?v=9.6" />
+  <link rel="stylesheet" href="../assets/css/style.css?v=9.9" />
   <!-- Prevent theme flash -->
   <script>(function(){var t=localStorage.getItem('spp_theme')||'dark';document.documentElement.setAttribute('data-theme',t);})();</script>
 </head>
@@ -281,30 +274,22 @@ unset($_SESSION['flash']);
                   data-nis="<?= htmlspecialchars($s['NO_INDUK']) ?>"
                   data-diknas="<?= htmlspecialchars((string)($s['NO_induk_diknas'] ?? '')) ?>"
                   data-nama="<?= htmlspecialchars($s['NAMA']) ?>"
-                  data-kelas="<?= htmlspecialchars(class_label(['tingkat'=>$s['master_tingkat']?:$s['KELAS'],'kode_rombel'=>$s['kode_rombel']??'BELUM','is_placeholder'=>$s['is_placeholder']??1])) ?>"
+                  data-kelas="<?= htmlspecialchars($s['graduation_year'] ? ('LULUS · TA '.$s['graduation_year']) : class_label(['tingkat'=>$s['master_tingkat']?:$s['KELAS'],'kode_rombel'=>$s['kode_rombel']??'BELUM','is_placeholder'=>$s['is_placeholder']??1])) ?>"
+                  data-is-graduate="<?= $s['graduation_year'] ? '1' : '0' ?>"
+                  data-graduation-year="<?= htmlspecialchars((string)$s['graduation_year']) ?>"
                   data-total-pangkal="<?= money_attr(total_after_discount($s['PANGKAL'], $s['potong_pangkal'], $s['tot_pangkal'])) ?>"
-                  data-total-bangunan="<?= money_attr($s['BANGUNAN']) ?>"
-                  data-total-seragam="<?= money_attr($s['SERAGAM']) ?>"
-                  data-total-kegiatan="<?= money_attr($s['KEGIATAN']) ?>"
+                  data-total-psb="<?= money_attr($s['PSB']) ?>"
                   data-total-spp="<?= money_attr($s['SPP_PERBULAN']) ?>"
                   data-total-komite="<?= money_attr($s['POMG']) ?>"
-                  data-total-makan="<?= money_attr($s['MAKAN']) ?>"
-                  data-total-sorga="<?= money_attr($s['SORGA']) ?>"
-                  data-total-infaq="<?= money_attr($s['INFAQ']) ?>"
                   data-paid-pangkal="<?= money_attr($s['paid_pangkal']) ?>"
-                  data-paid-bangunan="<?= money_attr($s['paid_bangunan']) ?>"
-                  data-paid-seragam="<?= money_attr($s['paid_seragam']) ?>"
-                  data-paid-kegiatan="<?= money_attr($s['paid_kegiatan']) ?>"
+                  data-paid-psb="<?= money_attr($s['paid_psb']) ?>"
                   data-paid-spp-periods="<?= htmlspecialchars(json_encode($period_payments[$s['NO_INDUK']]['spp'] ?? []), ENT_QUOTES, 'UTF-8') ?>"
                   data-spp-placements="<?= htmlspecialchars(json_encode($spp_placements[$s['NO_INDUK']] ?? [], JSON_UNESCAPED_UNICODE), ENT_QUOTES, 'UTF-8') ?>"
                   data-paid-komite-periods="<?= htmlspecialchars(json_encode($period_payments[$s['NO_INDUK']]['komite'] ?? []), ENT_QUOTES, 'UTF-8') ?>"
-                  data-paid-makan="<?= money_attr($s['paid_makan']) ?>"
-                  data-paid-sorga="<?= money_attr($s['paid_sorga']) ?>"
-                  data-paid-infaq="<?= money_attr($s['paid_infaq']) ?>"
                   data-annual-fees="<?= htmlspecialchars(json_encode($annual_fee_payload[$s['NO_INDUK']] ?? [], JSON_UNESCAPED_UNICODE), ENT_QUOTES, 'UTF-8') ?>"
                   data-du-bills="<?= htmlspecialchars(json_encode($du_bills[$s['NO_INDUK']] ?? []), ENT_QUOTES, 'UTF-8') ?>"
                   data-biaya-lain-bills="<?= htmlspecialchars(json_encode($biaya_lain_bills[$s['NO_INDUK']] ?? [], JSON_UNESCAPED_UNICODE), ENT_QUOTES, 'UTF-8') ?>">
-                  <?= htmlspecialchars($s['NAMA']) ?> (<?= htmlspecialchars(class_label(['tingkat'=>$s['master_tingkat']?:$s['KELAS'],'kode_rombel'=>$s['kode_rombel']??'BELUM','is_placeholder'=>$s['is_placeholder']??1])) ?>)
+                  <?= htmlspecialchars($s['NAMA']) ?> (<?= htmlspecialchars($s['graduation_year'] ? ('LULUS · TA '.$s['graduation_year']) : class_label(['tingkat'=>$s['master_tingkat']?:$s['KELAS'],'kode_rombel'=>$s['kode_rombel']??'BELUM','is_placeholder'=>$s['is_placeholder']??1])) ?>)
                 </option>
                 <?php endwhile; ?>
               </datalist>
@@ -325,7 +310,7 @@ unset($_SESSION['flash']);
 
           <!-- Rincian Pembayaran -->
           <div class="section-divider"><span>Rincian Pembayaran</span></div>
-          <p class="payment-auto-note">Kolom total, sudah terbayar, dan sisa dihitung otomatis dari riwayat transaksi.</p>
+          <p class="payment-auto-note">Kolom dihitung dari riwayat. SPP dan Komite mengikuti periode transaksi, sedangkan Daftar Ulang mengikuti tahun ajaran yang dipilih.</p>
           <div class="alert alert-warning payment-overpaid-alert" id="payment-overpaid-alert" hidden></div>
           <div class="alert alert-warning payment-input-overlimit-alert" id="payment-input-overlimit-alert" hidden></div>
           <div class="table-container">
@@ -343,21 +328,16 @@ unset($_SESSION['flash']);
                 <?php
                 $komponen = [
                   ['pangkal', '💰 Uang Pangkal', 'uang_pangkal'],
-                  ['bangunan', '🏗️ Uang Bangunan', 'uang_bangunan'],
-                  ['seragam', '👔 Uang Seragam', 'uang_seragam'],
-                  ['kegiatan', '🎡 Uang Kegiatan', 'uang_kegiatan'],
+                  ['psb', '🎒 Uang PSB', 'uang_psb'],
                   ['spp', '🎓 Uang SPP', 'uang_spp'],
-                  ['makan', '🍽️ Uang Makan', 'uang_makan'],
-                  ['sorga', '🌅 Uang Sorga', 'uang_sorga'],
-                  ['infaq', '🕌 Uang Infaq', 'uang_infaq'],
+                  ['komite', '🏫 Uang Komite', 'uang_komite'],
                   ['du', '📚 Daftar Ulang', 'uang_du']
                 ];
-                array_splice($komponen, 5, 0, [[ 'komite', '🏫 Uang Komite', 'uang_komite' ]]);
                 foreach ($komponen as $i => $k):
                   [$key, $label, $name] = $k;
                 ?>
                 <tr class="<?= $i % 2 === 0 ? 'row-highlight' : '' ?>">
-                  <td><span class="comp-label"<?= $key === 'spp' ? ' id="spp-component-label"' : '' ?>><?= $label ?><?= $key === 'spp' ? ' (' . htmlspecialchars($month_labels[$cur]) . ')' : '' ?></span><?php if($key==='spp'): ?><small class="du-inline-context du-context-label" id="spp-context-label">SPP wajib dibayar penuh</small><?php endif; ?><?php if(in_array($key,['komite','makan','sorga','infaq'],true)): ?><small class="du-inline-context du-context-label" id="<?= $key ?>-context-label">Tagihan tahunan bisa dicicil</small><?php endif; ?><?php if($key==='du'): ?><small class="du-inline-context du-context-label" id="du-context-label">Pilih siswa, bulan, dan tahun pembayaran.</small><small class="du-inline-context du-master-warning" id="du-master-warning" hidden></small><?php endif; ?></td>
+                  <td><?php if($key==='du'): ?><div class="du-bill-selector"><span class="comp-label du-static-label" id="du-static-label"><?= $label ?></span><button type="button" class="du-selector-trigger" id="du-selector-trigger" aria-haspopup="listbox" aria-controls="du-selector-menu" aria-expanded="false" hidden><span class="du-trigger-label"><?= $label ?></span><span class="du-arrear-warning" id="du-arrear-warning" role="img"></span><span class="du-chevron" aria-hidden="true">⌄</span></button><div class="du-selector-menu" id="du-selector-menu" role="listbox" aria-label="Pilih tagihan Daftar Ulang" tabindex="-1" hidden></div></div><?php else: ?><span class="comp-label"<?= $key === 'spp' ? ' id="spp-component-label"' : '' ?>><?= $label ?><?= $key === 'spp' ? ' (' . htmlspecialchars($month_labels[$cur]) . ')' : '' ?></span><?php endif; ?><?php if($key==='spp'): ?><small class="du-inline-context du-context-label" id="spp-context-label">SPP wajib dibayar penuh</small><?php endif; ?><?php if($key==='komite'): ?><small class="du-inline-context du-context-label" id="komite-context-label">Tagihan tahunan bisa dicicil</small><?php endif; ?><?php if(in_array($key,['pangkal','psb'],true)): ?><small class="du-inline-context du-context-label">Tagihan satu kali, dapat dicicil</small><?php endif; ?><?php if($key==='du'): ?><small class="du-inline-context du-context-label" id="du-context-label">Pilih siswa untuk melihat tagihan.</small><small class="du-inline-context du-master-warning" id="du-master-warning" hidden></small><?php endif; ?></td>
                   <td data-label="Total Tagihan"><input class="tbl-input tbl-system" type="text" value="0" id="<?=$key?>-total" readonly tabindex="-1" aria-readonly="true" /></td>
                   <td data-label="Sudah Terbayar"><input class="tbl-input tbl-system" type="text" value="0" id="<?=$key?>-bayar" readonly tabindex="-1" aria-readonly="true" /></td>
                   <td data-label="Sisa"><input class="tbl-input tbl-system tbl-system-sisa" type="text" value="0" id="<?=$key?>-sisa" readonly tabindex="-1" aria-readonly="true" /></td>
@@ -371,6 +351,7 @@ unset($_SESSION['flash']);
 
           <input type="hidden" id="kelas-du" name="kelas_du" value="" />
           <input type="hidden" id="tahun-ajaran-du" name="tahun_ajaran_du" value="<?= htmlspecialchars($activeAcademicYear) ?>" />
+          <input type="hidden" id="tagihan-daftar-ulang-id" name="tagihan_daftar_ulang_id" value="" />
 
           <!-- Lain-lain -->
           <div class="section-divider"><span>Lain-lain</span></div>
@@ -499,7 +480,7 @@ unset($_SESSION['flash']);
       JSON_UNESCAPED_UNICODE | JSON_UNESCAPED_SLASHES | JSON_HEX_TAG | JSON_HEX_APOS | JSON_HEX_AMP | JSON_HEX_QUOT
     ) ?>;
   </script>
-  <script src="../assets/js/app.js?v=6.7"></script>
+  <script src="../assets/js/app.js?v=6.9"></script>
 </body>
 </html>
 

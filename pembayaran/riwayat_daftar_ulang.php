@@ -300,7 +300,7 @@ unset($_SESSION['flash']);
                     <?php foreach ($group['transactions'] as $transaction): ?>
                       <div class="du-payment-entry">
                         <div><strong><?= du_money($transaction['jumlah']) ?></strong><span><?= du_e($transaction['full_date']['date']) ?> · <?= du_e($transaction['full_date']['time']) ?></span></div>
-                        <div class="du-payment-actions"><a class="btn-tbl btn-tbl-print" href="../laporan/cetak_struk.php?id=<?= (int)$transaction['bayar_id'] ?>" target="_blank" rel="noopener">Cetak</a><?php if ((int)$transaction['payment_link_version'] === 1): ?><a class="btn-tbl btn-tbl-edit" href="edit.php?id=<?= (int)$transaction['bayar_id'] ?>">Edit</a><?php endif; ?></div>
+                        <div class="du-payment-actions"><a class="btn-tbl btn-tbl-print" href="../laporan/cetak_struk.php?id=<?= (int)$transaction['bayar_id'] ?>" target="_blank" rel="noopener">Cetak</a><?php if (hasRole(['admin']) && (int)$transaction['payment_link_version'] === 1): ?><a class="btn-tbl btn-tbl-edit" href="edit.php?id=<?= (int)$transaction['bayar_id'] ?>">Edit</a><?php endif; ?></div>
                       </div>
                     <?php endforeach; ?>
                     </div>

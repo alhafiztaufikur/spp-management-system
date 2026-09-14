@@ -67,16 +67,8 @@ CREATE TABLE `siswa` (
   `master_kelas_id` INT DEFAULT NULL,
   `SPP_PERBULAN`    DECIMAL(15,2) NOT NULL DEFAULT 0,
   `PANGKAL`         DECIMAL(15,2) NOT NULL DEFAULT 0,
-  `BANGUNAN`        DECIMAL(15,2) NOT NULL DEFAULT 0,
-  `SERAGAM`         DECIMAL(15,2) NOT NULL DEFAULT 0,
-  `KEGIATAN`        DECIMAL(15,2) NOT NULL DEFAULT 0,
-  `MAKAN`           DECIMAL(15,2) NOT NULL DEFAULT 0,
-  `SORGA`           DECIMAL(15,2) NOT NULL DEFAULT 0,
-  `INFAQ`           DECIMAL(15,2) NOT NULL DEFAULT 0,
-  `PANGKAL_BAYAR`   DECIMAL(15,2) NOT NULL DEFAULT 0,
-  `BANGUNAN_BAYAR`  DECIMAL(15,2) NOT NULL DEFAULT 0,
-  `SERAGAM_BAYAR`   DECIMAL(15,2) NOT NULL DEFAULT 0,
-  `KEGIATAN_BAYAR`  DECIMAL(15,2) NOT NULL DEFAULT 0,
+  `PSB`             DECIMAL(15,2) NOT NULL DEFAULT 0,
+  `asal_psb`        TINYINT(1) NOT NULL DEFAULT 0,
   `POMG`            DECIMAL(15,2) NOT NULL DEFAULT 0,
   `DAFTAR_ULANG`    DECIMAL(15,2) NOT NULL DEFAULT 0,
   `NO_induk_diknas` CHAR(10) DEFAULT NULL,
@@ -90,7 +82,8 @@ CREATE TABLE `siswa` (
   KEY `idx_siswa_status_kelas_nama` (`is_active`, `KELAS`, `NAMA`),
   KEY `idx_siswa_master_kelas` (`master_kelas_id`,`is_active`,`NAMA`),
   CONSTRAINT `fk_siswa_master_kelas` FOREIGN KEY (`master_kelas_id`) REFERENCES `master_kelas`(`id`) ON DELETE RESTRICT ON UPDATE CASCADE,
-  CONSTRAINT `chk_siswa_kelas_sd` CHECK (`KELAS` IN ('0','1','2','3','4','5','6','PSB'))
+  CONSTRAINT `chk_siswa_kelas_sd` CHECK (`KELAS` IN ('0','1','2','3','4','5','6','PSB')),
+  CONSTRAINT `chk_siswa_psb` CHECK (`PSB` >= 0 AND `asal_psb` IN (0,1))
 ) ENGINE=InnoDB;
 
 -- Audit perubahan master siswa
@@ -114,39 +107,15 @@ CREATE TABLE `siswa_audit_log` (
 -- Data siswa contoh
 INSERT INTO `siswa` (
   `NO_INDUK`, `NO_induk_diknas`, `NAMA`, `KELAS`, `SPP_PERBULAN`,
-  `PANGKAL`, `BANGUNAN`, `SERAGAM`, `KEGIATAN`, `MAKAN`, `SORGA`, `INFAQ`,
-  `POMG`, `DAFTAR_ULANG`, `tot_pangkal`, `tot_du`
+  `PANGKAL`, `PSB`, `asal_psb`, `POMG`, `DAFTAR_ULANG`, `tot_pangkal`, `tot_du`
 ) VALUES
-('2024001', NULL,      'Ahmad Fauzi',             '1', 250000, 1000000, 1500000, 500000, 300000,      0,     0,     0,      0, 1000000, 1000000, 1000000),
-('2024002', NULL,      'Siti Rahayu',             '2', 250000, 1000000, 1500000, 500000, 300000,      0,     0,     0,      0, 1100000, 1000000, 1100000),
-('2024003', NULL,      'Budi Santoso',            '3', 275000, 1000000, 1500000, 500000, 300000,      0,     0,     0,      0, 1200000, 1000000, 1200000),
-('2024004', NULL,      'Dewi Lestari',            '4', 275000, 1000000, 1500000, 500000, 300000,      0,     0,     0,      0, 1300000, 1000000, 1300000),
-('2024005', NULL,      'Muhammad Rizky',          '5', 300000, 1000000, 1500000, 500000, 300000,      0,     0,     0,      0, 1400000, 1000000, 1400000),
-('2024006', NULL,      'Ayu Putri',               '6', 300000, 1000000, 1500000, 500000, 300000, 200000, 70000, 40000, 150000, 1500000, 1000000, 1500000),
-('2026101', 'D260101', 'Alya Nabila Demo',        '1', 250000, 1000000, 1500000, 500000, 300000, 180000, 50000, 25000, 100000, 1000000, 1000000, 1000000),
-('2026102', 'D260102', 'Rafi Pratama Demo',       '1', 250000, 1000000, 1500000, 500000, 300000, 180000, 50000, 25000, 100000, 1000000, 1000000, 1000000),
-('2026103', 'D260103', 'Kirana Putri Demo',       '2', 260000, 1100000, 1550000, 525000, 325000, 185000, 50000, 30000, 110000, 1100000, 1100000, 1100000),
-('2026104', 'D260104', 'Bagas Saputra Demo',      '2', 260000, 1100000, 1550000, 525000, 325000, 185000, 50000, 30000, 110000, 1100000, 1100000, 1100000),
-('2026105', 'D260105', 'Naya Ramadhani Demo',     '3', 275000, 1200000, 1600000, 550000, 350000, 190000, 60000, 30000, 120000, 1200000, 1200000, 1200000),
-('2026106', 'D260106', 'Dimas Arya Demo',         '3', 275000, 1200000, 1600000, 550000, 350000, 190000, 60000, 30000, 120000, 1200000, 1200000, 1200000),
-('2026107', 'D260107', 'Salsa Azzahra Demo',      '4', 290000, 1300000, 1650000, 575000, 375000, 195000, 60000, 35000, 130000, 1300000, 1300000, 1300000),
-('2026108', 'D260108', 'Fadli Maulana Demo',      '4', 290000, 1300000, 1650000, 575000, 375000, 195000, 60000, 35000, 130000, 1300000, 1300000, 1300000),
-('2026109', 'D260109', 'Citra Maharani Demo',     '5', 305000, 1400000, 1700000, 600000, 400000, 200000, 70000, 40000, 140000, 1400000, 1400000, 1400000),
-('2026110', 'D260110', 'Farhan Hafizh Demo',      '6', 320000, 1500000, 1750000, 625000, 425000, 210000, 70000, 40000, 150000, 1500000, 1500000, 1500000),
-('2026111', 'D260111', 'Andika Pratama Demo',     '1', 250000, 1000000, 1500000, 500000, 300000, 180000, 50000, 25000, 100000, 1000000, 1000000, 1000000),
-('2026112', 'D260112', 'Mira Aulia Demo',         '1', 250000, 1000000, 1500000, 500000, 300000, 180000, 50000, 25000, 100000, 1000000, 1000000, 1000000),
-('2026113', 'D260113', 'Rizky Ramadhan Demo',     '2', 260000, 1100000, 1550000, 525000, 325000, 185000, 50000, 30000, 110000, 1100000, 1100000, 1100000),
-('2026114', 'D260114', 'Tiara Safitri Demo',      '2', 260000, 1100000, 1550000, 525000, 325000, 185000, 50000, 30000, 110000, 1100000, 1100000, 1100000),
-('2026115', 'D260115', 'Gilang Saputra Demo',     '3', 275000, 1200000, 1600000, 550000, 350000, 190000, 60000, 30000, 120000, 1200000, 1200000, 1200000),
-('2026116', 'D260116', 'Putri Amelia Demo',       '3', 275000, 1200000, 1600000, 550000, 350000, 190000, 60000, 30000, 120000, 1200000, 1200000, 1200000),
-('2026117', 'D260117', 'Raka Firmansyah Demo',    '4', 290000, 1300000, 1650000, 575000, 375000, 195000, 60000, 35000, 130000, 1300000, 1300000, 1300000),
-('2026118', 'D260118', 'Zahra Nuraini Demo',      '4', 290000, 1300000, 1650000, 575000, 375000, 195000, 60000, 35000, 130000, 1300000, 1300000, 1300000),
-('2026119', 'D260119', 'Hafiz Alfarizi Demo',     '5', 305000, 1400000, 1700000, 600000, 400000, 200000, 70000, 40000, 140000, 1400000, 1400000, 1400000),
-('2026120', 'D260120', 'Laras Puspita Demo',      '5', 305000, 1400000, 1700000, 600000, 400000, 200000, 70000, 40000, 140000, 1400000, 1400000, 1400000),
-('2026121', 'D260121', 'Naufal Akbar Demo',       '5', 305000, 1400000, 1700000, 600000, 400000, 200000, 70000, 40000, 140000, 1400000, 1400000, 1400000),
-('2026122', 'D260122', 'Sabrina Fitri Demo',      '6', 320000, 1500000, 1750000, 625000, 425000, 210000, 70000, 40000, 150000, 1500000, 1500000, 1500000),
-('2026123', 'D260123', 'Arkan Maulana Demo',      '6', 320000, 1500000, 1750000, 625000, 425000, 210000, 70000, 40000, 150000, 1500000, 1500000, 1500000),
-('2026124', 'D260124', 'Nadya Khairunnisa Demo',  '6', 320000, 1500000, 1750000, 625000, 425000, 210000, 70000, 40000, 150000, 1500000, 1500000, 1500000);
+('2024001', NULL,      'Ahmad Fauzi',      '1', 250000, 1000000, 0, 0, 100000, 1000000, 1000000, 1000000),
+('2024002', NULL,      'Siti Rahayu',      '2', 260000, 1100000, 0, 0, 110000, 1100000, 1100000, 1100000),
+('2024003', NULL,      'Budi Santoso',     '3', 275000, 1200000, 0, 0, 120000, 1200000, 1200000, 1200000),
+('2024004', NULL,      'Dewi Lestari',     '4', 290000, 1300000, 0, 0, 130000, 1300000, 1300000, 1300000),
+('2024005', NULL,      'Muhammad Rizky',   '5', 305000, 1400000, 0, 0, 140000, 1400000, 1400000, 1400000),
+('2024006', NULL,      'Ayu Putri',        '6', 320000, 1500000, 0, 0, 150000, 1500000, 1500000, 1500000),
+('PSB0001', 'D26PSB001','Calon Siswa PSB','PSB', 0, 500000, 3600000, 1, 0, 0, 500000, 0);
 
 UPDATE `siswa` s
 JOIN `master_kelas` mk
@@ -155,6 +124,11 @@ JOIN `master_kelas` mk
  AND mk.is_placeholder = 0
 SET s.master_kelas_id = mk.id
 WHERE s.KELAS IN ('1','2','3','4','5','6');
+
+UPDATE `siswa` s
+JOIN `master_kelas` mk ON mk.id=s.master_kelas_id
+SET s.asal_psb=1
+WHERE mk.tingkat=0 OR UPPER(mk.kode_rombel)='PSB';
 
 -- Tabel Bayar (Revisi Baru)
 DROP TABLE IF EXISTS `bayar`;
@@ -165,13 +139,8 @@ CREATE TABLE `bayar` (
   `master_kelas_id` INT DEFAULT NULL,
   `kelas_rombel_snapshot` VARCHAR(30) DEFAULT NULL,
   `U_PANGKAL`   DOUBLE DEFAULT 0,
-  `U_BANGUNAN`  DOUBLE DEFAULT 0,
-  `U_SERAGAM`   DOUBLE DEFAULT 0,
-  `U_KEGIATAN`  DOUBLE DEFAULT 0,
+  `U_PSB`       DECIMAL(15,2) NOT NULL DEFAULT 0,
   `U_SPP`       DOUBLE DEFAULT 0,
-  `U_MAKAN`     DOUBLE DEFAULT 0,
-  `U_SORGA`     DOUBLE DEFAULT 0,
-  `U_INFAQ`     DOUBLE DEFAULT 0,
   `U_KOMITE`    DECIMAL(15,2) NOT NULL DEFAULT 0,
   `U_LAIN`      DOUBLE DEFAULT 0,
   `KETERANGAN`  VARCHAR(255) DEFAULT NULL,
@@ -203,7 +172,8 @@ CREATE TABLE `bayar` (
   KEY `idx_bayar_tanggal_operator_metode` (`TGL_BYR`,`user_id`,`sistem_pembayaran`),
   KEY `idx_bayar_siswa_periode` (`NO_INDUK`,`TAHUN`,`BULAN`),
   CONSTRAINT `fk_bayar_master_kelas` FOREIGN KEY (`master_kelas_id`) REFERENCES `master_kelas`(`id`) ON DELETE RESTRICT ON UPDATE CASCADE,
-  FOREIGN KEY (`NO_INDUK`) REFERENCES `siswa`(`NO_INDUK`) ON DELETE CASCADE ON UPDATE CASCADE
+  CONSTRAINT `fk_bayar_siswa` FOREIGN KEY (`NO_INDUK`) REFERENCES `siswa`(`NO_INDUK`) ON DELETE CASCADE ON UPDATE CASCADE,
+  CONSTRAINT `chk_bayar_psb` CHECK (`U_PSB` >= 0)
 ) ENGINE=InnoDB;
 
 -- Pemetaan periode per transaksi SPP. Satu siswa hanya boleh memiliki satu
@@ -314,6 +284,7 @@ CREATE TABLE `siswa_tahun_ajaran` (
   `no_induk` VARCHAR(10) NOT NULL, `kelas` VARCHAR(10) NOT NULL,
   `master_kelas_id` INT DEFAULT NULL, `kelas_rombel_snapshot` VARCHAR(30) DEFAULT NULL,
   `spp_perbulan_snapshot` DECIMAL(15,2) NOT NULL DEFAULT 0,
+  `spp_covered_by_psb` TINYINT(1) NOT NULL DEFAULT 0,
   `komite_snapshot` DECIMAL(15,2) NOT NULL DEFAULT 0,
   `status` ENUM('aktif','pindah','lulus') NOT NULL DEFAULT 'aktif',
   `created_at` TIMESTAMP NOT NULL DEFAULT CURRENT_TIMESTAMP,
@@ -325,7 +296,8 @@ CREATE TABLE `siswa_tahun_ajaran` (
   CONSTRAINT `fk_penempatan_tahun_ajaran` FOREIGN KEY (`tahun_ajaran_id`) REFERENCES `tahun_ajaran`(`id`) ON DELETE RESTRICT ON UPDATE CASCADE,
   CONSTRAINT `fk_penempatan_siswa` FOREIGN KEY (`no_induk`) REFERENCES `siswa`(`NO_INDUK`) ON DELETE RESTRICT ON UPDATE CASCADE,
   CONSTRAINT `fk_penempatan_master_kelas` FOREIGN KEY (`master_kelas_id`) REFERENCES `master_kelas`(`id`) ON DELETE RESTRICT ON UPDATE CASCADE,
-  CONSTRAINT `chk_penempatan_kelas_sd` CHECK (`kelas` IN ('0','1','2','3','4','5','6','PSB'))
+  CONSTRAINT `chk_penempatan_kelas_sd` CHECK (`kelas` IN ('0','1','2','3','4','5','6','PSB')),
+  CONSTRAINT `chk_penempatan_psb_spp` CHECK (`spp_covered_by_psb` IN (0,1) AND (`spp_covered_by_psb` = 0 OR `spp_perbulan_snapshot` = 0))
 ) ENGINE=InnoDB;
 CREATE TABLE `Daftar_ulang` (
   `id` INT AUTO_INCREMENT PRIMARY KEY, `tahun_ajaran_id` INT DEFAULT NULL,
@@ -446,7 +418,8 @@ SELECT ta.id, s.NO_INDUK, s.KELAS, s.master_kelas_id,
        s.SPP_PERBULAN, s.POMG, 'aktif'
 FROM siswa s
 JOIN tahun_ajaran ta ON ta.label = '2026/2027'
-LEFT JOIN master_kelas mk ON mk.id = s.master_kelas_id;
+LEFT JOIN master_kelas mk ON mk.id = s.master_kelas_id
+WHERE COALESCE(mk.tingkat,CAST(s.KELAS AS UNSIGNED))>0;
 
 INSERT INTO `tagihan_daftar_ulang` (
   `tahun_ajaran_id`, `penempatan_id`, `master_daftar_ulang_id`,
@@ -472,15 +445,7 @@ FROM siswa s
 JOIN tahun_ajaran ta ON ta.label = '2026/2027'
 JOIN siswa_tahun_ajaran sta ON sta.tahun_ajaran_id = ta.id AND sta.no_induk = s.NO_INDUK
 JOIN (
-  SELECT 'pangkal' AS komponen, sf.`NO_INDUK`, sf.`PANGKAL` AS nominal_awal, sf.`potong_pangkal` AS potongan,
-         IF(sf.`tot_pangkal` > 0, sf.`tot_pangkal`, GREATEST(sf.`PANGKAL` - sf.`potong_pangkal`, 0)) AS nominal_tagihan FROM `siswa` sf
-  UNION ALL SELECT 'bangunan', sf.`NO_INDUK`, sf.`BANGUNAN`, 0, sf.`BANGUNAN` FROM `siswa` sf
-  UNION ALL SELECT 'seragam', sf.`NO_INDUK`, sf.`SERAGAM`, 0, sf.`SERAGAM` FROM `siswa` sf
-  UNION ALL SELECT 'kegiatan', sf.`NO_INDUK`, sf.`KEGIATAN`, 0, sf.`KEGIATAN` FROM `siswa` sf
-  UNION ALL SELECT 'komite', sf.`NO_INDUK`, sf.`POMG`, 0, sf.`POMG` FROM `siswa` sf
-  UNION ALL SELECT 'makan', sf.`NO_INDUK`, sf.`MAKAN`, 0, sf.`MAKAN` FROM `siswa` sf
-  UNION ALL SELECT 'sorga', sf.`NO_INDUK`, sf.`SORGA`, 0, sf.`SORGA` FROM `siswa` sf
-  UNION ALL SELECT 'infaq', sf.`NO_INDUK`, sf.`INFAQ`, 0, sf.`INFAQ` FROM `siswa` sf
+  SELECT 'komite' AS komponen, sf.`NO_INDUK`, sf.`POMG` AS nominal_awal, 0 AS potongan, sf.`POMG` AS nominal_tagihan FROM `siswa` sf
 ) fees ON fees.NO_INDUK = s.NO_INDUK;
 
 -- Tabel Tabungan

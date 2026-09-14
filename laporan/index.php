@@ -163,13 +163,8 @@ foreach ($studentOptions as $studentOption) {
 $stmt = $koneksi->prepare("
     SELECT COUNT(*) AS jml_tx,
            COALESCE(SUM(b.U_PANGKAL), 0) AS pangkal,
-           COALESCE(SUM(b.U_BANGUNAN), 0) AS bangunan,
-           COALESCE(SUM(b.U_SERAGAM), 0) AS seragam,
-           COALESCE(SUM(b.U_KEGIATAN), 0) AS kegiatan,
+           COALESCE(SUM(b.U_PSB), 0) AS psb,
            COALESCE(SUM(b.U_SPP), 0) AS spp,
-           COALESCE(SUM(b.U_MAKAN), 0) AS makan,
-           COALESCE(SUM(b.U_SORGA), 0) AS sorga,
-           COALESCE(SUM(b.U_INFAQ), 0) AS infaq,
            COALESCE(SUM(b.U_KOMITE), 0) AS komite,
            COALESCE(SUM(b.total_jumlah), 0) AS total
     FROM bayar b
@@ -272,8 +267,7 @@ if (!$isUnpaidReport) {
 
     $stmt4 = $koneksi->prepare("
         SELECT b.id, s.NO_INDUK, s.NO_induk_diknas, s.NAMA, s.KELAS, b.BULAN, b.TAHUN,
-               b.U_PANGKAL, b.U_BANGUNAN, b.U_SERAGAM, b.U_KEGIATAN,
-               b.U_SPP, b.U_MAKAN, b.U_SORGA, b.U_INFAQ, b.U_KOMITE,
+               b.U_PANGKAL, b.U_PSB, b.U_SPP, b.U_KOMITE,
                b.sistem_pembayaran, b.total_jumlah, b.TGL_BYR
         FROM bayar b
         JOIN siswa s ON s.NO_INDUK = b.NO_INDUK
@@ -562,14 +556,9 @@ $exportQuery = http_build_query([
               <?php
               $komponen_map = [
                 'Uang Pangkal' => $bayar_recap['pangkal'],
-                'Uang Bangunan' => $bayar_recap['bangunan'],
-                'Uang Seragam' => $bayar_recap['seragam'],
-                'Uang Kegiatan' => $bayar_recap['kegiatan'],
+                'Uang PSB' => $bayar_recap['psb'],
                 'Uang SPP' => $bayar_recap['spp'],
                 'Uang Komite' => $bayar_recap['komite'],
-                'Uang Makan' => $bayar_recap['makan'],
-                'Uang Sorga' => $bayar_recap['sorga'],
-                'Uang Infaq' => $bayar_recap['infaq'],
                 'Daftar Ulang' => $total_du_periode,
               ];
               $shownComponents = 0;

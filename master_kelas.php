@@ -46,7 +46,7 @@ if ($_SERVER['REQUEST_METHOD'] === 'POST') {
             $koneksi->begin_transaction();
             $result = class_manual_graduate_student($koneksi, trim((string)($_POST['no_induk'] ?? '')), $targetYear);
             $koneksi->commit();
-            $message = $result['student'] . ' berhasil diluluskan untuk tahun ajaran ' . $result['target_year'] . '.';
+            $message = $result['student'] . ' berhasil diluluskan pada tahun ajaran ' . $result['graduation_year'] . '.';
         } elseif ($action === 'naikkan_siswa') {
             $targetYear = (string)($_POST['target_tahun_ajaran'] ?? class_next_academic_year_label(du_current_academic_year()));
             $targetClassId = (int)($_POST['target_master_kelas_id'] ?? 0);
@@ -253,7 +253,7 @@ $classFilterQuery = ['q_kelas' => $classSearch, 'tingkat_kelas' => $classLevelFi
           <div class="promotion-stage-overview">
             <div><span>Tahap Aktif</span><strong><?= $currentPromotionLevel === 6 ? 'Kelulusan Kelas 6' : 'Kenaikan Kelas ' . (int)$currentPromotionLevel ?></strong></div>
             <div><span>Siswa Tersisa</span><strong><?= number_format(count($promotionStudents)) ?> siswa</strong></div>
-            <div><span>Tahun Ajaran Tujuan</span><strong><?= htmlspecialchars($nextAcademicYear) ?></strong></div>
+            <div><span><?= $currentPromotionLevel === 6 ? 'Tahun Ajaran Kelulusan' : 'Tahun Ajaran Tujuan' ?></span><strong><?= htmlspecialchars($currentPromotionLevel === 6 ? du_current_academic_year() : $nextAcademicYear) ?></strong></div>
           </div>
 
           <div class="promotion-filter-bar">

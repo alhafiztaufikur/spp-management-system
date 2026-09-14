@@ -1,0 +1,54 @@
+<!doctype html>
+<html lang="id" data-theme="light">
+<head><meta charset="utf-8"><meta name="viewport" content="width=device-width,initial-scale=1"><title>pending</title><script>localStorage.setItem('spp_theme','light')</script><link rel="stylesheet" href="../assets/css/style.css"><style>body{padding:70px;background:#f7fbf8}.du-smoke-shell{max-width:1120px;margin:auto}.du-smoke-utility{display:none}@media(max-width:720px){body{padding:16px}}</style></head>
+<body>
+  <input class="du-smoke-utility" id="siswa-search" list="siswa-list" value="UJI">
+  <datalist id="siswa-list"><option value="UJI" data-nis="1" data-nama="UJI" data-kelas="1A" data-is-graduate="0" data-du-bills='[{"id":1,"tahun_ajaran":"2026/2027","kelas":"1","total":1000000,"terbayar":1000000,"sisa":0,"status":"open","is_current":true,"is_arrear":false},{"id":2,"tahun_ajaran":"2025/2026","kelas":"1","total":900000,"terbayar":100000,"sisa":800000,"status":"open","is_current":false,"is_arrear":true}]'></option></datalist>
+  <input class="du-smoke-utility" id="disp-nis" value="1"><input class="du-smoke-utility" id="disp-nama"><input class="du-smoke-utility" id="disp-kelas">
+  <main class="du-smoke-shell">
+    <div class="table-container">
+      <table class="payment-table form-payment-table">
+        <thead><tr><th>Komponen Bayar</th><th>Total Tagihan (Rp)</th><th>Sudah Terbayar (Rp)</th><th>Sisa (Rp)</th><th>Input Bayar (Rp)</th></tr></thead>
+        <tbody><tr class="row-highlight">
+          <td>
+            <div class="du-bill-selector"><span class="comp-label du-static-label" id="du-static-label">📚 Daftar Ulang</span>
+              <button class="du-selector-trigger" id="du-selector-trigger" aria-controls="du-selector-menu" hidden><span class="du-trigger-label">📚 Daftar Ulang</span><span class="du-arrear-warning" id="du-arrear-warning"></span><span class="du-chevron">⌄</span></button>
+              <div class="du-selector-menu" id="du-selector-menu" hidden></div>
+            </div>
+            <small class="du-inline-context du-context-label" id="du-context-label"></small><small id="du-master-warning"></small>
+          </td>
+          <td data-label="Total Tagihan"><input class="tbl-input tbl-system" id="du-total"></td>
+          <td data-label="Sudah Terbayar"><input class="tbl-input tbl-system" id="du-bayar"></td>
+          <td data-label="Sisa"><input class="tbl-input tbl-system tbl-system-sisa" id="du-sisa"></td>
+          <td data-label="Input Bayar"><input class="tbl-input tbl-pay" id="du-input"></td>
+        </tr></tbody>
+      </table>
+    </div>
+  </main>
+  <input class="du-smoke-utility" id="tagihan-daftar-ulang-id"><input class="du-smoke-utility" id="kelas-du"><input class="du-smoke-utility" id="tahun-ajaran-du">
+  <script src="../assets/js/app.js"></script>
+  <script>
+    window.addEventListener('load', function () {
+      try {
+        var opt = document.querySelector('#siswa-list option');
+        applyDefaultDaftarUlangClass(opt);
+        applyStudentPaymentDetails(opt);
+        if (document.getElementById('tagihan-daftar-ulang-id').value !== '1') throw new Error('default');
+        if (document.getElementById('du-selector-trigger').hidden) throw new Error('trigger');
+        if (getComputedStyle(document.getElementById('du-static-label')).display !== 'none') throw new Error('duplicate-label');
+        if (document.querySelectorAll('.du-selector-option').length !== 2) throw new Error('options');
+        if (location.search === '?visual') {
+          document.getElementById('du-selector-trigger').click();
+          document.title = 'DU_SELECTOR_VISUAL';
+          return;
+        }
+        document.querySelector('[data-bill-id="2"]').click();
+        if (document.getElementById('tagihan-daftar-ulang-id').value !== '2') throw new Error('selection');
+        document.title = 'DU_SELECTOR_OK';
+      } catch (error) {
+        document.title = 'DU_SELECTOR_FAILED_' + error.message;
+      }
+    });
+  </script>
+</body>
+</html>

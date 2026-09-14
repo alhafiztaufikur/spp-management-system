@@ -12,7 +12,7 @@
 
 USE `db_spp`;
 
-SET NAMES utf8mb4;
+SET NAMES utf8mb4 COLLATE utf8mb4_unicode_ci;
 SET @old_foreign_key_checks := @@FOREIGN_KEY_CHECKS;
 SET FOREIGN_KEY_CHECKS = 0;
 START TRANSACTION;
@@ -48,8 +48,7 @@ WHERE h.`i` * 100 + t.`i` * 10 + o.`i` + 1 BETWEEN 1 AND 144;
 
 INSERT INTO `siswa` (
   `NO_INDUK`, `NO_induk_diknas`, `NAMA`, `KELAS`, `SPP_PERBULAN`,
-  `PANGKAL`, `BANGUNAN`, `SERAGAM`, `KEGIATAN`, `MAKAN`, `SORGA`, `INFAQ`,
-  `POMG`, `DAFTAR_ULANG`, `tot_pangkal`, `tot_du`, `is_active`
+  `PANGKAL`, `PSB`, `asal_psb`, `POMG`, `DAFTAR_ULANG`, `tot_pangkal`, `tot_du`, `is_active`
 )
 SELECT
   CONCAT('2027', LPAD(seq.`n`, 4, '0')),
@@ -64,26 +63,8 @@ SELECT
     WHEN 1 THEN 1000000 WHEN 2 THEN 1100000 WHEN 3 THEN 1200000
     WHEN 4 THEN 1300000 WHEN 5 THEN 1400000 ELSE 1500000
   END,
-  CASE FLOOR((seq.`n` - 31) / 19) + 1
-    WHEN 1 THEN 1500000 WHEN 2 THEN 1550000 WHEN 3 THEN 1600000
-    WHEN 4 THEN 1650000 WHEN 5 THEN 1700000 ELSE 1750000
-  END,
-  CASE FLOOR((seq.`n` - 31) / 19) + 1
-    WHEN 1 THEN 500000 WHEN 2 THEN 525000 WHEN 3 THEN 550000
-    WHEN 4 THEN 575000 WHEN 5 THEN 600000 ELSE 625000
-  END,
-  CASE FLOOR((seq.`n` - 31) / 19) + 1
-    WHEN 1 THEN 300000 WHEN 2 THEN 325000 WHEN 3 THEN 350000
-    WHEN 4 THEN 375000 WHEN 5 THEN 400000 ELSE 425000
-  END,
-  CASE FLOOR((seq.`n` - 31) / 19) + 1
-    WHEN 1 THEN 180000 WHEN 2 THEN 185000 WHEN 3 THEN 190000
-    WHEN 4 THEN 195000 WHEN 5 THEN 200000 ELSE 210000
-  END,
-  CASE WHEN FLOOR((seq.`n` - 31) / 19) + 1 <= 2 THEN 50000
-       WHEN FLOOR((seq.`n` - 31) / 19) + 1 <= 4 THEN 60000 ELSE 70000 END,
-  CASE WHEN FLOOR((seq.`n` - 31) / 19) + 1 <= 2 THEN 25000
-       WHEN FLOOR((seq.`n` - 31) / 19) + 1 <= 4 THEN 30000 ELSE 40000 END,
+  0,
+  0,
   CASE FLOOR((seq.`n` - 31) / 19) + 1
     WHEN 1 THEN 100000 WHEN 2 THEN 110000 WHEN 3 THEN 120000
     WHEN 4 THEN 130000 WHEN 5 THEN 140000 ELSE 150000
@@ -111,12 +92,11 @@ WHERE seq.`n` BETWEEN 31 AND 144
 -- Siswa PSB adalah data calon siswa dan tidak diberi tagihan reguler.
 INSERT INTO `siswa` (
   `NO_INDUK`, `NO_induk_diknas`, `NAMA`, `KELAS`, `SPP_PERBULAN`,
-  `PANGKAL`, `BANGUNAN`, `SERAGAM`, `KEGIATAN`, `MAKAN`, `SORGA`, `INFAQ`,
-  `POMG`, `DAFTAR_ULANG`, `master_kelas_id`, `is_active`
+  `PANGKAL`, `PSB`, `asal_psb`, `POMG`, `DAFTAR_ULANG`, `master_kelas_id`, `is_active`
 )
 SELECT
   psb.`no_induk`, psb.`diknas`, psb.`nama`, 'PSB',
-  0, 0, 0, 0, 0, 0, 0, 0, 0, 0,
+  0, 0, 3600000, 1, 0, 0,
   (SELECT `id` FROM `master_kelas` WHERE `tingkat` = 0 AND `kode_rombel` = 'PSB' LIMIT 1),
   1
 FROM (

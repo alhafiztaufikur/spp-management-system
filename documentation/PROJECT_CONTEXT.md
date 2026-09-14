@@ -91,14 +91,15 @@ Guard backend memakai `requireRole()` dari `includes/auth.php`. Menyembunyikan m
 | Fitur | Admin | Bendahara | Kasir |
 | --- | :---: | :---: | :---: |
 | Dashboard | Ya | Ya | Tidak |
-| Input/lihat/edit pembayaran | Ya | Tidak | Tidak |
+| Input/lihat/cetak pembayaran | Ya | Tidak | Ya |
+| Edit/hapus pembayaran | Ya | Tidak | Tidak |
 | Master Siswa | Ya | Tidak | Tidak |
 | Master Biaya Lain | Ya | Tidak | Tidak |
 | Master Daftar Ulang | Ya | Tidak | Tidak |
 | Role Management | Ya | Tidak | Tidak |
 | Tabungan masuk/keluar | Ya | Tidak | Ya |
 | Riwayat tabungan | Ya | Ya | Ya |
-| Laporan, PDF, dan Excel | Ya | Ya | Tidak |
+| Laporan Global, PDF, dan Excel | Ya | Ya | Ya |
 
 Role yang valid hanya `admin`, `bendahara`, dan `kasir`. Pengguna tanpa role valid harus dikeluarkan dari session dan diarahkan kembali ke login.
 
@@ -110,16 +111,17 @@ Menyimpan akun, hash password, nama, dan role. Password baru wajib dibuat dengan
 
 ### `siswa`
 
-Menyimpan identitas, kelas, tarif per siswa, potongan, saldo awal pembayaran, dan status aktif. Aturan penting:
+Menyimpan identitas, kelas, tarif aktif per siswa, potongan, penanda asal PSB, dan status aktif. Aturan penting:
 
 - `NO_INDUK` unik dan menjadi foreign key pada transaksi;
-- `KELAS` hanya `1` sampai `6`;
+- `KELAS` hanya `PSB` atau `1` sampai `6`;
 - nominal master siswa menggunakan `DECIMAL(15,2)`;
-- `is_active=0` berarti siswa diarsipkan, bukan dihapus;
+- `is_active=0` berarti siswa diarsipkan, bukan dihapus; status lulus ditentukan terpisah dari snapshot `siswa_tahun_ajaran`;
 - `tot_pangkal = MAX(0, PANGKAL - potong_pangkal)`;
 - `tot_du = MAX(0, DAFTAR_ULANG - potong_du)`;
 - `POMG` adalah tarif dasar Uang Komite bulanan.
-- `MAKAN`, `SORGA`, dan `INFAQ` adalah total tagihan satu kali per siswa dan dapat dicicil.
+- `PSB` adalah nominal paket satu kali bagi siswa yang dibuat di kelas PSB dan dapat dicicil sepanjang histori siswa.
+- `asal_psb` ditetapkan otomatis saat siswa dibuat di kelas PSB dan tidak dapat diubah melalui request.
 
 ### `siswa_audit_log`
 
@@ -127,7 +129,7 @@ Menyimpan aksi, admin, waktu, nomor induk snapshot, serta JSON sebelum dan sesud
 
 ### `bayar`
 
-Header dan komponen utama transaksi pembayaran. `NO_INDUK` berelasi ke siswa dengan `ON UPDATE CASCADE` dan `ON DELETE CASCADE`. Kolom `U_KOMITE` menyimpan pembayaran Komite untuk kombinasi siswa, bulan, dan tahun.
+Header dan komponen utama transaksi pembayaran. `NO_INDUK` berelasi ke siswa dengan `ON UPDATE CASCADE` dan `ON DELETE CASCADE`. Komponen aktif hanya `U_PANGKAL`, `U_PSB`, `U_SPP`, dan `U_KOMITE`; Daftar Ulang dan Biaya Lain disimpan pada tabel detail.
 
 `payment_link_version` adalah kontrak integritas child pembayaran: `0` berarti transaksi legacy yang relasinya tidak dapat diverifikasi dan tidak boleh diubah/dihapus dari aplikasi; `1` berarti seluruh child yang dibuat oleh alur baru menggunakan relasi `bayar_id` aman.
 
@@ -147,7 +149,7 @@ Detail biaya tambahan per transaksi. Nama dan nominal disimpan sebagai snapshot 
 
 ### `bayar_du` dan `Daftar_ulang`
 
-`bayar_du` menyimpan pembayaran daftar ulang per siswa, kelas daftar ulang, dan tahun ajaran. Child yang dibuat oleh pembayaran versi aman menyimpan `bayar_id` unik dengan foreign key `ON DELETE CASCADE` ke `bayar`.
+`bayar_du` menyimpan pembayaran daftar ulang per siswa, kelas daftar ulang, dan tahun ajaran. Child yang dibuat oleh pembayaran versi aman menyimpan `bayar_id` unik dengan foreign key `ON DELETE CASCADE` ke `bayar`. `tagihan_daftar_ulang_id` adalah identitas utama saat input/edit; kelas dan tahun child selalu disalin dari snapshot tagihan.
 
 Tabel `Daftar_ulang` dipakai sebagai template tarif per kombinasi `kelas + th_ajaran`, sedangkan kewajiban nyata siswa disimpan pada `tagihan_daftar_ulang`. Tahun ajaran mengikuti kalender pendidikan Juli-Juni: Juli-Desember memakai `YYYY/YYYY+1`, sedangkan Januari-Juni memakai `YYYY-1/YYYY`. Pembayaran baru tidak memakai fallback nominal dari kolom Daftar Ulang pada `siswa`; total dan saldo selalu dibaca dari tagihan siswa yang sudah diterbitkan. `bayar_du.tagihan_daftar_ulang_id` menjadi referensi saldo utama, sementara kelas dan tahun ajaran tetap disimpan sebagai snapshot kompatibilitas.
 
@@ -160,26 +162,29 @@ Tabel `Daftar_ulang` dipakai sebagai template tarif per kombinasi `kelas + th_aj
 ### Master Siswa
 
 - Form dasar memuat nomor induk, nama, dan kelas.
-- Switch `Advance` membuka NIS Diknas, tarif, Komite, potongan, total turunan, dan saldo awal.
-- Tarif Makan, Sorga, dan Infaq di Advance disimpan per siswa. Nilai Rp0 berarti belum diatur dan tidak dapat dibayar.
+- Switch `Advance` membuka NIS Diknas, SPP per bulan, Uang Pangkal, Uang PSB, Komite, Daftar Ulang, serta potongan yang masih berlaku.
+- Uang PSB wajib lebih dari Rp0 ketika membuat siswa di kelas PSB. Siswa yang tidak berasal dari kelas PSB tidak dapat diberi nominal PSB.
 - Menutup Advance saat edit tidak boleh menimpa field lanjutan dengan nol.
 - Backend menolak nilai tarif/data lanjutan yang berubah ketika `Advance` tidak aktif; perubahan tidak boleh diabaikan sambil menampilkan status berhasil.
 - NIS Diknas harus tepat 10 digit bila diisi.
 - Nominal tidak boleh negatif dan potongan tidak boleh melebihi tagihan.
-- Saldo awal hanya dapat diedit sebelum ada histori pada pembayaran, daftar ulang, tabungan masuk, atau tabungan keluar.
 - Perubahan nomor induk dilakukan dalam database transaction dan mengandalkan foreign key `ON UPDATE CASCADE`.
 - Aksi hapus pada UI diganti menjadi Arsipkan/Pulihkan.
 - Siswa arsip tetap tersedia untuk histori dan laporan, tetapi tidak boleh dipakai pada transaksi baru.
 - Tambah, edit, perubahan tarif, perubahan nomor induk, arsip, dan pemulihan dicatat pada audit log.
-- Tarif Makan, Sorga, atau Infaq tidak boleh diturunkan di bawah akumulasi transaksi yang sudah dibayar.
+- Nominal Pangkal atau PSB tidak boleh diturunkan di bawah akumulasi pembayaran yang sudah diterima.
 - Tarif master siswa menjadi default penerbitan berikutnya. Untuk tahun berjalan, penguncian berlaku per komponen: snapshot yang sudah mempunyai pembayaran dipertahankan, sedangkan komponen tanpa pembayaran diselaraskan saat siswa disimpan.
 - Perbedaan kelas master dan kelas historis tidak boleh menghentikan sinkronisasi tarif yang masih aman. Kelas penempatan berbayar tetap dipertahankan sebagai histori.
 - Penyimpanan siswa otomatis memperbaiki ketidaksinkronan snapshot tahun berjalan yang belum memiliki pembayaran dan mencatat hasil sinkronisasi pada audit JSON.
+- Tombol Riwayat Kelas membuka timeline snapshot kelas 1–6 per tahun ajaran tanpa menebak data lama atau memasukkan masa PSB.
+- Kelulusan baru menandai snapshot kelas 6 pada tahun ajaran yang diselesaikan dan mengarsipkan siswa. Arsip manual tidak otomatis dianggap lulus.
 
 ### Pembayaran
 
 - Dropdown bulan menampilkan nama bulan saat dibuka dan menampilkan kode `01` sampai `12` setelah dipilih.
-- Hanya siswa aktif yang muncul pada transaksi baru.
+- Siswa aktif muncul pada transaksi baru. Lulusan ikut muncul hanya bila masih mempunyai tunggakan Daftar Ulang terbuka, diberi label `LULUS · TA …`, dan hanya boleh membayar Daftar Ulang.
+- Siswa di kelas PSB hanya dapat membayar Pangkal, PSB, dan Biaya Lain. SPP, Komite, serta Daftar Ulang ditolak oleh UI dan backend.
+- Sisa Uang PSB tetap dapat dicicil setelah siswa pindah dari kelas PSB.
 - Edit transaksi lama tetap mengizinkan siswa arsip yang memang menjadi pemilik transaksi; siswa arsip lain tidak dapat dipilih.
 - Backend mengambil kelas, tarif Komite, dan total tagihan master biaya lain langsung dari database.
 - `total_jumlah` dihitung ulang di backend dari komponen pembayaran, daftar ulang, biaya lain, dan potongan SPP. Hidden total dari browser bukan sumber kebenaran.
@@ -188,6 +193,7 @@ Tabel `Daftar_ulang` dipakai sebagai template tarif per kombinasi `kelas + th_aj
 - Sistem pembayaran dipilih dari opsi `Tunai`, `VA`, atau `Qris` dan divalidasi ulang di backend.
 - Nominal negatif, periode tidak valid, pembayaran Komite melebihi sisa periode, dan input komponen yang melebihi sisa tagihan harus ditolak.
 - SPP wajib dibayar penuh satu kali per bulan. Pembayaran sebagian dan pembayaran kedua untuk periode yang sama ditolak.
+- Penempatan kelas 1 aktif pertama bagi siswa `asal_psb=1` memiliki snapshot SPP Rp0 dan status `Tercakup Uang PSB`. Snapshot ini tidak boleh ditimpa sinkronisasi tarif; penempatan tahun berikutnya memakai tarif normal.
 - Urutan SPP mengikuti seluruh penempatan `siswa_tahun_ajaran` berstatus `aktif`, bukan hanya tahun ajaran dari bulan yang sedang dipilih. Misalnya, input Juli tahun ajaran baru tetap ditolak bila ada Juli-Juni pada penempatan aktif sebelumnya yang belum lunas.
 - Tarif setiap periode historis memakai `spp_perbulan_snapshot` pada penempatan tahun ajaran terkait. Sistem tidak memakai tarif siswa terkini untuk menyatakan tunggakan periode lama.
 - Penempatan berstatus `pindah` atau `lulus` tidak menjadi sumber tunggakan lintas tahun. Sistem juga tidak membuat utang untuk waktu sebelum penempatan aktif pertama siswa atau pada jeda tahun ajaran tanpa penempatan aktif.
@@ -196,17 +202,17 @@ Tabel `Daftar_ulang` dipakai sebagai template tarif per kombinasi `kelas + th_aj
 - Popup SPP hanya muncul untuk kondisi yang menghalangi pembayaran: tunggakan paling awal, periode sudah lunas, pembayaran legacy sebagian, tarif belum tersedia, siswa belum memenuhi syarat, nominal tidak penuh, atau perubahan Edit yang merusak urutan periode berikutnya. Backend mengulang pemeriksaan saat submit dan tetap menjadi sumber keputusan akhir.
 - Form pembayaran menampilkan alert bila `Sudah Terbayar` lebih besar dari `Total Tagihan`; sisa ditampilkan sebagai nol dan input bayar pada komponen tersebut dikunci.
 - Form pembayaran juga menampilkan alert inline bila `Input Bayar` lebih besar dari sisa tagihan sebelum submit; input tersebut diberi invalid state dan browser menahan submit melalui custom validity.
-- Simpan, edit, dan hapus transaksi utama, daftar ulang, serta detail biaya lain dijalankan dalam transaction.
-- Pembayaran baru menyimpan relasi eksplisit ke Daftar Ulang melalui `bayar_id`. Pembayaran tidak boleh membuat setoran tabungan; POST lama dengan `tabungan_wajib > 0` wajib ditolak.
+- Simpan, edit, dan hapus transaksi utama, daftar ulang, serta detail biaya lain dijalankan dalam transaction. Input/lihat/cetak tersedia bagi admin dan kasir, sedangkan edit/hapus hanya bagi admin.
+- Penghapusan pembayaran wajib memakai POST, role admin, dan token CSRF; URL GET tidak boleh melakukan mutasi.
+- Pembayaran baru menyimpan satu relasi eksplisit ke Daftar Ulang melalui `bayar_id` dan `tagihan_daftar_ulang_id`. ID tagihan wajib dikirim saat nominal DU lebih dari nol; backend menolak tagihan siswa lain, tagihan batal, masa depan, dan nominal di atas sisa. Pembayaran tidak boleh membuat setoran tabungan; POST lama dengan `tabungan_wajib > 0` wajib ditolak.
 - Pembayaran `payment_link_version=0` adalah legacy. Sistem menandainya di daftar dan menolak edit/hapus, termasuk akses endpoint langsung; rekonsiliasi harus dilakukan manual tanpa pencocokan otomatis.
 
-### Makan, Sorga, dan Infaq
+### Uang Pangkal dan Uang PSB
 
-- Total tagihan berasal dari `siswa.MAKAN`, `siswa.SORGA`, dan `siswa.INFAQ`; nominal transaksi aktual disimpan pada kolom `U_*` di `bayar`.
-- Ketiganya merupakan tagihan satu kali sepanjang histori siswa, bukan tagihan per bulan atau tahun ajaran.
-- Sudah dibayar dihitung dari seluruh transaksi siswa dan input dapat dicicil maksimal sebesar sisa.
-- Tarif nol dan tagihan lunas tetap ditampilkan tetapi input dikunci. Backend juga menolak manipulasi input untuk tarif yang belum tersedia atau pembayaran di atas sisa.
-- Edit transaksi mengecualikan transaksi aktif dari akumulasi; hapus transaksi mengembalikan saldo secara otomatis.
+- Pangkal dan PSB merupakan tagihan satu kali sepanjang histori siswa, bukan tagihan tahunan.
+- Nominal keduanya diisi manual melalui Master Siswa dan pembayaran dapat dicicil maksimal sebesar sisa.
+- Pangkal tersedia bagi semua siswa. PSB hanya tersedia bagi siswa dengan `asal_psb=1`.
+- Edit transaksi mengecualikan transaksi aktif dari akumulasi; perubahan nominal master tidak boleh lebih kecil dari jumlah yang telah dibayar.
 
 ### Uang Komite
 
@@ -235,7 +241,8 @@ Tabel `Daftar_ulang` dipakai sebagai template tarif per kombinasi `kelas + th_aj
 - Untuk tahun draf, satu transaksi menyimpan enam tarif, menyelaraskan penempatan internal, membuat satu tagihan per siswa aktif, mengubah status menjadi `published`, dan menulis audit. Kegagalan salah satu tahap membatalkan seluruh perubahan.
 - Tahun yang sudah terbit memakai `Simpan Perubahan Tarif`; tagihan belum lunas mengikuti aturan perubahan nominal, sedangkan tagihan lunas mempertahankan snapshot histori.
 - Siswa tinggal kelas memakai kelas yang tetap tersimpan pada Data Siswa; siswa tidak aktif tidak menerima tagihan. Siswa baru setelah penerbitan otomatis memperoleh penempatan dan tagihan.
-- Input/edit pembayaran menghitung tahun ajaran dari periode pilihan dan mengambil kelas serta saldo langsung dari tagihan server-side; hidden input kelas/tahun tidak dipercaya. Total, terbayar, sisa, kelas, tahun ajaran, status, dan warning tampil pada baris Daftar Ulang.
+- Input/edit pembayaran memilih tagihan berdasarkan `tagihan_daftar_ulang_id` dan mengambil kelas, tahun, serta saldo langsung dari snapshot server-side; hidden input kelas/tahun tidak dipercaya. Tahun berjalan menjadi pilihan awal walaupun lunas, atau tunggakan tertua bila tagihan tahun berjalan tidak tersedia. Dropdown aktif ketika ada tunggakan lama dan menampilkan total, terbayar, sisa, kelas, tahun ajaran, serta status.
+- Satu transaksi hanya boleh memuat satu tagihan Daftar Ulang, tetapi dapat digabung dengan SPP/Komite periode berjalan. Admin dapat memindahkannya ke tagihan tahun lain saat edit setelah saldo tujuan divalidasi.
 - Riwayat Daftar Ulang dipaginasi server-side per tagihan siswa/tahun ajaran. Default 25 baris dengan pilihan 25/50/100; ringkasan tetap mencakup seluruh hasil filter dan detail cicilan hanya diambil untuk halaman aktif.
 - Link pagination mempertahankan pencarian, kelas, tahun ajaran, status, dan ukuran halaman. Nomor baris memakai offset global dan parameter halaman di luar batas dinormalisasi.
 - Tagihan yang telah diterbitkan mempertahankan snapshot kelas dan nominal sehingga perubahan Data Siswa berikutnya tidak memindahkan histori.
@@ -278,7 +285,7 @@ Schema ini bersifat destruktif untuk sebagian tabel karena memakai `DROP TABLE`.
 ### Upgrade database lama
 
 1. Buat backup database.
-2. Periksa nilai `siswa.KELAS`. Label lama maksimal 5 karakter akan dipertahankan untuk kompatibilitas; siswa baru tetap dibatasi kelas `1` sampai `6`.
+2. Periksa nilai `siswa.KELAS`. Siswa baru dibatasi kelas `PSB` atau `1` sampai `6`.
 3. Jalankan `sql/add_master_biaya_lain.sql`.
 4. Jalankan `sql/add_master_daftar_ulang.sql`.
 5. Jalankan `sql/add_academic_year_billing.sql`.
@@ -286,7 +293,8 @@ Schema ini bersifat destruktif untuk sebagian tabel karena memakai `DROP TABLE`.
 7. Jalankan `sql/add_student_optional_fees.sql`.
 8. Jalankan `sql/add_payment_references.sql`.
 9. Jalankan `sql/add_payment_method.sql`.
-10. Jalankan `sql/verify_schema.sql` dan uji aplikasi.
+10. Tinjau dampak destruktif, lalu jalankan `sql/simplify_payment_components_and_add_psb.sql`. Migrasi ini menghapus transaksi yang memuat salah satu komponen lama dan tidak boleh dijalankan ulang.
+11. Jalankan `sql/verify_schema.sql` dan uji aplikasi.
 
 Contoh PowerShell:
 
@@ -298,10 +306,11 @@ Get-Content sql\add_student_advanced.sql -Raw | C:\xampp\mysql\bin\mysql.exe -u 
 Get-Content sql\add_student_optional_fees.sql -Raw | C:\xampp\mysql\bin\mysql.exe -u root
 Get-Content sql\add_payment_references.sql -Raw | C:\xampp\mysql\bin\mysql.exe -u root
 Get-Content sql\add_payment_method.sql -Raw | C:\xampp\mysql\bin\mysql.exe -u root
+Get-Content sql\simplify_payment_components_and_add_psb.sql -Raw | C:\xampp\mysql\bin\mysql.exe -u root
 Get-Content sql\verify_schema.sql -Raw | C:\xampp\mysql\bin\mysql.exe -u root
 ```
 
-Seluruh migrasi bertahap dirancang idempotent. Migrasi siswa melakukan preflight dan berhenti bila menemukan kelas kosong atau lebih dari 5 karakter. Migrasi tahun ajaran menambahkan penempatan dan tagihan siswa, lalu menghubungkan histori `bayar_du` yang memiliki kelas+tahun ajaran valid tanpa mengubah nominal transaksi. Tahun ajaran memakai batas Juli–Juni dan tagihan terbit menjadi sumber saldo Daftar Ulang baru. Migrasi relasi pembayaran lain tetap mempertahankan data legacy yang belum dapat dibuktikan relasinya.
+Migrasi bertahap lama bersifat idempoten. Pengecualiannya adalah `simplify_payment_components_and_add_psb.sql`: migrasi satu kali yang sengaja menghapus transaksi dengan nominal Bangunan, Seragam, Kegiatan, Makan, Sorga, atau Infaq; menghapus kolom lama; menghitung ulang total transaksi dan saldo tabungan; lalu menambahkan kontrak PSB. Wajib buat backup dan uji pada salinan database terlebih dahulu.
 
 ## 9. Konvensi Keamanan
 
@@ -314,7 +323,7 @@ Seluruh migrasi bertahap dirancang idempotent. Migrasi siswa melakukan preflight
 - Nomor induk, ID, nominal, role, hidden input, dan atribut `readonly` dari browser tetap dianggap tidak tepercaya.
 - Jangan menulis password plaintext, dump data siswa nyata, cookie, token session, atau secret ke repository maupun dokumentasi.
 
-Cakupan CSRF saat ini belum merata. Master Siswa, Role Management, Master Kelas, dan Master Biaya Lain sudah memakai CSRF, sedangkan pembayaran dan tabungan masih menjadi technical debt. Jangan menyatakan endpoint tersebut sudah terlindungi sebelum implementasinya benar-benar ditambahkan dan diuji.
+Cakupan CSRF saat ini belum merata. Master Siswa, Role Management, Master Kelas, Master Biaya Lain, dan penghapusan pembayaran sudah memakai CSRF; mutasi tabungan dan endpoint lama lain masih menjadi technical debt.
 
 ## 9A. Master Kelas, Tagihan Biaya Lain, dan Laporan Global Modular
 
@@ -322,12 +331,13 @@ Cakupan CSRF saat ini belum merata. Master Siswa, Role Management, Master Kelas,
 - `siswa.KELAS` tetap menjadi tingkat kompatibilitas, sedangkan `siswa.master_kelas_id` menjadi kelas aktif. `siswa_tahun_ajaran` menyimpan snapshot label rombel, tarif SPP, dan tarif Komite agar laporan historis tidak mengikuti perubahan tarif/kelas berikutnya.
 - Transaksi baru menyimpan `master_kelas_id` dan `kelas_rombel_snapshot`. Perpindahan kelas aktif tidak menulis ulang snapshot transaksi maupun penempatan yang sudah mempunyai pembayaran.
 - Biaya Lain baru dapat dibayar setelah `tagihan_biaya_lain` diterbitkan dari Master Biaya Lain kepada semua siswa, tingkat, rombel, atau siswa terpilih. Nominal tagihan adalah snapshot dan pembayaran dapat dicicil sampai lunas.
-- `laporan/global.php` hanya berisi katalog delapan template. Query dan aturan laporan berada di `includes/reports.php`, halaman web di `laporan/template.php`, serta cetak/PDF/Excel di `laporan/export_global.php`.
-- Delapan template terdiri dari Status Pembayaran, Penerimaan Harian, SPP Tahun Ajaran per Kelas, Pembayaran per Item, Mutasi Tabungan per Kelas, Tabungan Siswa, Riwayat Tagihan Siswa, dan Setoran Kas Harian.
+- `laporan/global.php` hanya berisi katalog sembilan template. Query dan aturan laporan berada di `includes/reports.php`, halaman web di `laporan/template.php`, serta cetak/PDF/Excel di `laporan/export_global.php`.
+- Sembilan template terdiri dari Status Pembayaran, Penerimaan Harian, SPP Tahun Ajaran per Kelas, Pembayaran per Item, Transaksi Tabungan Siswa, Saldo Tabungan, Riwayat Tagihan Siswa, Setoran Kas Harian, dan Kas Tabungan Harian.
+- Rekap Setoran Kas Harian hanya menghitung pembayaran sekolah dari Tunai, VA, dan QRIS. Rekap Kas Tabungan Harian membaca `transaksi_m` dan `transaksi_k` secara terpisah untuk menampilkan total masuk, keluar, dan mutasi bersih; metode pembayaran tidak tersedia pada jurnal tabungan.
 - Laporan Umum (`laporan/index.php`) tetap khusus admin/bendahara. Seluruh template Laporan Global dapat dibuka admin, bendahara, dan kasir. Halaman mandiri `laporan/rekap_kelas.php` tersedia kembali untuk admin/bendahara sebagai rekap pembayaran bulanan per tingkat kelas 1–6, berdampingan dengan template Per Item pada Laporan Global.
 - Tahun ajaran selalu Juli–Juni. Laporan transaksi memakai `TGL_BYR`, sedangkan laporan SPP memakai periode `bayar_spp_periode`; kedua konsep tidak boleh dipertukarkan.
 - PDF memerlukan Composer dependency dan ekstensi GD untuk menampilkan logo PNG. XAMPP menyediakan `php_gd.dll`; aktifkan `extension=gd` lalu restart Apache.
-- Upgrade database memakai `sql/add_modular_global_reports.sql`, wajib didahului backup dan dijalankan dua kali pada salinan database untuk membuktikan idempotensi.
+- Upgrade laporan modular memakai `sql/add_modular_global_reports.sql` yang idempoten. Penyederhanaan komponen memakai migrasi satu kali `sql/simplify_payment_components_and_add_psb.sql` setelah backup.
 
 ## 10. Checklist Verifikasi
 
@@ -342,7 +352,7 @@ git diff --check
 ### Database
 
 - Uji schema atau migrasi pada salinan database lebih dahulu.
-- Jalankan migrasi dua kali untuk memastikan idempotensi.
+- Jalankan migrasi idempoten dua kali. Untuk migrasi satu kali/destruktif, uji sekali pada salinan database dan validasi jumlah data sebelum/sesudah.
 - Periksa tipe kolom, index, check constraint, foreign key, dan jumlah data sebelum/sesudah.
 - Hapus semua data pengujian setelah selesai.
 
@@ -355,7 +365,8 @@ git diff --check
 ### Alur bisnis
 
 - Uji CRUD dasar dan Advance siswa, preservasi field, audit, arsip, perubahan nomor induk, dan cascade.
-- Uji pembayaran Komite sebagian, penuh, berlebih, dan pada dua periode berbeda.
+- Uji cicilan/pelunasan Pangkal dan PSB, penolakan kelebihan bayar, aturan siswa PSB, serta SPP Rp0 pada tahun pertama kelas 1 siswa asal PSB.
+- Uji edit/hapus sebagai admin serta penolakan akses langsung bagi kasir dan bendahara.
 - Uji satu siswa dengan dua pembayaran pada tanggal sama: edit/hapus salah satunya hanya boleh memengaruhi `bayar_du` yang memiliki `bayar_id` miliknya; setoran tabungan manual pada tanggal sama harus tetap utuh.
 - Uji penolakan POST `tabungan_wajib > 0`, serta penolakan edit/hapus pembayaran legacy.
 - Uji biaya lain aktif/nonaktif, snapshot, edit, penghapusan master terpakai, dan cascade detail.
@@ -373,10 +384,10 @@ git diff --check
 - Regression test berbasis PHP tersedia di folder `tests`; pengujian visual tetap dilakukan manual pada browser/PDF viewer.
 - Export Excel masih berupa HTML table dengan ekstensi `.xls`, bukan file XLSX native.
 - Export PDF memakai Dompdf; validasi visual tetap perlu dilakukan pada viewer PDF/browser karena engine PDF berbeda dari rendering HTML browser.
-- CSRF belum diterapkan pada seluruh endpoint mutasi.
-- Beberapa kolom transaksi legacy masih memakai `DOUBLE` dan struktur lama tetap dipertahankan untuk kompatibilitas.
+- CSRF belum diterapkan pada seluruh endpoint mutasi, tetapi penghapusan pembayaran sudah terlindungi.
+- Beberapa kolom transaksi aktif masih memakai `DOUBLE`; kolom enam komponen pembayaran lama sudah dihapus.
 - Penamaan `user_id` pada tabel legacy belum konsisten antara ID dan nama pengguna serta belum semuanya menjadi foreign key.
-- Konfigurasi database masih berada langsung di `koneksi.php` dan belum menggunakan environment variable.
+- `koneksi.php` mendukung override `SPP_DB_HOST`, `SPP_DB_USER`, `SPP_DB_PASS`, dan `SPP_DB_NAME`; nilai default lokal tetap dipakai bila environment variable tidak tersedia.
 
 ## 12. Aturan Wajib untuk Developer dan AI
 

@@ -47,25 +47,21 @@ try {
         $map = [
             'U_SPP' => 'SPP',
             'U_PANGKAL' => 'Pangkal',
-            'U_BANGUNAN' => 'Bangunan',
-            'U_SERAGAM' => 'Seragam',
-            'U_KEGIATAN' => 'Kegiatan',
+            'U_PSB' => 'PSB',
             'U_KOMITE' => 'Komite',
-            'U_MAKAN' => 'Makan',
-            'U_SORGA' => 'Sorga',
-            'U_INFAQ' => 'Infaq',
             'U_LAIN' => 'Biaya Lain',
         ];
         foreach ($map as $column => $label) {
             if ((float)($payment[$column] ?? 0) > 0.001) $components[] = $label;
         }
-        $stmtDu = $koneksi->prepare('SELECT COALESCE(SUM(jumlah),0) total FROM bayar_du WHERE bayar_id=?');
+        $stmtDu = $koneksi->prepare('SELECT COALESCE(SUM(jumlah),0) total, MAX(th_ajaran) tahun_ajaran FROM bayar_du WHERE bayar_id=?');
         $paymentId = (int)$payment['id'];
         $stmtDu->bind_param('i', $paymentId);
         $stmtDu->execute();
-        $duAmount = (float)($stmtDu->get_result()->fetch_assoc()['total'] ?? 0);
+        $duRow = $stmtDu->get_result()->fetch_assoc() ?: [];
+        $duAmount = (float)($duRow['total'] ?? 0);
         $stmtDu->close();
-        if ($duAmount > 0.001) $components[] = 'Daftar Ulang';
+        if ($duAmount > 0.001) $components[] = 'Daftar Ulang' . (!empty($duRow['tahun_ajaran']) ? ' (TA ' . $duRow['tahun_ajaran'] . ')' : '');
 
         $rows[] = [
             'tanggal' => date('d/m/Y H:i', strtotime((string)$payment['TGL_BYR'])),

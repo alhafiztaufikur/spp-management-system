@@ -60,8 +60,7 @@ if ($filter_tanggal_awal !== '' && $filter_tanggal_akhir !== '') {
 // Ambil data pembayaran
 $stmt = $koneksi->prepare("
     SELECT s.NO_INDUK, s.NO_induk_diknas, s.NAMA, s.KELAS, b.BULAN, b.TAHUN,
-           b.U_PANGKAL, b.U_BANGUNAN, b.U_SERAGAM, b.U_KEGIATAN,
-           b.U_SPP, b.U_MAKAN, b.U_SORGA, b.U_INFAQ, b.U_KOMITE,
+           b.U_PANGKAL, b.U_PSB, b.U_SPP, b.U_KOMITE,
            b.sistem_pembayaran, b.total_jumlah, b.TGL_BYR
     FROM bayar b JOIN siswa s ON s.NO_INDUK = b.NO_INDUK
     WHERE b.TGL_BYR >= ? AND b.TGL_BYR < ? $studentWhere
@@ -73,11 +72,8 @@ $rows = $stmt->get_result()->fetch_all(MYSQLI_ASSOC);
 $stmt->close();
 
 $stmtKomponen = $koneksi->prepare("
-    SELECT SUM(U_PANGKAL) AS pangkal, SUM(U_BANGUNAN) AS bangunan,
-           SUM(U_SERAGAM) AS seragam, SUM(U_KEGIATAN) AS kegiatan,
-           SUM(U_SPP) AS spp, SUM(U_MAKAN) AS makan,
-           SUM(U_SORGA) AS sorga, SUM(U_INFAQ) AS infaq,
-           SUM(U_KOMITE) AS komite
+    SELECT SUM(U_PANGKAL) AS pangkal, SUM(U_PSB) AS psb,
+           SUM(U_SPP) AS spp, SUM(U_KOMITE) AS komite
     FROM bayar b JOIN siswa s ON s.NO_INDUK = b.NO_INDUK
     WHERE b.TGL_BYR >= ? AND b.TGL_BYR < ? $studentWhere
 ");
@@ -88,10 +84,8 @@ $stmtKomponen->close();
 
 $komponen_rows = [];
 $komponenMap = [
-    'Uang Pangkal' => 'pangkal', 'Uang Bangunan' => 'bangunan',
-    'Uang Seragam' => 'seragam', 'Uang Kegiatan' => 'kegiatan',
-    'Uang SPP' => 'spp', 'Uang Komite' => 'komite', 'Uang Makan' => 'makan',
-    'Uang Sorga' => 'sorga', 'Uang Infaq' => 'infaq'
+    'Uang Pangkal' => 'pangkal', 'Uang PSB' => 'psb',
+    'Uang SPP' => 'spp', 'Uang Komite' => 'komite'
 ];
 foreach ($komponenMap as $nama => $key) {
     if ((float)($komponenTetap[$key] ?? 0) > 0) {

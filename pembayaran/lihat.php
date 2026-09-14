@@ -8,6 +8,7 @@ require_once '../koneksi.php';
 require_once '../includes/auth.php';
 require_once '../includes/pagination.php';
 requireRole(['admin', 'kasir']);
+if (empty($_SESSION['csrf_payment'])) $_SESSION['csrf_payment'] = bin2hex(random_bytes(32));
 
 $flash = $_SESSION['flash'] ?? null;
 unset($_SESSION['flash']);
@@ -273,7 +274,7 @@ foreach ($studentOptions as $studentOption) {
                   $paymentDateTime = format_payment_datetime($row['TGL_BYR']);
                   $updatedDateTime = format_payment_datetime($row['updated_at'] ?? null);
                   $wasUpdated = payment_was_updated($row['created_at'] ?? null, $row['updated_at'] ?? null);
-                  $canEdit = (int)($row['payment_link_version'] ?? 0) === 1;
+                  $canEdit = hasRole(['admin']) && (int)($row['payment_link_version'] ?? 0) === 1;
                   $editUrl = 'edit.php?id=' . (int)$row['id'];
                   $rowAttrs = $canEdit
                     ? ' class="clickable-payment-row" data-edit-url="' . htmlspecialchars($editUrl, ENT_QUOTES, 'UTF-8') . '" tabindex="0" role="link" aria-label="Edit pembayaran ' . htmlspecialchars($row['NAMA'], ENT_QUOTES, 'UTF-8') . '"'
@@ -308,17 +309,22 @@ foreach ($studentOptions as $studentOption) {
                     <svg width="13" height="13" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.5" stroke-linecap="round" stroke-linejoin="round"><path d="M11 4H4a2 2 0 0 0-2 2v14a2 2 0 0 0 2 2h14a2 2 0 0 0 2-2v-7"/><path d="M18.5 2.5a2.121 2.121 0 0 1 3 3L12 15l-4 1 1-4 9.5-9.5z"/></svg>
                     Edit
                   </a>
-                  <a href="proses.php?aksi=hapus&id=<?= $row['id'] ?>"
-                     class="btn-tbl btn-tbl-del" title="Hapus"
-                     onclick="return confirm('Yakin ingin menghapus data pembayaran ini?')">
+                  <form method="POST" action="proses.php" style="display:inline" onsubmit="return confirm('Yakin ingin menghapus data pembayaran ini?')">
+                    <input type="hidden" name="aksi" value="hapus" />
+                    <input type="hidden" name="id" value="<?= (int)$row['id'] ?>" />
+                    <input type="hidden" name="csrf_token" value="<?= htmlspecialchars($_SESSION['csrf_payment']) ?>" />
+                    <button type="submit" class="btn-tbl btn-tbl-del" title="Hapus">
                     <svg width="13" height="13" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.5" stroke-linecap="round" stroke-linejoin="round"><polyline points="3 6 5 6 21 6"/><path d="M19 6l-1 14a2 2 0 0 1-2 2H8a2 2 0 0 1-2-2L5 6"/></svg>
                     Hapus
-                  </a>
+                    </button>
+                  </form>
                   <?php if ((int)($row['payment_batch_count'] ?? 1) === 12): ?>
                   <a href="../laporan/cetak_struk_tahunan.php?batch=<?= urlencode((string)$row['payment_batch_token']) ?>" class="btn-tbl btn-tbl-print" target="_blank" rel="noopener" title="Cetak seluruh struk tahunan">12 Struk</a>
                   <?php endif; ?>
-                  <?php else: ?>
+                  <?php elseif ((int)($row['payment_link_version'] ?? 0) !== 1): ?>
                   <span class="master-status is-inactive" title="Transaksi lama tanpa relasi eksplisit">Legacy — rekonsiliasi manual</span>
+                  <?php else: ?>
+                  <span aria-label="Tidak ada aksi">—</span>
                   <?php endif; ?>
                 </td>
               </tr>

@@ -48,6 +48,15 @@ function payment_process_flash(string $baseUrl, array &$cookies): string {
     return '';
 }
 
+function payment_process_csrf(string $baseUrl, int $paymentId, array &$cookies): string {
+    $page = payment_process_request($baseUrl . '/pembayaran/edit.php?id=' . $paymentId, [], $cookies);
+    payment_process_assert($page['status'] === 200, 'Halaman edit admin tidak dapat dibuka.');
+    if (!preg_match('/name="csrf_token" value="([a-f0-9]+)"/', $page['body'], $match)) {
+        throw new RuntimeException('Token CSRF pembayaran tidak ditemukan.');
+    }
+    return $match[1];
+}
+
 function payment_process_unique_nis(mysqli $db): string {
     do {
         $nis = (string)random_int(9900000000, 9999999999);
@@ -103,8 +112,8 @@ try {
     }
     $stmtYear->close();
 
-    $classId = (int)$koneksi->query("SELECT id FROM master_kelas WHERE tingkat=1 AND is_placeholder=1 LIMIT 1")->fetch_assoc()['id'];
-    payment_process_assert($classId > 0, 'Kelas placeholder tingkat 1 tidak tersedia untuk tes.');
+    $classId = (int)$koneksi->query("SELECT id FROM master_kelas WHERE tingkat=1 AND is_placeholder=0 AND is_active=1 LIMIT 1")->fetch_assoc()['id'];
+    payment_process_assert($classId > 0, 'Rombel kelas 1 aktif tidak tersedia untuk tes.');
     $stmtStudent = $koneksi->prepare('INSERT INTO siswa (NO_INDUK, NAMA, KELAS, master_kelas_id, SPP_PERBULAN) VALUES (?, ?, \'1\', ?, 275000)');
     foreach (['UJI SPP LINTAS', 'UJI SPP HISTORI', 'UJI SPP PINDAH', 'UJI SPP BARU'] as $index => $name) {
         $stmtStudent->bind_param('ssi', $testNis[$index], $name, $classId);
@@ -112,7 +121,7 @@ try {
     }
     $stmtStudent->close();
 
-    $stmtPlacement = $koneksi->prepare('INSERT INTO siswa_tahun_ajaran (tahun_ajaran_id, no_induk, kelas, master_kelas_id, kelas_rombel_snapshot, spp_perbulan_snapshot, komite_snapshot, status) VALUES (?, ?, \'1\', ?, \'Kelas 1 (Belum Ditentukan)\', ?, 0, ?)');
+    $stmtPlacement = $koneksi->prepare('INSERT INTO siswa_tahun_ajaran (tahun_ajaran_id, no_induk, kelas, master_kelas_id, kelas_rombel_snapshot, spp_perbulan_snapshot, komite_snapshot, status) VALUES (?, ?, \'1\', ?, \'1A\', ?, 0, ?)');
     $addPlacement = static function (int $yearId, string $nis, float $tariff, string $status) use ($stmtPlacement, $classId): void {
         $stmtPlacement->bind_param('isids', $yearId, $nis, $classId, $tariff, $status);
         $stmtPlacement->execute();
@@ -187,16 +196,23 @@ try {
     $junePaymentId = (int)$stmtJune->get_result()->fetch_assoc()['id'];
     $stmtJune->close();
 
+    $csrfToken = payment_process_csrf($baseUrl, $junePaymentId, $cookies);
     $editJune = payment_process_request($baseUrl . '/pembayaran/proses.php', [
         'aksi' => 'update', 'id' => $junePaymentId, 'no_induk' => $testNis[0],
         'bulan_bayar' => '06', 'tahun_bayar' => (string)$startYear,
-        'sistem_pembayaran' => 'Tunai', 'uang_spp' => 0,
+        'sistem_pembayaran' => 'Tunai', 'uang_spp' => 0, 'csrf_token' => $csrfToken,
     ], $cookies);
     payment_process_assert($editJune['status'] === 302, 'Edit prasyarat lintas tahun tidak mengembalikan redirect.');
     payment_process_assert(str_contains(payment_process_flash($baseUrl, $cookies), 'tidak bisa dikosongkan karena Juli ' . $startYear . ' sudah dibayar'), 'Edit Juni tidak ditolak saat Juli tahun berikutnya sudah dibayar.');
 
-    $deleteJune = payment_process_request($baseUrl . '/pembayaran/proses.php?aksi=hapus&id=' . $junePaymentId, [], $cookies);
-    payment_process_assert($deleteJune['status'] === 302, 'Hapus prasyarat lintas tahun tidak mengembalikan redirect.');
+    $deleteViaGet = payment_process_request($baseUrl . '/pembayaran/proses.php?aksi=hapus&id=' . $junePaymentId, [], $cookies);
+    payment_process_assert($deleteViaGet['status'] === 302, 'Hapus via URL langsung tidak ditolak dengan redirect.');
+    payment_process_assert((int)$koneksi->query('SELECT COUNT(*) total FROM bayar WHERE id=' . $junePaymentId)->fetch_assoc()['total'] === 1, 'Hapus via GET masih memutasi transaksi.');
+
+    $deleteJune = payment_process_request($baseUrl . '/pembayaran/proses.php', [
+        'aksi' => 'hapus', 'id' => $junePaymentId, 'csrf_token' => $csrfToken,
+    ], $cookies);
+    payment_process_assert($deleteJune['status'] === 302, 'Hapus POST prasyarat lintas tahun tidak mengembalikan redirect.');
     payment_process_assert(str_contains(payment_process_flash($baseUrl, $cookies), 'tidak bisa dihapus karena Juli ' . $startYear . ' sudah dibayar'), 'Hapus Juni tidak ditolak saat Juli tahun berikutnya sudah dibayar.');
 
     $blockedHistory = $payment($testNis[1], '07', (string)$startYear, 250000);

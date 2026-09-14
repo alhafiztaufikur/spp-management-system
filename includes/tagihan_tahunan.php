@@ -4,14 +4,7 @@ require_once __DIR__ . '/daftar_ulang.php';
 
 function annual_fee_components(): array {
     return [
-        'pangkal' => ['label' => 'Uang Pangkal', 'bill' => 'PANGKAL', 'discount' => 'potong_pangkal', 'derived' => 'tot_pangkal', 'payment' => 'U_PANGKAL', 'mirror' => 'PANGKAL_BAYAR'],
-        'bangunan' => ['label' => 'Uang Bangunan', 'bill' => 'BANGUNAN', 'discount' => null, 'derived' => null, 'payment' => 'U_BANGUNAN', 'mirror' => 'BANGUNAN_BAYAR'],
-        'seragam' => ['label' => 'Uang Seragam', 'bill' => 'SERAGAM', 'discount' => null, 'derived' => null, 'payment' => 'U_SERAGAM', 'mirror' => 'SERAGAM_BAYAR'],
-        'kegiatan' => ['label' => 'Uang Kegiatan', 'bill' => 'KEGIATAN', 'discount' => null, 'derived' => null, 'payment' => 'U_KEGIATAN', 'mirror' => 'KEGIATAN_BAYAR'],
         'komite' => ['label' => 'Uang Komite', 'bill' => 'POMG', 'discount' => null, 'derived' => null, 'payment' => 'U_KOMITE', 'mirror' => null],
-        'makan' => ['label' => 'Uang Makan', 'bill' => 'MAKAN', 'discount' => null, 'derived' => null, 'payment' => 'U_MAKAN', 'mirror' => null],
-        'sorga' => ['label' => 'Uang Sorga', 'bill' => 'SORGA', 'discount' => null, 'derived' => null, 'payment' => 'U_SORGA', 'mirror' => null],
-        'infaq' => ['label' => 'Uang Infaq', 'bill' => 'INFAQ', 'discount' => null, 'derived' => null, 'payment' => 'U_INFAQ', 'mirror' => null],
     ];
 }
 
@@ -218,8 +211,7 @@ function annual_fee_reconcile_for_placement(mysqli $db, int $placementId, string
     ];
     $stmt = $db->prepare("SELECT sta.id AS penempatan_id,sta.tahun_ajaran_id,sta.no_induk,sta.kelas,
             sta.kelas_rombel_snapshot,sta.status AS penempatan_status,ta.label AS tahun_ajaran,
-            s.NAMA,s.PANGKAL,s.potong_pangkal,s.tot_pangkal,s.BANGUNAN,s.SERAGAM,s.KEGIATAN,
-            s.POMG,s.MAKAN,s.SORGA,s.INFAQ
+            s.NAMA,s.POMG
         FROM siswa_tahun_ajaran sta
         JOIN tahun_ajaran ta ON ta.id=sta.tahun_ajaran_id
         JOIN siswa s ON s.NO_INDUK=sta.no_induk
@@ -341,14 +333,6 @@ function annual_fee_payment_components_from_values(array $values): array {
 }
 
 function annual_fee_sync_payment(mysqli $db, int $bayarId, string $noInduk, string $bulan, string $tahun, array $components): void {
-    $oldStudents = [];
-    $stmt = $db->prepare('SELECT DISTINCT no_induk FROM bayar_tahunan_siswa WHERE bayar_id = ?');
-    $stmt->bind_param('i', $bayarId);
-    $stmt->execute();
-    $result = $stmt->get_result();
-    while ($row = $result->fetch_assoc()) $oldStudents[] = (string)$row['no_induk'];
-    $stmt->close();
-
     $stmt = $db->prepare('DELETE FROM bayar_tahunan_siswa WHERE bayar_id = ?');
     $stmt->bind_param('i', $bayarId);
     $stmt->execute();
@@ -376,39 +360,11 @@ function annual_fee_sync_payment(mysqli $db, int $bayarId, string $noInduk, stri
         $stmt->close();
     }
 
-    $oldStudents[] = $noInduk;
-    foreach (array_unique($oldStudents) as $affectedNoInduk) {
-        annual_fee_sync_legacy_paid_mirror($db, $affectedNoInduk);
-    }
+    // Komponen tahunan aktif tidak lagi memakai mirror pembayaran pada tabel siswa.
 }
 
 function annual_fee_sync_legacy_paid_mirror(mysqli $db, ?string $noInduk = null): void {
-    $currentYear = du_current_academic_year();
-    $whereStudent = $noInduk !== null ? ' AND s.NO_INDUK = ?' : '';
-    $sql = "UPDATE siswa s
-        LEFT JOIN (
-          SELECT bts.no_induk,
-            SUM(CASE WHEN bts.komponen='pangkal' THEN bts.jumlah ELSE 0 END) AS pangkal,
-            SUM(CASE WHEN bts.komponen='bangunan' THEN bts.jumlah ELSE 0 END) AS bangunan,
-            SUM(CASE WHEN bts.komponen='seragam' THEN bts.jumlah ELSE 0 END) AS seragam,
-            SUM(CASE WHEN bts.komponen='kegiatan' THEN bts.jumlah ELSE 0 END) AS kegiatan
-          FROM bayar_tahunan_siswa bts
-          WHERE bts.th_ajaran = ?
-          GROUP BY bts.no_induk
-        ) paid ON paid.no_induk = s.NO_INDUK
-        SET s.PANGKAL_BAYAR = COALESCE(paid.pangkal, 0),
-            s.BANGUNAN_BAYAR = COALESCE(paid.bangunan, 0),
-            s.SERAGAM_BAYAR = COALESCE(paid.seragam, 0),
-            s.KEGIATAN_BAYAR = COALESCE(paid.kegiatan, 0)
-        WHERE 1=1$whereStudent";
-    $stmt = $db->prepare($sql);
-    if ($noInduk !== null) {
-        $stmt->bind_param('ss', $currentYear, $noInduk);
-    } else {
-        $stmt->bind_param('s', $currentYear);
-    }
-    $stmt->execute();
-    $stmt->close();
+    // Dipertahankan sebagai shim kompatibilitas; seluruh nilai dibaca dari histori bayar.
 }
 
 function annual_fee_payload_for_options(mysqli $db, int $excludePaymentId = 0): array {

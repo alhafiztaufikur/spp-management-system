@@ -26,6 +26,103 @@ function du_current_academic_year(): string {
     return du_academic_year_label((int)date('n'), (int)date('Y'));
 }
 
+/**
+ * Mengambil satu tagihan berdasarkan identitas permanennya. Pembayaran tertentu
+ * dapat dikecualikan agar saldo saat edit dihitung seolah pembayaran lama sudah
+ * dikembalikan ke tagihan asal.
+ */
+function du_find_bill_by_id(mysqli $db, int $billId, int $excludePaymentId = 0, bool $forUpdate = false): ?array {
+    if ($billId <= 0) return null;
+
+    $sql = "SELECT tdu.id,tdu.no_induk,tdu.kelas_snapshot AS kelas,
+                   tdu.tahun_ajaran_snapshot AS tahun_ajaran,
+                   tdu.nominal_awal,tdu.nominal_tagihan,tdu.status,
+                   ta.id AS tahun_ajaran_id,ta.status AS tahun_status,
+                   sta.id AS penempatan_id,sta.status AS penempatan_status
+            FROM tagihan_daftar_ulang tdu
+            JOIN tahun_ajaran ta ON ta.id=tdu.tahun_ajaran_id
+            JOIN siswa_tahun_ajaran sta ON sta.id=tdu.penempatan_id
+            WHERE tdu.id=? LIMIT 1" . ($forUpdate ? ' FOR UPDATE' : '');
+    $stmt = $db->prepare($sql);
+    $stmt->bind_param('i', $billId);
+    $stmt->execute();
+    $bill = $stmt->get_result()->fetch_assoc() ?: null;
+    $stmt->close();
+    if (!$bill) return null;
+
+    $stmt = $db->prepare('SELECT COALESCE(SUM(jumlah),0) AS terbayar FROM bayar_du WHERE tagihan_daftar_ulang_id=? AND (bayar_id IS NULL OR bayar_id<>?)');
+    $stmt->bind_param('ii', $billId, $excludePaymentId);
+    $stmt->execute();
+    $bill['terbayar'] = (float)$stmt->get_result()->fetch_assoc()['terbayar'];
+    $stmt->close();
+    $bill['nominal_awal'] = (float)$bill['nominal_awal'];
+    $bill['nominal_tagihan'] = (float)$bill['nominal_tagihan'];
+    $bill['sisa'] = max(0, $bill['nominal_tagihan'] - $bill['terbayar']);
+    return $bill;
+}
+
+function du_require_selectable_bill(
+    mysqli $db,
+    int $billId,
+    string $noInduk,
+    int $excludePaymentId = 0,
+    bool $forUpdate = false
+): array {
+    if ($billId <= 0) {
+        throw new RuntimeException('Pilih ulang tagihan Daftar Ulang yang akan dibayar.');
+    }
+    $bill = du_find_bill_by_id($db, $billId, $excludePaymentId, $forUpdate);
+    if (!$bill || (string)$bill['no_induk'] !== $noInduk) {
+        throw new RuntimeException('Tagihan Daftar Ulang tidak ditemukan untuk siswa yang dipilih.');
+    }
+    if ($bill['status'] !== 'open') {
+        throw new RuntimeException('Tagihan Daftar Ulang tahun ajaran ' . $bill['tahun_ajaran'] . ' sudah dibatalkan.');
+    }
+    if (strcmp((string)$bill['tahun_ajaran'], du_current_academic_year()) > 0) {
+        throw new RuntimeException('Tagihan Daftar Ulang masa depan belum dapat dibayar.');
+    }
+    return $bill;
+}
+
+/** @return array<string,array<int,array<string,mixed>>> */
+function du_selectable_bills_payload(mysqli $db, int $excludePaymentId = 0, int $alwaysIncludeBillId = 0): array {
+    $current = du_current_academic_year();
+    $stmt = $db->prepare("SELECT tdu.id,tdu.no_induk,tdu.kelas_snapshot,tdu.tahun_ajaran_snapshot,
+            tdu.nominal_tagihan,tdu.status,ta.status AS tahun_status,
+            COALESCE(SUM(CASE WHEN bd.bayar_id<>? THEN bd.jumlah ELSE 0 END),0) AS terbayar
+        FROM tagihan_daftar_ulang tdu
+        JOIN tahun_ajaran ta ON ta.id=tdu.tahun_ajaran_id
+        LEFT JOIN bayar_du bd ON bd.tagihan_daftar_ulang_id=tdu.id
+        WHERE tdu.status='open' AND tdu.tahun_ajaran_snapshot<=?
+        GROUP BY tdu.id,tdu.no_induk,tdu.kelas_snapshot,tdu.tahun_ajaran_snapshot,
+                 tdu.nominal_tagihan,tdu.status,ta.status
+        ORDER BY tdu.tahun_ajaran_snapshot,tdu.id");
+    $stmt->bind_param('is', $excludePaymentId, $current);
+    $stmt->execute();
+    $result = $stmt->get_result();
+    $payload = [];
+    while ($bill = $result->fetch_assoc()) {
+        $total = (float)$bill['nominal_tagihan'];
+        $paid = (float)$bill['terbayar'];
+        $remaining = max(0, $total - $paid);
+        $isCurrent = (string)$bill['tahun_ajaran_snapshot'] === $current;
+        if (!$isCurrent && $remaining <= .001 && (int)$bill['id'] !== $alwaysIncludeBillId) continue;
+        $payload[(string)$bill['no_induk']][] = [
+            'id' => (int)$bill['id'],
+            'tahun_ajaran' => (string)$bill['tahun_ajaran_snapshot'],
+            'kelas' => (string)$bill['kelas_snapshot'],
+            'total' => $total,
+            'terbayar' => $paid,
+            'sisa' => $remaining,
+            'status' => (string)$bill['status'],
+            'is_current' => $isCurrent,
+            'is_arrear' => !$isCurrent && $remaining > .001,
+        ];
+    }
+    $stmt->close();
+    return $payload;
+}
+
 function du_find_bill(mysqli $db, string $noInduk, int $month, int $year, bool $forUpdate = false): ?array {
     $label = du_academic_year_label($month, $year);
     $sql = "

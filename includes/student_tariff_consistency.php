@@ -27,13 +27,8 @@ function student_tariff_component_changes(array $before, array $after): array {
     $fields = [
         'spp' => ['SPP_PERBULAN'],
         'pangkal' => ['PANGKAL', 'potong_pangkal', 'tot_pangkal'],
-        'bangunan' => ['BANGUNAN'],
-        'seragam' => ['SERAGAM'],
-        'kegiatan' => ['KEGIATAN'],
+        'psb' => ['PSB'],
         'komite' => ['POMG'],
-        'makan' => ['MAKAN'],
-        'sorga' => ['SORGA'],
-        'infaq' => ['INFAQ'],
         'daftar_ulang' => ['DAFTAR_ULANG', 'potong_du', 'tot_du'],
     ];
     $changed = [];
@@ -50,9 +45,8 @@ function student_tariff_component_changes(array $before, array $after): array {
 
 function student_tariff_label(string $component): string {
     $labels = [
-        'spp'=>'SPP', 'pangkal'=>'Pangkal', 'bangunan'=>'Bangunan', 'seragam'=>'Seragam',
-        'kegiatan'=>'Kegiatan', 'komite'=>'Komite', 'makan'=>'Makan', 'sorga'=>'Sorga',
-        'infaq'=>'Infaq', 'daftar_ulang'=>'Daftar Ulang',
+        'spp'=>'SPP', 'pangkal'=>'Pangkal', 'psb'=>'PSB', 'komite'=>'Komite',
+        'daftar_ulang'=>'Daftar Ulang',
     ];
     return $labels[$component] ?? ucfirst(str_replace('_', ' ', $component));
 }
@@ -66,7 +60,7 @@ function student_advanced_change_attempts(
     array $post,
     ?array $oldStudent,
     array $postMap,
-    array $openingMap
+    array $openingMap = []
 ): array {
     $changes = [];
     foreach ($postMap as $column => $postName) {

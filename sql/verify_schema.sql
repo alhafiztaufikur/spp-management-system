@@ -64,25 +64,48 @@ FROM (
              AND COLUMN_NAME = 'is_active'
          )
   UNION ALL
-  SELECT 'siswa.MAKAN',
+  SELECT 'siswa.PSB',
          EXISTS(
            SELECT 1 FROM information_schema.COLUMNS
            WHERE TABLE_SCHEMA = DATABASE() AND TABLE_NAME = 'siswa'
-             AND COLUMN_NAME = 'MAKAN'
+             AND COLUMN_NAME = 'PSB'
          )
   UNION ALL
-  SELECT 'siswa.SORGA',
+  SELECT 'siswa.asal_psb',
          EXISTS(
            SELECT 1 FROM information_schema.COLUMNS
            WHERE TABLE_SCHEMA = DATABASE() AND TABLE_NAME = 'siswa'
-             AND COLUMN_NAME = 'SORGA'
+             AND COLUMN_NAME = 'asal_psb'
          )
   UNION ALL
-  SELECT 'siswa.INFAQ',
+  SELECT 'bayar.U_PSB',
          EXISTS(
            SELECT 1 FROM information_schema.COLUMNS
-           WHERE TABLE_SCHEMA = DATABASE() AND TABLE_NAME = 'siswa'
-             AND COLUMN_NAME = 'INFAQ'
+           WHERE TABLE_SCHEMA = DATABASE() AND TABLE_NAME = 'bayar'
+             AND COLUMN_NAME = 'U_PSB'
+         )
+  UNION ALL
+  SELECT 'siswa_tahun_ajaran.spp_covered_by_psb',
+         EXISTS(
+           SELECT 1 FROM information_schema.COLUMNS
+           WHERE TABLE_SCHEMA = DATABASE() AND TABLE_NAME = 'siswa_tahun_ajaran'
+             AND COLUMN_NAME = 'spp_covered_by_psb'
+         )
+  UNION ALL
+  SELECT 'legacy_payment_columns.removed',
+         NOT EXISTS(
+           SELECT 1 FROM information_schema.COLUMNS
+           WHERE TABLE_SCHEMA = DATABASE()
+             AND (
+               (TABLE_NAME = 'siswa' AND COLUMN_NAME IN (
+                 'BANGUNAN','SERAGAM','KEGIATAN','MAKAN','SORGA','INFAQ',
+                 'PANGKAL_BAYAR','BANGUNAN_BAYAR','SERAGAM_BAYAR','KEGIATAN_BAYAR'
+               ))
+               OR
+               (TABLE_NAME = 'bayar' AND COLUMN_NAME IN (
+                 'U_BANGUNAN','U_SERAGAM','U_KEGIATAN','U_MAKAN','U_SORGA','U_INFAQ'
+               ))
+             )
          )
   UNION ALL
   SELECT 'bayar.U_KOMITE',
@@ -287,6 +310,21 @@ FROM (
   SELECT 'chk_penempatan_kelas_sd', EXISTS(
     SELECT 1 FROM information_schema.CHECK_CONSTRAINTS WHERE CONSTRAINT_SCHEMA=DATABASE()
       AND CONSTRAINT_NAME='chk_penempatan_kelas_sd'
+  )
+  UNION ALL
+  SELECT 'chk_siswa_psb', EXISTS(
+    SELECT 1 FROM information_schema.CHECK_CONSTRAINTS WHERE CONSTRAINT_SCHEMA=DATABASE()
+      AND CONSTRAINT_NAME='chk_siswa_psb'
+  )
+  UNION ALL
+  SELECT 'chk_bayar_psb', EXISTS(
+    SELECT 1 FROM information_schema.CHECK_CONSTRAINTS WHERE CONSTRAINT_SCHEMA=DATABASE()
+      AND CONSTRAINT_NAME='chk_bayar_psb'
+  )
+  UNION ALL
+  SELECT 'chk_penempatan_psb_spp', EXISTS(
+    SELECT 1 FROM information_schema.CHECK_CONSTRAINTS WHERE CONSTRAINT_SCHEMA=DATABASE()
+      AND CONSTRAINT_NAME='chk_penempatan_psb_spp'
   )
   UNION ALL
   SELECT 'chk_tagihan_du_nominal', EXISTS(

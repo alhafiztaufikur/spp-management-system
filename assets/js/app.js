@@ -70,6 +70,47 @@ document.addEventListener('DOMContentLoaded', function () {
       openEdit();
     });
   });
+
+  const classHistoryToggles = Array.from(document.querySelectorAll('.student-class-history-toggle[aria-controls]'));
+  const classHistoryMobile = window.matchMedia('(max-width: 900px)');
+  const syncClassHistoryHeight = detail => {
+    if (!detail) return;
+    detail.style.removeProperty('height');
+    if (detail.hidden || !classHistoryMobile.matches) return;
+    const panel = detail.querySelector('.student-class-history-panel');
+    if (panel) detail.style.height = Math.ceil(panel.getBoundingClientRect().height) + 'px';
+  };
+  classHistoryToggles.forEach(button => {
+    const detail = document.getElementById(button.getAttribute('aria-controls'));
+    const panel = detail?.querySelector('.student-class-history-panel');
+    if (panel && 'ResizeObserver' in window) {
+      new ResizeObserver(() => syncClassHistoryHeight(detail)).observe(panel);
+    }
+    button.addEventListener('click', event => {
+      event.stopPropagation();
+      if (!detail) return;
+      const opening = detail.hidden;
+      if (opening) {
+        classHistoryToggles.forEach(otherButton => {
+          if (otherButton === button) return;
+          const otherDetail = document.getElementById(otherButton.getAttribute('aria-controls'));
+          if (otherDetail) {
+            otherDetail.hidden = true;
+            syncClassHistoryHeight(otherDetail);
+          }
+          otherButton.setAttribute('aria-expanded', 'false');
+          otherButton.setAttribute('aria-label', 'Buka Riwayat Kelas ' + (otherButton.dataset.studentName || 'siswa'));
+        });
+      }
+      detail.hidden = !opening;
+      syncClassHistoryHeight(detail);
+      button.setAttribute('aria-expanded', String(opening));
+      button.setAttribute('aria-label', (opening ? 'Tutup' : 'Buka') + ' Riwayat Kelas ' + (button.dataset.studentName || 'siswa'));
+    });
+  });
+  window.addEventListener('resize', () => {
+    classHistoryToggles.forEach(button => syncClassHistoryHeight(document.getElementById(button.getAttribute('aria-controls'))));
+  });
 });
 
 /* ── Live Clock ──────────────────────────── */
@@ -470,8 +511,15 @@ function selectReportStudentSearchOption(input, opt) {
 }
 
 function applyDefaultDaftarUlangClass(opt) {
-  const studentClass = String(opt.dataset.kelas || '').match(/[1-6]/)?.[0] || '';
-  setDaftarUlangContext(studentClass, academicYearFromPaymentPeriod());
+  const hidden = document.getElementById('tagihan-daftar-ulang-id');
+  const editingLinkedId = parseInt(window.sppEditingDuBillId || 0, 10) || 0;
+  if (hidden && editingLinkedId && daftarUlangRecords(opt).some(bill => parseInt(bill.id, 10) === editingLinkedId)) {
+    hidden.value = String(editingLinkedId);
+    window.sppEditingDuBillId = 0;
+  } else if (hidden) {
+    hidden.value = '';
+  }
+  ensureDefaultDaftarUlangSelection(opt);
 }
 
 function selectedPaymentPeriod() {
@@ -740,8 +788,9 @@ function setDaftarUlangContext(kelas, tahunAjaran) {
 
 function syncDaftarUlangContextFromCurrentState() {
   const opt = selectedStudentOption();
+  ensureDefaultDaftarUlangSelection(opt);
   const bill = selectedDaftarUlangBill(opt);
-  setDaftarUlangContext(bill?.kelas || '', academicYearFromPaymentPeriod());
+  setDaftarUlangContext(bill?.kelas || '', bill?.tahun_ajaran || '');
   return opt;
 }
 
@@ -770,20 +819,39 @@ function paidForPeriod(opt, key) {
   }
 }
 
+function daftarUlangRecords(opt) {
+  if (!opt) return [];
+  try {
+    const raw = JSON.parse(opt.dataset.duBills || '[]');
+    if (Array.isArray(raw)) return raw;
+    return Object.entries(raw).map(([year, record]) => ({ tahun_ajaran: year, ...record }));
+  } catch (_) {
+    return [];
+  }
+}
+
 function selectedDaftarUlangKey() {
-  return academicYearFromPaymentPeriod();
+  return document.getElementById('tagihan-daftar-ulang-id')?.value || '';
 }
 
 function selectedDaftarUlangRecord(opt) {
-  if (!opt) return null;
-  const year = selectedDaftarUlangKey();
-  if (!year) return null;
-  try {
-    const bills = JSON.parse(opt.dataset.duBills || '{}');
-    return bills[year] || null;
-  } catch (_) {
-    return null;
+  const selectedId = parseInt(selectedDaftarUlangKey(), 10) || 0;
+  return daftarUlangRecords(opt).find(record => parseInt(record.id, 10) === selectedId) || null;
+}
+
+function ensureDefaultDaftarUlangSelection(opt) {
+  const hidden = document.getElementById('tagihan-daftar-ulang-id');
+  if (!hidden || !opt) return null;
+  const records = daftarUlangRecords(opt);
+  let selected = records.find(record => String(record.id) === hidden.value);
+  if (!selected) {
+    selected = records.find(record => record.is_current)
+      || records.filter(record => record.is_arrear && parseNumber(record.sisa) > .001)
+        .sort((a, b) => String(a.tahun_ajaran).localeCompare(String(b.tahun_ajaran)))[0]
+      || null;
+    hidden.value = selected ? String(selected.id) : '';
   }
+  return selected;
 }
 
 function selectedDaftarUlangBill(opt) {
@@ -795,33 +863,153 @@ function totalDaftarUlangForContext(opt) {
   return parseNumber(selectedDaftarUlangBill(opt)?.total || 0);
 }
 
+function refreshDaftarUlangSelector(opt) {
+  const trigger = document.getElementById('du-selector-trigger');
+  const staticLabel = document.getElementById('du-static-label');
+  const menu = document.getElementById('du-selector-menu');
+  const warningIcon = document.getElementById('du-arrear-warning');
+  if (!trigger || !staticLabel || !menu) return;
+
+  const records = daftarUlangRecords(opt);
+  const arrears = records.filter(record => record.is_arrear && parseNumber(record.sisa) > .001);
+  const canChoose = arrears.length > 0;
+  trigger.hidden = !canChoose;
+  staticLabel.hidden = canChoose;
+  menu.hidden = true;
+  trigger.setAttribute('aria-expanded', 'false');
+  if (warningIcon) {
+    const message = arrears.length + ' tahun ajaran masih memiliki tunggakan Daftar Ulang';
+    warningIcon.textContent = arrears.length ? '!' : '';
+    warningIcon.setAttribute('aria-label', message);
+    warningIcon.title = message;
+  }
+
+  menu.replaceChildren();
+  const menuHeader = document.createElement('div');
+  menuHeader.className = 'du-selector-menu-header';
+  const menuHeading = document.createElement('strong');
+  menuHeading.textContent = 'Pilih tagihan Daftar Ulang';
+  const menuHint = document.createElement('span');
+  menuHint.textContent = arrears.length + ' tunggakan perlu diselesaikan';
+  menuHeader.append(menuHeading, menuHint);
+  menu.appendChild(menuHeader);
+
+  records.forEach(record => {
+    const option = document.createElement('button');
+    option.type = 'button';
+    option.className = 'du-selector-option';
+    option.setAttribute('role', 'option');
+    option.setAttribute('aria-selected', String(String(record.id) === selectedDaftarUlangKey()));
+    option.dataset.billId = String(record.id);
+
+    const heading = document.createElement('span');
+    heading.className = 'du-option-heading';
+    const titleWrap = document.createElement('span');
+    titleWrap.className = 'du-option-title';
+    const title = document.createElement('strong');
+    title.textContent = 'TA ' + record.tahun_ajaran;
+    const className = document.createElement('span');
+    className.textContent = 'Kelas ' + record.kelas;
+    titleWrap.append(title, className);
+    const badge = document.createElement('span');
+    badge.className = 'du-option-badge ' + (record.is_current ? 'is-current' : 'is-arrear');
+    badge.textContent = record.is_current ? 'Tahun Berjalan' : 'Tunggakan';
+    heading.append(titleWrap, badge);
+
+    const values = document.createElement('span');
+    values.className = 'du-option-values';
+    [
+      ['Tagihan', record.total],
+      ['Terbayar', record.terbayar ?? record.paid ?? 0],
+      ['Sisa', record.sisa ?? 0]
+    ].forEach(([label, value]) => {
+      const stat = document.createElement('span');
+      const statLabel = document.createElement('small');
+      const statValue = document.createElement('strong');
+      statLabel.textContent = label;
+      statValue.textContent = 'Rp ' + formatRupiah(value);
+      stat.append(statLabel, statValue);
+      values.appendChild(stat);
+    });
+    const selectedMark = document.createElement('span');
+    selectedMark.className = 'du-option-selected-mark';
+    selectedMark.setAttribute('aria-hidden', 'true');
+    selectedMark.textContent = '✓';
+    option.append(heading, values, selectedMark);
+    option.addEventListener('click', () => {
+      const hidden = document.getElementById('tagihan-daftar-ulang-id');
+      if (hidden) hidden.value = String(record.id);
+      const input = document.getElementById('du-input');
+      if (input) input.value = '0';
+      menu.hidden = true;
+      trigger.setAttribute('aria-expanded', 'false');
+      setDaftarUlangContext(record.kelas, record.tahun_ajaran);
+      applyStudentPaymentDetails(opt);
+      trigger.focus();
+    });
+    menu.appendChild(option);
+  });
+
+  if (trigger.dataset.bound !== '1') {
+    trigger.dataset.bound = '1';
+    trigger.addEventListener('click', () => {
+      const opening = menu.hidden;
+      menu.hidden = !opening;
+      trigger.setAttribute('aria-expanded', String(opening));
+      if (opening) menu.querySelector('[aria-selected="true"]')?.focus();
+    });
+    trigger.addEventListener('keydown', event => {
+      if (event.key === 'ArrowDown' || event.key === 'Enter' || event.key === ' ') {
+        event.preventDefault();
+        menu.hidden = false;
+        trigger.setAttribute('aria-expanded', 'true');
+        menu.querySelector('[aria-selected="true"], .du-selector-option')?.focus();
+      }
+    });
+    document.addEventListener('click', event => {
+      if (!event.target.closest('.du-bill-selector')) {
+        menu.hidden = true;
+        trigger.setAttribute('aria-expanded', 'false');
+      }
+    });
+    menu.addEventListener('keydown', event => {
+      const options = Array.from(menu.querySelectorAll('.du-selector-option'));
+      const index = options.indexOf(document.activeElement);
+      if (event.key === 'Escape') {
+        menu.hidden = true;
+        trigger.setAttribute('aria-expanded', 'false');
+        trigger.focus();
+      } else if (event.key === 'ArrowDown' || event.key === 'ArrowUp') {
+        event.preventDefault();
+        const step = event.key === 'ArrowDown' ? 1 : -1;
+        options[(index + step + options.length) % options.length]?.focus();
+      }
+    });
+  }
+}
+
 function refreshDaftarUlangMasterWarning(opt) {
   const warning = document.getElementById('du-master-warning');
   const input = document.getElementById('du-input');
   if (!warning && !input) return;
 
-  const periodKey = selectedDaftarUlangKey();
-  const record = selectedDaftarUlangRecord(opt);
+  ensureDefaultDaftarUlangSelection(opt);
   const bill = selectedDaftarUlangBill(opt);
-  const hasContext = !!opt && !!periodKey;
+  const periodKey = bill?.tahun_ajaran || '';
   const total = parseNumber(bill?.total || 0);
-  const paid = parseNumber(bill?.paid || 0);
-  const remaining = Math.max(0, total - paid);
+  const paid = parseNumber(bill?.terbayar ?? bill?.paid ?? 0);
+  const remaining = parseNumber(bill?.sisa ?? Math.max(0, total - paid));
   const isSettled = !!bill && total > 0 && remaining <= 0.001;
-  const isUnavailable = hasContext && !bill;
+  const isUnavailable = !!opt && !bill;
   const contextLabel = document.getElementById('du-context-label');
   if (contextLabel) {
     let status = 'Belum Bayar';
     if (isSettled) status = 'Lunas';
     else if (paid > 0) status = 'Cicilan';
     if (!opt || !periodKey) {
-      contextLabel.textContent = 'Pilih siswa, bulan, dan tahun pembayaran.';
+      contextLabel.textContent = opt ? 'Belum ada tagihan Daftar Ulang yang dapat dipilih.' : 'Pilih siswa untuk melihat tagihan.';
     } else if (bill) {
       contextLabel.textContent = 'TA ' + periodKey + ' · Kelas ' + bill.kelas + ' · ' + status;
-    } else if (record?.status === 'cancelled') {
-      contextLabel.textContent = 'TA ' + periodKey + ' · Tagihan dibatalkan';
-    } else {
-      contextLabel.textContent = 'TA ' + periodKey + ' · Tagihan belum tersedia';
     }
   }
 
@@ -829,7 +1017,7 @@ function refreshDaftarUlangMasterWarning(opt) {
     const locked = !bill || isSettled;
     const lockedMessage = isSettled
       ? 'Tagihan Daftar Ulang sudah lunas.'
-      : 'Tagihan Daftar Ulang siswa untuk tahun ajaran ini belum diterbitkan.';
+      : 'Tidak ada tagihan Daftar Ulang yang dapat dibayar.';
     input.readOnly = locked;
     input.classList.toggle('tbl-readonly', locked);
     if (locked) {
@@ -846,17 +1034,76 @@ function refreshDaftarUlangMasterWarning(opt) {
   if (!isUnavailable) {
     warning.hidden = true;
     warning.textContent = '';
-    return;
+  } else {
+    warning.hidden = false;
+    warning.textContent = 'Tagihan Daftar Ulang belum diterbitkan atau tidak memiliki sisa.';
   }
-
-  warning.hidden = false;
-  warning.textContent = record?.status === 'cancelled'
-    ? 'Tagihan siswa ini telah dibatalkan dan tidak dapat dibayar.'
-    : 'Tagihan belum diterbitkan. Buka Master Daftar Ulang lalu gunakan Simpan & Terbitkan Tagihan.';
+  refreshDaftarUlangSelector(opt);
 }
 
 function paidDaftarUlangForContext(opt) {
-  return parseNumber(selectedDaftarUlangBill(opt)?.paid || 0);
+  const bill = selectedDaftarUlangBill(opt);
+  return parseNumber(bill?.terbayar ?? bill?.paid ?? 0);
+}
+
+function applyGraduatePaymentLock(opt) {
+  const graduateOnly = opt?.dataset.isGraduate === '1';
+  ['pangkal', 'psb', 'spp', 'komite'].forEach(key => {
+    const input = document.getElementById(key + '-input');
+    if (!input) return;
+    if (graduateOnly) {
+      input.value = '0';
+      input.readOnly = true;
+      input.classList.add('tbl-readonly');
+      input.dataset.graduateLocked = '1';
+      input.title = 'Lulusan hanya dapat melunasi tunggakan Daftar Ulang.';
+    } else if (input.dataset.graduateLocked === '1') {
+      input.readOnly = false;
+      input.classList.remove('tbl-readonly');
+      delete input.dataset.graduateLocked;
+      input.removeAttribute('title');
+    }
+  });
+  const discount = document.getElementById('potongan-spp');
+  if (discount) {
+    if (graduateOnly) {
+      discount.value = '0';
+      discount.readOnly = true;
+      discount.dataset.graduateLocked = '1';
+    } else if (discount.dataset.graduateLocked === '1') {
+      discount.readOnly = false;
+      delete discount.dataset.graduateLocked;
+    }
+  }
+  document.querySelectorAll('.biaya-lain-select').forEach(select => {
+    if (graduateOnly) {
+      select.value = '';
+      select.disabled = true;
+      select.dataset.graduateLocked = '1';
+    } else if (select.dataset.graduateLocked === '1') {
+      select.disabled = false;
+      delete select.dataset.graduateLocked;
+    }
+  });
+  document.querySelectorAll('.biaya-lain-nominal, .biaya-lain-keterangan').forEach(input => {
+    if (graduateOnly) input.value = input.classList.contains('biaya-lain-nominal') ? '0' : '';
+    if (graduateOnly) {
+      input.readOnly = true;
+      input.dataset.graduateLocked = '1';
+    } else if (input.dataset.graduateLocked === '1') {
+      input.readOnly = false;
+      delete input.dataset.graduateLocked;
+    }
+  });
+  document.querySelectorAll('.btn-remove-biaya-lain').forEach(button => {
+    if (graduateOnly) { button.disabled = true; button.dataset.graduateLocked = '1'; }
+    else if (button.dataset.graduateLocked === '1') { button.disabled = false; delete button.dataset.graduateLocked; }
+  });
+  const addButton = document.getElementById('btn-add-biaya-lain');
+  if (addButton) {
+    if (graduateOnly) { addButton.disabled = true; addButton.dataset.graduateLocked = '1'; }
+    else if (addButton.dataset.graduateLocked === '1') { delete addButton.dataset.graduateLocked; }
+  }
 }
 
 function selectedBiayaLainSummary() {
@@ -891,9 +1138,13 @@ function refreshAcademicYearSummary() {
     return;
   }
 
-  const annualKeys = ['pangkal','bangunan','seragam','kegiatan','komite','makan','sorga','infaq'];
+  const annualKeys = ['komite'];
   let total = annualKeys.reduce((sum, key) => sum + totalAnnualFeeForContext(opt, key), 0);
   let paid = annualKeys.reduce((sum, key) => sum + paidAnnualFeeForContext(opt, key), 0);
+  ['pangkal', 'psb'].forEach(key => {
+    total += datasetNumber(opt, 'total', key);
+    paid += datasetNumber(opt, 'paid', key);
+  });
 
   total += datasetNumber(opt, 'total', 'spp') * 12;
   paid += paidForAcademicYear(opt, 'spp');
@@ -921,15 +1172,17 @@ function setPaymentComponent(key, total, paid) {
 
 function applyStudentPaymentDetails(opt) {
   if (!opt) return;
-  ['pangkal','bangunan','seragam','kegiatan','spp','komite','makan','sorga','infaq','du'].forEach(key => {
+  ['pangkal','psb','spp','komite','du'].forEach(key => {
     const total = key === 'du'
       ? totalDaftarUlangForContext(opt)
       : (key === 'spp'
           ? selectedSppTariff(opt) * (isAnnualPaymentPlan() ? 12 : 1)
-          : totalAnnualFeeForContext(opt, key));
+          : (key === 'komite' ? totalAnnualFeeForContext(opt, key) : datasetNumber(opt, 'total', key)));
     const paid = key === 'du'
       ? paidDaftarUlangForContext(opt)
-      : (key === 'spp' ? paidForPeriod(opt, key) : paidAnnualFeeForContext(opt, key));
+      : (key === 'spp'
+          ? paidForPeriod(opt, key)
+          : (key === 'komite' ? paidAnnualFeeForContext(opt, key) : datasetNumber(opt, 'paid', key)));
     setPaymentComponent(key, total, paid);
   });
   refreshAnnualPaymentState(opt);
@@ -940,13 +1193,16 @@ function applyStudentPaymentDetails(opt) {
 }
 
 function clearPaymentDetails() {
-  ['pangkal','bangunan','seragam','kegiatan','spp','komite','makan','sorga','infaq','du'].forEach(key => {
+  const duBillId = document.getElementById('tagihan-daftar-ulang-id');
+  if (duBillId) duBillId.value = '';
+  ['pangkal','psb','spp','komite','du'].forEach(key => {
     ['total','bayar','sisa'].forEach(part => {
       const el = document.getElementById(key + '-' + part);
       if (el) el.value = '0';
     });
   });
   refreshDaftarUlangMasterWarning(null);
+  applyGraduatePaymentLock(null);
   refreshAnnualPaymentState(null);
   refreshBiayaLainOptions();
   document.querySelectorAll('.biaya-lain-row').forEach(row => refreshBiayaLainRow(row, true));
@@ -955,20 +1211,15 @@ function clearPaymentDetails() {
 
 const paymentComponentLabels = {
   pangkal: 'Uang Pangkal',
-  bangunan: 'Uang Bangunan',
-  seragam: 'Uang Seragam',
-  kegiatan: 'Uang Kegiatan',
+  psb: 'Uang PSB',
   spp: 'Uang SPP',
   komite: 'Uang Komite',
-  makan: 'Uang Makan',
-  sorga: 'Uang Sorga',
-  infaq: 'Uang Infaq',
   du: 'Uang Daftar Ulang'
 };
 
 function refreshOptionalOneTimeFeeAvailability() {
   const hasStudent = !!document.getElementById('disp-nis')?.value;
-  ['pangkal', 'bangunan', 'seragam', 'kegiatan', 'komite', 'makan', 'sorga', 'infaq'].forEach(key => {
+  ['pangkal', 'psb', 'komite'].forEach(key => {
     const total = parseNumber(document.getElementById(key + '-total')?.value || 0);
     const paid = parseNumber(document.getElementById(key + '-bayar')?.value || 0);
     const inputEl = document.getElementById(key + '-input');
@@ -991,7 +1242,7 @@ function refreshOptionalOneTimeFeeAvailability() {
       inputEl.removeAttribute('title');
     }
     if (contextEl) {
-      contextEl.textContent = locked ? message : 'Tagihan tahunan bisa dicicil';
+      contextEl.textContent = locked ? message : (key === 'komite' ? 'Tagihan tahunan bisa dicicil' : 'Tagihan satu kali, dapat dicicil');
     }
     hitungSisa(key);
   });
@@ -1884,6 +2135,7 @@ function refreshBiayaLainBillsFromServer(noInduk) {
       opt.dataset.biayaLainBills = JSON.stringify(Array.isArray(payload.rows) ? payload.rows : []);
       refreshBiayaLainOptions();
       document.querySelectorAll('.biaya-lain-row').forEach(row => refreshBiayaLainRow(row, true));
+      applyGraduatePaymentLock(opt);
     })
     .catch(error => {
       if (requestId !== biayaLainBillsRequestId) return;
@@ -2410,7 +2662,8 @@ function updateTotal() {
   refreshBiayaLainAvailability();
   document.querySelectorAll('.biaya-lain-row').forEach(row => refreshBiayaLainRow(row, true));
   refreshBiayaLainWarnings();
-  const ids = ['pangkal-input','bangunan-input','seragam-input','kegiatan-input','spp-input','komite-input','makan-input','sorga-input','infaq-input','du-input'];
+  applyGraduatePaymentLock(selectedStudentOption());
+  const ids = ['pangkal-input','psb-input','spp-input','komite-input','du-input'];
   let total = 0;
   ids.forEach(id => {
     const el = document.getElementById(id);
@@ -2456,7 +2709,7 @@ function resetForm() {
   const hiddenEl = document.getElementById('hidden-total');
   if (hiddenEl) hiddenEl.value = 0;
 
-  ['pangkal','bangunan','seragam','kegiatan','spp','komite','makan','sorga','infaq','du'].forEach(k => {
+  ['pangkal','psb','spp','komite','du'].forEach(k => {
     ['total','bayar','sisa','input'].forEach(s => {
       const el = document.getElementById(k + '-' + s);
       if (el) el.value = '0';

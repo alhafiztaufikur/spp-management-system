@@ -134,33 +134,27 @@ $stmt = $koneksi->prepare("
         s.NO_induk_diknas,
         s.KELAS AS KELAS_SISWA,
         s.PANGKAL,
-        s.PANGKAL_BAYAR,
+        s.PSB,
         s.potong_pangkal,
         s.tot_pangkal,
         s.DAFTAR_ULANG,
         s.potong_du,
         s.tot_du,
         COALESCE(du_current.jumlah, 0) AS uang_du,
-        COALESCE(psb_paid.total_pangkal_bayar, 0) AS total_pangkal_bayar,
+        du_current.th_ajaran AS du_tahun_ajaran,
+        COALESCE(one_paid.total_pangkal_bayar, 0) AS total_pangkal_bayar,
+        COALESCE(one_paid.total_psb_bayar, 0) AS total_psb_bayar,
         COALESCE(du_paid.total_du_bayar, 0) AS total_du_bayar,
         COALESCE(op.nama, NULLIF(b.user_id, '')) AS operator_name
     FROM bayar b
     JOIN siswa s ON s.NO_INDUK = b.NO_INDUK
     LEFT JOIN admin op ON op.id = CAST(b.user_id AS UNSIGNED)
+    LEFT JOIN bayar_du du_current ON du_current.bayar_id=b.id
     LEFT JOIN (
-        SELECT no_induk, th_ajaran, kelas, SUM(jumlah) AS jumlah
-        FROM bayar_du
-        GROUP BY no_induk, th_ajaran, kelas
-    ) du_current
-        ON du_current.no_induk = b.NO_INDUK
-        AND du_current.th_ajaran = b.th_ajaran
-        AND du_current.kelas = b.kelas_du
-        AND b.kelas_du <> ''
-    LEFT JOIN (
-        SELECT NO_INDUK, SUM(U_PANGKAL) AS total_pangkal_bayar
+        SELECT NO_INDUK, SUM(U_PANGKAL) AS total_pangkal_bayar, SUM(U_PSB) AS total_psb_bayar
         FROM bayar
         GROUP BY NO_INDUK
-    ) psb_paid ON psb_paid.NO_INDUK = b.NO_INDUK
+    ) one_paid ON one_paid.NO_INDUK = b.NO_INDUK
     LEFT JOIN (
         SELECT no_induk, SUM(jumlah) AS total_du_bayar
         FROM bayar_du
@@ -245,20 +239,15 @@ if (!$rows && !$selected_mode) {
         'BULAN' => str_pad((string)$filter_bulan, 2, '0', STR_PAD_LEFT),
         'TAHUN' => (string)$filter_tahun,
         'U_PANGKAL' => 0,
-        'U_BANGUNAN' => 0,
-        'U_SERAGAM' => 0,
-        'U_KEGIATAN' => 0,
+        'U_PSB' => 0,
         'U_SPP' => 495000,
-        'U_MAKAN' => 0,
-        'U_SORGA' => 0,
-        'U_INFAQ' => 0,
         'U_KOMITE' => 15000,
         'sistem_pembayaran' => 'VA',
         'potong_spp' => 0,
         'total_jumlah' => 510000,
         'TGL_BYR' => date('Y-m-d H:i:s'),
         'PANGKAL' => 0,
-        'PANGKAL_BAYAR' => 0,
+        'PSB' => 0,
         'potong_pangkal' => 0,
         'tot_pangkal' => 0,
         'DAFTAR_ULANG' => 0,
@@ -266,28 +255,23 @@ if (!$rows && !$selected_mode) {
         'tot_du' => 0,
         'uang_du' => 0,
         'total_pangkal_bayar' => 0,
+        'total_psb_bayar' => 0,
         'total_du_bayar' => 0,
     ];
 }
 
 function primary_lines(array $row): array {
     return [
-        payment_line('Uang PSB', $row['U_PANGKAL']),
-        payment_line('Uang Daftar Ulang', $row['uang_du']),
+        payment_line('Uang Pangkal', $row['U_PANGKAL']),
+        payment_line('Uang PSB', $row['U_PSB']),
+        payment_line('Uang Daftar Ulang' . (!empty($row['du_tahun_ajaran']) ? ' (TA ' . $row['du_tahun_ajaran'] . ')' : ''), $row['uang_du']),
         payment_line('Uang SPP', $row['U_SPP']),
         payment_line('Komite Sekolah', $row['U_KOMITE']),
     ];
 }
 
 function other_lines(array $row, array $details): array {
-    $lines = [
-        payment_line('Uang Bangunan', $row['U_BANGUNAN']),
-        payment_line('Uang Seragam', $row['U_SERAGAM']),
-        payment_line('Uang Kegiatan', $row['U_KEGIATAN']),
-        payment_line('Uang Makan', $row['U_MAKAN']),
-        payment_line('Uang Sorga', $row['U_SORGA']),
-        payment_line('Uang Infaq', $row['U_INFAQ']),
-    ];
+    $lines = [];
 
     foreach ($details as $detail) {
         $label = $detail['nama_biaya_snapshot'];
@@ -304,10 +288,14 @@ function other_lines(array $row, array $details): array {
     return array_values(array_filter($lines, fn($line) => abs((float)$line['amount']) > 0.001));
 }
 
-function total_psb_bill(array $row): float {
+function total_pangkal_bill(array $row): float {
     $derived = (float)$row['tot_pangkal'];
     if ($derived > 0) return $derived;
     return max(0, (float)$row['PANGKAL'] - (float)$row['potong_pangkal']);
+}
+
+function total_psb_bill(array $row): float {
+    return max(0, (float)($row['PSB'] ?? 0));
 }
 
 function total_du_bill(array $row): float {
@@ -506,7 +494,8 @@ ob_start();
     $details = $details_by_payment[(int)$row['id']] ?? [];
     $primary = primary_lines($row);
     $others = other_lines($row, $details);
-    $sisa_psb = max(0, total_psb_bill($row) - max((float)$row['PANGKAL_BAYAR'], (float)$row['total_pangkal_bayar']));
+    $sisa_pangkal = max(0, total_pangkal_bill($row) - (float)$row['total_pangkal_bayar']);
+    $sisa_psb = max(0, total_psb_bill($row) - (float)$row['total_psb_bayar']);
     $sisa_du = max(0, total_du_bill($row) - (float)$row['total_du_bayar']);
     $month_name = month_name_from_value($row['BULAN'], $bln_names);
     $signer = $row['operator_name'] ?: ($_SESSION['admin_nama'] ?? 'Bagian Keuangan');
@@ -577,6 +566,11 @@ ob_start();
         <td class="detail-right">
           <div class="section-label">Sisa Pembayaran :</div>
           <table class="pay-table">
+            <tr>
+              <td class="compact-label">Sisa Pangkal</td>
+              <td class="pay-sep">:</td>
+              <td class="pay-amount"><?= e(money_plain($sisa_pangkal)) ?></td>
+            </tr>
             <tr>
               <td class="compact-label">Sisa PSB</td>
               <td class="pay-sep">:</td>

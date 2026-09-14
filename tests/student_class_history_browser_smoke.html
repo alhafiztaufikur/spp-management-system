@@ -1,0 +1,68 @@
+<!doctype html>
+<html lang="id" data-theme="light">
+<head>
+  <meta charset="utf-8">
+  <meta name="viewport" content="width=device-width,initial-scale=1">
+  <title>pending</title>
+  <script>localStorage.setItem('spp_theme','light')</script>
+  <link rel="stylesheet" href="../assets/css/style.css">
+  <style>
+    body{padding:48px;background:#f5fbf7}.history-smoke-shell{max-width:1180px;margin:auto}
+    @media(max-width:900px){body{padding:14px}}
+  </style>
+</head>
+<body>
+  <main class="history-smoke-shell">
+    <div class="main-card master-modern-card master-modern-list">
+      <div class="card-title-row"><div class="card-title">Daftar Siswa (2)</div></div>
+      <div class="table-container">
+        <table class="payment-table responsive-table">
+          <thead><tr><th>No</th><th>No. Induk</th><th>Nama Siswa</th><th>Kelas</th><th>SPP/Bulan</th><th>Status</th><th>Riwayat Transaksi</th><th>Aksi</th></tr></thead>
+          <tbody>
+            <tr>
+              <td data-label="No">1</td><td data-label="No. Induk"><span class="badge-nis">2024001</span></td><td data-label="Nama Siswa">Ahmad Fauzi</td>
+              <td data-label="Kelas" class="student-class-col"><div class="student-class-cell"><span class="kelas-badge">3A</span><button type="button" class="student-class-history-toggle" aria-expanded="false" aria-controls="class-history-1" aria-label="Buka Riwayat Kelas Ahmad Fauzi" data-student-name="Ahmad Fauzi"><svg aria-hidden="true" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><path d="M3 12a9 9 0 1 0 3-6.7L3 8"/><path d="M3 3v5h5M12 7v5l3 2"/></svg><span>Riwayat</span><span class="student-class-history-chevron" aria-hidden="true">⌄</span></button></div></td>
+              <td data-label="SPP/Bulan" class="nominal">Rp 250.000</td><td data-label="Status"><span class="master-status is-active">Aktif</span></td><td data-label="Riwayat Transaksi"><span class="badge-count">20x</span></td><td data-label="Aksi"><button class="btn-tbl btn-tbl-edit">Edit</button></td>
+            </tr>
+            <tr class="student-class-history-row" id="class-history-1" hidden><td colspan="8"><section class="student-class-history-panel" aria-label="Riwayat kelas Ahmad Fauzi"><header class="student-class-history-head"><div class="student-class-history-head-icon" aria-hidden="true"><svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><path d="M3 12a9 9 0 1 0 3-6.7L3 8"/><path d="M3 3v5h5M12 7v5l3 2"/></svg></div><div class="student-class-history-copy"><h4>Riwayat Kelas</h4><p>Ahmad Fauzi · terbaru ke terlama</p></div><span class="student-class-history-count">3 catatan</span></header><ol class="student-class-timeline">
+              <li class="student-class-timeline-item is-current"><span class="student-class-timeline-dot" aria-hidden="true"></span><article><span class="student-class-year">TA 2026/2027</span><strong>Kelas 3A</strong><em>Saat Ini</em></article></li>
+              <li class="student-class-timeline-item is-past"><span class="student-class-timeline-dot" aria-hidden="true"></span><article><span class="student-class-year">TA 2025/2026</span><strong>Kelas 2A</strong><em>Pindah</em></article></li>
+              <li class="student-class-timeline-item is-past"><span class="student-class-timeline-dot" aria-hidden="true"></span><article><span class="student-class-year">TA 2024/2025</span><strong>Kelas 1A</strong><em>Pindah</em></article></li>
+            </ol></section></td></tr>
+            <tr><td data-label="No">2</td><td data-label="No. Induk"><span class="badge-nis">2024002</span></td><td data-label="Nama Siswa">Siswa Kedua</td><td data-label="Kelas" class="student-class-col"><div class="student-class-cell"><span class="kelas-badge">2B</span><button type="button" class="student-class-history-toggle" aria-expanded="false" aria-controls="class-history-2" aria-label="Buka Riwayat Kelas Siswa Kedua" data-student-name="Siswa Kedua"><svg aria-hidden="true" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><path d="M3 12a9 9 0 1 0 3-6.7L3 8"/><path d="M3 3v5h5M12 7v5l3 2"/></svg><span>Riwayat</span><span class="student-class-history-chevron" aria-hidden="true">⌄</span></button></div></td><td data-label="SPP/Bulan" class="nominal">Rp 250.000</td><td data-label="Status"><span class="master-status is-active">Aktif</span></td><td data-label="Riwayat Transaksi"><span class="badge-count">8x</span></td><td data-label="Aksi"><button class="btn-tbl btn-tbl-edit">Edit</button></td></tr>
+            <tr class="student-class-history-row" id="class-history-2" hidden><td colspan="8"><section class="student-class-history-panel"><header class="student-class-history-head"><div class="student-class-history-head-icon"></div><div class="student-class-history-copy"><h4>Riwayat Kelas</h4><p>Siswa Kedua · terbaru ke terlama</p></div><span class="student-class-history-count">1 catatan</span></header></section></td></tr>
+          </tbody>
+        </table>
+      </div>
+    </div>
+  </main>
+  <script src="../assets/js/app.js"></script>
+  <script>
+    window.addEventListener('load', function () {
+      try {
+        const buttons = document.querySelectorAll('.student-class-history-toggle');
+        const first = document.getElementById('class-history-1');
+        const second = document.getElementById('class-history-2');
+        const secondStudentRow = buttons[1].closest('tr');
+        if (!first.hidden || !second.hidden) throw new Error('initial-hidden');
+        buttons[0].click();
+        if (first.hidden || buttons[0].getAttribute('aria-expanded') !== 'true') throw new Error('first-open');
+        if (innerWidth <= 900 && first.getBoundingClientRect().bottom > secondStudentRow.getBoundingClientRect().top) {
+          throw new Error('mobile-overlap');
+        }
+        buttons[1].click();
+        if (!first.hidden || second.hidden) throw new Error('accordion');
+        if (location.search === '?visual') {
+          buttons[1].click();
+          buttons[0].click();
+          document.title = 'CLASS_HISTORY_VISUAL';
+          return;
+        }
+        document.title = 'CLASS_HISTORY_OK';
+      } catch (error) {
+        document.title = 'CLASS_HISTORY_FAILED_' + error.message;
+      }
+    });
+  </script>
+</body>
+</html>

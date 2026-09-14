@@ -7,6 +7,7 @@ require_once '../includes/daftar_ulang.php';
 require_once '../includes/kelas.php';
 require_once '../includes/pagination.php';
 require_once '../includes/student_tariff_consistency.php';
+require_once '../includes/tagihan_sekali.php';
 requireRole(['admin']);
 
 if (empty($_SESSION['csrf_student'])) {
@@ -41,10 +42,8 @@ function find_student(mysqli $db, int $id, bool $forUpdate = false): ?array {
 
 function student_snapshot(array $student): array {
     $keys = [
-        'id', 'NO_INDUK', 'NAMA', 'KELAS', 'master_kelas_id', 'SPP_PERBULAN', 'PANGKAL', 'BANGUNAN',
-        'SERAGAM', 'KEGIATAN', 'MAKAN', 'SORGA', 'INFAQ',
-        'PANGKAL_BAYAR', 'BANGUNAN_BAYAR', 'SERAGAM_BAYAR',
-        'KEGIATAN_BAYAR', 'POMG', 'DAFTAR_ULANG', 'NO_induk_diknas',
+        'id', 'NO_INDUK', 'NAMA', 'KELAS', 'master_kelas_id', 'SPP_PERBULAN', 'PANGKAL', 'PSB',
+        'asal_psb', 'POMG', 'DAFTAR_ULANG', 'NO_induk_diknas',
         'potong_pangkal', 'tot_pangkal', 'tot_du', 'potong_du', 'is_active'
     ];
     return array_intersect_key($student, array_flip($keys));
@@ -91,6 +90,20 @@ function validate_student_identity(mysqli $db, array $source): array {
     return [$noInduk, $name, (string)$class['tingkat'], $classId];
 }
 
+function reject_removed_student_components(array $source): void {
+    $removed = [
+        'bangunan'=>'Uang Bangunan', 'seragam'=>'Uang Seragam', 'kegiatan'=>'Uang Kegiatan',
+        'makan'=>'Uang Makan', 'sorga'=>'Uang Sorga', 'surga'=>'Uang Surga', 'infaq'=>'Uang Infaq',
+        'pangkal_bayar'=>'Saldo awal Pangkal', 'bangunan_bayar'=>'Saldo awal Bangunan',
+        'seragam_bayar'=>'Saldo awal Seragam', 'kegiatan_bayar'=>'Saldo awal Kegiatan',
+    ];
+    foreach ($removed as $field => $label) {
+        if (array_key_exists($field, $source)) {
+            throw new RuntimeException($label . ' sudah tidak didukung pada Master Siswa.');
+        }
+    }
+}
+
 $flash = $_SESSION['flash'] ?? null;
 unset($_SESSION['flash']);
 $oldInput = $_SESSION['student_old_input'] ?? [];
@@ -106,6 +119,7 @@ if ($_SERVER['REQUEST_METHOD'] === 'POST') {
 
     try {
         if ($action === 'tambah' || $action === 'update') {
+            reject_removed_student_components($_POST);
             $id = (int)($_POST['id'] ?? 0);
             if ($action === 'update') $returnLocation .= '?edit=' . $id;
             $koneksi->begin_transaction();
@@ -122,24 +136,17 @@ if ($_SERVER['REQUEST_METHOD'] === 'POST') {
 
             $advanced = isset($_POST['advanced_enabled']) && $_POST['advanced_enabled'] === '1';
             $advancedColumns = [
-                'SPP_PERBULAN', 'PANGKAL', 'BANGUNAN', 'SERAGAM', 'KEGIATAN',
-                'MAKAN', 'SORGA', 'INFAQ', 'POMG', 'DAFTAR_ULANG',
+                'SPP_PERBULAN', 'PANGKAL', 'PSB', 'POMG', 'DAFTAR_ULANG',
                 'potong_pangkal', 'potong_du'
             ];
             $postMap = [
                 'SPP_PERBULAN' => 'spp_perbulan', 'PANGKAL' => 'pangkal',
-                'BANGUNAN' => 'bangunan', 'SERAGAM' => 'seragam',
-                'KEGIATAN' => 'kegiatan', 'MAKAN' => 'makan',
-                'SORGA' => 'sorga', 'INFAQ' => 'infaq', 'POMG' => 'pomg',
+                'PSB' => 'psb', 'POMG' => 'pomg',
                 'DAFTAR_ULANG' => 'daftar_ulang', 'potong_pangkal' => 'potong_pangkal',
                 'potong_du' => 'potong_du'
             ];
-            $openingMap = [
-                'PANGKAL_BAYAR' => 'pangkal_bayar', 'BANGUNAN_BAYAR' => 'bangunan_bayar',
-                'SERAGAM_BAYAR' => 'seragam_bayar', 'KEGIATAN_BAYAR' => 'kegiatan_bayar'
-            ];
             if (!$advanced) {
-                $ignoredChanges = student_advanced_change_attempts($_POST, $oldStudent, $postMap, $openingMap);
+                $ignoredChanges = student_advanced_change_attempts($_POST, $oldStudent, $postMap);
                 if ($ignoredChanges) {
                     throw new RuntimeException('Perubahan tarif atau data lanjutan terdeteksi. Aktifkan Advance sebelum menyimpan.');
                 }
@@ -173,42 +180,26 @@ if ($_SERVER['REQUEST_METHOD'] === 'POST') {
             $values['tot_pangkal'] = max(0, $values['PANGKAL'] - $values['potong_pangkal']);
             $values['tot_du'] = max(0, $values['DAFTAR_ULANG'] - $values['potong_du']);
 
-            $canEditOpening = !$oldStudent || (int)$oldStudent['history_count'] === 0;
-            foreach ($openingMap as $column => $postName) {
-                $oldValue = (float)($oldStudent[$column] ?? 0);
-                if ($advanced && $canEditOpening) {
-                    $values[$column] = student_amount($_POST[$postName] ?? 0);
-                } else {
-                    $values[$column] = $oldValue;
-                    if (!$canEditOpening && isset($_POST[$postName]) && student_amount($_POST[$postName]) !== $oldValue) {
-                        throw new RuntimeException('Saldo awal tidak dapat diubah setelah siswa memiliki histori transaksi.');
-                    }
-                }
+            $asalPsb = $oldStudent ? (int)$oldStudent['asal_psb'] : ($class === '0' ? 1 : 0);
+            if (!$asalPsb && $values['PSB'] > 0.001) {
+                throw new RuntimeException('Uang PSB hanya dapat diatur untuk siswa yang pertama kali didaftarkan di kelas PSB.');
             }
-            $openingLimits = [
-                'PANGKAL_BAYAR' => $values['tot_pangkal'],
-                'BANGUNAN_BAYAR' => $values['BANGUNAN'],
-                'SERAGAM_BAYAR' => $values['SERAGAM'],
-                'KEGIATAN_BAYAR' => $values['KEGIATAN']
-            ];
-            if (!$oldStudent || $canEditOpening) {
-                foreach ($openingLimits as $column => $limit) {
-                    if ($values[$column] > $limit) throw new RuntimeException('Saldo awal tidak boleh melebihi nilai tagihan.');
+            if ($action === 'tambah' && $class === '0' && $values['PSB'] <= 0.001) {
+                throw new RuntimeException('Nominal Uang PSB wajib diisi untuk siswa kelas PSB.');
+            }
+            if ($oldStudent) {
+                $oneTimePaid = one_time_fee_status($koneksi, (string)$oldStudent['NO_INDUK'], 0, true);
+                if ($values['tot_pangkal'] + 0.001 < $oneTimePaid['pangkal']['paid']) {
+                    throw new RuntimeException('Total Uang Pangkal tidak boleh lebih kecil dari yang sudah dibayar.');
+                }
+                if ($values['PSB'] + 0.001 < $oneTimePaid['psb']['paid']) {
+                    throw new RuntimeException('Uang PSB tidak boleh lebih kecil dari yang sudah dibayar.');
                 }
             }
 
             $spp = $values['SPP_PERBULAN'];
             $pangkal = $values['PANGKAL'];
-            $bangunan = $values['BANGUNAN'];
-            $seragam = $values['SERAGAM'];
-            $kegiatan = $values['KEGIATAN'];
-            $makan = $values['MAKAN'];
-            $sorga = $values['SORGA'];
-            $infaq = $values['INFAQ'];
-            $pangkalBayar = $values['PANGKAL_BAYAR'];
-            $bangunanBayar = $values['BANGUNAN_BAYAR'];
-            $seragamBayar = $values['SERAGAM_BAYAR'];
-            $kegiatanBayar = $values['KEGIATAN_BAYAR'];
+            $psb = $values['PSB'];
             $pomg = $values['POMG'];
             $daftarUlang = $values['DAFTAR_ULANG'];
             $potongPangkal = $values['potong_pangkal'];
@@ -220,21 +211,17 @@ if ($_SERVER['REQUEST_METHOD'] === 'POST') {
             if ($action === 'tambah') {
                 $stmt = $koneksi->prepare("
                     INSERT INTO siswa (
-                      NO_INDUK, NAMA, KELAS, SPP_PERBULAN, PANGKAL, BANGUNAN, SERAGAM,
-                      KEGIATAN, MAKAN, SORGA, INFAQ,
-                      PANGKAL_BAYAR, BANGUNAN_BAYAR, SERAGAM_BAYAR, KEGIATAN_BAYAR,
+                      NO_INDUK, NAMA, KELAS, SPP_PERBULAN, PANGKAL, PSB, asal_psb,
                       POMG, DAFTAR_ULANG, NO_induk_diknas, potong_pangkal, tot_pangkal,
                       tot_du, potong_du, is_active
                     ) VALUES (
-                      ?, ?, ?,
-                      ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?,
+                      ?, ?, ?, ?, ?, ?, ?, ?, ?,
                       NULLIF(?, ''), ?, ?, ?, ?, ?
                     )
                 ");
                 $stmt->bind_param(
-                    'sssddddddddddddddsddddi',
-                    $noInduk, $name, $class, $spp, $pangkal, $bangunan, $seragam, $kegiatan,
-                    $makan, $sorga, $infaq, $pangkalBayar, $bangunanBayar, $seragamBayar, $kegiatanBayar, $pomg,
+                    'sssdddiddsddddi',
+                    $noInduk, $name, $class, $spp, $pangkal, $psb, $asalPsb, $pomg,
                     $daftarUlang, $nisDiknas, $potongPangkal, $totPangkal, $totDu, $potongDu, $active
                 );
                 $stmt->execute();
@@ -254,17 +241,14 @@ if ($_SERVER['REQUEST_METHOD'] === 'POST') {
                 $before = student_snapshot($oldStudent);
                 $stmt = $koneksi->prepare("
                     UPDATE siswa SET
-                      NO_INDUK=?, NAMA=?, KELAS=?, SPP_PERBULAN=?, PANGKAL=?, BANGUNAN=?,
-                      SERAGAM=?, KEGIATAN=?, MAKAN=?, SORGA=?, INFAQ=?,
-                      PANGKAL_BAYAR=?, BANGUNAN_BAYAR=?,
-                      SERAGAM_BAYAR=?, KEGIATAN_BAYAR=?, POMG=?, DAFTAR_ULANG=?,
+                      NO_INDUK=?, NAMA=?, KELAS=?, SPP_PERBULAN=?, PANGKAL=?, PSB=?,
+                      POMG=?, DAFTAR_ULANG=?,
                       NO_induk_diknas=NULLIF(?, ''), potong_pangkal=?, tot_pangkal=?,
                       tot_du=?, potong_du=? WHERE id=?
                 ");
                 $stmt->bind_param(
-                    'sssddddddddddddddsddddi',
-                    $noInduk, $name, $class, $spp, $pangkal, $bangunan, $seragam, $kegiatan,
-                    $makan, $sorga, $infaq, $pangkalBayar, $bangunanBayar, $seragamBayar, $kegiatanBayar, $pomg,
+                    'sssdddddsddddi',
+                    $noInduk, $name, $class, $spp, $pangkal, $psb, $pomg,
                     $daftarUlang, $nisDiknas, $potongPangkal, $totPangkal, $totDu, $potongDu, $id
                 );
                 $stmt->execute();
@@ -346,6 +330,13 @@ if ($_SERVER['REQUEST_METHOD'] === 'POST') {
             $koneksi->begin_transaction();
             $student = find_student($koneksi, $id, true);
             if (!$student) throw new RuntimeException('Data siswa tidak ditemukan.');
+            $stmtGraduate = $koneksi->prepare("SELECT 1 FROM siswa_tahun_ajaran WHERE no_induk=? AND status='lulus' LIMIT 1");
+            $graduateNoInduk = (string)$student['NO_INDUK'];
+            $stmtGraduate->bind_param('s', $graduateNoInduk);
+            $stmtGraduate->execute();
+            $isGraduate = (bool)$stmtGraduate->get_result()->fetch_row();
+            $stmtGraduate->close();
+            if ($isGraduate) throw new RuntimeException('Status lulusan tidak dapat diubah melalui arsip manual.');
             $before = student_snapshot($student);
             $newStatus = (int)$student['is_active'] === 1 ? 0 : 1;
             $stmt = $koneksi->prepare('UPDATE siswa SET is_active = ? WHERE id = ?');
@@ -434,6 +425,29 @@ $stmtList->bind_param($pageTypes, ...$pageParams);
 $stmtList->execute();
 $studentRows = $stmtList->get_result()->fetch_all(MYSQLI_ASSOC);
 $stmtList->close();
+$classHistories = [];
+$graduationYears = [];
+if ($studentRows) {
+    $historyStudentIds = array_values(array_map(fn($row) => (string)$row['NO_INDUK'], $studentRows));
+    $placeholders = implode(',', array_fill(0, count($historyStudentIds), '?'));
+    $stmtHistory = $koneksi->prepare("SELECT sta.no_induk,ta.label AS tahun_ajaran,
+            sta.kelas,sta.kelas_rombel_snapshot,sta.status
+        FROM siswa_tahun_ajaran sta
+        JOIN tahun_ajaran ta ON ta.id=sta.tahun_ajaran_id
+        WHERE sta.no_induk IN ($placeholders) AND sta.kelas IN ('1','2','3','4','5','6')
+        ORDER BY ta.label DESC,sta.id DESC");
+    $historyTypes = str_repeat('s', count($historyStudentIds));
+    $stmtHistory->bind_param($historyTypes, ...$historyStudentIds);
+    $stmtHistory->execute();
+    foreach ($stmtHistory->get_result()->fetch_all(MYSQLI_ASSOC) as $history) {
+        $nis = (string)$history['no_induk'];
+        $classHistories[$nis][] = $history;
+        if ($history['status'] === 'lulus' && !isset($graduationYears[$nis])) {
+            $graduationYears[$nis] = (string)$history['tahun_ajaran'];
+        }
+    }
+    $stmtHistory->close();
+}
 $studentPaginationQuery = pagination_query(['per_page' => $perPage]);
 
 $formStudent = $editStudent ?? [];
@@ -441,12 +455,9 @@ $fieldMap = [
     'no_induk' => 'NO_INDUK', 'nama' => 'NAMA', 'kelas' => 'KELAS',
     'master_kelas_id' => 'master_kelas_id',
     'no_induk_diknas' => 'NO_induk_diknas', 'spp_perbulan' => 'SPP_PERBULAN',
-    'pangkal' => 'PANGKAL', 'bangunan' => 'BANGUNAN', 'seragam' => 'SERAGAM',
-    'kegiatan' => 'KEGIATAN', 'makan' => 'MAKAN', 'sorga' => 'SORGA',
-    'infaq' => 'INFAQ', 'pomg' => 'POMG', 'daftar_ulang' => 'DAFTAR_ULANG',
-    'potong_pangkal' => 'potong_pangkal', 'potong_du' => 'potong_du',
-    'pangkal_bayar' => 'PANGKAL_BAYAR', 'bangunan_bayar' => 'BANGUNAN_BAYAR',
-    'seragam_bayar' => 'SERAGAM_BAYAR', 'kegiatan_bayar' => 'KEGIATAN_BAYAR'
+    'pangkal' => 'PANGKAL', 'psb' => 'PSB', 'pomg' => 'POMG',
+    'daftar_ulang' => 'DAFTAR_ULANG', 'potong_pangkal' => 'potong_pangkal',
+    'potong_du' => 'potong_du'
 ];
 function form_student_value(string $key, array $oldInput, array $student, array $fieldMap, $default = '') {
     if (array_key_exists($key, $oldInput)) return $oldInput[$key];
@@ -457,7 +468,6 @@ function rupiah_value($value): string {
     return number_format((float)$value, 0, ',', '.');
 }
 $advancedOpen = isset($oldInput['advanced_enabled']) && $oldInput['advanced_enabled'] === '1';
-$canEditOpening = !$editStudent || (int)($editStudent['history_count'] ?? 0) === 0;
 ?>
 <!DOCTYPE html>
 <html lang="id">
@@ -468,7 +478,7 @@ $canEditOpening = !$editStudent || (int)($editStudent['history_count'] ?? 0) ===
   <link rel="icon" type="image/png" href="../assets/img/favicon.png?v=2" />
   <link rel="preconnect" href="https://fonts.googleapis.com" />
   <link href="https://fonts.googleapis.com/css2?family=Inter:wght@300;400;500;600;700;800&display=swap" rel="stylesheet" />
-  <link rel="stylesheet" href="../assets/css/style.css?v=9.6" />
+  <link rel="stylesheet" href="../assets/css/style.css?v=9.9" />
   <script>(function(){var t=localStorage.getItem('spp_theme')||'dark';document.documentElement.setAttribute('data-theme',t);})();</script>
 </head>
 <body>
@@ -493,7 +503,7 @@ $canEditOpening = !$editStudent || (int)($editStudent['history_count'] ?? 0) ===
           <div>
             <span class="recap-class-overline">Data Master</span>
             <h1>Data Siswa</h1>
-            <p>Kelola identitas siswa, rombel, tarif, saldo awal legacy, dan status aktif siswa.</p>
+            <p>Kelola identitas siswa, rombel, tarif aktif, dan status siswa.</p>
           </div>
           <div class="master-modern-stats">
             <div><span>Hasil Filter</span><strong><?= number_format($totalStudents) ?></strong></div>
@@ -558,7 +568,7 @@ $canEditOpening = !$editStudent || (int)($editStudent['history_count'] ?? 0) ===
           </div>
 
           <label class="advanced-switch" for="advanced-enabled">
-            <span><strong>Advance</strong><small>Tarif siswa dan saldo awal; tagihan berbayar tetap terkunci</small></span>
+            <span><strong>Advance</strong><small>Tarif siswa dan potongan; nominal yang sudah dibayar tetap terlindungi</small></span>
             <input type="checkbox" id="advanced-enabled" name="advanced_enabled" value="1" <?= $advancedOpen ? 'checked' : '' ?> />
             <span class="advanced-switch-track"><span></span></span>
           </label>
@@ -578,9 +588,7 @@ $canEditOpening = !$editStudent || (int)($editStudent['history_count'] ?? 0) ===
               <?php
               $feeFields = [
                 'spp_perbulan' => 'SPP per Bulan', 'pangkal' => 'Uang Pangkal',
-                'bangunan' => 'Uang Bangunan', 'seragam' => 'Uang Seragam',
-                'kegiatan' => 'Uang Kegiatan', 'makan' => 'Uang Makan',
-                'sorga' => 'Uang Sorga', 'infaq' => 'Uang Infaq', 'pomg' => 'Uang Komite',
+                'psb' => 'Uang PSB', 'pomg' => 'Uang Komite',
                 'daftar_ulang' => 'Uang Daftar Ulang'
               ];
               foreach ($feeFields as $key => $label):
@@ -615,22 +623,6 @@ $canEditOpening = !$editStudent || (int)($editStudent['history_count'] ?? 0) ===
               </div>
             </div>
 
-            <div class="section-divider"><span>Migrasi Saldo Awal</span></div>
-            <div class="fields-grid student-money-grid">
-              <?php
-              $openingFields = [
-                'pangkal_bayar' => 'Pangkal Sudah Dibayar', 'bangunan_bayar' => 'Bangunan Sudah Dibayar',
-                'seragam_bayar' => 'Seragam Sudah Dibayar', 'kegiatan_bayar' => 'Kegiatan Sudah Dibayar'
-              ];
-              foreach ($openingFields as $key => $label):
-              ?>
-              <div class="field-row">
-                <label class="field-label" for="student-<?= $key ?>"><?= $label ?></label>
-                <input class="field-input rupiah-input advanced-field opening-balance" type="text" inputmode="numeric" id="student-<?= $key ?>" name="<?= $key ?>"
-                  value="<?= rupiah_value(form_student_value($key, $oldInput, $formStudent, $fieldMap, 0)) ?>" <?= $canEditOpening ? '' : 'disabled' ?> />
-              </div>
-              <?php endforeach; ?>
-            </div>
           </div>
 
           <div class="action-bar" style="margin-top:18px">
@@ -672,28 +664,57 @@ $canEditOpening = !$editStudent || (int)($editStudent['history_count'] ?? 0) ===
               <tr><td colspan="8"><div class="empty-state"><p>Data siswa tidak ditemukan</p></div></td></tr>
               <?php else: foreach ($studentRows as $index => $student):
                 $editUrl = 'daftar.php?edit=' . (int)$student['id'];
+                $historyRows = $classHistories[(string)$student['NO_INDUK']] ?? [];
+                $graduateYear = $graduationYears[(string)$student['NO_INDUK']] ?? '';
+                $isGraduate = $graduateYear !== '';
+                $historyId = 'class-history-' . (int)$student['id'];
               ?>
               <tr class="clickable-payment-row" data-edit-url="<?= htmlspecialchars($editUrl, ENT_QUOTES, 'UTF-8') ?>" tabindex="0" role="link" aria-label="Edit siswa <?= htmlspecialchars($student['NAMA'], ENT_QUOTES, 'UTF-8') ?>">
                 <td data-label="No"><?= $offset + $index + 1 ?></td>
                 <td data-label="No. Induk"><span class="badge-nis"><?= htmlspecialchars($student['NO_INDUK']) ?></span><?php if (!empty($student['NO_induk_diknas'])): ?><small class="du-history-nis">Diknas <?= htmlspecialchars($student['NO_induk_diknas']) ?></small><?php endif; ?></td>
                 <td data-label="Nama Siswa"><?= htmlspecialchars($student['NAMA']) ?></td>
-                <td data-label="Kelas"><span class="kelas-badge"><?= htmlspecialchars(class_label([
+                <td data-label="Kelas" class="student-class-col"><div class="student-class-cell"><span class="kelas-badge"><?= $isGraduate ? 'LULUS' : htmlspecialchars(class_label([
                   'tingkat' => $student['master_tingkat'] ?: $student['KELAS'],
                   'kode_rombel' => $student['kode_rombel'] ?? 'BELUM',
                   'is_placeholder' => $student['is_placeholder'] ?? 1,
-                ])) ?></span></td>
+                ])) ?></span><?php if($historyRows): ?><button type="button" class="student-class-history-toggle" aria-expanded="false" aria-controls="<?= $historyId ?>" aria-label="Buka Riwayat Kelas <?= htmlspecialchars($student['NAMA'], ENT_QUOTES, 'UTF-8') ?>" data-student-name="<?= htmlspecialchars($student['NAMA'], ENT_QUOTES, 'UTF-8') ?>"><svg aria-hidden="true" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><path d="M3 12a9 9 0 1 0 3-6.7L3 8"/><path d="M3 3v5h5M12 7v5l3 2"/></svg><span>Riwayat</span><span class="student-class-history-chevron" aria-hidden="true">⌄</span></button><?php endif; ?></div></td>
                 <td data-label="SPP/Bulan" class="nominal">Rp <?= number_format((float)$student['SPP_PERBULAN'], 0, ',', '.') ?></td>
-                <td data-label="Status"><span class="master-status <?= $student['is_active'] ? 'is-active' : 'is-inactive' ?>"><?= $student['is_active'] ? 'Aktif' : 'Diarsipkan' ?></span></td>
+                <td data-label="Status"><span class="master-status <?= $student['is_active'] ? 'is-active' : 'is-inactive' ?>"><?= $isGraduate ? 'Lulus · TA ' . htmlspecialchars($graduateYear) : ($student['is_active'] ? 'Aktif' : 'Diarsipkan') ?></span></td>
                 <td data-label="Riwayat Transaksi" class="student-history-col"><span class="badge-count"><?= (int)$student['history_count'] ?>x</span></td>
                 <td data-label="Aksi" class="aksi-col">
                   <a class="btn-tbl btn-tbl-edit" href="<?= htmlspecialchars($editUrl) ?>">Edit</a>
-                  <form method="POST" action="daftar.php" style="display:inline" onsubmit="return confirm('<?= $student['is_active'] ? 'Arsipkan' : 'Pulihkan' ?> siswa <?= htmlspecialchars(addslashes($student['NAMA'])) ?>?')">
+                  <?php if(!$isGraduate): ?><form method="POST" action="daftar.php" style="display:inline" onsubmit="return confirm('<?= $student['is_active'] ? 'Arsipkan' : 'Pulihkan' ?> siswa <?= htmlspecialchars(addslashes($student['NAMA'])) ?>?')">
                     <input type="hidden" name="csrf_token" value="<?= htmlspecialchars($_SESSION['csrf_student']) ?>" />
                     <input type="hidden" name="aksi" value="toggle_status" /><input type="hidden" name="id" value="<?= (int)$student['id'] ?>" />
                     <button type="submit" class="btn-tbl btn-tbl-toggle"><?= $student['is_active'] ? 'Arsipkan' : 'Pulihkan' ?></button>
-                  </form>
+                  </form><?php endif; ?>
                 </td>
               </tr>
+              <?php if($historyRows): ?>
+              <tr class="student-class-history-row" id="<?= $historyId ?>" hidden>
+                <td colspan="8">
+                  <section class="student-class-history-panel" aria-label="Riwayat kelas <?= htmlspecialchars($student['NAMA']) ?>">
+                    <header class="student-class-history-head">
+                      <div class="student-class-history-head-icon" aria-hidden="true"><svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><path d="M3 12a9 9 0 1 0 3-6.7L3 8"/><path d="M3 3v5h5M12 7v5l3 2"/></svg></div>
+                      <div class="student-class-history-copy"><h4>Riwayat Kelas</h4><p><?= htmlspecialchars($student['NAMA']) ?> · terbaru ke terlama</p></div>
+                      <span class="student-class-history-count"><?= count($historyRows) ?> catatan</span>
+                    </header>
+                    <ol class="student-class-timeline">
+                    <?php $currentShown=false; foreach($historyRows as $history):
+                      if($history['status']==='lulus') { $historyStatus='Lulus'; $historyTone='graduate'; }
+                      elseif(!$currentShown && $history['status']!=='pindah' && (int)$student['is_active']===1) { $historyStatus='Saat Ini'; $historyTone='current'; $currentShown=true; }
+                      else { $historyStatus='Pindah'; $historyTone='past'; }
+                    ?>
+                    <li class="student-class-timeline-item is-<?= $historyTone ?>">
+                      <span class="student-class-timeline-dot" aria-hidden="true"></span>
+                      <article><span class="student-class-year">TA <?= htmlspecialchars($history['tahun_ajaran']) ?></span><strong><?= htmlspecialchars($history['kelas_rombel_snapshot'] ?: ('Kelas '.$history['kelas'])) ?></strong><em><?= $historyStatus ?></em></article>
+                    </li>
+                    <?php endforeach; ?>
+                    </ol>
+                  </section>
+                </td>
+              </tr>
+              <?php endif; ?>
               <?php endforeach; endif; ?>
             </tbody>
           </table>
@@ -703,7 +724,7 @@ $canEditOpening = !$editStudent || (int)($editStudent['history_count'] ?? 0) ===
     </main>
   </div>
 
-  <script src="../assets/js/app.js?v=3.8"></script>
+  <script src="../assets/js/app.js?v=4.0"></script>
   <script>
     document.addEventListener('DOMContentLoaded', function () {
       const toggle = document.getElementById('advanced-enabled');

@@ -3,10 +3,10 @@
 // koneksi.php - Database Connection
 // ============================================
 
-define('DB_HOST', 'localhost');
-define('DB_USER', 'root');
-define('DB_PASS', '');
-define('DB_NAME', 'db_spp');
+define('DB_HOST', getenv('SPP_DB_HOST') ?: 'localhost');
+define('DB_USER', getenv('SPP_DB_USER') ?: 'root');
+define('DB_PASS', getenv('SPP_DB_PASS') !== false ? getenv('SPP_DB_PASS') : '');
+define('DB_NAME', getenv('SPP_DB_NAME') ?: 'db_spp');
 
 date_default_timezone_set('Asia/Jakarta');
 

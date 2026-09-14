@@ -13,9 +13,9 @@ Dokumen kerja ini melacak pekerjaan teknis yang sedang dan sudah dilakukan. Perb
 
 | Item | Status | Catatan |
 | --- | --- | --- |
-| Database pengembangan | Tersedia | `db_spp` lokal; saat migrasi ini diterapkan, tabel transaksi pembayaran dan tabungan tidak berisi data. |
-| Instalasi baru | Siap | `sql/schema.sql` sudah memuat relasi pembayaran aman. File ini destruktif dan tidak boleh dijalankan pada database berisi data. |
-| Upgrade database berhistori | Siap | Jalankan migrasi bertahap setelah backup, termasuk `sql/add_academic_year_billing.sql`. Migrasi idempoten dan melakukan backfill DU yang memiliki konteks valid. |
+| Database pengembangan | Termigrasi | `db_spp` lokal memuat 218 transaksi pembayaran setelah 182 transaksi berkandungan komponen lama dihapus sesuai keputusan migrasi. |
+| Instalasi baru | Siap | `sql/schema.sql` memuat Uang PSB, asal PSB, cakupan SPP kelas 1, dan hanya komponen pembayaran aktif. File ini destruktif dan tidak boleh dijalankan pada database berisi data. |
+| Upgrade database berhistori | Siap | Setelah backup dan migrasi bertahap lama, jalankan sekali `sql/simplify_payment_components_and_add_psb.sql`. Migrasi ini sengaja destruktif dan tidak idempoten. |
 | Pemeriksaan schema | Siap | Jalankan `sql/verify_schema.sql`; hasil harus seluruhnya `OK`. |
 
 ## Register temuan dan progres
@@ -26,7 +26,8 @@ Dokumen kerja ini melacak pekerjaan teknis yang sedang dan sudah dilakukan. Perb
 | FIN-002 | Pembalikan setoran Tabungan Wajib dapat membuat saldo tabungan negatif. | Kritis | Ditutup oleh PAY-012 | Alur setoran tabungan lewat pembayaran dihapus; cleanup menolak penghapusan linked saving lama bila saldo tidak cukup. |
 | DB-001 | Database lama belum memiliki relasi pembayaran eksplisit. | Kritis | Selesai | Migrasi idempoten dan `verify_schema.sql` tersedia; migrasi dijalankan dua kali pada database lokal dan pemeriksaan mengembalikan `OK`. |
 | COMP-001 | Histori pembayaran lama tidak dapat dibuktikan relasinya secara aman. | Tinggi | Diterima / dibatasi | Tetap legacy (`payment_link_version=0`, child `bayar_id=NULL`), tidak dicocokkan otomatis, dan hanya dapat direkonsiliasi manual. |
-| SEC-001 | CSRF serta lokasi SQL injection/XSS lain masih belum ditangani menyeluruh. | Tinggi | Terbuka | Perbaikan SEC-002 menutup filter NIS riwayat tabungan; endpoint mutasi dan lokasi lain tetap menjadi pekerjaan terpisah. |
+| SEC-001 | CSRF serta lokasi SQL injection/XSS lain masih belum ditangani menyeluruh. | Tinggi | Terbuka | Perbaikan SEC-002 menutup filter NIS riwayat tabungan dan SEC-003 melindungi hapus pembayaran; endpoint mutasi lain tetap menjadi pekerjaan terpisah. |
+| SEC-003 | Kasir atau bendahara dapat mencoba mengakses endpoint edit/hapus pembayaran secara langsung dan hapus masih memakai GET. | Kritis | Selesai | Form edit, proses update, dan proses hapus dibatasi role admin. Hapus menjadi POST dengan pemeriksaan CSRF; integration test role membuktikan admin berhasil dan kasir/bendahara ditolak. |
 | SEC-002 | Filter NIS riwayat tabungan merangkai input URL langsung ke query SQL. | Kritis | Selesai | Kedua cabang query `UNION` sekarang memakai placeholder prepared statement. Uji filter kosong, NIS valid, dan payload SQL dilakukan tanpa error atau perluasan hasil. |
 | PAY-001 | Input pembayaran sebelumnya belum mencegah komponen yang sudah terbayar lebih dari total tagihan. | Tinggi | Selesai | Form menampilkan alert, sisa dianggap nol, input komponen dikunci, dan backend menolak input yang melebihi sisa. |
 | PAY-002 | Biaya lain sebelumnya harus lunas sesuai nominal master dan belum mendukung cicilan. | Tinggi | Selesai | Baris biaya lain menampilkan `Total`, `Sudah`, `Sisa`, dan `Bayar`; nominal snapshot menyimpan nilai cicilan transaksi. |
@@ -39,20 +40,23 @@ Dokumen kerja ini melacak pekerjaan teknis yang sedang dan sudah dilakukan. Perb
 | PAY-007 | Edit pembayaran dari riwayat belum otomatis mengikat data siswa dan histori terbaru saat halaman dibuka. | Tinggi | Selesai | Edit sekarang auto-bind konteks siswa, mengecualikan transaksi aktif dari histori, memakai master/tarif terbaru, dan query histori edit memakai prepared statement. |
 | PAY-008 | Tahun ajaran master daftar ulang masih bisa diketik manual dan default pembayaran belum mengikuti tahun ajaran aktif sekolah. | Sedang | Selesai | Master DU memakai dropdown tahun ajaran aktif +/- 3 tahun, input pembayaran default ke tahun ajaran aktif, kelas DU mengikuti kelas siswa, dan input DU terkunci bila master kombinasi belum ada. |
 | PAY-009 | Tarif Master Daftar Ulang yang tersimpan belum otomatis menerbitkan tagihan dan informasi DU tampil di bagian Potongan & Tabungan. | Tinggi | Selesai | Tahun draf memakai aksi atomik Simpan & Terbitkan Tagihan; input/edit membaca tagihan materialized dan menampilkan total, terbayar, sisa, kelas, tahun ajaran, status, serta warning langsung pada baris Daftar Ulang. |
-| PAY-010 | Makan, Sorga, dan Infaq memiliki kolom transaksi tetapi tidak mempunyai sumber total tagihan sehingga selalu nol. | Tinggi | Selesai | Tiga tarif satu kali ditambahkan pada Data Siswa Advance; input/edit menghitung cicilan dari histori, mengunci tarif nol/lunas, dan backend menolak pembayaran di atas sisa serta penurunan tarif di bawah nominal terbayar. |
+| PAY-010 | Makan, Sorga, dan Infaq memiliki kolom transaksi tetapi tidak mempunyai sumber total tagihan sehingga selalu nol. | Tinggi | Digantikan PAY-018 | Implementasi historis ini dihapus ketika klien menyederhanakan komponen pembayaran. |
 | PAY-011 | Riwayat Daftar Ulang memuat seluruh tagihan dan seluruh cicilan ke PHP sehingga tidak efisien untuk ratusan siswa. | Sedang | Selesai | Agregasi, ringkasan, LIMIT/OFFSET, dan detail per halaman dipindahkan ke SQL; UI menyediakan ukuran 25/50/100 serta navigasi desktop/mobile yang mempertahankan filter. |
 | PAY-012 | Tabungan masih bisa dicatat dari Input Pembayaran sehingga bercampur dengan modul Tabungan Masuk/Keluar. | Tinggi | Selesai | Field tabungan dihapus dari input/edit pembayaran, backend menolak `tabungan_wajib > 0`, struk/laporan pembayaran tidak lagi menghitung linked tabungan, dan cleanup `sql/remove_payment_linked_savings.sql` menghapus jurnal pembayaran lama. |
 | PAY-013 | SPP dapat dibayar melompati bulan sebelumnya sehingga berisiko ada tunggakan bolong. | Tinggi | Selesai | Backend dan UI mewajibkan periode SPP sebelumnya pada seluruh penempatan tahun ajaran aktif lunas sebelum bulan berikutnya dibayar; edit/hapus prasyarat lintas tahun ditolak bila membuat periode sesudahnya bolong. |
 | PAY-015 | Input Juli tahun ajaran baru tidak memeriksa tunggakan penempatan aktif sebelumnya. | Kritis | Selesai | Timeline SPP memakai `siswa_tahun_ajaran` aktif dan snapshot tarif tiap tahun; Juli tetap memeriksa tunggakan lama, sedangkan penempatan `pindah`/`lulus` dan tahun tanpa penempatan tidak menciptakan kewajiban. |
 | PAY-016 | Edit tarif siswa dapat dilaporkan berhasil walaupun nilai Advance diabaikan atau sinkronisasi tagihan berhenti akibat perbedaan kelas historis. | Kritis | Selesai | Backend menolak perubahan Advance saat switch nonaktif, sinkronisasi kelas dan tarif dipisahkan, komponen dikunci berdasarkan pembayarannya sendiri, snapshot aman direkonsiliasi otomatis, hasil diverifikasi dan dicatat dalam audit. |
 | PAY-017 | Status penghalang SPP hanya tampil sebagai teks kecil dan dapat memakai data halaman yang tertinggal saat beberapa kasir bekerja bersamaan. | Tinggi | Selesai | Input dan Edit memeriksa status terbaru melalui endpoint read-only, memperbarui total/terbayar/sisa SPP, menampilkan popup singkat untuk kondisi terblokir, dan tetap memvalidasi ulang saat submit. |
+| PAY-018 | Komponen lama tidak lagi sesuai kebutuhan dan paket penerimaan siswa baru belum dimodelkan sebagai Uang PSB. | Kritis | Selesai | Bangunan, Seragam, Kegiatan, Makan, Sorga, dan Infaq dihapus dari schema serta seluruh alur aktif. Pangkal dan PSB menjadi tagihan satu kali berbasis histori; asal PSB mendapat SPP Rp0 pada penempatan kelas 1 pertama. |
+| PAY-019 | Daftar Ulang terikat otomatis ke periode transaksi sehingga kasir tidak dapat melunasi tunggakan tahun lain dan snapshot dapat salah konteks. | Kritis | Selesai | Form memilih `tagihan_daftar_ulang_id`; backend mengunci dan memvalidasi kepemilikan, status, tahun, serta sisa. Dropdown menampilkan tahun/kelas/nominal, edit admin dapat memindahkan relasi, dan struk mencantumkan TA tagihan. |
+| STD-001 | Master Siswa belum memperlihatkan perjalanan rombel per tahun dan tahun kelulusan tersimpan sebagai tahun tujuan berikutnya. | Tinggi | Selesai | Baris Riwayat Kelas expandable membaca `siswa_tahun_ajaran` tanpa backfill. Kelulusan baru menandai snapshot kelas 6 pada tahun selesai, lulusan tampil sebagai LULUS, dan arsip manual tetap terpisah. |
 | PAY-014 | Biaya Lain belum menjadi kewajiban siswa dan pilihan master saja tidak dapat membedakan siswa yang ditagih. | Tinggi | Selesai | `tagihan_biaya_lain` diterbitkan idempoten ke target siswa dengan snapshot tarif; input/edit hanya menerima tagihan siswa dan mendukung cicilan sampai lunas. |
 | DB-002 | Tingkat kelas 1–6 belum dapat membedakan rombel dan perubahan kelas berisiko mengubah konteks histori. | Tinggi | Selesai | Master Kelas/Rombel, placeholder migrasi, relasi kelas aktif, snapshot penempatan/tarif, dan snapshot transaksi ditambahkan tanpa workflow penempatan massal. |
 | REP-001 | Export Excel langsung download tanpa preview. | Sedang | Selesai | Alur diubah menjadi preview terlebih dahulu, lalu tombol `Download Excel`. |
 | REP-002 | Slip PDF pernah bergantung pada print browser dan memunculkan header/footer URL. | Tinggi | Selesai | Slip dirender server-side memakai Dompdf dengan ukuran landscape `210mm x 148mm`; header/footer browser tidak ikut tercetak. |
 | REP-003 | Filter tanggal laporan memakai dua input terpisah dan kurang nyaman untuk konsep rentang `S/D`. | Sedang | Selesai | UI laporan memakai satu kontrol date-range custom lokal dengan popover Mulai/Sampai, sementara backend tetap membaca `tanggal_awal` dan `tanggal_akhir`. |
 | REP-004 | Area `Sisa Pembayaran` pada struk terlalu ramai dan tidak sesuai kuitansi acuan. | Sedang | Selesai | Struk biasa dan struk tahunan hanya menampilkan `Sisa PSB` dan `Sisa DU`; rincian pembayaran utama tetap tidak berubah. |
-| REP-005 | Laporan Global masih satu halaman besar dan belum menyediakan template status, SPP tahunan, tabungan, serta setoran kas. | Tinggi | Selesai | Laporan Global menjadi katalog delapan template dengan registry/query bersama, pagination, web, cetak, PDF, Excel, dan filter konsisten. |
+| REP-005 | Laporan Global masih satu halaman besar dan belum menyediakan template status, SPP tahunan, tabungan, serta setoran kas. | Tinggi | Selesai | Laporan Global menjadi katalog sembilan template dengan registry/query bersama, pagination, web, cetak, PDF, Excel, dan filter konsisten; rekap kas pembayaran dan tabungan dipisahkan. |
 | REP-006 | Halaman mandiri Rekap per Kelas berubah menjadi redirect sehingga tampilan rekap kelas lama tidak lagi tersedia. | Sedang | Selesai | Versi penuh terakhir dari commit `a3497e2` dipulihkan pada `laporan/rekap_kelas.php`; menu admin/bendahara dan status aktif detail siswa juga dikembalikan tanpa menghapus Laporan Global. |
 | REP-007 | Riwayat Tagihan sulit dibaca per rombel karena satu siswa tersebar pada banyak baris dan urutan bulan SPP mengikuti teks. | Sedang | Selesai | Filter rombel/tingkat sekarang mengelompokkan satu baris per siswa, mem-page per siswa, mengurutkan SPP lewat kode periode, dan memakai format yang sama pada Cetak/PDF/Excel. |
 | UI-001 | Beberapa tampilan mobile dan dark mode kurang rapi/user friendly. | Sedang | Selesai bertahap | Sidebar mobile, logout, bottom nav, preview Excel, riwayat tabungan, avatar role, dan palet dark mode sudah direvisi. |
@@ -76,7 +80,8 @@ Dokumen kerja ini melacak pekerjaan teknis yang sedang dan sudah dilakukan. Perb
 ### Data siswa
 
 - Form siswa memiliki mode dasar dan mode `Advance`.
-- Mode `Advance` memuat NIS Diknas, tarif pembayaran, potongan, total turunan, dan saldo awal.
+- Mode `Advance` memuat NIS Diknas, SPP, Pangkal, PSB, Komite, Daftar Ulang, potongan, dan total turunan yang masih berlaku.
+- Siswa yang dibuat di kelas PSB wajib memiliki nominal PSB dan memperoleh penanda `asal_psb` permanen; siswa non-PSB tidak dapat diberi nominal PSB melalui request.
 - Siswa tidak dihapus permanen; status diubah menjadi arsip/nonaktif agar histori pembayaran dan laporan tetap aman.
 - Baris siswa pada daftar siswa dapat diklik langsung untuk masuk mode edit.
 
@@ -84,10 +89,14 @@ Dokumen kerja ini melacak pekerjaan teknis yang sedang dan sudah dilakukan. Perb
 
 - Sistem pembayaran transaksi berubah menjadi pilihan `Tunai`, `VA`, dan `Qris`.
 - Total pembayaran dihitung ulang di backend dari komponen resmi, bukan percaya penuh pada nilai browser.
+- Komponen utama hanya Pangkal, PSB, SPP, Komite, Daftar Ulang, dan Biaya Lain. Request komponen lama ditolak.
+- Pangkal dan PSB dapat dicicil sepanjang histori siswa. Siswa kelas PSB hanya dapat membayar Pangkal, PSB, dan Biaya Lain.
+- SPP kelas 1 pertama siswa asal PSB memakai snapshot Rp0 dengan status `Tercakup Uang PSB`; tahun berikutnya kembali memakai tarif normal.
 - Pembayaran Komite dan SPP dihitung per periode `NO_INDUK + BULAN + TAHUN`.
 - Komponen pembayaran yang sudah terbayar lebih besar dari total menampilkan alert, sisa menjadi nol, dan input dikunci.
 - Backend ikut menolak nominal negatif, periode tidak valid, metode pembayaran tidak valid, dan pembayaran yang melebihi sisa tagihan.
 - Edit/hapus pembayaran hanya menyentuh child yang terhubung dengan `bayar_id`, bukan mencocokkan berdasarkan NIS/tanggal secara rapuh.
+- Edit dan hapus pembayaran hanya tersedia bagi admin. Hapus memakai POST dan token CSRF; kasir tetap dapat input, lihat, dan cetak.
 - Edit pembayaran dari riwayat memakai master/tarif terbaru, mempertahankan nominal input transaksi aktif, dan mengecualikan transaksi aktif dari hitungan `Sudah Terbayar`.
 
 ### Daftar ulang
@@ -123,7 +132,7 @@ Dokumen kerja ini melacak pekerjaan teknis yang sedang dan sudah dilakukan. Perb
 
 - Halaman lihat pembayaran menampilkan tanggal dan jam bayar.
 - Bila transaksi pernah diupdate, sistem menampilkan keterangan waktu update.
-- Baris transaksi dapat diklik langsung untuk edit tanpa harus menekan tombol `Edit`.
+- Baris transaksi hanya dapat diklik menuju edit ketika pengguna adalah admin.
 - Saat edit dibuka dari riwayat, rincian pembayaran langsung terisi dari konteks siswa dan histori terbaru.
 - Transaksi legacy dengan `payment_link_version=0` tetap dibatasi dan tidak diedit/hapus otomatis.
 
@@ -137,7 +146,8 @@ Dokumen kerja ini melacak pekerjaan teknis yang sedang dan sudah dilakukan. Perb
 
 ### Laporan dan export
 
-- Laporan web menampilkan rekap pembayaran, tabungan masuk, tabungan keluar, detail pembayaran, dan rekap tabungan per periode.
+- Laporan pembayaran, struk, PDF, dan Excel menampilkan Uang PSB serta tidak lagi memuat enam komponen lama.
+- Rekap Setoran Kas Harian hanya memuat pembayaran sekolah, sedangkan Rekap Kas Tabungan Harian merangkum jurnal tabungan secara terpisah.
 - Export Excel berubah dari download otomatis menjadi preview terlebih dahulu, lalu download setelah pengguna menekan tombol.
 - Preview Excel memakai palet hijau-oranye dan layout mobile yang lebih rapi.
 - Export PDF slip pembayaran memakai Dompdf server-side, bukan print browser.
@@ -160,18 +170,20 @@ Dokumen kerja ini melacak pekerjaan teknis yang sedang dan sudah dilakukan. Perb
 
 ## Bukti verifikasi terakhir
 
-Dilakukan pada 2026-08-04 untuk perapihan tahun ajaran dan cicilan DU:
+Dilakukan pada 2026-09-14 untuk penyederhanaan komponen pembayaran dan Uang PSB:
 
 ```powershell
-C:\xampp\php\php.exe -l master_daftar_ulang.php
-C:\xampp\php\php.exe -l pembayaran\form.php
-C:\xampp\php\php.exe -l pembayaran\edit.php
-C:\xampp\php\php.exe -l pembayaran\proses.php
+Get-ChildItem -Recurse -Filter *.php | ForEach-Object { C:\xampp\php\php.exe -l $_.FullName }
+C:\xampp\php\php.exe tests\modular_reports_test.php
+C:\xampp\php\php.exe tests\class_snapshot_test.php
+C:\xampp\php\php.exe tests\student_optional_fees_test.php
+C:\xampp\php\php.exe tests\student_tariff_consistency_test.php
+# Tiga integration test dijalankan dengan SPP_TEST_ALLOW_MUTATION=1 pada database disposable.
 node --check assets\js\app.js
 git diff --check
 ```
 
-Seluruh lint dan check berhasil. `git diff --check` tidak menemukan error whitespace; hanya muncul warning line ending CRLF dari Git di Windows.
+Lint seluruh 60 file PHP, `node --check assets/js/app.js`, 12 unit/regression test, 3 integration test mutasi, 79 requirement schema baru, simulasi migrasi lama, serta smoke web/cetak/PDF/Excel lulus. Database aktif menyisakan 218 transaksi valid setelah 182 transaksi komponen lama dihapus dan tidak mempunyai selisih total, selisih saldo tabungan, atau relasi yatim yang diperiksa. `git diff --check` bersih selain warning line ending CRLF; Node portable pengujian telah dibersihkan kembali.
 
 ## Bukti verifikasi sebelumnya
 

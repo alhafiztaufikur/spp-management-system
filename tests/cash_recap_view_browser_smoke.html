@@ -1,0 +1,19 @@
+<!doctype html>
+<html lang="id">
+<head>
+  <meta charset="utf-8"><meta name="viewport" content="width=device-width,initial-scale=1">
+  <title>pending</title>
+  <script>localStorage.setItem('spp_theme',location.search==='?dark'?'dark':'light')</script>
+  <link rel="stylesheet" href="../assets/css/style.css">
+  <style>body{padding:42px}.report-smoke{max-width:1040px;margin:auto}@media(max-width:700px){body{padding:14px}}</style>
+</head>
+<body>
+  <main class="report-smoke report-template-shell report-table-report-filter-kas-tabungan">
+    <section class="report-settlement-component-card"><div class="report-settlement-section-head"><h3>Ringkasan Mutasi Tabungan</h3><div class="report-settlement-component-total"><span>Total Mutasi Bersih</span><strong>Rp 1.500.000</strong></div></div><div class="table-container report-settlement-component-table"><table class="payment-table"><thead><tr><th>No</th><th>Komponen Tabungan</th><th>Nominal</th></tr></thead><tbody><tr><td>1</td><td>Tabungan Masuk</td><td>Rp 2.000.000</td></tr><tr><td>2</td><td>Tabungan Keluar</td><td>Rp 500.000</td></tr></tbody><tfoot><tr><th colspan="2">Mutasi Bersih</th><th>Rp 1.500.000</th></tr></tfoot></table></div></section>
+    <section class="report-settlement-method-summary"><h3>Statistik Transaksi</h3><div class="report-settlement-method-grid"><div class="report-settlement-method-card"><span>Tabungan Masuk</span><strong>Rp 2.000.000</strong></div><div class="report-settlement-method-card"><span>Tabungan Keluar</span><strong>Rp 500.000</strong></div><div class="report-settlement-method-card"><span>Mutasi Bersih</span><strong>Rp 1.500.000</strong></div><div class="report-settlement-method-card"><span>Transaksi Masuk</span><strong>12</strong></div><div class="report-settlement-method-card"><span>Transaksi Keluar</span><strong>4</strong></div><div class="report-settlement-method-card"><span>Seluruh Transaksi</span><strong>16</strong></div></div></section>
+    <section class="report-settlement-total-card"><div><span>MUTASI BERSIH</span></div><strong>Rp 1.500.000</strong></section>
+  </main>
+  <script src="../assets/js/app.js"></script>
+  <script>window.addEventListener('load',function(){var heading=getComputedStyle(document.querySelector('.report-settlement-method-summary h3')).color;if(location.search==='?dark'&&heading==='rgb(23, 35, 29)'){document.title='CASH_RECAP_FAILED_DARK_CONTRAST';return}document.title='CASH_RECAP_VIEW_OK'})</script>
+</body>
+</html>
