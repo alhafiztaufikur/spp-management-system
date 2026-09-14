@@ -30,12 +30,20 @@ $allNavItems = [
    '<path d="M4 19.5A2.5 2.5 0 0 1 6.5 17H20"/><path d="M4 4.5A2.5 2.5 0 0 1 6.5 2H20v20H6.5A2.5 2.5 0 0 1 4 19.5z"/><path d="M9 7h6M9 11h6"/>',
    ['admin', 'kasir'], 'Pembayaran'],
 
+  ['pembayaran/titipan_spp.php', 'Titipan SPP',
+   '<path d="M12 1v22M17 5H9.5a3.5 3.5 0 0 0 0 7h5a3.5 3.5 0 0 1 0 7H6"/>',
+   ['admin', 'bendahara', 'kasir'], 'Pembayaran'],
+
   ['siswa/daftar.php', 'Data Siswa',
    '<path d="M17 21v-2a4 4 0 0 0-4-4H5a4 4 0 0 0-4 4v2"/><circle cx="9" cy="7" r="4"/><path d="M23 21v-2a4 4 0 0 0-3-3.87"/><path d="M16 3.13a4 4 0 0 1 0 7.75"/>',
    ['admin'], 'Data Master'],
 
   ['master_kelas.php', 'Master Kelas/Rombel',
    '<path d="M3 3h18v18H3z"/><path d="M3 9h18M9 3v18"/>',
+   ['admin'], 'Data Master'],
+
+  ['master_spp.php', 'Master Penerbitan SPP',
+   '<path d="M4 19.5A2.5 2.5 0 0 1 6.5 17H20"/><path d="M4 4.5A2.5 2.5 0 0 1 6.5 2H20v20H6.5A2.5 2.5 0 0 1 4 19.5z"/><path d="M9 7h6M9 11h6M9 15h4"/>',
    ['admin'], 'Data Master'],
 
   ['master_biaya_lain.php', 'Master Biaya Lain',
@@ -80,8 +88,10 @@ $shortLabels = [
   'Input Pembayaran'  => 'Input',
   'Riwayat Pembayaran' => 'Riwayat',
   'Riwayat Daftar Ulang' => 'Riwayat DU',
+  'Titipan SPP' => 'Titipan',
   'Data Siswa'        => 'Siswa',
   'Master Kelas/Rombel' => 'Kelas',
+  'Master Penerbitan SPP' => 'SPP',
   'Master Biaya Lain' => 'Biaya',
   'Master Daftar Ulang' => 'DU',
   'Role Management'   => 'Akun',

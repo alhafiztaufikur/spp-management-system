@@ -5,6 +5,7 @@ require_once '../koneksi.php';
 require_once '../includes/auth.php';
 require_once '../includes/tagihan_tahunan.php';
 require_once '../includes/tagihan_sekali.php';
+require_once '../includes/spp_billing.php';
 requireRole(['admin', 'bendahara', 'kasir']);
 
 header('Cache-Control: no-store, no-cache, must-revalidate, max-age=0');
@@ -163,6 +164,7 @@ $stmt->bind_param('i', $paymentId);
 $stmt->execute();
 $payment = $stmt->get_result()->fetch_assoc();
 $stmt->close();
+$sppAllocation = spp_billing_schema_ready($koneksi) ? spp_payment_allocation_summary($koneksi, $paymentId) : null;
 
 if (!$payment) {
     $_SESSION['flash'] = ['type' => 'error', 'msg' => 'Transaksi tidak ditemukan atau siswa sudah tidak tersedia.'];
@@ -188,9 +190,15 @@ $primaryLines = [
     ['Uang Pangkal', $payment['U_PANGKAL']],
     ['Uang PSB', $payment['U_PSB']],
     ['Uang Daftar Ulang' . (!empty($payment['du_tahun_ajaran']) ? ' (TA ' . $payment['du_tahun_ajaran'] . ')' : ''), $payment['uang_du']],
-    ['Uang SPP', $payment['U_SPP']],
     ['Komite Sekolah', $payment['U_KOMITE']],
 ];
+$sppReceiptLines=[];
+if($sppAllocation){
+    $primaryLines[]=['Uang SPP Diterima Sekarang',(float)$sppAllocation['uang_baru']];
+    foreach($sppAllocation['allocations'] as $allocation)$sppReceiptLines[]=['SPP '.receipt_month($allocation['bulan']).' '.$allocation['tahun'],(float)$allocation['nominal_dari_bayar']+(float)$allocation['nominal_dari_titipan']];
+    if((float)$sppAllocation['titipan_digunakan']>0)$sppReceiptLines[]=['Titipan SPP Digunakan',(float)$sppAllocation['titipan_digunakan']];
+    if((float)$sppAllocation['titipan_baru']>0)$sppReceiptLines[]=['Titipan SPP Baru',(float)$sppAllocation['titipan_baru']];
+}else{$primaryLines[]=['Uang SPP',$payment['U_SPP']];}
 $otherLines = [];
 foreach ($otherDetails as $detail) {
     $label = $detail['nama_biaya_snapshot'];
@@ -198,9 +206,10 @@ foreach ($otherDetails as $detail) {
     $otherLines[] = [$label, $detail['nominal_snapshot']];
 }
 if ((float)$payment['potong_spp'] > 0) $otherLines[] = ['Potongan SPP', -(float)$payment['potong_spp']];
-$otherLines = array_values(array_filter($otherLines, fn($line) => abs((float)$line[1]) >= 0.005));
+$otherLines = array_merge($sppReceiptLines,array_values(array_filter($otherLines, fn($line) => abs((float)$line[1]) >= 0.005)));
 
 $remainingLines = receipt_remaining_lines($koneksi, $payment, $otherDetails);
+if($sppAllocation)$remainingLines[]=['Saldo Titipan SPP',(float)$sppAllocation['balance_after']];
 $total = (float)$payment['total_jumlah'];
 $signer = $payment['operator_name'] ?: ($_SESSION['admin_nama'] ?? 'Bagian Keuangan');
 ?>
@@ -265,7 +274,7 @@ $signer = $payment['operator_name'] ?: ($_SESSION['admin_nama'] ?? 'Bagian Keuan
     <h1>SEKOLAH DASAR AL-QUR'AN<br>( SDA ) MUTIARA HIKMAH</h1>
     <p class="address">Perum Bekasi Griya Asri II, Blok E Jl.H.Nabrih Ds. Sumber Jaya Kp.Buwek Tambun Selatan Telp. 021.88363466</p>
     <div class="rule"></div>
-    <div class="document-title">SLIP PEMBAYARAN SEKOLAH</div>
+    <div class="document-title"><?= $sppAllocation && (float)$sppAllocation['uang_baru']<=.001 && (float)$sppAllocation['titipan_digunakan']>0 ? 'BUKTI PENGGUNAAN TITIPAN SPP' : 'SLIP PEMBAYARAN SEKOLAH' ?></div>
 
     <table class="info"><tr>
       <td><table class="mini">

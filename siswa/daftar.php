@@ -8,6 +8,7 @@ require_once '../includes/kelas.php';
 require_once '../includes/pagination.php';
 require_once '../includes/student_tariff_consistency.php';
 require_once '../includes/tagihan_sekali.php';
+require_once '../includes/spp_billing.php';
 requireRole(['admin']);
 
 if (empty($_SESSION['csrf_student'])) {
@@ -42,7 +43,7 @@ function find_student(mysqli $db, int $id, bool $forUpdate = false): ?array {
 
 function student_snapshot(array $student): array {
     $keys = [
-        'id', 'NO_INDUK', 'NAMA', 'KELAS', 'master_kelas_id', 'SPP_PERBULAN', 'PANGKAL', 'PSB',
+        'id', 'NO_INDUK', 'NAMA', 'KELAS', 'master_kelas_id', 'SPP_PERBULAN', 'potongan_spp_persen', 'PANGKAL', 'PSB',
         'asal_psb', 'POMG', 'DAFTAR_ULANG', 'NO_induk_diknas',
         'potong_pangkal', 'tot_pangkal', 'tot_du', 'potong_du', 'is_active'
     ];
@@ -136,11 +137,11 @@ if ($_SERVER['REQUEST_METHOD'] === 'POST') {
 
             $advanced = isset($_POST['advanced_enabled']) && $_POST['advanced_enabled'] === '1';
             $advancedColumns = [
-                'SPP_PERBULAN', 'PANGKAL', 'PSB', 'POMG', 'DAFTAR_ULANG',
+                'potongan_spp_persen', 'PANGKAL', 'PSB', 'POMG', 'DAFTAR_ULANG',
                 'potong_pangkal', 'potong_du'
             ];
             $postMap = [
-                'SPP_PERBULAN' => 'spp_perbulan', 'PANGKAL' => 'pangkal',
+                'potongan_spp_persen' => 'potongan_spp_persen', 'PANGKAL' => 'pangkal',
                 'PSB' => 'psb', 'POMG' => 'pomg',
                 'DAFTAR_ULANG' => 'daftar_ulang', 'potong_pangkal' => 'potong_pangkal',
                 'potong_du' => 'potong_du'
@@ -153,9 +154,20 @@ if ($_SERVER['REQUEST_METHOD'] === 'POST') {
             }
             $values = [];
             foreach ($advancedColumns as $column) {
+                $rawValue = $_POST[$postMap[$column]] ?? 0;
+                if ($column === 'potongan_spp_persen') {
+                    $rawValue = str_replace(',', '.', trim((string)$rawValue));
+                    if ($rawValue === '' || !is_numeric($rawValue)) throw new RuntimeException('Potongan SPP harus berupa persentase yang valid.');
+                    $parsedValue = round((float)$rawValue, 2);
+                } else {
+                    $parsedValue = student_amount($rawValue);
+                }
                 $values[$column] = $advanced
-                    ? student_amount($_POST[$postMap[$column]] ?? 0)
+                    ? $parsedValue
                     : (float)($oldStudent[$column] ?? 0);
+            }
+            if ($values['potongan_spp_persen'] < 0 || $values['potongan_spp_persen'] > 100) {
+                throw new RuntimeException('Potongan SPP harus berada di antara 0% sampai 100%.');
             }
             $nisDiknas = $advanced
                 ? trim((string)($_POST['no_induk_diknas'] ?? ''))
@@ -197,7 +209,9 @@ if ($_SERVER['REQUEST_METHOD'] === 'POST') {
                 }
             }
 
-            $spp = $values['SPP_PERBULAN'];
+            $effectiveSpp = spp_current_effective_rate($koneksi, $class, $values['potongan_spp_persen']);
+            $spp = $class === '0' ? 0.0 : ($effectiveSpp['net'] > 0 ? (float)$effectiveSpp['net'] : (float)($oldStudent['SPP_PERBULAN'] ?? 0));
+            $sppDiscountPercent = $values['potongan_spp_persen'];
             $pangkal = $values['PANGKAL'];
             $psb = $values['PSB'];
             $pomg = $values['POMG'];
@@ -211,17 +225,17 @@ if ($_SERVER['REQUEST_METHOD'] === 'POST') {
             if ($action === 'tambah') {
                 $stmt = $koneksi->prepare("
                     INSERT INTO siswa (
-                      NO_INDUK, NAMA, KELAS, SPP_PERBULAN, PANGKAL, PSB, asal_psb,
+                      NO_INDUK, NAMA, KELAS, SPP_PERBULAN, potongan_spp_persen, PANGKAL, PSB, asal_psb,
                       POMG, DAFTAR_ULANG, NO_induk_diknas, potong_pangkal, tot_pangkal,
                       tot_du, potong_du, is_active
                     ) VALUES (
-                      ?, ?, ?, ?, ?, ?, ?, ?, ?,
+                      ?, ?, ?, ?, ?, ?, ?, ?, ?, ?,
                       NULLIF(?, ''), ?, ?, ?, ?, ?
                     )
                 ");
                 $stmt->bind_param(
-                    'sssdddiddsddddi',
-                    $noInduk, $name, $class, $spp, $pangkal, $psb, $asalPsb, $pomg,
+                    'sssddddiddsddddi',
+                    $noInduk, $name, $class, $spp, $sppDiscountPercent, $pangkal, $psb, $asalPsb, $pomg,
                     $daftarUlang, $nisDiknas, $potongPangkal, $totPangkal, $totDu, $potongDu, $active
                 );
                 $stmt->execute();
@@ -241,20 +255,21 @@ if ($_SERVER['REQUEST_METHOD'] === 'POST') {
                 $before = student_snapshot($oldStudent);
                 $stmt = $koneksi->prepare("
                     UPDATE siswa SET
-                      NO_INDUK=?, NAMA=?, KELAS=?, SPP_PERBULAN=?, PANGKAL=?, PSB=?,
+                      NO_INDUK=?, NAMA=?, KELAS=?, SPP_PERBULAN=?, potongan_spp_persen=?, PANGKAL=?, PSB=?,
                       POMG=?, DAFTAR_ULANG=?,
                       NO_induk_diknas=NULLIF(?, ''), potong_pangkal=?, tot_pangkal=?,
                       tot_du=?, potong_du=? WHERE id=?
                 ");
                 $stmt->bind_param(
-                    'sssdddddsddddi',
-                    $noInduk, $name, $class, $spp, $pangkal, $psb, $pomg,
+                    'sssddddddsddddi',
+                    $noInduk, $name, $class, $spp, $sppDiscountPercent, $pangkal, $psb, $pomg,
                     $daftarUlang, $nisDiknas, $potongPangkal, $totPangkal, $totDu, $potongDu, $id
                 );
                 $stmt->execute();
                 $stmt->close();
                 $stmtClass = $koneksi->prepare('UPDATE siswa SET master_kelas_id = ? WHERE id = ?');
                 $stmtClass->bind_param('ii', $classId, $id); $stmtClass->execute(); $stmtClass->close();
+                $sppDiscountSync = spp_sync_student_discount($koneksi, $noInduk, $sppDiscountPercent);
                 $tariffSync = null;
                 $placementId = class_sync_student_current_year($koneksi, $noInduk, $classId, $spp, $pomg, $active === 1, $tariffSync);
                 $duBillBefore = du_find_bill($koneksi, $noInduk, (int)date('n'), (int)date('Y'), true);
@@ -295,6 +310,7 @@ if ($_SERVER['REQUEST_METHOD'] === 'POST') {
                 ];
                 $afterAudit = $afterSnapshot;
                 $afterAudit['_tariff_sync'] = $syncAudit;
+                $afterAudit['_spp_discount_sync'] = $sppDiscountSync;
                 $auditAction = $masterChanged ? 'update' : 'rekonsiliasi_tarif';
                 write_student_audit($koneksi, $id, $noInduk, $auditAction, $before, $afterAudit);
 
@@ -455,6 +471,7 @@ $fieldMap = [
     'no_induk' => 'NO_INDUK', 'nama' => 'NAMA', 'kelas' => 'KELAS',
     'master_kelas_id' => 'master_kelas_id',
     'no_induk_diknas' => 'NO_induk_diknas', 'spp_perbulan' => 'SPP_PERBULAN',
+    'potongan_spp_persen' => 'potongan_spp_persen',
     'pangkal' => 'PANGKAL', 'psb' => 'PSB', 'pomg' => 'POMG',
     'daftar_ulang' => 'DAFTAR_ULANG', 'potong_pangkal' => 'potong_pangkal',
     'potong_du' => 'potong_du'
@@ -468,6 +485,9 @@ function rupiah_value($value): string {
     return number_format((float)$value, 0, ',', '.');
 }
 $advancedOpen = isset($oldInput['advanced_enabled']) && $oldInput['advanced_enabled'] === '1';
+$previewLevel = (string)($formStudent['KELAS'] ?? '');
+$previewDiscount = (float)form_student_value('potongan_spp_persen', $oldInput, $formStudent, $fieldMap, 0);
+$sppRatePreview = spp_current_effective_rate($koneksi, $previewLevel, $previewDiscount);
 ?>
 <!DOCTYPE html>
 <html lang="id">
@@ -568,7 +588,7 @@ $advancedOpen = isset($oldInput['advanced_enabled']) && $oldInput['advanced_enab
           </div>
 
           <label class="advanced-switch" for="advanced-enabled">
-            <span><strong>Advance</strong><small>Tarif siswa dan potongan; nominal yang sudah dibayar tetap terlindungi</small></span>
+            <span><strong>Advance</strong><small>Komponen sekali/tahunan dan potongan SPP; tagihan yang pernah dibayar tetap terkunci</small></span>
             <input type="checkbox" id="advanced-enabled" name="advanced_enabled" value="1" <?= $advancedOpen ? 'checked' : '' ?> />
             <span class="advanced-switch-track"><span></span></span>
           </label>
@@ -584,11 +604,15 @@ $advancedOpen = isset($oldInput['advanced_enabled']) && $oldInput['advanced_enab
             </div>
 
             <div class="section-divider"><span>Tarif Siswa</span></div>
+            <div class="spp-student-rate-summary">
+              <div><span>Tarif dasar SPP</span><strong id="student-spp-base">Rp <?= number_format((float)$sppRatePreview['base'],0,',','.') ?></strong></div>
+              <div><span>Tarif efektif</span><strong id="student-spp-effective">Rp <?= number_format((float)$sppRatePreview['net'],0,',','.') ?></strong></div>
+              <small>TA <?= htmlspecialchars((string)$sppRatePreview['year']) ?> · tarif dasar dikelola melalui Master Penerbitan SPP.</small>
+            </div>
             <div class="fields-grid student-money-grid">
               <?php
               $feeFields = [
-                'spp_perbulan' => 'SPP per Bulan', 'pangkal' => 'Uang Pangkal',
-                'psb' => 'Uang PSB', 'pomg' => 'Uang Komite',
+                'pangkal' => 'Uang Pangkal', 'psb' => 'Uang PSB', 'pomg' => 'Uang Komite',
                 'daftar_ulang' => 'Uang Daftar Ulang'
               ];
               foreach ($feeFields as $key => $label):
@@ -603,6 +627,12 @@ $advancedOpen = isset($oldInput['advanced_enabled']) && $oldInput['advanced_enab
 
             <div class="section-divider"><span>Potongan</span></div>
             <div class="fields-grid student-money-grid">
+              <div class="field-row">
+                <label class="field-label" for="student-potongan-spp">Potongan SPP (%)</label>
+                <input class="field-input advanced-field" type="number" min="0" max="100" step="0.01" id="student-potongan-spp" name="potongan_spp_persen"
+                  value="<?= htmlspecialchars(number_format($previewDiscount, 2, '.', '')) ?>" />
+                <small class="payment-auto-note">Berlaku pada tagihan yang belum pernah menerima pembayaran.</small>
+              </div>
               <div class="field-row">
                 <label class="field-label" for="student-potong-pangkal">Potongan Pangkal</label>
                 <input class="field-input rupiah-input advanced-field derived-source" type="text" inputmode="numeric" id="student-potong-pangkal" name="potong_pangkal"

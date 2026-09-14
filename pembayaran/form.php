@@ -10,6 +10,7 @@ require_once '../includes/daftar_ulang.php';
 require_once '../includes/biaya_lain.php';
 require_once '../includes/tagihan_tahunan.php';
 require_once '../includes/tagihan_sekali.php';
+require_once '../includes/spp_billing.php';
 requireRole(['admin', 'kasir']);
 $activeAcademicYear = du_current_academic_year();
 $activeAcademicYearSql = $koneksi->real_escape_string($activeAcademicYear);
@@ -39,14 +40,14 @@ $siswa_sql = "
     ) du ON du.no_induk = s.NO_INDUK
     WHERE s.is_active = 1 OR (
         EXISTS(SELECT 1 FROM siswa_tahun_ajaran sta_l WHERE sta_l.no_induk=s.NO_INDUK AND sta_l.status='lulus')
-        AND EXISTS(
+        AND (EXISTS(
             SELECT 1 FROM tagihan_daftar_ulang tdu_o
             LEFT JOIN bayar_du bd_o ON bd_o.tagihan_daftar_ulang_id=tdu_o.id
             WHERE tdu_o.no_induk=s.NO_INDUK AND tdu_o.status='open'
               AND tdu_o.tahun_ajaran_snapshot<='$activeAcademicYearSql'
             GROUP BY tdu_o.id,tdu_o.nominal_tagihan
             HAVING tdu_o.nominal_tagihan-COALESCE(SUM(bd_o.jumlah),0)>.001
-        )
+        ) OR EXISTS(SELECT 1 FROM tagihan_spp ts_o WHERE ts_o.no_induk=s.NO_INDUK AND ts_o.status='open'))
     )
     ORDER BY s.NAMA ASC
 ";
@@ -80,6 +81,7 @@ while ($placement = $placementResult->fetch_assoc()) {
         'covered_by_psb' => (int)$placement['spp_covered_by_psb'],
     ];
 }
+$published_spp_payload = spp_billing_schema_ready($koneksi) ? spp_payment_payload($koneksi) : [];
 
 $du_bills = du_selectable_bills_payload($koneksi);
 
@@ -285,6 +287,7 @@ unset($_SESSION['flash']);
                   data-paid-psb="<?= money_attr($s['paid_psb']) ?>"
                   data-paid-spp-periods="<?= htmlspecialchars(json_encode($period_payments[$s['NO_INDUK']]['spp'] ?? []), ENT_QUOTES, 'UTF-8') ?>"
                   data-spp-placements="<?= htmlspecialchars(json_encode($spp_placements[$s['NO_INDUK']] ?? [], JSON_UNESCAPED_UNICODE), ENT_QUOTES, 'UTF-8') ?>"
+                  data-spp-billing="<?= htmlspecialchars(json_encode($published_spp_payload[$s['NO_INDUK']] ?? ['saldo'=>0,'tagihan'=>[]], JSON_UNESCAPED_UNICODE), ENT_QUOTES, 'UTF-8') ?>"
                   data-paid-komite-periods="<?= htmlspecialchars(json_encode($period_payments[$s['NO_INDUK']]['komite'] ?? []), ENT_QUOTES, 'UTF-8') ?>"
                   data-annual-fees="<?= htmlspecialchars(json_encode($annual_fee_payload[$s['NO_INDUK']] ?? [], JSON_UNESCAPED_UNICODE), ENT_QUOTES, 'UTF-8') ?>"
                   data-du-bills="<?= htmlspecialchars(json_encode($du_bills[$s['NO_INDUK']] ?? []), ENT_QUOTES, 'UTF-8') ?>"
@@ -310,7 +313,11 @@ unset($_SESSION['flash']);
 
           <!-- Rincian Pembayaran -->
           <div class="section-divider"><span>Rincian Pembayaran</span></div>
-          <p class="payment-auto-note">Kolom dihitung dari riwayat. SPP dan Komite mengikuti periode transaksi, sedangkan Daftar Ulang mengikuti tahun ajaran yang dipilih.</p>
+          <p class="payment-auto-note">SPP dialokasikan otomatis ke tagihan terbit yang paling lama. Periode transaksi dipakai oleh Komite; Daftar Ulang mengikuti tahun ajaran yang dipilih.</p>
+          <section class="spp-deposit-banner" id="spp-deposit-banner" hidden aria-live="polite">
+            <div><span>Saldo Titipan SPP</span><strong id="spp-deposit-balance">Rp 0</strong><small id="spp-deposit-capacity">Pilih siswa untuk melihat saldo.</small></div>
+            <button type="button" class="btn btn-ghost" id="spp-use-deposit-button">Gunakan Titipan</button>
+          </section>
           <div class="alert alert-warning payment-overpaid-alert" id="payment-overpaid-alert" hidden></div>
           <div class="alert alert-warning payment-input-overlimit-alert" id="payment-input-overlimit-alert" hidden></div>
           <div class="table-container">
@@ -329,7 +336,7 @@ unset($_SESSION['flash']);
                 $komponen = [
                   ['pangkal', '💰 Uang Pangkal', 'uang_pangkal'],
                   ['psb', '🎒 Uang PSB', 'uang_psb'],
-                  ['spp', '🎓 Uang SPP', 'uang_spp'],
+                  ['spp', '🎓 Uang SPP Diterima', 'uang_spp'],
                   ['komite', '🏫 Uang Komite', 'uang_komite'],
                   ['du', '📚 Daftar Ulang', 'uang_du']
                 ];
@@ -337,7 +344,7 @@ unset($_SESSION['flash']);
                   [$key, $label, $name] = $k;
                 ?>
                 <tr class="<?= $i % 2 === 0 ? 'row-highlight' : '' ?>">
-                  <td><?php if($key==='du'): ?><div class="du-bill-selector"><span class="comp-label du-static-label" id="du-static-label"><?= $label ?></span><button type="button" class="du-selector-trigger" id="du-selector-trigger" aria-haspopup="listbox" aria-controls="du-selector-menu" aria-expanded="false" hidden><span class="du-trigger-label"><?= $label ?></span><span class="du-arrear-warning" id="du-arrear-warning" role="img"></span><span class="du-chevron" aria-hidden="true">⌄</span></button><div class="du-selector-menu" id="du-selector-menu" role="listbox" aria-label="Pilih tagihan Daftar Ulang" tabindex="-1" hidden></div></div><?php else: ?><span class="comp-label"<?= $key === 'spp' ? ' id="spp-component-label"' : '' ?>><?= $label ?><?= $key === 'spp' ? ' (' . htmlspecialchars($month_labels[$cur]) . ')' : '' ?></span><?php endif; ?><?php if($key==='spp'): ?><small class="du-inline-context du-context-label" id="spp-context-label">SPP wajib dibayar penuh</small><?php endif; ?><?php if($key==='komite'): ?><small class="du-inline-context du-context-label" id="komite-context-label">Tagihan tahunan bisa dicicil</small><?php endif; ?><?php if(in_array($key,['pangkal','psb'],true)): ?><small class="du-inline-context du-context-label">Tagihan satu kali, dapat dicicil</small><?php endif; ?><?php if($key==='du'): ?><small class="du-inline-context du-context-label" id="du-context-label">Pilih siswa untuk melihat tagihan.</small><small class="du-inline-context du-master-warning" id="du-master-warning" hidden></small><?php endif; ?></td>
+                  <td><?php if($key==='du'): ?><div class="du-bill-selector"><span class="comp-label du-static-label" id="du-static-label"><?= $label ?></span><button type="button" class="du-selector-trigger" id="du-selector-trigger" aria-haspopup="listbox" aria-controls="du-selector-menu" aria-expanded="false" hidden><span class="du-trigger-label"><?= $label ?></span><span class="du-arrear-warning" id="du-arrear-warning" role="img"></span><span class="du-chevron" aria-hidden="true">⌄</span></button><div class="du-selector-menu" id="du-selector-menu" role="listbox" aria-label="Pilih tagihan Daftar Ulang" tabindex="-1" hidden></div></div><?php else: ?><span class="comp-label"<?= $key === 'spp' ? ' id="spp-component-label"' : '' ?>><?= $label ?></span><?php endif; ?><?php if($key==='spp'): ?><small class="du-inline-context du-context-label" id="spp-context-label">Lunasi tagihan tertua; dana yang belum teralokasi menjadi titipan</small><?php endif; ?><?php if($key==='komite'): ?><small class="du-inline-context du-context-label" id="komite-context-label">Tagihan tahunan bisa dicicil</small><?php endif; ?><?php if(in_array($key,['pangkal','psb'],true)): ?><small class="du-inline-context du-context-label">Tagihan satu kali, dapat dicicil</small><?php endif; ?><?php if($key==='du'): ?><small class="du-inline-context du-context-label" id="du-context-label">Pilih siswa untuk melihat tagihan.</small><small class="du-inline-context du-master-warning" id="du-master-warning" hidden></small><?php endif; ?></td>
                   <td data-label="Total Tagihan"><input class="tbl-input tbl-system" type="text" value="0" id="<?=$key?>-total" readonly tabindex="-1" aria-readonly="true" /></td>
                   <td data-label="Sudah Terbayar"><input class="tbl-input tbl-system" type="text" value="0" id="<?=$key?>-bayar" readonly tabindex="-1" aria-readonly="true" /></td>
                   <td data-label="Sisa"><input class="tbl-input tbl-system tbl-system-sisa" type="text" value="0" id="<?=$key?>-sisa" readonly tabindex="-1" aria-readonly="true" /></td>
@@ -401,19 +408,8 @@ unset($_SESSION['flash']);
             </div>
           </template>
 
-          <!-- Penyesuaian SPP -->
-          <div class="section-divider"><span>Penyesuaian SPP</span></div>
-          <div class="fields-grid">
-            <div class="field-row">
-              <label class="field-label" for="potongan-spp">Potongan SPP</label>
-              <input class="field-input" type="text" id="potongan-spp" name="potongan_spp" placeholder="Rp 0" />
-            </div>
-            <div class="field-row">
-              <label class="field-label" for="kewajiban-spp">Kewajiban SPP</label>
-              <input class="field-input" type="text" id="kewajiban-spp" name="kewajiban_spp" placeholder="Rp 0" readonly
-                style="background:rgba(99,102,241,0.08);color:var(--accent)" />
-            </div>
-          </div>
+          <input type="hidden" id="potongan-spp" name="potongan_spp" value="0" />
+          <input type="hidden" id="gunakan-titipan-spp" name="gunakan_titipan_spp" value="0" />
 
           <input type="hidden" id="catatan" name="catatan" value="">
           <div class="section-divider"><span>History Transaksi Siswa</span></div>
@@ -468,6 +464,9 @@ unset($_SESSION['flash']);
   </div>
 
   <?php include '../includes/spp_warning_modal.php'; ?>
+  <div class="spp-deposit-modal" id="spp-deposit-modal" hidden role="dialog" aria-modal="true" aria-labelledby="spp-deposit-modal-title">
+    <div class="spp-deposit-modal-card"><h3 id="spp-deposit-modal-title">Pratinjau Penggunaan Titipan</h3><p id="spp-deposit-modal-summary"></p><div id="spp-deposit-modal-lines" class="spp-deposit-preview-lines"></div><div class="action-bar"><button type="button" class="btn btn-primary" id="spp-deposit-confirm">Konfirmasi Penggunaan</button><button type="button" class="btn btn-ghost" id="spp-deposit-cancel">Batal</button></div></div>
+  </div>
 
   <script>
     window.sppDaftarUlangMasters = {};
@@ -475,6 +474,7 @@ unset($_SESSION['flash']);
     window.sppPaymentHistoryUrl = 'history_siswa.php';
     window.sppOtherFeeBillsUrl = 'biaya_lain_siswa.php';
     window.sppPaymentStatusUrl = 'status_spp.php';
+    window.sppPublishedBilling = true;
     window.sppFlashWarning = <?= json_encode(
       ($flash['scope'] ?? '') === 'spp' ? ($flash['spp_status'] ?? null) : null,
       JSON_UNESCAPED_UNICODE | JSON_UNESCAPED_SLASHES | JSON_HEX_TAG | JSON_HEX_APOS | JSON_HEX_AMP | JSON_HEX_QUOT

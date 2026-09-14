@@ -23,6 +23,8 @@ File ini mencatat perubahan proyek secara reverse chronological. Baca [PROJECT_C
 
 - Baris Daftar Ulang menampilkan dropdown ketika ada tunggakan lama. Tahun berjalan tetap menjadi default; tanpa tagihan tahun berjalan, tunggakan tertua dipilih.
 - Pemilih Daftar Ulang dirapikan mengikuti tema visual pembayaran: label tunggal, panel berstruktur, status dan nominal yang mudah dipindai, serta tampilan responsif desktop/mobile. Aturan `hidden` dipertegas agar label dan dropdown tidak pernah tampil ganda.
+- Riwayat Kelas dirancang ulang menjadi kontrol ringkas di samping badge kelas dan panel timeline yang memiliki header, jumlah catatan, garis waktu, serta status Saat Ini/Pindah/Lulus. Mode mobile memperoleh perhitungan tinggi panel agar detail tidak bertumpuk dengan kartu siswa berikutnya.
+- Tampilan baru Rekap Setoran Kas dan Rekap Kas Tabungan diaudit ulang untuk tema terang/gelap. Warna permukaan, teks, total, footer tabel, dan kondisi negatif kini mengikuti token tema tanpa warna terang hard-coded pada mode gelap.
 - Opsi memuat tahun ajaran, kelas snapshot, tagihan, terbayar, sisa, dan status Tahun Berjalan/Tunggakan. Pergantian opsi mereset input bayar.
 - Pembayaran Daftar Ulang lama dapat digabung dengan komponen berjalan; struk biasa, struk tahunan, histori ringkas, dan PDF mencantumkan tahun tagihan Daftar Ulang.
 - Lulusan yang masih mempunyai tunggakan Daftar Ulang tetap muncul pada pencarian pembayaran dengan label `LULUS · TA …`; seluruh komponen selain Daftar Ulang dikunci dan juga ditolak backend.
@@ -41,7 +43,7 @@ File ini mencatat perubahan proyek secara reverse chronological. Baca [PROJECT_C
 
 **Verifikasi:**
 
-- Lint seluruh PHP dan smoke test JavaScript melalui Chrome headless lulus.
+- Lint seluruh PHP dan smoke test JavaScript melalui Chrome headless lulus, termasuk tampilan Riwayat Kelas desktop/mobile, accordion tanpa overlap, pemilih Daftar Ulang, serta Rekap Kas dalam tema terang/gelap.
 - Seluruh unit/regression test lulus, termasuk test baru untuk payload tagihan, penolakan ID tanpa pemilik/masa depan, pengembalian saldo saat edit, tahun kelulusan, dan snapshot kelas 6.
 - Integration test database disposable lulus untuk pembayaran gabungan lintas tahun, pemindahan tagihan saat edit, label tahun pada struk, lulusan, role pembayaran, SPP, dan Master Siswa PSB.
 

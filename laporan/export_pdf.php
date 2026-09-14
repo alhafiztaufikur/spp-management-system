@@ -5,6 +5,7 @@
 session_start();
 require_once '../koneksi.php';
 require_once '../includes/auth.php';
+require_once '../includes/spp_billing.php';
 require_once '../vendor/autoload.php';
 requireRole(['admin', 'bendahara']);
 
@@ -175,6 +176,7 @@ if ($selected_mode && !$rows) {
 }
 
 $details_by_payment = [];
+$spp_allocations_by_payment = [];
 if ($rows) {
     $ids = array_map(fn($row) => (int)$row['id'], $rows);
     $placeholders = implode(',', array_fill(0, count($ids), '?'));
@@ -192,6 +194,7 @@ if ($rows) {
         $details_by_payment[(int)$detail['bayar_id']][] = $detail;
     }
     $stmt_details->close();
+    if(spp_billing_schema_ready($koneksi))foreach($ids as $paymentId){$summary=spp_payment_allocation_summary($koneksi,$paymentId);if($summary)$spp_allocations_by_payment[$paymentId]=$summary;}
 }
 
 if (!$selected_mode) {
@@ -260,18 +263,20 @@ if (!$rows && !$selected_mode) {
     ];
 }
 
-function primary_lines(array $row): array {
-    return [
+function primary_lines(array $row, ?array $sppAllocation=null): array {
+    $lines=[
         payment_line('Uang Pangkal', $row['U_PANGKAL']),
         payment_line('Uang PSB', $row['U_PSB']),
         payment_line('Uang Daftar Ulang' . (!empty($row['du_tahun_ajaran']) ? ' (TA ' . $row['du_tahun_ajaran'] . ')' : ''), $row['uang_du']),
-        payment_line('Uang SPP', $row['U_SPP']),
         payment_line('Komite Sekolah', $row['U_KOMITE']),
     ];
+    $lines[]=payment_line($sppAllocation?'Uang SPP Diterima Sekarang':'Uang SPP',$sppAllocation?(float)$sppAllocation['uang_baru']:$row['U_SPP']);return $lines;
 }
 
-function other_lines(array $row, array $details): array {
+function other_lines(array $row, array $details, ?array $sppAllocation=null): array {
     $lines = [];
+
+    if($sppAllocation){foreach($sppAllocation['allocations'] as $allocation)$lines[]=payment_line('SPP '.month_name_id($allocation['bulan']).' '.$allocation['tahun'],(float)$allocation['nominal_dari_bayar']+(float)$allocation['nominal_dari_titipan']);if((float)$sppAllocation['titipan_digunakan']>0)$lines[]=payment_line('Titipan SPP Digunakan',(float)$sppAllocation['titipan_digunakan']);if((float)$sppAllocation['titipan_baru']>0)$lines[]=payment_line('Titipan SPP Baru',(float)$sppAllocation['titipan_baru']);}
 
     foreach ($details as $detail) {
         $label = $detail['nama_biaya_snapshot'];
@@ -492,8 +497,9 @@ ob_start();
 <body>
   <?php foreach ($rows as $row):
     $details = $details_by_payment[(int)$row['id']] ?? [];
-    $primary = primary_lines($row);
-    $others = other_lines($row, $details);
+    $sppAllocation=$spp_allocations_by_payment[(int)$row['id']]??null;
+    $primary = primary_lines($row,$sppAllocation);
+    $others = other_lines($row, $details,$sppAllocation);
     $sisa_pangkal = max(0, total_pangkal_bill($row) - (float)$row['total_pangkal_bayar']);
     $sisa_psb = max(0, total_psb_bill($row) - (float)$row['total_psb_bayar']);
     $sisa_du = max(0, total_du_bill($row) - (float)$row['total_du_bayar']);

@@ -775,6 +775,7 @@ function selectedPaymentMonthLabel() {
 function refreshSppPeriodLabel() {
   const label = document.getElementById('spp-component-label');
   if (!label) return;
+  if (window.sppPublishedBilling) { label.textContent = '🎓 Uang SPP Diterima'; return; }
   const monthLabel = selectedPaymentMonthLabel();
   label.textContent = '🎓 Uang SPP' + (monthLabel ? ' (' + monthLabel + ')' : '');
 }
@@ -828,6 +829,62 @@ function daftarUlangRecords(opt) {
   } catch (_) {
     return [];
   }
+}
+
+function publishedSppData(opt = selectedStudentOption()) {
+  if (!window.sppPublishedBilling || !opt) return null;
+  try {
+    const parsed = JSON.parse(opt.dataset.sppBilling || '{"saldo":0,"tagihan":[]}');
+    return { saldo: parseNumber(parsed.saldo || 0), tagihan: Array.isArray(parsed.tagihan) ? parsed.tagihan : [] };
+  } catch (_) {
+    return { saldo: 0, tagihan: [] };
+  }
+}
+
+function publishedSppPlan(useDeposit = false) {
+  const data = publishedSppData();
+  const newMoney = parseNumber(document.getElementById('spp-input')?.value || 0);
+  if (!data) return { lines: [], depositUsed: 0, depositCreated: 0, balanceAfter: 0, newMoney };
+  let deposit = useDeposit ? data.saldo : 0;
+  let cash = newMoney;
+  let depositUsed = 0;
+  const lines = [];
+  for (const bill of data.tagihan) {
+    let need = parseNumber(bill.remaining || 0);
+    if (cash + deposit + 0.001 < need) break;
+    const fromDeposit = Math.min(deposit, need); deposit -= fromDeposit; need -= fromDeposit;
+    const fromCash = Math.min(cash, need); cash -= fromCash; need -= fromCash;
+    if (need > 0.001) break;
+    depositUsed += fromDeposit;
+    lines.push({ ...bill, fromDeposit, fromCash });
+  }
+  return { lines, depositUsed, depositCreated: cash, balanceAfter: data.saldo - depositUsed + cash, newMoney };
+}
+
+function refreshPublishedSppUi(opt = selectedStudentOption()) {
+  if (!window.sppPublishedBilling) return false;
+  const data = publishedSppData(opt) || { saldo: 0, tagihan: [] };
+  const total = data.tagihan.reduce((sum, bill) => sum + parseNumber(bill.total || 0), 0);
+  const paid = data.tagihan.reduce((sum, bill) => sum + parseNumber(bill.paid || 0), 0);
+  setPaymentComponent('spp', total, paid);
+  const context = document.getElementById('spp-context-label');
+  if (context) context.textContent = data.tagihan.length
+    ? data.tagihan.length + ' tagihan terbuka · alokasi dimulai dari ' + paymentPeriodLabel(data.tagihan[0].bulan + '-' + data.tagihan[0].tahun)
+    : 'Belum ada tagihan terbuka; seluruh uang SPP baru akan menjadi titipan.';
+  const banner = document.getElementById('spp-deposit-banner');
+  const balance = document.getElementById('spp-deposit-balance');
+  const capacity = document.getElementById('spp-deposit-capacity');
+  const button = document.getElementById('spp-use-deposit-button');
+  const hidden = document.getElementById('gunakan-titipan-spp');
+  const nis = opt?.dataset.nis || '';
+  if (hidden && hidden.dataset.nis !== nis) { hidden.value = '0'; hidden.dataset.nis = nis; }
+  if (banner) banner.hidden = !opt;
+  if (balance) balance.textContent = 'Rp ' + formatRupiah(data.saldo);
+  let pool = data.saldo, payable = 0;
+  for (const bill of data.tagihan) { const need=parseNumber(bill.remaining||0); if(pool+0.001<need) break; pool-=need; payable++; }
+  if (capacity) capacity.textContent = data.saldo > 0 ? 'Dapat melunasi ' + payable + ' tagihan penuh tanpa menambah kas hari ini.' : 'Belum ada saldo titipan SPP.';
+  if (button) { button.disabled = data.saldo <= 0 || data.tagihan.length === 0; button.textContent = hidden?.value === '1' ? 'Titipan Dipilih' : 'Gunakan Titipan'; }
+  return true;
 }
 
 function selectedDaftarUlangKey() {
@@ -1051,7 +1108,7 @@ function applyGraduatePaymentLock(opt) {
   ['pangkal', 'psb', 'spp', 'komite'].forEach(key => {
     const input = document.getElementById(key + '-input');
     if (!input) return;
-    if (graduateOnly) {
+    if (graduateOnly && !(window.sppPublishedBilling && key === 'spp')) {
       input.value = '0';
       input.readOnly = true;
       input.classList.add('tbl-readonly');
@@ -1146,8 +1203,12 @@ function refreshAcademicYearSummary() {
     paid += datasetNumber(opt, 'paid', key);
   });
 
-  total += datasetNumber(opt, 'total', 'spp') * 12;
-  paid += paidForAcademicYear(opt, 'spp');
+  if (window.sppPublishedBilling) {
+    const sppData=publishedSppData(opt);total+=(sppData?.tagihan||[]).reduce((sum,bill)=>sum+parseNumber(bill.total||0),0);paid+=(sppData?.tagihan||[]).reduce((sum,bill)=>sum+parseNumber(bill.paid||0),0);
+  } else {
+    total += datasetNumber(opt, 'total', 'spp') * 12;
+    paid += paidForAcademicYear(opt, 'spp');
+  }
 
   const daftarUlang = selectedDaftarUlangBill(opt);
   total += parseNumber(daftarUlang?.total || 0);
@@ -1173,6 +1234,7 @@ function setPaymentComponent(key, total, paid) {
 function applyStudentPaymentDetails(opt) {
   if (!opt) return;
   ['pangkal','psb','spp','komite','du'].forEach(key => {
+    if (key === 'spp' && window.sppPublishedBilling) return;
     const total = key === 'du'
       ? totalDaftarUlangForContext(opt)
       : (key === 'spp'
@@ -1185,6 +1247,7 @@ function applyStudentPaymentDetails(opt) {
           : (key === 'komite' ? paidAnnualFeeForContext(opt, key) : datasetNumber(opt, 'paid', key)));
     setPaymentComponent(key, total, paid);
   });
+  refreshPublishedSppUi(opt);
   refreshAnnualPaymentState(opt);
   refreshDaftarUlangMasterWarning(opt);
   refreshBiayaLainOptions();
@@ -1202,6 +1265,7 @@ function clearPaymentDetails() {
     });
   });
   refreshDaftarUlangMasterWarning(null);
+  refreshPublishedSppUi(null);
   applyGraduatePaymentLock(null);
   refreshAnnualPaymentState(null);
   refreshBiayaLainOptions();
@@ -1425,6 +1489,7 @@ async function requestSppStatus(options = {}) {
 }
 
 function scheduleSppStatusCheck(interactive = true, sourceElement = null) {
+  if (window.sppPublishedBilling) { refreshSppInstallmentAvailability(); return; }
   if (sppStatusTimer) window.clearTimeout(sppStatusTimer);
   const context = currentSppStatusContext();
   if (!context) {
@@ -1441,6 +1506,16 @@ function scheduleSppStatusCheck(interactive = true, sourceElement = null) {
 function refreshSppInstallmentAvailability() {
   const input = document.getElementById('spp-input');
   if (!input) return;
+  if (window.sppPublishedBilling) {
+    const opt = selectedStudentOption();
+    input.readOnly = !opt;
+    input.classList.toggle('tbl-readonly', !opt);
+    input.setCustomValidity('');
+    if (!opt) { input.value = '0'; input.title = 'Pilih siswa terlebih dahulu'; }
+    else input.removeAttribute('title');
+    refreshPublishedSppUi(opt);
+    return;
+  }
   const opt = selectedStudentOption();
   const total = parseNumber(document.getElementById('spp-total')?.value || 0);
   const paid = parseNumber(document.getElementById('spp-bayar')?.value || 0);
@@ -1550,6 +1625,7 @@ function refreshPaymentInputOverlimitWarnings() {
   const warnings = [];
 
   Object.keys(paymentComponentLabels).forEach(key => {
+    if (window.sppPublishedBilling && key === 'spp') return;
     const totalEl = document.getElementById(key + '-total');
     const paidEl = document.getElementById(key + '-bayar');
     const inputEl = document.getElementById(key + '-input');
@@ -1926,6 +2002,7 @@ document.addEventListener('DOMContentLoaded', function () {
   const sppInput = document.getElementById('spp-input');
   if (sppInput) {
     sppInput.addEventListener('blur', function () {
+      if (window.sppPublishedBilling) return;
       if (this.readOnly) return;
       const amount = parseNumber(this.value || 0);
       if (amount <= 0.001) return;
@@ -1944,6 +2021,37 @@ document.addEventListener('DOMContentLoaded', function () {
       if (sppEditDependencyBlocks(dependency, amount)) showSppWarning(dependency, this, true);
     });
   }
+
+  const depositModal = document.getElementById('spp-deposit-modal');
+  const closeDepositModal = () => { if (depositModal) depositModal.hidden = true; };
+  document.getElementById('spp-use-deposit-button')?.addEventListener('click', function () {
+    const hidden = document.getElementById('gunakan-titipan-spp');
+    if (hidden?.value === '1') {
+      hidden.value = '0';
+      refreshPublishedSppUi();
+      return;
+    }
+    const plan = publishedSppPlan(true);
+    const summary = document.getElementById('spp-deposit-modal-summary');
+    const lines = document.getElementById('spp-deposit-modal-lines');
+    if (summary) summary.textContent = plan.lines.length
+      ? 'Titipan Rp ' + formatRupiah(plan.depositUsed) + ' akan dipakai. Saldo akhir Rp ' + formatRupiah(plan.balanceAfter) + '.'
+      : 'Saldo belum cukup untuk melunasi satu tagihan penuh. Tambahkan uang SPP baru agar dapat digabungkan.';
+    if (lines) lines.innerHTML = plan.lines.length ? plan.lines.map(line =>
+      '<article><div><strong>' + paymentPeriodLabel(line.bulan + '-' + line.tahun) + '</strong><small>TA ' + String(line.tahun_ajaran || '-') + ' · ' + String(line.kelas || '-') + '</small></div><span>Rp ' + formatRupiah(line.remaining) + '</span></article>'
+    ).join('') : '<div class="spp-deposit-empty">Belum ada tagihan yang dapat dilunasi penuh.</div>';
+    if (depositModal) depositModal.hidden = false;
+  });
+  document.getElementById('spp-deposit-cancel')?.addEventListener('click', closeDepositModal);
+  document.getElementById('spp-deposit-confirm')?.addEventListener('click', function () {
+    const plan = publishedSppPlan(true);
+    if (!plan.lines.length) return;
+    const hidden = document.getElementById('gunakan-titipan-spp');
+    if (hidden) hidden.value = '1';
+    closeDepositModal();
+    refreshPublishedSppUi();
+  });
+  depositModal?.addEventListener('click', event => { if (event.target === depositModal) closeDepositModal(); });
 
   const warningClose = document.getElementById('spp-warning-close');
   const warningRetry = document.getElementById('spp-warning-retry');
@@ -1984,6 +2092,10 @@ document.addEventListener('DOMContentLoaded', function () {
       });
     };
     form.addEventListener('submit', async function (event) {
+      if (window.sppPublishedBilling) {
+        normalizePaymentInputs();
+        return;
+      }
       if (form.dataset.sppSubmitting === '1') {
         normalizePaymentInputs();
         return;

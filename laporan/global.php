@@ -14,7 +14,7 @@ $registry=report_registry();
 $catalogGroups=[
   'pembayaran'=>['label'=>'Pembayaran Siswa','description'=>'Pantau tagihan, pembayaran yang diterima, dan tunggakan siswa.','items'=>['status','penerimaan','spp-tahunan','per-item','riwayat-tagihan']],
   'tabungan'=>['label'=>'Tabungan Siswa','description'=>'Lihat mutasi dan saldo tabungan siswa secara terpisah.','items'=>['tabungan-siswa','saldo-tabungan']],
-  'kas'=>['label'=>'Rekap Kas','description'=>'Ringkasan pembayaran dan mutasi tabungan untuk kebutuhan penutupan kas harian.','items'=>['setoran','kas-tabungan']],
+  'kas'=>['label'=>'Rekap Kas','description'=>'Ringkasan pembayaran, tabungan siswa, dan Titipan SPP untuk kebutuhan rekonsiliasi kas.','items'=>['setoran','kas-tabungan','titipan-spp']],
 ];
 ?>
 <div class="report-catalog-v2">

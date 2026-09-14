@@ -3,7 +3,7 @@ require_once __DIR__.'/../koneksi.php';
 require_once __DIR__.'/../includes/reports.php';
 function modular_assert(bool $ok,string $message):void{if(!$ok)throw new RuntimeException($message);}
 try{
-    modular_assert(count(report_registry())===9,'Katalog tidak berisi sembilan template.');
+    modular_assert(count(report_registry())===10,'Katalog tidak berisi sepuluh template.');
     $missing=(int)$koneksi->query("SELECT COUNT(*) total FROM siswa WHERE KELAS IN ('1','2','3','4','5','6') AND master_kelas_id IS NULL")->fetch_assoc()['total'];
     modular_assert($missing===0,'Masih ada siswa SD tanpa Master Kelas.');
     $orphan=(int)$koneksi->query("SELECT COUNT(*) total FROM bayar_biaya_lain d LEFT JOIN tagihan_biaya_lain t ON t.id=d.tagihan_biaya_lain_id WHERE d.tagihan_biaya_lain_id IS NOT NULL AND t.id IS NULL")->fetch_assoc()['total'];
@@ -52,5 +52,5 @@ try{
     modular_assert(!isset($savingCash['details']),'Rekap Kas Tabungan masih mengirim rincian transaksi siswa.');
     $largeRows=array_map(fn($index)=>['nis'=>(string)$index],range(1,1001));$largePage=report_paginate($largeRows,array_merge($filters,['page'=>2,'per_page'=>100]),false);
     modular_assert($largePage['total']===1001&&$largePage['pages']===11&&$largePage['rows'][0]['nis']==='101','Pagination 1.000+ baris tidak stabil.');
-    echo "OK: sembilan template, Master Kelas, relasi tagihan, matriks SPP, rekap kas pembayaran, dan rekap kas tabungan tervalidasi.\n";
+    echo "OK: sepuluh template, Master Kelas, relasi tagihan, matriks SPP, rekap kas pembayaran, rekap kas tabungan, dan Titipan SPP tervalidasi.\n";
 }catch(Throwable $error){fwrite(STDERR,'FAILED: '.$error->getMessage().PHP_EOL);exit(1);}

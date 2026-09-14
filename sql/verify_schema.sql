@@ -423,6 +423,28 @@ FROM (
              AND TABLE_CONSTRAINTS.CONSTRAINT_TYPE = 'FOREIGN KEY'
              AND rc.DELETE_RULE = 'CASCADE' AND rc.UPDATE_RULE = 'CASCADE'
          )
+  UNION ALL
+  SELECT 'siswa.potongan_spp_persen', EXISTS(SELECT 1 FROM information_schema.COLUMNS WHERE TABLE_SCHEMA=DATABASE() AND TABLE_NAME='siswa' AND COLUMN_NAME='potongan_spp_persen')
+  UNION ALL
+  SELECT 'bayar.U_TITIPAN_SPP', EXISTS(SELECT 1 FROM information_schema.COLUMNS WHERE TABLE_SCHEMA=DATABASE() AND TABLE_NAME='bayar' AND COLUMN_NAME='U_TITIPAN_SPP')
+  UNION ALL
+  SELECT 'table.master_spp_tahun', EXISTS(SELECT 1 FROM information_schema.TABLES WHERE TABLE_SCHEMA=DATABASE() AND TABLE_NAME='master_spp_tahun')
+  UNION ALL
+  SELECT 'table.master_spp_tarif', EXISTS(SELECT 1 FROM information_schema.TABLES WHERE TABLE_SCHEMA=DATABASE() AND TABLE_NAME='master_spp_tarif')
+  UNION ALL
+  SELECT 'table.tagihan_spp', EXISTS(SELECT 1 FROM information_schema.TABLES WHERE TABLE_SCHEMA=DATABASE() AND TABLE_NAME='tagihan_spp')
+  UNION ALL
+  SELECT 'table.spp_alokasi_batch', EXISTS(SELECT 1 FROM information_schema.TABLES WHERE TABLE_SCHEMA=DATABASE() AND TABLE_NAME='spp_alokasi_batch')
+  UNION ALL
+  SELECT 'table.spp_alokasi', EXISTS(SELECT 1 FROM information_schema.TABLES WHERE TABLE_SCHEMA=DATABASE() AND TABLE_NAME='spp_alokasi')
+  UNION ALL
+  SELECT 'table.titipan_spp_mutasi', EXISTS(SELECT 1 FROM information_schema.TABLES WHERE TABLE_SCHEMA=DATABASE() AND TABLE_NAME='titipan_spp_mutasi')
+  UNION ALL
+  SELECT 'table.spp_audit_log', EXISTS(SELECT 1 FROM information_schema.TABLES WHERE TABLE_SCHEMA=DATABASE() AND TABLE_NAME='spp_audit_log')
+  UNION ALL
+  SELECT 'uk_tagihan_spp_siswa_periode', EXISTS(SELECT 1 FROM information_schema.STATISTICS WHERE TABLE_SCHEMA=DATABASE() AND TABLE_NAME='tagihan_spp' AND INDEX_NAME='uk_tagihan_spp_siswa_periode' AND NON_UNIQUE=0)
+  UNION ALL
+  SELECT 'uk_spp_alokasi_batch_bayar', EXISTS(SELECT 1 FROM information_schema.STATISTICS WHERE TABLE_SCHEMA=DATABASE() AND TABLE_NAME='spp_alokasi_batch' AND INDEX_NAME='uk_spp_alokasi_batch_bayar' AND NON_UNIQUE=0)
 ) AS requirements
 ORDER BY requirement;
 

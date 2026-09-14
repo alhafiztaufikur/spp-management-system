@@ -261,6 +261,7 @@ foreach ($studentOptions as $studentOption) {
                 <th class="kelas-col">Kelas</th>
                 <th>Bulan / Tahun</th>
                 <th>SPP</th>
+                <th>Titipan SPP</th>
                 <th>Sistem</th>
                 <th>Total Bayar</th>
                 <th>Bayar / Update</th>
@@ -292,6 +293,7 @@ foreach ($studentOptions as $studentOption) {
                   <?php endif; ?>
                 </td>
                 <td data-label="SPP" class="nominal">Rp <?= number_format($row['U_SPP'], 0, ',', '.') ?></td>
+                <td data-label="Titipan SPP" class="nominal">Rp <?= number_format($row['U_TITIPAN_SPP'] ?? 0, 0, ',', '.') ?></td>
                 <td data-label="Sistem"><?= htmlspecialchars($row['sistem_pembayaran'] ?? 'VA') ?></td>
                 <td data-label="Total Bayar" class="nominal">Rp <?= number_format($row['total_jumlah'], 0, ',', '.') ?></td>
                 <td data-label="Bayar / Update">

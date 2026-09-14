@@ -6,7 +6,7 @@ $registry=report_registry();$template=(string)($_GET['template']??'');if(!isset(
 $format=(string)($_GET['format']??'print');if(!in_array($format,['print','pdf','excel'],true))$format='print';
 $filters=report_filters($koneksi,$_GET);if($template==='riwayat-tagihan'&&!isset($_GET['siswa_status']))$filters['siswa_status']='all';if(!isset($_GET['kategori'])&&$template==='penerimaan')$filters['kategori']='semua';
 $report=report_build($koneksi,$template,$filters);$generated=date('d-m-Y H:i:s');$operator=(string)($_SESSION['admin_nama']??$_SESSION['admin_username']??'Pengguna');
-$isCashRecap=in_array($template,['setoran','kas-tabungan'],true);$isSavingsCashRecap=$template==='kas-tabungan';
+$isCashRecap=in_array($template,['setoran','kas-tabungan','titipan-spp'],true);$isSavingsCashRecap=$template==='kas-tabungan';
 $billingGroupedView=$template==='riwayat-tagihan'&&report_billing_history_uses_grouped_view($filters,$report['rows']);
 $billingPdfView=$template==='riwayat-tagihan'&&$format==='pdf';
 $billingGroups=($billingGroupedView||$billingPdfView)?report_billing_history_group_students($report['rows']):[];
