@@ -210,7 +210,8 @@ if ($_SERVER['REQUEST_METHOD'] === 'POST') {
             }
 
             $effectiveSpp = spp_current_effective_rate($koneksi, $class, $values['potongan_spp_persen']);
-            $spp = $class === '0' ? 0.0 : ($effectiveSpp['net'] > 0 ? (float)$effectiveSpp['net'] : (float)($oldStudent['SPP_PERBULAN'] ?? 0));
+            $hasMasterSppRate = $effectiveSpp['year'] !== 'Belum disiapkan';
+            $spp = $class === '0' ? 0.0 : ($hasMasterSppRate ? (float)$effectiveSpp['net'] : (float)($oldStudent['SPP_PERBULAN'] ?? 0));
             $sppDiscountPercent = $values['potongan_spp_persen'];
             $pangkal = $values['PANGKAL'];
             $psb = $values['PSB'];

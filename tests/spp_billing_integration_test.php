@@ -11,9 +11,12 @@ try{
   spp_master_save_rates($koneksi,$masterId,[1=>250000,2=>250000,3=>250000,4=>250000,5=>250000,6=>250000]);
   $publish=spp_publish_students($koneksi,$masterId,[$nis]);spp_it_assert($publish['created']===12,'Penerbitan pertama tidak membuat 12 tagihan.');$again=spp_publish_students($koneksi,$masterId,[$nis]);spp_it_assert($again['created']===0&&$again['existing']===12,'Penerbitan ulang tidak idempoten.');
   $a=spp_allocate_payment($koneksi,$nis,null,500000,false,'2196-07-02 08:00:00','Tunai','test');spp_it_assert($a['bill_count']===2&&$a['deposit_created']===0.0,'Pembayaran dua bulan tidak dialokasikan dengan benar.');
+  $rateChange=spp_master_save_rates($koneksi,$masterId,[1=>300000,2=>250000,3=>250000,4=>250000,5=>250000,6=>250000]);spp_it_assert($rateChange['bills_updated']===10&&$rateChange['bills_locked']===2,'Perubahan tarif tidak memisahkan tagihan terkunci dan belum beralokasi.');
+  $discountChange=spp_sync_student_discount($koneksi,$nis,10);spp_it_assert($discountChange['updated']===10&&$discountChange['locked']===2,'Perubahan potongan tidak menjaga snapshot tagihan berbayar.');
+  $amounts=$koneksi->query("SELECT bulan,nominal_tagihan FROM tagihan_spp WHERE no_induk='{$nis}' ORDER BY CAST(tahun AS UNSIGNED),CAST(bulan AS UNSIGNED) LIMIT 3")->fetch_all(MYSQLI_ASSOC);spp_it_assert((float)$amounts[0]['nominal_tagihan']===250000.0&&(float)$amounts[1]['nominal_tagihan']===250000.0&&(float)$amounts[2]['nominal_tagihan']===270000.0,'Snapshot tarif lama atau tarif efektif baru berubah tidak tepat.');
   $b=spp_allocate_payment($koneksi,$nis,null,100000,false,'2196-07-03 08:00:00','Tunai','test');spp_it_assert($b['bill_count']===0&&$b['deposit_created']===100000.0,'Pembayaran kurang dari sebulan tidak menjadi titipan.');
-  $c=spp_allocate_payment($koneksi,$nis,null,150000,true,'2196-07-04 08:00:00','Tunai','test');spp_it_assert($c['bill_count']===1&&$c['deposit_used']===100000.0&&$c['balance_after']===0.0,'Gabungan titipan dan uang baru salah.');
-  $d=spp_allocate_payment($koneksi,$nis,null,300000,false,'2196-07-05 08:00:00','VA','test');spp_it_assert($d['bill_count']===1&&$d['deposit_created']===50000.0,'Kelebihan pembayaran tidak menjadi titipan.');
+  $c=spp_allocate_payment($koneksi,$nis,null,170000,true,'2196-07-04 08:00:00','Tunai','test');spp_it_assert($c['bill_count']===1&&$c['deposit_used']===100000.0&&$c['balance_after']===0.0,'Gabungan titipan dan uang baru salah.');
+  $d=spp_allocate_payment($koneksi,$nis,null,320000,false,'2196-07-05 08:00:00','VA','test');spp_it_assert($d['bill_count']===1&&$d['deposit_created']===50000.0,'Kelebihan pembayaran tidak menjadi titipan.');
   spp_it_assert(abs(spp_deposit_balance($koneksi,$nis)-50000)<.001,'Saldo akhir titipan salah.');
-  $koneksi->rollback();echo "OK: penerbitan idempoten, alokasi tertua, pembayaran kurang/lebih, dan penggunaan titipan tervalidasi.\n";
+  $koneksi->rollback();echo "OK: penerbitan idempoten, snapshot tarif/potongan, alokasi tertua, dan Titipan SPP tervalidasi.\n";
 }catch(Throwable $e){$koneksi->rollback();throw $e;}

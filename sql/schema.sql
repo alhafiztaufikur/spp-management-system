@@ -247,7 +247,7 @@ CREATE TABLE `spp_alokasi_batch` (
   `titipan_baru` DECIMAL(15,2) NOT NULL DEFAULT 0,
   `status` ENUM('active','reversed') NOT NULL DEFAULT 'active',
   `created_at` TIMESTAMP NOT NULL DEFAULT CURRENT_TIMESTAMP,
-  UNIQUE KEY `uk_spp_alokasi_batch_bayar` (`bayar_id`), KEY `idx_spp_alokasi_batch_siswa` (`no_induk`,`tanggal`),
+  KEY `idx_spp_alokasi_batch_bayar_status` (`bayar_id`,`status`), KEY `idx_spp_alokasi_batch_siswa` (`no_induk`,`tanggal`),
   CONSTRAINT `fk_spp_alokasi_batch_siswa` FOREIGN KEY (`no_induk`) REFERENCES `siswa` (`NO_INDUK`) ON DELETE RESTRICT ON UPDATE CASCADE,
   CONSTRAINT `fk_spp_alokasi_batch_bayar` FOREIGN KEY (`bayar_id`) REFERENCES `bayar` (`id`) ON DELETE CASCADE ON UPDATE CASCADE,
   CONSTRAINT `chk_spp_alokasi_batch_nominal` CHECK (`uang_baru` >= 0 AND `titipan_digunakan` >= 0 AND `titipan_baru` >= 0)

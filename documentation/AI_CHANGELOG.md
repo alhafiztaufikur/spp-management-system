@@ -13,6 +13,45 @@ File ini mencatat perubahan proyek secara reverse chronological. Baca [PROJECT_C
 - Jangan menghapus atau menulis ulang entri lama. Tambahkan entri koreksi bila diperlukan.
 - Perubahan implementasi dan entri changelog wajib masuk commit yang sama.
 
+## 2026-09-15 - Master Penerbitan dan Titipan SPP
+
+**AI/Aktor:** Codex berbasis GPT-5, bersama pemilik proyek
+
+**Tujuan:** Mengganti pembayaran SPP berbasis periode bebas menjadi tagihan bulanan yang diterbitkan, mendukung pembayaran muka secara aman, serta menjaga snapshot tarif ketika harga berubah.
+
+**Perubahan fitur dan perilaku:**
+
+- Menambahkan Master Penerbitan SPP khusus administrator dengan tarif kelas 1–6, status Draft/Terbit/Ditutup, filter rombel/siswa, bulan mulai siswa pindahan, penerbitan 12 bulan Juli–Juni, dan pembatalan tagihan siswa keluar.
+- Tagihan diterbitkan hanya dari penempatan kelas yang tersimpan dan bersifat idempoten. Kelas 1 pertama asal PSB serta potongan 100% menghasilkan tagihan Rp0 dengan status yang berbeda.
+- Pembayaran SPP kini mengalokasikan uang ke tagihan tertua. Dana yang belum cukup satu bulan atau melebihi seluruh tagihan terbit disimpan sebagai Titipan SPP; saldo lama hanya dipakai setelah kasir mengonfirmasi pratinjau.
+- Perubahan tarif atau potongan hanya memperbarui tagihan yang belum pernah menerima alokasi. Tagihan berbayar, tahun tertutup, struk lama, dan snapshot historis tetap dipertahankan.
+- Form pembayaran, edit admin, struk, histori, Rekap Setoran Kas, PDF, Excel, dan laporan global memakai relasi tagihan/alokasi baru. Penerimaan SPP dan Titipan SPP dipisahkan, sedangkan penggunaan saldo lama tidak menambah kas hari ini.
+- Menambahkan buku besar Titipan SPP, rekap saldo, penggunaan, dan pengembalian admin. Lulusan dapat melunasi tagihan lama tetapi tidak dapat membentuk titipan baru yang tidak mungkin diterbitkan menjadi tagihan.
+- Memperbaiki edit pembayaran agar batch lama dapat berstatus `reversed` dan batch pengganti tetap dibuat tanpa menghapus histori audit.
+
+**Database dan migrasi:**
+
+- Menambahkan `siswa.potongan_spp_persen`, `bayar.U_TITIPAN_SPP`, master tahun/tarif SPP, tagihan bulanan, batch dan rincian alokasi, buku besar titipan, serta audit SPP melalui `sql/add_spp_billing_and_deposit.sql`.
+- Menambahkan migrasi historis `sql/migrate_spp_billing.php` dan koreksi indeks edit idempoten `sql/fix_spp_allocation_edit.sql`.
+- Migrasi telah diterapkan pada database pengembangan setelah backup: 672 tagihan historis dan 62 alokasi terbentuk, tidak ada alokasi yatim, dan total kas legacy tetap konsisten.
+
+**Kompatibilitas dan data lama:**
+
+- `siswa.SPP_PERBULAN` dipertahankan sebagai nilai kompatibilitas read-only; tagihan baru selalu memakai Master SPP dan snapshot penempatan.
+- Pembayaran lama yang cocok dipetakan ke tagihan historis. Nominal SPP tanpa penempatan/tagihan yang dapat dipastikan menjadi Titipan SPP tanpa mengubah tanggal, metode, atau total penerimaan aslinya.
+- `bayar_spp_periode` tidak lagi menjadi sumber utama, tetapi tetap tersedia untuk pembacaan data legacy.
+
+**Verifikasi:**
+
+- Lint PHP seluruh file berubah, `node --check assets/js/app.js`, dan `git diff --check` lulus.
+- Instalasi baru dari `sql/schema.sql` berhasil membentuk seluruh tabel Master SPP; pemeriksaan schema memastikan seluruh struktur baru tersedia.
+- Seluruh unit/regression test lulus, termasuk penerbitan idempoten, perubahan tarif/potongan, snapshot terkunci, potongan penuh, urutan tagihan, laporan, dan saldo titipan.
+- Integration test HTTP pada database disposable lulus untuk pembayaran beberapa bulan, uang kurang/lebih, penggunaan titipan, edit batch, pemindahan Daftar Ulang, struk, Master Siswa PSB, serta pembatasan role.
+
+**Catatan tindak lanjut:**
+
+- Pemeriksaan visual otomatis melalui plugin browser tidak dapat dijalankan karena browser tidak tersedia pada lingkungan sesi; struktur halaman tetap diverifikasi melalui render HTTP, kontrak HTML, dan pengujian responsif yang sudah ada.
+
 ## 2026-09-14 - Pemilih Tunggakan Daftar Ulang dan Riwayat Kelas
 
 **AI/Aktor:** Codex berbasis GPT-5, bersama pemilik proyek

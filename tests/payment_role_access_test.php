@@ -69,6 +69,8 @@ try {
         $cookies = role_test_login($baseUrl, $username, $password);
         $edit = role_test_request($baseUrl . '/pembayaran/edit.php?id=' . $paymentId, [], $cookies);
         role_test_assert($edit['status'] === 302, ucfirst($username) . ' masih dapat membuka edit pembayaran.');
+        $masterSpp = role_test_request($baseUrl . '/master_spp.php', [], $cookies);
+        role_test_assert($masterSpp['status'] === 302, ucfirst($username) . ' masih dapat membuka Master Penerbitan SPP.');
         foreach (['update','hapus'] as $action) {
             $response = role_test_request($baseUrl . '/pembayaran/proses.php', [
                 'aksi'=>$action, 'id'=>$paymentId, 'no_induk'=>$nis,
@@ -86,6 +88,7 @@ try {
     }
 
     $adminCookies = role_test_login($baseUrl, 'admin', 'admin123');
+    role_test_assert(role_test_request($baseUrl . '/master_spp.php', [], $adminCookies)['status'] === 200, 'Administrator tidak dapat membuka Master Penerbitan SPP.');
     $edit = role_test_request($baseUrl . '/pembayaran/edit.php?id=' . $paymentId, [], $adminCookies);
     role_test_assert($edit['status'] === 200, 'Administrator tidak dapat membuka edit pembayaran.');
     role_test_assert((bool)preg_match('/name="csrf_token" value="([a-f0-9]+)"/', $edit['body'], $match), 'Token CSRF admin tidak ditemukan.');

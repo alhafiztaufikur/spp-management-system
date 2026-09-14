@@ -2038,7 +2038,7 @@ document.addEventListener('DOMContentLoaded', function () {
       ? 'Titipan Rp ' + formatRupiah(plan.depositUsed) + ' akan dipakai. Saldo akhir Rp ' + formatRupiah(plan.balanceAfter) + '.'
       : 'Saldo belum cukup untuk melunasi satu tagihan penuh. Tambahkan uang SPP baru agar dapat digabungkan.';
     if (lines) lines.innerHTML = plan.lines.length ? plan.lines.map(line =>
-      '<article><div><strong>' + paymentPeriodLabel(line.bulan + '-' + line.tahun) + '</strong><small>TA ' + String(line.tahun_ajaran || '-') + ' · ' + String(line.kelas || '-') + '</small></div><span>Rp ' + formatRupiah(line.remaining) + '</span></article>'
+      '<article><div><strong>' + escapeHtml(paymentPeriodLabel(line.bulan + '-' + line.tahun)) + '</strong><small>TA ' + escapeHtml(line.tahun_ajaran || '-') + ' · ' + escapeHtml(line.kelas || '-') + '</small></div><span>Rp ' + formatRupiah(line.remaining) + '</span></article>'
     ).join('') : '<div class="spp-deposit-empty">Belum ada tagihan yang dapat dilunasi penuh.</div>';
     if (depositModal) depositModal.hidden = false;
   });

@@ -59,8 +59,9 @@ function spp_net_tariff(float $base, float $discountPercent): array {
 function spp_current_effective_rate(mysqli $db, string $level, float $discountPercent): array {
     $empty = ['base'=>0.0, 'discount_percent'=>$discountPercent, 'discount'=>0.0, 'net'=>0.0, 'year'=>'Belum disiapkan'];
     if (!spp_billing_schema_ready($db) || !preg_match('/^[1-6]$/', $level)) return $empty;
-    $stmt = $db->prepare("SELECT ta.label,mst.id FROM master_spp_tahun mst JOIN tahun_ajaran ta ON ta.id=mst.tahun_ajaran_id WHERE mst.status IN ('published','draft') ORDER BY (mst.status='published') DESC,ta.tanggal_mulai DESC,mst.id DESC LIMIT 1");
-    $stmt->execute(); $master=$stmt->get_result()->fetch_assoc(); $stmt->close();
+    $currentYear = du_current_academic_year();
+    $stmt = $db->prepare("SELECT ta.label,mst.id FROM master_spp_tahun mst JOIN tahun_ajaran ta ON ta.id=mst.tahun_ajaran_id WHERE mst.status IN ('published','draft') ORDER BY (ta.label=?) DESC,(mst.status='published') DESC,ta.tanggal_mulai DESC,mst.id DESC LIMIT 1");
+    $stmt->bind_param('s', $currentYear); $stmt->execute(); $master=$stmt->get_result()->fetch_assoc(); $stmt->close();
     if (!$master) return $empty;
     $stmt=$db->prepare('SELECT nominal_dasar FROM master_spp_tarif WHERE master_spp_tahun_id=? AND tingkat=? LIMIT 1');
     $masterId=(int)$master['id'];$levelInt=(int)$level;$stmt->bind_param('ii',$masterId,$levelInt);$stmt->execute();
@@ -125,16 +126,18 @@ function spp_master_save_rates(mysqli $db, int $masterYearId, array $rates): arr
              FROM tagihan_spp ts WHERE ts.master_spp_tahun_id=? AND ts.tingkat_snapshot=? AND ts.status IN ('open','waived') FOR UPDATE");
         $stmt->bind_param('ii', $masterYearId, $level); $stmt->execute();
         $bills = $stmt->get_result()->fetch_all(MYSQLI_ASSOC); $stmt->close();
+        $levelUpdated = 0;
+        $levelLocked = 0;
         foreach ($bills as $bill) {
-            if ((int)$bill['allocated'] === 1) { $lockedBills++; continue; }
+            if ((int)$bill['allocated'] === 1) { $lockedBills++; $levelLocked++; continue; }
             $net = spp_net_tariff($new, (float)$bill['potongan_persen_snapshot']);
             $newStatus = $net['net'] <= .001 ? 'waived' : 'open';
             $stmt = $db->prepare('UPDATE tagihan_spp SET tarif_dasar_snapshot=?,potongan_nominal_snapshot=?,nominal_tagihan=?,status=? WHERE id=?');
             $billId=(int)$bill['id']; $stmt->bind_param('dddsi', $new, $net['discount'], $net['net'], $newStatus, $billId); $stmt->execute(); $stmt->close();
-            $updatedBills++;
+            $updatedBills++; $levelUpdated++;
         }
         $changed++;
-        spp_write_audit($db, $masterYearId, null, 'ubah_tarif', ['tingkat'=>$level,'nominal'=>(float)$old['nominal_dasar']], ['tingkat'=>$level,'nominal'=>$new,'tagihan_diubah'=>count($bills)-$lockedBills], count($bills));
+        spp_write_audit($db, $masterYearId, null, 'ubah_tarif', ['tingkat'=>$level,'nominal'=>(float)$old['nominal_dasar']], ['tingkat'=>$level,'nominal'=>$new,'tagihan_diubah'=>$levelUpdated,'tagihan_terkunci'=>$levelLocked], count($bills));
     }
     return ['rates_changed'=>$changed,'bills_updated'=>$updatedBills,'bills_locked'=>$lockedBills];
 }

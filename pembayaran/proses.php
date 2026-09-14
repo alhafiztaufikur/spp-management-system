@@ -175,11 +175,11 @@ function payable_total(float $total, float $discount = 0, float $derivedTotal = 
     return $derivedTotal > 0 ? $derivedTotal : max(0, $total - $discount);
 }
 
-function validate_graduate_payment(array $student, array $components, float $uangDu, array $otherFees = [], float $uangSpp = 0): void {
+function validate_graduate_payment(array $student, array $components, float $uangDu, array $otherFees = [], float $uangSpp = 0, bool $useSppDeposit = false): void {
     if (empty($student['is_graduate'])) return;
     $otherTotal = array_sum(array_map('floatval', $components));
     foreach ($otherFees as $line) $otherTotal += (float)($line['nominal'] ?? 0);
-    if (($uangDu <= 0.001 && $uangSpp <= 0.001) || $otherTotal > 0.001) {
+    if (($uangDu <= 0.001 && $uangSpp <= 0.001 && !$useSppDeposit) || $otherTotal > 0.001) {
         throw new RuntimeException('Siswa yang sudah lulus hanya dapat membayar tunggakan SPP dan Daftar Ulang.');
     }
 }
@@ -537,7 +537,7 @@ if ($aksi === 'input') {
         }
         validate_graduate_payment($siswa_data, [
             $uang_pangkal, $uang_psb, $uang_komite, $potongan_spp
-        ], $uang_du, [], $uang_spp);
+        ], $uang_du, [], $uang_spp, $gunakan_titipan_spp);
 
         $periods = [['bulan' => $bulan_bayar, 'tahun' => (string)$tahun_bayar]];
         $spp_parts = [$uang_spp];
@@ -574,7 +574,7 @@ if ($aksi === 'input') {
         $biaya_lain = collect_biaya_lain($koneksi, $no_induk);
         validate_graduate_payment($siswa_data, [
             $uang_pangkal, $uang_psb, $uang_komite, $potongan_spp
-        ], $uang_du, $biaya_lain, $uang_spp);
+        ], $uang_du, $biaya_lain, $uang_spp, $gunakan_titipan_spp);
         $legacy_biaya_lain = legacy_biaya_lain_values($biaya_lain);
 
         // Satu pembayaran tahunan disimpan sebagai 12 header transaksi agar
@@ -629,6 +629,9 @@ if ($aksi === 'input') {
             $sppAllocation = null;
             if ($usePublishedSpp && ($row_spp > 0.001 || $gunakan_titipan_spp)) {
                 $sppAllocation = spp_allocate_payment($koneksi, $no_induk, $bayar_id, $row_spp, $gunakan_titipan_spp, $tanggal_bayar, $sistem_pembayaran, $user_id);
+                if (!empty($siswa_data['is_graduate']) && (float)$sppAllocation['deposit_created'] > 0.001) {
+                    throw new RuntimeException('Siswa yang sudah lulus tidak dapat menerima Titipan SPP baru. Nominal SPP harus tepat melunasi tagihan yang masih terbuka.');
+                }
             } elseif (!$usePublishedSpp) {
                 sync_spp_period_claim($koneksi, $bayar_id, $no_induk, $row_month, $row_year, $row_spp);
             }
@@ -789,7 +792,7 @@ if ($aksi === 'update') {
         $biaya_lain = collect_biaya_lain($koneksi, $no_induk, $id);
         validate_graduate_payment($siswa_data, [
             $uang_pangkal, $uang_psb, $uang_komite, $potongan_spp
-        ], $uang_du, $biaya_lain, $uang_spp);
+        ], $uang_du, $biaya_lain, $uang_spp, $gunakan_titipan_spp);
         $legacy_biaya_lain = legacy_biaya_lain_values($biaya_lain);
         $uang_lain = $legacy_biaya_lain['total'];
         [$ll_1_ket, $ll_2_ket, $ll_3_ket, $ll_4_ket] = $legacy_biaya_lain['names'];
@@ -829,6 +832,9 @@ if ($aksi === 'update') {
         $sppAllocation = null;
         if ($usePublishedSpp && ($uang_spp > 0.001 || $gunakan_titipan_spp)) {
             $sppAllocation = spp_allocate_payment($koneksi, $no_induk, $id, $uang_spp, $gunakan_titipan_spp, $tanggal_bayar, $sistem_pembayaran, $user_id);
+            if (!empty($siswa_data['is_graduate']) && (float)$sppAllocation['deposit_created'] > 0.001) {
+                throw new RuntimeException('Siswa yang sudah lulus tidak dapat menerima Titipan SPP baru. Nominal SPP harus tepat melunasi tagihan yang masih terbuka.');
+            }
         } elseif (!$usePublishedSpp) {
             sync_spp_period_claim($koneksi, $id, $no_induk, $bulan_bayar, (string)$tahun_bayar, $uang_spp);
         }

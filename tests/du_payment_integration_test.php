@@ -125,11 +125,11 @@ try {
     ], $cookies);
     du_http_assert($move['status'] === 302, 'Pemindahan tagihan saat edit tidak selesai.');
     $moved = $koneksi->query('SELECT tagihan_daftar_ulang_id,th_ajaran FROM bayar_du WHERE bayar_id=' . (int)$payment['id'])->fetch_assoc();
-    du_http_assert((int)$moved['tagihan_daftar_ulang_id'] === $studentBills[$current] && $moved['th_ajaran'] === $current, 'Relasi DU tidak berpindah ke tagihan tujuan.');
+    du_http_assert($moved && (int)$moved['tagihan_daftar_ulang_id'] === $studentBills[$current] && $moved['th_ajaran'] === $current, 'Relasi DU tidak berpindah ke tagihan tujuan: ' . du_http_flash($baseUrl, $cookies));
 
     du_http_assert($submit($students[2], $graduateBills[$previous], 100000)['status'] === 302, 'Lulusan tidak dapat melunasi tunggakan DU.');
     du_http_assert($submit($students[2], $graduateBills[$previous], 100000, 250000)['status'] === 302, 'Request campuran lulusan tidak mengembalikan redirect.');
-    du_http_assert(str_contains(du_http_flash($baseUrl, $cookies), 'hanya dapat membayar tunggakan Daftar Ulang'), 'Backend tidak menolak komponen selain DU untuk lulusan.');
+    du_http_assert(str_contains(du_http_flash($baseUrl, $cookies), 'tidak dapat menerima Titipan SPP baru'), 'Backend tidak menolak uang SPP lulusan tanpa tagihan terbuka.');
 } catch (Throwable $error) {
     $failure = $error;
 } finally {
@@ -145,4 +145,4 @@ if ($failure) {
     fwrite(STDERR, 'FAILED: ' . $failure->getMessage() . PHP_EOL);
     exit(1);
 }
-echo "OK: pembayaran DU lintas tahun, validasi ID, pemindahan edit, struk, dan lulusan tervalidasi.\n";
+echo "OK: pembayaran DU lintas tahun, validasi ID, pemindahan edit, struk, dan batas titipan lulusan tervalidasi.\n";

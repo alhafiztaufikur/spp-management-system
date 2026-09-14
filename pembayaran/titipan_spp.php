@@ -11,7 +11,7 @@ if($_SERVER['REQUEST_METHOD']==='POST'){
     if($nis===''||$amount<=0)throw new RuntimeException('Pilih siswa dan isi nominal pengembalian.');if(!in_array($method,['Tunai','VA','Qris'],true))throw new RuntimeException('Metode pengembalian tidak valid.');
     $koneksi->begin_transaction();$balance=spp_deposit_balance($koneksi,$nis,true);if($amount>$balance+.001)throw new RuntimeException('Nominal melebihi saldo Titipan SPP Rp '.number_format($balance,0,',','.').'.');
     $kind='pengembalian';$date=date('Y-m-d H:i:s');$user=(string)$_SESSION['admin_id'];$stmt=$koneksi->prepare('INSERT INTO titipan_spp_mutasi(no_induk,jenis,nominal,tanggal,sistem_pembayaran,user_id,keterangan) VALUES(?,?,?,?,?,?,?)');$stmt->bind_param('ssdssss',$nis,$kind,$amount,$date,$method,$user,$note);$stmt->execute();$stmt->close();spp_write_audit($koneksi,null,$nis,'pengembalian_titipan',['saldo'=>$balance],['nominal'=>$amount,'saldo'=>$balance-$amount,'metode'=>$method],1);$koneksi->commit();$_SESSION['flash']=['type'=>'success','msg'=>'Pengembalian Titipan SPP berhasil dicatat sebagai kas keluar.'];
-  }catch(Throwable $e){if($koneksi->errno===0||$koneksi->error===''){@$koneksi->rollback();}$_SESSION['flash']=['type'=>'error','msg'=>$e->getMessage()];}
+  }catch(Throwable $e){try{$koneksi->rollback();}catch(Throwable $ignored){}$_SESSION['flash']=['type'=>'error','msg'=>$e->getMessage()];}
   header('Location: titipan_spp.php');exit;
 }
 $flash=$_SESSION['flash']??null;unset($_SESSION['flash']);$q=mb_substr(trim((string)($_GET['q']??'')),0,100);$like='%'.$q.'%';

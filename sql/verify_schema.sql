@@ -444,7 +444,7 @@ FROM (
   UNION ALL
   SELECT 'uk_tagihan_spp_siswa_periode', EXISTS(SELECT 1 FROM information_schema.STATISTICS WHERE TABLE_SCHEMA=DATABASE() AND TABLE_NAME='tagihan_spp' AND INDEX_NAME='uk_tagihan_spp_siswa_periode' AND NON_UNIQUE=0)
   UNION ALL
-  SELECT 'uk_spp_alokasi_batch_bayar', EXISTS(SELECT 1 FROM information_schema.STATISTICS WHERE TABLE_SCHEMA=DATABASE() AND TABLE_NAME='spp_alokasi_batch' AND INDEX_NAME='uk_spp_alokasi_batch_bayar' AND NON_UNIQUE=0)
+  SELECT 'idx_spp_alokasi_batch_bayar_status', EXISTS(SELECT 1 FROM information_schema.STATISTICS WHERE TABLE_SCHEMA=DATABASE() AND TABLE_NAME='spp_alokasi_batch' AND INDEX_NAME='idx_spp_alokasi_batch_bayar_status')
 ) AS requirements
 ORDER BY requirement;
 

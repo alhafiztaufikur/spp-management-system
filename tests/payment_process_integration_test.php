@@ -5,6 +5,7 @@
  * disposable dengan SPP_TEST_ALLOW_MUTATION=1 dan kredensial admin test.
  */
 require_once __DIR__ . '/../koneksi.php';
+require_once __DIR__ . '/../includes/spp_billing.php';
 
 function payment_process_assert(bool $condition, string $message): void {
     if (!$condition) throw new RuntimeException($message);
@@ -80,6 +81,90 @@ if (!(string)getenv('SPP_TEST_ADMIN_PASSWORD')) {
 
 $baseUrl = getenv('SPP_TEST_BASE_URL') ?: 'http://127.0.0.1/sppaman/spp-management-system';
 $password = (string)getenv('SPP_TEST_ADMIN_PASSWORD');
+
+if (spp_billing_schema_ready($koneksi)) {
+    $nis = payment_process_unique_nis($koneksi);
+    $yearId = 0;
+    $masterId = 0;
+    $failure = null;
+    try {
+        $class = $koneksi->query("SELECT id FROM master_kelas WHERE tingkat=1 AND is_placeholder=0 AND is_active=1 ORDER BY id LIMIT 1")->fetch_assoc();
+        payment_process_assert((bool)$class, 'Rombel kelas 1 tidak tersedia untuk tes pembayaran SPP terbit.');
+        $classId = (int)$class['id'];
+        $start = (int)date('Y') + 8;
+        $label = $start . '/' . ($start + 1);
+
+        $koneksi->begin_transaction();
+        $master = spp_master_ensure_year($koneksi, $label, true);
+        $masterId = (int)$master['id'];
+        $yearId = (int)$master['tahun_ajaran_id'];
+        spp_master_save_rates($koneksi, $masterId, array_fill(1, 6, 250000));
+        $name = 'UJI HTTP SPP TERBIT';
+        $level = '1';
+        $stmt = $koneksi->prepare('INSERT INTO siswa(NO_INDUK,NAMA,KELAS,master_kelas_id,SPP_PERBULAN) VALUES(?,?,?,?,250000)');
+        $stmt->bind_param('sssi', $nis, $name, $level, $classId); $stmt->execute(); $stmt->close();
+        $snapshot = '1A'; $status = 'aktif'; $spp = 250000.0; $komite = 0.0;
+        $stmt = $koneksi->prepare('INSERT INTO siswa_tahun_ajaran(tahun_ajaran_id,no_induk,kelas,master_kelas_id,kelas_rombel_snapshot,spp_perbulan_snapshot,komite_snapshot,status) VALUES(?,?,?,?,?,?,?,?)');
+        $stmt->bind_param('issisdds', $yearId, $nis, $level, $classId, $snapshot, $spp, $komite, $status); $stmt->execute(); $stmt->close();
+        $published = spp_publish_students($koneksi, $masterId, [$nis]);
+        payment_process_assert($published['created'] === 12, 'Penerbitan HTTP tidak menyiapkan 12 tagihan.');
+        $koneksi->commit();
+
+        $cookies = [];
+        $login = payment_process_request($baseUrl . '/login.php', ['username'=>'admin','password'=>$password], $cookies);
+        payment_process_assert($login['status'] === 302 && isset($cookies['PHPSESSID']), 'Login admin database test gagal.');
+        $post = static function (float $money, bool $useDeposit = false) use ($baseUrl, &$cookies, $nis): array {
+            return payment_process_request($baseUrl . '/pembayaran/proses.php', [
+                'aksi'=>'input', 'payment_plan'=>'monthly', 'no_induk'=>$nis,
+                'bulan_bayar'=>date('m'), 'tahun_bayar'=>date('Y'),
+                'sistem_pembayaran'=>'Tunai', 'uang_spp'=>$money,
+                'gunakan_titipan_spp'=>$useDeposit ? '1' : '0',
+            ], $cookies);
+        };
+
+        payment_process_assert($post(600000)['status'] === 302, 'Pembayaran SPP beberapa bulan tidak selesai.');
+        $first = $koneksi->query("SELECT id,U_SPP,U_TITIPAN_SPP,total_jumlah FROM bayar WHERE NO_INDUK='{$nis}' ORDER BY id DESC LIMIT 1")->fetch_assoc();
+        payment_process_assert($first && abs((float)$first['U_SPP']-500000)<.001 && abs((float)$first['U_TITIPAN_SPP']-100000)<.001 && abs((float)$first['total_jumlah']-600000)<.001, 'Pemisahan SPP teralokasi dan Titipan SPP tidak tepat.');
+
+        payment_process_assert($post(150000, true)['status'] === 302, 'Gabungan uang baru dan titipan tidak selesai.');
+        $second = $koneksi->query("SELECT id,U_SPP,U_TITIPAN_SPP,total_jumlah FROM bayar WHERE NO_INDUK='{$nis}' ORDER BY id DESC LIMIT 1")->fetch_assoc();
+        payment_process_assert($second && abs((float)$second['U_SPP']-150000)<.001 && abs((float)$second['U_TITIPAN_SPP'])<.001, 'Penggunaan titipan melalui endpoint tidak tepat.');
+        payment_process_assert(abs(spp_deposit_balance($koneksi, $nis))<.001, 'Saldo titipan setelah digabung tidak menjadi Rp0.');
+
+        $editPage = payment_process_request($baseUrl . '/pembayaran/edit.php?id=' . (int)$second['id'], [], $cookies);
+        payment_process_assert($editPage['status'] === 200 && preg_match('/name="csrf_token" value="([a-f0-9]+)"/', $editPage['body'], $csrf) === 1, 'Form edit SPP admin atau token CSRF tidak tersedia.');
+        $edit = payment_process_request($baseUrl . '/pembayaran/proses.php', [
+            'aksi'=>'update', 'id'=>(int)$second['id'], 'csrf_token'=>$csrf[1], 'no_induk'=>$nis,
+            'tanggal_bayar'=>date('Y-m-d H:i:s'), 'bulan_bayar'=>date('m'), 'tahun_bayar'=>date('Y'),
+            'sistem_pembayaran'=>'Tunai', 'uang_spp'=>400000, 'gunakan_titipan_spp'=>'1',
+        ], $cookies);
+        payment_process_assert($edit['status'] === 302, 'Edit pembayaran SPP tidak selesai.');
+        $batchState = $koneksi->query('SELECT status,COUNT(*) total FROM spp_alokasi_batch WHERE bayar_id=' . (int)$second['id'] . ' GROUP BY status')->fetch_all(MYSQLI_ASSOC);
+        $states = array_column($batchState, 'total', 'status');
+        payment_process_assert((int)($states['active']??0)===1 && (int)($states['reversed']??0)===1, 'Edit tidak mempertahankan satu batch aktif dan histori batch terbalik.');
+
+        $receipt = payment_process_request($baseUrl . '/laporan/cetak_struk.php?id=' . (int)$first['id'], [], $cookies);
+        payment_process_assert($receipt['status'] === 200 && str_contains($receipt['body'], 'Titipan SPP Baru') && str_contains($receipt['body'], 'SPP Juli ' . $start), 'Struk tidak memuat rincian bulan dan Titipan SPP.');
+    } catch (Throwable $error) {
+        $failure = $error;
+        try { $koneksi->rollback(); } catch (Throwable $ignored) {}
+    } finally {
+        $stmt = $koneksi->prepare('DELETE FROM bayar WHERE NO_INDUK=?'); $stmt->bind_param('s', $nis); $stmt->execute(); $stmt->close();
+        $stmt = $koneksi->prepare('DELETE FROM tagihan_spp WHERE no_induk=?'); $stmt->bind_param('s', $nis); $stmt->execute(); $stmt->close();
+        $stmt = $koneksi->prepare('DELETE FROM spp_audit_log WHERE no_induk=?'); $stmt->bind_param('s', $nis); $stmt->execute(); $stmt->close();
+        $stmt = $koneksi->prepare('DELETE FROM siswa_tahun_ajaran WHERE no_induk=?'); $stmt->bind_param('s', $nis); $stmt->execute(); $stmt->close();
+        $stmt = $koneksi->prepare('DELETE FROM siswa WHERE NO_INDUK=?'); $stmt->bind_param('s', $nis); $stmt->execute(); $stmt->close();
+        if ($masterId > 0) $koneksi->query('DELETE FROM master_spp_tahun WHERE id=' . $masterId);
+        if ($yearId > 0) $koneksi->query('DELETE FROM tahun_ajaran WHERE id=' . $yearId);
+    }
+    if ($failure) {
+        fwrite(STDERR, 'FAILED: ' . $failure->getMessage() . PHP_EOL);
+        exit(1);
+    }
+    echo "OK: endpoint pembayaran mengalokasikan tagihan tertua, membentuk/menggunakan titipan, mendukung edit, dan mencetak rincian.\n";
+    exit(0);
+}
+
 $testNis = [payment_process_unique_nis($koneksi), payment_process_unique_nis($koneksi), payment_process_unique_nis($koneksi), payment_process_unique_nis($koneksi)];
 $createdYearIds = [];
 $failure = null;
