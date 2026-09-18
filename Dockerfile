@@ -25,4 +25,4 @@ RUN a2enconf sistemspp \
     && apache2ctl configtest
 
 EXPOSE 8080
-CMD ["apache2-foreground"]
+CMD ["/bin/sh", "-c", "rm -f /etc/apache2/mods-enabled/mpm_event.* /etc/apache2/mods-enabled/mpm_worker.* && a2enmod mpm_prefork >/dev/null 2>&1 && exec apache2-foreground"]
