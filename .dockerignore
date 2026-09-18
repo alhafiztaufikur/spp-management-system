@@ -1,0 +1,15 @@
+.git
+.github
+.idea
+.vscode
+documentation
+sql/*
+!sql/bootstrap_production.php
+tests
+tmp
+temp
+vendor
+*.log
+*.md
+*.sql
+!sql/schema.sql

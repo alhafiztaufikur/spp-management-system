@@ -13,6 +13,20 @@ File ini mencatat perubahan proyek secara reverse chronological. Baca [PROJECT_C
 - Jangan menghapus atau menulis ulang entri lama. Tambahkan entri koreksi bila diperlukan.
 - Perubahan implementasi dan entri changelog wajib masuk commit yang sama.
 
+## 2026-09-19 - Persiapan Railway privat
+
+**AI/Aktor:** Codex bersama pemilik proyek.
+
+**Tujuan:** Menyiapkan deployment PHP/MySQL tanpa mengekspos seed dan data demo.
+
+**Perubahan fitur dan perilaku:** Menambahkan Dockerfile PHP 8.2/Apache, pembatasan akses berkas server, konfigurasi sesi produksi, healthcheck, dan port database dari environment. Error database tidak lagi ditampilkan ke pengunjung. Menambahkan panduan deployment Railway.
+
+**Database dan migrasi:** `sql/bootstrap_production.php` membentuk schema kosong dan satu admin ber-hash kuat dari schema referensi; database non-kosong ditolak. Tidak ada perubahan pada data lokal akibat perubahan kode ini.
+
+**Kompatibilitas:** Koneksi lokal tetap memakai default XAMPP ketika variable Railway tidak disetel. Image tidak membawa backup SQL atau data demo. Project Railway dan service web telah dibuat privat, belum dideploy atau diberi domain.
+
+**Verifikasi:** Bootstrap pada database disposable menghasilkan 30 tabel, 61 kelas/rombel, satu admin, dan nol siswa demo; percobaan ulang ditolak. `sql/verify_schema.sql` pada database tersebut tidak menemukan requirement hilang. Build Docker dan deploy Railway masih menunggu service MySQL resmi serta koneksi source GitHub.
+
 ## 2026-09-19 - SPP dan Komite per Bulan
 
 **AI/Aktor:** Codex bersama pemilik proyek.
