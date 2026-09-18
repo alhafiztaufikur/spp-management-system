@@ -480,6 +480,12 @@ function du_publish_year_from_active_students(mysqli $db, int $yearId, string $l
           spp_perbulan_snapshot=VALUES(spp_perbulan_snapshot),komite_snapshot=VALUES(komite_snapshot),status='aktif'");
     $stmt->bind_param('i', $yearId); $stmt->execute(); $stmt->close();
 
+    require_once __DIR__ . '/komite_billing.php';
+    $stmtPlacement=$db->prepare("SELECT id FROM siswa_tahun_ajaran WHERE tahun_ajaran_id=? AND status='aktif' AND kelas IN ('1','2','3','4','5','6')");
+    $stmtPlacement->bind_param('i',$yearId);$stmtPlacement->execute();
+    foreach ($stmtPlacement->get_result()->fetch_all(MYSQLI_ASSOC) as $placement) komite_sync_placement($db,(int)$placement['id']);
+    $stmtPlacement->close();
+
     $isCurrentYear = $label === du_current_academic_year() ? 1 : 0;
     $stmt = $db->prepare("INSERT IGNORE INTO tagihan_daftar_ulang
         (tahun_ajaran_id,penempatan_id,master_daftar_ulang_id,no_induk,kelas_snapshot,tahun_ajaran_snapshot,nominal_awal,nominal_tagihan)

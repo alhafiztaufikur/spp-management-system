@@ -1,9 +1,8 @@
 -- =========================================================
 -- Verifikasi schema SistemSPP (read-only)
 -- Jalankan setelah schema baru atau seluruh migrasi upgrade.
+-- Pilih database target saat memanggil mysql; jangan alihkan ke database aktif.
 -- =========================================================
-
-USE `db_spp`;
 
 SELECT requirement,
        IF(is_present = 1, 'OK', 'MISSING') AS status
@@ -139,6 +138,16 @@ FROM (
   SELECT 'table.tahun_ajaran', EXISTS(SELECT 1 FROM information_schema.TABLES WHERE TABLE_SCHEMA=DATABASE() AND TABLE_NAME='tahun_ajaran')
   UNION ALL
   SELECT 'table.siswa_tahun_ajaran', EXISTS(SELECT 1 FROM information_schema.TABLES WHERE TABLE_SCHEMA=DATABASE() AND TABLE_NAME='siswa_tahun_ajaran')
+  UNION ALL
+  SELECT 'siswa_tahun_ajaran.komite_mulai_bulan', EXISTS(SELECT 1 FROM information_schema.COLUMNS WHERE TABLE_SCHEMA=DATABASE() AND TABLE_NAME='siswa_tahun_ajaran' AND COLUMN_NAME='komite_mulai_bulan')
+  UNION ALL
+  SELECT 'table.tagihan_komite', EXISTS(SELECT 1 FROM information_schema.TABLES WHERE TABLE_SCHEMA=DATABASE() AND TABLE_NAME='tagihan_komite')
+  UNION ALL
+  SELECT 'table.bayar_komite', EXISTS(SELECT 1 FROM information_schema.TABLES WHERE TABLE_SCHEMA=DATABASE() AND TABLE_NAME='bayar_komite')
+  UNION ALL
+  SELECT 'uk_tagihan_komite_periode', EXISTS(SELECT 1 FROM information_schema.STATISTICS WHERE TABLE_SCHEMA=DATABASE() AND TABLE_NAME='tagihan_komite' AND INDEX_NAME='uk_tagihan_komite_periode' AND NON_UNIQUE=0)
+  UNION ALL
+  SELECT 'spp_alokasi_batch.komite_required', EXISTS(SELECT 1 FROM information_schema.COLUMNS WHERE TABLE_SCHEMA=DATABASE() AND TABLE_NAME='spp_alokasi_batch' AND COLUMN_NAME='komite_required')
   UNION ALL
   SELECT 'table.tagihan_daftar_ulang', EXISTS(SELECT 1 FROM information_schema.TABLES WHERE TABLE_SCHEMA=DATABASE() AND TABLE_NAME='tagihan_daftar_ulang')
   UNION ALL

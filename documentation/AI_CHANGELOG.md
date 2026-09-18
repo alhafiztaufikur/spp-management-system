@@ -13,6 +13,20 @@ File ini mencatat perubahan proyek secara reverse chronological. Baca [PROJECT_C
 - Jangan menghapus atau menulis ulang entri lama. Tambahkan entri koreksi bila diperlukan.
 - Perubahan implementasi dan entri changelog wajib masuk commit yang sama.
 
+## 2026-09-19 - SPP dan Komite per Bulan
+
+**AI/Aktor:** Codex bersama pemilik proyek.
+
+**Tujuan:** Mengembalikan pemilihan periode SPP secara manual, membatasi satu bulan per transaksi, dan mewajibkan Komite bulan yang sama.
+
+**Perubahan fitur dan perilaku:** Form melabeli bulan/tahun tagihan serta tanggal penerimaan secara terpisah. SPP harus tepat melunasi tagihan terbit tertua yang dipilih; modal tunggakan tetap dipakai. Titipan hanya dicatat lewat tindakan eksplisit dan penggunaannya dikonfirmasi. Komite per bulan dapat dibayar sendiri secara penuh, tetapi tidak boleh tertinggal ketika SPP bulan itu dibayar. Master Siswa menyediakan tarif Komite per bulan dan bulan mulai siswa pindahan. Struk, histori, status, laporan, PDF, dan Excel membaca periode Komite yang sesuai.
+
+**Database dan migrasi:** `sql/migrate_komite_bulanan.sql` menambah tagihan/rincian Komite bulanan dan penanda pembayaran SPP baru yang wajib berpasangan dengan Komite. Data Komite tahunan demo dihapus dari rincian dan nominal transaksi, sedangkan header transaksi serta komponen lain dipertahankan. Schema referensi dan pemeriksaan schema diperbarui.
+
+**Kompatibilitas:** Pembayaran SPP lama tetap terbaca; aturan pasangan Komite berlaku untuk pembayaran SPP baru dan perubahan setelah migrasi. Migrasi harus dijalankan satu kali setelah backup. Tidak ada pemindahan nominal Komite tahunan lama ke tagihan bulanan.
+
+**Verifikasi:** Migrasi database disposable dan database aktif masing-masing mempertahankan 218 header transaksi; Komite tahunan Rp2.666.500 dihapus sehingga total kas demo menjadi Rp84.817.500. Terdapat 672 tagihan Komite bulanan dan tidak ada relasi yatim. Backup database aktif disimpan sebelum migrasi. Seluruh 22 tes PHP serta lint PHP perubahan lulus pada database uji. Sintaks JavaScript valid melalui parser Chrome headless; render form desktop diperiksa dan nama bulan ditampilkan lengkap. Helper computer-use Windows tidak tersedia sehingga interaksi manual browser tidak dapat diuji pada sesi ini. Pemeriksaan skema baru lulus; beberapa constraint baseline lama sudah tidak ada sebelum migrasi.
+
 ## 2026-09-15 - Master Penerbitan dan Titipan SPP
 
 **AI/Aktor:** Codex berbasis GPT-5, bersama pemilik proyek

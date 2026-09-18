@@ -268,7 +268,7 @@ function primary_lines(array $row, ?array $sppAllocation=null): array {
         payment_line('Uang Pangkal', $row['U_PANGKAL']),
         payment_line('Uang PSB', $row['U_PSB']),
         payment_line('Uang Daftar Ulang' . (!empty($row['du_tahun_ajaran']) ? ' (TA ' . $row['du_tahun_ajaran'] . ')' : ''), $row['uang_du']),
-        payment_line('Komite Sekolah', $row['U_KOMITE']),
+        payment_line('Komite Sekolah ('.month_name_id($row['BULAN']).' '.$row['TAHUN'].')', $row['U_KOMITE']),
     ];
     $lines[]=payment_line($sppAllocation?'Uang SPP Diterima Sekarang':'Uang SPP',$sppAllocation?(float)$sppAllocation['uang_baru']:$row['U_SPP']);return $lines;
 }

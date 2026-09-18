@@ -293,50 +293,45 @@ if (!$isUnpaidReport) {
     };
 
     if ($report_type === 'belum_spp') {
-        $studentBillColumn = 'SPP_PERBULAN';
-        $paymentColumn = 'U_SPP';
         $stmtUnpaid = $koneksi->prepare("
             SELECT *
             FROM (
                 SELECT s.NO_INDUK, s.NO_induk_diknas, s.NAMA, s.KELAS,
-                       s.$studentBillColumn AS tagihan,
-                       COALESCE(SUM(b.$paymentColumn), 0) AS sudah_bayar,
-                       GREATEST(s.$studentBillColumn - COALESCE(SUM(b.$paymentColumn), 0), 0) AS sisa
-                FROM siswa s
-                LEFT JOIN bayar b
-                    ON b.NO_INDUK = s.NO_INDUK
-                    AND b.TAHUN = ?
-                    AND (b.BULAN = ? OR b.BULAN = ? OR b.BULAN = ?)
-                WHERE s.is_active = 1 AND s.$studentBillColumn > 0 $studentSearchSql
-                GROUP BY s.NO_INDUK, s.NO_induk_diknas, s.NAMA, s.KELAS, s.$studentBillColumn
+                       ts.nominal_tagihan AS tagihan,
+                       COALESCE(SUM(CASE WHEN ab.status='active' THEN a.nominal_dari_bayar+a.nominal_dari_titipan ELSE 0 END),0) AS sudah_bayar,
+                       GREATEST(ts.nominal_tagihan-COALESCE(SUM(CASE WHEN ab.status='active' THEN a.nominal_dari_bayar+a.nominal_dari_titipan ELSE 0 END),0),0) AS sisa
+                FROM tagihan_spp ts JOIN siswa s ON s.NO_INDUK=ts.no_induk
+                LEFT JOIN spp_alokasi a ON a.tagihan_spp_id=ts.id
+                LEFT JOIN spp_alokasi_batch ab ON ab.id=a.batch_id
+                WHERE s.is_active=1 AND ts.status='open' AND ts.tahun=? AND ts.bulan=? AND ts.nominal_tagihan>0 $studentSearchSql
+                GROUP BY ts.id,s.NO_induk_diknas,s.NAMA,s.KELAS
             ) unpaid
             WHERE sisa > 0
             ORDER BY $orderUnpaid
         ");
-        report_bind($stmtUnpaid, 'ssss' . str_repeat('s', count($studentSearchParams)), array_merge([$filter_tahun, $periodMonthCode, $periodMonthName, $periodMonthLegacy], $studentSearchParams));
+        report_bind($stmtUnpaid, 'ss' . str_repeat('s', count($studentSearchParams)), array_merge([$filter_tahun, $periodMonthCode], $studentSearchParams));
     } elseif ($report_type === 'belum_komite') {
         $stmtUnpaid = $koneksi->prepare("
             SELECT *
             FROM (
                 SELECT s.NO_INDUK, s.NO_induk_diknas, s.NAMA, s.KELAS,
                        t.nominal_tagihan AS tagihan,
-                       COALESCE(SUM(d.jumlah), 0) AS sudah_bayar,
-                       GREATEST(t.nominal_tagihan - COALESCE(SUM(d.jumlah), 0), 0) AS sisa
-                FROM tagihan_tahunan_siswa t
+                       COALESCE(SUM(d.nominal), 0) AS sudah_bayar,
+                       GREATEST(t.nominal_tagihan - COALESCE(SUM(d.nominal), 0), 0) AS sisa
+                FROM tagihan_komite t
                 JOIN siswa s ON s.NO_INDUK = t.no_induk
-                LEFT JOIN bayar_tahunan_siswa d ON d.tagihan_tahunan_id = t.id
+                LEFT JOIN bayar_komite d ON d.tagihan_komite_id = t.id
                 WHERE s.is_active = 1
                   AND t.status = 'open'
-                  AND t.komponen = 'komite'
-                  AND t.tahun_ajaran_snapshot = ?
+                  AND t.tahun = ? AND t.bulan = ?
                   AND t.nominal_tagihan > 0
                   $studentSearchSql
-                GROUP BY s.NO_INDUK, s.NO_induk_diknas, s.NAMA, s.KELAS, t.nominal_tagihan
+                GROUP BY t.id,s.NO_induk_diknas,s.NAMA,s.KELAS
             ) unpaid
             WHERE sisa > 0
             ORDER BY $orderUnpaid
         ");
-        report_bind($stmtUnpaid, 's' . str_repeat('s', count($studentSearchParams)), array_merge([$academicYear], $studentSearchParams));
+        report_bind($stmtUnpaid, 'ss' . str_repeat('s', count($studentSearchParams)), array_merge([$filter_tahun,$periodMonthCode], $studentSearchParams));
     } elseif ($report_type === 'belum_du') {
         $stmtUnpaid = $koneksi->prepare("
             SELECT *

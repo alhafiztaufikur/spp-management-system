@@ -6,6 +6,7 @@ require_once '../includes/auth.php';
 require_once '../includes/tagihan_tahunan.php';
 require_once '../includes/tagihan_sekali.php';
 require_once '../includes/spp_billing.php';
+require_once '../includes/komite_billing.php';
 requireRole(['admin', 'bendahara', 'kasir']);
 
 header('Cache-Control: no-store, no-cache, must-revalidate, max-age=0');
@@ -107,15 +108,8 @@ function receipt_remaining_lines(mysqli $db, array $payment, array $otherDetails
             $lines[] = [$label, (float)$oneTime[$component]['remaining']];
         }
     }
-    $annualRemaining = annual_fee_remaining_for_payment($db, (int)$payment['id']);
-    $annualLabels = [
-        'komite' => ['Sisa Komite', 'U_KOMITE'],
-    ];
-    foreach ($annualLabels as $component => [$label, $field]) {
-        if (abs((float)($payment[$field] ?? 0)) >= 0.005 && isset($annualRemaining[$component])) {
-            $lines[] = [$label, $annualRemaining[$component]];
-        }
-    }
+    $komite=komite_receipt_summary($db,(int)$payment['id']);
+    if ($komite) $lines[]=['Sisa Komite '.$komite['label'],$komite['remaining']];
 
     $duBillId = (int)($payment['tagihan_daftar_ulang_id'] ?? 0);
     $duTotal = (float)($payment['du_nominal_tagihan'] ?? 0);
@@ -186,11 +180,12 @@ $detailResult = $stmt->get_result();
 while ($detail = $detailResult->fetch_assoc()) $otherDetails[] = $detail;
 $stmt->close();
 
+$komiteReceipt=komite_receipt_summary($koneksi,$paymentId);
 $primaryLines = [
     ['Uang Pangkal', $payment['U_PANGKAL']],
     ['Uang PSB', $payment['U_PSB']],
     ['Uang Daftar Ulang' . (!empty($payment['du_tahun_ajaran']) ? ' (TA ' . $payment['du_tahun_ajaran'] . ')' : ''), $payment['uang_du']],
-    ['Komite Sekolah', $payment['U_KOMITE']],
+    ['Komite Sekolah'.($komiteReceipt?' ('.$komiteReceipt['label'].')':''), $payment['U_KOMITE']],
 ];
 $sppReceiptLines=[];
 if($sppAllocation){

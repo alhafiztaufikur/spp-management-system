@@ -12,6 +12,7 @@ if (!isset($_SESSION['admin_id'])) {
 require_once '../koneksi.php';
 require_once '../includes/auth.php';
 require_once '../includes/spp_payment_status.php';
+require_once '../includes/spp_billing.php';
 requireRole(['admin', 'kasir']);
 
 $noInduk = trim((string)($_GET['no_induk'] ?? ''));
@@ -44,8 +45,10 @@ try {
         $allowInactive = (string)$editedPayment['NO_INDUK'] === $noInduk;
     }
 
-    $status = spp_payment_status($koneksi, $noInduk, $bulan, $tahun, $editId, false, $allowInactive);
-    $status['edit_dependency'] = $editId > 0 ? spp_edit_dependency($koneksi, $editId, false) : null;
+    $status = spp_billing_schema_ready($koneksi)
+        ? spp_published_period_status($koneksi,$noInduk,$bulan,$tahun,$editId)
+        : spp_payment_status($koneksi, $noInduk, $bulan, $tahun, $editId, false, $allowInactive);
+    $status['edit_dependency'] = spp_billing_schema_ready($koneksi) ? null : ($editId > 0 ? spp_edit_dependency($koneksi, $editId, false) : null);
     $koneksi->commit();
     $transactionStarted = false;
     echo json_encode($status, JSON_UNESCAPED_UNICODE | JSON_UNESCAPED_SLASHES);

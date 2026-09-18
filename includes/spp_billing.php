@@ -168,7 +168,7 @@ function spp_publish_students(mysqli $db, int $masterYearId, array $students, ar
     if(!$selected) throw new RuntimeException('Pilih minimal satu siswa untuk penerbitan SPP.');
     $periods=spp_academic_periods((string)$master['label']);
     $created=0;$skipped=0;$ineligible=[];
-    $find=$db->prepare("SELECT sta.id,sta.no_induk,sta.kelas,sta.master_kelas_id,sta.kelas_rombel_snapshot,sta.spp_covered_by_psb,s.potongan_spp_persen,s.is_active
+    $find=$db->prepare("SELECT sta.id,sta.no_induk,sta.kelas,sta.master_kelas_id,sta.kelas_rombel_snapshot,sta.spp_covered_by_psb,sta.komite_mulai_bulan,s.potongan_spp_persen,s.is_active
       FROM siswa_tahun_ajaran sta JOIN siswa s ON s.NO_INDUK=sta.no_induk
       WHERE sta.tahun_ajaran_id=? AND sta.no_induk=? AND sta.kelas IN ('1','2','3','4','5','6') LIMIT 1 FOR UPDATE");
     $insert=$db->prepare("INSERT IGNORE INTO tagihan_spp(master_spp_tahun_id,tahun_ajaran_id,penempatan_id,no_induk,tingkat_snapshot,master_kelas_id,kelas_rombel_snapshot,bulan,tahun,tarif_dasar_snapshot,potongan_persen_snapshot,potongan_nominal_snapshot,nominal_tagihan,status)
@@ -178,7 +178,7 @@ function spp_publish_students(mysqli $db, int $masterYearId, array $students, ar
         if(!$placement || (int)$placement['is_active']!==1){$ineligible[]=$nis;continue;}
         $level=(int)$placement['kelas'];$base=(float)$rates[$level];$discount=(float)$placement['potongan_spp_persen'];
         $net=spp_net_tariff($base,$discount);$covered=(int)$placement['spp_covered_by_psb']===1;
-        $start=(string)($startMonths[$nis]??'07');$startIndex=0;
+        $start=(string)($startMonths[$nis]??$placement['komite_mulai_bulan']??'07');$startIndex=0;
         foreach($periods as $idx=>$period) if($period['bulan']===$start){$startIndex=$idx;break;}
         foreach($periods as $idx=>$period){
             if($idx<$startIndex)continue;
@@ -217,6 +217,30 @@ function spp_open_bills(mysqli $db, string $noInduk, bool $forUpdate=false): arr
     return $rows;
 }
 
+function spp_published_period_status(mysqli $db, string $noInduk, string $month, string $year, int $excludePaymentId=0): array {
+    $stmt=$db->prepare("SELECT ts.id,ts.bulan,ts.tahun,ts.nominal_tagihan,ts.status,COALESCE(SUM(CASE WHEN ab.status='active' AND (ab.bayar_id IS NULL OR ab.bayar_id<>?) THEN a.nominal_dari_bayar+a.nominal_dari_titipan ELSE 0 END),0) paid FROM tagihan_spp ts LEFT JOIN spp_alokasi a ON a.tagihan_spp_id=ts.id LEFT JOIN spp_alokasi_batch ab ON ab.id=a.batch_id WHERE ts.no_induk=? GROUP BY ts.id ORDER BY CAST(ts.tahun AS UNSIGNED),CAST(ts.bulan AS UNSIGNED)");
+    $stmt->bind_param('is',$excludePaymentId,$noInduk);$stmt->execute();$bills=$stmt->get_result()->fetch_all(MYSQLI_ASSOC);$stmt->close();
+    $selected=null;$older=null;
+    $target=(int)$year*100+(int)$month;
+    foreach ($bills as $bill) {
+        $period=(int)$bill['tahun']*100+(int)$bill['bulan'];
+        $remaining=max(0,(float)$bill['nominal_tagihan']-(float)$bill['paid']);
+        if ($period===$target) $selected=$bill;
+        if ($period<$target && $bill['status']==='open' && $remaining>.001 && !$older) $older=$bill;
+    }
+    $label=spp_month_label($month).' '.$year;
+    $paid=(float)($selected['paid']??0);$total=(float)($selected['nominal_tagihan']??0);
+    $status=['ok'=>true,'status'=>'payable','code'=>'payable','lock_spp'=>false,'title'=>'','message'=>'','amount_label'=>'','selected'=>['bulan'=>$month,'tahun'=>$year,'label'=>$label,'tariff'=>$total,'paid'=>$paid,'remaining'=>max(0,$total-$paid)],'blocking_period'=>null];
+    if (!$selected) return array_merge($status,['status'=>'not_published','code'=>'not_published','lock_spp'=>true,'title'=>'Tagihan SPP belum terbit','message'=>'SPP '.$label.' belum tersedia.','amount_label'=>'Pilih bulan lain atau hubungi admin.']);
+    if ($selected['status']!=='open' || $total<=.001) return array_merge($status,['status'=>'not_payable','code'=>'not_payable','lock_spp'=>true,'title'=>'SPP tidak perlu dibayar','message'=>'SPP '.$label.' tidak memiliki tagihan terbuka.']);
+    if ($paid+.001>=$total) return array_merge($status,['status'=>'already_paid','code'=>'already_paid','lock_spp'=>true,'title'=>'SPP sudah lunas','message'=>'SPP '.$label.' sudah lunas.']);
+    if ($older) {
+        $oldLabel=spp_month_label((string)$older['bulan']).' '.$older['tahun'];
+        return array_merge($status,['status'=>'prior_unpaid','code'=>'prior_unpaid','lock_spp'=>true,'title'=>'Ada tunggakan SPP','message'=>'Lunasi dahulu SPP '.$oldLabel.'.','amount_label'=>'Sisa Rp '.number_format((float)$older['nominal_tagihan']-(float)$older['paid'],0,',','.'),'blocking_period'=>['bulan'=>$older['bulan'],'tahun'=>$older['tahun'],'label'=>$oldLabel]]);
+    }
+    return $status;
+}
+
 function spp_payment_payload(mysqli $db, int $excludePaymentId = 0): array {
     $payload=[];
     $excludeLedger=$excludePaymentId>0?' AND (m.bayar_id IS NULL OR m.bayar_id<>'.(int)$excludePaymentId.')':'';
@@ -233,35 +257,45 @@ function spp_payment_payload(mysqli $db, int $excludePaymentId = 0): array {
     return $payload;
 }
 
-/** Alokasi dana baru dan, bila dikonfirmasi, saldo titipan ke tagihan tertua. */
-function spp_allocate_payment(mysqli $db, string $noInduk, ?int $bayarId, float $newMoney, bool $useDeposit, string $date, string $method, string $userId): array {
-    if($newMoney<0)throw new RuntimeException('Nominal SPP tidak boleh negatif.');
+/** Satu transaksi SPP melunasi tepat satu tagihan terbit yang dipilih kasir. */
+function spp_allocate_payment(mysqli $db, string $noInduk, ?int $bayarId, string $month, string $year, float $newMoney, bool $useDeposit, string $date, string $method, string $userId): array {
+    if (!in_array($month, ['01','02','03','04','05','06','07','08','09','10','11','12'], true) || !preg_match('/^\d{4}$/', $year)) throw new RuntimeException('Periode SPP tidak valid.');
+    if ($newMoney < 0 || !is_finite($newMoney)) throw new RuntimeException('Nominal SPP tidak valid.');
     $balance=spp_deposit_balance($db,$noInduk,true);
-    $depositPool=$useDeposit?$balance:0.0;$cashPool=$newMoney;
     $bills=spp_open_bills($db,$noInduk,true);
-    $plan=[];$cashUsed=0.0;$depositUsed=0.0;
-    foreach($bills as $bill){
-        $need=(float)$bill['remaining'];
-        if($cashPool+$depositPool+.001<$need)break;
-        $fromDeposit=min($depositPool,$need);$depositPool-=$fromDeposit;$need-=$fromDeposit;
-        $fromCash=min($cashPool,$need);$cashPool-=$fromCash;$need-=$fromCash;
-        if($need>.001)break;
-        $depositUsed+=$fromDeposit;$cashUsed+=$fromCash;
-        $plan[]=['bill'=>$bill,'cash'=>$fromCash,'deposit'=>$fromDeposit];
-    }
-    $newDeposit=$cashPool;
-    if(!$plan && $newMoney<=.001 && $depositUsed<=.001)throw new RuntimeException('Tidak ada tagihan SPP yang dapat dilunasi atau uang baru yang dapat dititipkan.');
-    $useFlag=$depositUsed>.001?1:0;
-    $stmt=$db->prepare("INSERT INTO spp_alokasi_batch(no_induk,bayar_id,tanggal,user_id,gunakan_titipan,uang_baru,titipan_digunakan,titipan_baru) VALUES(?,?,?,?,?,?,?,?)");
-    $stmt->bind_param('sissiddd',$noInduk,$bayarId,$date,$userId,$useFlag,$newMoney,$depositUsed,$newDeposit);$stmt->execute();$batchId=(int)$db->insert_id;$stmt->close();
+    $selected=null;
+    foreach ($bills as $bill) if ($bill['bulan']===$month && $bill['tahun']===$year) { $selected=$bill; break; }
+    if (!$selected) throw new RuntimeException('Tagihan SPP '.spp_month_label($month).' '.$year.' belum terbit atau sudah lunas.');
+    $oldest=$bills[0];
+    if ((int)$oldest['id'] !== (int)$selected['id']) throw new RuntimeException('Lunasi dahulu SPP '.spp_month_label((string)$oldest['bulan']).' '.$oldest['tahun'].'.');
+    $need=(float)$selected['remaining'];
+    $depositUsed=$useDeposit?min($balance,$need):0.0;
+    if ($useDeposit && $balance <= .001) throw new RuntimeException('Saldo Titipan SPP tidak tersedia.');
+    if (abs($newMoney+$depositUsed-$need)>.001) throw new RuntimeException('SPP '.spp_month_label($month).' '.$year.' harus dilunasi tepat Rp '.number_format($need,0,',','.').($depositUsed>.001?' termasuk Titipan SPP Rp '.number_format($depositUsed,0,',','.'):'').'.');
+    $useFlag=$depositUsed>.001?1:0;$required=1;
+    $stmt=$db->prepare('INSERT INTO spp_alokasi_batch(no_induk,bayar_id,tanggal,user_id,gunakan_titipan,komite_required,uang_baru,titipan_digunakan,titipan_baru) VALUES(?,?,?,?,?,?,?,?,0)');
+    $stmt->bind_param('sissiidd',$noInduk,$bayarId,$date,$userId,$useFlag,$required,$newMoney,$depositUsed);$stmt->execute();$batchId=(int)$db->insert_id;$stmt->close();
+    $billId=(int)$selected['id'];
     $stmt=$db->prepare('INSERT INTO spp_alokasi(batch_id,tagihan_spp_id,nominal_dari_bayar,nominal_dari_titipan) VALUES(?,?,?,?)');
-    foreach($plan as $line){$billId=(int)$line['bill']['id'];$stmt->bind_param('iidd',$batchId,$billId,$line['cash'],$line['deposit']);$stmt->execute();}
-    $stmt->close();
-    if($depositUsed>.001){$kind='pakai';$note='Digunakan untuk '.count($plan).' tagihan SPP';$stmt=$db->prepare('INSERT INTO titipan_spp_mutasi(no_induk,batch_id,bayar_id,jenis,nominal,tanggal,user_id,keterangan) VALUES(?,?,?,?,?,?,?,?)');$stmt->bind_param('siisdsss',$noInduk,$batchId,$bayarId,$kind,$depositUsed,$date,$userId,$note);$stmt->execute();$stmt->close();}
-    if($newDeposit>.001){$kind='masuk';$note=$bills?'Sisa pembayaran SPP':'Tagihan SPP belum diterbitkan';$stmt=$db->prepare('INSERT INTO titipan_spp_mutasi(no_induk,batch_id,bayar_id,jenis,nominal,tanggal,sistem_pembayaran,user_id,keterangan) VALUES(?,?,?,?,?,?,?,?,?)');$stmt->bind_param('siisdssss',$noInduk,$batchId,$bayarId,$kind,$newDeposit,$date,$method,$userId,$note);$stmt->execute();$stmt->close();}
-    if($bayarId){$stmt=$db->prepare('UPDATE bayar SET U_SPP=?,U_TITIPAN_SPP=? WHERE id=?');$stmt->bind_param('ddi',$cashUsed,$newDeposit,$bayarId);$stmt->execute();$stmt->close();}
-    $labels=[];foreach($plan as $line)$labels[]=spp_month_label((string)$line['bill']['bulan']).' '.$line['bill']['tahun'];
-    return ['batch_id'=>$batchId,'cash_received'=>$newMoney,'cash_allocated'=>$cashUsed,'deposit_used'=>$depositUsed,'deposit_created'=>$newDeposit,'balance_after'=>$balance-$depositUsed+$newDeposit,'periods'=>$labels,'bill_count'=>count($plan)];
+    $stmt->bind_param('iidd',$batchId,$billId,$newMoney,$depositUsed);$stmt->execute();$stmt->close();
+    if ($depositUsed>.001) {
+        $kind='pakai';$note='SPP '.spp_month_label($month).' '.$year;
+        $stmt=$db->prepare('INSERT INTO titipan_spp_mutasi(no_induk,batch_id,bayar_id,jenis,nominal,tanggal,user_id,keterangan) VALUES(?,?,?,?,?,?,?,?)');
+        $stmt->bind_param('siisdsss',$noInduk,$batchId,$bayarId,$kind,$depositUsed,$date,$userId,$note);$stmt->execute();$stmt->close();
+    }
+    return ['batch_id'=>$batchId,'cash_received'=>$newMoney,'cash_allocated'=>$newMoney,'deposit_used'=>$depositUsed,'deposit_created'=>0.0,'balance_after'=>$balance-$depositUsed,'periods'=>[spp_month_label($month).' '.$year],'bill_count'=>1];
+}
+
+/** Titipan adalah tindakan eksplisit; tidak pernah menjadi sisa otomatis dari input SPP. */
+function spp_record_deposit(mysqli $db, string $noInduk, ?int $bayarId, float $amount, string $date, string $method, string $userId): array {
+    if ($amount <= .001 || !is_finite($amount)) throw new RuntimeException('Isi nominal Titipan SPP lebih dari Rp0.');
+    $balance=spp_deposit_balance($db,$noInduk,true);
+    $stmt=$db->prepare('INSERT INTO spp_alokasi_batch(no_induk,bayar_id,tanggal,user_id,uang_baru,titipan_baru) VALUES(?,?,?,?,?,?)');
+    $stmt->bind_param('sissdd',$noInduk,$bayarId,$date,$userId,$amount,$amount);$stmt->execute();$batchId=(int)$db->insert_id;$stmt->close();
+    $kind='masuk';$note='Catat Titipan SPP';
+    $stmt=$db->prepare('INSERT INTO titipan_spp_mutasi(no_induk,batch_id,bayar_id,jenis,nominal,tanggal,sistem_pembayaran,user_id,keterangan) VALUES(?,?,?,?,?,?,?,?,?)');
+    $stmt->bind_param('siisdssss',$noInduk,$batchId,$bayarId,$kind,$amount,$date,$method,$userId,$note);$stmt->execute();$stmt->close();
+    return ['batch_id'=>$batchId,'deposit_created'=>$amount,'balance_after'=>$balance+$amount,'bill_count'=>0];
 }
 
 function spp_reverse_payment_allocation(mysqli $db, int $bayarId): void {
@@ -271,6 +305,19 @@ function spp_reverse_payment_allocation(mysqli $db, int $bayarId): void {
     if($remaining<-.001)throw new RuntimeException('Transaksi tidak dapat diubah karena titipannya sudah digunakan pada transaksi setelahnya. Batalkan penggunaan titipan yang lebih baru terlebih dahulu.');
     $stmt=$db->prepare("UPDATE spp_alokasi_batch SET status='reversed' WHERE id=?");$id=(int)$batch['id'];$stmt->bind_param('i',$id);$stmt->execute();$stmt->close();
     $stmt=$db->prepare('DELETE FROM titipan_spp_mutasi WHERE batch_id=?');$stmt->bind_param('i',$id);$stmt->execute();$stmt->close();
+}
+
+function spp_assert_paid_order(mysqli $db, string $noInduk): void {
+    $stmt=$db->prepare("SELECT ts.bulan,ts.tahun,ts.nominal_tagihan,COALESCE(SUM(CASE WHEN ab.status='active' THEN a.nominal_dari_bayar+a.nominal_dari_titipan ELSE 0 END),0) paid,MAX(CASE WHEN ab.status='active' AND ab.komite_required=1 THEN 1 ELSE 0 END) protected_payment FROM tagihan_spp ts LEFT JOIN spp_alokasi a ON a.tagihan_spp_id=ts.id LEFT JOIN spp_alokasi_batch ab ON ab.id=a.batch_id WHERE ts.no_induk=? AND ts.status='open' GROUP BY ts.id ORDER BY CAST(ts.tahun AS UNSIGNED),CAST(ts.bulan AS UNSIGNED)");
+    $stmt->bind_param('s',$noInduk);$stmt->execute();$firstUnpaid=null;
+    foreach ($stmt->get_result()->fetch_all(MYSQLI_ASSOC) as $bill) {
+        if ((float)$bill['nominal_tagihan']-(float)$bill['paid']>.001 && !$firstUnpaid) $firstUnpaid=$bill;
+        if ($firstUnpaid && (int)$bill['protected_payment']===1 && ((int)$bill['tahun']*100+(int)$bill['bulan']) > ((int)$firstUnpaid['tahun']*100+(int)$firstUnpaid['bulan'])) {
+            $stmt->close();
+            throw new RuntimeException('SPP '.spp_month_label((string)$firstUnpaid['bulan']).' '.$firstUnpaid['tahun'].' tidak boleh menjadi tunggakan karena pembayaran bulan berikutnya sudah tersimpan.');
+        }
+    }
+    $stmt->close();
 }
 
 function spp_payment_allocation_summary(mysqli $db, int $bayarId): ?array {

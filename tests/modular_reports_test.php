@@ -18,6 +18,10 @@ try{
     $psbStatus=report_status_data($koneksi,array_merge($filters,['kategori'=>'psb']));
     modular_assert($psbStatus['title']==='Uang PSB','Status pembayaran PSB memakai judul yang salah.');
     foreach($psbStatus['rows'] as $row)modular_assert($row['periode']==='Sekali saat masuk','Periode status PSB bukan sekali saat masuk.');
+    $komiteStatus=report_status_data($koneksi,array_merge($filters,['kategori'=>'komite']));
+    foreach($komiteStatus['rows'] as $row)modular_assert($row['periode']==='Agustus 2026','Status Komite tidak memakai bulan tagihan.');
+    $komiteItem=report_item_data($koneksi,array_merge($filters,['kategori'=>'komite','tahun_awal'=>2026,'tahun_akhir'=>2026]));
+    modular_assert(str_contains($komiteItem['subtitle'],'Agustus 2026'),'Rekap per item Komite tidak memakai periode bulanan.');
     $spp=report_spp_year_data($koneksi,$filters);$monthColumns=array_values(array_filter($spp['columns'],fn($column)=>($column[2]??'')==='html'));
     modular_assert(count($monthColumns)===12,'Rekap SPP tidak mempunyai 12 kolom Juli-Juni.');
     modular_assert(str_contains($monthColumns[0][1],'Juli')&&str_contains($monthColumns[11][1],'Juni'),'Urutan tahun ajaran SPP bukan Juli-Juni.');

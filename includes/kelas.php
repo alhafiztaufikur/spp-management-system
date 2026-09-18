@@ -2,6 +2,7 @@
 
 require_once __DIR__ . '/daftar_ulang.php';
 require_once __DIR__ . '/tagihan_tahunan.php';
+require_once __DIR__ . '/komite_billing.php';
 
 function class_label(array $class): string {
     $level = (int)($class['tingkat'] ?? 0);
@@ -287,7 +288,7 @@ function class_manual_promote_student(mysqli $db, string $noInduk, int $targetCl
     $stmt->execute();
     $placementId = (int)$db->insert_id;
     $stmt->close();
-    if ($placementId > 0) annual_fee_sync_for_placement($db, $placementId, 'manual-promotion');
+    if ($placementId > 0) komite_sync_placement($db, $placementId);
     return ['student' => (string)$student['NAMA'], 'target_year' => $targetYear, 'action' => 'naik', 'target' => $snapshot];
 }
 
@@ -382,7 +383,7 @@ function class_process_year_promotion(mysqli $db, string $targetYear): array {
         $insertPlacement->execute();
         $placementId = (int)$db->insert_id;
         if ($placementId > 0) {
-            annual_fee_sync_for_placement($db, $placementId, 'promotion');
+            komite_sync_placement($db, $placementId);
         }
         $promoted++;
     }
@@ -543,10 +544,9 @@ function class_sync_student_current_year(
         $syncResult['unchanged'][] = 'spp';
     }
     if ($placementId > 0 && $status === 'aktif') {
-        $annualResult = annual_fee_reconcile_for_placement($db, $placementId, 'system');
-        foreach (['synced', 'locked', 'unchanged'] as $key) {
-            $syncResult[$key] = array_values(array_unique(array_merge($syncResult[$key], $annualResult[$key])));
-        }
+        komite_sync_placement($db, $placementId);
+        $rateResult=komite_sync_student_rate($db,$noInduk,$komite);
+        $syncResult[$rateResult['updated']>0?'synced':'unchanged'][]='komite';
     }
 
     if ($placementId > 0) {

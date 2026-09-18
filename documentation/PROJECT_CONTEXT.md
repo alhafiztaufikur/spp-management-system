@@ -17,6 +17,15 @@ SistemSPP adalah aplikasi administrasi sekolah berbasis web untuk SDIT. Aplikasi
 
 Aplikasi ini merupakan aplikasi PHP tradisional tanpa framework. Halaman merender HTML di server, memakai JavaScript biasa untuk interaksi browser, dan mengakses MySQL melalui `mysqli`.
 
+### Kontrak pembayaran SPP dan Komite (2026-09-19)
+
+- Kasir memilih **Bulan Tagihan SPP & Komite** dan **Tahun Tagihan**; **Tanggal Bayar** adalah hari uang diterima, bukan penentu periode tagihan.
+- SPP memakai tagihan Master Penerbitan SPP yang sudah terbit. Satu transaksi hanya melunasi satu bulan, tepat sebesar sisa tagihan. Tunggakan SPP yang lebih tua wajib dilunasi dahulu.
+- Kelebihan atau dana yang belum cukup satu bulan hanya diterima melalui tindakan terpisah **Catat Titipan SPP**. Penggunaan saldo titipan untuk bulan terpilih harus dikonfirmasi; kas baru dan saldo lama dicatat terpisah.
+- `siswa.POMG` adalah tarif Komite **per bulan**. Tagihan dibuat dari `siswa_tahun_ajaran`, mulai bulan masuk untuk siswa pindahan, tanpa tombol penerbitan pada Master SPP. Perubahan tarif hanya mengubah tagihan Komite yang belum pernah dibayar.
+- Komite boleh dibayar sendiri tetapi harus lunas penuh. Saat SPP dibayar, Komite bulan yang sama harus sudah lunas atau ikut dilunasi. Lulusan hanya dapat melunasi tagihan lama.
+- Struktur baru: `tagihan_komite`, `bayar_komite`, `siswa_tahun_ajaran.komite_mulai_bulan`, dan `spp_alokasi_batch.komite_required`. Migrasi demo `sql/migrate_komite_bulanan.sql` menghapus nominal/rincian Komite tahunan lama dan menyesuaikan total transaksi, tanpa menghapus header transaksi atau komponen lain. Backup dan uji pada database disposable wajib dilakukan sebelum migrasi aktif.
+
 ## 2. Stack dan Lingkungan Lokal
 
 | Bagian | Teknologi |
@@ -307,7 +316,7 @@ Get-Content sql\add_student_optional_fees.sql -Raw | C:\xampp\mysql\bin\mysql.ex
 Get-Content sql\add_payment_references.sql -Raw | C:\xampp\mysql\bin\mysql.exe -u root
 Get-Content sql\add_payment_method.sql -Raw | C:\xampp\mysql\bin\mysql.exe -u root
 Get-Content sql\simplify_payment_components_and_add_psb.sql -Raw | C:\xampp\mysql\bin\mysql.exe -u root
-Get-Content sql\verify_schema.sql -Raw | C:\xampp\mysql\bin\mysql.exe -u root
+Get-Content sql\verify_schema.sql -Raw | C:\xampp\mysql\bin\mysql.exe -u root db_spp
 ```
 
 Migrasi bertahap lama bersifat idempoten. Pengecualiannya adalah `simplify_payment_components_and_add_psb.sql`: migrasi satu kali yang sengaja menghapus transaksi dengan nominal Bangunan, Seragam, Kegiatan, Makan, Sorga, atau Infaq; menghapus kolom lama; menghitung ulang total transaksi dan saldo tabungan; lalu menambahkan kontrak PSB. Wajib buat backup dan uji pada salinan database terlebih dahulu.

@@ -12,6 +12,7 @@ require_once '../includes/tagihan_tahunan.php';
 require_once '../includes/tagihan_sekali.php';
 require_once '../includes/spp_payment_status.php';
 require_once '../includes/spp_billing.php';
+require_once '../includes/komite_billing.php';
 requireRole(['admin', 'kasir']);
 
 $aksi = $_POST['aksi'] ?? $_GET['aksi'] ?? '';
@@ -179,8 +180,8 @@ function validate_graduate_payment(array $student, array $components, float $uan
     if (empty($student['is_graduate'])) return;
     $otherTotal = array_sum(array_map('floatval', $components));
     foreach ($otherFees as $line) $otherTotal += (float)($line['nominal'] ?? 0);
-    if (($uangDu <= 0.001 && $uangSpp <= 0.001 && !$useSppDeposit) || $otherTotal > 0.001) {
-        throw new RuntimeException('Siswa yang sudah lulus hanya dapat membayar tunggakan SPP dan Daftar Ulang.');
+    if (($uangDu <= 0.001 && $uangSpp <= 0.001 && !$useSppDeposit && $otherTotal <= 0.001) || array_sum(array_map('floatval', array_slice($components,0,2))) > .001 || !empty($otherFees)) {
+        throw new RuntimeException('Siswa yang sudah lulus hanya dapat membayar tunggakan SPP, Komite, dan Daftar Ulang.');
     }
 }
 
@@ -493,6 +494,7 @@ if ($aksi === 'input') {
     $kelas_du        = $_POST['kelas_du'] ?? '';
     $tahun_ajaran_du = $_POST['tahun_ajaran_du'] ?? '';
     $tagihan_daftar_ulang_id = (int)($_POST['tagihan_daftar_ulang_id'] ?? 0);
+    $spp_action = (string)($_POST['spp_action'] ?? 'bayar');
     $payment_plan    = $_POST['payment_plan'] ?? 'monthly';
 
     if (empty($no_induk)) {
@@ -506,6 +508,8 @@ if ($aksi === 'input') {
     try {
         $usePublishedSpp = spp_billing_schema_ready($koneksi);
         if ($payment_plan !== 'monthly') throw new RuntimeException('Pembayaran banyak bulan sedang ditangguhkan. Gunakan transaksi bulanan.');
+        if (!in_array($spp_action, ['bayar','titipan'], true)) throw new RuntimeException('Tindakan SPP tidak dikenal.');
+        if ($spp_action === 'titipan' && ($uang_spp <= .001 || $gunakan_titipan_spp)) throw new RuntimeException('Catat Titipan SPP memerlukan uang baru tanpa penggunaan saldo lama.');
         reject_removed_payment_components($_POST);
         $sistem_pembayaran = normalize_payment_method($sistem_pembayaran);
         validate_payment_amounts([
@@ -571,6 +575,8 @@ if ($aksi === 'input') {
             ], $isFirst ? $uang_du : 0, $isFirst ? $du_bill : null, 0, $usePublishedSpp);
         }
 
+        $komiteBill = komite_validate_amount($koneksi, $no_induk, $bulan_bayar, (string)$tahun_bayar, $uang_komite, $spp_action === 'bayar' && ($uang_spp > .001 || $gunakan_titipan_spp));
+
         $biaya_lain = collect_biaya_lain($koneksi, $no_induk);
         validate_graduate_payment($siswa_data, [
             $uang_pangkal, $uang_psb, $uang_komite, $potongan_spp
@@ -627,17 +633,17 @@ if ($aksi === 'input') {
             $stmtClass->close();
             $receipt_ids[] = $bayar_id;
             $sppAllocation = null;
-            if ($usePublishedSpp && ($row_spp > 0.001 || $gunakan_titipan_spp)) {
-                $sppAllocation = spp_allocate_payment($koneksi, $no_induk, $bayar_id, $row_spp, $gunakan_titipan_spp, $tanggal_bayar, $sistem_pembayaran, $user_id);
-                if (!empty($siswa_data['is_graduate']) && (float)$sppAllocation['deposit_created'] > 0.001) {
-                    throw new RuntimeException('Siswa yang sudah lulus tidak dapat menerima Titipan SPP baru. Nominal SPP harus tepat melunasi tagihan yang masih terbuka.');
-                }
+            if ($usePublishedSpp && $spp_action === 'titipan') {
+                if (!empty($siswa_data['is_graduate'])) throw new RuntimeException('Lulusan tidak dapat menerima Titipan SPP baru.');
+                $sppAllocation = spp_record_deposit($koneksi, $no_induk, $bayar_id, $row_spp, $tanggal_bayar, $sistem_pembayaran, $user_id);
+                $stmtDeposit = $koneksi->prepare('UPDATE bayar SET U_SPP=0,U_TITIPAN_SPP=? WHERE id=?');
+                $stmtDeposit->bind_param('di',$row_spp,$bayar_id);$stmtDeposit->execute();$stmtDeposit->close();
+            } elseif ($usePublishedSpp && ($row_spp > 0.001 || $gunakan_titipan_spp)) {
+                $sppAllocation = spp_allocate_payment($koneksi, $no_induk, $bayar_id, $row_month, $row_year, $row_spp, $gunakan_titipan_spp, $tanggal_bayar, $sistem_pembayaran, $user_id);
             } elseif (!$usePublishedSpp) {
                 sync_spp_period_claim($koneksi, $bayar_id, $no_induk, $row_month, $row_year, $row_spp);
             }
-            annual_fee_sync_payment($koneksi, $bayar_id, $no_induk, $row_month, $row_year, [
-                'komite' => $row_komite,
-            ]);
+            komite_save_payment($koneksi, $bayar_id, $komiteBill, $row_komite);
 
             if (!$isFirst) continue;
             save_biaya_lain($koneksi, $bayar_id, $biaya_lain);
@@ -711,6 +717,7 @@ if ($aksi === 'update') {
     $kelas_du        = $_POST['kelas_du'] ?? '';
     $tahun_ajaran_du = $_POST['tahun_ajaran_du'] ?? '';
     $tagihan_daftar_ulang_id = (int)($_POST['tagihan_daftar_ulang_id'] ?? 0);
+    $spp_action = (string)($_POST['spp_action'] ?? 'bayar');
 
     if (empty($no_induk)) {
         $_SESSION['flash'] = ['type' => 'error', 'msg' => 'Pilih siswa terlebih dahulu!'];
@@ -723,6 +730,10 @@ if ($aksi === 'update') {
         $old_bayar = find_linked_payment($koneksi, $id);
         $usePublishedSpp = spp_billing_schema_ready($koneksi);
         if ($usePublishedSpp) spp_reverse_payment_allocation($koneksi, $id);
+        $stmtOldKomite=$koneksi->prepare('DELETE FROM bayar_komite WHERE bayar_id=?');
+        $stmtOldKomite->bind_param('i',$id);$stmtOldKomite->execute();$stmtOldKomite->close();
+        if (!in_array($spp_action,['bayar','titipan'],true)) throw new RuntimeException('Tindakan SPP tidak dikenal.');
+        if ($spp_action==='titipan' && ($uang_spp<=.001 || $gunakan_titipan_spp)) throw new RuntimeException('Catat Titipan SPP memerlukan uang baru tanpa penggunaan saldo lama.');
         reject_removed_payment_components($_POST);
         $sistem_pembayaran = normalize_payment_method($sistem_pembayaran);
         validate_payment_amounts([
@@ -752,6 +763,7 @@ if ($aksi === 'update') {
             'spp' => $uang_spp,
             'komite' => $uang_komite,
         ], $uang_du, $du_bill, $id, $usePublishedSpp);
+        $komiteBill = komite_validate_amount($koneksi, $no_induk, $bulan_bayar, (string)$tahun_bayar, $uang_komite, $spp_action==='bayar' && ($uang_spp > .001 || $gunakan_titipan_spp));
 
         $oldSppMonth = normalize_month_code((string)$old_bayar['BULAN']);
         $oldSppYear = (string)$old_bayar['TAHUN'];
@@ -830,17 +842,23 @@ if ($aksi === 'update') {
         // Klaim periode ikut berpindah/dihapus ketika bulan, tahun, siswa,
         // atau nominal SPP pada transaksi diedit.
         $sppAllocation = null;
-        if ($usePublishedSpp && ($uang_spp > 0.001 || $gunakan_titipan_spp)) {
-            $sppAllocation = spp_allocate_payment($koneksi, $no_induk, $id, $uang_spp, $gunakan_titipan_spp, $tanggal_bayar, $sistem_pembayaran, $user_id);
-            if (!empty($siswa_data['is_graduate']) && (float)$sppAllocation['deposit_created'] > 0.001) {
-                throw new RuntimeException('Siswa yang sudah lulus tidak dapat menerima Titipan SPP baru. Nominal SPP harus tepat melunasi tagihan yang masih terbuka.');
-            }
+        if ($usePublishedSpp && $spp_action==='titipan') {
+            if (!empty($siswa_data['is_graduate'])) throw new RuntimeException('Lulusan tidak dapat menerima Titipan SPP baru.');
+            $sppAllocation=spp_record_deposit($koneksi,$no_induk,$id,$uang_spp,$tanggal_bayar,$sistem_pembayaran,$user_id);
+            $stmtDeposit=$koneksi->prepare('UPDATE bayar SET U_SPP=0,U_TITIPAN_SPP=? WHERE id=?');
+            $stmtDeposit->bind_param('di',$uang_spp,$id);$stmtDeposit->execute();$stmtDeposit->close();
+        } elseif ($usePublishedSpp && ($uang_spp > 0.001 || $gunakan_titipan_spp)) {
+            $sppAllocation = spp_allocate_payment($koneksi, $no_induk, $id, $bulan_bayar, (string)$tahun_bayar, $uang_spp, $gunakan_titipan_spp, $tanggal_bayar, $sistem_pembayaran, $user_id);
         } elseif (!$usePublishedSpp) {
             sync_spp_period_claim($koneksi, $id, $no_induk, $bulan_bayar, (string)$tahun_bayar, $uang_spp);
         }
-        annual_fee_sync_payment($koneksi, $id, $no_induk, $bulan_bayar, (string)$tahun_bayar, [
-            'komite' => $uang_komite,
-        ]);
+        komite_save_payment($koneksi, $id, $komiteBill, $uang_komite);
+        if ($usePublishedSpp) {
+            spp_assert_paid_order($koneksi,(string)$old_bayar['NO_INDUK']);
+            if ($no_induk !== (string)$old_bayar['NO_INDUK']) spp_assert_paid_order($koneksi,$no_induk);
+        }
+        komite_assert_spp_pairs($koneksi,(string)$old_bayar['NO_INDUK']);
+        if ($no_induk !== (string)$old_bayar['NO_INDUK']) komite_assert_spp_pairs($koneksi,$no_induk);
 
         save_biaya_lain($koneksi, $id, $biaya_lain);
 
@@ -889,6 +907,10 @@ if ($aksi === 'hapus') {
         $old_bayar = find_linked_payment($koneksi, $id);
         $usePublishedSpp = spp_billing_schema_ready($koneksi);
         if ($usePublishedSpp) spp_reverse_payment_allocation($koneksi, $id);
+        $stmtOldKomite=$koneksi->prepare('DELETE FROM bayar_komite WHERE bayar_id=?');
+        $stmtOldKomite->bind_param('i',$id);$stmtOldKomite->execute();$stmtOldKomite->close();
+        if ($usePublishedSpp) spp_assert_paid_order($koneksi,(string)$old_bayar['NO_INDUK']);
+        komite_assert_spp_pairs($koneksi,(string)$old_bayar['NO_INDUK']);
 
         if (!$usePublishedSpp && (float)$old_bayar['U_SPP'] > 0) {
             $oldSppMonth = normalize_month_code((string)$old_bayar['BULAN']);

@@ -405,7 +405,7 @@ if ($download) {
   <tr class="header-row"><td colspan="7">REKAP PEMBAYARAN SPP — <?= strtoupper($period_label) ?></td></tr>
   <tr>
     <th>No</th><th>No. Induk</th><th>Nama Siswa</th><th>Kelas</th>
-    <th>Bulan Bayar / Sistem</th><th>Total Bayar (Rp)</th><th>Tanggal Bayar</th>
+    <th>Bulan Tagihan / Sistem</th><th>Total Bayar (Rp)</th><th>Tanggal Bayar</th>
   </tr>
   <?php if (empty($rows)): ?>
   <tr><td colspan="7" class="empty-row">Belum ada transaksi pembayaran pada periode ini.</td></tr>

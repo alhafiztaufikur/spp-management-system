@@ -5,6 +5,7 @@ require_once '../koneksi.php';
 require_once '../includes/auth.php';
 require_once '../includes/tagihan_tahunan.php';
 require_once '../includes/tagihan_sekali.php';
+require_once '../includes/komite_billing.php';
 requireRole(['admin', 'bendahara', 'kasir']);
 
 header('Cache-Control: no-store, no-cache, must-revalidate, max-age=0');
@@ -110,15 +111,8 @@ function annual_receipt_remaining_lines(mysqli $db, array $payment, array $other
     foreach (['pangkal' => ['Sisa Pangkal', 'U_PANGKAL'], 'psb' => ['Sisa PSB', 'U_PSB']] as $component => [$label, $field]) {
         if (abs((float)($payment[$field] ?? 0)) >= 0.005) $lines[] = [$label, (float)$oneTime[$component]['remaining']];
     }
-    $annualRemaining = annual_fee_remaining_for_payment($db, (int)$payment['id']);
-    $annualLabels = [
-        'komite' => ['Sisa Komite', 'U_KOMITE'],
-    ];
-    foreach ($annualLabels as $component => [$label, $field]) {
-        if (abs((float)($payment[$field] ?? 0)) >= 0.005 && isset($annualRemaining[$component])) {
-            $lines[] = [$label, $annualRemaining[$component]];
-        }
-    }
+    $komite=komite_receipt_summary($db,(int)$payment['id']);
+    if ($komite) $lines[]=['Sisa Komite '.$komite['label'],$komite['remaining']];
 
     $duBillId = (int)($payment['tagihan_daftar_ulang_id'] ?? 0);
     $duTotal = (float)($payment['du_nominal_tagihan'] ?? 0);
@@ -174,7 +168,7 @@ foreach ($ids as $paymentId) {
 
     $payment['primary_lines'] = array_values(array_filter([
         ['Uang Pangkal', $payment['U_PANGKAL']], ['Uang PSB', $payment['U_PSB']], ['Uang Daftar Ulang' . (!empty($payment['du_tahun_ajaran']) ? ' (TA ' . $payment['du_tahun_ajaran'] . ')' : ''), $payment['uang_du']],
-        ['Uang SPP', $payment['U_SPP']], ['Komite Sekolah', $payment['U_KOMITE']],
+        ['Uang SPP', $payment['U_SPP']], ['Komite Sekolah'.(($komiteReceipt=komite_receipt_summary($koneksi,$paymentId))?' ('.$komiteReceipt['label'].')':''), $payment['U_KOMITE']],
     ], fn($line) => abs((float)$line[1]) >= 0.005));
     $payment['other_lines'] = [];
     foreach ($otherDetails as $detail) {

@@ -1,5 +1,7 @@
 # Audit dan Baseline SistemSPP
 
+> **Pembaruan 2026-09-19:** Bagian audit di bawah adalah baseline historis 2026-09-09, bukan kontrak fitur terbaru. SPP sekarang dibayar tepat satu tagihan terbit yang dipilih melalui bulan/tahun; tunggakan lebih tua tetap menghalangi. Dana lebih atau belum cukup dicatat lewat tindakan terpisah **Catat Titipan SPP**. Komite berasal dari `siswa.POMG` per bulan, mengikuti penempatan siswa, wajib lunas pada bulan yang sama ketika SPP dibayar, dan dapat dibayar sendiri. Rincian implementasi dan migrasi ada di [PROJECT_CONTEXT.md](documentation/PROJECT_CONTEXT.md) serta [AI_CHANGELOG.md](documentation/AI_CHANGELOG.md).
+
 **Tanggal audit:** 2026-09-09 (Asia/Jakarta)  
 **Ruang lingkup:** pembacaan struktur repository, konfigurasi, alur bisnis, role, schema SQL, database lokal baca-saja, pemeriksaan invariant finansial, dokumentasi, dan test.  
 **Batas keamanan dokumen:** tidak memuat password, hash, token, cookie, URL privat, maupun data identitas siswa.

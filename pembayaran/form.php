@@ -11,6 +11,7 @@ require_once '../includes/biaya_lain.php';
 require_once '../includes/tagihan_tahunan.php';
 require_once '../includes/tagihan_sekali.php';
 require_once '../includes/spp_billing.php';
+require_once '../includes/komite_billing.php';
 requireRole(['admin', 'kasir']);
 $activeAcademicYear = du_current_academic_year();
 $activeAcademicYearSql = $koneksi->real_escape_string($activeAcademicYear);
@@ -47,7 +48,8 @@ $siswa_sql = "
               AND tdu_o.tahun_ajaran_snapshot<='$activeAcademicYearSql'
             GROUP BY tdu_o.id,tdu_o.nominal_tagihan
             HAVING tdu_o.nominal_tagihan-COALESCE(SUM(bd_o.jumlah),0)>.001
-        ) OR EXISTS(SELECT 1 FROM tagihan_spp ts_o WHERE ts_o.no_induk=s.NO_INDUK AND ts_o.status='open'))
+        ) OR EXISTS(SELECT 1 FROM tagihan_spp ts_o LEFT JOIN spp_alokasi a_o ON a_o.tagihan_spp_id=ts_o.id LEFT JOIN spp_alokasi_batch ab_o ON ab_o.id=a_o.batch_id WHERE ts_o.no_induk=s.NO_INDUK AND ts_o.status='open' GROUP BY ts_o.id HAVING MIN(ts_o.nominal_tagihan)-COALESCE(SUM(CASE WHEN ab_o.status='active' THEN a_o.nominal_dari_bayar+a_o.nominal_dari_titipan ELSE 0 END),0)>.001)
+          OR EXISTS(SELECT 1 FROM tagihan_komite tk_o LEFT JOIN bayar_komite bk_o ON bk_o.tagihan_komite_id=tk_o.id WHERE tk_o.no_induk=s.NO_INDUK AND tk_o.status='open' GROUP BY tk_o.id HAVING MIN(tk_o.nominal_tagihan)-COALESCE(SUM(bk_o.nominal),0)>.001))
     )
     ORDER BY s.NAMA ASC
 ";
@@ -82,6 +84,7 @@ while ($placement = $placementResult->fetch_assoc()) {
     ];
 }
 $published_spp_payload = spp_billing_schema_ready($koneksi) ? spp_payment_payload($koneksi) : [];
+$komite_payload = komite_payment_payload($koneksi);
 
 $du_bills = du_selectable_bills_payload($koneksi);
 
@@ -207,7 +210,7 @@ unset($_SESSION['flash']);
                     <span class="payment-field-icon" aria-hidden="true">
                       <svg width="15" height="15" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.3" stroke-linecap="round" stroke-linejoin="round"><path d="M8 2v4"/><path d="M16 2v4"/><rect x="3" y="4" width="18" height="18" rx="2"/><path d="M3 10h18"/></svg>
                     </span>
-                    Pembayaran Bulan
+                    Bulan Tagihan SPP &amp; Komite
                   </label>
                   <div class="field-group-inline payment-period-inputs">
                     <select class="field-input field-select month-code-select" id="bulan-bayar" name="bulan_bayar" required>
@@ -224,10 +227,11 @@ unset($_SESSION['flash']);
                       ?>
                     </select>
                     <div class="payment-year-picker">
+                      <label class="payment-year-caption" for="tahun-bayar">Tahun Tagihan</label>
                       <input class="field-input payment-year-select" type="text" inputmode="numeric" pattern="\d{4}" maxlength="4"
                         id="tahun-bayar" name="tahun_bayar" value="<?= date('Y') ?>" autocomplete="off" required />
-                      <div class="payment-year-options" role="listbox" aria-label="Pilihan tahun pembayaran">
-                        <?php for ($y = (int)date('Y'); $y <= (int)date('Y') + 10; $y++): ?>
+                      <div class="payment-year-options" role="listbox" aria-label="Tahun Tagihan">
+                        <?php for ($y = (int)date('Y') - 6; $y <= (int)date('Y') + 10; $y++): ?>
                         <button type="button" class="payment-year-option" data-year="<?= $y ?>" role="option"><?= $y ?></button>
                         <?php endfor; ?>
                       </div>
@@ -288,6 +292,7 @@ unset($_SESSION['flash']);
                   data-paid-spp-periods="<?= htmlspecialchars(json_encode($period_payments[$s['NO_INDUK']]['spp'] ?? []), ENT_QUOTES, 'UTF-8') ?>"
                   data-spp-placements="<?= htmlspecialchars(json_encode($spp_placements[$s['NO_INDUK']] ?? [], JSON_UNESCAPED_UNICODE), ENT_QUOTES, 'UTF-8') ?>"
                   data-spp-billing="<?= htmlspecialchars(json_encode($published_spp_payload[$s['NO_INDUK']] ?? ['saldo'=>0,'tagihan'=>[]], JSON_UNESCAPED_UNICODE), ENT_QUOTES, 'UTF-8') ?>"
+                  data-komite-billing="<?= htmlspecialchars(json_encode($komite_payload[$s['NO_INDUK']] ?? [], JSON_UNESCAPED_UNICODE), ENT_QUOTES, 'UTF-8') ?>"
                   data-paid-komite-periods="<?= htmlspecialchars(json_encode($period_payments[$s['NO_INDUK']]['komite'] ?? []), ENT_QUOTES, 'UTF-8') ?>"
                   data-annual-fees="<?= htmlspecialchars(json_encode($annual_fee_payload[$s['NO_INDUK']] ?? [], JSON_UNESCAPED_UNICODE), ENT_QUOTES, 'UTF-8') ?>"
                   data-du-bills="<?= htmlspecialchars(json_encode($du_bills[$s['NO_INDUK']] ?? []), ENT_QUOTES, 'UTF-8') ?>"
@@ -313,11 +318,12 @@ unset($_SESSION['flash']);
 
           <!-- Rincian Pembayaran -->
           <div class="section-divider"><span>Rincian Pembayaran</span></div>
-          <p class="payment-auto-note">SPP dialokasikan otomatis ke tagihan terbit yang paling lama. Periode transaksi dipakai oleh Komite; Daftar Ulang mengikuti tahun ajaran yang dipilih.</p>
+          <p class="payment-auto-note">SPP dan Komite bulan ini dibayar bersama.</p>
           <section class="spp-deposit-banner" id="spp-deposit-banner" hidden aria-live="polite">
             <div><span>Saldo Titipan SPP</span><strong id="spp-deposit-balance">Rp 0</strong><small id="spp-deposit-capacity">Pilih siswa untuk melihat saldo.</small></div>
             <button type="button" class="btn btn-ghost" id="spp-use-deposit-button">Gunakan Titipan</button>
           </section>
+          <div class="spp-deposit-action"><button type="button" class="btn btn-ghost" id="spp-record-deposit-button">Catat Titipan SPP</button><span id="spp-action-context" aria-live="polite"></span></div>
           <div class="alert alert-warning payment-overpaid-alert" id="payment-overpaid-alert" hidden></div>
           <div class="alert alert-warning payment-input-overlimit-alert" id="payment-input-overlimit-alert" hidden></div>
           <div class="table-container">
@@ -344,7 +350,7 @@ unset($_SESSION['flash']);
                   [$key, $label, $name] = $k;
                 ?>
                 <tr class="<?= $i % 2 === 0 ? 'row-highlight' : '' ?>">
-                  <td><?php if($key==='du'): ?><div class="du-bill-selector"><span class="comp-label du-static-label" id="du-static-label"><?= $label ?></span><button type="button" class="du-selector-trigger" id="du-selector-trigger" aria-haspopup="listbox" aria-controls="du-selector-menu" aria-expanded="false" hidden><span class="du-trigger-label"><?= $label ?></span><span class="du-arrear-warning" id="du-arrear-warning" role="img"></span><span class="du-chevron" aria-hidden="true">⌄</span></button><div class="du-selector-menu" id="du-selector-menu" role="listbox" aria-label="Pilih tagihan Daftar Ulang" tabindex="-1" hidden></div></div><?php else: ?><span class="comp-label"<?= $key === 'spp' ? ' id="spp-component-label"' : '' ?>><?= $label ?></span><?php endif; ?><?php if($key==='spp'): ?><small class="du-inline-context du-context-label" id="spp-context-label">Lunasi tagihan tertua; dana yang belum teralokasi menjadi titipan</small><?php endif; ?><?php if($key==='komite'): ?><small class="du-inline-context du-context-label" id="komite-context-label">Tagihan tahunan bisa dicicil</small><?php endif; ?><?php if(in_array($key,['pangkal','psb'],true)): ?><small class="du-inline-context du-context-label">Tagihan satu kali, dapat dicicil</small><?php endif; ?><?php if($key==='du'): ?><small class="du-inline-context du-context-label" id="du-context-label">Pilih siswa untuk melihat tagihan.</small><small class="du-inline-context du-master-warning" id="du-master-warning" hidden></small><?php endif; ?></td>
+                  <td><?php if($key==='du'): ?><div class="du-bill-selector"><span class="comp-label du-static-label" id="du-static-label"><?= $label ?></span><button type="button" class="du-selector-trigger" id="du-selector-trigger" aria-haspopup="listbox" aria-controls="du-selector-menu" aria-expanded="false" hidden><span class="du-trigger-label"><?= $label ?></span><span class="du-arrear-warning" id="du-arrear-warning" role="img"></span><span class="du-chevron" aria-hidden="true">⌄</span></button><div class="du-selector-menu" id="du-selector-menu" role="listbox" aria-label="Pilih tagihan Daftar Ulang" tabindex="-1" hidden></div></div><?php else: ?><span class="comp-label"<?= $key === 'spp' ? ' id="spp-component-label"' : '' ?>><?= $label ?></span><?php endif; ?><?php if($key==='spp'): ?><small class="du-inline-context du-context-label" id="spp-context-label">Pilih bulan tagihan.</small><?php endif; ?><?php if($key==='komite'): ?><small class="du-inline-context du-context-label" id="komite-context-label">Lunas penuh per bulan.</small><?php endif; ?><?php if(in_array($key,['pangkal','psb'],true)): ?><small class="du-inline-context du-context-label">Tagihan satu kali, dapat dicicil</small><?php endif; ?><?php if($key==='du'): ?><small class="du-inline-context du-context-label" id="du-context-label">Pilih siswa untuk melihat tagihan.</small><small class="du-inline-context du-master-warning" id="du-master-warning" hidden></small><?php endif; ?></td>
                   <td data-label="Total Tagihan"><input class="tbl-input tbl-system" type="text" value="0" id="<?=$key?>-total" readonly tabindex="-1" aria-readonly="true" /></td>
                   <td data-label="Sudah Terbayar"><input class="tbl-input tbl-system" type="text" value="0" id="<?=$key?>-bayar" readonly tabindex="-1" aria-readonly="true" /></td>
                   <td data-label="Sisa"><input class="tbl-input tbl-system tbl-system-sisa" type="text" value="0" id="<?=$key?>-sisa" readonly tabindex="-1" aria-readonly="true" /></td>
@@ -410,6 +416,7 @@ unset($_SESSION['flash']);
 
           <input type="hidden" id="potongan-spp" name="potongan_spp" value="0" />
           <input type="hidden" id="gunakan-titipan-spp" name="gunakan_titipan_spp" value="0" />
+          <input type="hidden" id="spp-action" name="spp_action" value="bayar" />
 
           <input type="hidden" id="catatan" name="catatan" value="">
           <div class="section-divider"><span>History Transaksi Siswa</span></div>

@@ -136,6 +136,10 @@ if ($_SERVER['REQUEST_METHOD'] === 'POST') {
             if ($duplicate) throw new RuntimeException('Nomor induk sudah digunakan siswa lain.');
 
             $advanced = isset($_POST['advanced_enabled']) && $_POST['advanced_enabled'] === '1';
+            $komiteStartMonth = (string)($_POST['komite_mulai_bulan'] ?? '07');
+            if (!in_array($komiteStartMonth,['01','02','03','04','05','06','07','08','09','10','11','12'],true)) {
+                throw new RuntimeException('Pilih bulan mulai tagihan Komite yang valid.');
+            }
             $advancedColumns = [
                 'potongan_spp_persen', 'PANGKAL', 'PSB', 'POMG', 'DAFTAR_ULANG',
                 'potong_pangkal', 'potong_du'
@@ -246,6 +250,7 @@ if ($_SERVER['REQUEST_METHOD'] === 'POST') {
                 $stmtClass->bind_param('ii', $classId, $id); $stmtClass->execute(); $stmtClass->close();
                 $tariffSync = null;
                 $placementId = class_sync_student_current_year($koneksi, $noInduk, $classId, $spp, $pomg, true, $tariffSync);
+                if ($placementId) komite_set_start_month($koneksi,$placementId,$komiteStartMonth);
                 if ($placementId) du_create_bill_for_placement($koneksi, $placementId);
                 $after = find_student($koneksi, $id);
                 $afterAudit = student_snapshot($after);
@@ -273,6 +278,7 @@ if ($_SERVER['REQUEST_METHOD'] === 'POST') {
                 $sppDiscountSync = spp_sync_student_discount($koneksi, $noInduk, $sppDiscountPercent);
                 $tariffSync = null;
                 $placementId = class_sync_student_current_year($koneksi, $noInduk, $classId, $spp, $pomg, $active === 1, $tariffSync);
+                if ($placementId) komite_set_start_month($koneksi,$placementId,$komiteStartMonth);
                 $duBillBefore = du_find_bill($koneksi, $noInduk, (int)date('n'), (int)date('Y'), true);
                 $duBillId = $placementId ? du_create_bill_for_placement($koneksi, $placementId, false) : null;
                 $duSync = du_reconcile_current_student_override($koneksi, $noInduk);
@@ -468,6 +474,14 @@ if ($studentRows) {
 $studentPaginationQuery = pagination_query(['per_page' => $perPage]);
 
 $formStudent = $editStudent ?? [];
+$komiteStartMonth = '07';
+if ($editStudent) {
+    $currentYearLabel=du_current_academic_year();
+    $stmtKomiteStart=$koneksi->prepare('SELECT sta.komite_mulai_bulan FROM siswa_tahun_ajaran sta JOIN tahun_ajaran ta ON ta.id=sta.tahun_ajaran_id WHERE sta.no_induk=? AND ta.label=? LIMIT 1');
+    $stmtKomiteStart->bind_param('ss',$editStudent['NO_INDUK'],$currentYearLabel);$stmtKomiteStart->execute();
+    $komiteStartMonth=(string)($stmtKomiteStart->get_result()->fetch_assoc()['komite_mulai_bulan']??'07');$stmtKomiteStart->close();
+}
+$komiteStartMonth=(string)($oldInput['komite_mulai_bulan']??$komiteStartMonth);
 $fieldMap = [
     'no_induk' => 'NO_INDUK', 'nama' => 'NAMA', 'kelas' => 'KELAS',
     'master_kelas_id' => 'master_kelas_id',
@@ -586,10 +600,19 @@ $sppRatePreview = spp_current_effective_rate($koneksi, $previewLevel, $previewDi
               </div>
               <small class="payment-auto-note">Kelola pilihan melalui menu Master Kelas.</small>
             </div>
+            <div class="field-row">
+              <label class="field-label" for="student-komite-start">Mulai Tagihan Komite</label>
+              <select class="field-input field-select" id="student-komite-start" name="komite_mulai_bulan" required>
+                <?php foreach (spp_academic_periods(du_current_academic_year()) as $period): ?>
+                <option value="<?= htmlspecialchars($period['bulan']) ?>" <?= $komiteStartMonth===$period['bulan']?'selected':'' ?>><?= htmlspecialchars(spp_month_label($period['bulan'])) ?></option>
+                <?php endforeach; ?>
+              </select>
+              <small class="payment-auto-note">Siswa pindahan: pilih bulan mulai masuk.</small>
+            </div>
           </div>
 
           <label class="advanced-switch" for="advanced-enabled">
-            <span><strong>Advance</strong><small>Komponen sekali/tahunan dan potongan SPP; tagihan yang pernah dibayar tetap terkunci</small></span>
+            <span><strong>Advance</strong><small>Tarif tambahan dan potongan SPP; tagihan yang pernah dibayar tetap terkunci</small></span>
             <input type="checkbox" id="advanced-enabled" name="advanced_enabled" value="1" <?= $advancedOpen ? 'checked' : '' ?> />
             <span class="advanced-switch-track"><span></span></span>
           </label>
@@ -613,7 +636,7 @@ $sppRatePreview = spp_current_effective_rate($koneksi, $previewLevel, $previewDi
             <div class="fields-grid student-money-grid">
               <?php
               $feeFields = [
-                'pangkal' => 'Uang Pangkal', 'psb' => 'Uang PSB', 'pomg' => 'Uang Komite',
+                'pangkal' => 'Uang Pangkal', 'psb' => 'Uang PSB', 'pomg' => 'Uang Komite / Bulan',
                 'daftar_ulang' => 'Uang Daftar Ulang'
               ];
               foreach ($feeFields as $key => $label):

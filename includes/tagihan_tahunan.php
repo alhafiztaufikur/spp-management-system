@@ -3,9 +3,7 @@
 require_once __DIR__ . '/daftar_ulang.php';
 
 function annual_fee_components(): array {
-    return [
-        'komite' => ['label' => 'Uang Komite', 'bill' => 'POMG', 'discount' => null, 'derived' => null, 'payment' => 'U_KOMITE', 'mirror' => null],
-    ];
+    return [];
 }
 
 function annual_fee_component(string $component): array {

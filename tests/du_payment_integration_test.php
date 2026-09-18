@@ -3,6 +3,7 @@
 /** Jalankan hanya terhadap database disposable dan server PHP uji. */
 require_once __DIR__ . '/../koneksi.php';
 require_once __DIR__ . '/../includes/daftar_ulang.php';
+require_once __DIR__ . '/../includes/komite_billing.php';
 
 function du_http_assert(bool $condition, string $message): void {
     if (!$condition) throw new RuntimeException($message);
@@ -88,6 +89,15 @@ try {
     $studentBills = du_http_student($koneksi, $students[0], 'UJI DU LINTAS TAHUN', $classId, $yearIds);
     $otherBills = du_http_student($koneksi, $students[1], 'UJI DU PEMILIK LAIN', $classId, [$previous=>$yearIds[$previous]]);
     $graduateBills = du_http_student($koneksi, $students[2], 'UJI DU LULUSAN', $classId, [$previous=>$yearIds[$previous]], true);
+    $stmtPlacement=$koneksi->prepare('SELECT id FROM siswa_tahun_ajaran WHERE no_induk=? AND tahun_ajaran_id=?');
+    $stmtPlacement->bind_param('si',$students[0],$yearIds[$current]);$stmtPlacement->execute();$placementId=(int)$stmtPlacement->get_result()->fetch_assoc()['id'];$stmtPlacement->close();
+    komite_sync_placement($koneksi,$placementId);
+    $master=spp_master_ensure_year($koneksi,$current,true);
+    $startYear=(string)$currentStart;$monthCode='07';$classLabel='1A';$rate=250000.0;$discount=0.0;$billStatus='open';$level=1;
+    $stmtSpp=$koneksi->prepare('INSERT INTO tagihan_spp(master_spp_tahun_id,tahun_ajaran_id,penempatan_id,no_induk,tingkat_snapshot,master_kelas_id,kelas_rombel_snapshot,bulan,tahun,tarif_dasar_snapshot,potongan_persen_snapshot,potongan_nominal_snapshot,nominal_tagihan,status) VALUES(?,?,?,?,?,?,?,?,?,?,?,?,?,?)');
+    $masterId=(int)$master['id'];$yearId=$yearIds[$current];
+    $stmtSpp->bind_param('iiisiisssdddds',$masterId,$yearId,$placementId,$students[0],$level,$classId,$classLabel,$monthCode,$startYear,$rate,$discount,$discount,$rate,$billStatus);
+    $stmtSpp->execute();$stmtSpp->close();
 
     $cookies = [];
     $login = du_http_request($baseUrl . '/login.php', ['username'=>'admin','password'=>'admin123'], $cookies);
@@ -97,15 +107,15 @@ try {
     du_http_assert(str_contains($form['body'], 'du-selector-trigger') && str_contains($form['body'], 'LULUS · TA ' . $previous), 'Dropdown tunggakan atau label lulusan belum dirender.');
 
     $month = '07'; $calendarYear = (string)$currentStart;
-    $submit = static function (string $nis, int $billId, float $du, float $spp = 0) use ($baseUrl, &$cookies, $month, $calendarYear): array {
+    $submit = static function (string $nis, int $billId, float $du, float $spp = 0, float $komite=0) use ($baseUrl, &$cookies, $month, $calendarYear): array {
         return du_http_request($baseUrl . '/pembayaran/proses.php', [
             'aksi'=>'input', 'payment_plan'=>'monthly', 'no_induk'=>$nis,
             'bulan_bayar'=>$month, 'tahun_bayar'=>$calendarYear, 'sistem_pembayaran'=>'Tunai',
-            'uang_spp'=>$spp, 'uang_du'=>$du, 'tagihan_daftar_ulang_id'=>$billId,
+            'uang_spp'=>$spp, 'uang_komite'=>$komite, 'uang_du'=>$du, 'tagihan_daftar_ulang_id'=>$billId,
         ], $cookies);
     };
 
-    du_http_assert($submit($students[0], $studentBills[$previous], 300000, 250000)['status'] === 302, 'Pembayaran gabungan DU lama dan SPP berjalan gagal.');
+    du_http_assert($submit($students[0], $studentBills[$previous], 300000, 250000, 100000)['status'] === 302, 'Pembayaran gabungan DU lama, SPP, dan Komite berjalan gagal.');
     $stmt = $koneksi->prepare('SELECT b.id,b.U_SPP,bd.tagihan_daftar_ulang_id,bd.th_ajaran,bd.kelas FROM bayar b JOIN bayar_du bd ON bd.bayar_id=b.id WHERE b.NO_INDUK=? ORDER BY b.id DESC LIMIT 1');
     $stmt->bind_param('s', $students[0]); $stmt->execute(); $payment = $stmt->get_result()->fetch_assoc(); $stmt->close();
     du_http_assert($payment && (int)$payment['tagihan_daftar_ulang_id'] === $studentBills[$previous] && $payment['th_ajaran'] === $previous && $payment['kelas'] === '1', 'Snapshot DU tidak disalin dari tagihan terpilih.');
@@ -120,7 +130,7 @@ try {
     $move = du_http_request($baseUrl . '/pembayaran/proses.php', [
         'aksi'=>'update', 'id'=>(int)$payment['id'], 'csrf_token'=>$tokenMatch[1], 'no_induk'=>$students[0],
         'tanggal_bayar'=>date('Y-m-d H:i:s'), 'bulan_bayar'=>$month, 'tahun_bayar'=>$calendarYear,
-        'sistem_pembayaran'=>'Tunai', 'uang_spp'=>250000, 'uang_du'=>300000,
+        'sistem_pembayaran'=>'Tunai', 'uang_spp'=>250000, 'uang_komite'=>100000, 'uang_du'=>300000,
         'tagihan_daftar_ulang_id'=>$studentBills[$current],
     ], $cookies);
     du_http_assert($move['status'] === 302, 'Pemindahan tagihan saat edit tidak selesai.');
@@ -129,13 +139,15 @@ try {
 
     du_http_assert($submit($students[2], $graduateBills[$previous], 100000)['status'] === 302, 'Lulusan tidak dapat melunasi tunggakan DU.');
     du_http_assert($submit($students[2], $graduateBills[$previous], 100000, 250000)['status'] === 302, 'Request campuran lulusan tidak mengembalikan redirect.');
-    du_http_assert(str_contains(du_http_flash($baseUrl, $cookies), 'tidak dapat menerima Titipan SPP baru'), 'Backend tidak menolak uang SPP lulusan tanpa tagihan terbuka.');
+    du_http_assert(str_contains(du_http_flash($baseUrl, $cookies), 'Tagihan Komite'), 'Backend tidak menolak SPP lulusan tanpa tagihan bulanan.');
 } catch (Throwable $error) {
     $failure = $error;
 } finally {
     foreach ($students as $nis) {
         $stmt = $koneksi->prepare('DELETE FROM bayar WHERE NO_INDUK=?'); $stmt->bind_param('s', $nis); $stmt->execute(); $stmt->close();
         $stmt = $koneksi->prepare('DELETE FROM tagihan_daftar_ulang WHERE no_induk=?'); $stmt->bind_param('s', $nis); $stmt->execute(); $stmt->close();
+        $stmt = $koneksi->prepare('DELETE FROM tagihan_spp WHERE no_induk=?'); $stmt->bind_param('s', $nis); $stmt->execute(); $stmt->close();
+        $stmt = $koneksi->prepare('DELETE FROM tagihan_komite WHERE no_induk=?'); $stmt->bind_param('s', $nis); $stmt->execute(); $stmt->close();
         $stmt = $koneksi->prepare('DELETE FROM siswa_tahun_ajaran WHERE no_induk=?'); $stmt->bind_param('s', $nis); $stmt->execute(); $stmt->close();
         $stmt = $koneksi->prepare('DELETE FROM siswa WHERE NO_INDUK=?'); $stmt->bind_param('s', $nis); $stmt->execute(); $stmt->close();
     }
