@@ -113,7 +113,7 @@ $roleAvatars = [
 $roleAvatar = $roleAvatars[$role] ?? 'US';
 ?>
 <!-- Early theme init to prevent flash -->
-<script>(function(){var t=localStorage.getItem('spp_theme')||'dark';document.documentElement.setAttribute('data-theme',t);})();</script>
+<script>(function(){var t=localStorage.getItem('spp_theme')||'light';document.documentElement.setAttribute('data-theme',t);})();</script>
 
 <aside class="sidebar" id="sidebar">
   <div class="sidebar-brand">

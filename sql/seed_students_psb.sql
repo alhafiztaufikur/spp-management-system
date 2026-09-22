@@ -10,7 +10,8 @@
 -- Tidak menghapus transaksi, histori, atau akun operator.
 -- =========================================================
 
-USE `db_spp`;
+-- Pilih database target di client SQL sebelum menjalankan file ini.
+-- Tidak memakai USE agar seeder tidak berpindah database tanpa sengaja.
 
 SET NAMES utf8mb4 COLLATE utf8mb4_unicode_ci;
 SET @old_foreign_key_checks := @@FOREIGN_KEY_CHECKS;
@@ -90,13 +91,14 @@ WHERE seq.`n` BETWEEN 31 AND 144
   );
 
 -- Siswa PSB adalah data calon siswa dan tidak diberi tagihan reguler.
+-- Namun Pangkal dan PSB sama-sama boleh dicicil sejak masa PSB.
 INSERT INTO `siswa` (
   `NO_INDUK`, `NO_induk_diknas`, `NAMA`, `KELAS`, `SPP_PERBULAN`,
-  `PANGKAL`, `PSB`, `asal_psb`, `POMG`, `DAFTAR_ULANG`, `master_kelas_id`, `is_active`
+  `PANGKAL`, `PSB`, `asal_psb`, `POMG`, `DAFTAR_ULANG`, `tot_pangkal`, `master_kelas_id`, `is_active`
 )
 SELECT
   psb.`no_induk`, psb.`diknas`, psb.`nama`, 'PSB',
-  0, 0, 3600000, 1, 0, 0,
+  0, 1000000, 3600000, 1, 0, 0, 1000000,
   (SELECT `id` FROM `master_kelas` WHERE `tingkat` = 0 AND `kode_rombel` = 'PSB' LIMIT 1),
   1
 FROM (
@@ -107,9 +109,18 @@ FROM (
   UNION ALL SELECT 'PSB0005', 'D26PSB0005', 'Calon Siswa PSB 05'
   UNION ALL SELECT 'PSB0006', 'D26PSB0006', 'Calon Siswa PSB 06'
 ) psb
-WHERE NOT EXISTS (
-  SELECT 1 FROM `siswa` existing WHERE existing.`NO_INDUK` = psb.`no_induk`
-);
+ON DUPLICATE KEY UPDATE
+  `NAMA` = VALUES(`NAMA`),
+  `KELAS` = 'PSB',
+  `SPP_PERBULAN` = 0,
+  `PANGKAL` = VALUES(`PANGKAL`),
+  `PSB` = VALUES(`PSB`),
+  `asal_psb` = 1,
+  `POMG` = 0,
+  `DAFTAR_ULANG` = 0,
+  `tot_pangkal` = VALUES(`tot_pangkal`),
+  `master_kelas_id` = VALUES(`master_kelas_id`),
+  `is_active` = 1;
 
 -- Buat pemetaan rombel A-D yang stabil untuk seluruh siswa reguler.
 DROP TEMPORARY TABLE IF EXISTS `seed_student_class_map`;
@@ -131,6 +142,9 @@ FROM (
 
 ALTER TABLE `seed_student_class_map` ADD PRIMARY KEY (`no_induk`);
 ALTER TABLE `seed_student_class_map` ADD INDEX `idx_seed_student_class` (`tingkat`, `kode_rombel`);
+ALTER TABLE `seed_student_class_map`
+  MODIFY `no_induk` VARCHAR(10) CHARACTER SET utf8mb4 COLLATE utf8mb4_general_ci NOT NULL,
+  MODIFY `kode_rombel` VARCHAR(10) CHARACTER SET utf8mb4 COLLATE utf8mb4_general_ci NOT NULL;
 
 -- Pindahkan siswa aktif dan sinkronkan identitas kelasnya.
 UPDATE `siswa` s

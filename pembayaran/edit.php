@@ -191,8 +191,8 @@ function money_attr($value) {
 }
 
 function total_after_discount($total, $discount, $fallbackTotal = 0) {
-    $fallbackTotal = (float)$fallbackTotal;
-    if ($fallbackTotal > 0) return $fallbackTotal;
+    // $fallbackTotal dipertahankan agar kontrak pemanggil lama tidak putus,
+    // tetapi Pangkal selalu dihitung dari nominal Master Siswa dan potongan.
     return max(0, (float)$total - (float)$discount);
 }
 
@@ -218,9 +218,9 @@ $selectedPaymentMethod = $d['sistem_pembayaran'] ?? 'VA';
   <meta name="description" content="Edit data transaksi pembayaran siswa." />
   <link rel="preconnect" href="https://fonts.googleapis.com" />
   <link href="https://fonts.googleapis.com/css2?family=Inter:wght@300;400;500;600;700;800&display=swap" rel="stylesheet" />
-  <link rel="stylesheet" href="../assets/css/style.css?v=9.9" />
+  <link rel="stylesheet" href="../assets/css/style.css?v=10.2" />
   <!-- Prevent theme flash -->
-  <script>(function(){var t=localStorage.getItem('spp_theme')||'dark';document.documentElement.setAttribute('data-theme',t);})();</script>
+  <script>(function(){var t=localStorage.getItem('spp_theme')||'light';document.documentElement.setAttribute('data-theme',t);})();</script>
 </head>
 <body>
 
@@ -564,7 +564,7 @@ $selectedPaymentMethod = $d['sistem_pembayaran'] ?? 'VA';
       JSON_UNESCAPED_UNICODE | JSON_UNESCAPED_SLASHES | JSON_HEX_TAG | JSON_HEX_APOS | JSON_HEX_AMP | JSON_HEX_QUOT
     ) ?>;
   </script>
-  <script src="../assets/js/app.js?v=6.9"></script>
+  <script src="../assets/js/app.js?v=10.2"></script>
 </body>
 </html>
 

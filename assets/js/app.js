@@ -12,14 +12,14 @@ function escapeHtml(value) {
 
 /* ── Theme Init (run ASAP to avoid flash) ─── */
 (function () {
-  const saved = localStorage.getItem('spp_theme') || 'dark';
+  const saved = localStorage.getItem('spp_theme') || 'light';
   document.documentElement.setAttribute('data-theme', saved);
 })();
 
 /* ── Theme Toggle ────────────────────────── */
 function toggleTheme() {
   const html    = document.documentElement;
-  const current = html.getAttribute('data-theme') || 'dark';
+  const current = html.getAttribute('data-theme') || 'light';
   const next    = current === 'dark' ? 'light' : 'dark';
 
   html.setAttribute('data-theme', next);
@@ -47,7 +47,7 @@ function updateThemeUI(theme) {
 
 // Apply UI labels once DOM is ready
 document.addEventListener('DOMContentLoaded', function () {
-  const saved = localStorage.getItem('spp_theme') || 'dark';
+  const saved = localStorage.getItem('spp_theme') || 'light';
   updateThemeUI(saved);
 });
 
@@ -1292,10 +1292,15 @@ function refreshOptionalOneTimeFeeAvailability() {
     const contextEl = document.getElementById(key + '-context-label');
     if (!inputEl) return;
 
+    const labels = {
+      pangkal: 'Uang Pangkal',
+      psb: 'Uang PSB',
+      komite: 'Uang Komite'
+    };
     let message = '';
     if (!hasStudent) message = 'Pilih siswa terlebih dahulu';
-    else if (total <= 0) message = 'Tarif belum diatur di Data Siswa';
-    else if (paid + 0.001 >= total) message = 'Lunas';
+    else if (total <= 0) message = labels[key] + ' belum diatur di Data Siswa';
+    else if (paid + 0.001 >= total) message = labels[key] + ' sudah lunas';
 
     const locked = message !== '';
     inputEl.readOnly = locked;

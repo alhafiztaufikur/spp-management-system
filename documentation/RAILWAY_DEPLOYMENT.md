@@ -1,6 +1,15 @@
 # Persiapan Deployment Railway
 
-Status 2026-09-19: MySQL Railway sudah online dengan volume persisten. Service `sistemspp-prod` sudah terhubung ke GitHub (`main`), memakai Dockerfile proyek, memiliki reference variables ke MySQL, dan Apache berhasil berjalan secara privat. Database aplikasi belum diisi dan belum ada domain publik. Service `sistemspp-web` adalah placeholder kosong; `sistemspp-app` adalah percobaan deploy sebelumnya yang gagal startup Apache. Jangan arahkan domain ke keduanya. Hapus kedua service lama setelah `sistemspp-prod` lolos pemeriksaan aplikasi.
+Status 2026-09-22: MySQL Railway sudah online dengan volume persisten dan database lokal `db_spp` telah diimpor ke database `railway`. Service produksi memakai Dockerfile proyek, reference variables ke MySQL, dan domain Railway sudah aktif. Setelah menjalankan perubahan data, lakukan pemeriksaan `/health.php`, login administrator, serta satu transaksi uji yang sah sebelum aplikasi dipakai operasional.
+
+## Hasil impor database lokal
+
+- Impor terlebih dahulu lolos uji pada database disposable, kemudian diterapkan ke `railway`. Database lokal tidak diubah.
+- Verifikasi setelah impor: 30 tabel, 61 foreign key, 152 siswa, 218 transaksi pembayaran, dan total `bayar.total_jumlah` Rp84.817.500; jumlah baris setiap tabel cocok dengan lokal.
+- Identifier tabel `Daftar_ulang` disesuaikan kapitalisasinya pada salinan dump karena MySQL Linux membedakan huruf besar/kecil pada nama tabel. Database lokal tetap menggunakan nama lamanya.
+- Salinan dump sumber dan dump impor tersimpan di direktori temp lokal `spp-railway-import-fe59aa6f035640a5a2b290e12ff77a13` untuk pemulihan sementara; jangan masukkan dump berisi data siswa ke Git.
+- TCP proxy MySQL yang dibuat khusus untuk impor sudah dihapus; tidak ada proxy publik tersisa. Koneksi internal `sistemspp-prod` ke MySQL tetap memakai reference variables.
+- Schema lokal memiliki tujuh CHECK constraint referensi yang belum ada pada database sumber; impor mempertahankan kondisi sumber tersebut. Periksa sebelum aplikasi dipakai sebagai produksi sungguhan.
 
 ## Yang sudah disiapkan di repository
 
@@ -13,7 +22,7 @@ Status 2026-09-19: MySQL Railway sudah online dengan volume persisten. Service `
 
 ## Langkah tersisa sebelum membuka domain
 
-1. Tentukan sumber data: impor database lokal yang telah diverifikasi, atau mulai dari database kosong. Jangan jalankan kedua jalur sekaligus. Aktifkan backup MySQL sebelum memasukkan data. [Panduan Railway MySQL](https://docs.railway.com/databases/mysql).
+1. Database sudah berisi data lokal. **Jangan jalankan bootstrap atau impor `sql/schema.sql`** pada database ini. Pastikan backup MySQL Railway diaktifkan dan kebijakan pemulihannya diuji. [Panduan Railway MySQL](https://docs.railway.com/databases/mysql).
 2. Konfigurasi koneksi pada `sistemspp-prod` sudah terpasang memakai *reference variables* dari service MySQL:
 
    ```text
@@ -26,9 +35,9 @@ Status 2026-09-19: MySQL Railway sudah online dengan volume persisten. Service `
    ```
 
    Sesuaikan `MySQL` jika nama service database berbeda. Jangan menyalin nilai password database ke repository. [Panduan reference variables](https://docs.railway.com/variables#referencing-another-services-variable).
-3. Jika memilih database baru, pada container web privat jalankan `php sql/bootstrap_production.php --execute` **sekali** dengan `SPP_BOOTSTRAP_TARGET` sama persis dengan `SPP_DB_NAME`, serta `SPP_BOOTSTRAP_ADMIN_USER` dan `SPP_BOOTSTRAP_ADMIN_PASSWORD` yang kuat sebagai environment sementara. Jangan menaruh password admin dalam commit, log, atau argumen perintah. [Panduan Railway SSH](https://docs.railway.com/cli/ssh). Jika memilih impor lokal, jangan jalankan bootstrap.
-4. Periksa `/health.php`, login administrator, serta form/laporan dengan data uji yang sah. Setelah lolos, atur healthcheck `/health.php`, lalu baru aktifkan domain publik. Ganti atau hapus data uji sebelum dipakai sekolah.
+3. Periksa `/health.php` pada service web, login administrator, serta form/laporan dengan data uji yang sah. Pastikan healthcheck memakai `/health.php`. Ganti kredensial dan data demo sebelum dipakai sekolah.
+4. Pastikan perubahan kode terbaru benar-benar ter-deploy sebelum perubahan schema atau data dijalankan. Gunakan satu jalur deploy yang konsisten (repository yang sudah terhubung atau Railway CLI); jangan membuat service web baru untuk setiap deploy.
 
-Jangan mengimpor `sql/schema.sql` langsung ke database produksi: file itu berisi akun dan siswa demo serta perintah `DROP TABLE`. Jangan menjalankan bootstrap pada database yang berisi data; script akan menolak database non-kosong. Bila data lokal akan dipindahkan ke Railway, proses migrasi data dan persetujuan privasi harus diputuskan terpisah dari setup ini.
+Jangan mengimpor `sql/schema.sql` langsung ke database produksi: file itu berisi akun dan siswa demo serta perintah `DROP TABLE`. Jangan menjalankan bootstrap pada database yang berisi data; script akan menolak database non-kosong. Pastikan pemakaian data siswa di Railway telah disetujui sesuai kebijakan privasi sekolah.
 
 DDL MySQL tidak dapat di-rollback secara menyeluruh. Jika bootstrap gagal di tengah proses, jangan ulangi pada database parsial; buat database kosong baru atau pulihkan dari backup setelah penyebabnya diperbaiki.

@@ -4,33 +4,33 @@
 
 @import url('https://fonts.googleapis.com/css2?family=Inter:wght@300;400;500;600;700;800&family=Outfit:wght@400;500;600;700;800&display=swap');
 
-/* ── M3 CSS Variables (Dark Mode Default) ─── */
+/* ── M3 CSS Variables (Light Mode Default) ─── */
 :root {
-  color-scheme: dark;
-  --bg-base:       #0f1518;
-  --bg-surface:    #151d20;
-  --bg-elevated:   #1c282b;
-  --bg-card:       rgba(22, 31, 34, 0.96);
+  color-scheme: light;
+  --bg-base:       #fbfefc;
+  --bg-surface:    #f3fbf6;
+  --bg-elevated:   #ffffff;
+  --bg-card:       rgba(255, 255, 255, 0.99);
 
-  --accent:        #34d399;
-  --accent-light:  #6ee7b7;
-  --accent-glow:   rgba(52, 211, 153, 0.13);
-  --accent-hover:  #10b981;
+  --accent:        #168a46;
+  --accent-light:  #1f9d55;
+  --accent-glow:   rgba(31, 157, 85, 0.10);
+  --accent-hover:  #0f6f36;
 
-  --green:         #34d399;
-  --green-bg:      rgba(52, 211, 153, 0.12);
-  --orange:        #f59e0b;
-  --orange-bg:     rgba(245, 158, 11, 0.12);
-  --red:           #e57373;
-  --red-bg:        rgba(229, 115, 115, 0.12);
-  --blue:          #38bdf8;
-  --blue-bg:       rgba(56, 189, 248, 0.11);
-  --purple-bg:     rgba(168, 162, 158, 0.11);
-  --purple:        #cbd5e1;
+  --green:         #168a46;
+  --green-bg:      rgba(31, 157, 85, 0.09);
+  --orange:        #d97706;
+  --orange-bg:     rgba(217, 119, 6, 0.09);
+  --red:           #d32f2f;
+  --red-bg:        rgba(211, 47, 47, 0.1);
+  --blue:          #0f766e;
+  --blue-bg:       rgba(15, 118, 110, 0.09);
+  --purple-bg:     rgba(217, 119, 6, 0.08);
+  --purple:        #d97706;
 
-  --text-primary:  #f6f8f7;
-  --text-secondary:#cbd5d1;
-  --text-muted:    #93a39d;
+  --text-primary:  #17261e;
+  --text-secondary:#40564a;
+  --text-muted:    #6b7e72;
 
   /* Compatibility aliases used by the report and master components. */
   --primary:       var(--accent);
@@ -38,16 +38,16 @@
   --text-main:     var(--text-primary);
   --card-bg:       var(--bg-card);
 
-  --border:        rgba(148, 163, 184, 0.18);
-  --border-hover:  rgba(52, 211, 153, 0.34);
+  --border:        rgba(31, 157, 85, 0.16);
+  --border-hover:  rgba(22, 138, 70, 0.38);
 
   --radius-sm:     8px;
   --radius:        16px; /* M3 Medium */
   --radius-lg:     20px;
   --radius-xl:     28px; /* M3 Large/Extra-Large */
 
-  --shadow:        0 14px 34px rgba(0,0,0,0.28);
-  --shadow-glow:   0 18px 42px rgba(0,0,0,0.26), 0 0 0 1px rgba(52, 211, 153, 0.08);
+  --shadow:        0 10px 28px rgba(19, 86, 48, 0.07);
+  --shadow-glow:   0 16px 38px rgba(31, 157, 85, 0.10);
 
   --sidebar-w:     260px;
   --transition:    0.2s cubic-bezier(0.2, 0, 0, 1); /* M3 Easing */
@@ -86,6 +86,41 @@
 
   --shadow:        0 10px 28px rgba(19, 86, 48, 0.07);
   --shadow-glow:   0 16px 38px rgba(31, 157, 85, 0.10);
+}
+
+/* Explicit dark-mode preference. The root values stay light for first visits. */
+[data-theme="dark"] {
+  color-scheme: dark;
+  --bg-base:       #0f1518;
+  --bg-surface:    #151d20;
+  --bg-elevated:   #1c282b;
+  --bg-card:       rgba(22, 31, 34, 0.96);
+
+  --accent:        #34d399;
+  --accent-light:  #6ee7b7;
+  --accent-glow:   rgba(52, 211, 153, 0.13);
+  --accent-hover:  #10b981;
+
+  --green:         #34d399;
+  --green-bg:      rgba(52, 211, 153, 0.12);
+  --orange:        #f59e0b;
+  --orange-bg:     rgba(245, 158, 11, 0.12);
+  --red:           #e57373;
+  --red-bg:        rgba(229, 115, 115, 0.12);
+  --blue:          #38bdf8;
+  --blue-bg:       rgba(56, 189, 248, 0.11);
+  --purple-bg:     rgba(168, 162, 158, 0.11);
+  --purple:        #cbd5e1;
+
+  --text-primary:  #f6f8f7;
+  --text-secondary:#cbd5d1;
+  --text-muted:    #93a39d;
+
+  --border:        rgba(148, 163, 184, 0.18);
+  --border-hover:  rgba(52, 211, 153, 0.34);
+
+  --shadow:        0 14px 34px rgba(0,0,0,0.28);
+  --shadow-glow:   0 18px 42px rgba(0,0,0,0.26), 0 0 0 1px rgba(52, 211, 153, 0.08);
 }
 
 /* Master siswa */
@@ -7431,9 +7466,10 @@ a.btn {
 }
 
 .payment-history-panel {
-  border: 1px solid rgba(16, 139, 91, .18);
+  border: 1px solid var(--border);
   border-radius: 16px;
-  background: rgba(255, 255, 255, .68);
+  background: var(--bg-card);
+  box-shadow: 0 10px 24px rgba(0, 0, 0, 0.08);
   overflow: hidden;
 }
 
@@ -7443,8 +7479,8 @@ a.btn {
   justify-content: space-between;
   gap: 16px;
   padding: 14px 16px;
-  border-bottom: 1px solid rgba(16, 139, 91, .14);
-  background: rgba(16, 139, 91, .06);
+  border-bottom: 1px solid var(--border);
+  background: var(--accent-glow);
 }
 
 .payment-history-head strong {
@@ -7467,11 +7503,21 @@ a.btn {
   overflow: auto;
   border: 0;
   border-radius: 0;
+  background: var(--bg-card);
+  scrollbar-color: var(--border-hover) transparent;
 }
 
 .payment-history-table td,
 .payment-history-table th {
   white-space: nowrap;
+}
+
+.payment-history-table td {
+  border-bottom-color: var(--border);
+}
+
+.payment-history-table tbody tr:last-child td {
+  border-bottom: 0;
 }
 
 /* Focused filter layout fixes for Laporan Global */

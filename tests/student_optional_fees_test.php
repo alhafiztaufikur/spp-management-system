@@ -42,6 +42,17 @@ try {
     optional_fee_assert(abs($status['psb']['paid'] - 1000000) < .001, 'Dua cicilan PSB tidak terakumulasi.');
     optional_fee_assert(abs($status['psb']['remaining'] - 2600000) < .001, 'Sisa PSB salah.');
 
+    // Pangkal mengikuti kontrak yang sama dengan PSB: tagihan satu kali,
+    // dapat dicicil, tetapi tidak pernah boleh melampaui sisa tagihan.
+    validate_one_time_fee_payments($koneksi, $noInduk, ['pangkal' => 250000]);
+    $pangkalOverpaymentRejected = false;
+    try {
+        validate_one_time_fee_payments($koneksi, $noInduk, ['pangkal' => 700001]);
+    } catch (RuntimeException $error) {
+        $pangkalOverpaymentRejected = str_contains($error->getMessage(), 'melebihi sisa');
+    }
+    optional_fee_assert($pangkalOverpaymentRejected, 'Pembayaran Pangkal melebihi sisa tidak ditolak.');
+
     $overpaymentRejected = false;
     try {
         validate_one_time_fee_payments($koneksi, $noInduk, ['psb'=>2700000]);
@@ -59,7 +70,7 @@ try {
     optional_fee_assert(abs($status['psb']['paid'] - 900000) < .001, 'Edit cicilan PSB tidak dihitung ulang.');
 
     $koneksi->rollback();
-    echo "OK: schema PSB, cicilan, batas pembayaran, dan edit tervalidasi.\n";
+    echo "OK: schema PSB/Pangkal, cicilan, batas pembayaran, dan edit tervalidasi.\n";
 } catch (Throwable $error) {
     $koneksi->rollback();
     fwrite(STDERR, 'FAILED: ' . $error->getMessage() . PHP_EOL);

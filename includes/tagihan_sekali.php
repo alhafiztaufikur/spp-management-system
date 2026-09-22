@@ -17,10 +17,10 @@ function one_time_fee_components(): array {
 }
 
 function one_time_fee_totals_from_student(array $student): array {
-    $pangkal = (float)($student['tot_pangkal'] ?? 0);
-    if ($pangkal <= 0) {
-        $pangkal = max(0, (float)($student['PANGKAL'] ?? 0) - (float)($student['potong_pangkal'] ?? 0));
-    }
+    // PANGKAL dan potong_pangkal adalah nilai master. tot_pangkal hanya
+    // kolom kompatibilitas/hasil hitung lama, jadi tidak boleh menentukan
+    // tagihan saat nilainya tertinggal dari data master.
+    $pangkal = max(0, (float)($student['PANGKAL'] ?? 0) - (float)($student['potong_pangkal'] ?? 0));
     return [
         'pangkal' => $pangkal,
         'psb' => max(0, (float)($student['PSB'] ?? 0)),
