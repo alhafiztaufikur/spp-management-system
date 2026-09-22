@@ -38,6 +38,8 @@ Status 2026-09-22: MySQL Railway sudah online dengan volume persisten dan databa
 3. Periksa `/health.php` pada service web, login administrator, serta form/laporan dengan data uji yang sah. Pastikan healthcheck memakai `/health.php`. Ganti kredensial dan data demo sebelum dipakai sekolah.
 4. Pastikan perubahan kode terbaru benar-benar ter-deploy sebelum perubahan schema atau data dijalankan. Gunakan satu jalur deploy yang konsisten (repository yang sudah terhubung atau Railway CLI); jangan membuat service web baru untuk setiap deploy.
 
-Jangan mengimpor `sql/schema.sql` langsung ke database produksi: file itu berisi akun dan siswa demo serta perintah `DROP TABLE`. Jangan menjalankan bootstrap pada database yang berisi data; script akan menolak database non-kosong. Pastikan pemakaian data siswa di Railway telah disetujui sesuai kebijakan privasi sekolah.
+Jangan mengimpor `sql/schema.sql` langsung ke database produksi: file itu berisi akun default dan perintah `DROP TABLE`. Jangan menjalankan bootstrap pada database yang berisi data; script akan menolak database non-kosong. Pastikan pemakaian data siswa di Railway telah disetujui sesuai kebijakan privasi sekolah.
+
+Untuk mengganti database demo yang sudah terlanjur diimpor dengan baseline baru, ikuti [panduan reset baseline demo](DEMO_DATA_RESET.md). Proses itu destruktif dan hanya untuk data yang memang boleh dihapus.
 
 DDL MySQL tidak dapat di-rollback secara menyeluruh. Jika bootstrap gagal di tengah proses, jangan ulangi pada database parsial; buat database kosong baru atau pulihkan dari backup setelah penyebabnya diperbaiki.

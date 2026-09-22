@@ -35,7 +35,15 @@ try {
     sort($tables); sort($required);
     if ($tables !== $required) throw new RuntimeException('Tabel Master SPP pada instalasi baru tidak lengkap.');
 
-    echo "OK: schema.sql dapat membangun database baru beserta seluruh tabel Master SPP.\n";
+    $empty = $db->query("SELECT
+        (SELECT COUNT(*) FROM `{$database}`.siswa) siswa,
+        (SELECT COUNT(*) FROM `{$database}`.bayar) pembayaran,
+        (SELECT COUNT(*) FROM `{$database}`.tahun_ajaran) tahun_ajaran")->fetch_assoc();
+    if ((int)$empty['siswa'] !== 0 || (int)$empty['pembayaran'] !== 0 || (int)$empty['tahun_ajaran'] !== 0) {
+        throw new RuntimeException('schema.sql tidak boleh menyisipkan siswa, pembayaran, atau tahun ajaran demo.');
+    }
+
+    echo "OK: schema.sql membangun tabel Master SPP tanpa data demo.\n";
 } finally {
     $db->query("DROP DATABASE IF EXISTS `{$database}`");
     $db->close();

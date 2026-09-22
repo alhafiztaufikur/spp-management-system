@@ -106,32 +106,6 @@ CREATE TABLE `siswa_audit_log` (
   CONSTRAINT `fk_siswa_audit_admin` FOREIGN KEY (`admin_id`) REFERENCES `admin` (`id`) ON DELETE SET NULL ON UPDATE CASCADE
 ) ENGINE=InnoDB;
 
--- Data siswa contoh
-INSERT INTO `siswa` (
-  `NO_INDUK`, `NO_induk_diknas`, `NAMA`, `KELAS`, `SPP_PERBULAN`,
-  `PANGKAL`, `PSB`, `asal_psb`, `POMG`, `DAFTAR_ULANG`, `tot_pangkal`, `tot_du`
-) VALUES
-('2024001', NULL,      'Ahmad Fauzi',      '1', 250000, 1000000, 0, 0, 100000, 1000000, 1000000, 1000000),
-('2024002', NULL,      'Siti Rahayu',      '2', 260000, 1100000, 0, 0, 110000, 1100000, 1100000, 1100000),
-('2024003', NULL,      'Budi Santoso',     '3', 275000, 1200000, 0, 0, 120000, 1200000, 1200000, 1200000),
-('2024004', NULL,      'Dewi Lestari',     '4', 290000, 1300000, 0, 0, 130000, 1300000, 1300000, 1300000),
-('2024005', NULL,      'Muhammad Rizky',   '5', 305000, 1400000, 0, 0, 140000, 1400000, 1400000, 1400000),
-('2024006', NULL,      'Ayu Putri',        '6', 320000, 1500000, 0, 0, 150000, 1500000, 1500000, 1500000),
-('PSB0001', 'D26PSB001','Calon Siswa PSB','PSB', 0, 500000, 3600000, 1, 0, 0, 500000, 0);
-
-UPDATE `siswa` s
-JOIN `master_kelas` mk
-  ON mk.tingkat = CAST(s.KELAS AS UNSIGNED)
- AND mk.kode_rombel = ELT(MOD(CAST(s.NO_INDUK AS UNSIGNED) - 1, 4) + 1, 'A', 'B', 'C', 'D')
- AND mk.is_placeholder = 0
-SET s.master_kelas_id = mk.id
-WHERE s.KELAS IN ('1','2','3','4','5','6');
-
-UPDATE `siswa` s
-JOIN `master_kelas` mk ON mk.id=s.master_kelas_id
-SET s.asal_psb=1
-WHERE mk.tingkat=0 OR UPPER(mk.kode_rombel)='PSB';
-
 -- Tabel Bayar (Revisi Baru)
 DROP TABLE IF EXISTS `bayar`;
 CREATE TABLE `bayar` (
@@ -518,53 +492,6 @@ CREATE TABLE `bayar_tahunan_siswa` (
   CONSTRAINT `fk_bayar_tahunan_siswa` FOREIGN KEY (`no_induk`) REFERENCES `siswa`(`NO_INDUK`) ON DELETE CASCADE ON UPDATE CASCADE,
   CONSTRAINT `chk_bayar_tahunan_jumlah` CHECK (`jumlah` >= 0)
 ) ENGINE=InnoDB;
-
-INSERT INTO `tahun_ajaran` (`label`, `tanggal_mulai`, `tanggal_selesai`, `status`, `published_at`) VALUES
-('2026/2027', '2026-07-01', '2027-06-30', 'published', NOW());
-
-INSERT INTO `Daftar_ulang` (`tahun_ajaran_id`, `th_ajaran`, `kelas`, `Jumlah`)
-SELECT ta.id, ta.label, kelas_data.kelas, kelas_data.jumlah
-FROM tahun_ajaran ta
-JOIN (
-  SELECT '1' AS kelas, 1000000 AS jumlah UNION ALL
-  SELECT '2', 1100000 UNION ALL
-  SELECT '3', 1200000 UNION ALL
-  SELECT '4', 1300000 UNION ALL
-  SELECT '5', 1400000 UNION ALL
-  SELECT '6', 1500000
-) kelas_data
-WHERE ta.label = '2026/2027';
-
-INSERT INTO `siswa_tahun_ajaran` (`tahun_ajaran_id`, `no_induk`, `kelas`, `master_kelas_id`, `kelas_rombel_snapshot`, `spp_perbulan_snapshot`, `komite_snapshot`, `status`)
-SELECT ta.id, s.NO_INDUK, s.KELAS, s.master_kelas_id,
-       CASE WHEN mk.tingkat = 0 THEN 'PSB' ELSE CONCAT(mk.tingkat, UPPER(mk.kode_rombel)) END,
-       s.SPP_PERBULAN, s.POMG, 'aktif'
-FROM siswa s
-JOIN tahun_ajaran ta ON ta.label = '2026/2027'
-LEFT JOIN master_kelas mk ON mk.id = s.master_kelas_id
-WHERE COALESCE(mk.tingkat,CAST(s.KELAS AS UNSIGNED))>0;
-
-INSERT INTO `tagihan_daftar_ulang` (
-  `tahun_ajaran_id`, `penempatan_id`, `master_daftar_ulang_id`,
-  `no_induk`, `kelas_snapshot`, `tahun_ajaran_snapshot`, `nominal_awal`, `nominal_tagihan`
-)
-SELECT ta.id, sta.id, du.id, s.NO_INDUK, s.KELAS, ta.label,
-       COALESCE(NULLIF(s.DAFTAR_ULANG, 0), du.Jumlah, 0),
-       COALESCE(NULLIF(s.tot_du, 0), NULLIF(s.DAFTAR_ULANG - s.potong_du, 0), du.Jumlah, 0)
-FROM siswa s
-JOIN tahun_ajaran ta ON ta.label = '2026/2027'
-JOIN siswa_tahun_ajaran sta ON sta.tahun_ajaran_id = ta.id AND sta.no_induk = s.NO_INDUK
-LEFT JOIN Daftar_ulang du ON du.tahun_ajaran_id = ta.id AND du.kelas = s.KELAS;
-
-INSERT INTO `tagihan_komite` (`tahun_ajaran_id`,`penempatan_id`,`no_induk`,`kelas_rombel_snapshot`,`bulan`,`tahun`,`nominal_tagihan`)
-SELECT sta.tahun_ajaran_id,sta.id,sta.no_induk,sta.kelas_rombel_snapshot,
-       LPAD(m.bulan,2,'0'),IF(m.bulan>=7,LEFT(ta.label,4),RIGHT(ta.label,4)),s.POMG
-FROM siswa_tahun_ajaran sta
-JOIN tahun_ajaran ta ON ta.id=sta.tahun_ajaran_id
-JOIN siswa s ON s.NO_INDUK=sta.no_induk
-JOIN (SELECT 1 bulan UNION ALL SELECT 2 UNION ALL SELECT 3 UNION ALL SELECT 4 UNION ALL SELECT 5 UNION ALL SELECT 6 UNION ALL SELECT 7 UNION ALL SELECT 8 UNION ALL SELECT 9 UNION ALL SELECT 10 UNION ALL SELECT 11 UNION ALL SELECT 12) m
-WHERE sta.kelas IN ('1','2','3','4','5','6')
-  AND IF(m.bulan>=7,m.bulan-7,m.bulan+5)>=IF(CAST(sta.komite_mulai_bulan AS UNSIGNED)>=7,CAST(sta.komite_mulai_bulan AS UNSIGNED)-7,CAST(sta.komite_mulai_bulan AS UNSIGNED)+5);
 
 -- Tabel Tabungan
 DROP TABLE IF EXISTS `tabungan`;
