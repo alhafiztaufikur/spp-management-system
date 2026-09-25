@@ -12,7 +12,7 @@ $registry=report_registry();
 <div class="report-catalog-grid"><?php foreach($registry as $id=>$report): ?><article class="report-template-card"><div class="report-template-icon"><?= report_e($report['icon']) ?></div><div><h3><?= report_e($report['label']) ?></h3><p><?= report_e($report['description']) ?></p></div><a class="btn btn-primary" href="template.php?template=<?= urlencode($id) ?>">Buka Laporan <span aria-hidden="true">→</span></a></article><?php endforeach; ?></div>
 <?php
 $catalogGroups=[
-  'pembayaran'=>['label'=>'Pembayaran Siswa','description'=>'Pantau tagihan, pembayaran yang diterima, dan tunggakan siswa.','items'=>['status','penerimaan','spp-tahunan','per-item','riwayat-tagihan']],
+  'pembayaran'=>['label'=>'Pembayaran Siswa','description'=>'Pantau tagihan, pembayaran yang diterima, dan tunggakan siswa.','items'=>['status','penerimaan','spp-tahunan','per-item','riwayat-tagihan','tunggakan-siswa']],
   'tabungan'=>['label'=>'Tabungan Siswa','description'=>'Lihat mutasi dan saldo tabungan siswa secara terpisah.','items'=>['tabungan-siswa','saldo-tabungan']],
   'kas'=>['label'=>'Rekap Kas','description'=>'Ringkasan pembayaran, tabungan siswa, dan Titipan SPP untuk kebutuhan rekonsiliasi kas.','items'=>['setoran','kas-tabungan','titipan-spp']],
 ];

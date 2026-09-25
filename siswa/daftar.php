@@ -708,7 +708,7 @@ $sppRatePreview = spp_current_effective_rate($koneksi, $previewLevel, $previewDi
             <?php endforeach; ?>
           </select>
           <button class="btn btn-primary" type="submit">Filter</button>
-          <a class="btn btn-ghost" href="export_excel.php?<?= htmlspecialchars(http_build_query($_GET), ENT_QUOTES, 'UTF-8') ?>">Export Excel</a>
+          <a class="btn btn-ghost" target="_blank" rel="noopener" href="export_excel.php?<?= htmlspecialchars(http_build_query($_GET), ENT_QUOTES, 'UTF-8') ?>">Export Excel</a>
         </form>
         <div class="table-container">
           <table class="payment-table responsive-table">

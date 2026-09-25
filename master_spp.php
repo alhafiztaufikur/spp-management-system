@@ -3,9 +3,11 @@ session_start();
 require_once 'koneksi.php';
 require_once 'includes/auth.php';
 require_once 'includes/spp_billing.php';
+require_once 'includes/reports.php';
 requireRole(['admin', 'kasir']);
 if (!spp_billing_schema_ready($koneksi)) die('Schema Master SPP belum tersedia. Jalankan sql/add_spp_billing_and_deposit.sql.');
 if (empty($_SESSION['csrf_master_spp'])) $_SESSION['csrf_master_spp']=bin2hex(random_bytes(32));
+if (empty($_SESSION['csrf_prior_debt'])) $_SESSION['csrf_prior_debt']=bin2hex(random_bytes(32));
 
 function mspp_e($value): string { return htmlspecialchars((string)$value,ENT_QUOTES,'UTF-8'); }
 function mspp_money($value): string { return number_format((float)$value,0,',','.'); }
@@ -27,7 +29,9 @@ if($_SERVER['REQUEST_METHOD']==='POST'){
             $result=spp_master_save_rates($koneksi,$masterId,$rates);
             $_SESSION['flash']=['type'=>'success','msg'=>'Tarif tersimpan. '.$result['bills_updated'].' tagihan belum bayar diperbarui dan '.$result['bills_locked'].' tagihan berbayar dipertahankan.'];
         }elseif($action==='terbitkan'){
-            $students=is_array($_POST['selected_students']??null)?$_POST['selected_students']:[];
+            $students=is_array($_POST['selected_students']??null)?array_values(array_unique(array_filter(array_map('strval',$_POST['selected_students'])))):[];
+            $priorDebt=report_prior_debt_summary($koneksi,$selectedYear,$students);
+            if($priorDebt['has_debt']&&(string)($_POST['confirm_previous_debt']??'0')!=='1')throw new RuntimeException('Masih ada tunggakan tahun sebelumnya. Konfirmasi diperlukan sebelum SPP diterbitkan.');
             $starts=is_array($_POST['start_month']??null)?$_POST['start_month']:[];
             $result=spp_publish_students($koneksi,$masterId,$students,$starts);
             $message=$result['created'].' tagihan SPP baru berhasil diterbitkan.';
@@ -73,10 +77,11 @@ $stmt=$koneksi->prepare("SELECT COUNT(*) bills,SUM(CASE WHEN paid+0.001>=nominal
 $stmt->bind_param('i',$masterId);$stmt->execute();$stats=$stmt->get_result()->fetch_assoc();$stmt->close();
 $depositTotal=(float)($koneksi->query("SELECT COALESCE(SUM(CASE WHEN jenis IN ('masuk','koreksi_masuk') THEN nominal ELSE -nominal END),0) total FROM titipan_spp_mutasi")->fetch_assoc()['total']??0);
 ?>
-<!doctype html><html lang="id"><head><meta charset="UTF-8"><meta name="viewport" content="width=device-width,initial-scale=1"><title>Master SPP | SistemSPP</title><link rel="icon" href="assets/img/favicon.png?v=2"><link rel="preconnect" href="https://fonts.googleapis.com"><link href="https://fonts.googleapis.com/css2?family=Inter:wght@300;400;500;600;700;800&display=swap" rel="stylesheet"><link rel="stylesheet" href="assets/css/style.css?v=10.5"><script>(function(){var t=localStorage.getItem('spp_theme')||'light';document.documentElement.setAttribute('data-theme',t);})();</script></head><body>
+<!doctype html><html lang="id"><head><meta charset="UTF-8"><meta name="viewport" content="width=device-width,initial-scale=1"><title>Master SPP | SistemSPP</title><link rel="icon" href="assets/img/favicon.png?v=2"><link rel="preconnect" href="https://fonts.googleapis.com"><link href="https://fonts.googleapis.com/css2?family=Inter:wght@300;400;500;600;700;800&display=swap" rel="stylesheet"><link rel="stylesheet" href="assets/css/style.css?v=10.6"><script>(function(){var t=localStorage.getItem('spp_theme')||'light';document.documentElement.setAttribute('data-theme',t);})();</script></head><body>
 <div class="bg-orbs"><div class="orb orb-1"></div><div class="orb orb-2"></div><div class="orb orb-3"></div></div><div class="layout"><?php include 'includes/sidebar.php';?><main class="main-content">
 <div class="topbar"><button class="sidebar-toggle" onclick="toggleSidebar()" aria-label="Buka navigasi">☰</button><div class="topbar-title"><h2>Master Penerbitan SPP</h2><span class="breadcrumb">SistemSPP / Data Master / SPP</span></div><div class="clock-badge" id="liveClock">--:--:--</div></div>
 <?php if($flash):?><div class="alert alert-<?=mspp_e($flash['type'])?>" id="flash-msg"><?=mspp_e($flash['msg'])?></div><?php endif;?>
+<script>window.priorDebtForms=[{id:'spp-publish-form',scope:'selected',csrf:<?=json_encode($_SESSION['csrf_prior_debt'])?>}];</script><script src="assets/js/prior-debt-warning.js?v=1.0"></script><?php include 'includes/prior_debt_modal.php'; ?>
 <section class="main-card master-modern-shell spp-master-hero"><div class="master-modern-hero"><div><span class="recap-class-overline">Penerbitan SPP Juli–Juni</span><h1><?=mspp_e($selectedYear)?></h1><p>Tarif dan tagihan SPP berdiri sendiri dari penerbitan Daftar Ulang.</p></div><div class="master-modern-stats"><div><span>Tagihan</span><strong><?=number_format((int)($stats['bills']??0))?></strong></div><div><span>Belum Bayar</span><strong><?=number_format((int)($stats['unpaid_bills']??0))?></strong></div><div><span>Saldo Titipan</span><strong>Rp <?=mspp_money($depositTotal)?></strong></div></div><div class="du-master-year-tools"><form method="get"><select class="field-input field-select" name="tahun" onchange="this.form.submit()"><?php foreach($years as $year):?><option value="<?=mspp_e($year)?>" <?=$year===$selectedYear?'selected':''?>><?=mspp_e($year)?></option><?php endforeach;?></select></form><span class="recap-status <?=$master['status']==='draft'?'is-partial':($master['status']==='published'?'is-paid':'is-unpaid')?>"><?=mspp_e(strtoupper($master['status']))?></span></div></div></section>
 
 <section class="main-card master-modern-card"><div class="card-title-row"><div><div class="card-title">Tarif Dasar per Tingkat</div><p class="payment-auto-note">Perubahan tarif memperbarui hanya tagihan yang belum pernah menerima pembayaran.</p></div></div><form method="post" id="spp-rate-form"><input type="hidden" name="csrf_token" value="<?=mspp_e($_SESSION['csrf_master_spp'])?>"><input type="hidden" name="aksi" value="simpan_tarif"><input type="hidden" name="tahun_ajaran" value="<?=mspp_e($selectedYear)?>"><div class="du-rate-grid"><?php for($i=1;$i<=6;$i++):?><label class="field-row"><span class="field-label">Kelas <?=$i?></span><input class="field-input rupiah-input" name="jumlah[<?=$i?>]" inputmode="numeric" value="<?=$rates[$i]>0?mspp_money($rates[$i]):''?>" placeholder="Rp 0" <?=$master['status']==='closed'?'disabled':''?>></label><?php endfor;?></div><?php if($master['status']!=='closed'):?><div class="action-bar"><button class="btn btn-primary" type="submit">Simpan Tarif</button></div><?php endif;?></form></section>

@@ -4,9 +4,11 @@ if (!isset($_SESSION['admin_id'])) { header('Location: login.php'); exit; }
 require_once 'koneksi.php';
 require_once 'includes/auth.php';
 require_once 'includes/daftar_ulang.php';
+require_once 'includes/reports.php';
 requireRole(['admin', 'kasir']);
 
 if (empty($_SESSION['csrf_master_du'])) $_SESSION['csrf_master_du'] = bin2hex(random_bytes(32));
+if (empty($_SESSION['csrf_prior_debt'])) $_SESSION['csrf_prior_debt'] = bin2hex(random_bytes(32));
 
 function master_du_e($value): string { return htmlspecialchars((string)$value, ENT_QUOTES, 'UTF-8'); }
 function master_du_amount($value): float { return (float)str_replace(['.', ','], ['', '.'], trim((string)$value)); }
@@ -44,6 +46,12 @@ if ($_SERVER['REQUEST_METHOD'] === 'POST') {
         $koneksi->begin_transaction();
         $year = master_du_year($koneksi, $selectedYear, true);
         $yearId = (int)$year['id'];
+
+        if(in_array($action,['simpan_dan_terbitkan','terbitkan'],true)){
+            $publishStudents=report_active_regular_student_nis($koneksi);
+            $priorDebt=report_prior_debt_summary($koneksi,$selectedYear,$publishStudents);
+            if($priorDebt['has_debt']&&(string)($_POST['confirm_previous_debt']??'0')!=='1')throw new RuntimeException('Masih ada tunggakan tahun sebelumnya. Konfirmasi diperlukan sebelum tagihan Daftar Ulang diterbitkan.');
+        }
 
         if (in_array($action, ['simpan_tarif', 'simpan_dan_terbitkan'], true)) {
             if ($year['status'] === 'closed') throw new RuntimeException('Tahun ajaran sudah ditutup; tarif tidak dapat diubah.');
@@ -154,10 +162,11 @@ $stmt=$koneksi->prepare("SELECT COUNT(*) bills,COALESCE(SUM(tdu.nominal_tagihan)
 $stmt->bind_param('i',$yearId); $stmt->execute(); $billSummary=$stmt->get_result()->fetch_assoc(); $stmt->close();
 ?>
 <!DOCTYPE html><html lang="id"><head><meta charset="UTF-8"><meta name="viewport" content="width=device-width,initial-scale=1.0">
-<title>Master Daftar Ulang | SistemSPP</title><link rel="icon" type="image/png" href="assets/img/favicon.png?v=2"><link rel="preconnect" href="https://fonts.googleapis.com"><link href="https://fonts.googleapis.com/css2?family=Inter:wght@300;400;500;600;700;800&display=swap" rel="stylesheet"><link rel="stylesheet" href="assets/css/style.css?v=9.6"><script>(function(){var t=localStorage.getItem('spp_theme')||'light';document.documentElement.setAttribute('data-theme',t);})();</script></head><body>
+<title>Master Daftar Ulang | SistemSPP</title><link rel="icon" type="image/png" href="assets/img/favicon.png?v=2"><link rel="preconnect" href="https://fonts.googleapis.com"><link href="https://fonts.googleapis.com/css2?family=Inter:wght@300;400;500;600;700;800&display=swap" rel="stylesheet"><link rel="stylesheet" href="assets/css/style.css?v=9.7"><script>(function(){var t=localStorage.getItem('spp_theme')||'light';document.documentElement.setAttribute('data-theme',t);})();</script></head><body>
 <div class="bg-orbs"><div class="orb orb-1"></div><div class="orb orb-2"></div><div class="orb orb-3"></div></div><div class="layout"><?php include 'includes/sidebar.php'; ?><main class="main-content">
 <div class="topbar"><button class="sidebar-toggle" onclick="toggleSidebar()" id="btn-sidebar-toggle" aria-label="Buka navigasi"><svg width="20" height="20" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><line x1="3" y1="12" x2="21" y2="12"/><line x1="3" y1="6" x2="21" y2="6"/><line x1="3" y1="18" x2="21" y2="18"/></svg></button><div class="topbar-title"><h2>Master Daftar Ulang</h2><span class="breadcrumb">SistemSPP / Tahun Ajaran / Daftar Ulang</span></div><div class="clock-badge" id="liveClock">--:--:--</div></div>
 <?php if($flash): ?><div class="alert alert-<?= master_du_e($flash['type']) ?>" id="flash-msg"><?= master_du_e($flash['msg']) ?></div><?php endif; ?>
+<?php if($year['status']==='draft'): ?><script>window.priorDebtForms=[{id:'du-rate-form',scope:'all_active_regular',csrf:<?=json_encode($_SESSION['csrf_prior_debt'])?>}];</script><script src="assets/js/prior-debt-warning.js?v=1.0"></script><?php include 'includes/prior_debt_modal.php'; ?><?php endif; ?>
 <div class="main-card du-master-hero master-modern-shell"><div class="master-modern-hero"><div><span class="recap-class-overline">Konfigurasi Tahun Ajaran</span><h1><?= master_du_e($selectedYear) ?></h1><p>Periode 1 Juli <?= substr($selectedYear,0,4) ?> sampai 30 Juni <?= substr($selectedYear,5,4) ?>.</p></div><div class="master-modern-stats"><div><span>Siswa Aktif</span><strong><?= number_format($activeTotal) ?></strong></div><div><span>Tagihan Terbit</span><strong><?= number_format((int)$billSummary['bills']) ?></strong></div><div><span>Terbayar</span><strong>Rp <?= number_format((float)$billSummary['paid'],0,',','.') ?></strong></div></div><div class="du-master-year-tools"><form method="get"><select class="field-input field-select" name="tahun" onchange="this.form.submit()"><?php foreach($yearRows as $yr): ?><option value="<?= master_du_e($yr['label']) ?>" <?= $yr['label']===$selectedYear?'selected':'' ?>><?= master_du_e($yr['label']) ?> · <?= master_du_e(strtoupper($yr['status'])) ?></option><?php endforeach; ?></select></form><span class="recap-status <?= $year['status']==='draft'?'is-partial':($year['status']==='published'?'is-paid':'is-unpaid') ?>"><?= master_du_e(strtoupper($year['status'])) ?></span></div></div></div>
 
 <div class="main-card master-modern-card master-modern-form"><div class="card-title-row"><div><div class="card-title">Tarif Kelas 1–6</div><p class="payment-auto-note">Jumlah siswa dibaca langsung dari Data Siswa aktif. Pastikan kelas siswa sudah benar sebelum menerbitkan tagihan.</p></div></div><form method="post" id="du-rate-form"><input type="hidden" name="csrf_token" value="<?= master_du_e($_SESSION['csrf_master_du']) ?>"><input type="hidden" name="aksi" value="<?= $year['status']==='draft'?'simpan_dan_terbitkan':'simpan_tarif' ?>"><input type="hidden" name="tahun_ajaran" value="<?= master_du_e($selectedYear) ?>"><div class="du-rate-grid"><?php for($c=1;$c<=6;$c++): ?><label class="field-row"><span class="field-label">Kelas <?= $c ?></span><input class="field-input rupiah-input" name="jumlah[<?= $c ?>]" inputmode="numeric" value="<?= $masters[$c]>0?number_format($masters[$c],0,',','.') : '' ?>" placeholder="Rp 0" <?= $year['status']==='closed'?'disabled':'' ?>><small><?= $activeByClass[$c] ?> siswa aktif · estimasi Rp <?= number_format($activeByClass[$c]*$masters[$c],0,',','.') ?></small></label><?php endfor; ?></div><?php if($year['status']!=='closed'): ?><div class="action-bar"><button class="btn btn-primary" type="submit"><?= $year['status']==='draft'?'Simpan & Terbitkan Tagihan':'Simpan Perubahan Tarif' ?></button></div><?php endif; ?></form></div>

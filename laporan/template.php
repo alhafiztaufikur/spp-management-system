@@ -5,7 +5,7 @@ requireRole(['admin','bendahara','kasir']);
 $registry=report_registry(); $template=(string)($_GET['template']??'');
 if(!isset($registry[$template])){ header('Location: global.php'); exit; }
 $filters=report_filters($koneksi,$_GET);
-if($template==='riwayat-tagihan'&&!isset($_GET['siswa_status'])) $filters['siswa_status']='all';
+if(in_array($template,['riwayat-tagihan','tunggakan-siswa'],true)&&!isset($_GET['siswa_status'])) $filters['siswa_status']='all';
 if(!isset($_GET['kategori'])&&$template==='penerimaan') $filters['kategori']='semua';
 $perItemUsesMonthly=$template==='per-item'&&report_item_is_monthly_category($filters['kategori']);
 $perItemUsesAnnual=$template==='per-item'&&array_key_exists($filters['kategori'],annual_fee_components());
@@ -23,7 +23,7 @@ $displayRows=$billingGroupedView?report_billing_history_group_students($report['
 $pagination=report_paginate($displayRows,$filters,false);
 $years=report_years($koneksi); $operatorOptions=report_operator_options($koneksi); $operatorFilterLabel=report_operator_filter_label(); $categories=report_categories($koneksi); $billingCategories=$template==='riwayat-tagihan'?report_billing_categories($koneksi):[]; $query=array_merge($_GET,$filters,['template'=>$template]);
 $moneyTotals=report_money_totals($report,$template);$useGlobalIdentitySticky=in_array($template,['penerimaan','spp-tahunan','per-item'],true);
-$studentOptionWhere=in_array($template,['saldo-tabungan','riwayat-tagihan'],true)&&$filters['siswa_status']!=='active'?'':' WHERE s.is_active=1';
+$studentOptionWhere=in_array($template,['saldo-tabungan','riwayat-tagihan','tunggakan-siswa'],true)&&$filters['siswa_status']!=='active'?'':' WHERE s.is_active=1';
 $studentOptions=$koneksi->query("SELECT s.NO_INDUK,s.NO_induk_diknas,s.NAMA,s.KELAS,s.master_kelas_id,mk.tingkat AS master_tingkat,mk.kode_rombel,mk.is_placeholder FROM siswa s LEFT JOIN master_kelas mk ON mk.id=s.master_kelas_id$studentOptionWhere ORDER BY s.NAMA ASC")->fetch_all(MYSQLI_ASSOC);
 $studentSearchDisplay=$filters['q'];foreach($studentOptions as $studentOption){if($filters['q']!==''&&($filters['q']===$studentOption['NO_INDUK']||$filters['q']===(string)($studentOption['NO_induk_diknas']??''))){$studentSearchDisplay=$studentOption['NAMA'];break;}}
 $summaryCards=report_summaries($report['rows']);$visibleRows=count($pagination['rows']);$totalRows=count($displayRows);$paginationUnit=$billingGroupedView?'siswa':'baris';$exportQuery=$query;$exportQuery['page']=1;$firstShown=$totalRows>0?(($pagination['page']-1)*$pagination['per_page'])+1:0;$lastShown=$totalRows>0?min($totalRows,$pagination['page']*$pagination['per_page']):0;$resultRangeLabel=$totalRows<=0?'0 '.$paginationUnit:($visibleRows===$totalRows?'Semua '.number_format($totalRows).' '.$paginationUnit:number_format($firstShown).' s.d. '.number_format($lastShown).' dari '.number_format($totalRows).' '.$paginationUnit);if($billingGroupedView)$resultRangeLabel.=' · '.number_format($billingDetailCount).' rincian tagihan';
@@ -59,7 +59,7 @@ function template_url(array $changes=[]):string { global $query; return 'templat
 <div class="bg-orbs"><div class="orb orb-1"></div><div class="orb orb-2"></div><div class="orb orb-3"></div></div><div class="layout"><?php include '../includes/sidebar.php'; ?><main class="main-content">
 <div class="topbar"><button class="sidebar-toggle" onclick="toggleSidebar()" aria-label="Buka navigasi"><svg width="20" height="20" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><line x1="3" y1="6" x2="21" y2="6"/><line x1="3" y1="12" x2="21" y2="12"/><line x1="3" y1="18" x2="21" y2="18"/></svg></button><div class="topbar-title"><h2><?= report_e($report['title']) ?></h2><span class="breadcrumb"><a href="global.php">Laporan Global</a> / <?= report_e($registry[$template]['label']) ?></span></div><div class="clock-badge" id="liveClock">--:--:--</div></div>
 <section class="main-card class-recap-card recap-report-shell report-template-shell report-table-<?= report_e($templateFilterClass) ?>">
-<?php if(in_array($template,['saldo-tabungan','riwayat-tagihan'],true)): ?><script>
+<?php if(in_array($template,['saldo-tabungan','riwayat-tagihan','tunggakan-siswa'],true)): ?><script>
 document.addEventListener('DOMContentLoaded',function(){
   const form=document.querySelector('.report-global-filter-form');if(!form)return;
   const template=<?= json_encode($template) ?>;const filters=<?= json_encode($filters) ?>;
@@ -68,6 +68,8 @@ document.addEventListener('DOMContentLoaded',function(){
   if(template==='saldo-tabungan'){
     addSelect('Status Siswa','siswa_status',[{value:'active',label:'Aktif'},{value:'archived',label:'Arsip/Lulus'},{value:'all',label:'Semua'}]);
     addSelect('Status Saldo','saldo_status',[{value:'',label:'Semua Saldo'},{value:'ada_saldo',label:'Ada Saldo'},{value:'saldo_nol',label:'Saldo Nol'}]);
+  }else if(template==='tunggakan-siswa'){
+    addSelect('Status Siswa','siswa_status',[{value:'active',label:'Aktif'},{value:'archived',label:'Arsip/Lulus'},{value:'all',label:'Semua'}]);
   }else{
     addSelect('Tahun Ajaran','tahun_tagihan',[{value:'',label:'Semua Tahun Ajaran'},<?= implode(',',array_map(static fn($year)=>json_encode(['value'=>$year['label'],'label'=>$year['label']]),$years)) ?>]);
     addSelect('Komponen','komponen_tagihan',[{value:'',label:'Semua Komponen'},<?= implode(',',array_map(static fn($key,$label)=>json_encode(['value'=>$key,'label'=>$label]),array_keys($billingCategories),$billingCategories)) ?>]);
