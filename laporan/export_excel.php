@@ -144,6 +144,7 @@ if ($download) {
     header('Content-Disposition: attachment; filename="' . $filename . '"');
     header('Cache-Control: max-age=0');
 }
+ob_start();
 ?>
 <html xmlns:o="urn:schemas-microsoft-com:office:office" xmlns:x="urn:schemas-microsoft-com:office:excel">
 <head>
@@ -351,10 +352,6 @@ if ($download) {
 <body>
 
 <?php if (!$download): ?>
-<div class="no-print">
-  <a class="primary" href="export_excel.php?bulan=<?= $filter_bulan ?>&tahun=<?= $filter_tahun ?>&tanggal_awal=<?= urlencode($filter_tanggal_awal) ?>&tanggal_akhir=<?= urlencode($filter_tanggal_akhir) ?>&q=<?= urlencode($filter_q) ?>&download=1">Download Excel</a>
-  <a href="index.php?bulan=<?= $filter_bulan ?>&tahun=<?= $filter_tahun ?>&tanggal_awal=<?= urlencode($filter_tanggal_awal) ?>&tanggal_akhir=<?= urlencode($filter_tanggal_akhir) ?>&q=<?= urlencode($filter_q) ?>">Kembali</a>
-</div>
 <main class="preview-sheet">
 <?php endif; ?>
 
@@ -475,3 +472,28 @@ if ($download) {
 
 </body>
 </html>
+<?php
+$excelHtml = ob_get_clean();
+
+if ($download) {
+    echo "\xEF\xBB\xBF" . $excelHtml;
+    exit;
+}
+
+require_once __DIR__ . '/../includes/report_preview.php';
+$downloadQuery = $_GET;
+$downloadQuery['download'] = '1';
+$backQuery = $_GET;
+unset($backQuery['download']);
+render_report_export_preview($excelHtml, [
+    'file_type' => 'EXCEL',
+    'show_print' => false,
+    'title' => 'Rekap Laporan Keuangan',
+    'subtitle' => 'Periode ' . $period_label,
+    'generated' => date('d-m-Y H:i:s'),
+    'row_count' => count($rows) + count($tab_rows),
+    'orientation' => 'landscape',
+    'download_url' => 'export_excel.php?' . http_build_query($downloadQuery),
+    'back_url' => 'index.php?' . http_build_query($backQuery),
+]);
+?>

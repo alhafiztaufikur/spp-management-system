@@ -6,8 +6,12 @@ session_start();
 require_once '../koneksi.php';
 require_once '../includes/auth.php';
 require_once '../includes/spp_billing.php';
-require_once '../vendor/autoload.php';
 requireRole(['admin', 'bendahara']);
+
+$output_mode = (string)($_GET['output'] ?? 'preview');
+if (!in_array($output_mode, ['preview', 'pdf'], true)) {
+    $output_mode = 'preview';
+}
 
 $filter_bulan = (int)($_GET['bulan'] ?? date('m'));
 $filter_tahun = (int)($_GET['tahun'] ?? date('Y'));
@@ -82,6 +86,16 @@ function month_code($value): string {
 }
 
 function month_name_from_value($value, array $names): string {
+    $code = (int)month_code($value);
+    return $names[$code] ?? (string)$value;
+}
+
+function month_name_id($value): string {
+    $names = [
+        1 => 'Januari', 2 => 'Februari', 3 => 'Maret', 4 => 'April',
+        5 => 'Mei', 6 => 'Juni', 7 => 'Juli', 8 => 'Agustus',
+        9 => 'September', 10 => 'Oktober', 11 => 'November', 12 => 'Desember',
+    ];
     $code = (int)month_code($value);
     return $names[$code] ?? (string)$value;
 }
@@ -216,19 +230,45 @@ if (!$selected_mode) {
     if ($htmlRows === '') {
         $htmlRows = '<tr><td colspan="8" class="empty">Tidak ada data pembayaran pada filter ini.</td></tr>';
     }
-    $html = '<!DOCTYPE html><html><head><meta charset="UTF-8"><style>'
-        . '@page{margin:20px 18px}body{font-family:DejaVu Sans,Arial,sans-serif;color:#18281f;font-size:10px}h1{font-size:18px;margin:0 0 4px}p{margin:0 0 12px;color:#66766d}.summary{display:table;width:100%;margin:12px 0;border:1px solid #cfe9dc;border-radius:8px}.summary div{display:table-cell;padding:10px;border-right:1px solid #e1f1e8}.summary div:last-child{border-right:0}.summary span{display:block;color:#708078;font-size:9px;text-transform:uppercase;font-weight:700}.summary strong{font-size:13px}table{width:100%;border-collapse:collapse}th{background:#eaf7f0;color:#0b8d4b;text-align:left;font-size:9px;text-transform:uppercase;padding:8px;border:1px solid #cfe9dc}td{padding:7px;border:1px solid #e3f0e9;vertical-align:top}tbody tr:nth-child(even){background:#f8fcfa}.num{text-align:right;font-weight:700;color:#0b8d4b}.empty{text-align:center;color:#718078;padding:24px}small{color:#708078}'
-        . '</style></head><body><h1>Rekap Laporan Keuangan</h1><p>Periode ' . e($periode) . '</p><div class="summary"><div><span>Total Transaksi</span><strong>' . number_format($totalRows) . '</strong></div><div><span>Total Pembayaran</span><strong>Rp ' . money_total($grandTotal) . '</strong></div></div><table><thead><tr><th>No</th><th>NIS</th><th>Nama</th><th>Kelas</th><th>Periode Bayar</th><th>Sistem</th><th>Tanggal</th><th>Total</th></tr></thead><tbody>'
+    $logoPath = realpath(__DIR__ . '/../assets/img/school-logo.png');
+    $logoData = $logoPath ? 'data:image/png;base64,' . base64_encode((string)file_get_contents($logoPath)) : '';
+    $generated = date('d-m-Y H:i:s');
+    $operator = (string)($_SESSION['admin_nama'] ?? $_SESSION['admin_username'] ?? 'Pengguna');
+    $html = '<!DOCTYPE html><html lang="id"><head><meta charset="UTF-8"><style>'
+        . '@page{margin:14mm;size:A4 landscape}*{box-sizing:border-box}body{font-family:DejaVu Sans,Arial,sans-serif;color:#18281f;font-size:9px;margin:0}.kop{width:100%;border-bottom:3px double #15543c;margin-bottom:10px}.kop td{border:0;padding:0 0 8px}.kop img{width:54px;height:54px;object-fit:contain}.kop h1{font-size:15px;margin:0;text-align:center}.kop p{text-align:center;margin:3px 0;color:#52645b}.title{text-align:center;margin:10px 0}.title h2{font-size:15px;margin:0 0 4px}.title p{margin:0;color:#66766d}.meta{width:100%;margin-bottom:8px}.meta td{border:0;padding:2px}.summary{display:table;width:100%;margin:10px 0 12px;border:1px solid #cfe9dc}.summary div{display:table-cell;padding:9px;border-right:1px solid #e1f1e8}.summary div:last-child{border-right:0}.summary span{display:block;color:#708078;font-size:8px;text-transform:uppercase;font-weight:700}.summary strong{display:block;margin-top:3px;font-size:12px}table{width:100%;border-collapse:collapse}thead{display:table-header-group}tr{page-break-inside:avoid}th{background:#15543c;color:#fff;text-align:left;font-size:8px;text-transform:uppercase;padding:7px;border:1px solid #8fb3a2}td{padding:6px;border:1px solid #d9e9e1;vertical-align:top}tbody tr:nth-child(even){background:#f5faf7}.num{text-align:right;font-weight:700;color:#0b8d4b;white-space:nowrap}.empty{text-align:center;color:#718078;padding:24px}small{color:#708078}.footer{position:fixed;bottom:-8mm;left:0;right:0;border-top:1px solid #b9cec3;padding-top:3px;color:#697970;font-size:7px}.footer:after{content:"SistemSPP - Halaman " counter(page)}'
+        . 'body{font-size:9.5px;line-height:1.38;background:#fff}.kop{margin-bottom:12px}.kop img{width:60px;height:60px}.kop h1{font-size:16px;letter-spacing:.15px}.title{margin:12px 0 9px;padding:9px 12px;border:1px solid #d3e7dc;background:#f3faf6}.title h2{font-size:16px;color:#123f2f}.meta{color:#61736a;margin-bottom:10px}.summary{border-radius:4px;background:#fbfdfc}.summary div{padding:10px 12px}.summary strong{color:#143d2f;font-size:13px}body>table:last-of-type{table-layout:fixed}body>table:last-of-type th:nth-child(1){width:4%}body>table:last-of-type th:nth-child(2){width:14%}body>table:last-of-type th:nth-child(3){width:19%}body>table:last-of-type th:nth-child(4){width:8%}body>table:last-of-type th:nth-child(5){width:13%}body>table:last-of-type th:nth-child(6){width:10%}body>table:last-of-type th:nth-child(7){width:17%}body>table:last-of-type th:nth-child(8){width:15%}th{padding:7px 8px}td{padding:6px 8px;word-break:break-word}@media screen{body{padding:28px 30px;font-size:10.5px}.kop h1{font-size:18px}.kop p{font-size:10px}.title h2{font-size:17px}.title p{font-size:10px}.meta{font-size:10px}.summary span{font-size:8.5px}.summary strong{font-size:14px}th{font-size:9px;padding:8px}td{padding:7px 8px}.footer{position:static;margin-top:18px}}'
+        . '</style></head><body><table class="kop"><tr><td style="width:72px">' . ($logoData !== '' ? '<img src="' . $logoData . '" alt="Logo sekolah">' : '') . '</td><td><h1>SEKOLAH DASAR AL-QUR\'AN (SDA) MUTIARA HIKMAH</h1><p>Perum Bekasi Griya Asri II, Tambun Selatan - Telp. 021-88363466</p></td><td style="width:72px"></td></tr></table><div class="title"><h2>REKAP LAPORAN KEUANGAN</h2><p>Periode ' . e($periode) . '</p></div><table class="meta"><tr><td>Dibuat: ' . e($generated) . '</td><td style="text-align:right">Petugas: ' . e($operator) . '</td></tr></table><div class="summary"><div><span>Total Transaksi</span><strong>' . number_format($totalRows) . '</strong></div><div><span>Total Pembayaran</span><strong>Rp ' . money_total($grandTotal) . '</strong></div></div><table><thead><tr><th>No</th><th>NIS</th><th>Nama</th><th>Kelas</th><th>Periode Bayar</th><th>Sistem</th><th>Tanggal</th><th>Total</th></tr></thead><tbody>'
         . $htmlRows
-        . '</tbody></table></body></html>';
+        . '</tbody></table><div class="footer"></div></body></html>';
+
+    if ($output_mode === 'preview') {
+        require_once __DIR__ . '/../includes/report_preview.php';
+        $downloadQuery = $_GET;
+        $downloadQuery['output'] = 'pdf';
+        $backQuery = $_GET;
+        unset($backQuery['output'], $backQuery['mode'], $backQuery['ids'], $backQuery['contoh']);
+        render_report_pdf_preview($html, [
+            'title' => 'Rekap Laporan Keuangan',
+            'subtitle' => 'Periode ' . $periode,
+            'generated' => $generated,
+            'row_count' => $totalRows,
+            'orientation' => 'landscape',
+            'download_url' => 'export_pdf.php?' . http_build_query($downloadQuery),
+            'back_url' => 'index.php?' . http_build_query($backQuery),
+        ]);
+    }
+
+    require_once __DIR__ . '/../includes/pdf.php';
+    require_pdf_library();
     $options = new \Dompdf\Options();
     $options->set('isRemoteEnabled', false);
     $options->set('isHtml5ParserEnabled', true);
+    $options->setDefaultMediaType('print');
     $dompdf = new \Dompdf\Dompdf($options);
     $dompdf->loadHtml($html);
     $dompdf->setPaper('A4', 'landscape');
     $dompdf->render();
-    $dompdf->stream('rekap-laporan-keuangan.pdf', ['Attachment' => false]);
+    $dompdf->stream('rekap-laporan-keuangan.pdf', ['Attachment' => true]);
     exit;
 }
 
@@ -647,6 +687,26 @@ ob_start();
 <?php
 $html = ob_get_clean();
 
+if ($output_mode === 'preview') {
+    require_once __DIR__ . '/../includes/report_preview.php';
+    $downloadQuery = $_GET;
+    $downloadQuery['output'] = 'pdf';
+    $backQuery = $_GET;
+    unset($backQuery['output'], $backQuery['mode'], $backQuery['ids'], $backQuery['contoh']);
+    render_report_pdf_preview($html, [
+        'title' => 'Slip Pembayaran',
+        'subtitle' => 'Periode ' . $periode . ' - ' . number_format(count($rows)) . ' transaksi dipilih',
+        'generated' => date('d-m-Y H:i:s'),
+        'row_count' => count($rows),
+        'orientation' => 'landscape',
+        'download_url' => 'export_pdf.php?' . http_build_query($downloadQuery),
+        'back_url' => 'index.php?' . http_build_query($backQuery),
+    ]);
+}
+
+require_once __DIR__ . '/../includes/pdf.php';
+require_pdf_library();
+
 $options = new \Dompdf\Options();
 $options->setDefaultMediaType('print');
 $options->setIsHtml5ParserEnabled(true);
@@ -657,6 +717,6 @@ $dompdf = new \Dompdf\Dompdf($options);
 $dompdf->loadHtml($html, 'UTF-8');
 $dompdf->setPaper([0, 0, 595.276, 419.528]);
 $dompdf->render();
-$dompdf->stream(sprintf('slip-pembayaran-%04d-%02d.pdf', $filter_tahun, $filter_bulan), ['Attachment' => false]);
+$dompdf->stream(sprintf('slip-pembayaran-%04d-%02d.pdf', $filter_tahun, $filter_bulan), ['Attachment' => true]);
 exit;
 ?>

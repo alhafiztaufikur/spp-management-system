@@ -3,12 +3,15 @@ session_start();
 require_once '../koneksi.php'; require_once '../includes/auth.php'; require_once '../includes/reports.php';
 requireRole(['admin','bendahara','kasir']);
 $registry=report_registry();$template=(string)($_GET['template']??'');if(!isset($registry[$template])){http_response_code(404);exit('Template tidak ditemukan.');}
-$format=(string)($_GET['format']??'print');if(!in_array($format,['print','pdf','excel'],true))$format='print';
+$format=(string)($_GET['format']??'preview');if(!in_array($format,['preview','print','pdf','excel'],true))$format='preview';
+$excelDownload=$format==='excel'&&($_GET['download']??'')==='1';
+if($format==='pdf'){require_once __DIR__.'/../includes/pdf.php';require_pdf_library();}
 $filters=report_filters($koneksi,$_GET);if($template==='riwayat-tagihan'&&!isset($_GET['siswa_status']))$filters['siswa_status']='all';if(!isset($_GET['kategori'])&&$template==='penerimaan')$filters['kategori']='semua';
 $report=report_build($koneksi,$template,$filters);$generated=date('d-m-Y H:i:s');$operator=(string)($_SESSION['admin_nama']??$_SESSION['admin_username']??'Pengguna');
 $isCashRecap=in_array($template,['setoran','kas-tabungan','titipan-spp'],true);$isSavingsCashRecap=$template==='kas-tabungan';
 $billingGroupedView=$template==='riwayat-tagihan'&&report_billing_history_uses_grouped_view($filters,$report['rows']);
-$billingPdfView=$template==='riwayat-tagihan'&&$format==='pdf';
+$billingPdfView=$template==='riwayat-tagihan'&&in_array($format,['preview','print','pdf'],true);
+$billingPdfCompactView=$billingPdfView&&count($report['rows'])>300;
 $billingGroups=($billingGroupedView||$billingPdfView)?report_billing_history_group_students($report['rows']):[];
 $moneyTotals=report_money_totals($report,$template);
 function export_cell($value,string $type,array $row=[],string $key=''):string{if($type==='money')return report_e(report_money($value));if($type==='money_optional')return $value===null||$value===''?'-':report_e(report_money($value));if($type==='html'&&is_array($value))return report_e(($value['text']??'').(($value['sub']??'')!==''?' · '.$value['sub']:''));if($type==='nis'||$key==='nis'){$diknas=$row['diknas']??$row['nis_diknas']??$row['NO_induk_diknas']??'';return report_e($value).($diknas!==''?'<br><small>Diknas '.report_e($diknas).'</small>':'');}return report_e($value);}
@@ -20,6 +23,7 @@ $logoData=$logoPath&&$canRenderLogo?'data:image/png;base64,'.base64_encode((stri
 ob_start(); ?>
 <!DOCTYPE html><html lang="id"><head><meta charset="UTF-8"><title><?= report_e($report['title']) ?></title><style>
 @page{margin:12mm;size:<?= $registry[$template]['orientation']==='landscape'?'A4 landscape':'A4 portrait' ?>}*{box-sizing:border-box}body{font-family:Arial,sans-serif;color:#17231d;font-size:9px;margin:0}.toolbar{padding:10px;background:#eef7f2;margin-bottom:12px}.toolbar button{padding:8px 14px;border:0;background:#108952;color:#fff;border-radius:6px;cursor:pointer}.kop{width:100%;border-bottom:3px double #15543c;padding-bottom:8px;margin-bottom:12px}.kop td{border:0}.kop img{width:58px;height:58px;object-fit:contain}.kop-logo-text{width:58px;height:58px;border:1px solid #15543c;color:#15543c;font-weight:bold;font-size:12px;text-align:center;line-height:58px}.kop h1{font-size:16px;margin:0;text-align:center}.kop p{text-align:center;margin:3px 0}.title{text-align:center;margin:10px 0 12px}.title h2{font-size:14px;margin:0 0 3px}.meta{width:100%;margin-bottom:8px}.meta td{border:0;padding:2px}table.data{border-collapse:collapse;width:100%}.data th,.data td{border:1px solid #9bb9aa;padding:4px;vertical-align:top}.data th{background:#12503a;color:white;text-transform:uppercase;font-size:8px}.data tr:nth-child(even){background:#f4f8f6}.money{text-align:right;white-space:nowrap}.total-table{margin-top:10px;max-width:420px;margin-left:auto}.total-table caption{text-align:left;font-weight:bold;margin-bottom:4px}.footer{position:fixed;bottom:-7mm;left:0;right:0;border-top:1px solid #aaa;padding-top:3px;color:#666;font-size:7px}.footer:after{content:" · Halaman " counter(page)}.signatures{width:100%;margin-top:24px}.signatures td{border:0;text-align:center;width:50%;height:70px;vertical-align:top}.negative{color:#b42318;font-weight:bold}.billing-group-row{page-break-inside:avoid}.billing-student strong{display:block;font-size:10px;margin-bottom:3px}.billing-student small,.billing-class{color:#52645b}.billing-summary div{margin-bottom:3px;white-space:nowrap}.billing-summary b{display:inline-block;min-width:54px}.billing-detail-item{padding:3px 0;border-bottom:1px solid #d8e5de;line-height:1.35}.billing-detail-item:last-child{border-bottom:0}.billing-detail-item b{display:inline-block;min-width:90px}.billing-detail-meta{color:#52645b}.billing-detail-money{white-space:nowrap}@media print{.toolbar{display:none}}
+thead{display:table-header-group}tfoot{display:table-row-group}tr{page-break-inside:avoid}.title{padding:8px 10px;border:1px solid #d4e6dc;background:#f4faf7}.title div{color:#52645b;line-height:1.45}.meta{color:#52645b}.data tbody tr:nth-child(odd){background:#fff}.data tbody tr:nth-child(even){background:#f5faf7}.data tfoot th,.data tfoot td{background:#e7f4ed;color:#0c7042;font-weight:bold}.total-table{border-collapse:collapse}.total-table caption{padding:5px 0;color:#173b2d;font-size:9px}.signatures{page-break-inside:avoid}.footer{white-space:nowrap}@media screen{body{padding:28px;background:#fff}.footer{position:static;margin-top:18px}.billing-pdf-student+.billing-pdf-student{page-break-before:auto}}
 <?php if($billingPdfView): ?>
 @page{margin:10mm 10mm 14mm}
 .billing-pdf-overview{width:100%;margin:7px 0 10px;border-collapse:separate;border-spacing:5px 0}
@@ -49,8 +53,21 @@ ob_start(); ?>
 .billing-pdf-status.is-paid{background:#dff5e8;color:#0b7441}
 .billing-pdf-status.is-unpaid{background:#fde4e3;color:#b42318}
 .billing-pdf-status.is-cancelled{background:#eceff1;color:#56616a}
+.billing-pdf-note{margin:6px 0 8px;padding:6px 8px;border:1px solid #c9e0d4;background:#f1f8f4;color:#52645b;font-size:7.4px;line-height:1.4}
+.billing-pdf-compact{table-layout:fixed}
+.billing-pdf-compact thead{display:table-header-group}
+.billing-pdf-compact tr{page-break-inside:avoid}
+.billing-pdf-compact th,.billing-pdf-compact td{padding:4px 5px;font-size:7.3px}
+.billing-pdf-compact .number{width:4%;text-align:center}
+.billing-pdf-compact .student{width:28%}
+.billing-pdf-compact .student strong{display:block;font-size:8px}
+.billing-pdf-compact .student small{display:block;margin-top:2px;color:#52645b;font-size:6.6px}
+.billing-pdf-compact .class{width:10%}
+.billing-pdf-compact .items{width:8%;text-align:center}
+.billing-pdf-compact .amount{width:15%;text-align:right;white-space:nowrap}
+.billing-pdf-compact .status{width:12%;text-align:center}
 <?php endif; ?>
-</style></head><body><?php if($format==='print'): ?><div class="toolbar"><button onclick="window.print()">Cetak Laporan</button></div><?php endif; ?>
+</style></head><body>
 <table class="kop"><tr><td style="width:70px"><?php if($logoData): ?><img src="<?= $logoData ?>" alt="Logo sekolah"><?php elseif($format==='excel'): ?><div class="kop-logo-text">SD MH</div><?php endif; ?></td><td><h1>SEKOLAH DASAR AL-QUR'AN (SDA) MUTIARA HIKMAH</h1><p>Perum Bekasi Griya Asri II, Tambun Selatan · Telp. 021-88363466</p></td><td style="width:70px"></td></tr></table>
 <div class="title"><h2><?= report_e(strtoupper($report['title'])) ?></h2><div><?= report_e($report['subtitle']) ?></div></div><table class="meta"><tr><td>Dibuat: <?= report_e($generated) ?></td><td style="text-align:right">Petugas: <?= report_e($operator) ?></td></tr></table>
 <?php if($billingPdfView&&$moneyTotals): ?><table class="billing-pdf-overview"><tr><?php foreach($moneyTotals as $total): ?><td><span><?= report_e($total['label']) ?></span><strong><?= report_money($total['value']) ?></strong></td><?php endforeach; ?></tr></table><?php endif; ?>
@@ -68,6 +85,7 @@ ob_start(); ?>
 <?php if(!$isCashRecap): ?>
 <?php if($billingPdfView): ?>
 <?php if(!$billingGroups): ?><div class="billing-pdf-empty">Tidak ada data pada filter terpilih.</div><?php else: foreach($billingGroups as $index=>$student): ?>
+<?php if($billingPdfCompactView): break; endif; ?>
 <div class="billing-pdf-student">
   <table class="billing-pdf-student-head"><tr>
     <td class="identity"><strong><?= ($index+1).'. '.report_e($student['nama']) ?></strong><span>NIS <?= report_e($student['nis']) ?><?php if($student['nis_diknas']!==''): ?> · NIS Diknas <?= report_e($student['nis_diknas']) ?><?php endif; ?> · Kelas <?= report_e($student['kelas']) ?> · <?= number_format((int)$student['item_count']) ?> rincian</span></td>
@@ -81,6 +99,14 @@ ob_start(); ?>
   <?php endforeach; ?></tbody></table>
 </div>
 <?php endforeach; endif; ?>
+<?php if($billingPdfCompactView&&$billingGroups): ?>
+<div class="billing-pdf-note">Data berjumlah besar, sehingga PDF diringkas per siswa agar tetap cepat dan stabil. Gunakan filter siswa, kelas, tahun ajaran, atau komponen untuk mencetak rincian tagihan yang lebih spesifik.</div>
+<table class="data billing-pdf-compact"><thead><tr><th class="number">No</th><th class="student">Siswa</th><th class="class">Kelas</th><th class="items">Rincian</th><th class="amount">Tagihan</th><th class="amount">Sudah Dibayar</th><th class="amount">Sisa</th><th class="status">Status</th></tr></thead><tbody>
+<?php foreach($billingGroups as $index=>$student): $groupStatus=(float)$student['total_sisa']<=0.001?'Lunas':((float)$student['total_terbayar']>0.001?'Sebagian':'Belum Bayar');$groupStatusClass=$groupStatus==='Lunas'?'is-paid':($groupStatus==='Belum Bayar'?'is-unpaid':''); ?>
+<tr><td class="number"><?= $index+1 ?></td><td class="student"><strong><?= report_e($student['nama']) ?></strong><small>NIS <?= report_e($student['nis']) ?><?php if($student['nis_diknas']!==''): ?> · Diknas <?= report_e($student['nis_diknas']) ?><?php endif; ?></small></td><td class="class"><?= report_e($student['kelas']) ?></td><td class="items"><?= number_format((int)$student['item_count']) ?></td><td class="amount"><?= report_money($student['total_tagihan']) ?></td><td class="amount"><?= report_money($student['total_terbayar']) ?></td><td class="amount"><?= report_money($student['total_sisa']) ?></td><td class="status"><span class="billing-pdf-status <?= $groupStatusClass ?>"><?= report_e($groupStatus) ?></span></td></tr>
+<?php endforeach; ?>
+</tbody></table>
+<?php endif; ?>
 <?php elseif($billingGroupedView): ?>
 <table class="data billing-group-table"><thead><tr><th>No</th><th>Siswa</th><th>Kelas</th><th>Ringkasan</th><th>Rincian Tagihan</th></tr></thead><tbody><?php if(!$billingGroups): ?><tr><td colspan="5" style="text-align:center">Tidak ada data pada filter terpilih.</td></tr><?php else: foreach($billingGroups as $index=>$student): ?><tr class="billing-group-row"><td><?= $index+1 ?></td><td class="billing-student"><strong><?= report_e($student['nama']) ?></strong><span>NIS <?= report_e($student['nis']) ?></span><?php if($student['nis_diknas']!==''): ?><br><small>Diknas <?= report_e($student['nis_diknas']) ?></small><?php endif; ?><br><small><?= number_format((int)$student['item_count']) ?> rincian</small></td><td class="billing-class"><?= report_e($student['kelas']) ?></td><td class="billing-summary"><div><b>Tagihan</b> <?= report_money($student['total_tagihan']) ?></div><div><b>Terbayar</b> <?= report_money($student['total_terbayar']) ?></div><div><b>Sisa</b> <?= report_money($student['total_sisa']) ?></div></td><td><?php foreach($student['items'] as $item): ?><div class="billing-detail-item"><b><?= report_e($item['komponen']) ?></b> <span class="billing-detail-meta"><?= report_e($item['periode']) ?><?php if($item['periode']!==$item['tahun_ajaran']): ?> · TA <?= report_e($item['tahun_ajaran']) ?><?php endif; ?></span><br><span class="billing-detail-money">Tagihan <?= report_money($item['tagihan']) ?> · Terbayar <?= report_money($item['terbayar']) ?> · Sisa <?= report_money($item['sisa']) ?></span> · <?= report_e($item['status']) ?></div><?php endforeach; ?></td></tr><?php endforeach; endif; ?></tbody></table>
 <?php else: ?><table class="data"><thead><tr><th>No</th><?php foreach($report['columns'] as $column): ?><th><?= report_e($column[1]) ?></th><?php endforeach; ?></tr></thead><tbody><?php if(!$report['rows']): ?><tr><td colspan="<?= count($report['columns'])+1 ?>" style="text-align:center">Tidak ada data pada filter terpilih.</td></tr><?php else: foreach($report['rows'] as $index=>$row): ?><tr><td><?= $index+1 ?></td><?php foreach($report['columns'] as $column): $type=$column[2]??'text';$key=$column[0];$value=$row[$key]??''; ?><td class="<?= in_array($type,['money','money_optional'],true)?'money':'' ?> <?= is_numeric($value)&&(float)$value<0?'negative':'' ?>"><?= export_cell($value,$type,$row,$key) ?></td><?php endforeach; ?></tr><?php endforeach; endif; ?></tbody></table><?php endif; ?>
@@ -88,6 +114,37 @@ ob_start(); ?>
 <?php if($isCashRecap): ?><table class="signatures"><tr><td>Kasir/Petugas,<br><br><br><br>(________________________)</td><td>Bagian Keuangan,<br><br><br><br>(________________________)</td></tr></table><?php endif; ?><div class="footer">SistemSPP · Data laporan bersifat live dan mengikuti koreksi transaksi sampai saat laporan dibuat.</div></body></html>
 <?php $html=ob_get_clean();
 $safeName=preg_replace('/[^a-z0-9_-]+/i','-',strtolower($template)).'-'.date('Ymd-His');
-if($format==='excel'){header('Content-Type: application/vnd.ms-excel; charset=UTF-8');header('Content-Disposition: attachment; filename="'.$safeName.'.xls"');echo "\xEF\xBB\xBF".$html;exit;}
-if($format==='pdf'){require_once '../vendor/autoload.php';$options=new \Dompdf\Options();$options->set('isRemoteEnabled',false);$options->set('isHtml5ParserEnabled',true);$dompdf=new \Dompdf\Dompdf($options);$dompdf->loadHtml($html,'UTF-8');$dompdf->setPaper('A4',$registry[$template]['orientation']);$dompdf->render();$dompdf->stream($safeName.'.pdf',['Attachment'=>true]);exit;}
+if(in_array($format,['preview','print'],true)){
+    require_once __DIR__.'/../includes/report_preview.php';
+    $downloadQuery=$_GET;$downloadQuery['format']='pdf';unset($downloadQuery['preview_action']);
+    $backQuery=$_GET;unset($backQuery['format'],$backQuery['preview_action']);
+    render_report_pdf_preview($html,[
+        'title'=>$report['title'],
+        'subtitle'=>$report['subtitle'],
+        'generated'=>$generated,
+        'row_count'=>(int)($report['total']??count($report['rows']??[])),
+        'orientation'=>$registry[$template]['orientation'],
+        'download_url'=>'export_global.php?'.http_build_query($downloadQuery),
+        'back_url'=>'template.php?'.http_build_query(array_merge(['template'=>$template],$backQuery)),
+        'auto_print'=>$format==='print'||($_GET['preview_action']??'')==='print',
+    ]);
+}
+if($format==='excel'&&!$excelDownload){
+    require_once __DIR__.'/../includes/report_preview.php';
+    $downloadQuery=$_GET;$downloadQuery['format']='excel';$downloadQuery['download']='1';
+    $backQuery=$_GET;unset($backQuery['format'],$backQuery['download'],$backQuery['preview_action']);
+    render_report_export_preview($html,[
+        'file_type'=>'EXCEL',
+        'show_print'=>false,
+        'title'=>$report['title'],
+        'subtitle'=>$report['subtitle'],
+        'generated'=>$generated,
+        'row_count'=>(int)($report['total']??count($report['rows']??[])),
+        'orientation'=>$registry[$template]['orientation'],
+        'download_url'=>'export_global.php?'.http_build_query($downloadQuery),
+        'back_url'=>'template.php?'.http_build_query(array_merge(['template'=>$template],$backQuery)),
+    ]);
+}
+if($format==='excel'&&$excelDownload){header('Content-Type: application/vnd.ms-excel; charset=UTF-8');header('Content-Disposition: attachment; filename="'.$safeName.'.xls"');echo "\xEF\xBB\xBF".$html;exit;}
+if($format==='pdf'){$options=new \Dompdf\Options();$options->set('isRemoteEnabled',false);$options->set('isHtml5ParserEnabled',true);$options->setDefaultMediaType('print');$options->setChroot(realpath(__DIR__.'/..'));$dompdf=new \Dompdf\Dompdf($options);$dompdf->loadHtml($html,'UTF-8');$dompdf->setPaper('A4',$registry[$template]['orientation']);$dompdf->render();$dompdf->stream($safeName.'.pdf',['Attachment'=>true]);exit;}
 echo $html;

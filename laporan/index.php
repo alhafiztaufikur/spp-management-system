@@ -514,8 +514,8 @@ $exportQuery = http_build_query([
             <a href="global.php" class="btn btn-success">Laporan Global</a>
           </div>
           <div class="report-export-actions">
-            <a href="export_excel.php?<?= report_e($exportQuery) ?>" class="btn btn-success">Export Excel</a>
-            <a href="export_pdf.php?<?= report_e($exportQuery) ?>" class="btn btn-warning">Export PDF</a>
+            <a href="export_excel.php?<?= report_e($exportQuery) ?>" class="btn btn-success" target="_blank" rel="noopener">Export Excel</a>
+            <a href="export_pdf.php?<?= report_e($exportQuery) ?>&amp;output=preview" class="btn btn-warning" target="_blank" rel="noopener">Export PDF</a>
           </div>
         </form>
         </div>
@@ -613,6 +613,7 @@ $exportQuery = http_build_query([
         </div>
         <?php else: ?>
         <form method="GET" action="export_pdf.php" id="print-selected-form" target="_blank" rel="noopener">
+          <input type="hidden" name="output" value="preview">
           <input type="hidden" name="bulan" value="<?= report_e($filter_bulan) ?>">
           <input type="hidden" name="tahun" value="<?= report_e($filter_tahun) ?>">
           <input type="hidden" name="tanggal_awal" value="<?= report_e($filter_tanggal_awal) ?>">

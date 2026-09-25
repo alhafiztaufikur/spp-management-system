@@ -15,6 +15,7 @@ Thumbs.db
 *.log
 tmp/
 temp/
+.tmp-session/
 documentation/_sop_preview_*.png
 documentation/_flow_preview_*.png
 sql/backups/*.sql
