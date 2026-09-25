@@ -9,7 +9,7 @@ require_once '../includes/pagination.php';
 require_once '../includes/student_tariff_consistency.php';
 require_once '../includes/tagihan_sekali.php';
 require_once '../includes/spp_billing.php';
-requireRole(['admin']);
+requireRole(['admin', 'kasir']);
 
 if (empty($_SESSION['csrf_student'])) {
     $_SESSION['csrf_student'] = bin2hex(random_bytes(32));

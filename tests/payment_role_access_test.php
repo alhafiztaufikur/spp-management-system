@@ -70,7 +70,7 @@ try {
         $edit = role_test_request($baseUrl . '/pembayaran/edit.php?id=' . $paymentId, [], $cookies);
         role_test_assert($edit['status'] === 302, ucfirst($username) . ' masih dapat membuka edit pembayaran.');
         $masterSpp = role_test_request($baseUrl . '/master_spp.php', [], $cookies);
-        role_test_assert($masterSpp['status'] === 302, ucfirst($username) . ' masih dapat membuka Master Penerbitan SPP.');
+        role_test_assert($masterSpp['status'] === ($username === 'kasir' ? 200 : 302), ucfirst($username) . ' memiliki akses Master SPP yang tidak sesuai.');
         foreach (['update','hapus'] as $action) {
             $response = role_test_request($baseUrl . '/pembayaran/proses.php', [
                 'aksi'=>$action, 'id'=>$paymentId, 'no_induk'=>$nis,
@@ -84,6 +84,10 @@ try {
             role_test_assert(role_test_request($baseUrl . '/pembayaran/form.php', [], $cookies)['status'] === 200, 'Kasir tidak dapat membuka input pembayaran.');
             role_test_assert(role_test_request($baseUrl . '/pembayaran/lihat.php', [], $cookies)['status'] === 200, 'Kasir tidak dapat melihat pembayaran.');
             role_test_assert(role_test_request($baseUrl . '/laporan/cetak_struk.php?id=' . $paymentId, [], $cookies)['status'] === 200, 'Kasir tidak dapat mencetak pembayaran.');
+            foreach (['/siswa/daftar.php', '/master_kelas.php', '/master_spp.php', '/master_biaya_lain.php', '/master_daftar_ulang.php', '/siswa/export_excel.php'] as $masterPath) {
+                role_test_assert(role_test_request($baseUrl . $masterPath, [], $cookies)['status'] === 200, 'Kasir tidak dapat membuka ' . $masterPath . '.');
+            }
+            role_test_assert(role_test_request($baseUrl . '/role_management.php', [], $cookies)['status'] === 302, 'Kasir tidak boleh membuka Role Management.');
         }
     }
 
@@ -110,7 +114,7 @@ try {
     role_test_assert((int)$koneksi->query('SELECT COUNT(*) total FROM bayar WHERE id=' . $paymentId)->fetch_assoc()['total'] === 0, 'Hapus administrator tidak tersimpan.');
     $paymentId = 0;
 
-    echo "OK: hanya administrator dapat mengedit/menghapus; kasir tetap dapat input, lihat, dan cetak.\n";
+    echo "OK: hanya administrator dapat mengedit/menghapus; kasir dapat mengelola Data Master serta input, lihat, dan cetak.\n";
 } catch (Throwable $error) {
     fwrite(STDERR, 'FAILED: ' . $error->getMessage() . PHP_EOL);
     exit(1);

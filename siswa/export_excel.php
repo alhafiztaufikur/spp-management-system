@@ -4,7 +4,7 @@ if (!isset($_SESSION['admin_id'])) { header('Location: ../login.php'); exit; }
 require_once '../koneksi.php';
 require_once '../includes/auth.php';
 require_once '../includes/kelas.php';
-requireRole(['admin']);
+requireRole(['admin', 'kasir']);
 
 $query = trim((string)($_GET['q'] ?? ''));
 $filterClass = (int)($_GET['kelas'] ?? 0);

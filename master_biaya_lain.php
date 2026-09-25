@@ -4,7 +4,7 @@ if (!isset($_SESSION['admin_id'])) { header('Location: login.php'); exit; }
 require_once 'koneksi.php';
 require_once 'includes/auth.php';
 require_once 'includes/biaya_lain.php';
-requireRole(['admin']);
+requireRole(['admin', 'kasir']);
 
 if (empty($_SESSION['csrf_master_biaya_lain'])) $_SESSION['csrf_master_biaya_lain'] = bin2hex(random_bytes(32));
 

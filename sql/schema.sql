@@ -436,7 +436,7 @@ CREATE TABLE `daftar_ulang_audit_log` (
 ) ENGINE=InnoDB;
 CREATE TABLE `bayar_du` (
   `id` INT AUTO_INCREMENT PRIMARY KEY, `bayar_id` INT DEFAULT NULL,
-  `tagihan_daftar_ulang_id` BIGINT DEFAULT NULL, `no_induk` VARCHAR(50) DEFAULT NULL,
+  `tagihan_daftar_ulang_id` BIGINT DEFAULT NULL, `no_induk` VARCHAR(10) DEFAULT NULL,
   `kelas` VARCHAR(5) DEFAULT NULL, `th_ajaran` CHAR(9) DEFAULT NULL,
   `jumlah` DECIMAL(18,2) DEFAULT 0,
   UNIQUE KEY `uk_bayar_du_bayar_id` (`bayar_id`), KEY `idx_bayar_du_tagihan` (`tagihan_daftar_ulang_id`),

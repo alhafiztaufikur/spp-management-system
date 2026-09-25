@@ -4,7 +4,7 @@ require_once 'koneksi.php';
 require_once 'includes/auth.php';
 require_once 'includes/kelas.php';
 require_once 'includes/pagination.php';
-requireRole(['admin']);
+requireRole(['admin', 'kasir']);
 
 if (empty($_SESSION['csrf_master_kelas'])) $_SESSION['csrf_master_kelas'] = bin2hex(random_bytes(32));
 

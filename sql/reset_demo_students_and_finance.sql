@@ -10,7 +10,7 @@
 --    Jika tidak sama persis, semua DELETE menjadi no-op.
 
 SET NAMES utf8mb4 COLLATE utf8mb4_unicode_ci;
-SET @spp_reset_confirmation := 'RESET_DEMO_2026';
+SET @spp_reset_confirmation := '';
 
 DROP TEMPORARY TABLE IF EXISTS `spp_reset_guard`;
 CREATE TEMPORARY TABLE `spp_reset_guard` AS

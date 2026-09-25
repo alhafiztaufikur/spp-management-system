@@ -4,7 +4,7 @@ if (!isset($_SESSION['admin_id'])) { header('Location: login.php'); exit; }
 require_once 'koneksi.php';
 require_once 'includes/auth.php';
 require_once 'includes/daftar_ulang.php';
-requireRole(['admin']);
+requireRole(['admin', 'kasir']);
 
 if (empty($_SESSION['csrf_master_du'])) $_SESSION['csrf_master_du'] = bin2hex(random_bytes(32));
 

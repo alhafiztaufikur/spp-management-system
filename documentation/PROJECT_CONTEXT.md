@@ -25,10 +25,11 @@ SistemSPP adalah aplikasi administrasi pembayaran sekolah berbasis PHP, JavaScri
 | --- | :---: | :---: | :---: |
 | Input, lihat, cetak pembayaran | Ya | Ya | Tidak |
 | Edit/hapus pembayaran | Ya | Tidak | Tidak |
+| Kelola Data Siswa, Kelas/Rombel, SPP, Biaya Lain, Daftar Ulang | Ya | Ya | Tidak |
 | Kelola akun/role | Ya | Tidak | Tidak |
 | Laporan Global | Ya | Ya | Ya |
 
-Guard backend berada di `includes/auth.php`. Akses tiap Data Master mengikuti `requireRole()` pada halaman/endpoint versi yang ter-deploy; jangan menyimpulkannya dari tampilan menu saja. Hak akses harus diperiksa pada endpoint mutasi, bukan hanya dengan menyembunyikan tombol.
+Guard backend berada di `includes/auth.php`. Hak akses harus diperiksa pada endpoint mutasi, bukan hanya dengan menyembunyikan tombol.
 
 ## Lokasi kode utama
 

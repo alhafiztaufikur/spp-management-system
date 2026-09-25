@@ -36,23 +36,23 @@ $allNavItems = [
 
   ['siswa/daftar.php', 'Data Siswa',
    '<path d="M17 21v-2a4 4 0 0 0-4-4H5a4 4 0 0 0-4 4v2"/><circle cx="9" cy="7" r="4"/><path d="M23 21v-2a4 4 0 0 0-3-3.87"/><path d="M16 3.13a4 4 0 0 1 0 7.75"/>',
-   ['admin'], 'Data Master'],
+   ['admin', 'kasir'], 'Data Master'],
 
   ['master_kelas.php', 'Master Kelas/Rombel',
    '<path d="M3 3h18v18H3z"/><path d="M3 9h18M9 3v18"/>',
-   ['admin'], 'Data Master'],
+   ['admin', 'kasir'], 'Data Master'],
 
   ['master_spp.php', 'Master Penerbitan SPP',
    '<path d="M4 19.5A2.5 2.5 0 0 1 6.5 17H20"/><path d="M4 4.5A2.5 2.5 0 0 1 6.5 2H20v20H6.5A2.5 2.5 0 0 1 4 19.5z"/><path d="M9 7h6M9 11h6M9 15h4"/>',
-   ['admin'], 'Data Master'],
+   ['admin', 'kasir'], 'Data Master'],
 
   ['master_biaya_lain.php', 'Master Biaya Lain',
    '<path d="M20 12V8H6a2 2 0 0 1 0-4h12v4"/><path d="M4 6v12a2 2 0 0 0 2 2h14v-4"/><path d="M18 12a2 2 0 0 0 0 4h4v-4z"/>',
-   ['admin'], 'Data Master'],
+   ['admin', 'kasir'], 'Data Master'],
 
   ['master_daftar_ulang.php', 'Master Daftar Ulang',
    '<path d="M4 19.5A2.5 2.5 0 0 1 6.5 17H20"/><path d="M4 4.5A2.5 2.5 0 0 1 6.5 2H20v20H6.5A2.5 2.5 0 0 1 4 19.5z"/><path d="M9 7h6"/><path d="M9 11h6"/>',
-   ['admin'], 'Data Master'],
+   ['admin', 'kasir'], 'Data Master'],
 
   ['tabungan/masuk.php', 'Tabungan Masuk',
    '<path d="M12 2v20M17 7H9.5a3.5 3.5 0 0 0 0 7h5a3.5 3.5 0 0 1 0 7H6"/>',

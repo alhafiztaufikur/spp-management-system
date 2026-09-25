@@ -3,7 +3,7 @@ session_start();
 require_once 'koneksi.php';
 require_once 'includes/auth.php';
 require_once 'includes/spp_billing.php';
-requireRole(['admin']);
+requireRole(['admin', 'kasir']);
 if (!spp_billing_schema_ready($koneksi)) die('Schema Master SPP belum tersedia. Jalankan sql/add_spp_billing_and_deposit.sql.');
 if (empty($_SESSION['csrf_master_spp'])) $_SESSION['csrf_master_spp']=bin2hex(random_bytes(32));
 
