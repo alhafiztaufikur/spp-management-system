@@ -420,7 +420,7 @@ $activeStudents = $koneksi->query("SELECT s.NO_INDUK,s.NO_induk_diknas,s.NAMA,s.
       </div>
     </main>
   </div>
-  <script src="assets/js/app.js?v=3.2"></script>
+  <script src="assets/js/app.js?v=10.4"></script>
   <script>
     document.addEventListener('DOMContentLoaded', function () {
       var nominal = document.getElementById('nominal-biaya');

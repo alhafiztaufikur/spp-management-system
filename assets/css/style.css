@@ -7615,6 +7615,29 @@ a.btn {
   order: 8;
 }
 
+.report-template-shell .report-filter-kas-tabungan .report-date-range-field,
+.report-template-shell .report-filter-titipan-spp .report-date-range-field {
+  grid-column: span 5 !important;
+}
+.report-template-shell .report-filter-kas-tabungan .field-row:has(select[name="operator"]),
+.report-template-shell .report-filter-titipan-spp .field-row:has(select[name="operator"]) {
+  grid-column: span 4 !important;
+}
+.report-template-shell .report-filter-kas-tabungan .report-filter-actions,
+.report-template-shell .report-filter-titipan-spp .report-filter-actions {
+  grid-column: span 3 !important;
+  grid-template-columns: minmax(0, 1fr) minmax(88px, 112px) !important;
+  align-self: end;
+  margin-top: 0;
+  padding: 0 !important;
+  background: transparent !important;
+}
+.report-template-shell .report-filter-kas-tabungan .report-filter-actions .btn,
+.report-template-shell .report-filter-titipan-spp .report-filter-actions .btn {
+  height: 42px;
+  border-radius: 12px;
+}
+
 .report-template-shell .report-filter-spp-tahunan .field-row:has(select[name="tahun_ajaran"]),
 .report-template-shell .report-filter-spp-tahunan .field-row:has(select[name="kelas"]),
 .report-template-shell .report-filter-spp-tahunan .field-row:has(select[name="status"]),
@@ -7708,7 +7731,13 @@ a.btn {
   .report-template-shell .report-filter-setoran .report-date-range-field,
   .report-template-shell .report-filter-setoran .field-row:has(select[name="operator"]),
   .report-template-shell .report-filter-setoran .field-row:has(select[name="metode"]),
-  .report-template-shell .report-filter-setoran .field-row:has(select[name="per_page"]) {
+  .report-template-shell .report-filter-setoran .field-row:has(select[name="per_page"]),
+  .report-template-shell .report-filter-kas-tabungan .report-date-range-field,
+  .report-template-shell .report-filter-kas-tabungan .field-row:has(select[name="operator"]),
+  .report-template-shell .report-filter-kas-tabungan .report-filter-actions,
+  .report-template-shell .report-filter-titipan-spp .report-date-range-field,
+  .report-template-shell .report-filter-titipan-spp .field-row:has(select[name="operator"]),
+  .report-template-shell .report-filter-titipan-spp .report-filter-actions {
     grid-column: span 1 !important;
   }
   .report-template-shell .report-global-filter-form .report-filter-actions,
@@ -8214,12 +8243,406 @@ a.btn {
   background: linear-gradient(115deg, rgba(52, 211, 153, .09), rgba(245, 158, 11, .035));
 }
 
+/* Riwayat Titipan SPP dan Rekap Kas Tabungan: compact, readable recap blocks. */
+:is(.report-table-report-filter-setoran,.report-table-report-filter-kas-tabungan,.report-table-report-filter-titipan-spp) .report-settlement-component-card {
+  margin-top: 0;
+  border-color: rgba(20,130,80,.15);
+  border-radius: 16px;
+  box-shadow: 0 10px 26px rgba(20,80,50,.06);
+}
+:is(.report-table-report-filter-setoran,.report-table-report-filter-kas-tabungan,.report-table-report-filter-titipan-spp) .report-settlement-section-head {
+  padding: 18px 20px;
+  background: linear-gradient(115deg, rgba(232,247,239,.9), rgba(255,255,255,.98));
+}
+:is(.report-table-report-filter-setoran,.report-table-report-filter-kas-tabungan,.report-table-report-filter-titipan-spp) .report-settlement-section-head h3 {
+  font-size: 1.02rem;
+}
+:is(.report-table-report-filter-setoran,.report-table-report-filter-kas-tabungan,.report-table-report-filter-titipan-spp) .report-settlement-component-total {
+  min-width: 170px;
+  padding: 10px 14px;
+  background: var(--bg-elevated);
+}
+:is(.report-table-report-filter-setoran,.report-table-report-filter-kas-tabungan,.report-table-report-filter-titipan-spp) .report-settlement-component-table {
+  overflow-x: auto;
+}
+:is(.report-table-report-filter-setoran,.report-table-report-filter-kas-tabungan,.report-table-report-filter-titipan-spp) .report-settlement-component-table table {
+  width: 100%;
+  min-width: 0;
+  border-collapse: collapse;
+}
+:is(.report-table-report-filter-setoran,.report-table-report-filter-kas-tabungan,.report-table-report-filter-titipan-spp) .report-settlement-component-table thead th {
+  border-color: #12503a !important;
+  background: #12503a !important;
+  color: #fff !important;
+  font-size: .73rem;
+  font-weight: 850;
+  letter-spacing: .02em;
+  text-transform: uppercase;
+}
+:is(.report-table-report-filter-setoran,.report-table-report-filter-kas-tabungan,.report-table-report-filter-titipan-spp) .report-settlement-component-table th,
+:is(.report-table-report-filter-setoran,.report-table-report-filter-kas-tabungan,.report-table-report-filter-titipan-spp) .report-settlement-component-table td {
+  padding: 12px 14px;
+}
+:is(.report-table-report-filter-setoran,.report-table-report-filter-kas-tabungan,.report-table-report-filter-titipan-spp) .report-settlement-component-table th:first-child,
+:is(.report-table-report-filter-setoran,.report-table-report-filter-kas-tabungan,.report-table-report-filter-titipan-spp) .report-settlement-component-table td:first-child {
+  width: 86px;
+}
+:is(.report-table-report-filter-setoran,.report-table-report-filter-kas-tabungan,.report-table-report-filter-titipan-spp) .report-settlement-component-table th:last-child,
+:is(.report-table-report-filter-setoran,.report-table-report-filter-kas-tabungan,.report-table-report-filter-titipan-spp) .report-settlement-component-table td:last-child {
+  text-align: right;
+  white-space: nowrap;
+}
+:is(.report-table-report-filter-setoran,.report-table-report-filter-kas-tabungan,.report-table-report-filter-titipan-spp) .report-settlement-component-table tbody tr:nth-child(even) {
+  background: rgba(148,163,184,.035);
+}
+:is(.report-table-report-filter-setoran,.report-table-report-filter-kas-tabungan,.report-table-report-filter-titipan-spp) .report-settlement-component-table tbody tr:hover {
+  background: rgba(16,137,82,.055);
+}
+:is(.report-table-report-filter-setoran,.report-table-report-filter-kas-tabungan,.report-table-report-filter-titipan-spp) .report-settlement-component-table tfoot th {
+  border-color: #c7e4d4 !important;
+  background: #e5f3ec !important;
+  color: #138a53 !important;
+  font-size: .75rem;
+  text-transform: uppercase;
+}
+:is(.report-table-report-filter-setoran,.report-table-report-filter-kas-tabungan,.report-table-report-filter-titipan-spp) .report-settlement-method-summary {
+  margin: 18px 0 0;
+  padding: 0 2px;
+}
+:is(.report-table-report-filter-setoran,.report-table-report-filter-kas-tabungan,.report-table-report-filter-titipan-spp) .report-settlement-method-summary h3 {
+  margin: 0 0 10px;
+  color: var(--text-main,#17231d);
+  font-size: .92rem;
+}
+:is(.report-table-report-filter-setoran,.report-table-report-filter-kas-tabungan,.report-table-report-filter-titipan-spp) .report-settlement-total-card {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  gap: 18px;
+  margin: 18px 0 0;
+  padding: 18px 20px;
+  border: 1px solid rgba(16,137,82,.25);
+  border-radius: 14px;
+  background: linear-gradient(110deg,#e3f5eb,#f6fbf8);
+  box-shadow: 0 8px 24px rgba(20,80,50,.06);
+}
+:is(.report-table-report-filter-setoran,.report-table-report-filter-kas-tabungan,.report-table-report-filter-titipan-spp) .report-settlement-total-card span {
+  display: block;
+  color: #087c4a;
+  font-size: .78rem;
+  font-weight: 900;
+  letter-spacing: .08em;
+}
+:is(.report-table-report-filter-setoran,.report-table-report-filter-kas-tabungan,.report-table-report-filter-titipan-spp) .report-settlement-total-card > strong {
+  color: #087c4a;
+  font-size: 1.45rem;
+  line-height: 1;
+}
+.report-deposit-history-card {
+  margin-top: 18px;
+  border: 1px solid rgba(20,130,80,.16);
+  border-radius: 16px;
+  background: var(--bg-card,#fff);
+  overflow: hidden;
+  box-shadow: 0 10px 26px rgba(20,80,50,.055);
+}
+.report-deposit-history-head {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  gap: 16px;
+  padding: 18px 22px;
+  border-bottom: 1px solid rgba(20,130,80,.14);
+  background: linear-gradient(115deg, rgba(232,247,239,.86), rgba(255,252,240,.62));
+}
+.report-deposit-history-head span:first-child {
+  display: block;
+  margin-bottom: 5px;
+  color: var(--primary,#138a53);
+  font-size: .72rem;
+  font-weight: 900;
+  letter-spacing: .08em;
+  text-transform: uppercase;
+}
+.report-deposit-history-head h3 {
+  margin: 0;
+  color: var(--text-main,#17231d);
+  font-size: 1.06rem;
+}
+.report-deposit-history-head p {
+  max-width: 640px;
+  margin: 5px 0 0;
+  color: var(--text-secondary,#64756c);
+  font-size: .84rem;
+  line-height: 1.48;
+}
+.report-deposit-history-table-wrap {
+  max-height: 430px;
+  margin: 0;
+  border: 0;
+  border-radius: 0;
+}
+.report-deposit-history-table {
+  min-width: 1120px;
+}
+.report-deposit-history-table th {
+  border-color: #12503a !important;
+  background: #12503a !important;
+  color: #fff !important;
+}
+.report-deposit-history-table td {
+  vertical-align: middle;
+}
+.report-deposit-history-card .report-pagination,
+.report-deposit-history-card .du-pagination-footer {
+  padding: 14px 22px 18px;
+}
+[data-theme="dark"] :is(.report-table-report-filter-setoran,.report-table-report-filter-kas-tabungan,.report-table-report-filter-titipan-spp) .report-settlement-section-head,
+[data-theme="dark"] .report-deposit-history-head {
+  background: linear-gradient(115deg, rgba(52,211,153,.09), rgba(245,158,11,.035));
+}
+[data-theme="dark"] :is(.report-table-report-filter-setoran,.report-table-report-filter-kas-tabungan,.report-table-report-filter-titipan-spp) .report-settlement-total-card {
+  border-color: rgba(52,211,153,.24);
+  background: linear-gradient(110deg, rgba(52,211,153,.13), rgba(52,211,153,.035));
+  box-shadow: 0 8px 24px rgba(0,0,0,.12);
+}
+@media (max-width: 700px) {
+  :is(.report-table-report-filter-setoran,.report-table-report-filter-kas-tabungan,.report-table-report-filter-titipan-spp) .report-settlement-section-head,
+  .report-deposit-history-head {
+    align-items: stretch;
+    flex-direction: column;
+    padding: 16px;
+  }
+  :is(.report-table-report-filter-setoran,.report-table-report-filter-kas-tabungan,.report-table-report-filter-titipan-spp) .report-settlement-total-card {
+    align-items: flex-start;
+    flex-direction: column;
+    gap: 10px;
+    padding: 16px;
+  }
+  .report-deposit-history-table {
+    min-width: 980px;
+  }
+}
+
 /* Master SPP dan titipan SPP */
 .spp-master-hero .master-modern-hero{align-items:flex-start}.spp-master-hero .master-modern-stats{grid-template-columns:repeat(3,minmax(120px,1fr))}.spp-publish-row{grid-template-columns:auto minmax(210px,1.4fr) auto minmax(130px,.7fr) minmax(190px,.9fr) auto;gap:14px}.spp-rate-preview{display:flex;flex-direction:column;gap:4px;padding:9px 12px;border:1px solid var(--border);border-radius:12px;background:var(--surface-soft)}.spp-rate-preview span{font-size:11px;color:var(--text-muted);text-transform:uppercase;letter-spacing:.05em}.spp-rate-preview strong{color:var(--accent);font-size:14px}.spp-student-rate-summary{display:grid;grid-template-columns:repeat(2,minmax(150px,220px)) 1fr;align-items:center;gap:12px;margin:0 0 16px;padding:14px 16px;border:1px solid var(--border);border-radius:14px;background:linear-gradient(135deg,var(--surface-soft),transparent)}.spp-student-rate-summary div{display:flex;flex-direction:column;gap:4px}.spp-student-rate-summary span,.spp-student-rate-summary small{color:var(--text-muted);font-size:12px}.spp-student-rate-summary strong{font-size:17px;color:var(--accent)}
+.spp-publish-card {
+  overflow: visible;
+}
+.spp-publish-card .card-title-row {
+  align-items: flex-start;
+  padding-bottom: 18px;
+  border-bottom: 1px solid rgba(16, 185, 129, .13);
+}
+.spp-publish-card .promotion-filter-bar {
+  grid-template-columns: minmax(320px, 1fr) minmax(180px, 260px);
+  align-items: stretch;
+  gap: 12px;
+  margin: 18px 0 14px;
+  padding: 13px;
+  border: 1px solid rgba(16, 185, 129, .16);
+  border-radius: 18px;
+  background: linear-gradient(135deg, rgba(16, 185, 129, .06), rgba(245, 158, 11, .025));
+}
+.spp-publish-card .promotion-filter-bar .search-box,
+.spp-publish-card .promotion-filter-bar .field-input {
+  height: 48px;
+  min-height: 48px;
+  border-radius: 14px;
+  background: var(--card);
+}
+.spp-publish-card .promotion-filter-bar .search-box .search-icon {
+  display: inline-flex;
+  align-items: center;
+  justify-content: center;
+  flex: 0 0 30px;
+  width: 30px;
+  height: 30px;
+  border: 1px solid rgba(16, 185, 129, .16);
+  border-radius: 12px;
+  background: linear-gradient(135deg, rgba(16, 185, 129, .14), rgba(16, 185, 129, .04));
+  color: var(--accent);
+}
+.spp-publish-card .promotion-filter-bar .search-box .search-icon svg {
+  width: 16px;
+  height: 16px;
+}
+.spp-publish-card #spp-publish-form {
+  display: grid;
+  gap: 14px;
+}
+.spp-publish-card .promotion-selection-toolbar {
+  padding: 12px 14px;
+  border: 1px solid rgba(16, 185, 129, .14);
+  border-radius: 18px;
+  background: var(--surface-soft);
+}
+.spp-publish-card .promotion-selection-toolbar > div:first-child {
+  display: flex;
+  align-items: center;
+  gap: 8px;
+  flex-wrap: wrap;
+}
+.spp-publish-card .promotion-selection-toolbar strong {
+  display: inline-flex;
+  align-items: center;
+  min-height: 30px;
+  padding: 7px 12px;
+  border-radius: 999px;
+  background: rgba(16, 185, 129, .12);
+  color: var(--accent);
+  font-size: 12px;
+}
+.spp-publish-card .promotion-selection-toolbar span {
+  display: inline-flex;
+  align-items: center;
+  min-height: 30px;
+  padding: 7px 12px;
+  border: 1px solid rgba(16, 185, 129, .13);
+  border-radius: 999px;
+  background: var(--card);
+  color: var(--text-primary);
+  font-size: 12px;
+  font-weight: 750;
+}
+.spp-publish-card .promotion-selection-toolbar .btn {
+  min-height: 38px;
+  padding: 9px 15px;
+  border-radius: 999px;
+}
+.spp-publish-card .promotion-student-list {
+  display: grid;
+  gap: 10px;
+  max-height: 520px;
+  padding: 10px;
+  border-radius: 18px;
+  background: linear-gradient(180deg, rgba(16, 185, 129, .045), rgba(255, 255, 255, .02));
+}
+.spp-publish-card .spp-publish-row {
+  grid-template-columns: 34px minmax(220px, 1.35fr) minmax(64px, auto) minmax(140px, .55fr) minmax(180px, .7fr) minmax(105px, auto);
+  gap: 14px;
+  min-height: 82px;
+  padding: 13px 16px;
+  border: 1px solid rgba(16, 185, 129, .13);
+  border-radius: 16px;
+  background: var(--card);
+  box-shadow: 0 8px 20px rgba(15, 70, 45, .035);
+}
+.spp-publish-card .spp-publish-row:hover {
+  border-color: rgba(16, 185, 129, .28);
+  background: rgba(16, 185, 129, .045);
+}
+.spp-publish-card .spp-publish-row.is-selected {
+  border-color: rgba(16, 185, 129, .42);
+  background: rgba(16, 185, 129, .09);
+}
+.spp-publish-card .promotion-student-check span {
+  display: none;
+}
+.spp-publish-card .promotion-student-check input {
+  width: 18px;
+  height: 18px;
+}
+.spp-publish-card .promotion-student-identity strong {
+  font-size: 14px;
+}
+.spp-publish-card .promotion-student-identity small {
+  font-size: 11.5px;
+}
+.spp-publish-card .spp-rate-preview {
+  justify-self: stretch;
+  min-height: 52px;
+  border-radius: 14px;
+  background: rgba(16, 185, 129, .06);
+}
+.spp-publish-card .promotion-target-field {
+  justify-self: stretch;
+}
+.spp-publish-card .promotion-target-field > span {
+  color: var(--text-muted);
+  font-size: 10px;
+  font-weight: 850;
+  letter-spacing: .04em;
+  text-transform: uppercase;
+}
+.spp-publish-card .promotion-target-field .field-input {
+  height: 39px;
+  min-height: 39px;
+  border-radius: 12px;
+  background: var(--surface-soft);
+}
+.spp-publish-card .master-status {
+  justify-self: end;
+  min-width: 96px;
+  text-align: center;
+}
+.spp-publish-card .promotion-submit-bar {
+  position: sticky;
+  bottom: 14px;
+  z-index: 5;
+  padding: 14px 16px;
+  border: 1px solid rgba(16, 185, 129, .18);
+  border-radius: 18px;
+  background: color-mix(in srgb, var(--card) 92%, rgba(16, 185, 129, .16));
+  box-shadow: 0 16px 34px rgba(15, 70, 45, .11);
+}
+.spp-publish-card .promotion-submit-bar .btn {
+  min-width: 210px;
+  min-height: 46px;
+  border-radius: 999px;
+}
+.spp-publish-card .promotion-submit-bar .btn:disabled {
+  opacity: .58;
+  cursor: not-allowed;
+}
+[data-theme="dark"] .spp-publish-card .promotion-filter-bar,
+[data-theme="dark"] .spp-publish-card .promotion-selection-toolbar,
+[data-theme="dark"] .spp-publish-card .promotion-submit-bar {
+  background: rgba(17, 24, 39, .76);
+}
+[data-theme="dark"] .spp-publish-card .spp-publish-row {
+  background: rgba(15, 23, 42, .94);
+  box-shadow: none;
+}
+.spp-publish-card .promotion-student-row[hidden] {
+  display: none;
+}
 .spp-deposit-banner{margin:14px 0 18px;padding:16px 18px;display:flex;align-items:center;justify-content:space-between;gap:18px;border:1px solid color-mix(in srgb,var(--accent) 36%,var(--border));border-radius:16px;background:linear-gradient(120deg,color-mix(in srgb,var(--accent) 12%,var(--card)),var(--card));box-shadow:0 10px 28px rgba(0,0,0,.06)}.spp-deposit-banner[hidden]{display:none}.spp-deposit-banner>div{display:grid;grid-template-columns:auto auto;align-items:baseline;gap:3px 12px}.spp-deposit-banner span{font-size:12px;font-weight:700;letter-spacing:.05em;text-transform:uppercase;color:var(--text-muted)}.spp-deposit-banner strong{font-size:20px;color:var(--accent)}.spp-deposit-banner small{grid-column:1/-1;color:var(--text-muted)}
 .payment-year-caption{position:absolute;right:8px;top:-19px;font-size:11px;font-weight:700;color:var(--text-muted);white-space:nowrap}.spp-deposit-action{display:flex;align-items:center;gap:12px;margin:0 0 14px}.spp-deposit-action .btn{font-size:13px}.spp-deposit-action span{font-size:12px;color:var(--text-muted)}
 .spp-deposit-modal{position:fixed;inset:0;z-index:2500;display:grid;place-items:center;padding:20px;background:rgba(5,15,12,.62);backdrop-filter:blur(7px)}.spp-deposit-modal[hidden]{display:none}.spp-deposit-modal-card{width:min(560px,100%);max-height:min(720px,90vh);overflow:auto;padding:24px;border:1px solid var(--border);border-radius:20px;background:var(--card);box-shadow:0 28px 80px rgba(0,0,0,.3)}.spp-deposit-modal-card h3{margin:0 0 6px}.spp-deposit-modal-card>p{margin:0 0 16px;color:var(--text-muted);line-height:1.55}.spp-deposit-preview-lines{display:grid;gap:8px}.spp-deposit-preview-lines article{display:flex;align-items:center;justify-content:space-between;gap:14px;padding:12px 14px;border:1px solid var(--border);border-radius:12px;background:var(--surface-soft)}.spp-deposit-preview-lines article div{display:flex;flex-direction:column;gap:3px}.spp-deposit-preview-lines article small{color:var(--text-muted)}.spp-deposit-preview-lines article span{font-weight:700;color:var(--accent)}.spp-deposit-empty{padding:18px;text-align:center;color:var(--text-muted);border:1px dashed var(--border);border-radius:12px}
 @media(max-width:980px){.spp-publish-row{grid-template-columns:auto 1fr auto}.spp-publish-row .spp-rate-preview,.spp-publish-row .promotion-target-field,.spp-publish-row .master-status{grid-column:2/-1}.spp-student-rate-summary{grid-template-columns:1fr 1fr}.spp-student-rate-summary small{grid-column:1/-1}}
+@media(max-width:980px){
+  .spp-publish-card .promotion-filter-bar {
+    grid-template-columns: 1fr;
+  }
+  .spp-publish-card .spp-publish-row {
+    grid-template-columns: 34px minmax(0, 1fr) auto;
+  }
+  .spp-publish-card .spp-publish-row .spp-rate-preview,
+  .spp-publish-card .spp-publish-row .promotion-target-field,
+  .spp-publish-card .spp-publish-row .master-status {
+    grid-column: 2 / -1;
+    justify-self: stretch;
+  }
+  .spp-publish-card .promotion-submit-bar {
+    position: static;
+  }
+}
+@media(max-width:700px){
+  .spp-publish-card .promotion-selection-toolbar,
+  .spp-publish-card .promotion-submit-bar {
+    align-items: stretch;
+    flex-direction: column;
+  }
+  .spp-publish-card .promotion-selection-toolbar > div:last-child,
+  .spp-publish-card .promotion-selection-toolbar .btn,
+  .spp-publish-card .promotion-submit-bar .btn {
+    width: 100%;
+  }
+  .spp-publish-card .spp-publish-row {
+    padding: 12px;
+  }
+}
 @media(max-width:620px){.spp-master-hero .master-modern-stats{grid-template-columns:1fr}.spp-deposit-banner{align-items:stretch;flex-direction:column}.spp-deposit-banner .btn{width:100%}.spp-student-rate-summary{grid-template-columns:1fr}.spp-student-rate-summary small{grid-column:auto}.spp-deposit-modal-card{padding:18px;border-radius:16px}}
 :is(.report-table-report-filter-setoran,.report-table-report-filter-kas-tabungan) .report-settlement-component-total {
   background: var(--bg-elevated);
@@ -9461,4 +9884,338 @@ a.btn {
   }
   .student-class-timeline-dot { margin: 13px 0 0; }
   .student-class-timeline-item article { min-height: 0; }
+}
+
+/* Stable layout for the daily savings recap and SPP deposit history. */
+.report-template-shell :is(.report-filter-kas-tabungan, .report-filter-titipan-spp) {
+  grid-template-columns: repeat(12, minmax(0, 1fr)) !important;
+  align-items: end;
+  gap: 12px !important;
+}
+.report-template-shell :is(.report-filter-kas-tabungan, .report-filter-titipan-spp) .report-date-range-field {
+  grid-column: span 7 !important;
+  min-width: 0;
+}
+.report-template-shell :is(.report-filter-kas-tabungan, .report-filter-titipan-spp) .field-row:has(select[name="operator"]) {
+  grid-column: span 5 !important;
+  min-width: 0;
+}
+.report-template-shell :is(.report-filter-kas-tabungan, .report-filter-titipan-spp) .report-filter-actions {
+  grid-column: 1 / -1 !important;
+  display: grid !important;
+  grid-template-columns: minmax(220px, 1fr) minmax(120px, 170px) !important;
+  gap: 10px !important;
+  width: 100%;
+  margin: 0;
+  padding: 0 !important;
+  background: transparent !important;
+}
+.report-template-shell :is(.report-filter-kas-tabungan, .report-filter-titipan-spp) .report-filter-actions .btn {
+  width: 100%;
+  min-width: 0;
+  height: 44px;
+  padding: 0 18px;
+  border-radius: 11px;
+}
+.report-template-shell :is(.report-filter-kas-tabungan, .report-filter-titipan-spp) .report-date-range-picker {
+  position: relative;
+  z-index: 12;
+}
+.report-template-shell :is(.report-filter-kas-tabungan, .report-filter-titipan-spp) .report-date-range-popover {
+  z-index: 80;
+}
+
+.report-table-report-filter-kas-tabungan > .report-settlement-component-card {
+  margin: 18px 22px 0;
+}
+.report-table-report-filter-kas-tabungan > .report-settlement-method-summary {
+  margin: 18px 22px 0;
+  padding: 0;
+}
+.report-table-report-filter-kas-tabungan > .report-settlement-total-card {
+  margin: 18px 22px 24px;
+}
+.report-table-report-filter-kas-tabungan .report-settlement-section-head {
+  padding: 17px 20px;
+}
+.report-table-report-filter-kas-tabungan .report-settlement-component-table th,
+.report-table-report-filter-kas-tabungan .report-settlement-component-table td {
+  padding: 12px 16px;
+}
+.report-table-report-filter-kas-tabungan .report-settlement-method-grid {
+  gap: 12px;
+}
+.report-table-report-filter-kas-tabungan .report-settlement-method-card {
+  min-height: 82px;
+  padding: 15px 16px;
+}
+
+.report-deposit-summary-simple {
+  margin: 18px 22px 0;
+  border: 1px solid var(--border);
+  border-radius: 14px;
+  background: var(--bg-elevated);
+  overflow: hidden;
+}
+.report-deposit-summary-head {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  gap: 18px;
+  padding: 17px 20px;
+  border-bottom: 1px solid var(--border);
+}
+.report-deposit-summary-head h3 {
+  margin: 0;
+  color: var(--text-primary);
+  font-size: 1rem;
+}
+.report-deposit-summary-head p {
+  margin: 4px 0 0;
+  color: var(--text-muted);
+  font-size: .82rem;
+}
+.report-deposit-summary-balance {
+  flex: 0 0 auto;
+  min-width: 170px;
+  padding: 9px 12px;
+  border: 1px solid var(--border);
+  border-radius: 10px;
+  background: var(--bg-surface);
+  text-align: right;
+}
+.report-deposit-summary-balance span,
+.report-deposit-summary-item span {
+  display: block;
+  color: var(--text-muted);
+  font-size: .7rem;
+  font-weight: 800;
+  text-transform: uppercase;
+}
+.report-deposit-summary-balance strong {
+  display: block;
+  margin-top: 3px;
+  color: var(--accent-light);
+  font-size: 1.08rem;
+}
+.report-deposit-summary-grid {
+  display: grid;
+  grid-template-columns: repeat(4, minmax(0, 1fr));
+  gap: 0;
+}
+.report-deposit-summary-item {
+  min-width: 0;
+  padding: 15px 18px;
+  border-right: 1px solid var(--border);
+}
+.report-deposit-summary-item:last-child { border-right: 0; }
+.report-deposit-summary-item strong {
+  display: block;
+  margin-top: 5px;
+  color: var(--text-primary);
+  font-size: .96rem;
+  white-space: nowrap;
+}
+.report-table-report-filter-titipan-spp > .report-deposit-history-card-simple {
+  margin: 18px 22px 24px;
+  border-radius: 14px;
+  box-shadow: none;
+}
+.report-deposit-history-card-simple .report-deposit-history-head {
+  padding: 16px 20px;
+  background: var(--bg-elevated);
+}
+.report-deposit-history-card-simple .report-deposit-history-head h3 {
+  font-size: 1rem;
+}
+.report-deposit-history-card-simple .report-deposit-history-head p {
+  margin-top: 4px;
+}
+
+@media (max-width: 1100px) {
+  .report-template-shell :is(.report-filter-kas-tabungan, .report-filter-titipan-spp) .report-date-range-field,
+  .report-template-shell :is(.report-filter-kas-tabungan, .report-filter-titipan-spp) .field-row:has(select[name="operator"]) {
+    grid-column: span 6 !important;
+  }
+}
+@media (max-width: 700px) {
+  .report-template-shell :is(.report-filter-kas-tabungan, .report-filter-titipan-spp) .report-date-range-field,
+  .report-template-shell :is(.report-filter-kas-tabungan, .report-filter-titipan-spp) .field-row:has(select[name="operator"]),
+  .report-template-shell :is(.report-filter-kas-tabungan, .report-filter-titipan-spp) .report-filter-actions {
+    grid-column: 1 / -1 !important;
+  }
+  .report-template-shell :is(.report-filter-kas-tabungan, .report-filter-titipan-spp) .report-filter-actions {
+    grid-template-columns: 1fr !important;
+  }
+  .report-table-report-filter-kas-tabungan > .report-settlement-component-card,
+  .report-table-report-filter-kas-tabungan > .report-settlement-method-summary,
+  .report-table-report-filter-kas-tabungan > .report-settlement-total-card,
+  .report-deposit-summary-simple,
+  .report-table-report-filter-titipan-spp > .report-deposit-history-card-simple {
+    margin-right: 14px;
+    margin-left: 14px;
+  }
+  .report-deposit-summary-head {
+    align-items: stretch;
+    flex-direction: column;
+    padding: 15px;
+  }
+  .report-deposit-summary-balance {
+    min-width: 0;
+    text-align: left;
+  }
+  .report-deposit-summary-grid {
+    grid-template-columns: 1fr 1fr;
+  }
+  .report-deposit-summary-item:nth-child(2) { border-right: 0; }
+  .report-deposit-summary-item:nth-child(-n+2) { border-bottom: 1px solid var(--border); }
+}
+
+/* Final layout: Kas Tabungan Harian and Riwayat Titipan SPP. */
+.report-template-shell .report-template-filters.report-filter-kas-tabungan,
+.report-template-shell .report-template-filters.report-filter-titipan-spp {
+  display: grid !important;
+  grid-template-columns: minmax(0, 1fr) minmax(220px, .72fr) !important;
+  align-items: end !important;
+  gap: 12px !important;
+}
+.report-template-shell .report-template-filters.report-filter-kas-tabungan .report-date-range-field,
+.report-template-shell .report-template-filters.report-filter-titipan-spp .report-date-range-field,
+.report-template-shell .report-template-filters.report-filter-kas-tabungan .field-row:has(select[name="operator"]),
+.report-template-shell .report-template-filters.report-filter-titipan-spp .field-row:has(select[name="operator"]) {
+  grid-column: auto !important;
+  width: 100%;
+  min-width: 0;
+}
+.report-template-shell .report-template-filters.report-filter-kas-tabungan .report-date-range-button,
+.report-template-shell .report-template-filters.report-filter-titipan-spp .report-date-range-button,
+.report-template-shell .report-template-filters.report-filter-kas-tabungan select[name="operator"],
+.report-template-shell .report-template-filters.report-filter-titipan-spp select[name="operator"] {
+  box-sizing: border-box;
+  width: 100%;
+  min-width: 0;
+  height: 44px;
+}
+.report-template-shell .report-template-filters.report-filter-kas-tabungan .report-date-range-value,
+.report-template-shell .report-template-filters.report-filter-titipan-spp .report-date-range-value {
+  min-width: 0;
+  overflow: hidden;
+  text-overflow: ellipsis;
+  white-space: nowrap;
+}
+.report-template-shell .report-template-filters.report-filter-kas-tabungan .report-filter-actions,
+.report-template-shell .report-template-filters.report-filter-titipan-spp .report-filter-actions {
+  grid-column: 1 / -1 !important;
+  display: grid !important;
+  grid-template-columns: minmax(0, 1fr) minmax(220px, .72fr) !important;
+  align-items: center;
+  gap: 10px !important;
+  width: 100%;
+  margin: 2px 0 0 !important;
+  padding: 0 !important;
+  background: transparent !important;
+}
+.report-template-shell .report-template-filters.report-filter-kas-tabungan .report-filter-actions .btn,
+.report-template-shell .report-template-filters.report-filter-titipan-spp .report-filter-actions .btn {
+  width: 100% !important;
+  min-width: 0;
+  height: 42px;
+  padding: 0 22px;
+  border-radius: 10px;
+}
+
+:is(.report-table-report-filter-kas-tabungan, .report-table-report-filter-titipan-spp) > .report-settlement-component-card,
+:is(.report-table-report-filter-kas-tabungan, .report-table-report-filter-titipan-spp) > .report-settlement-method-summary,
+:is(.report-table-report-filter-kas-tabungan, .report-table-report-filter-titipan-spp) > .report-settlement-total-card {
+  box-sizing: border-box;
+  width: auto;
+  margin-right: 22px;
+  margin-left: 22px;
+}
+:is(.report-table-report-filter-kas-tabungan, .report-table-report-filter-titipan-spp) > .report-settlement-component-card {
+  margin-top: 18px;
+  border: 1px solid var(--border);
+  border-radius: 14px;
+  overflow: hidden;
+  background: var(--bg-elevated);
+}
+:is(.report-table-report-filter-kas-tabungan, .report-table-report-filter-titipan-spp) .report-settlement-section-head {
+  min-height: 76px;
+  padding: 16px 18px;
+}
+:is(.report-table-report-filter-kas-tabungan, .report-table-report-filter-titipan-spp) .report-settlement-component-total {
+  min-width: 164px;
+  padding: 11px 14px;
+}
+:is(.report-table-report-filter-kas-tabungan, .report-table-report-filter-titipan-spp) .report-settlement-component-table th,
+:is(.report-table-report-filter-kas-tabungan, .report-table-report-filter-titipan-spp) .report-settlement-component-table td {
+  padding: 12px 16px;
+}
+:is(.report-table-report-filter-kas-tabungan, .report-table-report-filter-titipan-spp) > .report-settlement-method-summary {
+  margin-top: 16px;
+  padding: 0;
+}
+:is(.report-table-report-filter-kas-tabungan, .report-table-report-filter-titipan-spp) .report-settlement-method-summary > h3 {
+  margin: 0 0 10px;
+}
+:is(.report-table-report-filter-kas-tabungan, .report-table-report-filter-titipan-spp) .report-settlement-method-grid {
+  gap: 12px;
+}
+.report-table-report-filter-titipan-spp .report-settlement-method-grid {
+  grid-template-columns: repeat(4, minmax(0, 1fr));
+}
+:is(.report-table-report-filter-kas-tabungan, .report-table-report-filter-titipan-spp) .report-settlement-method-card {
+  box-sizing: border-box;
+  min-width: 0;
+  min-height: 82px;
+  padding: 15px 16px;
+}
+:is(.report-table-report-filter-kas-tabungan, .report-table-report-filter-titipan-spp) > .report-settlement-total-card {
+  margin-top: 16px;
+  margin-bottom: 22px;
+  padding: 17px 20px;
+}
+
+@media (max-width: 900px) {
+  .report-template-shell .report-template-filters.report-filter-kas-tabungan,
+  .report-template-shell .report-template-filters.report-filter-titipan-spp {
+    grid-template-columns: 1fr !important;
+  }
+  .report-template-shell .report-template-filters.report-filter-kas-tabungan .report-filter-actions,
+  .report-template-shell .report-template-filters.report-filter-titipan-spp .report-filter-actions {
+    grid-column: 1 !important;
+    grid-template-columns: 1fr 1fr !important;
+  }
+  .report-table-report-filter-titipan-spp .report-settlement-method-grid {
+    grid-template-columns: repeat(2, minmax(0, 1fr));
+  }
+}
+@media (max-width: 620px) {
+  .report-template-shell .report-template-filters.report-filter-kas-tabungan .report-filter-actions,
+  .report-template-shell .report-template-filters.report-filter-titipan-spp .report-filter-actions {
+    display: grid !important;
+    grid-template-columns: 1fr 1fr !important;
+  }
+  .report-template-shell .report-template-filters.report-filter-kas-tabungan .report-filter-actions .btn,
+  .report-template-shell .report-template-filters.report-filter-titipan-spp .report-filter-actions .btn {
+    width: 100% !important;
+    min-width: 0;
+  }
+  :is(.report-table-report-filter-kas-tabungan, .report-table-report-filter-titipan-spp) > .report-settlement-component-card,
+  :is(.report-table-report-filter-kas-tabungan, .report-table-report-filter-titipan-spp) > .report-settlement-method-summary,
+  :is(.report-table-report-filter-kas-tabungan, .report-table-report-filter-titipan-spp) > .report-settlement-total-card {
+    margin-right: 14px;
+    margin-left: 14px;
+  }
+  :is(.report-table-report-filter-kas-tabungan, .report-table-report-filter-titipan-spp) .report-settlement-section-head {
+    align-items: stretch;
+    flex-direction: column;
+  }
+  :is(.report-table-report-filter-kas-tabungan, .report-table-report-filter-titipan-spp) .report-settlement-component-total {
+    min-width: 0;
+    text-align: left;
+  }
+  .report-table-report-filter-titipan-spp .report-settlement-method-grid {
+    grid-template-columns: 1fr;
+  }
 }

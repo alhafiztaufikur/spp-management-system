@@ -28,4 +28,4 @@ $catalogGroups=[
     </section><?php endforeach; ?>
   </div>
 </div>
-</main></div><script src="../assets/js/app.js?v=8.2"></script></body></html>
+</main></div><script src="../assets/js/app.js?v=10.4"></script></body></html>

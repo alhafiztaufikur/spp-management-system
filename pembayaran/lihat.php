@@ -348,7 +348,7 @@ foreach ($studentOptions as $studentOption) {
     </main>
   </div>
 
-  <script src="../assets/js/app.js?v=4.1"></script>
+  <script src="../assets/js/app.js?v=10.4"></script>
   <?php if ($showPrintPrompt): ?>
   <script>
     document.addEventListener('DOMContentLoaded', function () {

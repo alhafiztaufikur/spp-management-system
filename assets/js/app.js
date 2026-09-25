@@ -12,8 +12,12 @@ function escapeHtml(value) {
 
 /* ── Theme Init (run ASAP to avoid flash) ─── */
 (function () {
-  const saved = localStorage.getItem('spp_theme') || 'light';
-  document.documentElement.setAttribute('data-theme', saved);
+  const saved = localStorage.getItem('spp_theme');
+  const theme = (saved === 'dark' || saved === 'light') ? saved : 'light';
+  if (saved !== theme) {
+    localStorage.setItem('spp_theme', theme);
+  }
+  document.documentElement.setAttribute('data-theme', theme);
 })();
 
 /* ── Theme Toggle ────────────────────────── */
@@ -47,8 +51,9 @@ function updateThemeUI(theme) {
 
 // Apply UI labels once DOM is ready
 document.addEventListener('DOMContentLoaded', function () {
-  const saved = localStorage.getItem('spp_theme') || 'light';
-  updateThemeUI(saved);
+  const saved = localStorage.getItem('spp_theme');
+  const theme = (saved === 'dark' || saved === 'light') ? saved : 'light';
+  updateThemeUI(theme);
 });
 
 document.addEventListener('DOMContentLoaded', function () {

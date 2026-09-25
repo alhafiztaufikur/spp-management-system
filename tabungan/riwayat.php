@@ -418,7 +418,7 @@ $periodLabel = $filter_tanggal_awal === $filter_tanggal_akhir
   </main>
 </div>
 <div class="toast" id="toast"><span id="toast-icon"></span><span id="toast-msg"></span></div>
-<script src="../assets/js/app.js?v=2.8"></script>
+<script src="../assets/js/app.js?v=10.4"></script>
 <script>
 document.addEventListener('DOMContentLoaded', function(){
   autoHideFlash();

@@ -229,7 +229,7 @@ if ($_SERVER['REQUEST_METHOD'] === 'POST') {
 
   </div><!-- /login-card-wrap -->
 
-  <script src="assets/js/app.js?v=2.8"></script>
+  <script src="assets/js/app.js?v=10.4"></script>
   <script>
     // Override togglePw for split layout
     function togglePw() {

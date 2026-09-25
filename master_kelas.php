@@ -329,5 +329,5 @@ $classFilterQuery = ['q_kelas' => $classSearch, 'tingkat_kelas' => $classLevelFi
     </div>
   </main>
 </div>
-<script src="assets/js/app.js?v=7.6"></script><script>document.addEventListener('DOMContentLoaded',function(){autoHideFlash();});</script>
+<script src="assets/js/app.js?v=10.4"></script><script>document.addEventListener('DOMContentLoaded',function(){autoHideFlash();});</script>
 </body></html>

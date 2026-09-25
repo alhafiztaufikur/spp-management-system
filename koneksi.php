@@ -22,6 +22,7 @@ try {
         throw new RuntimeException($koneksi->connect_error);
     }
     $koneksi->set_charset('utf8mb4');
+    $koneksi->query("SET NAMES utf8mb4 COLLATE utf8mb4_general_ci");
     $koneksi->query("SET time_zone = '+07:00'");
 } catch (Throwable $error) {
     error_log('Koneksi database SistemSPP gagal: ' . $error->getMessage());

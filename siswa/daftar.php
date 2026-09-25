@@ -778,7 +778,7 @@ $sppRatePreview = spp_current_effective_rate($koneksi, $previewLevel, $previewDi
     </main>
   </div>
 
-  <script src="../assets/js/app.js?v=4.0"></script>
+  <script src="../assets/js/app.js?v=10.4"></script>
   <script>
     document.addEventListener('DOMContentLoaded', function () {
       const toggle = document.getElementById('advanced-enabled');

@@ -164,7 +164,7 @@ $siswa_list = $koneksi->query("SELECT id, NO_INDUK, NO_induk_diknas, NAMA, KELAS
     </div>
   </div>
 
-  <script src="../assets/js/app.js?v=6.2"></script>
+  <script src="../assets/js/app.js?v=10.4"></script>
   <script>
     document.addEventListener('DOMContentLoaded', function () {
       const tgl = document.getElementById('tgl-keluar');

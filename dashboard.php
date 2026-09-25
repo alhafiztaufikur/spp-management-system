@@ -218,6 +218,6 @@ $exportSetoranExcelUrl = 'laporan/export_global.php?template=setoran&format=exce
     </main>
   </div><!-- /layout -->
 
-  <script src="assets/js/app.js?v=6.2"></script>
+  <script src="assets/js/app.js?v=10.4"></script>
 </body>
 </html>

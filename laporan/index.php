@@ -656,7 +656,7 @@ $exportQuery = http_build_query([
 </div>
 
 <div class="toast" id="toast"><span id="toast-icon"></span><span id="toast-msg"></span></div>
-<script src="../assets/js/app.js?v=7.2"></script>
+<script src="../assets/js/app.js?v=10.4"></script>
 <script>
 document.addEventListener('DOMContentLoaded', function(){
   autoHideFlash();

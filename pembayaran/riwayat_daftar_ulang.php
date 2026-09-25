@@ -348,6 +348,6 @@ unset($_SESSION['flash']);
       </section>
     </main>
   </div>
-  <script src="../assets/js/app.js?v=4.4"></script>
+  <script src="../assets/js/app.js?v=10.4"></script>
 </body>
 </html>

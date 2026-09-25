@@ -564,7 +564,7 @@ $selectedPaymentMethod = $d['sistem_pembayaran'] ?? 'VA';
       JSON_UNESCAPED_UNICODE | JSON_UNESCAPED_SLASHES | JSON_HEX_TAG | JSON_HEX_APOS | JSON_HEX_AMP | JSON_HEX_QUOT
     ) ?>;
   </script>
-  <script src="../assets/js/app.js?v=10.2"></script>
+  <script src="../assets/js/app.js?v=10.4"></script>
 </body>
 </html>
 

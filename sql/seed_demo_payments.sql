@@ -274,21 +274,34 @@ WHERE h.`kategori` = 'lain';
 COMMIT;
 
 -- Pemeriksaan akhir: 1.000 header dengan relasi yang konsisten.
+-- Hitung temporary table satu kali agar kompatibel dengan MariaDB yang tidak
+-- mengizinkan tabel temporary dibuka berulang kali dalam satu UNION.
+SELECT
+  SUM(`kategori` = 'spp'),
+  SUM(`kategori` = 'psb'),
+  SUM(`kategori` = 'titipan'),
+  SUM(`kategori` = 'lain'),
+  SUM(ABS(`total` - (`uang_pangkal` + `uang_psb` + `uang_spp` + `uang_titipan` + `uang_komite` + `uang_du` + `uang_lain`)) > 0.001)
+INTO
+  @seed_demo_count_spp,
+  @seed_demo_count_psb,
+  @seed_demo_count_titipan,
+  @seed_demo_count_lain,
+  @seed_demo_count_invalid_total
+FROM `seed_demo_payment_header`;
+
 SELECT 'pembayaran_total' AS `pemeriksaan`, COUNT(*) AS `jumlah` FROM `bayar`
-UNION ALL SELECT 'pembayaran_spp_komite', COUNT(*) FROM `seed_demo_payment_header` WHERE `kategori` = 'spp'
-UNION ALL SELECT 'pembayaran_psb', COUNT(*) FROM `seed_demo_payment_header` WHERE `kategori` = 'psb'
-UNION ALL SELECT 'pembayaran_titipan', COUNT(*) FROM `seed_demo_payment_header` WHERE `kategori` = 'titipan'
-UNION ALL SELECT 'pembayaran_biaya_lain', COUNT(*) FROM `seed_demo_payment_header` WHERE `kategori` = 'lain'
+UNION ALL SELECT 'pembayaran_spp_komite', @seed_demo_count_spp
+UNION ALL SELECT 'pembayaran_psb', @seed_demo_count_psb
+UNION ALL SELECT 'pembayaran_titipan', @seed_demo_count_titipan
+UNION ALL SELECT 'pembayaran_biaya_lain', @seed_demo_count_lain
 UNION ALL SELECT 'alokasi_spp', (SELECT COUNT(*) FROM `spp_alokasi`)
 UNION ALL SELECT 'bayar_komite', (SELECT COUNT(*) FROM `bayar_komite`)
 UNION ALL SELECT 'bayar_daftar_ulang', (SELECT COUNT(*) FROM `bayar_du`)
 UNION ALL SELECT 'rincian_biaya_lain', (SELECT COUNT(*) FROM `bayar_biaya_lain`)
 UNION ALL SELECT 'mutasi_titipan', (SELECT COUNT(*) FROM `titipan_spp_mutasi`)
 UNION ALL SELECT 'mutasi_tabungan', (SELECT COUNT(*) FROM `transaksi_m`) + (SELECT COUNT(*) FROM `transaksi_k`)
-UNION ALL SELECT 'header_total_tidak_sesuai', (
-  SELECT COUNT(*) FROM `seed_demo_payment_header`
-  WHERE ABS(`total` - (`uang_pangkal` + `uang_psb` + `uang_spp` + `uang_titipan` + `uang_komite` + `uang_du` + `uang_lain`)) > 0.001
-);
+UNION ALL SELECT 'header_total_tidak_sesuai', @seed_demo_count_invalid_total;
 
 DROP TEMPORARY TABLE IF EXISTS `seed_demo_payment_header`;
 DROP TEMPORARY TABLE IF EXISTS `seed_demo_payment_plan`;

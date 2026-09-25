@@ -387,7 +387,7 @@ $roleLabels = ['admin' => 'Admin', 'bendahara' => 'Bendahara', 'kasir' => 'Kasir
     </div>
   </div>
 
-  <script src="assets/js/app.js?v=2.8"></script>
+  <script src="assets/js/app.js?v=10.4"></script>
   <script>
     (function () {
       const modal = document.getElementById('reset-password-modal');
