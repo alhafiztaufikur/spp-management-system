@@ -107,6 +107,8 @@ CREATE TABLE `siswa_audit_log` (
 ) ENGINE=InnoDB;
 
 -- Tabel Bayar (Revisi Baru)
+-- Hapus antrean lebih dahulu karena tabel ini mereferensikan pembayaran.
+DROP TABLE IF EXISTS `transaksi_otorisasi`;
 DROP TABLE IF EXISTS `bayar`;
 CREATE TABLE `bayar` (
   `id`          INT AUTO_INCREMENT PRIMARY KEY,
@@ -151,6 +153,34 @@ CREATE TABLE `bayar` (
   CONSTRAINT `fk_bayar_master_kelas` FOREIGN KEY (`master_kelas_id`) REFERENCES `master_kelas`(`id`) ON DELETE RESTRICT ON UPDATE CASCADE,
   CONSTRAINT `fk_bayar_siswa` FOREIGN KEY (`NO_INDUK`) REFERENCES `siswa`(`NO_INDUK`) ON DELETE CASCADE ON UPDATE CASCADE,
   CONSTRAINT `chk_bayar_psb` CHECK (`U_PSB` >= 0)
+) ENGINE=InnoDB;
+
+-- Antrean persetujuan untuk perubahan dan penghapusan transaksi pembayaran.
+CREATE TABLE `transaksi_otorisasi` (
+  `id` BIGINT UNSIGNED NOT NULL AUTO_INCREMENT,
+  `bayar_id` INT DEFAULT NULL,
+  `transaction_reference` VARCHAR(30) NOT NULL,
+  `no_induk_snapshot` VARCHAR(10) DEFAULT NULL,
+  `student_name_snapshot` VARCHAR(100) NOT NULL,
+  `action` ENUM('edit','hapus') NOT NULL,
+  `status` ENUM('pending','approved','rejected','cancelled','failed') NOT NULL DEFAULT 'pending',
+  `before_snapshot` LONGTEXT NOT NULL,
+  `snapshot_hash` CHAR(64) NOT NULL,
+  `proposed_payload` LONGTEXT DEFAULT NULL,
+  `request_reason` VARCHAR(500) NOT NULL,
+  `requested_by` INT NOT NULL,
+  `decided_by` INT DEFAULT NULL,
+  `decision_note` VARCHAR(1000) DEFAULT NULL,
+  `requested_at` TIMESTAMP NOT NULL DEFAULT CURRENT_TIMESTAMP,
+  `decided_at` DATETIME DEFAULT NULL,
+  `applied_at` DATETIME DEFAULT NULL,
+  PRIMARY KEY (`id`),
+  KEY `idx_transaksi_otorisasi_payment_status` (`bayar_id`,`status`),
+  KEY `idx_transaksi_otorisasi_status_time` (`status`,`requested_at`),
+  KEY `idx_transaksi_otorisasi_requester` (`requested_by`,`requested_at`),
+  CONSTRAINT `fk_transaksi_otorisasi_bayar` FOREIGN KEY (`bayar_id`) REFERENCES `bayar` (`id`) ON DELETE SET NULL ON UPDATE CASCADE,
+  CONSTRAINT `fk_transaksi_otorisasi_requester` FOREIGN KEY (`requested_by`) REFERENCES `admin` (`id`) ON DELETE RESTRICT ON UPDATE CASCADE,
+  CONSTRAINT `fk_transaksi_otorisasi_decider` FOREIGN KEY (`decided_by`) REFERENCES `admin` (`id`) ON DELETE SET NULL ON UPDATE CASCADE
 ) ENGINE=InnoDB;
 
 -- Pemetaan periode per transaksi SPP. Satu siswa hanya boleh memiliki satu

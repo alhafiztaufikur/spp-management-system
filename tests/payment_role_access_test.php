@@ -102,24 +102,120 @@ try {
         'aksi'=>'update', 'id'=>$paymentId, 'no_induk'=>$nis, 'uang_pangkal'=>$updatedAmount,
         'bulan_bayar'=>$month, 'tahun_bayar'=>$year, 'tanggal_bayar'=>$date,
         'sistem_pembayaran'=>'Tunai', 'csrf_token'=>$token,
+        'authorization_reason'=>'Koreksi nominal untuk pengujian otorisasi.',
     ], $adminCookies);
-    role_test_assert($update['status'] === 302, 'Update administrator tidak selesai.');
+    role_test_assert($update['status'] === 302, 'Pengajuan update administrator tidak selesai.');
     $stored = $koneksi->query('SELECT U_PANGKAL FROM bayar WHERE id=' . $paymentId)->fetch_assoc();
-    role_test_assert($stored && abs((float)$stored['U_PANGKAL'] - $updatedAmount) < .001, 'Update administrator tidak tersimpan: ' . role_test_flash($baseUrl, $adminCookies));
+    role_test_assert($stored && abs((float)$stored['U_PANGKAL'] - 100) < .001, 'Pengajuan update langsung mengubah transaksi.');
+    $pending = $koneksi->query("SELECT id FROM transaksi_otorisasi WHERE bayar_id={$paymentId} AND action='edit' AND status='pending' ORDER BY id DESC LIMIT 1")->fetch_assoc();
+    role_test_assert((bool)$pending, 'Antrean otorisasi update tidak terbentuk.');
+
+    $authorizationPage = role_test_request($baseUrl . '/otorisasi_transaksi.php', [], $adminCookies);
+    role_test_assert($authorizationPage['status'] === 200, 'Administrator tidak dapat membuka antrean otorisasi.');
+    role_test_assert((bool)preg_match('/name="csrf_token" value="([a-f0-9]+)"/', $authorizationPage['body'], $authorizationMatch), 'Token CSRF otorisasi tidak ditemukan.');
+    $authorizationToken = $authorizationMatch[1];
+    $selfApprove = role_test_request($baseUrl . '/pembayaran/proses.php', [
+        'aksi'=>'otorisasi_setujui', 'request_id'=>(int)$pending['id'],
+        'csrf_token'=>$authorizationToken,
+    ], $adminCookies);
+    role_test_assert($selfApprove['status'] === 302, 'Persetujuan mandiri tidak ditangani.');
+    role_test_assert((int)$koneksi->query('SELECT COUNT(*) total FROM transaksi_otorisasi WHERE id='.(int)$pending['id']." AND status='pending'")->fetch_assoc()['total'] === 1, 'Administrator dapat menyetujui permintaannya sendiri.');
+
+    $treasurerCookies = role_test_login($baseUrl, 'bendahara', 'bendahara123');
+    $treasurerPage = role_test_request($baseUrl . '/otorisasi_transaksi.php', [], $treasurerCookies);
+    role_test_assert($treasurerPage['status'] === 200, 'Bendahara tidak dapat membuka antrean otorisasi.');
+    role_test_assert((bool)preg_match('/name="csrf_token" value="([a-f0-9]+)"/', $treasurerPage['body'], $treasurerMatch), 'Token CSRF bendahara tidak ditemukan.');
+    $approveEdit = role_test_request($baseUrl . '/pembayaran/proses.php', [
+        'aksi'=>'otorisasi_setujui', 'request_id'=>(int)$pending['id'],
+        'csrf_token'=>$treasurerMatch[1], 'decision_note'=>'Koreksi transaksi uji disetujui.',
+    ], $treasurerCookies);
+    role_test_assert($approveEdit['status'] === 302, 'Persetujuan perubahan oleh bendahara tidak selesai.');
+    $stored = $koneksi->query('SELECT U_PANGKAL FROM bayar WHERE id=' . $paymentId)->fetch_assoc();
+    role_test_assert($stored && abs((float)$stored['U_PANGKAL'] - $updatedAmount) < .001, 'Persetujuan tidak menerapkan perubahan transaksi.');
+    role_test_assert((int)$koneksi->query('SELECT COUNT(*) total FROM transaksi_otorisasi WHERE id='.(int)$pending['id']." AND status='approved'")->fetch_assoc()['total'] === 1, 'Permintaan edit tidak ditandai disetujui.');
+
+    $secondUpdate = role_test_request($baseUrl . '/pembayaran/proses.php', [
+        'aksi'=>'update', 'id'=>$paymentId, 'no_induk'=>$nis, 'uang_pangkal'=>175,
+        'bulan_bayar'=>$month, 'tahun_bayar'=>$year, 'tanggal_bayar'=>$date,
+        'sistem_pembayaran'=>'Tunai', 'csrf_token'=>$token,
+        'authorization_reason'=>'Memastikan pemohon dapat membatalkan pengajuan.',
+    ], $adminCookies);
+    role_test_assert($secondUpdate['status'] === 302, 'Pengajuan update kedua tidak selesai.');
+    $cancelPending = $koneksi->query("SELECT id FROM transaksi_otorisasi WHERE bayar_id={$paymentId} AND action='edit' AND status='pending' ORDER BY id DESC LIMIT 1")->fetch_assoc();
+    role_test_assert((bool)$cancelPending, 'Permintaan edit untuk pembatalan tidak terbentuk.');
+    $cancel = role_test_request($baseUrl . '/otorisasi_transaksi.php', [
+        'request_id'=>(int)$cancelPending['id'], 'action'=>'cancel', 'csrf_token'=>$authorizationToken,
+    ], $adminCookies);
+    role_test_assert($cancel['status'] === 302, 'Pembatalan permintaan edit tidak selesai.');
+    role_test_assert((int)$koneksi->query('SELECT COUNT(*) total FROM transaksi_otorisasi WHERE id='.(int)$cancelPending['id']." AND status='cancelled'")->fetch_assoc()['total'] === 1, 'Permintaan edit tidak dibatalkan.');
+    $stored = $koneksi->query('SELECT U_PANGKAL FROM bayar WHERE id=' . $paymentId)->fetch_assoc();
+    role_test_assert($stored && abs((float)$stored['U_PANGKAL'] - $updatedAmount) < .001, 'Pembatalan mengubah transaksi yang sudah tersimpan.');
+
+    $rejectedUpdate = role_test_request($baseUrl . '/pembayaran/proses.php', [
+        'aksi'=>'update', 'id'=>$paymentId, 'no_induk'=>$nis, 'uang_pangkal'=>180,
+        'bulan_bayar'=>$month, 'tahun_bayar'=>$year, 'tanggal_bayar'=>$date,
+        'sistem_pembayaran'=>'Tunai', 'csrf_token'=>$token,
+        'authorization_reason'=>'Memastikan penolakan wajib memiliki catatan.',
+    ], $adminCookies);
+    role_test_assert($rejectedUpdate['status'] === 302, 'Pengajuan edit untuk penolakan tidak selesai.');
+    $rejectPending = $koneksi->query("SELECT id FROM transaksi_otorisasi WHERE bayar_id={$paymentId} AND action='edit' AND status='pending' ORDER BY id DESC LIMIT 1")->fetch_assoc();
+    role_test_assert((bool)$rejectPending, 'Permintaan edit untuk penolakan tidak terbentuk.');
+    role_test_request($baseUrl . '/otorisasi_transaksi.php', [
+        'request_id'=>(int)$rejectPending['id'], 'action'=>'reject', 'decision_note'=>'',
+        'csrf_token'=>$treasurerMatch[1],
+    ], $treasurerCookies);
+    role_test_assert((int)$koneksi->query('SELECT COUNT(*) total FROM transaksi_otorisasi WHERE id='.(int)$rejectPending['id']." AND status='pending'")->fetch_assoc()['total'] === 1, 'Penolakan tanpa catatan tetap diproses.');
+    role_test_request($baseUrl . '/otorisasi_transaksi.php', [
+        'request_id'=>(int)$rejectPending['id'], 'action'=>'reject',
+        'decision_note'=>'Nominal usulan belum didukung bukti koreksi.', 'csrf_token'=>$treasurerMatch[1],
+    ], $treasurerCookies);
+    role_test_assert((int)$koneksi->query('SELECT COUNT(*) total FROM transaksi_otorisasi WHERE id='.(int)$rejectPending['id']." AND status='rejected'")->fetch_assoc()['total'] === 1, 'Permintaan edit tidak berhasil ditolak dengan catatan.');
+
+    $staleDelete = role_test_request($baseUrl . '/pembayaran/proses.php', [
+        'aksi'=>'hapus', 'id'=>$paymentId, 'csrf_token'=>$token,
+        'authorization_reason'=>'Memastikan snapshot transaksi kedaluwarsa ditolak.',
+    ], $adminCookies);
+    role_test_assert($staleDelete['status'] === 302, 'Pengajuan hapus untuk uji konflik tidak selesai.');
+    $stalePending = $koneksi->query("SELECT id FROM transaksi_otorisasi WHERE bayar_id={$paymentId} AND action='hapus' AND status='pending' ORDER BY id DESC LIMIT 1")->fetch_assoc();
+    role_test_assert((bool)$stalePending, 'Permintaan hapus untuk uji konflik tidak terbentuk.');
+    $previousNote = (string)($koneksi->query('SELECT KETERANGAN FROM bayar WHERE id=' . $paymentId)->fetch_assoc()['KETERANGAN'] ?? '');
+    $conflictNote = 'TEST:SNAPSHOT-CONFLICT';
+    $stmt = $koneksi->prepare('UPDATE bayar SET KETERANGAN=? WHERE id=?');
+    $stmt->bind_param('si', $conflictNote, $paymentId); $stmt->execute(); $stmt->close();
+    role_test_request($baseUrl . '/pembayaran/proses.php', [
+        'aksi'=>'otorisasi_setujui', 'request_id'=>(int)$stalePending['id'],
+        'csrf_token'=>$treasurerMatch[1], 'decision_note'=>'Uji konflik snapshot.',
+    ], $treasurerCookies);
+    role_test_assert((int)$koneksi->query('SELECT COUNT(*) total FROM bayar WHERE id=' . $paymentId)->fetch_assoc()['total'] === 1, 'Permintaan kedaluwarsa tetap menghapus transaksi.');
+    role_test_assert((int)$koneksi->query('SELECT COUNT(*) total FROM transaksi_otorisasi WHERE id='.(int)$stalePending['id']." AND status='failed'")->fetch_assoc()['total'] === 1, 'Permintaan kedaluwarsa tidak ditandai gagal.');
+    $stmt = $koneksi->prepare('UPDATE bayar SET KETERANGAN=? WHERE id=?');
+    $stmt->bind_param('si', $previousNote, $paymentId); $stmt->execute(); $stmt->close();
 
     $delete = role_test_request($baseUrl . '/pembayaran/proses.php', [
         'aksi'=>'hapus', 'id'=>$paymentId, 'csrf_token'=>$token,
+        'authorization_reason'=>'Transaksi uji perlu dihapus setelah verifikasi.',
     ], $adminCookies);
-    role_test_assert($delete['status'] === 302, 'Hapus administrator tidak selesai.');
-    role_test_assert((int)$koneksi->query('SELECT COUNT(*) total FROM bayar WHERE id=' . $paymentId)->fetch_assoc()['total'] === 0, 'Hapus administrator tidak tersimpan.');
+    role_test_assert($delete['status'] === 302, 'Pengajuan hapus administrator tidak selesai.');
+    role_test_assert((int)$koneksi->query('SELECT COUNT(*) total FROM bayar WHERE id=' . $paymentId)->fetch_assoc()['total'] === 1, 'Pengajuan hapus langsung menghapus transaksi.');
+    $deletePending = $koneksi->query("SELECT id FROM transaksi_otorisasi WHERE bayar_id={$paymentId} AND action='hapus' AND status='pending' ORDER BY id DESC LIMIT 1")->fetch_assoc();
+    role_test_assert((bool)$deletePending, 'Antrean otorisasi hapus tidak terbentuk.');
+
+    $approve = role_test_request($baseUrl . '/pembayaran/proses.php', [
+        'aksi'=>'otorisasi_setujui', 'request_id'=>(int)$deletePending['id'],
+        'csrf_token'=>$treasurerMatch[1], 'decision_note'=>'Penghapusan transaksi uji disetujui.',
+    ], $treasurerCookies);
+    role_test_assert($approve['status'] === 302, 'Persetujuan bendahara tidak selesai.');
+    role_test_assert((int)$koneksi->query('SELECT COUNT(*) total FROM bayar WHERE id=' . $paymentId)->fetch_assoc()['total'] === 0, 'Persetujuan tidak menghapus transaksi.');
+    role_test_assert((int)$koneksi->query('SELECT COUNT(*) total FROM transaksi_otorisasi WHERE id='.(int)$deletePending['id']." AND status='approved' AND bayar_id IS NULL")->fetch_assoc()['total'] === 1, 'Audit penghapusan tidak dipertahankan.');
     $paymentId = 0;
 
-    echo "OK: hanya administrator dapat mengedit/menghapus; kasir dapat mengelola Data Master serta input, lihat, dan cetak.\n";
+    echo "OK: perubahan transaksi memerlukan otorisasi pihak lain; audit penghapusan tetap tersimpan.\n";
 } catch (Throwable $error) {
     fwrite(STDERR, 'FAILED: ' . $error->getMessage() . PHP_EOL);
     exit(1);
 } finally {
     if ($paymentId > 0) $koneksi->query('DELETE FROM bayar WHERE id=' . $paymentId);
+    $koneksi->query("DELETE FROM transaksi_otorisasi WHERE no_induk_snapshot='" . $koneksi->real_escape_string($nis) . "'");
     $stmt = $koneksi->prepare('DELETE FROM siswa WHERE NO_INDUK=?');
     $stmt->bind_param('s', $nis); $stmt->execute(); $stmt->close();
 }

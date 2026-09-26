@@ -13,6 +13,19 @@ FROM (
            WHERE TABLE_SCHEMA = DATABASE() AND TABLE_NAME = 'bayar'
          ) AS is_present
   UNION ALL
+  SELECT 'table.transaksi_otorisasi',
+         EXISTS(
+           SELECT 1 FROM information_schema.TABLES
+           WHERE TABLE_SCHEMA = DATABASE() AND TABLE_NAME = 'transaksi_otorisasi'
+         )
+  UNION ALL
+  SELECT 'transaksi_otorisasi.snapshot_hash',
+         EXISTS(
+           SELECT 1 FROM information_schema.COLUMNS
+           WHERE TABLE_SCHEMA = DATABASE() AND TABLE_NAME = 'transaksi_otorisasi'
+             AND COLUMN_NAME = 'snapshot_hash'
+         )
+  UNION ALL
   SELECT 'table.bayar_du',
          EXISTS(
            SELECT 1 FROM information_schema.TABLES

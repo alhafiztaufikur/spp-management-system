@@ -218,7 +218,7 @@ $selectedPaymentMethod = $d['sistem_pembayaran'] ?? 'VA';
   <meta name="description" content="Edit data transaksi pembayaran siswa." />
   <link rel="preconnect" href="https://fonts.googleapis.com" />
   <link href="https://fonts.googleapis.com/css2?family=Inter:wght@300;400;500;600;700;800&display=swap" rel="stylesheet" />
-  <link rel="stylesheet" href="../assets/css/style.css?v=10.2" />
+  <link rel="stylesheet" href="../assets/css/style.css?v=10.9" />
   <!-- Prevent theme flash -->
   <script>(function(){var t=localStorage.getItem('spp_theme')||'light';document.documentElement.setAttribute('data-theme',t);})();</script>
 </head>
@@ -526,11 +526,22 @@ $selectedPaymentMethod = $d['sistem_pembayaran'] ?? 'VA';
             </div>
           </div>
 
+          <div class="authorization-request-panel">
+            <div>
+              <h3>Ajukan perubahan transaksi</h3>
+              <p>Perubahan baru diterapkan setelah disetujui bendahara atau administrator lain.</p>
+            </div>
+            <label class="field-row authorization-reason-field">
+              <span class="field-label">Alasan perubahan</span>
+              <textarea class="field-input" name="authorization_reason" rows="3" minlength="5" maxlength="500" required placeholder="Jelaskan alasan dan bagian transaksi yang perlu diperbaiki."></textarea>
+            </label>
+          </div>
+
           <!-- Action Buttons -->
           <div class="action-bar">
             <button type="submit" class="btn btn-warning" id="btn-update">
               <svg width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.5" stroke-linecap="round" stroke-linejoin="round"><path d="M19 21H5a2 2 0 0 1-2-2V5a2 2 0 0 1 2-2h11l5 5v14a2 2 0 0 1-2 2z"/><polyline points="17 21 17 13 7 13 7 21"/><polyline points="7 3 7 8 15 8"/></svg>
-              Update
+              Ajukan Perubahan
             </button>
             <a href="lihat.php" class="btn btn-ghost" id="btn-batal">
               <svg width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.5" stroke-linecap="round" stroke-linejoin="round"><line x1="18" y1="6" x2="6" y2="18"/><line x1="6" y1="6" x2="18" y2="18"/></svg>

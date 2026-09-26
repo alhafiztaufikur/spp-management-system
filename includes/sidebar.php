@@ -34,6 +34,10 @@ $allNavItems = [
    '<path d="M12 1v22M17 5H9.5a3.5 3.5 0 0 0 0 7h5a3.5 3.5 0 0 1 0 7H6"/>',
    ['admin', 'bendahara', 'kasir'], 'Pembayaran'],
 
+  ['otorisasi_transaksi.php', 'Otorisasi Transaksi',
+   '<path d="M12 22s8-4 8-10V5l-8-3-8 3v7c0 6 8 10 8 10z"/><path d="M9 12l2 2 4-4"/>',
+   ['admin', 'bendahara'], 'Pembayaran'],
+
   ['siswa/daftar.php', 'Data Siswa',
    '<path d="M17 21v-2a4 4 0 0 0-4-4H5a4 4 0 0 0-4 4v2"/><circle cx="9" cy="7" r="4"/><path d="M23 21v-2a4 4 0 0 0-3-3.87"/><path d="M16 3.13a4 4 0 0 1 0 7.75"/>',
    ['admin', 'kasir'], 'Data Master'],
@@ -89,6 +93,7 @@ $shortLabels = [
   'Riwayat Pembayaran' => 'Riwayat',
   'Riwayat Daftar Ulang' => 'Riwayat DU',
   'Titipan SPP' => 'Titipan',
+  'Otorisasi Transaksi' => 'Otorisasi',
   'Data Siswa'        => 'Siswa',
   'Master Kelas/Rombel' => 'Kelas',
   'Master Penerbitan SPP' => 'SPP',

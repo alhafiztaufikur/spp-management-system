@@ -13,10 +13,44 @@ require_once '../includes/tagihan_sekali.php';
 require_once '../includes/spp_payment_status.php';
 require_once '../includes/spp_billing.php';
 require_once '../includes/komite_billing.php';
-requireRole(['admin', 'kasir']);
+require_once '../includes/transaction_authorization.php';
 
 $aksi = $_POST['aksi'] ?? $_GET['aksi'] ?? '';
-if (in_array($aksi, ['update', 'hapus'], true)) {
+$authorizationRequest = null;
+$authorizationRequestId = 0;
+$authorizationApproverId = 0;
+$authorizationDecisionNote = '';
+$executionActorId = null;
+
+if ($aksi === 'otorisasi_setujui') {
+    requireRole(['admin', 'bendahara']);
+    $token = (string)($_POST['csrf_token'] ?? '');
+    if ($_SERVER['REQUEST_METHOD'] !== 'POST' || empty($_SESSION['csrf_transaction_authorization']) || !hash_equals($_SESSION['csrf_transaction_authorization'], $token)) {
+        $_SESSION['flash'] = ['type' => 'error', 'msg' => 'Permintaan persetujuan tidak valid atau sesi telah kedaluwarsa.'];
+        header('Location: ../otorisasi_transaksi.php');
+        exit;
+    }
+    $authorizationRequestId = (int)($_POST['request_id'] ?? 0);
+    $authorizationApproverId = (int)($_SESSION['admin_id'] ?? 0);
+    $authorizationDecisionNote = trim((string)($_POST['decision_note'] ?? ''));
+    try {
+        $authorizationRequest = transaction_authorization_find($koneksi, $authorizationRequestId);
+        if (!$authorizationRequest || $authorizationRequest['status'] !== 'pending') throw new RuntimeException('Permintaan otorisasi tidak ditemukan atau sudah diproses.');
+        if ((int)$authorizationRequest['requested_by'] === $authorizationApproverId) throw new RuntimeException('Pemohon tidak boleh menyetujui permintaannya sendiri.');
+        $payload = transaction_authorization_decode_payload($authorizationRequest);
+        $_POST = $payload;
+        $aksi = $authorizationRequest['action'] === 'hapus' ? 'hapus' : 'update';
+        $executionActorId = (int)$authorizationRequest['requested_by'];
+    } catch (Throwable $error) {
+        $_SESSION['flash'] = ['type' => 'error', 'msg' => $error->getMessage()];
+        header('Location: ../otorisasi_transaksi.php');
+        exit;
+    }
+} else {
+    requireRole(['admin', 'kasir']);
+}
+
+if (in_array($aksi, ['update', 'hapus'], true) && !$authorizationRequest) {
     requireRole(['admin']);
     $token = (string)($_POST['csrf_token'] ?? '');
     if ($_SERVER['REQUEST_METHOD'] !== 'POST' || empty($_SESSION['csrf_payment']) || !hash_equals($_SESSION['csrf_payment'], $token)) {
@@ -24,6 +58,23 @@ if (in_array($aksi, ['update', 'hapus'], true)) {
         header('Location: lihat.php');
         exit;
     }
+    try {
+        $paymentId = (int)($_POST['id'] ?? 0);
+        $actionName = $aksi === 'hapus' ? 'hapus' : 'edit';
+        $requestId = transaction_authorization_create(
+            $koneksi,
+            $paymentId,
+            $actionName,
+            transaction_authorization_payload($_POST, $actionName),
+            (string)($_POST['authorization_reason'] ?? ''),
+            (int)$_SESSION['admin_id']
+        );
+        $_SESSION['flash'] = ['type' => 'success', 'msg' => 'Permintaan ' . ($actionName === 'hapus' ? 'penghapusan' : 'perubahan') . ' berhasil diajukan dengan nomor #' . $requestId . '. Transaksi belum berubah sampai disetujui.'];
+    } catch (Throwable $error) {
+        $_SESSION['flash'] = ['type' => 'error', 'msg' => 'Pengajuan gagal: ' . $error->getMessage()];
+    }
+    header('Location: lihat.php');
+    exit;
 }
 
 function parse_amount($value) {
@@ -33,7 +84,36 @@ function parse_amount($value) {
 }
 
 function current_operator_id(): string {
-    return (string)($_SESSION['admin_id'] ?? '');
+    global $executionActorId;
+    return (string)($executionActorId ?: ($_SESSION['admin_id'] ?? ''));
+}
+
+function authorization_assert_current_snapshot(mysqli $db, array $request): void {
+    $snapshot = transaction_authorization_snapshot($db, (int)$request['bayar_id']);
+    if (!hash_equals((string)$request['snapshot_hash'], $snapshot['hash'])) {
+        throw new RuntimeException('Transaksi sudah berubah sejak permintaan dibuat. Permintaan tidak dapat diterapkan.');
+    }
+}
+
+function authorization_finish(mysqli $db, ?array $request, int $requestId, int $approverId, string $note): void {
+    if (!$request) return;
+    transaction_authorization_decide($db, $requestId, 'approved', $approverId, $note);
+}
+
+function authorization_fail_after_rollback(mysqli $db, ?array $request, int $requestId, int $approverId, Throwable $error): void {
+    if ($request) transaction_authorization_mark_failed($db, $requestId, $approverId, $error->getMessage());
+}
+
+function authorization_abort_before_transaction(mysqli $db, ?array $request, int $requestId, int $approverId, string $message, string $fallbackLocation): void {
+    if ($request) {
+        transaction_authorization_mark_failed($db, $requestId, $approverId, $message);
+        $_SESSION['flash'] = ['type' => 'error', 'msg' => 'Otorisasi gagal diterapkan: ' . $message];
+        header('Location: ../otorisasi_transaksi.php');
+    } else {
+        $_SESSION['flash'] = ['type' => 'error', 'msg' => $message];
+        header('Location: ' . $fallbackLocation);
+    }
+    exit;
 }
 
 function payment_failure_flash(Throwable $error, string $fallbackPrefix): array {
@@ -684,7 +764,7 @@ if ($aksi === 'input') {
 // ── UPDATE ──────────────────────────────────
 if ($aksi === 'update') {
     $id = (int)($_POST['id'] ?? 0);
-    if ($id <= 0) { header('Location: lihat.php'); exit; }
+    if ($id <= 0) authorization_abort_before_transaction($koneksi, $authorizationRequest, $authorizationRequestId, $authorizationApproverId, 'ID transaksi tidak valid.', 'lihat.php');
 
     $no_induk        = trim($_POST['no_induk'] ?? '');
     $tanggal_bayar   = $_POST['tanggal_bayar'] ?? date('Y-m-d H:i:s');
@@ -710,9 +790,7 @@ if ($aksi === 'update') {
     $total_jumlah    = 0.0;
     $catatan         = trim((string)($_POST['catatan'] ?? ''));
     if (mb_strlen($catatan) > 255) {
-        $_SESSION['flash'] = ['type' => 'error', 'msg' => 'Catatan maksimal 255 karakter.'];
-        header('Location: edit.php?id=' . $id);
-        exit;
+        authorization_abort_before_transaction($koneksi, $authorizationRequest, $authorizationRequestId, $authorizationApproverId, 'Catatan maksimal 255 karakter.', 'edit.php?id=' . $id);
     }
     $kelas_du        = $_POST['kelas_du'] ?? '';
     $tahun_ajaran_du = $_POST['tahun_ajaran_du'] ?? '';
@@ -720,13 +798,18 @@ if ($aksi === 'update') {
     $spp_action = (string)($_POST['spp_action'] ?? 'bayar');
 
     if (empty($no_induk)) {
-        $_SESSION['flash'] = ['type' => 'error', 'msg' => 'Pilih siswa terlebih dahulu!'];
-        header('Location: edit.php?id=' . $id);
-        exit;
+        authorization_abort_before_transaction($koneksi, $authorizationRequest, $authorizationRequestId, $authorizationApproverId, 'Pilih siswa terlebih dahulu.', 'edit.php?id=' . $id);
     }
 
     $koneksi->begin_transaction();
     try {
+        if ($authorizationRequest) {
+            $lockedRequest = transaction_authorization_find($koneksi, $authorizationRequestId, true);
+            if (!$lockedRequest || $lockedRequest['status'] !== 'pending') throw new RuntimeException('Permintaan sudah diproses atau tidak lagi tersedia.');
+            if ((int)$lockedRequest['requested_by'] === $authorizationApproverId) throw new RuntimeException('Pemohon tidak boleh menyetujui permintaannya sendiri.');
+            authorization_assert_current_snapshot($koneksi, $lockedRequest);
+            $authorizationRequest = $lockedRequest;
+        }
         $old_bayar = find_linked_payment($koneksi, $id);
         $usePublishedSpp = spp_billing_schema_ready($koneksi);
         if ($usePublishedSpp) spp_reverse_payment_allocation($koneksi, $id);
@@ -875,10 +958,11 @@ if ($aksi === 'update') {
             $stmt_ins_du->close();
         }
 
+        authorization_finish($koneksi, $authorizationRequest, $authorizationRequestId, $authorizationApproverId, $authorizationDecisionNote);
         $koneksi->commit();
         $_SESSION['flash'] = [
             'type' => 'success',
-            'msg' => 'Data pembayaran berhasil diperbarui!',
+            'msg' => $authorizationRequest ? 'Permintaan disetujui dan transaksi berhasil diperbarui.' : 'Data pembayaran berhasil diperbarui!',
             'print_payment' => [
                 'id' => $id,
                 'bulan' => $bulan_bayar,
@@ -886,12 +970,13 @@ if ($aksi === 'update') {
                 'source' => 'update',
             ],
         ];
-        header('Location: lihat.php');
+        header('Location: ' . ($authorizationRequest ? '../otorisasi_transaksi.php' : 'lihat.php'));
         exit;
     } catch (Throwable $e) {
         $koneksi->rollback();
+        authorization_fail_after_rollback($koneksi, $authorizationRequest, $authorizationRequestId, $authorizationApproverId, $e);
         $_SESSION['flash'] = payment_failure_flash($e, 'Gagal memperbarui: ');
-        header('Location: edit.php?id=' . $id);
+        header('Location: ' . ($authorizationRequest ? '../otorisasi_transaksi.php' : 'edit.php?id=' . $id));
         exit;
     }
 }
@@ -899,11 +984,18 @@ if ($aksi === 'update') {
 // ── DELETE ──────────────────────────────────
 if ($aksi === 'hapus') {
     $id = (int)($_POST['id'] ?? 0);
-    if ($id <= 0) { header('Location: lihat.php'); exit; }
+    if ($id <= 0) authorization_abort_before_transaction($koneksi, $authorizationRequest, $authorizationRequestId, $authorizationApproverId, 'ID transaksi tidak valid.', 'lihat.php');
 
     $koneksi->begin_transaction();
 
     try {
+        if ($authorizationRequest) {
+            $lockedRequest = transaction_authorization_find($koneksi, $authorizationRequestId, true);
+            if (!$lockedRequest || $lockedRequest['status'] !== 'pending') throw new RuntimeException('Permintaan sudah diproses atau tidak lagi tersedia.');
+            if ((int)$lockedRequest['requested_by'] === $authorizationApproverId) throw new RuntimeException('Pemohon tidak boleh menyetujui permintaannya sendiri.');
+            authorization_assert_current_snapshot($koneksi, $lockedRequest);
+            $authorizationRequest = $lockedRequest;
+        }
         $old_bayar = find_linked_payment($koneksi, $id);
         $usePublishedSpp = spp_billing_schema_ready($koneksi);
         if ($usePublishedSpp) spp_reverse_payment_allocation($koneksi, $id);
@@ -940,14 +1032,16 @@ if ($aksi === 'hapus') {
         $stmt_del->bind_param('i', $id);
         $stmt_del->execute();
         $stmt_del->close();
+        authorization_finish($koneksi, $authorizationRequest, $authorizationRequestId, $authorizationApproverId, $authorizationDecisionNote);
         $koneksi->commit();
-        $_SESSION['flash'] = ['type' => 'success', 'msg' => 'Data pembayaran berhasil dihapus!'];
-    } catch (Exception $e) {
+        $_SESSION['flash'] = ['type' => 'success', 'msg' => $authorizationRequest ? 'Permintaan disetujui dan transaksi berhasil dihapus.' : 'Data pembayaran berhasil dihapus!'];
+    } catch (Throwable $e) {
         $koneksi->rollback();
+        authorization_fail_after_rollback($koneksi, $authorizationRequest, $authorizationRequestId, $authorizationApproverId, $e);
         $_SESSION['flash'] = ['type' => 'error', 'msg' => 'Gagal menghapus data: ' . $e->getMessage()];
     }
 
-    header('Location: lihat.php');
+    header('Location: ' . ($authorizationRequest ? '../otorisasi_transaksi.php' : 'lihat.php'));
     exit;
 }
 

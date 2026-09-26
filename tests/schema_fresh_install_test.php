@@ -24,7 +24,7 @@ try {
     $db->multi_query($sql);
     while ($db->more_results()) $db->next_result();
 
-    $required = ['master_spp_tahun', 'master_spp_tarif', 'tagihan_spp', 'spp_alokasi_batch', 'spp_alokasi', 'titipan_spp_mutasi', 'spp_audit_log'];
+    $required = ['master_spp_tahun', 'master_spp_tarif', 'tagihan_spp', 'spp_alokasi_batch', 'spp_alokasi', 'titipan_spp_mutasi', 'spp_audit_log', 'transaksi_otorisasi'];
     $quoted = implode(',', array_fill(0, count($required), '?'));
     $stmt = $db->prepare("SELECT TABLE_NAME FROM information_schema.TABLES WHERE TABLE_SCHEMA=? AND TABLE_NAME IN ({$quoted})");
     $params = array_merge([$database], $required);
