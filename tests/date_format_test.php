@@ -1,4 +1,5 @@
 <?php
+if(PHP_SAPI!=='cli'){http_response_code(404);exit;}
 require_once __DIR__.'/../includes/date_format.php';
 $cases=[
  ['2024-02-29',false,'29/02/2024'],['2023-02-29',false,'—'],['2024-04-31',false,'—'],

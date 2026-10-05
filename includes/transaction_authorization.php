@@ -84,6 +84,7 @@ function transaction_authorization_snapshot(mysqli $db, int $paymentId): array
 
 function transaction_authorization_payload(array $source, string $action): array
 {
+    if(array_key_exists('uang_pangkal',$source))throw new RuntimeException('Formulir pembayaran lama tidak berlaku; Pangkal sudah digabung ke PSB.');
     if (!in_array($action, ['edit', 'hapus'], true)) throw new RuntimeException('Jenis permintaan transaksi tidak dikenal.');
     if ($action === 'hapus') return ['aksi' => 'hapus', 'id' => (int)($source['id'] ?? 0)];
 

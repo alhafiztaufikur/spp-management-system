@@ -1,5 +1,7 @@
 # Konteks Proyek SistemSPP
 
+> **Status 5 Oktober 2026:** PSB mencakup Pangkal; komponen Pangkal dan persen operasional telah dihapus pada db_spp lokal. Potongan SPP nominal, DIKNAS opsional, tampilan tanggal DD/MM/YYYY dan timestamp WIB. Pembayaran lama digabung ke PSB tanpa menambah kas: 1.359 siswa, 1.020 pembayaran/Rp577.790.000; Tabungan 12/Rp1.050.000 tetap utuh. Health OK dan 30 integritas bersih; worker importer berjalan kembali. [Audit/migrasi/pemulihan](PSB_NOMINAL_DATE_AUDIT_20261005.md) menjadi status terbaru; catatan tanggal sebelumnya adalah bukti historis. Railway tidak dimigrasikan.
+
 > **Status terkini setelah impor Legacy 3 Oktober 2026:** migrasi unit/NIS dan status Legacy sudah terpasang pada trial `db_spp`, implementasi `62dd273` pada main. Total 1.359 siswa (222 existing + 1.137 pending Legacy). Tepat setelah impor, pembayaran 1.018/Rp577.145.000 dan seluruh nilai existing tetap identik. Setelah dua pembayaran operasional berikutnya, total terbaru 1.020 pembayaran/Rp577.790.000; perubahan tarif SD berikutnya tercatat terpisah di audit. Pembayaran/alokasi original dan Tabungan 12 rekening/Rp1.050.000 tetap utuh. Worker LocalDB privat aktif; mulai lagi manual setelah restart Windows. Aktivasi oleh admin/kasir unit membuat hanya satu penempatan awal, tanpa tagihan otomatis; master SPP menyiapkan pasangan Komite saat penerbitan. Histori/alumni/keuangan legacy tidak ditebak atau diimpor. [Audit backend](LEGACY_IMPORT_BACKEND_20261003.md) dan [runbook](LEGACY_IMPORT_RUNBOOK_20261003.md) memuat hasil/batas trial.
 
 

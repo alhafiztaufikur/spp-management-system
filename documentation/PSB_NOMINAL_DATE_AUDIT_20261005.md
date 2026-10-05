@@ -2,7 +2,7 @@
 
 ## Status
 
-Regresi pada database disposable lulus. Penerapan ke Laragon lokal dicatat pada bagian hasil penerapan setelah backup final dan verifikasi. Railway tidak dimigrasikan. Data pribadi, dump, JSON pembanding, PDF dan tangkapan layar disimpan di luar Git: C:\laragon\backups\spp-management-system\payments_cleanup_20261005.
+Regresi pada database disposable lulus dan penerapan Laragon/db_spp sudah selesai. Aplikasi kembali terbuka, health HTTP 200 ok, dan worker importer berjalan kembali dengan SQL ready. Railway tidak dimigrasikan. Data pribadi, dump, JSON pembanding, PDF dan tangkapan layar disimpan di luar Git: C:\laragon\backups\spp-management-system\payments_cleanup_20261005.
 
 ## Aturan aktif
 
@@ -13,7 +13,7 @@ Regresi pada database disposable lulus. Penerapan ke Laragon lokal dicatat pada 
 - Snapshot menyimpan potongan yang ditetapkan dan potongan aktual secara terpisah, agar tarif turun/naik tidak menghilangkan nominal yang tetap. Tagihan beralokasi/berbayar dan riwayat tahun asal terlindungi.
 - DIKNAS opsional; kosong menjadi NULL, jika diisi wajib 10 digit/unik per unit dan nol awal dipertahankan. Field yang tidak dikirim saat edit tidak menghapus nomor existing.
 - Tampilan tanggal DD/MM/YYYY; timestamp DD/MM/YYYY HH:mm:ss WIB. Kontrol tanggal menyediakan input Indonesia dan kalender, dengan nilai ISO tetap dikirim ke server. Database, sortir dan periode tetap ISO; zona tampilan Asia/Jakarta tidak mengikuti zona browser.
-- Audit JSON historis dan raw sumber Legacy tidak ditulis ulang. Nilai sebelum/sesudah konversi disimpan berdasarkan migration/entity/ID/unit pada tabel audit migrasi. Kiriman Pangkal/persen lama ditolak, bukan diinterpretasikan sebagai nominal.
+- Audit JSON historis dan raw sumber Legacy tidak ditulis ulang. Nilai sebelum/sesudah konversi disimpan berdasarkan migration/entity/ID/unit pada tabel audit migrasi. Kiriman Pangkal/persen lama ditolak, bukan diinterpretasikan sebagai nominal. Guard Pangkal dijalankan sebelum normalisasi/pembuatan pengajuan kasir; field lama bernilai nol/array sekalipun tidak boleh tersaring lalu masuk antrean. Kontrak payload baru PSB diuji terpisah tanpa penulisan data.
 
 ## Bukti pengujian
 
@@ -49,5 +49,12 @@ Definisi SQL mutatif lama yang merekonstruksi Pangkal/persen dipensiunkan dengan
 
 ## Hasil penerapan lokal
 
-Belum dicatat pada commit persiapan; bagian ini diperbarui setelah penerapan/verifikasi aktual. Kesiapan deployment Railway dan impor histori keuangan Legacy tidak termasuk kesimpulan ini.
+- Kode implementasi `2bb074b` dan koreksi fixture `ba8f5f7` dipindahkan ke main tanpa konflik; origin/main terbaru masih `dd4b3c9` sebelum pengiriman. Perubahan lokal Railway dan catatan DBeaver milik pengguna dipertahankan.
+- Backup final: `C:\laragon\backups\spp-management-system\payments_cleanup_20261005\preapply-final.sql`, SHA-256 `3BE3AB31E1ADBF1E8A486D7E7B0A936B94438F9102F52CFA41C1D5497D860D56`. Restore dan konversi clone final baru lulus sebelum main diubah.
+- Journal `psb_nominal_20261005` complete pada 05/10/2026 13:51:27 WIB. Arsip before/after: 1.020 pembayaran, 1.359 siswa, dan 2.520 tagihan SPP. Kolom operasional Pangkal/persen tersisa nol; snapshot/audit JSON historis tetap ada.
+- Main tetap **1.359 siswa, 1.020 pembayaran/Rp577.790.000**, Tabungan **12 rekening/Rp1.050.000**, penempatan **210**. Total PSB kini **Rp49.650.000 = Rp19.950.000 PSB lama + Rp29.700.000 Pangkal lama**, bukan penerimaan tambahan.
+- Seluruh tabel original main cocok dengan clone final terverifikasi. Hanya tiga tabel original berubah sesuai konversi (`siswa_data`, `bayar_data`, `tagihan_spp_data`); semua tabel original lain, termasuk pembayaran/alokasi komponen lain dan tiga tabel Tabungan, memiliki fingerprint sebelum/sesudah identik. Semua ID/tanggal/nominal selain konversi disepakati dipertahankan.
+- Health HTTP 200 ok, 30 invariant nol, 61 FK canonical lengkap/cocok. Worker sebelumnya sudah berhenti; startup helper menghidupkannya kembali pada instance/storage importer yang sama dan heartbeat SQL ready terverifikasi.
+- Script DBeaver lokal diselaraskan dengan skema baru: tujuh kontrak Legacy + 30 invariant, seluruh 37 pemeriksaan OK. Catatan khusus Railway milik pengguna tetap ada. Tidak ada langkah SQL manual yang diperlukan untuk penerapan ini.
+- Kesiapan deployment Railway dan impor histori keuangan Legacy tidak termasuk kesimpulan ini. Backup dan artefak privat dipertahankan. Tambahan 48 keadaan UI utama baca saja (empat cakupan/dua tema/tiga viewport) lulus; fingerprint seluruh tabel tetap identik setelah GET/UI dan restart worker. Dua server HTTP latihan dan tiga clone bernama khusus audit dihapus/dihentikan setelah kepemilikan diperiksa; sesi baca audit sendiri dihancurkan. Laragon, worker dan storage importer utama tetap tersedia. Tidak ada penolakan cleanup pada tahap penutupan.
 

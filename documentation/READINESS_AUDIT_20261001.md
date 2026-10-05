@@ -1,6 +1,6 @@
 # Kesiapan SistemSPP — pembaruan 3 Oktober 2026
 
-> **Pembaruan 5 Oktober 2026:** [audit PSB, potongan nominal dan tanggal](PSB_NOMINAL_DATE_AUDIT_20261005.md) menjadi rujukan perubahan terbaru. Pengujian clone lulus; status penerapan lokal tercatat pada audit tersebut. Klaim dan angka audit lama di bawah dipertahankan sebagai bukti historis.
+> **Pembaruan 5 Oktober 2026:** [audit PSB, potongan nominal dan tanggal](PSB_NOMINAL_DATE_AUDIT_20261005.md) menjadi rujukan perubahan terbaru. Pengujian clone dan penerapan lokal lulus; 30 invariant bersih, kas/Tabungan utuh, health OK serta worker hidup kembali. Klaim dan angka audit lama di bawah dipertahankan sebagai bukti historis.
 
 > **Pembaruan impor Legacy:** identitas per unit, status Legacy dan worker LocalDB diuji pada clone lalu diterapkan pada trial; 1.359 siswa (1.137 Legacy pending), pada snapshot segera setelah impor, pembayaran/Tabungan serta seluruh nilai existing tetap identik; aktivitas operasional berikutnya dicatat terpisah, health OK dan 26 integritas bersih; [audit backend](LEGACY_IMPORT_BACKEND_20261003.md) menjadi rujukan terbaru kategori ini. Kesimpulan audit lama tidak diperluas menjadi kesiapan migrasi histori keuangan atau deployment importer pada server lain.
 

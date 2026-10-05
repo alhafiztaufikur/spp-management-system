@@ -54,7 +54,7 @@ if ($aksi === 'otorisasi_setujui') {
 }
 
 // Reject retired balance requests before a cashier proposal can be queued.
-if ((isset($_POST['spp_action']) && $_POST['spp_action'] !== 'bayar')
+if (array_key_exists('uang_pangkal', $_POST) || (isset($_POST['spp_action']) && $_POST['spp_action'] !== 'bayar')
     || (isset($_POST['gunakan_titipan_spp']) && !in_array((string)$_POST['gunakan_titipan_spp'], ['0',''], true))) {
     $_SESSION['flash'] = ['type'=>'error','msg'=>'Formulir pembayaran lama tidak berlaku. Muat ulang dan bayar tagihan langsung.'];
     header('Location: form.php');

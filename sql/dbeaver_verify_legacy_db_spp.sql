@@ -1,5 +1,5 @@
 -- SistemSPP: pemeriksaan db_spp sesudah impor identitas Legacy.
--- MySQL 8.4 / DBeaver, 3 Oktober 2026.
+-- MySQL 8.4 / DBeaver, pembaruan skema PSB/nominal 5 Oktober 2026.
 -- Database lokal ini sudah dimigrasi dan diimpor. Script hanya membaca.
 -- Tidak mengimpor .dat, menerapkan DDL, mengaktifkan siswa, atau membuat transaksi.
 -- Buka pada koneksi MySQL Laragon; jalankan seluruh script (Alt+X).
@@ -123,7 +123,7 @@ SELECT 'jurnal_tabungan_masuk' AS metrik, (SELECT COUNT(*) FROM transaksi_m_data
 UNION ALL
 SELECT 'jurnal_tabungan_keluar' AS metrik, (SELECT COUNT(*) FROM transaksi_k_data) AS nilai;
 
--- 6. Integritas: seluruh 26 baris harus OK dan jumlah_masalah = 0.
+-- 6. Integritas: seluruh 30 baris harus OK dan jumlah_masalah = 0.
 SELECT pemeriksaan, IF(jumlah_masalah=0,'OK','PERIKSA') AS hasil,
        jumlah_masalah
 FROM (
@@ -150,7 +150,7 @@ UNION ALL
 SELECT 'total_header_tidak_cocok' AS pemeriksaan, (SELECT COUNT(*) FROM bayar_data b
         LEFT JOIN (SELECT bayar_id,SUM(jumlah) total_du FROM bayar_du_data GROUP BY bayar_id) d ON d.bayar_id=b.id
         WHERE ABS(COALESCE(b.total_jumlah,0)-(
-            COALESCE(b.U_PANGKAL,0)+COALESCE(b.U_PSB,0)+COALESCE(b.U_SPP,0)
+            COALESCE(b.U_PSB,0)+COALESCE(b.U_SPP,0)
             +COALESCE(b.U_KOMITE,0)
             +COALESCE(b.U_LAIN,0)+COALESCE(d.total_du,0)
             -COALESCE(b.potong_spp,0)
@@ -231,6 +231,15 @@ UNION ALL
 SELECT 'legacy_memiliki_tagihan_biaya_lain' AS pemeriksaan, (SELECT COUNT(*) FROM tagihan_biaya_lain_data c JOIN siswa_data s ON s.unit_id=c.unit_id AND s.NO_INDUK=c.no_induk WHERE s.legacy_pending=1) AS jumlah_masalah
 UNION ALL
 SELECT 'legacy_memiliki_tagihan_tahunan_siswa' AS pemeriksaan, (SELECT COUNT(*) FROM tagihan_tahunan_siswa_data c JOIN siswa_data s ON s.unit_id=c.unit_id AND s.NO_INDUK=c.no_induk WHERE s.legacy_pending=1) AS jumlah_masalah
+
+UNION ALL
+SELECT 'psb_melebihi_master', (SELECT COUNT(*) FROM (SELECT b.unit_id,b.NO_INDUK,SUM(b.U_PSB) paid,s.PSB FROM bayar_data b JOIN siswa_data s ON s.unit_id=b.unit_id AND s.NO_INDUK=b.NO_INDUK GROUP BY b.unit_id,b.NO_INDUK,s.PSB HAVING SUM(b.U_PSB)>s.PSB+0.01) x)
+UNION ALL
+SELECT 'potongan_nominal_negatif', (SELECT COUNT(*) FROM siswa_data WHERE potongan_spp_nominal<0)
+UNION ALL
+SELECT 'snapshot_potongan_nominal_tidak_valid', (SELECT COUNT(*) FROM tagihan_spp_data WHERE potongan_nominal_ditetapkan_snapshot<0 OR potongan_nominal_snapshot<0 OR potongan_nominal_snapshot>tarif_dasar_snapshot+0.01 OR potongan_nominal_snapshot>potongan_nominal_ditetapkan_snapshot+0.01)
+UNION ALL
+SELECT 'migrasi_komponen_belum_selesai', (SELECT COUNT(*) FROM financial_component_migration WHERE stage<>'complete')
 ) integritas;
 
 COMMIT;

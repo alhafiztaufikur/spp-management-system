@@ -13,6 +13,13 @@ File ini mencatat perubahan proyek secara reverse chronological. Baca [PROJECT_C
 - Jangan menghapus atau menulis ulang entri lama. Tambahkan entri koreksi bila diperlukan.
 - Perubahan implementasi dan entri changelog wajib masuk commit yang sama.
 
+## 2026-10-05 - Penerapan lokal dan verifikasi akhir PSB/nominal
+
+- Aktor: Codex, otorisasi pemilik untuk penerapan otomatis db_spp lokal; backup final hashed/restore clone, maintenance dan worker gate dijalankan.
+- Data: 33 header Pangkal diserap ke PSB; total PSB Rp49.650.000, total kas tetap Rp577.790.000/1.020 pembayaran. Siswa tetap 1.359, penempatan 210, Tabungan 12/Rp1.050.000. Tiga tabel original berubah tepat sesuai konversi; seluruh tabel original lain identik. Audit before/after disimpan pada database, tanpa data pribadi di Git.
+- Verifikasi: 30 invariant nol, FK/health OK, worker SQL ready; 48 keadaan UI utama baca saja dan fingerprint seluruh tabel tetap; script DBeaver 37 pemeriksaan OK dan catatan Railway existing dipertahankan. [Audit hasil dan pemulihan](PSB_NOMINAL_DATE_AUDIT_20261005.md) memuat backup/hash serta bukti.
+- Deployment: lokal diterapkan; Railway tidak dimigrasikan. Perubahan lokal panduan/diagnostik Railway tidak dihapus atau ditimpa.
+
 ## 2026-10-05 - PSB tanpa Pangkal, potongan nominal dan tanggal Indonesia
 
 - Aktor: Codex, implementasi rencana pemilik pada clone sebelum penerapan lokal; Railway tidak dimigrasikan.
