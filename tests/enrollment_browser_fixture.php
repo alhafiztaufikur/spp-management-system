@@ -124,7 +124,7 @@ try {
 
     enrollment_browser_assert($psb['NAMA'] === 'UJI BROWSER PSB' && $psb['KELAS'] === '0'
         && (int)$psb['master_kelas_id'] === $psbClassId && (int)$psb['is_active'] === 1
-        && (int)$psb['asal_psb'] === 1 && (float)$psb['PSB'] === 3600000.0
+        && (int)$psb['asal_psb'] === 1 && (float)$psb['PSB'] === 3600000.0 && (float)$psb['SPP_PERBULAN'] === 0.0,
         'Identitas atau tarif siswa PSB salah.');
     foreach (['siswa_tahun_ajaran', 'tagihan_spp', 'tagihan_komite', 'tagihan_daftar_ulang'] as $table) {
         enrollment_browser_assert(enrollment_browser_count($koneksi, $table, $psbNis) === 0,
