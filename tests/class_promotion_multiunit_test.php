@@ -18,6 +18,7 @@ $failure = null;
 $koneksi->begin_transaction();
 try {
     $sourceYear = '2098/2099';
+    $_SERVER['HTTP_X_SPP_TEST_CURRENT_YEAR']=$sourceYear;
     $targetYear = '2099/2100';
     $cohorts = [];
     foreach ([2 => [9, 8], 3 => [12, 11]] as $unit => [$last, $previous]) {

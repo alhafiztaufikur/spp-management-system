@@ -30,6 +30,7 @@ function historical_class(mysqli $db, int $level): int {
 }
 
 $source = '2090/2091';
+$_SERVER['HTTP_X_SPP_TEST_CURRENT_YEAR']=$source;
 $target = '2091/2092';
 $third = '2092/2093';
 $fixtures = [];
@@ -108,6 +109,7 @@ try {
             if ($otherUnit === $unit) continue;
             historical_assert(historical_rows($koneksi, 'per-item', ['q' => $other['nis'], 'kategori' => 'spp', 'bulan_awal' => '07', 'tahun_awal' => 2090, 'bulan_akhir' => '07', 'tahun_akhir' => 2090]) === [], 'Laporan melintasi batas unit.');
         }
+        $_SERVER['HTTP_X_SPP_TEST_CURRENT_YEAR']=$target;
         class_manual_graduate_student($koneksi, $fixture['nis'], $third);
         $base = ['q' => $fixture['nis'], 'tahun_ajaran' => $source, 'kategori' => 'spp', 'bulan_awal' => '07'];
         historical_assert(historical_rows($koneksi, 'status', $base) === [], 'Lulusan masih masuk filter Aktif.');

@@ -17,6 +17,12 @@ SistemSPP adalah aplikasi administrasi pembayaran sekolah berbasis PHP, JavaScri
 - Skema instalasi baru berada pada payload non-SQL `sql/schema.payload`, dibaca oleh `sql/schema_source.php`. `sql/schema.sql` hanya menolak impor langsung, termasuk ketika klien memakai `mysql --force`. Gunakan `sql/bootstrap_production.php` untuk database kosong; jangan pakai payload ini sebagai migrasi data lama.
 - Untuk reset dan pengisian data **demo**, ikuti [DEMO_DATA_RESET.md](./DEMO_DATA_RESET.md). Jangan terapkan reset pada data sekolah sungguhan.
 
+## Kenaikan kelas fleksibel
+
+Master Kelas memakai tahun dan tingkat asal yang dipilih. Tidak ada kewajiban luluskan kelas tertinggi terlebih dahulu. Peserta mengikuti penempatan aktif/latest pada tahun asal; target tepat satu tingkat/tahun berikutnya dan unit sama. Source diproses satu kali (pindah/lulus), kelas aktif segera berubah. Tahun mendatang belum menjadi source sampai berjalan; Legacy/PSB/arsip dan riwayat yang bertentangan ditahan.
+
+Tarif target mengikuti master tahun/kelas dan nominal potongan; jika belum siap, nilai informasi/snapshot target nol, bukan perkiraan tagihan. Master menerbitkan SPP/DU, Komite mengikuti perilaku existing. Tidak menulis ulang source atau paid snapshots. [Audit perubahan](FLEXIBLE_PROMOTION_AUDIT_20261005.md) menjadi rujukan pengujian dan status penerapan.
+
 ## Alur pembayaran aktif
 
 - Master Siswa menyimpan PSB sebagai kewajiban sekali bayar, termasuk Pangkal. Komponen Pangkal terpisah dipensiunkan; PSB dapat dicicil sesuai sisa tagihan. Potongan SPP memakai nominal rupiah per bulan dan DIKNAS opsional.

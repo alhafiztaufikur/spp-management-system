@@ -17,6 +17,7 @@ $failure = null;
 $koneksi->begin_transaction();
 try {
     $sourceYear = '2098/2099';
+    $_SERVER['HTTP_X_SPP_TEST_CURRENT_YEAR']=$sourceYear;
     $targetYear = '2099/2100';
     $sourceYearId = class_ensure_academic_year($koneksi, $sourceYear);
     $classes = [];
@@ -69,10 +70,8 @@ try {
     $second = class_process_students_batch($koneksi, [$students[2]], [$students[2] => (int)$classes[6]['id']], $targetYear, 5);
     sequence_assert(count($second['successes']) === 1, 'Kenaikan siswa kedua gagal.');
     sequence_assert(class_highest_active_regular_level($koneksi, $targetYear) === 0, 'Tahap belum selesai setelah seluruh siswa asal diproses.');
-    $stale = false;
-    try { class_process_students_batch($koneksi, [$students[1]], [$students[1] => (int)$classes[6]['id']], $targetYear, 5); }
-    catch (RuntimeException $error) { $stale = true; }
-    sequence_assert($stale, 'Pengiriman ulang dari halaman lama diterima.');
+    $stale = class_process_students_batch($koneksi, [$students[1]], [$students[1] => (int)$classes[6]['id']], $targetYear, 5);
+    sequence_assert(!$stale['successes'] && count($stale['failures'])===1, 'Pengiriman ulang diterima.');
 
     $stmt = $koneksi->prepare('SELECT ta.label,sta.kelas,sta.status FROM siswa_tahun_ajaran sta JOIN tahun_ajaran ta ON ta.id=sta.tahun_ajaran_id WHERE sta.no_induk=? ORDER BY ta.label');
     $stmt->bind_param('s', $students[1]);

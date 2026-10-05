@@ -1857,6 +1857,20 @@ function bindNumericInput(input) {
 }
 
 function initPromotionBatchSelector() {
+  const context=document.getElementById('promotion-context-form');
+  if(context&&!context.dataset.ready){
+    context.dataset.ready='1';
+    const year=document.getElementById('promotion-source-year'),level=document.getElementById('promotion-source-level');
+    const changed=()=>{
+      const match=/^(\d{4})\/(\d{4})$/.exec(year.selectedOptions[0]?.textContent.trim()||'');
+      const graduation=Number(level.value)===Number(context.dataset.lastLevel);
+      document.getElementById('promotion-target-label').textContent=graduation?'Tahun Kelulusan':'Tahun Ajaran Tujuan';
+      document.getElementById('promotion-target-year').textContent=match?(graduation?match[0]:(Number(match[1])+1)+'/'+(Number(match[2])+1)):'Pilih tahun asal';
+      const old=document.getElementById('promotion-submit-button');if(old)old.disabled=true;
+      if(year.value&&level.value)context.requestSubmit();
+    };
+    year.addEventListener('change',changed);level.addEventListener('change',changed);
+  }
   const form = document.getElementById('promotion-batch-form');
   if (!form || form.dataset.promotionReady === '1') return;
 
@@ -1900,7 +1914,9 @@ function initPromotionBatchSelector() {
 
   const filterRows = () => {
     const query = normalize(search?.value);
+    const querySubmit=document.getElementById('promotion-search-submit');if(querySubmit)querySubmit.value=search?.value||'';
     const source = sourceFilter?.value || '';
+    const sourceSubmit=document.getElementById('promotion-source-rombel-submit');if(sourceSubmit)sourceSubmit.value=source;
     let shown = 0;
     rows.forEach(row => {
       const matchesSearch = !query || normalize(row.dataset.search).includes(query);
@@ -1948,7 +1964,7 @@ function initPromotionBatchSelector() {
       const target = row.querySelector('select[name^="target_master_kelas_id"]');
       return target && !target.value;
     }).length;
-    let message = actionLabel + ' ' + selected.length + ' siswa untuk tahun ajaran yang dituju?';
+    let message = form.dataset.graduation==='1' ? 'Luluskan '+selected.length+' siswa pada TA '+form.dataset.sourceYear+'? Tidak membuat penempatan tahun tujuan.' : actionLabel + ' ' + selected.length + ' siswa dari TA ' + form.dataset.sourceYear + ' ke TA ' + form.dataset.targetYear + '?';
     if (missingTargets > 0) {
       message += '\n\n' + missingTargets + ' siswa belum memiliki rombel tujuan dan akan dilewati.';
     }

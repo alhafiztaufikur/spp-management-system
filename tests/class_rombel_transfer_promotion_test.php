@@ -18,6 +18,7 @@ rombel_assert((string)$koneksi->query('SELECT DATABASE()')->fetch_row()[0] === $
 try {
     $nis = 'AUDR000001';
     $sourceYear = '2098/2099';
+    $_SERVER['HTTP_X_SPP_TEST_CURRENT_YEAR']=$sourceYear;
     $targetYear = '2099/2100';
     $classes = [];
     $result = $koneksi->query("SELECT id, tingkat, kode_rombel FROM master_kelas

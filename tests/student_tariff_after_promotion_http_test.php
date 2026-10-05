@@ -57,6 +57,7 @@ $_SESSION['active_unit_id'] = 1;
 unit_set_context($koneksi, 1);
 $nis = (string)random_int(9500000000, 9599999999);
 $oldYear = '2187/2188';
+$_SERVER['HTTP_X_SPP_TEST_CURRENT_YEAR']=$oldYear;
 $newYear = '2188/2189';
 $oldMasterId = 0;
 $newMasterId = 0;
@@ -106,7 +107,7 @@ try {
     promoted_tariff_assert($login['status'] === 302 && isset($cookies['PHPSESSID']), 'Login HTTP gagal.');
     $page = promoted_tariff_request($baseUrl . '/siswa/daftar.php?edit=' . $studentId, null, $cookies);
     promoted_tariff_assert($page['status'] === 200, 'Form edit Data Siswa gagal dibuka.');
-    promoted_tariff_assert(str_contains($page['body'], 'TA ' . $newYear . ' · tarif dasar'), 'Pratinjau tidak memilih tahun tujuan.');
+    promoted_tariff_assert(str_contains(html_entity_decode(strip_tags($page['body'])), 'TA ' . $newYear . ' · tarif dasar'), 'Pratinjau tidak memilih tahun tujuan.');
     promoted_tariff_assert(preg_match('/<form\b[^>]*\bid="form-master-siswa"[^>]*>(.*?)<\/form>/s', $page['body'], $studentForm) === 1
         && preg_match('/name="csrf_token" value="([a-f0-9]+)"/', $studentForm[1], $match) === 1,
         'Token CSRF form Data Siswa tidak ada.');

@@ -16,6 +16,10 @@ $username = [1 => 'admin', 2 => 'admin.smp', 3 => 'admin.sma'][$unitId];
 $_SESSION['active_unit_id'] = $unitId;
 unit_set_context($koneksi, $unitId);
 
+function psb_promotion_context(mysqli $db,string $nis,string $source):array {
+    $q=$db->prepare("SELECT p.id source_placement_id,p.tahun_ajaran_id source_year_id FROM siswa_tahun_ajaran p JOIN tahun_ajaran y ON y.id=p.tahun_ajaran_id AND y.unit_id=p.unit_id WHERE p.no_induk=? AND y.label=?");
+    $q->bind_param('ss',$nis,$source);$q->execute();$r=$q->get_result()->fetch_assoc();$q->close();if(!$r)throw new RuntimeException('Missing PSB source fixture');return $r;
+}
 function psb_cycle_assert(bool $ok, string $message): void {
     if (!$ok) throw new RuntimeException($message);
 }
@@ -281,9 +285,11 @@ try {
         }
     }
 
-    $promotionPage = psb_cycle_request($base, '/master_kelas.php', null, $cookies, '2027/2028');
+    $sourceCtx=psb_promotion_context($koneksi,$nis,'2027/2028');
+    $promotionPage = psb_cycle_request($base, '/master_kelas.php?'.http_build_query(['source_year_id'=>$sourceCtx['source_year_id'],'source_level'=>$firstLevel]), null, $cookies, '2027/2028');
     psb_cycle_assert($promotionPage['status'] === 200, 'Promotion page unavailable.');
     $promotion = psb_cycle_request($base, '/master_kelas.php', [
+        'source_year_id'=>$sourceCtx['source_year_id'],'source_level'=>$firstLevel,'source_placement_id'=>$sourceCtx['source_placement_id'],
         'aksi' => 'naikkan_siswa', 'csrf_token' => psb_cycle_token($promotionPage['body'], 'promotion-batch-form'),
         'no_induk' => $nis, 'target_tahun_ajaran' => '2028/2029',
         'target_master_kelas_id' => $gradeTwoClass,
@@ -345,9 +351,11 @@ try {
         $sourceStart = 2027 + ($level - $firstLevel);
         $sourceYear = $sourceStart . '/' . ($sourceStart + 1);
         $targetYear = ($sourceStart + 1) . '/' . ($sourceStart + 2);
-        $classPage = psb_cycle_request($base, '/master_kelas.php', null, $cookies, $sourceYear);
+        $sourceCtx=psb_promotion_context($koneksi,$nis,$sourceYear);
+        $classPage = psb_cycle_request($base, '/master_kelas.php?'.http_build_query(['source_year_id'=>$sourceCtx['source_year_id'],'source_level'=>$level]), null, $cookies, $sourceYear);
         psb_cycle_assert($classPage['status'] === 200, 'Promotion page unavailable in ' . $sourceYear);
         $promote = psb_cycle_request($base, '/master_kelas.php', [
+            'source_year_id'=>$sourceCtx['source_year_id'],'source_level'=>$level,'source_placement_id'=>$sourceCtx['source_placement_id'],
             'aksi' => 'naikkan_siswa', 'csrf_token' => psb_cycle_token($classPage['body'], 'promotion-batch-form'),
             'no_induk' => $nis, 'target_tahun_ajaran' => $targetYear,
             'target_master_kelas_id' => psb_cycle_class($koneksi, $unitId, $level + 1, 'A'),
@@ -386,9 +394,11 @@ try {
 
     $lastStart = 2027 + ($lastLevel - $firstLevel);
     $graduationYear = $lastStart . '/' . ($lastStart + 1);
-    $classPage = psb_cycle_request($base, '/master_kelas.php', null, $cookies, $graduationYear);
+    $sourceCtx=psb_promotion_context($koneksi,$nis,$graduationYear);
+    $classPage = psb_cycle_request($base, '/master_kelas.php?'.http_build_query(['source_year_id'=>$sourceCtx['source_year_id'],'source_level'=>$lastLevel]), null, $cookies, $graduationYear);
     psb_cycle_assert($classPage['status'] === 200, 'Graduation page unavailable.');
     $graduate = psb_cycle_request($base, '/master_kelas.php', [
+        'source_year_id'=>$sourceCtx['source_year_id'],'source_level'=>$lastLevel,'source_placement_id'=>$sourceCtx['source_placement_id'],
         'aksi' => 'luluskan_siswa', 'csrf_token' => psb_cycle_token($classPage['body'], 'promotion-batch-form'),
         'no_induk' => $nis, 'target_tahun_ajaran' => ($lastStart + 1) . '/' . ($lastStart + 2),
     ], $cookies, $graduationYear);

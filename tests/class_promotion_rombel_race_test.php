@@ -12,6 +12,7 @@ if (getenv('SPP_TEST_ALLOW_MUTATION') !== '1'
 $expectUnsafe = in_array('--expect-unsafe', $argv, true);
 $bulkDeactivate = in_array('--bulk', $argv, true);
 $sourceYear = '2190/2191';
+    $_SERVER['HTTP_X_SPP_TEST_CURRENT_YEAR']=$sourceYear;
 $targetYear = '2191/2192';
 $nis = (string)random_int(9800000000, 9899999999);
 $connectionB = new mysqli(DB_HOST, DB_USER, DB_PASS, DB_NAME, $dbPort);

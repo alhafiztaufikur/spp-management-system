@@ -47,6 +47,7 @@ try {
     $stmt->execute(); $stmt->close();
 
     $sourceYear = '2197/2198';
+    $_SERVER['HTTP_X_SPP_TEST_CURRENT_YEAR']=$sourceYear;
     $targetYear = '2198/2199';
     $oldMaster = spp_master_ensure_year($koneksi, $sourceYear, true);
     $sourceYearId = (int)$oldMaster['tahun_ajaran_id'];

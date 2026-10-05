@@ -80,6 +80,11 @@ function lifecycle_report(mysqli $db, string $template, string $nis, string $yea
     ]))['rows'];
 }
 
+function lifecycle_promotion_context(mysqli $db,string $nis,string $source):array {
+    $q=$db->prepare("SELECT p.id source_placement_id,p.tahun_ajaran_id source_year_id FROM siswa_tahun_ajaran p JOIN tahun_ajaran y ON y.id=p.tahun_ajaran_id AND y.unit_id=p.unit_id WHERE p.no_induk=? AND y.label=?");
+    $q->bind_param('ss',$nis,$source);$q->execute();$r=$q->get_result()->fetch_assoc();$q->close();lifecycle_assert((bool)$r,'Source fixture missing');return $r;
+}
+
 $cookies = [];
 $nis = (string)random_int(9900000000, 9999999999);
 $firstYear = '2030/2031';
@@ -183,9 +188,11 @@ try {
             $targetCount=(int)$koneksi->query("SELECT COUNT(*) FROM tagihan_spp ts JOIN tahun_ajaran ta ON ta.id=ts.tahun_ajaran_id WHERE ts.no_induk='$nis' AND ta.label='$targetYear'")->fetch_row()[0];
             lifecycle_assert($targetCount===0,'Target year published without official placement.');
         }
-        $classPage = lifecycle_request($base . '/master_kelas.php', null, $cookies, $sourceYear);
+        $sourceCtx=lifecycle_promotion_context($koneksi,$nis,$sourceYear);
+        $classPage = lifecycle_request($base . '/master_kelas.php?'.http_build_query(['source_year_id'=>$sourceCtx['source_year_id'],'source_level'=>$level]), null, $cookies, $sourceYear);
         lifecycle_assert($classPage['status'] === 200, 'Promotion page failed for class ' . $level . '.');
         $promote = lifecycle_request($base . '/master_kelas.php', [
+            'source_year_id'=>$sourceCtx['source_year_id'],'source_level'=>$level,'source_placement_id'=>$sourceCtx['source_placement_id'],
             'aksi' => 'naikkan_siswa', 'csrf_token' => lifecycle_token($classPage['body'], 'promotion-batch-form'),
             'no_induk' => $nis, 'target_tahun_ajaran' => $targetYear,
             'target_master_kelas_id' => lifecycle_class($koneksi, $unitId, $level + 1),
@@ -248,8 +255,10 @@ try {
     $lastStart = 2030 + ($lastLevel - $firstLevel);
     $lastYear = $lastStart . '/' . ($lastStart + 1);
     $graduationTargetYear = ($lastStart + 1) . '/' . ($lastStart + 2);
-    $classPage = lifecycle_request($base . '/master_kelas.php', null, $cookies, $lastYear);
+    $sourceCtx=lifecycle_promotion_context($koneksi,$nis,$lastYear);
+    $classPage = lifecycle_request($base . '/master_kelas.php?'.http_build_query(['source_year_id'=>$sourceCtx['source_year_id'],'source_level'=>$lastLevel]), null, $cookies, $lastYear);
     $graduate = lifecycle_request($base . '/master_kelas.php', [
+        'source_year_id'=>$sourceCtx['source_year_id'],'source_level'=>$lastLevel,'source_placement_id'=>$sourceCtx['source_placement_id'],
         'aksi' => 'luluskan_siswa', 'csrf_token' => lifecycle_token($classPage['body'], 'promotion-batch-form'),
         'no_induk' => $nis, 'target_tahun_ajaran' => $graduationTargetYear,
     ], $cookies, $lastYear);

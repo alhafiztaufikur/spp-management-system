@@ -13,6 +13,14 @@ File ini mencatat perubahan proyek secara reverse chronological. Baca [PROJECT_C
 - Jangan menghapus atau menulis ulang entri lama. Tambahkan entri koreksi bila diperlukan.
 - Perubahan implementasi dan entri changelog wajib masuk commit yang sama.
 
+## 2026-10-05 - Kenaikan bebas urutan dengan tahun asal eksplisit
+
+- Aktor: Codex, implementasi rencana pemilik; clone dan seluruh pengujian mutatif terpisah dari db_spp utama.
+- Perilaku: tahun asal berjalan/lampau, tingkat/rombel bebas urutan, tahun tujuan tepat berikutnya. Kelulusan berdasarkan source terakhir 6/9/12; penempatan tujuan mendatang bukan peserta source lama. Form lama tanpa konteks/ID source ditolak.
+- Backend: core individual/batch/massal, fresh actor/unit/status/history locks, per-student savepoint dan bounded retry; source/destination audit, no inferred history. Tarif tujuan master+nominal discount; belum tersedia nol, source/paid snapshots terlindungi.
+- Database/API: tidak ada schema/migrasi atau fixture utama; POST existing ditambah source_year_id/source_level/source_placement_id, nama tindakan dipertahankan. UI context/confirmation/persistence dan stylesheet khusus dengan filemtime; shared CSS tetap.
+- Verifikasi: tiga unit lower-first/split/no repeated graduation, future/current/past contexts, invalid/history guards, two cashiers/deactivation races, reguler/PSB sampai graduation, reports layar/Excel/PDF, 307 accesses, finance/savings, 60 visual states/three viewports, syntax/CSS/integrity. [Audit hasil dan batas](FLEXIBLE_PROMOTION_AUDIT_20261005.md).
+
 ## 2026-10-05 - Penerapan lokal dan verifikasi akhir PSB/nominal
 
 - Aktor: Codex, otorisasi pemilik untuk penerapan otomatis db_spp lokal; backup final hashed/restore clone, maintenance dan worker gate dijalankan.

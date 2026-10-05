@@ -1,0 +1,8 @@
+/* Scoped layout for explicit promotion context; shared design remains unchanged. */
+#promotion-context-form{grid-template-columns:repeat(3,minmax(0,1fr));align-items:start;gap:14px;margin-bottom:18px}
+#promotion-context-form .field-row{min-width:0}
+#promotion-context-form .report-filter-actions{grid-column:1/-1;display:flex;align-items:center}
+#promotion-target-year{display:block;padding:10px 14px;border:1px solid var(--border,rgba(130,145,150,.3));border-radius:10px;min-height:44px;font-size:15px}
+@media(max-width:768px){#promotion-context-form{grid-template-columns:repeat(2,minmax(0,1fr))}#promotion-context-form .field-row:nth-child(3){grid-column:1/-1}}
+@media(max-width:480px){#promotion-context-form{grid-template-columns:minmax(0,1fr)}}
+
