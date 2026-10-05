@@ -2,7 +2,7 @@
 
 ## Status dan cakupan
 
-Implementasi diuji pada clone db_spp_audit_promotion_20261005. Penerapan lokal dicatat setelah penggabungan dan pemeriksaan akhir. Tidak ada migrasi skema atau kenaikan siswa sungguhan sebagai fixture. Railway tidak diterapkan pada pekerjaan ini. Backup, hash, screenshot, PDF dan hasil rinci disimpan di C:\laragon\backups\spp-management-system\flexible_promotion_20261005, di luar Git.
+Implementasi diuji pada clone db_spp_audit_promotion_20261005 dan terpasang pada main lokal pada 6 Oktober 2026. Tidak ada migrasi skema atau kenaikan siswa sungguhan sebagai fixture. Railway tidak diterapkan pada pekerjaan ini. Backup, hash, screenshot, PDF dan hasil rinci disimpan di C:\laragon\backups\spp-management-system\flexible_promotion_20261005, di luar Git.
 
 ## Temuan dan perubahan
 
@@ -61,4 +61,13 @@ Backup hashed dan restore clone diverifikasi sebelum pekerjaan. Database utama d
 
 ## Penerapan akhir
 
-Belum dicatat pada commit persiapan. Rincian ini diperbarui setelah kode dipindahkan ke main, health/integritas dan fingerprint utama diverifikasi.
+Kode implementasi `7887fc3` dipasang ke main lokal melalui fast-forward dari `34af82e`. Origin/main diperiksa dan masih berada pada baseline tersebut; tidak ada konflik fitur yang perlu digabung. Draft lokal Railway/DBeaver tetap di working tree: patch keduanya sama dengan sebelum pekerjaan, dan berkas pemeriksaan Railway yang belum dilacak tetap dipertahankan.
+
+- Backup SHA-256: `c0a7705a550b229012eb36f7390cf42ed8fea960441352b3b118cf8bfd69743d`; restore ke clone telah dibuktikan, dan hash diperiksa ulang sebelum cleanup.
+- Laragon setelah penerapan: health HTTP 200 `ok`, skema existing sesuai, seluruh 30 pemeriksaan integritas bersih.
+- Database utama sebelum/sesudah: **1.359 siswa, 1.020 pembayaran, Rp577.790.000 penerimaan, 12 rekening Tabungan dengan saldo Rp1.050.000**. Hash seluruh tabel fisik identik, termasuk pembayaran, rekening dan jurnal Tabungan. Tidak ada kenaikan nyata, DDL atau perubahan data utama.
+- Browser Laragon aktual memakai sesi audit privat dan GET saja: **60 keadaan** empat cakupan/dua tema/1440, 2560, 390 piksel; palette, konteks, readonly Semua Unit, tanpa warning/JS error/luapan halaman. Bukti `main-readonly-browser-results.json` dan screenshot `ui/main-*.png` disimpan di direktori privat. Sesi milik pemeriksaan sudah dihapus.
+- Pengujian endpoint terakhir sesudah pengetatan validasi konteks: 307 pemeriksaan lulus dan seluruh fingerprint tabel clone tetap sama; HTTP kenaikan ketiga unit dan race dua kasir juga lulus ulang.
+- Server audit 8118/8119 dihentikan setelah PID, executable, command line, waktu pembuatan dan kepemilikan port dicocokkan. Hanya database `db_spp_audit_promotion_20261005` dihapus setelah owner manifest, backup hash, dan dump bukti akhir diperiksa. Dump/hash, screenshot, worktree dan backup tetap tersimpan di luar repository. Laragon dan worker importer existing tidak dihentikan.
+
+**Hasil: siap untuk trial kenaikan fleksibel pada Laragon dalam cakupan yang diuji.** Riwayat yang tidak lengkap/tidak konsisten tetap ditahan untuk pemeriksaan pengguna; tidak diperbaiki otomatis. Kesimpulan ini tidak mencakup tinggal kelas, lompat tingkat, deployment Railway, atau migrasi histori keuangan Legacy. Tidak diperlukan SQL manual atau migrasi tambahan dari pengguna.

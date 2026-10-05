@@ -13,6 +13,13 @@ File ini mencatat perubahan proyek secara reverse chronological. Baca [PROJECT_C
 - Jangan menghapus atau menulis ulang entri lama. Tambahkan entri koreksi bila diperlukan.
 - Perubahan implementasi dan entri changelog wajib masuk commit yang sama.
 
+## 2026-10-06 - Verifikasi penerapan kenaikan fleksibel di Laragon
+
+- Aktor: Codex. Implementasi `7887fc3` dipasang pada main lokal; health OK dan 30 pemeriksaan integritas bersih.
+- Browser clone dan Laragon masing-masing 60 keadaan lulus; regresi HTTP tiga unit, race dua kasir dan 307 pemeriksaan akses lulus. Rincian dan batas bukti pada [audit kenaikan fleksibel](./FLEXIBLE_PROMOTION_AUDIT_20261005.md).
+- Database/migrasi: tidak ada. Seluruh hash tabel utama identik; 1.359 siswa, 1.020 pembayaran/Rp577.790.000 dan 12 rekening Tabungan/Rp1.050.000 tetap sama.
+- Server/database latihan milik audit dibersihkan; backup/bukti privat dipertahankan. Draft lokal Railway/DBeaver tidak berubah. Railway tidak diterapkan.
+
 ## 2026-10-05 - Kenaikan bebas urutan dengan tahun asal eksplisit
 
 - Aktor: Codex, implementasi rencana pemilik; clone dan seluruh pengujian mutatif terpisah dari db_spp utama.
