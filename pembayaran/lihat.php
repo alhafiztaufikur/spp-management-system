@@ -8,6 +8,7 @@ require_once '../koneksi.php';
 require_once '../includes/auth.php';
 require_once '../includes/pagination.php';
 require_once '../includes/transaction_authorization.php';
+require_once '../includes/payment_archive.php';
 requireRole(['admin', 'kasir']);
 if (empty($_SESSION['csrf_payment'])) $_SESSION['csrf_payment'] = bin2hex(random_bytes(32));
 
@@ -62,6 +63,13 @@ $allowedPageSizes = [10, 25, 50];
 $perPage = page_size_param('per_page', $allowedPageSizes, 10);
 $page = page_int_param('page');
 
+$isArchive = ($_GET['view'] ?? '') === 'deleted';
+if ($isArchive) {
+    $archive = payment_archive_page($koneksi, $filter_tanggal_awal, $filter_tanggal_akhir, $search,
+        max(0,(int)($_GET['student_id']??0)), $page, $perPage);
+    $paymentRows = $archive['rows']; $totalPayments = $archive['total'];
+    $totalPages = $archive['pages']; $page = $archive['page']; $offset = $archive['offset'];
+} else {
 $where = "WHERE 1=1".unit_student_selection_where();
 $params = [];
 $types  = '';
@@ -101,7 +109,15 @@ $pageTypes = $types . 'ii';
 $stmt->bind_param($pageTypes, ...$pageParams);
 $stmt->execute();
 $result = $stmt->get_result();
-$paymentPaginationQuery = pagination_query(['per_page' => $perPage]);
+
+
+    $paymentRows = $result->fetch_all(MYSQLI_ASSOC);
+}
+$paymentPaginationQuery = pagination_query(['per_page' => $perPage, 'view'=>$isArchive?'deleted':'active']);
+$activityGroups = payment_activity_for_payments($koneksi, array_column($paymentRows, 'id'));
+$tabQuery = $_GET; unset($tabQuery['page']);
+$activeTabUrl = 'lihat.php?' . http_build_query(array_merge($tabQuery,['view'=>'active']));
+$archiveTabUrl = 'lihat.php?' . http_build_query(array_merge($tabQuery,['view'=>'deleted']));
 
 // Months list
 $bln_list = [
@@ -131,6 +147,7 @@ if(count($displayMatches)===1)$studentSearchDisplay=$displayMatches[0]['NAMA'];
   <link href="https://fonts.googleapis.com/css2?family=Inter:wght@300;400;500;600;700;800&display=swap" rel="stylesheet" />
   <link rel="stylesheet" href="../assets/css/style.css?v=unitpalette4&amp;mtime=<?= filemtime(__DIR__ . '/../assets/css/style.css') ?>" />
   <link rel="stylesheet" href="../assets/css/date_controls.css?v=unitpalette4&amp;mtime=<?= filemtime(__DIR__ . '/../assets/css/date_controls.css') ?>" />
+  <link rel="stylesheet" href="../assets/css/payment_details.css?v=<?= filemtime(__DIR__ . "/../assets/css/payment_details.css") ?>">
   <!-- Prevent theme flash -->
   <script>(function(){var t=localStorage.getItem('spp_theme')||'light';document.documentElement.setAttribute('data-theme',t);})();</script>
 </head>
@@ -189,14 +206,15 @@ if(count($displayMatches)===1)$studentSearchDisplay=$displayMatches[0]['NAMA'];
           <div class="recap-report-copy">
             <span class="recap-class-overline">Pembayaran</span>
             <h1>Riwayat Pembayaran Siswa</h1>
-            <p><?= number_format($totalPayments) ?> transaksi cocok dengan filter saat ini.</p>
+            <p><?= number_format($totalPayments) ?> <?= $isArchive ? "transaksi terhapus; tidak masuk total pembayaran aktif" : "transaksi cocok dengan filter saat ini" ?>.</p>
           </div>
 
         <!-- Filter Bar -->
         <form method="GET" action="lihat.php" class="recap-header-controls history-recap-filter filter-bar"><input type="hidden" name="student_id" data-student-identity="1" value="<?= max(0,(int)($_GET['student_id']??0)) ?>">
+          <input type="hidden" name="view" value="<?= $isArchive ? "deleted" : "active" ?>">
           <span class="recap-filter-label">Filter Riwayat</span>
           <div class="field-row report-date-range-field">
-            <label class="field-label">Tanggal Transaksi</label>
+            <label class="field-label"><?= $isArchive ? "Tanggal Penghapusan" : "Tanggal Transaksi" ?></label>
             <div class="report-date-range-control report-date-range-picker" data-range-picker data-empty-label="<?= htmlspecialchars($periodLabel) ?>">
               <input type="hidden" name="tanggal_awal" value="<?= htmlspecialchars($filter_tanggal_awal) ?>">
               <input type="hidden" name="tanggal_akhir" value="<?= htmlspecialchars($filter_tanggal_akhir) ?>">
@@ -231,14 +249,18 @@ if(count($displayMatches)===1)$studentSearchDisplay=$displayMatches[0]['NAMA'];
           </select>
           <div class="history-recap-actions">
             <button type="submit" class="btn btn-primary" id="btn-filter">Tampilkan Rekap</button>
-            <a href="lihat.php" class="btn btn-ghost" id="btn-reset-filter">Reset</a>
+            <a href="lihat.php?view=<?= $isArchive ? "deleted" : "active" ?>" class="btn btn-ghost" id="btn-reset-filter">Reset</a>
             <a href="form.php" class="btn btn-primary" id="btn-tambah">Tambah Baru</a>
           </div>
         </form>
         </div>
 
+        <nav class="payment-history-tabs" aria-label="Jenis riwayat pembayaran">
+          <a href="<?= htmlspecialchars($activeTabUrl) ?>" <?= !$isArchive ? 'aria-current="page"' : '' ?>>Transaksi Aktif</a>
+          <a href="<?= htmlspecialchars($archiveTabUrl) ?>" <?= $isArchive ? 'aria-current="page"' : '' ?>>Transaksi Dihapus</a>
+        </nav>
         <div class="recap-period-strip history-recap-strip">
-          <div><strong>Transaksi Pembayaran <?= htmlspecialchars($periodLabel) ?></strong><span>Menampilkan <?= number_format($firstShown) ?>–<?= number_format($lastShown) ?> dari <?= number_format($totalPayments) ?> transaksi.</span></div>
+          <div><strong><?= $isArchive ? "Transaksi Dihapus" : "Transaksi Pembayaran" ?> <?= htmlspecialchars($periodLabel) ?></strong><span>Menampilkan <?= number_format($firstShown) ?>–<?= number_format($lastShown) ?> dari <?= number_format($totalPayments) ?> transaksi.</span></div>
           <span><?= number_format($totalPayments) ?> transaksi</span>
         </div>
 
@@ -257,13 +279,13 @@ if(count($displayMatches)===1)$studentSearchDisplay=$displayMatches[0]['NAMA'];
                 <th>Sistem</th>
                 <th>Total Bayar</th>
                 <th>Bayar / Update</th>
+                <th>Operator</th>
                 <th>Aksi</th>
               </tr>
             </thead>
             <tbody>
               <?php
-                $paymentRows = $result->fetch_all(MYSQLI_ASSOC);
-                $pendingRequests = transaction_authorization_pending_for_payments($koneksi, array_column($paymentRows, 'id'));
+                $pendingRequests = $isArchive ? [] : transaction_authorization_pending_for_payments($koneksi, array_column($paymentRows, 'id'));
               ?>
               <?php if ($paymentRows):
                 $no = $offset + 1;
@@ -272,7 +294,8 @@ if(count($displayMatches)===1)$studentSearchDisplay=$displayMatches[0]['NAMA'];
                   $updatedDateTime = format_payment_datetime($row['updated_at'] ?? null);
                   $wasUpdated = payment_was_updated($row['created_at'] ?? null, $row['updated_at'] ?? null);
                   $pendingRequest = $pendingRequests[(int)$row['id']] ?? null;
-                  $canEdit = hasRole(['admin', 'kasir']) && (int)($row['payment_link_version'] ?? 0) === 1 && !$pendingRequest;
+                  $operatorSummary = payment_activity_summary($activityGroups[(int)$row['id']] ?? []);
+                  $canEdit = !$isArchive && hasRole(['admin', 'kasir']) && (int)($row['payment_link_version'] ?? 0) === 1 && !$pendingRequest;
                   $editUrl = 'edit.php?id=' . (int)$row['id'];
                   $rowAttrs = $canEdit
                     ? ' class="clickable-payment-row" data-edit-url="' . htmlspecialchars($editUrl, ENT_QUOTES, 'UTF-8') . '" tabindex="0" role="link" aria-label="Edit pembayaran ' . htmlspecialchars($row['NAMA'], ENT_QUOTES, 'UTF-8') . '"'
@@ -296,13 +319,18 @@ if(count($displayMatches)===1)$studentSearchDisplay=$displayMatches[0]['NAMA'];
                   <span class="date-time-cell">
                     <strong>Bayar: <?= htmlspecialchars($paymentDateTime['date']) ?></strong>
                     <small><?= htmlspecialchars($paymentDateTime['time']) ?></small>
-                    <?php if ($wasUpdated): ?>
+                    <?php if ($isArchive): ?>
+                    <small class="date-time-updated">Dihapus: <?= htmlspecialchars(spp_date_label($row['_deleted_event']['occurred_at'],true)) ?></small>
+                    <?php elseif ($wasUpdated): ?>
                     <small class="date-time-updated">Diubah: <?= htmlspecialchars($updatedDateTime['date']) ?> <?= htmlspecialchars($updatedDateTime['time']) ?></small>
                     <?php endif; ?>
                   </span>
                 </td>
+                <td data-label="Operator" class="payment-operator-cell"><?= payment_operator_html($operatorSummary) ?></td>
                 <td data-label="Aksi" class="aksi-col">
-                  <?php if ($canEdit): ?>
+                  <?php if ($isArchive): ?>
+                  <span class="master-status is-inactive">Transaksi dihapus</span>
+                  <?php elseif ($canEdit): ?>
                   <a href="<?= htmlspecialchars($editUrl) ?>" class="btn-tbl btn-tbl-edit" title="Edit">
                     <svg width="13" height="13" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.5" stroke-linecap="round" stroke-linejoin="round"><path d="M11 4H4a2 2 0 0 0-2 2v14a2 2 0 0 0 2 2h14a2 2 0 0 0 2-2v-7"/><path d="M18.5 2.5a2.121 2.121 0 0 1 3 3L12 15l-4 1 1-4 9.5-9.5z"/></svg>
                     Edit
@@ -321,14 +349,15 @@ if(count($displayMatches)===1)$studentSearchDisplay=$displayMatches[0]['NAMA'];
                   <?php else: ?>
                   <span aria-label="Tidak ada aksi">—</span>
                   <?php endif; ?>
+                  <button type="button" class="btn-tbl open-payment-activity" data-id="<?= (int)$row['id'] ?>">Riwayat Aktivitas</button>
                 </td>
               </tr>
               <?php endforeach;
               else: ?>
-              <tr><td colspan="10">
+              <tr><td colspan="11">
                 <div class="empty-state">
                   <svg width="48" height="48" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.5" stroke-linecap="round" stroke-linejoin="round"><path d="M13 2H6a2 2 0 0 0-2 2v16a2 2 0 0 0 2 2h12a2 2 0 0 0 2-2V9z"/><polyline points="13 2 13 9 20 9"/></svg>
-                  <p>Belum ada data pembayaran</p>
+                  <p><?= $isArchive ? "Belum ada transaksi terhapus pada periode ini" : "Belum ada data pembayaran" ?></p>
                   <a href="form.php" class="btn btn-primary" style="margin-top:12px">+ Input Pembayaran</a>
                 </div>
               </td></tr>
@@ -361,6 +390,12 @@ if(count($displayMatches)===1)$studentSearchDisplay=$displayMatches[0]['NAMA'];
     </form>
   </div>
 
+  <dialog class="payment-activity-dialog" id="payment-activity-dialog" aria-labelledby="payment-activity-title">
+    <header class="payment-activity-dialog-header"><div><h3 id="payment-activity-title">Riwayat Aktivitas</h3><p data-activity-subtitle></p></div>
+      <button type="button" class="btn btn-ghost btn-sm" data-close-activity aria-label="Tutup riwayat aktivitas">Tutup</button>
+    </header><div class="payment-activity-content" aria-live="polite"></div>
+  </dialog>
+  <script src="../assets/js/payment_activity.js?v=<?= filemtime(__DIR__ . "/../assets/js/payment_activity.js") ?>"></script>
   <script src="../assets/js/date_format.js?v=<?= filemtime(__DIR__ . '/../assets/js/date_format.js') ?>"></script>
   <script src="../assets/js/app.js?v=<?= filemtime(__DIR__ . '/../assets/js/app.js') ?>"></script>
   <script>

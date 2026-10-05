@@ -142,6 +142,7 @@ unset($_SESSION['payment_draft']);
   <link href="https://fonts.googleapis.com/css2?family=Inter:wght@300;400;500;600;700;800&display=swap" rel="stylesheet" />
   <link rel="stylesheet" href="../assets/css/style.css?v=duselector8&amp;mtime=<?= filemtime(__DIR__ . '/../assets/css/style.css') ?>" />
   <link rel="stylesheet" href="../assets/css/date_controls.css?v=duselector8&amp;mtime=<?= filemtime(__DIR__ . '/../assets/css/date_controls.css') ?>" />
+  <link rel="stylesheet" href="../assets/css/payment_details.css?v=<?= filemtime(__DIR__ . "/../assets/css/payment_details.css") ?>">
   <!-- Prevent theme flash -->
   <script>(function(){var t=localStorage.getItem('spp_theme')||'light';document.documentElement.setAttribute('data-theme',t);})();</script>
 </head>
@@ -372,14 +373,14 @@ unset($_SESSION['payment_draft']);
             <div class="lainlain-row biaya-lain-row">
               <span class="ll-num">1</span>
               <input type="hidden" name="biaya_lain_detail_id[]" value="" />
-              <label class="ll-field">
+              <label class="ll-field ll-field-kind">
                 <span class="ll-field-label">Jenis</span>
                 <select class="field-input field-select biaya-lain-select" name="biaya_lain_tagihan_id[]">
                   <option value="">-- Pilih Tagihan --</option>
                 </select>
               </label>
               <label class="ll-field"><span class="ll-field-label">Total</span><input class="field-input biaya-lain-total" type="text" value="0" placeholder="Total" readonly aria-label="Total biaya lain" /></label>
-              <label class="ll-field"><span class="ll-field-label">Sudah</span><input class="field-input biaya-lain-paid" type="text" value="0" placeholder="Sudah" readonly aria-label="Sudah dibayar biaya lain" /></label>
+              <label class="ll-field"><span class="ll-field-label">Sudah Dibayar</span><input class="field-input biaya-lain-paid" type="text" value="0" placeholder="Sudah" readonly aria-label="Sudah dibayar biaya lain" /></label>
               <label class="ll-field"><span class="ll-field-label">Sisa</span><input class="field-input biaya-lain-sisa" type="text" value="0" placeholder="Sisa" readonly aria-label="Sisa biaya lain" /></label>
               <label class="ll-field"><span class="ll-field-label">Bayar</span><input class="field-input biaya-lain-nominal" type="text" value="0" placeholder="Input bayar" name="biaya_lain_nominal[]" aria-label="Input bayar biaya lain" /></label>
               <label class="ll-field ll-field-note"><span class="ll-field-label">Keterangan</span><input class="field-input biaya-lain-keterangan" type="text" placeholder="Keterangan opsional..." name="biaya_lain_keterangan[]" maxlength="255" /></label>
@@ -396,14 +397,14 @@ unset($_SESSION['payment_draft']);
             <div class="lainlain-row biaya-lain-row">
               <span class="ll-num"></span>
               <input type="hidden" name="biaya_lain_detail_id[]" value="" />
-              <label class="ll-field">
+              <label class="ll-field ll-field-kind">
                 <span class="ll-field-label">Jenis</span>
                 <select class="field-input field-select biaya-lain-select" name="biaya_lain_tagihan_id[]">
                   <option value="">-- Pilih Tagihan --</option>
                 </select>
               </label>
               <label class="ll-field"><span class="ll-field-label">Total</span><input class="field-input biaya-lain-total" type="text" value="0" placeholder="Total" readonly aria-label="Total biaya lain" /></label>
-              <label class="ll-field"><span class="ll-field-label">Sudah</span><input class="field-input biaya-lain-paid" type="text" value="0" placeholder="Sudah" readonly aria-label="Sudah dibayar biaya lain" /></label>
+              <label class="ll-field"><span class="ll-field-label">Sudah Dibayar</span><input class="field-input biaya-lain-paid" type="text" value="0" placeholder="Sudah" readonly aria-label="Sudah dibayar biaya lain" /></label>
               <label class="ll-field"><span class="ll-field-label">Sisa</span><input class="field-input biaya-lain-sisa" type="text" value="0" placeholder="Sisa" readonly aria-label="Sisa biaya lain" /></label>
               <label class="ll-field"><span class="ll-field-label">Bayar</span><input class="field-input biaya-lain-nominal" type="text" value="0" placeholder="Input bayar" name="biaya_lain_nominal[]" aria-label="Input bayar biaya lain" /></label>
               <label class="ll-field ll-field-note"><span class="ll-field-label">Keterangan</span><input class="field-input biaya-lain-keterangan" type="text" placeholder="Keterangan opsional..." name="biaya_lain_keterangan[]" maxlength="255" /></label>
@@ -484,6 +485,7 @@ unset($_SESSION['payment_draft']);
     window.paymentDraft = <?= json_encode($paymentDraft, JSON_UNESCAPED_UNICODE | JSON_UNESCAPED_SLASHES | JSON_HEX_TAG | JSON_HEX_APOS | JSON_HEX_AMP | JSON_HEX_QUOT) ?>;
   </script>
   <script src="../assets/js/date_format.js?v=<?= filemtime(__DIR__ . '/../assets/js/date_format.js') ?>"></script>
+  <script src="../assets/js/other_fee_picker.js?v=<?= filemtime(__DIR__ . "/../assets/js/other_fee_picker.js") ?>"></script>
   <script src="../assets/js/app.js?v=<?= filemtime(__DIR__ . '/../assets/js/app.js') ?>"></script>
 </body>
 </html>

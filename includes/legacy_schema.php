@@ -22,8 +22,18 @@ function legacy_schema_apply(mysqli $db): void {
         $t=$r['TABLE_NAME'];$c=$r['COLUMN_NAME'];
         if((int)$db->query("SELECT COUNT(*) FROM `$t` c LEFT JOIN siswa_data s ON s.NO_INDUK=c.`$c` AND s.unit_id=c.unit_id WHERE c.`$c` IS NOT NULL AND s.id IS NULL")->fetch_row()[0]) throw new RuntimeException('Orphan or cross-unit relation: '.$t);
     }
-    $missing=(int)$db->query("SELECT COUNT(*) FROM information_schema.COLUMNS c WHERE c.TABLE_SCHEMA=DATABASE() AND c.TABLE_NAME LIKE '%_data' AND c.TABLE_NAME NOT IN ('siswa_data','spp_audit_log_data') AND LOWER(c.COLUMN_NAME)='no_induk' AND NOT EXISTS(SELECT 1 FROM information_schema.KEY_COLUMN_USAGE k WHERE k.TABLE_SCHEMA=c.TABLE_SCHEMA AND k.TABLE_NAME=c.TABLE_NAME AND k.COLUMN_NAME=c.COLUMN_NAME AND k.REFERENCED_TABLE_NAME='siswa_data' AND k.REFERENCED_COLUMN_NAME='NO_INDUK')")->fetch_row()[0];
-    if($missing)throw new RuntimeException('Missing student relation; restore foreign keys before Legacy migration');
+    $missingRelations=$db->query("SELECT c.TABLE_NAME FROM information_schema.COLUMNS c WHERE c.TABLE_SCHEMA=DATABASE() AND c.TABLE_NAME LIKE '%_data' AND c.TABLE_NAME NOT IN ('siswa_data','spp_audit_log_data') AND LOWER(c.COLUMN_NAME)='no_induk' AND NOT EXISTS(SELECT 1 FROM information_schema.KEY_COLUMN_USAGE k WHERE k.TABLE_SCHEMA=c.TABLE_SCHEMA AND k.TABLE_NAME=c.TABLE_NAME AND k.COLUMN_NAME=c.COLUMN_NAME AND k.REFERENCED_TABLE_NAME='siswa_data' AND k.REFERENCED_COLUMN_NAME='NO_INDUK')")->fetch_all(MYSQLI_ASSOC);
+    $restoreDepositRelation=false;
+    foreach($missingRelations as $missingRelation){
+        if($missingRelation['TABLE_NAME']!=='titipan_spp_mutasi_data')throw new RuntimeException('Missing student relation: '.$missingRelation['TABLE_NAME']);
+        $restoreDepositRelation=true;
+    }
+    if($restoreDepositRelation){
+        $columns=$db->query("SELECT COLUMN_NAME FROM information_schema.COLUMNS WHERE TABLE_SCHEMA=DATABASE() AND TABLE_NAME='titipan_spp_mutasi_data'")->fetch_all(MYSQLI_ASSOC);
+        if(!in_array('unit_id',array_column($columns,'COLUMN_NAME'),true))throw new RuntimeException('Historical deposit table has no unit identity');
+        $orphans=(int)$db->query('SELECT COUNT(*) FROM titipan_spp_mutasi_data t LEFT JOIN siswa_data s ON s.unit_id=t.unit_id AND s.NO_INDUK=t.no_induk WHERE s.id IS NULL')->fetch_row()[0];
+        if($orphans)throw new RuntimeException('Historical deposit rows have no matching student: '.$orphans);
+    }
     foreach(['siswa_data_bi','siswa_data_bu'] as $trigger){$body=$db->query("SELECT ACTION_STATEMENT FROM information_schema.TRIGGERS WHERE TRIGGER_SCHEMA=DATABASE() AND TRIGGER_NAME='$trigger'")->fetch_row();if(!$body||!str_contains($body[0],"NEW.`KELAS` NOT IN ('0','PSB')"))throw new RuntimeException('Unknown or missing student unit guard');}
     echo "DDL stage: student marker and unit identity\n";
     $pending=(int)$db->query("SELECT COUNT(*) FROM information_schema.COLUMNS WHERE TABLE_SCHEMA=DATABASE() AND TABLE_NAME='siswa_data' AND COLUMN_NAME='legacy_pending'")->fetch_row()[0];
@@ -31,6 +41,11 @@ function legacy_schema_apply(mysqli $db): void {
     if(!(int)$db->query("SELECT COUNT(*) FROM information_schema.TABLE_CONSTRAINTS WHERE CONSTRAINT_SCHEMA=DATABASE() AND TABLE_NAME='siswa_data' AND CONSTRAINT_NAME='chk_siswa_legacy_pending'")->fetch_row()[0])$db->query("ALTER TABLE siswa_data ADD CONSTRAINT chk_siswa_legacy_pending CHECK (legacy_pending IN (0,1) AND (legacy_pending=0 OR (is_active=0 AND KELAS='LEGACY')))");
     $key=(int)$db->query("SELECT COUNT(*) FROM information_schema.STATISTICS WHERE TABLE_SCHEMA=DATABASE() AND TABLE_NAME='siswa_data' AND INDEX_NAME='uk_siswa_unit_nis'")->fetch_row()[0];
     if(!$key) $db->query('ALTER TABLE siswa_data ADD UNIQUE KEY uk_siswa_unit_nis (unit_id,NO_INDUK)');
+    if($restoreDepositRelation){
+        // Preserve pre-retirement deposit history and give its unit/NIS pair a real FK.
+        $db->query('ALTER TABLE titipan_spp_mutasi_data ADD CONSTRAINT fk_titipan_spp_student_unit FOREIGN KEY (unit_id,no_induk) REFERENCES siswa_data(unit_id,NO_INDUK) ON DELETE RESTRICT ON UPDATE CASCADE');
+        $relations[]=['TABLE_NAME'=>'titipan_spp_mutasi_data','COLUMN_NAME'=>'no_induk','CONSTRAINT_NAME'=>'fk_titipan_spp_student_unit','DELETE_RULE'=>'RESTRICT','UPDATE_RULE'=>'CASCADE'];
+    }
     foreach($relations as $r){
         $t=$r['TABLE_NAME'];$c=$r['COLUMN_NAME'];$old=$r['CONSTRAINT_NAME'];
         $size=(int)$db->query("SELECT COUNT(*) FROM information_schema.KEY_COLUMN_USAGE WHERE TABLE_SCHEMA=DATABASE() AND TABLE_NAME='$t' AND CONSTRAINT_NAME='$old'")->fetch_row()[0];

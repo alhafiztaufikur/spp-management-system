@@ -758,6 +758,10 @@ if ($aksi === 'input') {
         }
         $stmt->close();
 
+        foreach ($receipt_ids as $journalPaymentId) {
+            payment_activity_record($koneksi, (int)$journalPaymentId, 'created', (int)$_SESSION['admin_id'],
+                null, transaction_authorization_snapshot($koneksi, (int)$journalPaymentId)['data'], 'created:' . $journalPaymentId);
+        }
         financial_request_complete($koneksi, $requestKey, (int)$receipt_ids[0]);
         $koneksi->commit();
         unset($_SESSION['payment_draft']);
@@ -834,6 +838,21 @@ if ($aksi === 'update') {
             $authorizationRequest = $lockedRequest;
         } else authorization_assert_no_pending($koneksi, $id);
         $old_bayar = find_linked_payment($koneksi, $id);
+        $activityBefore = transaction_authorization_snapshot($koneksi, $id)["data"];
+        $activityEditKey = trim((string)($_POST['activity_request_key'] ?? ''));
+        if ($activityEditKey !== '' && !preg_match('/^[a-f0-9]{32}$/D', $activityEditKey)) throw new RuntimeException('Kunci perubahan tidak valid.');
+        $activityEditKey = 'edit:' . ($activityEditKey ?: bin2hex(random_bytes(16)));
+        if (!$authorizationRequest) {
+            $replay = $koneksi->prepare('SELECT payment_id,actor_id FROM pembayaran_aktivitas WHERE event_key=?');
+            $replay->bind_param('s',$activityEditKey);$replay->execute();$applied = $replay->get_result()->fetch_assoc();$replay->close();
+            if ($applied) {
+                if ((int)$applied['payment_id'] !== $id || (int)$applied['actor_id'] !== (int)$_SESSION['admin_id']) throw new RuntimeException('Kunci perubahan tidak sesuai transaksi.');
+                $koneksi->rollback();
+                $_SESSION['flash'] = ['type'=>'success','msg'=>'Perubahan ini sudah tersimpan; tidak diterapkan ulang.'];
+                header('Location: lihat.php');exit;
+            }
+        }
+
         $oldPairKey=(string)$old_bayar['NO_INDUK'].'|'.normalize_month_code((string)$old_bayar['BULAN']).'|'.(string)$old_bayar['TAHUN'];
         $newPairKey=$no_induk.'|'.$bulan_bayar.'|'.(string)$tahun_bayar;
         $pairContexts=[$oldPairKey=>[(string)$old_bayar['NO_INDUK'],normalize_month_code((string)$old_bayar['BULAN']),(string)$old_bayar['TAHUN']],$newPairKey=>[$no_induk,$bulan_bayar,(string)$tahun_bayar]];
@@ -981,6 +1000,10 @@ if ($aksi === 'update') {
         }
 
         authorization_finish($koneksi, $authorizationRequest, $authorizationRequestId, $authorizationApproverId, $authorizationDecisionNote);
+        payment_activity_record($koneksi, $id, 'edited', (int)$_SESSION['admin_id'], $activityBefore,
+            transaction_authorization_snapshot($koneksi, $id)['data'],
+            $authorizationRequest ? 'applied:' . $authorizationRequestId : $activityEditKey,
+            $authorizationRequestId ?: null, $authorizationDecisionNote);
         $koneksi->commit();
         $_SESSION['flash'] = [
             'type' => 'success',
@@ -1020,6 +1043,7 @@ if ($aksi === 'hapus') {
             $authorizationRequest = $lockedRequest;
         } else authorization_assert_no_pending($koneksi, $id);
         $old_bayar = find_linked_payment($koneksi, $id);
+        $activityBefore = transaction_authorization_snapshot($koneksi, $id)["data"];
         $pairParts=[(string)$old_bayar['NO_INDUK'],normalize_month_code((string)$old_bayar['BULAN']),(string)$old_bayar['TAHUN']];
         $pairBefore=komite_pair_gap($koneksi,...$pairParts);
         $usePublishedSpp = spp_billing_schema_ready($koneksi);
@@ -1059,6 +1083,9 @@ if ($aksi === 'hapus') {
         $stmt_del->execute();
         $stmt_del->close();
         authorization_finish($koneksi, $authorizationRequest, $authorizationRequestId, $authorizationApproverId, $authorizationDecisionNote);
+        payment_activity_record($koneksi, $id, 'deleted', (int)$_SESSION['admin_id'], $activityBefore, null,
+            $authorizationRequest ? 'applied:' . $authorizationRequestId : 'delete:' . $id,
+            $authorizationRequestId ?: null, $authorizationDecisionNote);
         $koneksi->commit();
         $_SESSION['flash'] = ['type' => 'success', 'msg' => $authorizationRequest ? 'Permintaan disetujui dan transaksi berhasil dihapus.' : 'Data pembayaran berhasil dihapus!'];
     } catch (Throwable $e) {

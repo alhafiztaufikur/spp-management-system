@@ -144,11 +144,11 @@ function unitSwitchReportScope(select) {
   document.body.append(form);form.submit();
 }
 </script>
-<?php if (unit_all_readonly() && !$transactionUnitOnly): ?>
+<?php if (unit_all_readonly() && !$transactionUnitOnly && $current !== 'role_management.php'): ?>
 <script>
 document.addEventListener('DOMContentLoaded', function () {
   var main=document.querySelector('main');
-  if(main){var note=document.createElement('div');note.className='alert alert-info';note.textContent='Semua Unit: tampilan baca. Pilih SD, SMP, atau SMA untuk transaksi atau perubahan data.';var content=main.querySelector('.page-content');if(content)content.prepend(note);else main.querySelector('.topbar')?.after(note)}
+  if(main && !main.querySelector('.report-general-shell')){var note=document.createElement('div');note.className='alert alert-info';note.textContent='Semua Unit: tampilan baca. Pilih SD, SMP, atau SMA untuk transaksi atau perubahan data.';var content=main.querySelector('.page-content');if(content)content.prepend(note);else main.querySelector('.topbar')?.after(note)}
   document.querySelectorAll('form[method="post" i]').forEach(function(form){
     if(form.classList.contains('sidebar-unit-form') || form.classList.contains('dashboard-unit-switch-form') || form.action.includes('logout.php'))return;
     form.querySelectorAll('input,select,textarea,button').forEach(function(control){control.disabled=true});
@@ -189,7 +189,7 @@ document.addEventListener('DOMContentLoaded', function () {
         </select>
         <svg aria-hidden="true" width="18" height="18" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><path d="m6 9 6 6 6-6"/></svg>
       </span>
-      <small><?= $transactionUnitOnly ? 'Transaksi wajib menggunakan satu unit.' : ($activeUnit === 0 ? 'Semua Unit hanya untuk melihat data dan rekap.' : 'Menu operasional mengikuti unit ini.') ?></small>
+      <small><?= $current === 'role_management.php' ? ($activeUnit === 0 ? 'Kelola akun semua unit dari halaman ini.' : 'Kelola akun unit yang dipilih.') : ($transactionUnitOnly ? 'Transaksi wajib menggunakan satu unit.' : ($activeUnit === 0 ? 'Semua Unit hanya untuk melihat data dan rekap.' : 'Menu operasional mengikuti unit ini.')) ?></small>
     </form>
   </div>
   <?php endif; ?>

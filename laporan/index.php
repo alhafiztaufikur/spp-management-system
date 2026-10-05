@@ -402,7 +402,7 @@ $exportQuery = http_build_query([
   <link rel="stylesheet" href="../assets/css/style.css?v=unitpalette4&amp;mtime=<?= filemtime(__DIR__ . '/../assets/css/style.css') ?>" />
   <link rel="stylesheet" href="../assets/css/date_controls.css?v=unitpalette4&amp;mtime=<?= filemtime(__DIR__ . '/../assets/css/date_controls.css') ?>" />
 </head>
-<body>
+<body class="report-general-page">
 <div class="bg-orbs"><div class="orb orb-1"></div><div class="orb orb-2"></div><div class="orb orb-3"></div></div>
 
 <div class="layout">
@@ -437,7 +437,8 @@ $exportQuery = http_build_query([
             </div>
             <a class="report-general-catalog-link" href="global.php?unit=<?= $reportUnitId===0?'all':'active' ?>">Laporan Global <span aria-hidden="true">&rarr;</span></a>
           </div>
-        <form method="GET" class="recap-header-controls report-filter-card report-general-filter report-filter-grid<?= unit_is_super() ? ' has-scope' : '' ?><input type="hidden" name="student_id" data-student-identity="1" value="<?= max(0,(int)($_GET['student_id']??0)) ?>">">
+        <form method="GET" class="recap-header-controls report-filter-card report-general-filter report-filter-grid<?= unit_is_super() ? ' has-scope' : '' ?>">
+          <input type="hidden" name="student_id" data-student-identity="1" value="<?= max(0,(int)($_GET['student_id']??0)) ?>">
           <?= unit_report_selector($reportUnitId) ?>
           <div class="field-row report-date-range-field">
             <label class="field-label">Tanggal transaksi</label>
@@ -507,13 +508,15 @@ $exportQuery = http_build_query([
               <?php endforeach; ?>
             </datalist>
           </div>
-          <div class="report-filter-actions">
-            <button type="submit" class="btn btn-primary">Tampilkan Rekap</button>
-            <a href="index.php?unit=<?= $reportUnitId===0?'all':'active' ?>" class="btn btn-ghost">Reset</a>
-          </div>
-          <div class="report-export-actions">
-            <a href="export_excel.php?<?= report_e($exportQuery) ?>" class="btn btn-success" target="_blank" rel="noopener">Export Excel</a>
-            <a href="export_pdf.php?<?= report_e($exportQuery) ?>&amp;output=preview" class="btn btn-warning" target="_blank" rel="noopener">Export PDF</a>
+          <div class="report-general-actions">
+            <div class="report-filter-actions">
+              <button type="submit" class="btn btn-primary">Tampilkan Rekap</button>
+              <a href="index.php?unit=<?= $reportUnitId===0?'all':'active' ?>" class="btn btn-ghost">Reset</a>
+            </div>
+            <div class="report-export-actions">
+              <a href="export_excel.php?<?= report_e($exportQuery) ?>" class="btn btn-success" target="_blank" rel="noopener">Export Excel</a>
+              <a href="export_pdf.php?<?= report_e($exportQuery) ?>&amp;output=preview" class="btn btn-warning" target="_blank" rel="noopener">Export PDF</a>
+            </div>
           </div>
         </form>
         </div>

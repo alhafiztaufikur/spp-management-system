@@ -2201,7 +2201,7 @@ document.addEventListener('DOMContentLoaded', function () {
         if (total <= .001) { showSppWarning({code:'empty_payment',title:'Belum ada pembayaran',message:'Isi setidaknya satu nominal pembayaran sebelum menyimpan.',target:'spp-input'},document.getElementById('spp-input'),true);return; }
         const invalidInput = Array.from(form.querySelectorAll('.tbl-pay, .biaya-lain-nominal, .biaya-lain-select')).find(input => input.validationMessage && !input.readOnly && !input.disabled);
         if (invalidInput?.classList.contains('biaya-lain-select')) {
-          showSppWarning({code:'other_fee_invalid',title:'Pilih tagihan lain',message:invalidInput.validationMessage},invalidInput,true);return;
+          showSppWarning({code:'other_fee_invalid',title:'Pilih tagihan lain',message:invalidInput.validationMessage},invalidInput.closest('.ll-field')?.querySelector('.other-fee-trigger') || invalidInput,true);return;
         }
         if (invalidInput && invalidInput.id !== 'spp-input' && invalidInput.id !== 'komite-input') {
           const key=invalidInput.id?.replace('-input','') || '';
@@ -2429,7 +2429,7 @@ function refreshBiayaLainOptions() {
     const placeholder = document.createElement('option');
     placeholder.value = '';
     placeholder.textContent = legacyPlaceholder?.textContent || (selectedStudentOption()
-      ? (bills.length ? 'Pilih tagihan' : 'Belum ada tagihan. Publish dari Master Biaya Lain')
+      ? (bills.length ? 'Pilih tagihan' : 'Belum ada tagihan')
       : 'Pilih siswa dulu');
     if (legacyPlaceholder) {
       placeholder.dataset.legacy = '1';
@@ -2562,6 +2562,7 @@ function refreshBiayaLainAvailability() {
     row.classList.toggle('row-unavailable', !!message);
   });
 
+  window.syncOtherFeePickers?.();
   if (!addButton) return;
   const referenceSelect = rows[0]?.querySelector('.biaya-lain-select');
   const hasAvailableMaster = referenceSelect && Array.from(referenceSelect.options).some(option => {

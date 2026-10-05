@@ -130,7 +130,7 @@ function unit_guard_request(): void {
     }
     if (!unit_all_readonly()) return;
     $koneksi = $GLOBALS['koneksi'];
-    $allowed = ['unit_switch.php', 'logout.php'];
+    $allowed = ['unit_switch.php', 'logout.php', 'role_management.php'];
     if (($_SERVER['REQUEST_METHOD'] ?? 'GET') !== 'GET'
         && !in_array(basename($path), $allowed, true)) {
         http_response_code(409);

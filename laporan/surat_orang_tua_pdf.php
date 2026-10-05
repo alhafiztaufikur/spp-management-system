@@ -6,32 +6,15 @@ require_once __DIR__.'/../includes/report_letters.php';
 require_once __DIR__.'/../includes/pdf.php';
 requireRole(['admin','bendahara','kasir']);
 
-$mode=(string)($_GET['mode']??'single');
-if(!in_array($mode,['single','selected','class','all'],true)){http_response_code(400);exit('Pilihan cetak tidak dikenal.');}
-$filters=report_filters($koneksi,$_GET);
-$filters['status']='';
-$filters['q']=$mode==='class'?$filters['q']:'';
-$filters['kelas']=$mode==='class'?$filters['kelas']:'';
-if($mode==='class'&&$filters['kelas']===''){http_response_code(400);exit('Pilih kelas atau rombel terlebih dahulu.');}
-$today=report_letter_today();
-$students=report_student_debt_groups($koneksi,$filters,'',[],$today);
-
-if(in_array($mode,['single','selected'],true)){
-    $raw=mb_substr((string)($_GET['nis']??''),0,10000);
-    $requested=array_filter(array_map('trim',explode(',',$raw)),static fn($nis)=>$nis!=='');
-    if($mode==='single')$requested=array_slice($requested,0,1);
-    $lookup=array_fill_keys(array_slice($requested,0,1000),true);
-    $students=array_values(array_filter($students,static fn($student)=>isset($lookup[$student['nis']])));
-}
-if(!$students){http_response_code(404);header('Content-Type: text/html; charset=utf-8');exit('<!doctype html><html lang="id"><meta charset="utf-8"><title>Surat tidak tersedia</title><body><p>Tidak ada tunggakan yang masih terbuka untuk pilihan ini. Perbarui daftar surat lalu coba lagi.</p></body></html>');}
-
-$scope=match($mode){
-    'single'=>'siswa-'.$students[0]['nis'],
-    'selected'=>'dipilih-'.count($students).'-siswa',
-    'class'=>str_starts_with($filters['kelas'],'rombel:')?'rombel-'.preg_replace('/[^a-z0-9]/i','',strtolower($students[0]['kelas'])):'kelas-'.preg_replace('/[^0-9]/','',$filters['kelas']),
-    default=>'semua-rombel',
-};
-$safeName=preg_replace('/[^a-z0-9_-]+/i','-',strtolower('surat-tunggakan-orang-tua-'.$scope.'-'.str_replace('-','',$today)));
+require_once __DIR__.'/../includes/parent_letter_drafts.php';
+$token=(string)($_GET['draft']??'');
+if($token==='') { header('Location: surat_orang_tua_susun.php?'.http_build_query($_GET));exit; }
+try { $draft=parent_letter_draft_read($token); }
+catch(Throwable $e){http_response_code(400);header('Content-Type: text/html; charset=utf-8');exit('<!doctype html><html lang="id"><meta charset="utf-8"><p>'.report_e($e->getMessage()).'</p><a href="surat_orang_tua.php">Kembali ke daftar</a></html>');}
+$students=$draft['students'];$today=$draft['today'];$messages=$draft['messages'];
+$safeName='surat-orang-tua-'.str_replace('-','',$today).'-'.count($students).'-siswa';
+header('Cache-Control: no-store, private');
+session_write_close();
 require_pdf_library();
 // Satu PDF massal dapat berisi ratusan lembar; naikkan batas hanya untuk permintaan ini.
 $memoryLimit=trim((string)ini_get('memory_limit'));
@@ -45,8 +28,8 @@ $options->set('isRemoteEnabled',false);
 $options->set('isHtml5ParserEnabled',true);
 $options->setChroot(realpath(__DIR__.'/..'));
 $pdf=new \Dompdf\Dompdf($options);
-$pdf->loadHtml(report_parent_letters_html($students,$today),'UTF-8');
+$pdf->loadHtml(report_parent_letters_html($students,$today,$messages),'UTF-8');
 $pdf->setPaper('A4','portrait');
 $pdf->render();
 header('Cache-Control: no-store, private');
-$pdf->stream($safeName.'.pdf',['Attachment'=>false]);
+$pdf->stream($safeName.'.pdf',['Attachment'=>(($_GET['download']??'')==='1')]);

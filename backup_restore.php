@@ -123,7 +123,7 @@ function backup_ui_picker(string $prefix, string $label): void { ?>
         <p class="dbt-hint">Kandidat hanya diterapkan setelah pratinjau dan konfirmasi. Lihat <a href="documentation/LEGACY_IMPORT_FEASIBILITY_20261003.md">audit kelayakan impor legacy</a> untuk bukti, kekurangan histori, dan keputusan lanjutan.</p>
       </div>
     </section>
-    <noscript><div class="dbt-warning">Aktifkan JavaScript untuk pemilihan file dan pratinjau alur. Operasi database tetap belum tersedia.</div></noscript>
+    <noscript><div class="dbt-warning">Aktifkan JavaScript untuk impor identitas Legacy. Backup dan Restore penuh tetap belum tersedia.</div></noscript>
   </div>
 </main>
 </div>

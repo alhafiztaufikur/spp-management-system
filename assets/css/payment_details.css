@@ -1,0 +1,74 @@
+/* Payment detail cards and operator history; palette tokens cover all units/themes. */
+.biaya-lain-row {
+  grid-template-columns: 28px repeat(4,minmax(0,1fr)) 38px;
+  align-items: start; gap: 14px 12px; padding: 18px; position: relative;
+}
+.biaya-lain-row .ll-num { grid-column:1; grid-row:1; margin-top:24px; }
+.biaya-lain-row .ll-field-kind { grid-column:2 / 4; grid-row:1; }
+.biaya-lain-row .ll-field-note { grid-column:4 / 6; grid-row:1; }
+.biaya-lain-row .btn-remove-biaya-lain { grid-column:6; grid-row:1; margin-top:23px; }
+.biaya-lain-row .ll-field:has(.biaya-lain-total) { grid-column:2; grid-row:2; }
+.biaya-lain-row .ll-field:has(.biaya-lain-paid) { grid-column:3; grid-row:2; }
+.biaya-lain-row .ll-field:has(.biaya-lain-sisa) { grid-column:4; grid-row:2; }
+.biaya-lain-row .ll-field:has(.biaya-lain-nominal) { grid-column:5; grid-row:2; }
+.biaya-lain-row .ll-field-label { font-size:11px; line-height:1.4; }
+.other-fee-picker { position:relative; min-width:0; }
+.other-fee-native { position:absolute!important; width:1px!important; height:1px!important; opacity:0; pointer-events:none; }
+.other-fee-trigger { display:flex; align-items:center; justify-content:space-between; gap:14px; height:auto; min-height:48px; text-align:left; cursor:pointer; }
+.other-fee-trigger > span:first-child { white-space:normal; overflow-wrap:anywhere; line-height:1.5; }
+.other-fee-chevron { flex:none; color:var(--accent); font-size:20px; }
+.other-fee-trigger[aria-invalid="true"] { border-color:var(--danger,#ef4444); }
+.other-fee-menu { position:absolute; z-index:100; top:calc(100% + 6px); left:0; right:0; padding:6px; max-height:300px; overflow:auto; background:var(--bg-card,#fff); border:1px solid var(--border); border-radius:12px; box-shadow:0 14px 35px rgba(0,0,0,.18); }
+.other-fee-menu[hidden],.other-fee-hint[hidden] { display:none!important; }
+.other-fee-option { display:flex; width:100%; align-items:center; justify-content:space-between; gap:12px; padding:12px; border:0; border-radius:8px; color:var(--text-primary); background:transparent; text-align:left; font:inherit; cursor:pointer; line-height:1.5; }
+.other-fee-option > span { overflow-wrap:anywhere; }
+.other-fee-option:hover,.other-fee-option:focus-visible,.other-fee-option[aria-selected="true"] { background:var(--accent-soft,rgba(128,128,128,.1)); }
+.other-fee-option:disabled { opacity:.6; cursor:not-allowed; }
+.other-fee-status { flex:none; font-size:10px; font-weight:700; border:1px solid var(--border); border-radius:999px; padding:3px 7px; }
+.other-fee-hint { line-height:1.5; font-size:12px; color:var(--text-muted); }
+.payment-history-tabs { display:flex; gap:8px; flex-wrap:wrap; padding:16px 24px; border-top:1px solid var(--border); border-bottom:1px solid var(--border); }
+.payment-history-tabs a { text-decoration:none; border:1px solid var(--border); border-radius:10px; padding:10px 16px; color:var(--text-secondary); font-weight:700; font-size:13px; }
+.payment-history-tabs a[aria-current="page"] { color:var(--accent); background:var(--accent-soft,rgba(128,128,128,.08)); border-color:var(--accent); }
+.payment-history-shell .payment-operator-cell { min-width:205px; max-width:260px; white-space:normal; }
+.payment-operator-summary { display:grid; gap:9px; line-height:1.45; }
+.payment-operator-summary span { display:block; font-size:11px; color:var(--text-muted); }
+.payment-operator-summary strong { display:block; font-size:12px; color:var(--text-primary); overflow-wrap:anywhere; }
+.payment-operator-summary small { display:block; color:var(--text-secondary); font-size:11px; }
+.payment-history-shell .aksi-col { min-width:190px; }
+.payment-history-shell .open-payment-activity { margin-top:6px; color:var(--accent); background:transparent; border:1px solid var(--border); }
+.payment-activity-dialog { margin:auto; padding:0; width:min(760px,calc(100vw - 32px)); max-height:85vh; overflow:hidden; border:1px solid var(--border); border-radius:18px; background:var(--bg-card,#fff); color:var(--text-primary); box-shadow:0 24px 60px rgba(0,0,0,.2); }
+.payment-activity-dialog::backdrop { background:rgba(8,18,28,.5); }
+.payment-activity-dialog-header { display:flex; align-items:start; justify-content:space-between; gap:18px; padding:22px 24px; border-bottom:1px solid var(--border); }
+.payment-activity-dialog h3 { margin:0; font-size:20px; }
+.payment-activity-dialog-header p { margin:6px 0 0; color:var(--text-muted); font-size:12px; }
+.payment-activity-content { padding:24px; max-height:calc(85vh - 110px); overflow-y:auto; }
+.payment-activity-list { margin:0; padding:0; list-style:none; display:grid; gap:16px; }
+.payment-activity-event { border:1px solid var(--border); border-left:3px solid var(--accent); border-radius:10px; padding:16px; }
+.payment-activity-event-heading { display:flex; justify-content:space-between; flex-wrap:wrap; gap:8px; font-size:13px; }
+.payment-activity-event time { font-size:11px; color:var(--text-muted); }
+.payment-activity-event p { margin:8px 0 0; line-height:1.6; font-size:12px; overflow-wrap:anywhere; }
+.payment-activity-legacy { color:var(--text-muted); }
+.payment-activity-change { display:grid; grid-template-columns:minmax(100px,1fr) 2fr; gap:8px; padding:10px 0; border-top:1px solid var(--border); font-size:12px; line-height:1.5; overflow-wrap:anywhere; }
+.payment-activity-changes { margin-top:12px; }
+.payment-activity-change del { display:block; text-decoration:none; color:var(--text-muted); }
+.payment-activity-change ins { display:block; text-decoration:none; color:var(--accent); }
+@media(max-width:900px) {
+  .biaya-lain-row { grid-template-columns:28px repeat(2,minmax(0,1fr)) 38px; }
+  .biaya-lain-row .ll-field-kind { grid-column:2 / 4; }
+  .biaya-lain-row .ll-field-note { grid-column:2 / 4; grid-row:2; }
+  .biaya-lain-row .btn-remove-biaya-lain { grid-column:4; }
+  .biaya-lain-row .ll-field:has(.biaya-lain-total) { grid-column:2; grid-row:3; }
+  .biaya-lain-row .ll-field:has(.biaya-lain-paid) { grid-column:3; grid-row:3; }
+  .biaya-lain-row .ll-field:has(.biaya-lain-sisa) { grid-column:2; grid-row:4; }
+  .biaya-lain-row .ll-field:has(.biaya-lain-nominal) { grid-column:3; grid-row:4; }
+  .payment-history-shell .payment-operator-cell { min-width:0; max-width:none; }
+}
+@media(max-width:560px) {
+  .biaya-lain-row { grid-template-columns:1fr 38px; padding:14px; gap:12px; }
+  .biaya-lain-row .ll-num { grid-column:1;grid-row:1;margin:0; }
+  .biaya-lain-row .btn-remove-biaya-lain { grid-column:2;grid-row:1;margin:0;width:38px; }
+  .biaya-lain-row .ll-field { grid-column:1 / -1!important; grid-row:auto!important; }
+  .payment-activity-dialog-header,.payment-activity-content { padding:16px; }
+  .payment-activity-change { grid-template-columns:1fr; }
+  .payment-history-tabs { padding:14px; }
+}

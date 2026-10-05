@@ -43,7 +43,10 @@ try{
   $debtors=report_student_debt_groups($koneksi,report_filters($koneksi,['siswa_status'=>'active']),'',[],report_letter_today());
   $debtor=null;foreach($debtors as $row)if($row['unit_id']===$unitId){$debtor=$row;break;}
   export_assert($debtor!==null,"Missing parent-letter fixture for unit $unitId");
-  $parent=export_pdf_text(export_get($base.'/laporan/surat_orang_tua_pdf.php?mode=single&nis='.rawurlencode($debtor['nis']),$sid));
+  $compose=export_get($base.'/laporan/surat_orang_tua_susun.php?mode=single&student_key='.rawurlencode(unit_student_key($debtor)),$sid);
+  export_assert(preg_match('/id="parent-draft-data"[^>]*>(.*?)<\/script>/s',$compose,$draftMatch)===1,'Parent draft is unavailable');
+  $draftData=json_decode($draftMatch[1],true,512,JSON_THROW_ON_ERROR);
+  $parent=export_pdf_text(export_get($base.'/laporan/surat_orang_tua_pdf.php?draft='.rawurlencode($draftData['token']),$sid));
   export_assert(str_contains(preg_replace('/\s+/',' ',$parent),$school),"Parent PDF school mismatch for unit $unitId");
   echo "OK: unit $unitId receipt and book/parent PDF use owning school in combined scope\n";
  }

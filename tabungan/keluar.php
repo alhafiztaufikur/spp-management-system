@@ -29,6 +29,7 @@ $siswa_list = $koneksi->query("SELECT id, NO_INDUK, NO_induk_diknas, NAMA, KELAS
   <script>(function(){var t=localStorage.getItem('spp_theme')||'light';document.documentElement.setAttribute('data-theme',t);})();</script>
   <link rel="stylesheet" href="../assets/css/style.css?v=unitpalette4&amp;mtime=<?= filemtime(__DIR__ . '/../assets/css/style.css') ?>" />
   <link rel="stylesheet" href="../assets/css/date_controls.css?v=unitpalette4&amp;mtime=<?= filemtime(__DIR__ . '/../assets/css/date_controls.css') ?>" />
+  <link rel="stylesheet" href="../assets/css/transaction_workflows.css?v=<?= filemtime(__DIR__.'/../assets/css/transaction_workflows.css') ?>">
 </head>
 <body>
   <div class="bg-orbs">
@@ -73,7 +74,7 @@ $siswa_list = $koneksi->query("SELECT id, NO_INDUK, NO_induk_diknas, NAMA, KELAS
             </div>
           </div>
 
-          <form method="POST" action="proses.php" id="form-tabungan" class="savings-entry-form">
+          <form method="POST" action="proses.php" id="form-tabungan" class="savings-entry-form" data-unit="<?= unit_active_id() ?>">
             <input type="hidden" name="aksi" value="keluar" />
             <input type="hidden" name="csrf_token" value="<?= htmlspecialchars($_SESSION['csrf_savings'], ENT_QUOTES, 'UTF-8') ?>" />
             <input type="hidden" name="request_key" value="<?= $savingsRequestKey ?>" />
@@ -159,73 +160,10 @@ $siswa_list = $koneksi->query("SELECT id, NO_INDUK, NO_induk_diknas, NAMA, KELAS
   </div>
 
   <div class="toast" id="toast"><span id="toast-icon"></span><span id="toast-msg"></span></div>
-  <div class="modal-overlay" id="modal-overlay">
-    <div class="modal-box">
-      <h3 class="modal-title" id="modal-title"></h3>
-      <p class="modal-body" id="modal-body"></p>
-      <div class="modal-actions">
-        <button class="btn btn-ghost" onclick="closeModal()">Tutup</button>
-      </div>
-    </div>
-  </div>
+  <?php include __DIR__.'/../includes/spp_warning_modal.php'; ?>
 
   <script src="../assets/js/date_format.js?v=<?= filemtime(__DIR__ . '/../assets/js/date_format.js') ?>"></script>
   <script src="../assets/js/app.js?v=<?= filemtime(__DIR__ . '/../assets/js/app.js') ?>"></script>
-  <script>
-    document.addEventListener('DOMContentLoaded', function () {
-      const tgl = document.getElementById('tgl-keluar');
-      if (tgl && !tgl.value) tgl.value = new Date().toISOString().split('T')[0];
-
-      document.querySelectorAll('.format-rupiah').forEach(function(input) {
-        input.addEventListener('input', function () {
-          const clean = this.value.replace(/\D/g, '');
-          this.value = clean ? parseInt(clean).toLocaleString('id-ID') : '';
-        });
-      });
-
-      // Validasi saldo sebelum submit
-      document.getElementById('form-tabungan').addEventListener('submit', function (e) {
-        const nominal = parseInt(document.getElementById('nominal-keluar').value.replace(/\./g, '') || 0);
-        const saldo   = parseInt(document.getElementById('raw-saldo').value || 0);
-        if (nominal > saldo) {
-          e.preventDefault();
-          alert('Nominal penarikan (Rp ' + nominal.toLocaleString('id-ID') + ') melebihi saldo tabungan (Rp ' + saldo.toLocaleString('id-ID') + ')!');
-          return;
-        }
-        // Strip dots
-        document.querySelectorAll('.format-rupiah').forEach(function(input) {
-          input.value = input.value.replace(/\./g, '');
-        });
-      });
-
-      autoHideFlash();
-
-      const prefilledSearch = document.getElementById('siswa-search');
-      if (prefilledSearch && prefilledSearch.value.trim()) {
-        window.pilihSiswaDatalist(prefilledSearch);
-      }
-    });
-
-    const _originalPilih = window.pilihSiswaDatalist;
-    window.pilihSiswaDatalist = function (input) {
-      _originalPilih(input);
-      const nis = document.getElementById('disp-nis').value;
-      if (nis) fetchSaldo(nis);
-    };
-
-    function fetchSaldo(nis) {
-      fetch('../tabungan/get_saldo.php?nis=' + encodeURIComponent(nis))
-        .then(r => r.json())
-        .then(d => {
-          const saldo = parseInt(d.saldo || 0);
-          const saldoEl = document.getElementById('disp-saldo');
-          if (saldoEl) saldoEl.value = 'Rp ' + saldo.toLocaleString('id-ID');
-          const preview = document.getElementById('saldo-preview');
-          if (preview) preview.textContent = 'Rp ' + saldo.toLocaleString('id-ID');
-          const rawEl = document.getElementById('raw-saldo');
-          if (rawEl) rawEl.value = saldo;
-        }).catch(() => {});
-    }
-  </script>
+  <script src="../assets/js/savings_validation.js?v=<?= filemtime(__DIR__ . '/../assets/js/savings_validation.js') ?>"></script>
 </body>
 </html>

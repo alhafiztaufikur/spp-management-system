@@ -27,8 +27,10 @@ try{
         preg_match('/<select id="sidebar-unit-select".*?<\/select>/s',$body,$select);scope_assert(!str_contains($select[0]??'','value="0"'),$path.' exposes all');
         scope_assert(!str_contains($body,'id="form-bayar"')&&!str_contains($body,'id="form-tabungan"'),$path.' loaded transaction form');
     }
-    $targets=['pembayaran/proses.php','tabungan/proses.php','otorisasi_transaksi.php','siswa/daftar.php','master_kelas.php','master_spp.php','master_daftar_ulang.php','master_biaya_lain.php','role_management.php','tagihan_tunggakan_check.php'];
+    $targets=['pembayaran/proses.php','tabungan/proses.php','otorisasi_transaksi.php','siswa/daftar.php','master_kelas.php','master_spp.php','master_daftar_ulang.php','master_biaya_lain.php','tagihan_tunggakan_check.php'];
     foreach($targets as $path){[$status]=scope_request($base,$path,$sid,['aksi'=>'hapus','action'=>'approve','id'=>1,'unit_id'=>1,'csrf_token'=>$token]);scope_assert($status===409,$path.' allowed all-unit write');}
+    [$status,$body]=scope_request($base,'role_management.php',$sid);scope_assert($status===200&&str_contains($body,'id="form-tambah-akun"'),'Super Admin cannot manage accounts from Semua Unit');
+    [$status]=scope_request($base,'role_management.php',$sid,['aksi'=>'tambah','unit_id'=>2,'csrf_token'=>'invalid']);scope_assert($status===302,'Role Management did not enforce CSRF from Semua Unit');
     [$status]=scope_request($base,'pembayaran/proses.php?aksi=hapus&id=1',$sid);scope_assert($status===409,'GET write endpoint escaped gate');
     [$status]=scope_request($base,'unit_switch.php',$sid,['unit_id'=>1]);scope_assert($status===403,'CSRF bypass');
     [$status]=scope_request($base,'unit_switch.php',$sid,['unit_id'=>0,'next'=>'/pembayaran/form.php','csrf_token'=>$token]);scope_assert($status===422,'All accepted for transaction target');

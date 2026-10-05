@@ -11,12 +11,13 @@ if (!isset($_SESSION['admin_id'])) {
 require_once 'koneksi.php';
 require_once 'includes/auth.php';
 requireRole(['super_admin']);
+$accountScopeUnit = unit_active_id();
 
 if (empty($_SESSION['csrf_token'])) {
     $_SESSION['csrf_token'] = bin2hex(random_bytes(32));
 }
 $csrfToken   = $_SESSION['csrf_token'];
-$allowedRole = ['super_admin', 'admin', 'bendahara', 'kasir'];
+$allowedRole = ['super_admin', 'bendahara', 'kasir'];
 
 $flash = $_SESSION['flash'] ?? null;
 unset($_SESSION['flash']);
@@ -53,6 +54,8 @@ if ($_SERVER['REQUEST_METHOD'] === 'POST') {
             setAccountFlash('error', 'Username harus 3–50 karakter dan hanya boleh berisi huruf, angka, titik, garis bawah, atau tanda hubung.');
         } elseif (!in_array($role, $allowedRole, true)) {
             setAccountFlash('error', 'Role akun tidak valid.');
+        } elseif ($accountScopeUnit !== 0 && ($role === 'super_admin' || $unitId !== $accountScopeUnit)) {
+            setAccountFlash('error', 'Pilih unit yang sesuai di sidebar. Untuk akun Super Admin, pilih Semua Unit.');
         } elseif ($role === 'super_admin' ? $unitId !== 0 : !in_array($unitId, [1,2,3], true)) {
             setAccountFlash('error', $role === 'super_admin' ? 'Super Admin harus memakai cakupan Semua Unit.' : 'Pilih unit SD, SMP, atau SMA.');
         } elseif (!validPassword($password)) {
@@ -99,7 +102,7 @@ if ($_SERVER['REQUEST_METHOD'] === 'POST') {
         } elseif ($password !== $passwordConfirmation) {
             setAccountFlash('error', 'Konfirmasi password baru tidak sama.');
         } else {
-            $check = $koneksi->prepare("SELECT nama FROM admin WHERE id = ? LIMIT 1");
+            $check = $koneksi->prepare("SELECT nama, role, unit_id FROM admin WHERE id = ? LIMIT 1");
             $check->bind_param('i', $accountId);
             $check->execute();
             $account = $check->get_result()->fetch_assoc();
@@ -107,6 +110,10 @@ if ($_SERVER['REQUEST_METHOD'] === 'POST') {
 
             if (!$account) {
                 setAccountFlash('error', 'Akun tidak ditemukan.');
+            } elseif ($accountScopeUnit !== 0 && (int)$account['unit_id'] !== $accountScopeUnit) {
+                setAccountFlash('error', 'Akun ini berada di luar unit yang dipilih.');
+            } elseif ($account['role'] === 'admin') {
+                setAccountFlash('error', 'Akun Admin unit lama sudah diarsipkan.');
             } else {
                 $passwordHash = password_hash($password, PASSWORD_DEFAULT);
                 $stmt = $koneksi->prepare("UPDATE admin SET password = ? WHERE id = ?");
@@ -145,15 +152,21 @@ if ($_SERVER['REQUEST_METHOD'] === 'POST') {
             if (!$account) {
                 setAccountFlash('error', 'Akun tidak ditemukan.');
                 $koneksi->rollback();
+            } elseif ($accountScopeUnit !== 0 && (int)$account['unit_id'] !== $accountScopeUnit) {
+                setAccountFlash('error', 'Akun ini berada di luar unit yang dipilih.');
+                $koneksi->rollback();
+            } elseif ($account['role'] === 'admin' && $targetActive === 1) {
+                setAccountFlash('error', 'Akun Admin unit lama diarsipkan. Kelola seluruh unit melalui Super Admin.');
+                $koneksi->rollback();
             } else {
-                if ($targetActive === 0 && (int)$account['is_active'] === 1 && in_array($account['role'], ['admin','super_admin'], true)) {
+                if ($targetActive === 0 && (int)$account['is_active'] === 1 && $account['role'] === 'super_admin') {
                     $roleToCount=$account['role']; $unitToCount=$account['unit_id'];
                     $count=$koneksi->prepare('SELECT id FROM admin WHERE role=? AND is_active=1 AND (unit_id<=>?) FOR UPDATE');
                     $count->bind_param('si',$roleToCount,$unitToCount);$count->execute();
                     $remaining=$count->get_result()->num_rows;$count->close();
                     if ($remaining <= 1) {
                         $koneksi->rollback();
-                        setAccountFlash('error', $account['role']==='super_admin' ? 'Super Admin aktif terakhir tidak dapat dinonaktifkan.' : 'Administrator aktif terakhir di unit ini tidak dapat dinonaktifkan.');
+                        setAccountFlash('error', 'Super Admin aktif terakhir tidak dapat dinonaktifkan.');
                         header('Location: role_management.php'); exit;
                     }
                 }
@@ -181,11 +194,9 @@ if ($_SERVER['REQUEST_METHOD'] === 'POST') {
     exit;
 }
 
-$filterUnit = filter_input(INPUT_GET,'unit',FILTER_VALIDATE_INT);
-if (!in_array($filterUnit,[1,2,3],true)) $filterUnit=0;
 $accounts = $koneksi->query(
-    "SELECT id, username, nama, role, unit_id, is_active, created_at FROM admin "
-    . ($filterUnit ? 'WHERE unit_id='.(int)$filterUnit.' ' : '')
+    "SELECT id, username, nama, role, unit_id, is_active, created_at FROM admin WHERE role<>'admin' "
+    . ($accountScopeUnit ? 'AND unit_id='.(int)$accountScopeUnit.' ' : '')
     . "ORDER BY unit_id,FIELD(role,'super_admin','admin','bendahara','kasir'),nama ASC"
 );
 $roleLabels = ['super_admin'=>'Super Admin','admin' => 'Admin', 'bendahara' => 'Bendahara', 'kasir' => 'Kasir'];
@@ -197,7 +208,7 @@ $roleLabels = ['super_admin'=>'Super Admin','admin' => 'Admin', 'bendahara' => '
   <meta name="viewport" content="width=device-width, initial-scale=1.0" />
   <title>Role Management | SistemSPP</title>
   <link rel="icon" type="image/png" href="assets/img/favicon.png?v=2" />
-  <meta name="description" content="Manajemen akun admin, bendahara, dan kasir SistemSPP." />
+  <meta name="description" content="Super Admin mengelola akun petugas SD, SMP, dan SMA." />
   <link rel="preconnect" href="https://fonts.googleapis.com" />
   <link href="https://fonts.googleapis.com/css2?family=Inter:wght@300;400;500;600;700;800&display=swap" rel="stylesheet" />
   <link rel="stylesheet" href="assets/css/style.css?v=unitpalette4&amp;mtime=<?= filemtime(__DIR__ . '/assets/css/style.css') ?>" />
@@ -239,9 +250,10 @@ $roleLabels = ['super_admin'=>'Super Admin','admin' => 'Admin', 'bendahara' => '
         <div class="card-title-row">
           <div class="card-title">
             <svg width="18" height="18" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><circle cx="12" cy="12" r="10"/><line x1="12" y1="8" x2="12" y2="16"/><line x1="8" y1="12" x2="16" y2="12"/></svg>
-            Buat Akun Baru
+            Buat Akun Petugas
           </div>
         </div>
+        <p class="field-hint">Hanya Super Admin yang membuat akun. Saat memilih <?= htmlspecialchars(unit_label($accountScopeUnit)) ?>, akun baru mengikuti cakupan ini. Akun Admin unit lama diarsipkan.</p>
 
         <form method="POST" action="role_management.php" id="form-tambah-akun">
           <input type="hidden" name="csrf_token" value="<?= htmlspecialchars($csrfToken) ?>" />
@@ -262,17 +274,15 @@ $roleLabels = ['super_admin'=>'Super Admin','admin' => 'Admin', 'bendahara' => '
                 <option value="">-- Pilih Role --</option>
                 <option value="kasir">Kasir</option>
                 <option value="bendahara">Bendahara</option>
-                <option value="admin">Admin</option>
-                <option value="super_admin">Super Admin</option>
+                <?php if ($accountScopeUnit === 0): ?><option value="super_admin">Super Admin</option><?php endif; ?>
               </select>
             </div>
             <div class="field-row">
               <label class="field-label" for="account-unit">Unit</label>
               <select class="field-input field-select" id="account-unit" name="unit_id" required>
-                <option value="">-- Pilih Unit --</option>
-                <option value="0">Semua Unit (Super Admin)</option>
-                <?php foreach ([1=>'SD',2=>'SMP',3=>'SMA'] as $id=>$label): ?>
-                <option value="<?= $id ?>" <?= $filterUnit===$id?'selected':'' ?>><?= $label ?></option>
+                <?php if ($accountScopeUnit === 0): ?><option value="">-- Pilih Unit --</option><option value="0">Semua Unit (Super Admin)</option><?php endif; ?>
+                <?php foreach (($accountScopeUnit === 0 ? [1=>'SD',2=>'SMP',3=>'SMA'] : [$accountScopeUnit=>unit_label($accountScopeUnit)]) as $id=>$label): ?>
+                <option value="<?= $id ?>" <?= $accountScopeUnit===$id?'selected':'' ?>><?= $label ?></option>
                 <?php endforeach; ?>
               </select>
             </div>
@@ -311,15 +321,7 @@ $roleLabels = ['super_admin'=>'Super Admin','admin' => 'Admin', 'bendahara' => '
             Daftar Akun (<?= $accounts->num_rows ?> akun)
           </div>
         </div>
-        <form method="get" class="account-unit-filter">
-          <label for="filter-account-unit">Tampilkan unit</label>
-          <select class="field-input field-select" id="filter-account-unit" name="unit" onchange="this.form.submit()">
-            <option value="0" <?= $filterUnit===0?'selected':'' ?>>Semua Unit</option>
-            <?php foreach ([1=>'SD',2=>'SMP',3=>'SMA'] as $id=>$label): ?>
-            <option value="<?= $id ?>" <?= $filterUnit===$id?'selected':'' ?>><?= $label ?></option>
-            <?php endforeach; ?>
-          </select>
-        </form>
+        <div class="account-unit-filter">Menampilkan akun: <strong><?= htmlspecialchars(unit_label($accountScopeUnit)) ?></strong>. Ganti unit melalui pilihan di sidebar.</div>
         <div class="table-container">
           <table class="payment-table responsive-table">
             <thead>
@@ -343,6 +345,7 @@ $roleLabels = ['super_admin'=>'Super Admin','admin' => 'Admin', 'bendahara' => '
                 <td data-label="Dibuat"><?= spp_date_label($account['created_at']) ?></td>
                 <td data-label="Aksi" class="aksi-col">
                   <div class="savings-row-actions">
+                    <?php if ($account['role'] !== 'admin'): ?>
                     <button type="button" class="btn-tbl btn-tbl-edit btn-reset-password"
                       data-account-id="<?= (int)$account['id'] ?>"
                       data-account-name="<?= htmlspecialchars($account['nama']) ?>"
@@ -350,6 +353,7 @@ $roleLabels = ['super_admin'=>'Super Admin','admin' => 'Admin', 'bendahara' => '
                       <svg width="13" height="13" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.5" stroke-linecap="round" stroke-linejoin="round"><rect x="3" y="11" width="18" height="11" rx="2"/><path d="M7 11V7a5 5 0 0 1 9.9-1"/></svg>
                       Ganti Password
                     </button>
+                    <?php endif; ?>
                     <?php if ((int)$account['id'] !== (int)($_SESSION['admin_id'] ?? 0) && (int)$account['is_active']===1): ?>
                     <button type="button" class="btn-tbl btn-tbl-del btn-delete-account"
                       data-account-id="<?= (int)$account['id'] ?>"
@@ -359,7 +363,7 @@ $roleLabels = ['super_admin'=>'Super Admin','admin' => 'Admin', 'bendahara' => '
                       <svg width="13" height="13" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.5" stroke-linecap="round" stroke-linejoin="round"><path d="M3 6h18"/><path d="M19 6v14a2 2 0 0 1-2 2H7a2 2 0 0 1-2-2V6m3 0V4a2 2 0 0 1 2-2h4a2 2 0 0 1 2 2v2"/></svg>
                       Nonaktifkan
                     </button>
-                    <?php elseif ((int)$account['is_active']===0): ?>
+                    <?php elseif ((int)$account['is_active']===0 && $account['role'] !== 'admin'): ?>
                     <form method="post" action="role_management.php" class="account-activate-form">
                       <input type="hidden" name="csrf_token" value="<?= htmlspecialchars($csrfToken) ?>">
                       <input type="hidden" name="aksi" value="status">
@@ -367,6 +371,8 @@ $roleLabels = ['super_admin'=>'Super Admin','admin' => 'Admin', 'bendahara' => '
                       <input type="hidden" name="target_active" value="1">
                       <button class="btn-tbl btn-tbl-edit" type="submit">Aktifkan</button>
                     </form>
+                    <?php elseif ($account['role'] === 'admin'): ?>
+                    <span class="account-self-badge">Arsip Admin unit</span>
                     <?php else: ?>
                     <span class="account-self-badge">👤 Akun Anda</span>
                     <?php endif; ?>

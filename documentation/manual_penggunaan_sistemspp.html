@@ -57,7 +57,7 @@
       <div class="eyebrow">MANUAL BOOK</div>
       <h1>Manual Penggunaan SistemSPP</h1>
       <p>Panduan langkah demi langkah untuk mengelola siswa, pembayaran, tabungan, laporan, dan akun sekolah.</p>
-      <div class="tag">Administrator</div><div class="tag">Kasir</div><div class="tag">Bendahara TU</div><div class="tag">Super Admin</div>
+      <div class="tag">Super Admin</div><div class="tag">Kasir</div><div class="tag">Bendahara TU</div>
     </div>
     <h2>Isi panduan</h2>
     <table class="contents">
@@ -73,7 +73,7 @@
       <tr><td>10. Laporan Global: panduan umum dan 11 jenis laporan</td><td>21-32</td></tr>
       <tr><td>11. Surat, akun, contoh alur dan pemecahan masalah</td><td>33-35</td></tr>
     </table>
-    <div class="cover-bottom">Edisi 30 September 2026 | Contoh dalam panduan memakai data demo. Kata sandi tidak dicantumkan di manual ini.</div>
+    <div class="cover-bottom">Edisi 5 Oktober 2026 | Contoh dalam panduan memakai data demo. Kata sandi tidak dicantumkan di manual ini.</div>
   </section>
 
   <section class="page">
@@ -82,13 +82,12 @@
     <p class="lead">Aplikasi lokal dibuka di <b>http://localhost/spp-management-system/</b> saat Laragon dan database sudah berjalan. Gunakan username dan kata sandi dari PDF kredensial terbaru yang diberikan pengelola.</p>
     <div class="steps"><ol><li>Buka alamat aplikasi pada browser.</li><li>Isi <b>Username</b> dan <b>Password</b>, lalu pilih <b>Masuk</b>.</li><li>Periksa nama dan unit pada bagian atas. Pilih menu dari sidebar.</li><li>Setelah selesai, gunakan tombol <b>Logout</b> di bagian bawah sidebar.</li></ol></div>
     <h2>Unit operasional dan cakupan laporan</h2>
-    <p>Admin, kasir, dan bendahara bekerja pada unit akunnya: SD, SMP, atau SMA. Super Admin memilih <b>Unit operasional</b> di sidebar sebelum mengubah data. Pada dashboard dan laporan, Super Admin juga dapat memilih <b>Semua Unit</b> sebagai cakupan rekap; pilihan itu tidak memindahkan unit operasional.</p>
+    <p>Kasir dan bendahara bekerja pada unit akunnya: SD, SMP, atau SMA. Super Admin memilih <b>Unit operasional</b> di sidebar sebelum mengubah data transaksi. Role Management dapat dibuka dari cakupan Semua Unit. Pada dashboard dan laporan, Super Admin juga dapat memilih <b>Semua Unit</b> sebagai cakupan rekap.</p>
     <h2>Hak akses ringkas</h2>
     <table><thead><tr><th>Peran</th><th>Pekerjaan utama</th></tr></thead><tbody>
       <tr><td>Kasir</td><td>Input pembayaran, Data Siswa dan master terkait, tabungan, laporan global, serta mengajukan edit atau hapus transaksi.</td></tr>
-      <tr><td>Administrator</td><td>Pekerjaan kasir, edit atau hapus langsung, memutuskan pengajuan, dan melihat laporan umum.</td></tr>
       <tr><td>Bendahara TU</td><td>Melihat laporan, riwayat otorisasi, Titipan SPP, dan riwayat atau cetak tabungan.</td></tr>
-      <tr><td>Super Admin</td><td>Akses administrator pada unit terpilih, laporan Semua Unit, serta <b>Role Management</b>.</td></tr>
+      <tr><td>Super Admin</td><td>Akses pengelolaan pada unit terpilih, keputusan otorisasi, laporan Semua Unit, serta pembuatan akun melalui <b>Role Management</b>.</td></tr>
     </tbody></table>
     <div class="warning">Jika menu tidak tampil, periksa peran akun dan unit yang sedang aktif. Jangan memakai akun petugas lain untuk melewati pembatasan akses.</div>
     <div class="footer">Manual Penggunaan SistemSPP | 2</div>
@@ -137,7 +136,7 @@
     <h2>Mengoreksi transaksi</h2>
     <table><thead><tr><th>Peran</th><th>Alur</th></tr></thead><tbody>
       <tr><td>Kasir</td><td>Dari riwayat, ajukan edit atau hapus. Pantau statusnya pada <b>Pengajuan Saya</b>. Perubahan berlaku setelah disetujui administrator.</td></tr>
-      <tr><td>Administrator</td><td>Dapat mengedit atau menghapus langsung, atau membuka <b>Otorisasi Transaksi</b> untuk menyetujui/menolak pengajuan kasir.</td></tr>
+      <tr><td>Super Admin</td><td>Dapat mengedit atau menghapus langsung, atau membuka <b>Otorisasi Transaksi</b> untuk menyetujui/menolak pengajuan kasir pada unit yang dipilih.</td></tr>
       <tr><td>Bendahara TU</td><td>Membuka <b>Riwayat Otorisasi</b> untuk pemeriksaan, tanpa memutuskan pengajuan.</td></tr>
     </tbody></table>
     <div class="warning">Selalu cocokkan nomor transaksi, nama siswa, unit, tanggal, komponen, dan alasan sebelum menyetujui perubahan atau penghapusan.</div>
@@ -525,10 +524,10 @@
     <div class="eyebrow">HANYA SUPER ADMIN</div><h1>Role Management</h1>
     <p class="lead">Menu ini mengelola akun pengguna, peran, unit, status aktif, dan kata sandi. Hanya Super Admin yang dapat membukanya.</p>
     <h2>Membuat akun</h2>
-    <div class="steps"><ol><li>Isi nama lengkap dan username yang belum dipakai.</li><li>Pilih peran Administrator, Kasir, Bendahara TU, atau Super Admin. Tetapkan SD/SMP/SMA untuk akun unit, atau Semua Unit bagi Super Admin.</li><li>Isi kata sandi baru dan konfirmasi; simpan. Berikan kredensial melalui jalur yang aman kepada pemilik akun.</li></ol></div>
+    <div class="steps"><ol><li>Masuk sebagai Super Admin, lalu pilih SD, SMP, atau SMA di sidebar untuk melihat dan mengelola akun unit tersebut saja. Pilih Super Admin (Semua Unit) di sidebar untuk melihat semua akun.</li><li>Isi nama lengkap dan username yang belum dipakai. Pada unit tertentu, akun baru otomatis mengikuti unit tersebut.</li><li>Pilih peran Kasir atau Bendahara TU; pada cakupan Semua Unit Anda juga dapat membuat akun Super Admin. Role Admin unit tidak dibuat lagi.</li><li>Isi kata sandi baru dan konfirmasi; simpan. Berikan kredensial melalui jalur yang aman kepada pemilik akun.</li></ol></div>
     <h2>Mengelola akun yang ada</h2>
     <p>Gunakan daftar akun untuk memeriksa nama, username, peran, unit, dan status aktif. Ubah status jika seseorang tidak lagi boleh masuk. Saat mereset kata sandi, pastikan akun yang dipilih benar dan beri tahu pemilik akun bahwa kata sandi sebelumnya tidak berlaku.</p>
-    <div class="card"><h3>Pemisahan tugas</h3><p>Kasir mencatat transaksi dan mengajukan koreksi; admin memutuskan otorisasi; bendahara memeriksa laporan. Pilih peran sesuai pekerjaan, bukan agar semua menu muncul.</p></div>
+    <div class="card"><h3>Pemisahan tugas</h3><p>Kasir mencatat transaksi dan mengajukan koreksi; Super Admin mengelola akun dan memutuskan otorisasi sesuai unit aktif; bendahara memeriksa laporan. Akun Admin unit lama diarsipkan tanpa menghapus riwayat transaksi.</p></div>
     <div class="warning">PDF kredensial memuat informasi sensitif. Simpan di lokasi terbatas; jangan menaruhnya di folder web, mengirim ke grup umum, atau memasukkan kata sandi ke manual ini.</div>
     <div class="footer">Manual Penggunaan SistemSPP | 34</div>
   </section>

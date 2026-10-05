@@ -1,4 +1,5 @@
 <?php
+require_once __DIR__ . "/payment_activity.php";
 
 function transaction_authorization_schema_ready(mysqli $db): bool
 {
@@ -140,6 +141,8 @@ function transaction_authorization_create(mysqli $db, int $paymentId, string $ac
         $stmt->execute();
         $requestId = (int)$db->insert_id;
         $stmt->close();
+        payment_activity_record($db, $paymentId, $action === "hapus" ? "request_delete" : "request_edit",
+            $requesterId, $snapshot["data"], null, "request:" . $requestId, $requestId, $reason);
         $db->commit();
         return $requestId;
     } catch (Throwable $error) {
@@ -180,10 +183,18 @@ function transaction_authorization_mark_failed(mysqli $db, int $requestId, int $
 {
     if ($requestId <= 0 || !transaction_authorization_schema_ready($db)) return;
     $note = mb_substr(trim($note), 0, 1000);
-    $stmt = $db->prepare("UPDATE transaksi_otorisasi SET status='failed',decided_by=?,decision_note=?,decided_at=NOW() WHERE id=? AND status='pending'");
-    $stmt->bind_param('isi', $approverId, $note, $requestId);
-    $stmt->execute();
-    $stmt->close();
+    $db->begin_transaction();
+    try {
+        $request = transaction_authorization_find($db, $requestId, true);
+        if (!$request || $request['status'] !== 'pending') { $db->rollback(); return; }
+        $stmt = $db->prepare("UPDATE transaksi_otorisasi SET status='failed',decided_by=?,decision_note=?,decided_at=NOW() WHERE id=? AND status='pending'");
+        $stmt->bind_param('isi', $approverId, $note, $requestId);
+        $stmt->execute(); $stmt->close();
+        $snapshot = json_decode($request['before_snapshot'], true, 512, JSON_THROW_ON_ERROR);
+        payment_activity_record($db, (int)$snapshot['payment']['id'], 'failed', $approverId,
+            $snapshot, null, 'decision:' . $requestId, $requestId, $note);
+        $db->commit();
+    } catch (Throwable $e) { $db->rollback(); throw $e; }
 }
 
 function transaction_authorization_decode_payload(array $request): array
@@ -201,6 +212,8 @@ function transaction_authorization_decide(mysqli $db, int $requestId, string $st
     $note = trim($note);
     if ($status === 'rejected' && $note === '') throw new RuntimeException('Catatan penolakan wajib diisi.');
     if (mb_strlen($note) > 1000) throw new RuntimeException('Catatan keputusan maksimal 1000 karakter.');
+    $request = transaction_authorization_find($db, $requestId, true);
+    if (!$request || $request['status'] !== 'pending') throw new RuntimeException('Permintaan sudah diproses.');
     $appliedSql = $status === 'approved' ? ',applied_at=NOW()' : '';
     $stmt = $db->prepare("UPDATE transaksi_otorisasi SET status=?,decided_by=?,decision_note=?,decided_at=NOW()$appliedSql WHERE id=? AND status='pending'");
     $stmt->bind_param('sisi', $status, $deciderId, $note, $requestId);
@@ -210,6 +223,9 @@ function transaction_authorization_decide(mysqli $db, int $requestId, string $st
         throw new RuntimeException('Permintaan sudah diproses atau tidak lagi tersedia.');
     }
     $stmt->close();
+    $snapshot = json_decode($request['before_snapshot'], true, 512, JSON_THROW_ON_ERROR);
+    payment_activity_record($db, (int)$snapshot['payment']['id'], $status, $deciderId,
+        $snapshot, null, 'decision:' . $requestId, $requestId, $note);
 }
 
 function transaction_authorization_status_label(string $status): string

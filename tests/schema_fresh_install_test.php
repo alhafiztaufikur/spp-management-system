@@ -70,6 +70,10 @@ try {
         WHERE TABLE_SCHEMA=DATABASE() AND TABLE_NAME='siswa'")->fetch_assoc()['n'] !== 1) {
         throw new RuntimeException('Migrasi multiunit tidak membuat view operasional siswa.');
     }
+    require_once __DIR__.'/../includes/payment_activity.php';
+    if (!payment_activity_ready($koneksi)) {
+        throw new RuntimeException('Instalasi baru tidak memasang jurnal operator pembayaran.');
+    }
     require_once __DIR__.'/../includes/legacy_schema.php';
     if(!legacy_schema_ready($koneksi))throw new RuntimeException('Fresh install missing Legacy/unit identity schema');
     // The documented workflow runs account bootstrap in a new CLI process.
@@ -83,7 +87,9 @@ try {
     if (proc_close($process) !== 0) {
         throw new RuntimeException('Bootstrap akun clone gagal: ' . trim($bootstrapError ?: $bootstrapOutput));
     }
-    if ((int)$koneksi->query('SELECT COUNT(*) FROM admin')->fetch_row()[0] !== 19
+    // One Super Admin and five accounts per unit; unit admins are no longer created.
+    if ((int)$koneksi->query('SELECT COUNT(*) FROM admin')->fetch_row()[0] !== 16
+        || (int)$koneksi->query("SELECT COUNT(*) FROM admin WHERE role='admin' AND is_active=1")->fetch_row()[0] !== 0
         || !is_file($credentialsFile) || filesize($credentialsFile) === 0) {
         throw new RuntimeException('Bootstrap akun clone tidak lengkap.');
     }

@@ -12135,14 +12135,19 @@ html body .report-general-shell .recap-report-header {
   display: flex;
   align-items: center;
   justify-content: space-between;
-  gap: 20px;
+  gap: 18px;
   min-width: 0;
-  padding: 28px 32px;
+  padding: 22px 28px;
   border-bottom: 1px solid var(--border);
   background: linear-gradient(112deg, rgba(var(--unit-rgb, 31, 157, 85), .10), rgba(var(--unit-rgb-2, 34, 197, 94), .025) 68%), var(--bg-card);
 }
 .report-general-shell .report-general-heading .recap-report-copy { min-width: 0; }
-.report-general-shell .report-general-heading .recap-report-copy p { max-width: 620px; }
+.report-general-shell .report-general-heading .recap-report-copy h1 {
+  margin: 4px 0 5px;
+  font-size: clamp(1.65rem, 2.3vw, 2.15rem);
+  line-height: 1.18;
+}
+.report-general-shell .report-general-heading .recap-report-copy p { max-width: 620px; margin: 0; }
 .report-general-catalog-link {
   display: inline-flex;
   align-items: center;
@@ -12163,11 +12168,11 @@ html body .report-general-shell .recap-report-header {
 .report-general-catalog-link:focus-visible { outline: 3px solid var(--accent-glow); outline-offset: 2px; }
 html body .report-general-shell .report-general-filter {
   display: grid !important;
-  grid-template-columns: repeat(4, minmax(0, 1fr)) !important;
-  gap: 16px !important;
+  grid-template-columns: minmax(0, 1.2fr) minmax(0, 1.2fr) minmax(0, 1fr) minmax(0, .8fr) !important;
+  gap: 14px 12px !important;
   width: 100% !important;
   min-width: 0 !important;
-  padding: 24px 32px 28px !important;
+  padding: 20px 28px 24px !important;
   border: 0 !important;
   background: var(--bg-card) !important;
   box-shadow: none !important;
@@ -12181,37 +12186,67 @@ html body .report-general-shell .report-general-filter > :is(.field-row, .unit-r
   max-width: none !important;
   margin: 0 !important;
 }
-html body .report-general-shell .report-general-filter .field-row.full-span {
-  grid-column: span 3 !important;
-  grid-row: auto !important;
-}
-html body .report-general-shell .report-general-filter:not(.has-scope) .field-row.full-span {
+html body .report-general-shell .report-general-filter > .unit-report-picker {
   grid-column: 1 / -1 !important;
+  display: flex;
+  flex-direction: row;
+  align-items: center;
+  justify-content: space-between;
+  gap: 12px;
+  min-height: 42px;
+  box-sizing: border-box;
+  padding: 8px 14px;
+  border: 1px solid var(--border);
+  border-radius: 11px;
+  background: var(--accent-glow);
+  color: var(--text-secondary);
+  font-size: .79rem;
 }
-html body .report-general-shell .report-general-filter .field-row:has(select[name="per_page"]) {
+html body .report-general-shell .report-general-filter > .unit-report-picker strong { color: var(--accent); }
+html body .report-general-shell .report-general-filter > .unit-report-picker select {
+  flex: 0 1 250px;
+  width: min(250px, 100%) !important;
+  min-width: 0;
+}
+html body .report-general-shell .report-general-filter > .field-row:has(select[name="per_page"]) {
   grid-column: auto !important;
   grid-row: auto !important;
 }
-html body .report-general-shell .report-general-filter > :is(.report-filter-actions, .report-export-actions) {
+html body .report-general-shell .report-general-filter > .field-row.full-span {
+  grid-column: 1 / -1 !important;
   grid-row: auto !important;
-  grid-column: span 2 !important;
+}
+html body .report-general-shell .report-general-filter > .report-general-actions {
+  grid-column: 1 / -1 !important;
   display: grid !important;
-  grid-template-columns: repeat(2, minmax(0, 1fr)) !important;
-  gap: 8px !important;
+  grid-template-columns: minmax(0, 1.1fr) minmax(0, 1fr) !important;
+  gap: 12px !important;
   min-width: 0 !important;
   width: 100% !important;
   margin: 0 !important;
-  padding: 5px !important;
-  border: 1px solid var(--border) !important;
-  border-radius: 13px !important;
-  background: var(--bg-elevated) !important;
+  padding: 14px 0 0 !important;
+  border-top: 1px solid var(--border);
+}
+html body .report-general-shell .report-general-actions > :is(.report-filter-actions, .report-export-actions) {
+  grid-column: auto !important;
+  grid-row: auto !important;
+  display: grid !important;
+  grid-template-columns: repeat(2, minmax(0, 1fr)) !important;
+  gap: 10px !important;
+  min-width: 0 !important;
+  width: 100% !important;
+  margin: 0 !important;
+  padding: 0 !important;
+  border: 0 !important;
+  background: transparent !important;
+  box-shadow: none !important;
 }
 html body .report-general-shell .report-general-filter :is(.field-input, .field-select, .report-date-range-button, .search-box) {
   box-sizing: border-box;
   width: 100% !important;
   min-width: 0 !important;
-  height: 46px !important;
-  min-height: 46px !important;
+  height: 44px !important;
+  min-height: 44px !important;
   border-radius: 11px !important;
 }
 html body .report-general-shell .report-general-filter .btn {
@@ -12219,7 +12254,7 @@ html body .report-general-shell .report-general-filter .btn {
   align-items: center;
   justify-content: center;
   min-width: 0;
-  min-height: 40px !important;
+  min-height: 43px !important;
   padding: 8px 12px !important;
   font-size: .83rem !important;
   white-space: nowrap;
@@ -12241,21 +12276,30 @@ html[data-theme="dark"] body .report-general-shell .report-general-filter .repor
 
 @media (max-width: 1100px) {
   html body .report-general-shell .report-general-filter { grid-template-columns: repeat(2, minmax(0, 1fr)) !important; }
-  html body .report-general-shell .report-general-filter .field-row.full-span,
-  html body .report-general-shell .report-general-filter:not(.has-scope) .field-row.full-span,
-  html body .report-general-shell .report-general-filter > :is(.report-filter-actions, .report-export-actions) { grid-column: 1 / -1 !important; }
+  html body .report-general-shell .report-general-filter > .report-general-actions { grid-template-columns: minmax(0, 1fr) !important; }
+  .report-general-page .report-stats-grid { grid-template-columns: repeat(2, minmax(0, 1fr)); }
+  .report-general-page .topbar .clock-badge { display: none; }
+}
+@media (min-width: 641px) and (max-width: 1100px) {
+  .report-general-page .report-date-range-icon { display: none; }
+  .report-general-page .report-date-range-button { padding-inline: 10px; font-size: .76rem; }
 }
 @media (max-width: 640px) {
   .dashboard-scope-card { flex-direction: column; align-items: stretch; gap: 13px; padding: 15px; }
   .dashboard-scope-options { flex: none; min-width: 0; width: 100%; grid-template-columns: repeat(2, minmax(0, 1fr)); }
   .dashboard-scope-option { min-height: 44px; }
-  html body .report-general-shell .report-general-heading { align-items: stretch; flex-direction: column; padding: 22px 18px; }
+  html body .report-general-shell .report-general-heading { align-items: stretch; flex-direction: column; padding: 18px; }
   .report-general-catalog-link { align-self: flex-start; }
   html body .report-general-shell .report-general-filter { grid-template-columns: minmax(0, 1fr) !important; gap: 13px !important; padding: 18px !important; }
-  html body .report-general-shell .report-general-filter > :is(.field-row, .unit-report-picker, .report-filter-actions, .report-export-actions),
-  html body .report-general-shell .report-general-filter .field-row.full-span,
-  html body .report-general-shell .report-general-filter:not(.has-scope) .field-row.full-span { grid-column: 1 / -1 !important; }
-  html body .report-general-shell .report-general-filter > :is(.report-filter-actions, .report-export-actions) { grid-template-columns: minmax(0, 1fr) !important; }
+  html body .report-general-shell .report-general-filter > .unit-report-picker { align-items: stretch; flex-direction: column; }
+  html body .report-general-shell .report-general-filter > .unit-report-picker select { flex: none; width: 100% !important; }
+  html body .report-general-shell .report-general-filter > .report-general-actions { grid-template-columns: minmax(0, 1fr) !important; }
+  .report-general-page .report-stats-grid { grid-template-columns: minmax(0, 1fr); }
+}
+@media (max-width: 390px) {
+  html body .report-general-shell .report-general-actions > :is(.report-filter-actions, .report-export-actions) {
+    grid-template-columns: minmax(0, 1fr) !important;
+  }
 }
 
 /* Otorisasi: tombol Reset setara dengan aksi filter dan mengikuti palet unit. */

@@ -31,6 +31,8 @@ $tables = [
 ];
 
 if (unit_migration_table($koneksi, 'siswa') === 'VIEW') {
+    require_once __DIR__ . "/payment_activity_schema.php";
+    payment_activity_schema_apply($koneksi);
     echo "SKIPPED: views multiunit sudah tersedia.\n";
     exit(0);
 }
@@ -183,3 +185,6 @@ legacy_schema_apply($koneksi);
 
 require_once __DIR__.'/../includes/financial_components_schema.php';
 financial_components_apply($koneksi);
+
+require_once __DIR__ . "/payment_activity_schema.php";
+payment_activity_schema_apply($koneksi);

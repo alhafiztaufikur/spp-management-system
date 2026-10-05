@@ -22,12 +22,12 @@ Sistem memakai satu database. Setiap tabel siswa, kelas, master, tagihan, pembay
 
 ## Akun awal
 
-- SD: `admin`, `bendahara`, `kasir1` sampai `kasir4`. Migrasi mempertahankan hash akun yang sudah ada; pada instalasi lokal saat ini kata sandinya telah dirotasi. Gunakan PDF kredensial terbaru dari pengelola, bukan kata sandi lama. Akun kasir SD lain dinonaktifkan tanpa menghapus riwayat.
-- SMP: `admin.smp`, `bendahara.smp`, `kasir1.smp` sampai `kasir4.smp`.
-- SMA: `admin.sma`, `bendahara.sma`, `kasir1.sma` sampai `kasir4.sma`.
+- SD: `bendahara`, `kasir1` sampai `kasir4`. Akun `admin` lama diarsipkan tanpa menghapus riwayat. Akun kasir SD lain tetap nonaktif.
+- SMP: `bendahara.smp`, `kasir1.smp` sampai `kasir4.smp`. Akun `admin.smp` lama diarsipkan.
+- SMA: `bendahara.sma`, `kasir1.sma` sampai `kasir4.sma`. Akun `admin.sma` lama diarsipkan.
 - Super Admin: `superadmin`.
 
-Pada instalasi baru, kata sandi akun yang dibuat oleh `sql/bootstrap_unit_accounts.php` bersifat acak dan dicatat satu kali pada berkas absolut di luar repositori. Pada instalasi lokal saat ini, seluruh 19 akun aktif memakai kata sandi hasil rotasi; acuannya adalah PDF kredensial terbaru yang disimpan pengelola di luar folder web. Serahkan kredensial lewat jalur aman. Penambahan akun, termasuk Super Admin tambahan, penggantian kata sandi, serta aktivasi akun berikutnya dilakukan oleh Super Admin di Role Management.
+Pada instalasi baru, kata sandi akun yang dibuat oleh `sql/bootstrap_unit_accounts.php` bersifat acak dan dicatat satu kali pada berkas absolut di luar repositori. Akun Admin unit lama diarsipkan tanpa menghapus riwayat; bootstrap baru membuat akun Super Admin, Bendahara dan Kasir. PDF kredensial lama yang masih mencantumkan Admin unit tidak lagi menjadi acuan untuk akun tersebut. Serahkan kredensial aktif lewat jalur aman. Penambahan akun, termasuk Super Admin tambahan, penggantian kata sandi, serta aktivasi akun berikutnya dilakukan oleh Super Admin di Role Management, termasuk dari cakupan Semua Unit.
 
 ## Instalasi baru
 
@@ -44,7 +44,7 @@ php sql/migrate_units.php
 php sql/bootstrap_unit_accounts.php 'C:\lokasi-aman\kredensial-unit.txt'
 ```
 
-Jangan simpan berkas kredensial di repositori. `sql/bootstrap_production.php` memerlukan `SPP_BOOTSTRAP_TARGET` yang cocok dengan database kosong, username admin, kata sandi awal kuat, dan `--execute`. Gunakan username `admin` agar akun itu dipertahankan saat akun unit dibuat. Jalur berkas kredensial akun unit harus absolut dan berada di luar repository.
+Jangan simpan berkas kredensial di repositori. `sql/bootstrap_production.php` memerlukan `SPP_BOOTSTRAP_TARGET` yang cocok dengan database kosong, username admin, kata sandi awal kuat, dan `--execute`. Username `admin` pada bootstrap awal adalah akun sementara; bootstrap akun unit kemudian mengarsipkannya dan membuat `superadmin`. Jalur berkas kredensial akun unit harus absolut dan berada di luar repository.
 
 ## Migrasi database berisi data
 
@@ -57,7 +57,7 @@ Migrasi menolak tabel yang tidak sesuai atau proses migrasi yang pernah terhenti
 
 ## Hak akses dan laporan
 
-Admin, kasir, dan bendahara terikat pada satu unit. Super Admin memilih SD, SMP, atau SMA di sidebar; pilihan itu berlaku ke semua menu operasional. Dashboard dan laporan menyediakan pilihan **Semua Unit** yang hanya mengubah cakupan rekap pada halaman tersebut. Pilihan rekap tidak mengganti unit operasional. Cetak, PDF, dan Excel mengikuti cakupan rekap pada URL.
+Kasir dan bendahara terikat pada satu unit. Super Admin memilih SD, SMP, atau SMA di sidebar untuk pekerjaan operasional; Role Management tetap tersedia dari **Semua Unit**. Dashboard dan laporan menyediakan pilihan **Semua Unit** untuk cakupan rekap. Cetak, PDF, dan Excel mengikuti cakupan rekap pada URL.
 
 Kelas SD adalah 1–6, SMP 7–9, SMA 10–12. Kelulusan terjadi pada kelas terakhir setiap unit. Siswa yang melanjutkan ke unit baru dibuat sebagai data siswa baru dengan NIS internal unik di seluruh sekolah; NIS Diknas dapat sama di unit berbeda. Riwayat lama tetap pada unit asal.
 

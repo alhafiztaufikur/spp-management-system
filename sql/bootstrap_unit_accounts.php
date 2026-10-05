@@ -29,13 +29,11 @@ try {
     foreach ($koneksi->query('SELECT id,username,role,unit_id FROM admin FOR UPDATE') as $row) $existing[$row['username']] = $row;
     $keep = [];
     $accounts = [
-        ['admin','Administrator SD','admin',1],
         ['bendahara','Bendahara TU SD','bendahara',1],
         ['kasir1','Kasir SD 1','kasir',1], ['kasir2','Kasir SD 2','kasir',1],
         ['kasir3','Kasir SD 3','kasir',1], ['kasir4','Kasir SD 4','kasir',1],
     ];
     foreach ([2=>'smp',3=>'sma'] as $id=>$code) {
-        $accounts[]=["admin.{$code}","Administrator ".strtoupper($code),'admin',$id];
         $accounts[]=["bendahara.{$code}","Bendahara TU ".strtoupper($code),'bendahara',$id];
         for ($number=1;$number<=4;$number++) $accounts[]=["kasir{$number}.{$code}","Kasir ".strtoupper($code)." {$number}",'kasir',$id];
     }
@@ -62,11 +60,11 @@ try {
         $stmt->bind_param('ssssi',$username,$hash,$name,$role,$unitId);$stmt->execute();$stmt->close();
         fwrite($handle, $username . " | " . $password . " | " . $role . " | " . unit_label($unitId ?? 0) . "\n");
     }
-    // Preserve every legacy account and its audit links; disable extras.
+    // Preserve historical account ownership and audit links; archive legacy unit admins.
     foreach ($existing as $username=>$row) {
         if (in_array($username,$keep,true)) continue;
         $id=(int)$row['id'];
-        $koneksi->query("UPDATE admin SET is_active=0,unit_id=1 WHERE id={$id}");
+        $koneksi->query("UPDATE admin SET is_active=0 WHERE id={$id}");
     }
     $koneksi->commit();
     fclose($handle);

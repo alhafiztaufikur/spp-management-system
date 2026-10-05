@@ -20,7 +20,7 @@ function report_letter_header(string $logo, ?int $unitId=null): string {
     return '<table class="kop"><tr><td style="width:68px">'.$image.'</td><td><h1>'.report_e($schoolName).'</h1><p>Perum Bekasi Griya Asri II, Tambun Selatan · Telp. 021-88363466</p></td><td style="width:68px"></td></tr></table>';
 }
 
-function report_parent_letters_html(array $students,string $today): string {
+function report_parent_letters_html(array $students,string $today,array $messages=[]): string {
     $logo=report_letter_logo();
     $html='<!doctype html><html lang="id"><head><meta charset="utf-8"><title>Surat Tunggakan Orang Tua</title><style>'.report_letter_css().'</style></head><body>';
     foreach($students as $student){
@@ -38,6 +38,8 @@ function report_parent_letters_html(array $students,string $today): string {
             $html.='<tr><td>'.($index+1).'</td><td>'.report_e($item['komponen']).'</td><td>'.report_e($item['periode']).'</td><td class="money">'.report_e(report_money($item['sisa'])).'</td></tr>';
         }
         $html.='</tbody><tfoot><tr><td colspan="3">Jumlah tunggakan</td><td class="money">'.report_e(report_money($student['total_tunggakan'])).'</td></tr></tfoot></table>';
+        $message=trim((string)($messages[unit_student_key($student)]??''));
+        if($message!=='')foreach(preg_split('/\n\s*\n/u',$message) as $paragraph)$html.='<p style="overflow-wrap:anywhere;word-wrap:break-word">'.nl2br(report_e($paragraph)).'</p>';
         $html.='<p class="closing">Mohon Bapak/Ibu dapat menyelesaikan kewajiban tersebut melalui bagian pembayaran sekolah. Jika sudah membayar, mohon hubungi petugas agar catatan kami dapat diperiksa kembali.</p>';
         $html.='<p>Demikian pemberitahuan ini kami sampaikan. Terima kasih atas perhatian dan kerja sama Bapak/Ibu.</p>';
         $html.='<p>Wassalamu’alaikum warahmatullahi wabarakatuh.</p>';
