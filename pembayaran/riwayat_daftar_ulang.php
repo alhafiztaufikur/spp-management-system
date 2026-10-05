@@ -14,16 +14,7 @@ function du_money($value): string {
     return 'Rp ' . number_format((float)$value, 0, ',', '.');
 }
 
-function du_full_date($value): array {
-    $timestamp = strtotime((string)$value);
-    if (!$timestamp) return ['date' => '-', 'time' => '-'];
-    $days = ['Minggu', 'Senin', 'Selasa', 'Rabu', 'Kamis', 'Jumat', 'Sabtu'];
-    $months = [1 => 'Januari', 'Februari', 'Maret', 'April', 'Mei', 'Juni', 'Juli', 'Agustus', 'September', 'Oktober', 'November', 'Desember'];
-    return [
-        'date' => $days[(int)date('w', $timestamp)] . ', ' . date('j', $timestamp) . ' ' . $months[(int)date('n', $timestamp)] . ' ' . date('Y', $timestamp),
-        'time' => date('H:i', $timestamp) . ' WIB',
-    ];
-}
+function du_full_date($value): array { return spp_date_parts($value); }
 
 function du_history_page_url(array $query, int $page): string {
     $query['page'] = max(1, $page);
@@ -207,6 +198,7 @@ unset($_SESSION['flash']);
   <link rel="preconnect" href="https://fonts.googleapis.com" />
   <link href="https://fonts.googleapis.com/css2?family=Inter:wght@300;400;500;600;700;800&display=swap" rel="stylesheet" />
   <link rel="stylesheet" href="../assets/css/style.css?v=unitpalette4&amp;mtime=<?= filemtime(__DIR__ . '/../assets/css/style.css') ?>" />
+  <link rel="stylesheet" href="../assets/css/date_controls.css?v=unitpalette4&amp;mtime=<?= filemtime(__DIR__ . '/../assets/css/date_controls.css') ?>" />
   <script>(function(){var t=localStorage.getItem('spp_theme')||'light';document.documentElement.setAttribute('data-theme',t);})();</script>
 </head>
 <body>
@@ -344,6 +336,7 @@ unset($_SESSION['flash']);
       </section>
     </main>
   </div>
+  <script src="../assets/js/date_format.js?v=<?= filemtime(__DIR__ . '/../assets/js/date_format.js') ?>"></script>
   <script src="../assets/js/app.js?v=<?= filemtime(__DIR__ . '/../assets/js/app.js') ?>"></script>
 </body>
 </html>

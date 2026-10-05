@@ -126,7 +126,7 @@ function book_page(array $page, array $student, string $school, string $logo, st
             . '<table class="ledger"><colgroup><col style="width:16mm"><col style="width:20mm"><col style="width:20mm"><col style="width:22mm"><col style="width:17mm"></colgroup>'
             . '<thead><tr><th rowspan="2">Tanggal</th><th colspan="2">Tabungan (Rp)</th><th rowspan="2">Saldo (Rp)</th><th rowspan="2">Tanda<br>Tangan</th></tr><tr><th>Masuk</th><th>Keluar</th></tr></thead><tbody>';
         foreach ($page['rows'] as $entry) {
-            $date = $entry && $entry['tanggal'] !== '' ? date('d/m/Y', strtotime($entry['tanggal'])) : ($entry ? '-' : '');
+            $date = $entry && $entry['tanggal'] !== '' ? spp_date_label($entry['tanggal']) : ($entry ? '-' : '');
             $out .= '<tr><td>' . book_escape($date) . '</td>'
                 . '<td class="amount">' . ($entry && $entry['masuk'] ? savings_book_money($entry['masuk']) : '') . '</td>'
                 . '<td class="amount">' . ($entry && $entry['keluar'] ? savings_book_money($entry['keluar']) : '') . '</td>'

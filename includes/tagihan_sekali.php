@@ -5,10 +5,6 @@
  */
 function one_time_fee_components(): array {
     return [
-        'pangkal' => [
-            'label' => 'Uang Pangkal',
-            'payment' => 'U_PANGKAL',
-        ],
         'psb' => [
             'label' => 'Uang PSB',
             'payment' => 'U_PSB',
@@ -17,12 +13,7 @@ function one_time_fee_components(): array {
 }
 
 function one_time_fee_totals_from_student(array $student): array {
-    // PANGKAL dan potong_pangkal adalah nilai master. tot_pangkal hanya
-    // kolom kompatibilitas/hasil hitung lama, jadi tidak boleh menentukan
-    // tagihan saat nilainya tertinggal dari data master.
-    $pangkal = max(0, (float)($student['PANGKAL'] ?? 0) - (float)($student['potong_pangkal'] ?? 0));
     return [
-        'pangkal' => $pangkal,
         'psb' => max(0, (float)($student['PSB'] ?? 0)),
     ];
 }
@@ -32,7 +23,7 @@ function one_time_fee_totals_from_student(array $student): array {
  */
 function one_time_fee_status(mysqli $db, string $noInduk, int $excludePaymentId = 0, bool $forUpdate = false): array {
     $lock = $forUpdate ? ' FOR UPDATE' : '';
-    $stmt = $db->prepare('SELECT PANGKAL,potong_pangkal,tot_pangkal,PSB FROM siswa WHERE NO_INDUK=? LIMIT 1' . $lock);
+    $stmt = $db->prepare('SELECT PSB FROM siswa WHERE NO_INDUK=? LIMIT 1' . $lock);
     $stmt->bind_param('s', $noInduk);
     $stmt->execute();
     $student = $stmt->get_result()->fetch_assoc();
@@ -42,17 +33,16 @@ function one_time_fee_status(mysqli $db, string $noInduk, int $excludePaymentId 
     if ($forUpdate) {
         // Locking read melihat pembayaran yang baru di-commit saat transaksi
         // ini menunggu kunci siswa. SUM biasa dapat membaca snapshot lama.
-        $stmt = $db->prepare('SELECT U_PANGKAL,U_PSB FROM bayar WHERE NO_INDUK=? AND id<>? FOR UPDATE');
+        $stmt = $db->prepare('SELECT U_PSB FROM bayar WHERE NO_INDUK=? AND id<>? FOR UPDATE');
         $stmt->bind_param('si', $noInduk, $excludePaymentId);
         $stmt->execute();
-        $paid = ['pangkal'=>0.0, 'psb'=>0.0];
+        $paid = ['psb'=>0.0];
         foreach ($stmt->get_result()->fetch_all(MYSQLI_ASSOC) as $payment) {
-            $paid['pangkal'] += (float)$payment['U_PANGKAL'];
             $paid['psb'] += (float)$payment['U_PSB'];
         }
         $stmt->close();
     } else {
-        $stmt = $db->prepare('SELECT COALESCE(SUM(U_PANGKAL),0) pangkal,COALESCE(SUM(U_PSB),0) psb FROM bayar WHERE NO_INDUK=? AND id<>?');
+        $stmt = $db->prepare('SELECT COALESCE(SUM(U_PSB),0) psb FROM bayar WHERE NO_INDUK=? AND id<>?');
         $stmt->bind_param('si', $noInduk, $excludePaymentId);
         $stmt->execute();
         $paid = $stmt->get_result()->fetch_assoc() ?: [];
@@ -75,12 +65,11 @@ function one_time_fee_status(mysqli $db, string $noInduk, int $excludePaymentId 
 }
 
 function one_time_fee_payload_for_options(mysqli $db, int $excludePaymentId = 0): array {
-    $stmt = $db->prepare("SELECT s.NO_INDUK,s.PANGKAL,s.potong_pangkal,s.tot_pangkal,s.PSB,
-        COALESCE(SUM(CASE WHEN b.id<>? THEN b.U_PANGKAL ELSE 0 END),0) paid_pangkal,
+    $stmt = $db->prepare("SELECT s.NO_INDUK,s.PSB,
         COALESCE(SUM(CASE WHEN b.id<>? THEN b.U_PSB ELSE 0 END),0) paid_psb
         FROM siswa s LEFT JOIN bayar b ON b.NO_INDUK=s.NO_INDUK AND b.unit_id=s.unit_id
-        GROUP BY s.NO_INDUK,s.PANGKAL,s.potong_pangkal,s.tot_pangkal,s.PSB");
-    $stmt->bind_param('ii', $excludePaymentId, $excludePaymentId);
+        GROUP BY s.NO_INDUK,s.PSB");
+    $stmt->bind_param('i', $excludePaymentId);
     $stmt->execute();
     $rows = $stmt->get_result();
     $payload = [];

@@ -26,7 +26,7 @@ try {
         $stmt->bind_param('ssi', $nis, $levelText, $classId);
         $stmt->execute(); $stmt->close();
         foreach ([[$oldClass,'2090-07-15 09:00:00',100.0],[$newClass,'2091-07-15 09:00:00',150.0]] as [$class,$date,$amount]) {
-            $stmt = $koneksi->prepare("INSERT INTO bayar(NO_INDUK,KELAS,kelas_rombel_snapshot,U_PANGKAL,total_jumlah,TGL_BYR,BULAN,TAHUN,user_id,sistem_pembayaran) VALUES(?,?,?,?,?,?,'07','2091','1','Tunai')");
+            $stmt = $koneksi->prepare("INSERT INTO bayar(NO_INDUK,KELAS,kelas_rombel_snapshot,U_PSB,total_jumlah,TGL_BYR,BULAN,TAHUN,user_id,sistem_pembayaran) VALUES(?,?,?,?,?,?,'07','2091','1','Tunai')");
             $stmt->bind_param('sssdds', $nis, $levelText, $class, $amount, $amount, $date);
             $stmt->execute(); $stmt->close();
         }

@@ -87,11 +87,10 @@ try {
     $psb = enrollment_browser_student($koneksi, $psbNis);
     enrollment_browser_assert($regular && $psb && enrollment_browser_student($koneksi, $invalidNis) === null,
         'Pendaftaran reguler/PSB atau penolakan invalid tidak sesuai.');
-    $expectedSpp = round((float)$rate['nominal_dasar'] * .9, 0);
+    $expectedSpp = max(0,(float)$rate['nominal_dasar'] - 25000);
     enrollment_browser_assert($regular['NAMA'] === 'UJI BROWSER REGULER' && $regular['KELAS'] === '1'
         && (int)$regular['master_kelas_id'] === $classId && (int)$regular['is_active'] === 1
         && (int)$regular['asal_psb'] === 0 && (float)$regular['PSB'] === 0.0
-        && (float)$regular['PANGKAL'] === 1000000.0 && (float)$regular['tot_pangkal'] === 900000.0
         && (float)$regular['DAFTAR_ULANG'] === 500000.0 && (float)$regular['tot_du'] === 450000.0
         && (float)$regular['POMG'] === 100000.0 && (float)$regular['SPP_PERBULAN'] === $expectedSpp,
         'Identitas, potongan, atau tarif siswa reguler tidak sesuai.');
@@ -126,7 +125,6 @@ try {
     enrollment_browser_assert($psb['NAMA'] === 'UJI BROWSER PSB' && $psb['KELAS'] === '0'
         && (int)$psb['master_kelas_id'] === $psbClassId && (int)$psb['is_active'] === 1
         && (int)$psb['asal_psb'] === 1 && (float)$psb['PSB'] === 3600000.0
-        && (float)$psb['PANGKAL'] === 100000.0 && (float)$psb['SPP_PERBULAN'] === 0.0,
         'Identitas atau tarif siswa PSB salah.');
     foreach (['siswa_tahun_ajaran', 'tagihan_spp', 'tagihan_komite', 'tagihan_daftar_ulang'] as $table) {
         enrollment_browser_assert(enrollment_browser_count($koneksi, $table, $psbNis) === 0,

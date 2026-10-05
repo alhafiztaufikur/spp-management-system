@@ -127,7 +127,7 @@ try {
     require_once __DIR__.'/../includes/spp_billing.php';
     foreach([2,3] as $unitId){
         unit_set_context($koneksi,$unitId);
-        if((int)$koneksi->query('SELECT COUNT(*) FROM bayar')->fetch_row()[0]!==14)throw new RuntimeException('Seed pembayaran multiunit tidak idempoten.');
+        if((int)$koneksi->query('SELECT COUNT(*) FROM bayar')->fetch_row()[0]!==13)throw new RuntimeException('Seed pembayaran multiunit tidak idempoten.');
         $wrong=(int)$koneksi->query("SELECT COUNT(*) FROM spp_alokasi a JOIN tagihan_spp ts ON ts.id=a.tagihan_spp_id WHERE ABS(a.nominal_dari_bayar-ts.nominal_tagihan)>.001")->fetch_row()[0];
         if($wrong)throw new RuntimeException('Seed SPP tidak melunasi tepat satu tagihan.');
         foreach($koneksi->query('SELECT DISTINCT no_induk FROM spp_alokasi_batch')->fetch_all(MYSQLI_ASSOC) as $seedStudent)

@@ -96,11 +96,11 @@ try {
     $class = $koneksi->query("SELECT id,kode_rombel FROM master_kelas WHERE tingkat=1 AND is_placeholder=0 AND is_active=1 ORDER BY id LIMIT 1")->fetch_assoc();
     role_test_assert((bool)$class, 'Rombel kelas 1 tidak tersedia.');
     $name = 'UJI AKSES MUTASI'; $level = '1'; $classId = (int)$class['id']; $pangkal = 1000.0;
-    $stmt = $koneksi->prepare('INSERT INTO siswa(NO_INDUK,NAMA,KELAS,master_kelas_id,PANGKAL,tot_pangkal) VALUES(?,?,?,?,?,?)');
-    $stmt->bind_param('sssidd', $nis, $name, $level, $classId, $pangkal, $pangkal);
+    $stmt = $koneksi->prepare('INSERT INTO siswa(NO_INDUK,NAMA,KELAS,master_kelas_id,PSB) VALUES(?,?,?,?,?)');
+    $stmt->bind_param('sssid', $nis, $name, $level, $classId, $pangkal);
     $stmt->execute(); $stmt->close();
     $amount = 100.0; $date = date('Y-m-d H:i:s'); $month = date('m'); $year = date('Y'); $method = 'Tunai';
-    $stmt = $koneksi->prepare('INSERT INTO bayar(NO_INDUK,KELAS,master_kelas_id,U_PANGKAL,TGL_BYR,BULAN,TAHUN,sistem_pembayaran,total_jumlah,payment_link_version) VALUES(?,?,?,?,?,?,?,?,?,1)');
+    $stmt = $koneksi->prepare('INSERT INTO bayar(NO_INDUK,KELAS,master_kelas_id,U_PSB,TGL_BYR,BULAN,TAHUN,sistem_pembayaran,total_jumlah,payment_link_version) VALUES(?,?,?,?,?,?,?,?,?,1)');
     $stmt->bind_param('ssidssssd', $nis, $level, $classId, $amount, $date, $month, $year, $method, $amount);
     $stmt->execute(); $paymentId = (int)$koneksi->insert_id; $stmt->close();
 
@@ -114,11 +114,11 @@ try {
         foreach (['update','hapus'] as $action) {
             $response = role_test_request($baseUrl . '/pembayaran/proses.php', [
                 'aksi'=>$action, 'id'=>$paymentId, 'no_induk'=>$nis,
-                'uang_pangkal'=>200, 'sistem_pembayaran'=>'Tunai', 'csrf_token'=>'invalid',
+                'uang_psb'=>200, 'sistem_pembayaran'=>'Tunai', 'csrf_token'=>'invalid',
             ], $cookies);
             role_test_assert($response['status'] === 302, ucfirst($username) . ' tidak ditolak dari endpoint ' . $action . '.');
-            $stored = $koneksi->query('SELECT U_PANGKAL FROM bayar WHERE id=' . $paymentId)->fetch_assoc();
-            role_test_assert($stored && abs((float)$stored['U_PANGKAL'] - 100) < .001, ucfirst($username) . ' berhasil memutasi pembayaran.');
+            $stored = $koneksi->query('SELECT U_PSB FROM bayar WHERE id=' . $paymentId)->fetch_assoc();
+            role_test_assert($stored && abs((float)$stored['U_PSB'] - 100) < .001, ucfirst($username) . ' berhasil memutasi pembayaran.');
         }
         if ($isCashier) {
             role_test_assert(role_test_request($baseUrl . '/pembayaran/form.php', [], $cookies)['status'] === 200, 'Kasir tidak dapat membuka input pembayaran.');
@@ -144,13 +144,13 @@ try {
     $token = $match[1];
     $updatedAmount = 150.0;
     $update = role_test_request($baseUrl . '/pembayaran/proses.php', [
-        'aksi'=>'update', 'id'=>$paymentId, 'no_induk'=>$nis, 'uang_pangkal'=>$updatedAmount,
+        'aksi'=>'update', 'id'=>$paymentId, 'no_induk'=>$nis, 'uang_psb'=>$updatedAmount,
         'bulan_bayar'=>$month, 'tahun_bayar'=>$year, 'tanggal_bayar'=>$date,
         'sistem_pembayaran'=>'Tunai', 'csrf_token'=>$token,
     ], $adminCookies);
     role_test_assert($update['status'] === 302, 'Perubahan langsung administrator gagal.');
-    $stored = $koneksi->query('SELECT U_PANGKAL FROM bayar WHERE id=' . $paymentId)->fetch_assoc();
-    role_test_assert($stored && abs((float)$stored['U_PANGKAL'] - $updatedAmount) < .001, 'Perubahan administrator tidak langsung diterapkan.');
+    $stored = $koneksi->query('SELECT U_PSB FROM bayar WHERE id=' . $paymentId)->fetch_assoc();
+    role_test_assert($stored && abs((float)$stored['U_PSB'] - $updatedAmount) < .001, 'Perubahan administrator tidak langsung diterapkan.');
     role_test_assert((int)$koneksi->query("SELECT COUNT(*) total FROM transaksi_otorisasi WHERE bayar_id={$paymentId}")->fetch_assoc()['total'] === 0, 'Perubahan administrator masuk antrean.');
 
     $cashier1 = role_test_login($baseUrl, 'kasir1', $testPassword);
@@ -158,23 +158,23 @@ try {
     role_test_assert((bool)preg_match('/name="csrf_token" value="([a-f0-9]+)"/', spp_test_form_scope($cashierEdit['body'], 'no_induk'), $cashierMatch), 'Token CSRF kasir tidak ditemukan.');
     $cashierToken = $cashierMatch[1];
     $requestEdit = role_test_request($baseUrl . '/pembayaran/proses.php', [
-        'aksi'=>'update', 'id'=>$paymentId, 'no_induk'=>$nis, 'uang_pangkal'=>200,
+        'aksi'=>'update', 'id'=>$paymentId, 'no_induk'=>$nis, 'uang_psb'=>200,
         'bulan_bayar'=>$month, 'tahun_bayar'=>$year, 'tanggal_bayar'=>$date,
         'sistem_pembayaran'=>'Tunai', 'csrf_token'=>$cashierToken,
         'authorization_reason'=>'Koreksi nominal oleh kasir satu.',
     ], $cashier1);
     role_test_assert($requestEdit['status'] === 302, 'Pengajuan perubahan kasir gagal.');
-    $stored = $koneksi->query('SELECT U_PANGKAL FROM bayar WHERE id=' . $paymentId)->fetch_assoc();
-    role_test_assert($stored && abs((float)$stored['U_PANGKAL'] - $updatedAmount) < .001, 'Pengajuan kasir langsung mengubah transaksi.');
+    $stored = $koneksi->query('SELECT U_PSB FROM bayar WHERE id=' . $paymentId)->fetch_assoc();
+    role_test_assert($stored && abs((float)$stored['U_PSB'] - $updatedAmount) < .001, 'Pengajuan kasir langsung mengubah transaksi.');
     $pending = $koneksi->query("SELECT id FROM transaksi_otorisasi WHERE bayar_id={$paymentId} AND action='edit' AND status='pending' ORDER BY id DESC LIMIT 1")->fetch_assoc();
     role_test_assert((bool)$pending, 'Pengajuan kasir tidak masuk antrean.');
     role_test_request($baseUrl . '/pembayaran/proses.php', [
-        'aksi'=>'update', 'id'=>$paymentId, 'no_induk'=>$nis, 'uang_pangkal'=>250,
+        'aksi'=>'update', 'id'=>$paymentId, 'no_induk'=>$nis, 'uang_psb'=>250,
         'bulan_bayar'=>$month, 'tahun_bayar'=>$year, 'tanggal_bayar'=>$date,
         'sistem_pembayaran'=>'Tunai', 'csrf_token'=>$token,
     ], $adminCookies);
-    $stored = $koneksi->query('SELECT U_PANGKAL FROM bayar WHERE id=' . $paymentId)->fetch_assoc();
-    role_test_assert($stored && abs((float)$stored['U_PANGKAL'] - $updatedAmount) < .001, 'Perubahan langsung admin menimpa pengajuan kasir.');
+    $stored = $koneksi->query('SELECT U_PSB FROM bayar WHERE id=' . $paymentId)->fetch_assoc();
+    role_test_assert($stored && abs((float)$stored['U_PSB'] - $updatedAmount) < .001, 'Perubahan langsung admin menimpa pengajuan kasir.');
 
     $authorizationPage = role_test_request($baseUrl . '/otorisasi_transaksi.php', [], $adminCookies);
     role_test_assert($authorizationPage['status'] === 200 && str_contains($authorizationPage['body'], 'Setujui dan Terapkan'), 'Administrator tidak melihat tindakan persetujuan.');
@@ -210,14 +210,14 @@ try {
         'csrf_token'=>$authorizationToken, 'decision_note'=>'Koreksi kasir disetujui.',
     ], $adminCookies);
     role_test_assert($approveEdit['status'] === 302, 'Persetujuan perubahan administrator gagal.');
-    $stored = $koneksi->query('SELECT U_PANGKAL FROM bayar WHERE id=' . $paymentId)->fetch_assoc();
-    role_test_assert($stored && abs((float)$stored['U_PANGKAL'] - 200) < .001, 'Persetujuan administrator tidak menerapkan perubahan.');
+    $stored = $koneksi->query('SELECT U_PSB FROM bayar WHERE id=' . $paymentId)->fetch_assoc();
+    role_test_assert($stored && abs((float)$stored['U_PSB'] - 200) < .001, 'Persetujuan administrator tidak menerapkan perubahan.');
     role_test_assert((int)$koneksi->query('SELECT COUNT(*) total FROM transaksi_otorisasi WHERE id='.(int)$pending['id']." AND status='approved'")->fetch_assoc()['total'] === 1, 'Audit persetujuan edit tidak tersimpan.');
 
     $cashier2Edit = role_test_request($baseUrl . '/pembayaran/edit.php?id=' . $paymentId, [], $cashier2);
     role_test_assert((bool)preg_match('/name="csrf_token" value="([a-f0-9]+)"/', spp_test_form_scope($cashier2Edit['body'], 'no_induk'), $cashier2Match), 'Token kasir dua tidak ditemukan.');
     role_test_request($baseUrl . '/pembayaran/proses.php', [
-        'aksi'=>'update', 'id'=>$paymentId, 'no_induk'=>$nis, 'uang_pangkal'=>225,
+        'aksi'=>'update', 'id'=>$paymentId, 'no_induk'=>$nis, 'uang_psb'=>225,
         'bulan_bayar'=>$month, 'tahun_bayar'=>$year, 'tanggal_bayar'=>$date,
         'sistem_pembayaran'=>'Tunai', 'csrf_token'=>$cashier2Match[1],
         'authorization_reason'=>'Pengajuan untuk pengujian pembatalan.',
@@ -235,7 +235,7 @@ try {
     $cashier3Edit = role_test_request($baseUrl . '/pembayaran/edit.php?id=' . $paymentId, [], $cashier3);
     role_test_assert((bool)preg_match('/name="csrf_token" value="([a-f0-9]+)"/', spp_test_form_scope($cashier3Edit['body'], 'no_induk'), $cashier3Match), 'Token kasir tiga tidak ditemukan.');
     role_test_request($baseUrl . '/pembayaran/proses.php', [
-        'aksi'=>'update', 'id'=>$paymentId, 'no_induk'=>$nis, 'uang_pangkal'=>230,
+        'aksi'=>'update', 'id'=>$paymentId, 'no_induk'=>$nis, 'uang_psb'=>230,
         'bulan_bayar'=>$month, 'tahun_bayar'=>$year, 'tanggal_bayar'=>$date,
         'sistem_pembayaran'=>'Tunai', 'csrf_token'=>$cashier3Match[1],
         'authorization_reason'=>'Pengajuan untuk pengujian penolakan.',
@@ -292,7 +292,7 @@ try {
     $paymentId = 0;
 
     $directAmount = 100.0;
-    $stmt = $koneksi->prepare('INSERT INTO bayar(NO_INDUK,KELAS,master_kelas_id,U_PANGKAL,TGL_BYR,BULAN,TAHUN,sistem_pembayaran,total_jumlah,payment_link_version) VALUES(?,?,?,?,?,?,?,?,?,1)');
+    $stmt = $koneksi->prepare('INSERT INTO bayar(NO_INDUK,KELAS,master_kelas_id,U_PSB,TGL_BYR,BULAN,TAHUN,sistem_pembayaran,total_jumlah,payment_link_version) VALUES(?,?,?,?,?,?,?,?,?,1)');
     $stmt->bind_param('ssidssssd', $nis, $level, $classId, $directAmount, $date, $month, $year, $method, $directAmount);
     $stmt->execute(); $paymentId = (int)$koneksi->insert_id; $stmt->close();
     $directDelete = role_test_request($baseUrl . '/pembayaran/proses.php', [

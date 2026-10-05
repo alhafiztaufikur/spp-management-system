@@ -35,8 +35,8 @@ const { chromium } = require(process.env.SPP_PLAYWRIGHT_CORE || 'playwright-core
     async function propose(amount) {
       const before = state();
       await cashier.goto(new URL(`/pembayaran/edit.php?id=${before.payment.id}`, base).href);
-      await cashier.waitForFunction(() => !document.querySelector('#pangkal-input')?.readOnly);
-      await cashier.locator('#pangkal-input').fill(String(amount));
+      await cashier.waitForFunction(() => !document.querySelector('#psb-input')?.readOnly);
+      await cashier.locator('#psb-input').fill(String(amount));
       await cashier.locator('[name="authorization_reason"]').fill(`Browser koreksi nominal menjadi ${amount}`);
       await Promise.all([cashier.waitForNavigation({waitUntil:'domcontentloaded'}), cashier.locator('#btn-update').click()]);
       const after = state();

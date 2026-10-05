@@ -80,6 +80,7 @@ if ($view === 'preview' && $principalRows) {
     <title>Surat Laporan ke Kepala Sekolah | SistemSPP</title>
     <link rel="icon" href="../assets/img/favicon.png?v=2">
     <link rel="stylesheet" href="../assets/css/style.css?v=principal-redesign1&amp;mtime=<?= filemtime(__DIR__ . '/../assets/css/style.css') ?>">
+    <link rel="stylesheet" href="../assets/css/date_controls.css?v=principal-redesign1&amp;mtime=<?= filemtime(__DIR__ . '/../assets/css/date_controls.css') ?>">
     <script>(function(){try{document.documentElement.setAttribute('data-theme',localStorage.getItem('spp_theme')||'light')}catch(e){}})();</script>
 </head>
 <body class="principal-report-page">
@@ -149,6 +150,7 @@ if ($view === 'preview' && $principalRows) {
         <?php endif; ?>
     </div>
 </main></div>
-<script src="../assets/js/app.js?v=<?= filemtime(__DIR__ . '/../assets/js/app.js') ?>"></script>
+<script src="../assets/js/date_format.js?v=<?= filemtime(__DIR__ . '/../assets/js/date_format.js') ?>"></script>
+  <script src="../assets/js/app.js?v=<?= filemtime(__DIR__ . '/../assets/js/app.js') ?>"></script>
 <script src="../assets/js/principal_report.js?v=1" defer></script>
 </body></html>

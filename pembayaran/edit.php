@@ -61,7 +61,6 @@ $d['uang_spp_baru'] = $currentSppAllocation ? (float)$currentSppAllocation['uang
 $siswa_sql = "
     SELECT
         s.*,
-        COALESCE(p.paid_pangkal, 0) AS paid_pangkal,
         COALESCE(p.paid_psb, 0) AS paid_psb,
         COALESCE(du.paid_du, 0) AS paid_du,
         mk.tingkat AS master_tingkat, mk.kode_rombel, mk.is_placeholder,
@@ -72,7 +71,7 @@ $siswa_sql = "
     FROM siswa s
     LEFT JOIN master_kelas mk ON mk.id=s.master_kelas_id
     LEFT JOIN (
-        SELECT unit_id,NO_INDUK, SUM(U_PANGKAL) AS paid_pangkal, SUM(U_PSB) AS paid_psb
+        SELECT unit_id,NO_INDUK, SUM(U_PSB) AS paid_psb
         FROM bayar
         WHERE id <> ?
         GROUP BY unit_id,NO_INDUK
@@ -161,14 +160,14 @@ $selectedAcademicYear = $res_du && trim((string)$res_du['th_ajaran']) !== ''
 $annual_fee_payload = annual_fee_payload_for_options($koneksi, $id);
 $oneTimeAvailability = one_time_fee_status($koneksi, (string)$d['NO_INDUK'], $id);
 $initialFeeLocks = [];
-foreach (['pangkal', 'psb'] as $feeKey) {
+foreach (['psb'] as $feeKey) {
     $fee = $oneTimeAvailability[$feeKey];
     $initialFeeLocks[$feeKey] = $fee['total'] <= .001 || $fee['remaining'] <= .001;
 }
 $initialFeeLocks['spp'] = true; // Dibuka setelah status tagihan periode ini diperiksa.
 $initialFeeLocks['komite'] = true;
 $initialFeeLocks['du'] = true;
-$initialInputZero = ['pangkal' => $initialFeeLocks['pangkal'], 'psb' => $initialFeeLocks['psb']];
+$initialInputZero = ['psb' => $initialFeeLocks['psb']];
 $initialLockReasons = [];
 $sppBill = null;
 foreach ($published_spp_payload[$d['NO_INDUK']]['tagihan'] ?? [] as $bill) {
@@ -234,7 +233,6 @@ function money_attr($value) {
 
 function total_after_discount($total, $discount, $fallbackTotal = 0) {
     // $fallbackTotal dipertahankan agar kontrak pemanggil lama tidak putus,
-    // tetapi Pangkal selalu dihitung dari nominal Master Siswa dan potongan.
     return max(0, (float)$total - (float)$discount);
 }
 
@@ -261,6 +259,7 @@ $selectedPaymentMethod = $d['sistem_pembayaran'] ?? 'VA';
   <link rel="preconnect" href="https://fonts.googleapis.com" />
   <link href="https://fonts.googleapis.com/css2?family=Inter:wght@300;400;500;600;700;800&display=swap" rel="stylesheet" />
   <link rel="stylesheet" href="../assets/css/style.css?v=duselector8&amp;mtime=<?= filemtime(__DIR__ . '/../assets/css/style.css') ?>" />
+  <link rel="stylesheet" href="../assets/css/date_controls.css?v=duselector8&amp;mtime=<?= filemtime(__DIR__ . '/../assets/css/date_controls.css') ?>" />
   <!-- Prevent theme flash -->
   <script>(function(){var t=localStorage.getItem('spp_theme')||'light';document.documentElement.setAttribute('data-theme',t);})();</script>
 </head>
@@ -385,11 +384,9 @@ $selectedPaymentMethod = $d['sistem_pembayaran'] ?? 'VA';
                   data-kelas="<?= htmlspecialchars($s['graduation_year'] ? ('LULUS · TA '.$s['graduation_year']) : class_label(['tingkat'=>$s['master_tingkat']?:$s['KELAS'],'kode_rombel'=>$s['kode_rombel']??'BELUM','is_placeholder'=>$s['is_placeholder']??1])) ?>"
                   data-is-graduate="<?= $s['graduation_year'] ? '1' : '0' ?>"
                   data-graduation-year="<?= htmlspecialchars((string)$s['graduation_year']) ?>"
-                  data-total-pangkal="<?= money_attr(total_after_discount($s['PANGKAL'], $s['potong_pangkal'], $s['tot_pangkal'])) ?>"
                   data-total-psb="<?= money_attr($s['PSB']) ?>"
                   data-total-spp="<?= money_attr($s['SPP_PERBULAN']) ?>"
                   data-total-komite="<?= money_attr($s['POMG']) ?>"
-                  data-paid-pangkal="<?= money_attr($s['paid_pangkal']) ?>"
                   data-paid-psb="<?= money_attr($s['paid_psb']) ?>"
                   data-paid-spp-periods="<?= htmlspecialchars(json_encode($period_payments[$s['NO_INDUK']]['spp'] ?? []), ENT_QUOTES, 'UTF-8') ?>"
                   data-spp-placements="<?= htmlspecialchars(json_encode($spp_placements[$s['NO_INDUK']] ?? [], JSON_UNESCAPED_UNICODE), ENT_QUOTES, 'UTF-8') ?>"
@@ -436,7 +433,6 @@ $selectedPaymentMethod = $d['sistem_pembayaran'] ?? 'VA';
               <tbody>
                 <?php
                 $komp = [
-                  ['pangkal', '💰 Uang Pangkal', 'U_PANGKAL', 'uang_pangkal'],
                   ['psb', '🎒 Uang PSB', 'U_PSB', 'uang_psb'],
                   ['spp', '🎓 Uang SPP Diterima', 'uang_spp_baru', 'uang_spp'],
                   ['komite', '🏫 Uang Komite', 'U_KOMITE', 'uang_komite'],
@@ -445,7 +441,7 @@ $selectedPaymentMethod = $d['sistem_pembayaran'] ?? 'VA';
                 foreach ($komp as $i => [$key,$label,$col,$inputName]):
                 ?>
                 <tr class="<?= $i%2===0?'row-highlight':'' ?>">
-                  <td><?php if($key==='du'): ?><div class="du-bill-selector"><button type="button" class="du-selector-trigger" id="du-selector-trigger" aria-haspopup="listbox" aria-controls="du-selector-menu" aria-expanded="false"><span class="du-trigger-label"><?=$label?></span><span class="du-arrear-warning" id="du-arrear-warning" role="img" hidden></span><span class="du-chevron" aria-hidden="true"><svg viewBox="0 0 16 16" focusable="false"><path d="M3.5 6 8 10 12.5 6"/></svg></span></button><div class="du-selector-menu" id="du-selector-menu" role="listbox" aria-label="Pilih tagihan Daftar Ulang" tabindex="-1" hidden></div></div><?php else: ?><span class="comp-label"<?= $key === 'spp' ? ' id="spp-component-label"' : '' ?>><?=$label?></span><?php endif; ?><?php if($key==='spp'): ?><small class="du-inline-context du-context-label" id="spp-context-label"><?= htmlspecialchars($initialLockReasons['spp'] ?? 'Memeriksa tagihan bulan ini.') ?></small><?php endif; ?><?php if($key==='komite'): ?><small class="du-inline-context du-context-label" id="komite-context-label"><?= htmlspecialchars($initialLockReasons['komite'] ?? 'Memeriksa tagihan bulan ini.') ?></small><?php endif; ?><?php if(in_array($key,['pangkal','psb'],true)): ?><small class="du-inline-context du-context-label" id="<?=$key?>-context-label"><?= $initialFeeLocks[$key] ? (($oneTimeAvailability[$key]['total'] <= .001) ? 'Belum ada tagihan di Data Siswa.' : 'Tagihan sudah lunas.') : 'Tagihan satu kali, dapat dicicil' ?></small><?php endif; ?><?php if($key==='du'): ?><small class="du-inline-context du-context-label" id="du-context-label"><?= htmlspecialchars($initialLockReasons['du'] ?? 'Memeriksa tagihan Daftar Ulang.') ?></small><small class="du-inline-context du-master-warning" id="du-master-warning" hidden></small><?php endif; ?></td>
+                  <td><?php if($key==='du'): ?><div class="du-bill-selector"><button type="button" class="du-selector-trigger" id="du-selector-trigger" aria-haspopup="listbox" aria-controls="du-selector-menu" aria-expanded="false"><span class="du-trigger-label"><?=$label?></span><span class="du-arrear-warning" id="du-arrear-warning" role="img" hidden></span><span class="du-chevron" aria-hidden="true"><svg viewBox="0 0 16 16" focusable="false"><path d="M3.5 6 8 10 12.5 6"/></svg></span></button><div class="du-selector-menu" id="du-selector-menu" role="listbox" aria-label="Pilih tagihan Daftar Ulang" tabindex="-1" hidden></div></div><?php else: ?><span class="comp-label"<?= $key === 'spp' ? ' id="spp-component-label"' : '' ?>><?=$label?></span><?php endif; ?><?php if($key==='spp'): ?><small class="du-inline-context du-context-label" id="spp-context-label"><?= htmlspecialchars($initialLockReasons['spp'] ?? 'Memeriksa tagihan bulan ini.') ?></small><?php endif; ?><?php if($key==='komite'): ?><small class="du-inline-context du-context-label" id="komite-context-label"><?= htmlspecialchars($initialLockReasons['komite'] ?? 'Memeriksa tagihan bulan ini.') ?></small><?php endif; ?><?php if(in_array($key,['psb'],true)): ?><small class="du-inline-context du-context-label" id="<?=$key?>-context-label"><?= $initialFeeLocks[$key] ? (($oneTimeAvailability[$key]['total'] <= .001) ? 'Belum ada tagihan di Data Siswa.' : 'Tagihan sudah lunas.') : 'Tagihan satu kali, dapat dicicil' ?></small><?php endif; ?><?php if($key==='du'): ?><small class="du-inline-context du-context-label" id="du-context-label"><?= htmlspecialchars($initialLockReasons['du'] ?? 'Memeriksa tagihan Daftar Ulang.') ?></small><small class="du-inline-context du-master-warning" id="du-master-warning" hidden></small><?php endif; ?></td>
                   <td data-label="Total Tagihan"><input class="tbl-input tbl-system" type="text" value="0" id="<?=$key?>-total" readonly tabindex="-1" aria-readonly="true" /></td>
                   <td data-label="Sudah Terbayar"><input class="tbl-input tbl-system" type="text" value="0" id="<?=$key?>-bayar" readonly tabindex="-1" aria-readonly="true" /></td>
                   <td data-label="Sisa"><input class="tbl-input tbl-system tbl-system-sisa" type="text" value="0" id="<?=$key?>-sisa" readonly tabindex="-1" aria-readonly="true" /></td>
@@ -617,6 +613,7 @@ $selectedPaymentMethod = $d['sistem_pembayaran'] ?? 'VA';
       JSON_UNESCAPED_UNICODE | JSON_UNESCAPED_SLASHES | JSON_HEX_TAG | JSON_HEX_APOS | JSON_HEX_AMP | JSON_HEX_QUOT
     ) ?>;
   </script>
+  <script src="../assets/js/date_format.js?v=<?= filemtime(__DIR__ . '/../assets/js/date_format.js') ?>"></script>
   <script src="../assets/js/app.js?v=<?= filemtime(__DIR__ . '/../assets/js/app.js') ?>"></script>
 </body>
 </html>

@@ -8,7 +8,7 @@ $format=(string)($_GET['format']??'preview');if(!in_array($format,['preview','pr
 $excelDownload=$format==='excel'&&($_GET['download']??'')==='1';
 if($format==='pdf'){require_once __DIR__.'/../includes/pdf.php';require_pdf_library();}
 $filters=report_filters($koneksi,$_GET);if($template==='riwayat-tagihan'&&!isset($_GET['siswa_status']))$filters['siswa_status']='all';if(!isset($_GET['kategori'])&&$template==='penerimaan')$filters['kategori']='semua';if($template==='tunggakan-siswa'){$filters['q']='';if(($_GET['mode']??'')==='all')$filters['kelas']='';}
-$report=report_build($koneksi,$template,$filters);$generated=date('d-m-Y H:i:s');$operator=(string)($_SESSION['admin_nama']??$_SESSION['admin_username']??'Pengguna');
+$report=report_build($koneksi,$template,$filters);$generated=spp_date_label(new DateTimeImmutable('now'),true);$operator=(string)($_SESSION['admin_nama']??$_SESSION['admin_username']??'Pengguna');
 if($template==='tunggakan-siswa'&&$format==='excel'&&($_GET['view']??'')==='detail'){
     $classId=report_class_filter_rombel_id($filters);
     $selectedClass=null;
@@ -85,6 +85,7 @@ function export_safe_text($value):string{
     return report_e($text);
 }
 function export_cell($value,string $type,array $row=[],string $key=''):string{
+    if(in_array($type,['date','datetime'],true))return report_e(spp_date_label($value,$type==='datetime'));
     if($type==='money')return report_e(report_money($value));
     if($type==='money_optional')return $value===null||$value===''?'-':report_e(report_money($value));
     if($type==='html'&&is_array($value))return export_safe_text(($value['text']??'').(($value['sub']??'')!==''?' · '.$value['sub']:''));
@@ -146,7 +147,7 @@ thead{display:table-header-group}tfoot{display:table-row-group}tr{page-break-ins
 ?><h3><?= report_e($componentTitle) ?></h3><table class="data report-component-table"><thead><tr><th>No</th><th><?= report_e($componentTitle) ?></th><th>Nominal</th></tr></thead><tbody><?php if(!$componentRows): ?><tr><td colspan="3" style="text-align:center">Tidak ada transaksi pada filter terpilih.</td></tr><?php else: foreach($componentRows as $index=>$component): ?><tr><td class="report-number"><?= $index+1 ?></td><td><?= export_safe_text($component['komponen']) ?></td><td class="money <?= (float)$component['nominal']<0?'negative':'' ?>"><?= report_money($component['nominal']) ?></td></tr><?php endforeach; endif; ?></tbody><tfoot><tr><th colspan="2"><?= report_e($componentTotalLabel) ?></th><th class="money <?= (float)($report['component_total']??0)<0?'negative':'' ?>"><?= report_money($report['component_total']??0) ?></th></tr></tfoot></table><h3><?= report_e($summaryTitle) ?></h3><table class="data"><thead><tr><th>Ringkasan</th><th>Nilai</th></tr></thead><tbody><?php foreach($summaryItems as $item): ?><tr><td><?= export_safe_text($item['label']) ?></td><td class="money"><?= $item['type']==='money'?report_money($item['value']):number_format((int)$item['value']) ?></td></tr><?php endforeach; ?></tbody></table><table class="data total-table"><caption><?= report_e($totalLabel) ?></caption><tbody><tr><th><?= report_e(ucwords(strtolower($totalLabel))) ?></th><td class="money <?= $totalValue<0?'negative':'' ?>"><?= report_money($totalValue) ?></td></tr></tbody></table><?php endif; ?>
 <?php if(!$isCashRecap): ?>
 <?php if($template==='riwayat-tagihan'): ?>
-<div class="billing-export-note">Tanggal yang dipilih adalah tanggal tagihan dibuat. Untuk Uang Pangkal dan Uang PSB, tanggal mengikuti tanggal data siswa dibuat.</div>
+<div class="billing-export-note">Tanggal yang dipilih adalah tanggal tagihan dibuat. Untuk Uang PSB, tanggal mengikuti tanggal data siswa dibuat.</div>
 <table class="data billing-export-table">
 <thead><tr>
   <th class="billing-number">No</th><th class="billing-nis">NIS</th><th class="billing-name">Nama Siswa</th><th class="billing-class">Kelas</th>

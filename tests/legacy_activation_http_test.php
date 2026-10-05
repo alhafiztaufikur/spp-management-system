@@ -1,5 +1,5 @@
 <?php
-if(PHP_SAPI!=='cli'||getenv('SPP_TEST_ALLOW_MUTATION')!=='1'||getenv('SPP_DB_NAME')!=='db_spp_audit_legacy_backend_20261003')exit(1);
+if(PHP_SAPI!=='cli'||getenv('SPP_TEST_ALLOW_MUTATION')!=='1'||!preg_match('/^db_spp_audit_[a-z0-9_]+$/D',(string)getenv('SPP_DB_NAME')))exit(1);
 ob_start();
 require_once __DIR__.'/../koneksi.php';require_once __DIR__.'/../includes/legacy_activation.php';require_once __DIR__.'/http_form_scope.php';
 $base=rtrim(getenv('SPP_TEST_BASE_URL'),'/');spp_test_assert_http_clone($base,DB_NAME);
@@ -20,9 +20,10 @@ foreach([1=>1,2=>7,3=>10] as $unit=>$level){
  unit_set_context($koneksi,$unit);$_SESSION['active_unit_id']=$unit;$id=$students[$unit];$sid=$sessions[$unit];
  [$status,$page]=lh_request('/siswa/aktivasi_legacy.php?id='.$id,$sid);lh_assert($status===200,'Activation page');$form=spp_test_form_scope($page,'confirmed');preg_match('/name="csrf_token" value="([a-f0-9]{64})"/',$form,$csrf);
  $class=(int)$koneksi->query("SELECT id FROM master_kelas WHERE tingkat=$level AND kode_rombel='A' AND is_active=1 LIMIT 1")->fetch_row()[0];$year=$koneksi->query("SELECT id,label FROM tahun_ajaran WHERE label='2026/2027'")->fetch_assoc();$rate=spp_current_effective_rate($koneksi,(string)$level,0,$year['label']);
- $post=['id'=>$id,'csrf_token'=>$csrf[1],'class_id'=>$class,'year_id'=>$year['id'],'spp'=>$rate['net'],'pangkal'=>0,'psb'=>0,'komite'=>$unit*10000,'du'=>0,'confirmed'=>'1'];
+ $post=['id'=>$id,'csrf_token'=>$csrf[1],'class_id'=>$class,'year_id'=>$year['id'],'spp'=>$rate['net'],'psb'=>0,'komite'=>$unit*10000,'du'=>0,'confirmed'=>'1'];
  lh_assert(lh_request('/siswa/aktivasi_legacy.php',$sid,array_replace($post,['csrf_token'=>'wrong']))[0]===403,'Activation CSRF');
  lh_assert(lh_request('/siswa/aktivasi_legacy.php',$sid,array_replace($post,['spp'=>999999]))[0]===409,'Unconfirmed/mismatched master rate');
+ lh_assert(lh_request('/siswa/aktivasi_legacy.php',$sid,array_replace($post,['pangkal'=>0]))[0]===409,'Retired activation component');
  lh_assert(lh_request('/siswa/aktivasi_legacy.php',$sid,$post)[0]===302,'Admin/cashier explicit activation');
  lh_assert(lh_request('/siswa/aktivasi_legacy.php',$sid,$post)[0]===409,'Stale activation replay');
  lh_assert((int)$koneksi->query("SELECT COUNT(*) FROM siswa_tahun_ajaran WHERE no_induk='$nis'")->fetch_row()[0]===1,'Placement duplicated');

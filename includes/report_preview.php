@@ -26,7 +26,7 @@ function render_report_export_preview(string $documentHtml, array $options): voi
 {
     $title = (string)($options['title'] ?? 'Preview Laporan');
     $subtitle = (string)($options['subtitle'] ?? 'Periksa data sebelum mengunduh laporan.');
-    $generated = (string)($options['generated'] ?? date('d-m-Y H:i:s'));
+    $generated = (string)($options['generated'] ?? spp_date_label(new DateTimeImmutable('now'),true));
     $rowCount = max(0, (int)($options['row_count'] ?? 0));
     $orientation = ($options['orientation'] ?? 'portrait') === 'landscape' ? 'landscape' : 'portrait';
     $fileType = strtoupper((string)($options['file_type'] ?? 'PDF'));

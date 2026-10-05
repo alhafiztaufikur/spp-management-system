@@ -111,8 +111,8 @@ try {
     $class = $koneksi->query("SELECT id FROM master_kelas WHERE tingkat=1 AND kode_rombel='A' AND is_active=1 LIMIT 1")->fetch_assoc();
     guard_assert((bool)$class, 'Kelas 1A tidak tersedia.');
     $classId = (int)$class['id']; $name = 'UJI GUARD KEUANGAN'; $level = '1'; $pangkal = 1000000.0;
-    $stmt = $koneksi->prepare('INSERT INTO siswa(NO_INDUK,NAMA,KELAS,master_kelas_id,PANGKAL,tot_pangkal) VALUES(?,?,?,?,?,?)');
-    $stmt->bind_param('sssidd', $nis, $name, $level, $classId, $pangkal, $pangkal);
+    $stmt = $koneksi->prepare('INSERT INTO siswa(NO_INDUK,NAMA,KELAS,master_kelas_id,PSB) VALUES(?,?,?,?,?)');
+    $stmt->bind_param('sssid', $nis, $name, $level, $classId, $pangkal);
     $stmt->execute(); $stmt->close();
     $masterName = 'UJI GUARD ' . $nis;
     $stmt = $koneksi->prepare('INSERT INTO master_biaya_lain(nama,nominal) VALUES(?,1000000)');
@@ -125,7 +125,7 @@ try {
     $second = guard_login($secondBase, $password);
     $period = ['bulan_bayar' => date('m'), 'tahun_bayar' => date('Y')];
     $paymentData = ['aksi' => 'input', 'payment_plan' => 'monthly', 'no_induk' => $nis,
-        'sistem_pembayaran' => 'Tunai', 'uang_pangkal' => 100000] + $period;
+        'sistem_pembayaran' => 'Tunai', 'uang_psb' => 100000] + $period;
     $paymentForm = guard_form($base, '/pembayaran/form.php', $first); $keys[] = $paymentForm['request_key'];
     guard_http($base . '/pembayaran/proses.php?aksi=input&no_induk=' . rawurlencode($nis), null, $first);
     guard_assert(guard_count($koneksi, 'bayar', $nis) === 0, 'Input pembayaran lewat GET mengubah data.');
@@ -189,35 +189,22 @@ try {
     $differentPaymentB = guard_form($secondBase, '/pembayaran/form.php', $second);
     $keys[] = $differentPaymentA['request_key']; $keys[] = $differentPaymentB['request_key'];
     $beforePayments = guard_count($koneksi, 'bayar', $nis);
-    $competingPayment = $paymentData; $competingPayment['uang_pangkal'] = 600000;
+    $competingPayment = $paymentData; $competingPayment['uang_psb'] = 600000;
     $paymentPair = guard_parallel([
         [$base . '/pembayaran/proses.php', $competingPayment + $differentPaymentA, $first],
         [$secondBase . '/pembayaran/proses.php', $competingPayment + $differentPaymentB, $second],
     ]);
-    guard_assert($paymentPair[0]['status'] === 302 && $paymentPair[1]['status'] === 302, 'Tes dua kasir pada tagihan Pangkal tidak selesai.');
+    guard_assert($paymentPair[0]['status'] === 302 && $paymentPair[1]['status'] === 302, 'Tes dua kasir pada tagihan PSB tidak selesai.');
     $afterPayments = guard_count($koneksi, 'bayar', $nis);
     guard_assert($afterPayments === $beforePayments + 1,
-        'Dua kasir melampaui sisa tagihan Pangkal: sebelum=' . $beforePayments . ', sesudah=' . $afterPayments
+        'Dua kasir melampaui sisa tagihan PSB: sebelum=' . $beforePayments . ', sesudah=' . $afterPayments
         . ', respons=' . json_encode($paymentPair)
         . ', flash=' . guard_flash($base, $first) . ' / ' . guard_flash($secondBase, $second));
-
-    $stmt = $koneksi->prepare('UPDATE siswa SET PSB=1000000 WHERE NO_INDUK=?');
-    $stmt->bind_param('s', $nis); $stmt->execute(); $stmt->close();
-    $psbA = guard_form($base, '/pembayaran/form.php', $first);
-    $psbB = guard_form($secondBase, '/pembayaran/form.php', $second);
-    $keys[] = $psbA['request_key']; $keys[] = $psbB['request_key'];
-    $beforePayments = guard_count($koneksi, 'bayar', $nis);
-    $psbData = $paymentData; unset($psbData['uang_pangkal']); $psbData['uang_psb'] = 600000;
-    $psbPair = guard_parallel([
-        [$base . '/pembayaran/proses.php', $psbData + $psbA, $first],
-        [$secondBase . '/pembayaran/proses.php', $psbData + $psbB, $second],
-    ]);
-    guard_assert(guard_count($koneksi, 'bayar', $nis) === $beforePayments + 1, 'Dua kasir melampaui tagihan PSB: ' . json_encode($psbPair));
 
     $otherA = guard_form($base, '/pembayaran/form.php', $first);
     $otherB = guard_form($secondBase, '/pembayaran/form.php', $second);
     $keys[] = $otherA['request_key']; $keys[] = $otherB['request_key'];
-    $otherData = $paymentData; unset($otherData['uang_pangkal']);
+    $otherData = $paymentData; unset($otherData['uang_psb']);
     $otherData += ['biaya_lain_detail_id'=>[''], 'biaya_lain_tagihan_id'=>[(string)$billId],
         'biaya_lain_nominal'=>['600000'], 'biaya_lain_keterangan'=>['']];
     $otherPair = guard_parallel([

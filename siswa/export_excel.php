@@ -51,7 +51,7 @@ if ($filterClass > 0) {
 }
 $filterParts[] = 'Status: ' . ($statusLabels[$filterStatus] ?? 'Aktif');
 $filterLabel = implode(' | ', $filterParts);
-$generated = date('d-m-Y H:i:s');
+$generated = spp_date_label(new DateTimeImmutable('now'),true);
 
 ob_start();
 ?>

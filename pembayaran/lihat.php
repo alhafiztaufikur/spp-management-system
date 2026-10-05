@@ -38,14 +38,7 @@ function month_code($value) {
     return str_pad((string)$value, 2, '0', STR_PAD_LEFT);
 }
 
-function format_payment_datetime($value): array {
-    $timestamp = strtotime((string)$value);
-    if (!$timestamp) return ['date' => '-', 'time' => '-'];
-    return [
-        'date' => date('d/m/Y', $timestamp),
-        'time' => date('H:i', $timestamp) . ' WIB'
-    ];
-}
+function format_payment_datetime($value): array { return spp_date_parts($value); }
 
 function payment_was_updated($createdAt, $updatedAt): bool {
     $created = strtotime((string)$createdAt);
@@ -119,8 +112,8 @@ $bln_list = [
 $firstShown = $totalPayments > 0 ? $offset + 1 : 0;
 $lastShown = $totalPayments > 0 ? min($offset + $perPage, $totalPayments) : 0;
 $periodLabel = $filter_tanggal_awal === $filter_tanggal_akhir
-    ? date('d/m/Y', strtotime($filter_tanggal_awal))
-    : date('d/m/Y', strtotime($filter_tanggal_awal)) . ' - ' . date('d/m/Y', strtotime($filter_tanggal_akhir));
+    ? spp_date_label($filter_tanggal_awal)
+    : spp_date_label($filter_tanggal_awal) . ' - ' . spp_date_label($filter_tanggal_akhir);
 $studentOptions = $koneksi->query("SELECT s.id AS student_id,s.NO_INDUK,s.unit_id,s.NO_induk_diknas,s.NAMA,s.KELAS FROM siswa s WHERE s.is_active=1 ORDER BY s.NAMA")->fetch_all(MYSQLI_ASSOC);
 $studentSearchDisplay = $search;
 $displayMatches=array_values(array_filter($studentOptions,static fn($o)=>(int)($_GET['student_id']??0)>0 ? (int)$o['student_id']===(int)$_GET['student_id'] : ($search!==''&&($search===$o['NO_INDUK']||$search===(string)($o['NO_induk_diknas']??'')))));
@@ -137,6 +130,7 @@ if(count($displayMatches)===1)$studentSearchDisplay=$displayMatches[0]['NAMA'];
   <link rel="preconnect" href="https://fonts.googleapis.com" />
   <link href="https://fonts.googleapis.com/css2?family=Inter:wght@300;400;500;600;700;800&display=swap" rel="stylesheet" />
   <link rel="stylesheet" href="../assets/css/style.css?v=unitpalette4&amp;mtime=<?= filemtime(__DIR__ . '/../assets/css/style.css') ?>" />
+  <link rel="stylesheet" href="../assets/css/date_controls.css?v=unitpalette4&amp;mtime=<?= filemtime(__DIR__ . '/../assets/css/date_controls.css') ?>" />
   <!-- Prevent theme flash -->
   <script>(function(){var t=localStorage.getItem('spp_theme')||'light';document.documentElement.setAttribute('data-theme',t);})();</script>
 </head>
@@ -367,6 +361,7 @@ if(count($displayMatches)===1)$studentSearchDisplay=$displayMatches[0]['NAMA'];
     </form>
   </div>
 
+  <script src="../assets/js/date_format.js?v=<?= filemtime(__DIR__ . '/../assets/js/date_format.js') ?>"></script>
   <script src="../assets/js/app.js?v=<?= filemtime(__DIR__ . '/../assets/js/app.js') ?>"></script>
   <script>
   (() => {

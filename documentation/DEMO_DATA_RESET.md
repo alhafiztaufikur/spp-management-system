@@ -1,5 +1,7 @@
 # Reset Baseline Demo
 
+> **Pembaruan 5 Oktober 2026:** definisi seed/reset historis yang masih memakai Pangkal/persen telah dipensiunkan dan menolak eksekusi. Seeder multiunit terbaru dan instalasi kosong diuji pada skema PSB/potongan nominal. Instruksi historis di bawah tidak boleh digunakan untuk mereset database trial; lihat [audit perubahan](PSB_NOMINAL_DATE_AUDIT_20261005.md).
+
 Reset ini hanya untuk **clone disposable** bernama `db_spp_audit_*` atau `db_spp_test_*`. Skrip menghapus siswa, pembayaran, tagihan, tabungan dan audit terkait. Akun operator, Master Kelas, Master Biaya Lain, dan struktur database dipertahankan. Jangan gunakan pada database sekolah, termasuk `db_spp` atau database Railway yang aktif.
 
 Sebelum menjalankan, buat clone dari backup yang sesuai dan pastikan nama target pada koneksi. Jalankan dari CLI dengan `SPP_DB_NAME` eksplisit dan `SPP_TEST_ALLOW_MUTATION=1`:

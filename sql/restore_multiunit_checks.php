@@ -127,13 +127,13 @@ function schema_grade_trigger_definition_matches(string $actual): bool {
 $checks = [
     'siswa_data' => [
         'chk_siswa_psb' => 'PSB >= 0 AND asal_psb IN (0,1)',
-        'chk_siswa_potongan_spp' => 'potongan_spp_persen BETWEEN 0 AND 100',
+        'chk_siswa_potongan_spp_nominal' => 'potongan_spp_nominal >= 0',
     ],
     'bayar_data' => ['chk_bayar_psb' => 'U_PSB >= 0'],
     'master_spp_tarif_data' => ['chk_master_spp_nominal' => 'nominal_dasar > 0'],
     'tagihan_spp_data' => [
         'chk_tagihan_spp_bulan' => 'CAST(bulan AS UNSIGNED) BETWEEN 1 AND 12',
-        'chk_tagihan_spp_nominal' => 'tarif_dasar_snapshot >= 0 AND potongan_persen_snapshot BETWEEN 0 AND 100 AND nominal_tagihan >= 0',
+        'chk_tagihan_spp_nominal' => 'tarif_dasar_snapshot >= 0 AND potongan_nominal_ditetapkan_snapshot >= 0 AND potongan_nominal_snapshot >= 0 AND potongan_nominal_snapshot <= tarif_dasar_snapshot AND nominal_tagihan >= 0',
     ],
     'spp_alokasi_batch_data' => ['chk_spp_alokasi_batch_nominal' => 'uang_baru >= 0'],
     'spp_alokasi_data' => ['chk_spp_alokasi_nominal' => 'nominal_dari_bayar > 0'],

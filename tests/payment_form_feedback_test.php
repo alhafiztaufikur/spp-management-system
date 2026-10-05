@@ -22,7 +22,7 @@ feedback_assert(!array_key_exists('csrf_token', $draft), 'Token tidak boleh masu
 feedback_assert(count(payment_capture_draft(['biaya_lain_nominal' => array_fill(0, 15, '1')])['biaya_lain_nominal']) === 12, 'Jumlah rincian draft tidak dibatasi.');
 
 $cases = [
-    ['Pembayaran Uang Pangkal melebihi sisa tagihan', 'over_limit', 'pangkal-input'],
+    ['Pembayaran Uang PSB melebihi sisa tagihan', 'over_limit', 'psb-input'],
     ['Tagihan Biaya Lain tidak tersedia untuk siswa ini.', 'billing_changed', 'biaya-lain-list'],
     ['Tagihan Komite belum tersedia.', 'billing_changed', 'komite-input'],
     ['SPP Juli tidak boleh menjadi tunggakan.', 'prior_unpaid_edit', 'bulan-bayar'],

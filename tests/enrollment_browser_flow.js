@@ -73,11 +73,9 @@ async function submit(page) {
     await page.locator('#student-komite-start').selectOption('09');
     await page.locator('label.advanced-switch').click();
     assert.equal(await page.locator('#advanced-enabled').isChecked(), true);
-    await page.locator('#student-pangkal').fill('1000000');
     await page.locator('#student-pomg').fill('100000');
     await page.locator('#student-daftar_ulang').fill('500000');
-    await page.locator('#student-potongan-spp').fill('10');
-    await page.locator('#student-potong-pangkal').fill('100000');
+    await page.locator('#student-potongan-spp').fill('25000');
     await page.locator('#student-potong-du').fill('50000');
     assert.match(await submit(page), /berhasil ditambahkan/i);
     await page.goto(new URL(`/siswa/daftar.php?q=${regularNis}`, base).href);
@@ -104,7 +102,6 @@ async function submit(page) {
     await page.locator('#nama-baru').fill('UJI BROWSER PSB');
     await page.locator('label.advanced-switch').click();
     assert.equal(await page.locator('#advanced-enabled').isChecked(), true);
-    await page.locator('#student-pangkal').fill('100000');
     await page.locator('#student-psb').fill('3600000');
     assert.match(await submit(page), /berhasil ditambahkan/i);
     await page.goto(new URL(`/siswa/daftar.php?q=${psbNis}`, base).href);

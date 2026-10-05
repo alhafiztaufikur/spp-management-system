@@ -144,8 +144,8 @@ $bln_names = ['01'=>'Januari','02'=>'Februari','03'=>'Maret','04'=>'April','05'=
 $firstShown = $totalHistoryRows > 0 ? $offset + 1 : 0;
 $lastShown = $totalHistoryRows > 0 ? min($offset + count($rows), $totalHistoryRows) : 0;
 $periodLabel = $filter_tanggal_awal === $filter_tanggal_akhir
-    ? date('d/m/Y', strtotime($filter_tanggal_awal))
-    : date('d/m/Y', strtotime($filter_tanggal_awal)) . ' - ' . date('d/m/Y', strtotime($filter_tanggal_akhir));
+    ? spp_date_label($filter_tanggal_awal)
+    : spp_date_label($filter_tanggal_awal) . ' - ' . spp_date_label($filter_tanggal_akhir);
 ?>
 <!DOCTYPE html>
 <html lang="id" data-palette="<?= unit_palette_for_view(isset($reportUnitId) ? (int)$reportUnitId : null) ?>">
@@ -158,6 +158,7 @@ $periodLabel = $filter_tanggal_awal === $filter_tanggal_akhir
   <link href="https://fonts.googleapis.com/css2?family=Inter:wght@300;400;500;600;700;800&display=swap" rel="stylesheet" />
   <script>(function(){var t=localStorage.getItem('spp_theme')||'light';document.documentElement.setAttribute('data-theme',t);})();</script>
   <link rel="stylesheet" href="../assets/css/style.css?v=unitpalette4&amp;mtime=<?= filemtime(__DIR__ . '/../assets/css/style.css') ?>" />
+  <link rel="stylesheet" href="../assets/css/date_controls.css?v=unitpalette4&amp;mtime=<?= filemtime(__DIR__ . '/../assets/css/date_controls.css') ?>" />
 </head>
 <body>
 <div class="bg-orbs"><div class="orb orb-1"></div><div class="orb orb-2"></div><div class="orb orb-3"></div></div>
@@ -283,7 +284,7 @@ $periodLabel = $filter_tanggal_awal === $filter_tanggal_akhir
                 <td data-label="No. Induk"><span class="badge-nis"><?= htmlspecialchars($r['NO_INDUK']) ?></span></td>
                 <td data-label="Nama"><?= unit_record_badge($r) ?><?= htmlspecialchars($r['NAMA']) ?></td>
                 <td data-label="Kelas" class="savings-class-col"><span class="savings-class-badge">Kelas <?= htmlspecialchars($r['KELAS']) ?></span></td>
-                <td data-label="Tanggal"><?= date('d M Y H:i', strtotime($r['TANGGAL'])) ?></td>
+                <td data-label="Tanggal"><?= spp_date_label($r['TANGGAL'],true) ?></td>
                 <td data-label="Jenis">
                   <?php if ($r['jenis'] === 'masuk'): ?>
                   <span style="background:rgba(34,197,94,0.15);color:#16a34a;padding:3px 10px;border-radius:20px;font-size:12px;font-weight:600;">↑ Masuk</span>
@@ -372,7 +373,7 @@ $periodLabel = $filter_tanggal_awal === $filter_tanggal_akhir
               <?php foreach ($saldo_list as $i => $sl): ?>
               <?php
                 $saldo = (float)$sl['SALDO'];
-                $lastActivity = $sl['last_activity'] ? date('d/m/Y', strtotime($sl['last_activity'])) : 'Belum ada';
+                $lastActivity = $sl['last_activity'] ? spp_date_label($sl['last_activity']) : 'Belum ada';
                 $searchText = strtolower($sl['NO_INDUK'] . ' ' . ($sl['NO_induk_diknas'] ?? '') . ' ' . $sl['NAMA'] . ' kelas ' . $sl['KELAS']);
               ?>
               <tr class="<?= $i%2===0?'row-highlight':'' ?>"
@@ -418,7 +419,8 @@ $periodLabel = $filter_tanggal_awal === $filter_tanggal_akhir
   </main>
 </div>
 <div class="toast" id="toast"><span id="toast-icon"></span><span id="toast-msg"></span></div>
-<script src="../assets/js/app.js?v=<?= filemtime(__DIR__ . '/../assets/js/app.js') ?>"></script>
+<script src="../assets/js/date_format.js?v=<?= filemtime(__DIR__ . '/../assets/js/date_format.js') ?>"></script>
+  <script src="../assets/js/app.js?v=<?= filemtime(__DIR__ . '/../assets/js/app.js') ?>"></script>
 <script>
 document.addEventListener('DOMContentLoaded', function(){
   autoHideFlash();

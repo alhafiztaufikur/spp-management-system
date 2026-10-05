@@ -48,7 +48,6 @@ try {
         $components = [];
         $map = [
             'U_SPP' => 'SPP',
-            'U_PANGKAL' => 'Pangkal',
             'U_PSB' => 'PSB',
             'U_KOMITE' => 'Komite (' . (report_months()[report_month_code((string)$payment['BULAN'])] ?? (string)$payment['BULAN']) . ' ' . $payment['TAHUN'] . ')',
             'U_LAIN' => 'Biaya Lain',
@@ -66,7 +65,7 @@ try {
         if ($duAmount > 0.001) $components[] = 'Daftar Ulang' . (!empty($duRow['tahun_ajaran']) ? ' (TA ' . $duRow['tahun_ajaran'] . ')' : '');
 
         $rows[] = [
-            'tanggal' => date('d/m/Y H:i', strtotime((string)$payment['TGL_BYR'])),
+            'tanggal' => spp_date_label((string)$payment['TGL_BYR'],true),
             'periode' => (report_months()[report_month_code((string)$payment['BULAN'])] ?? (string)$payment['BULAN']) . ' ' . $payment['TAHUN'],
             'komponen' => $components ? implode(', ', $components) : 'Koreksi',
             'metode' => (string)($payment['sistem_pembayaran'] ?? ''),

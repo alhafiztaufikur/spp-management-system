@@ -49,7 +49,7 @@ $checks = [
     'total_header_tidak_cocok' => "SELECT COUNT(*) FROM bayar b
         LEFT JOIN (SELECT bayar_id,SUM(jumlah) total_du FROM bayar_du GROUP BY bayar_id) d ON d.bayar_id=b.id
         WHERE ABS(COALESCE(b.total_jumlah,0)-(
-            COALESCE(b.U_PANGKAL,0)+COALESCE(b.U_PSB,0)+COALESCE(b.U_SPP,0)
+            COALESCE(b.U_PSB,0)+COALESCE(b.U_SPP,0)
             +COALESCE(b.U_KOMITE,0)
             +COALESCE(b.U_LAIN,0)+COALESCE(d.total_du,0)
             -COALESCE(b.potong_spp,0)
@@ -105,6 +105,13 @@ if((int)$koneksi->query("SELECT COUNT(*) FROM information_schema.COLUMNS WHERE T
     $checks['legacy_metadata_tidak_cocok']="SELECT COUNT(*) FROM legacy_student_import m LEFT JOIN siswa s ON s.id=m.student_id AND s.unit_id=m.unit_id WHERE s.id IS NULL";
     $checks['legacy_tanpa_manifest']="SELECT COUNT(*) FROM siswa s LEFT JOIN legacy_student_import m ON m.student_id=s.id AND m.unit_id=s.unit_id WHERE s.legacy_pending=1 AND m.id IS NULL";
     foreach(['siswa_tahun_ajaran'=>'no_induk','bayar'=>'NO_INDUK','tabungan'=>'NO_INDUK','tagihan_spp'=>'no_induk','tagihan_komite'=>'no_induk','tagihan_daftar_ulang'=>'no_induk','tagihan_biaya_lain'=>'no_induk','tagihan_tahunan_siswa'=>'no_induk'] as $table=>$nis){$checks['legacy_memiliki_'.$table]="SELECT COUNT(*) FROM $table c JOIN siswa s ON s.unit_id=c.unit_id AND s.NO_INDUK=c.$nis WHERE s.legacy_pending=1";}
+}
+
+if((int)$koneksi->query("SELECT COUNT(*) FROM information_schema.COLUMNS WHERE TABLE_SCHEMA=DATABASE() AND TABLE_NAME='siswa_data' AND COLUMN_NAME='potongan_spp_nominal'")->fetch_row()[0]){
+    $checks['psb_melebihi_master']="SELECT COUNT(*) FROM (SELECT b.unit_id,b.NO_INDUK,SUM(b.U_PSB) paid,s.PSB FROM bayar b JOIN siswa s ON s.unit_id=b.unit_id AND s.NO_INDUK=b.NO_INDUK GROUP BY b.unit_id,b.NO_INDUK,s.PSB HAVING SUM(b.U_PSB)>s.PSB+0.01) x";
+    $checks['potongan_nominal_negatif']="SELECT COUNT(*) FROM siswa WHERE potongan_spp_nominal<0";
+    $checks['snapshot_potongan_nominal_tidak_valid']="SELECT COUNT(*) FROM tagihan_spp WHERE potongan_nominal_ditetapkan_snapshot<0 OR potongan_nominal_snapshot<0 OR potongan_nominal_snapshot>tarif_dasar_snapshot+0.01 OR potongan_nominal_snapshot>potongan_nominal_ditetapkan_snapshot+0.01";
+    $checks['migrasi_komponen_belum_selesai']="SELECT COUNT(*) FROM financial_component_migration WHERE stage<>'complete'";
 }
 
 echo 'database=' . DB_NAME . PHP_EOL;

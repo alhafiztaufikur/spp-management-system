@@ -40,12 +40,7 @@ function receipt_month($value): string {
     return $months[$code] ?? (string)$value;
 }
 
-function receipt_date($value): string {
-    $timestamp = strtotime((string)$value);
-    if (!$timestamp) return '-';
-    $months = [1 => 'Januari', 'Februari', 'Maret', 'April', 'Mei', 'Juni', 'Juli', 'Agustus', 'September', 'Oktober', 'November', 'Desember'];
-    return date('j', $timestamp) . ' ' . $months[(int)date('n', $timestamp)] . ' ' . date('Y', $timestamp);
-}
+function receipt_date($value): string { return spp_date_label($value,true); }
 
 function receipt_words(int $number): string {
     $words = ['', 'satu', 'dua', 'tiga', 'empat', 'lima', 'enam', 'tujuh', 'delapan', 'sembilan', 'sepuluh', 'sebelas'];
@@ -103,7 +98,7 @@ function receipt_add_remaining_line(array &$lines, string $label, float $current
 function receipt_remaining_lines(mysqli $db, array $payment, array $otherDetails): array {
     $lines = [];
     $oneTime = one_time_fee_status($db, (string)$payment['NO_INDUK']);
-    foreach (['pangkal' => ['Sisa Pangkal', 'U_PANGKAL'], 'psb' => ['Sisa PSB', 'U_PSB']] as $component => [$label, $field]) {
+    foreach (['psb' => ['Sisa PSB', 'U_PSB']] as $component => [$label, $field]) {
         if (abs((float)($payment[$field] ?? 0)) >= 0.005) {
             $lines[] = [$label, (float)$oneTime[$component]['remaining']];
         }
@@ -130,13 +125,10 @@ $stmt = $koneksi->prepare("
         b.*,
         s.NAMA,
         s.KELAS AS KELAS_SISWA,
-        s.PANGKAL,
         s.PSB,
         s.NO_induk_diknas,
         s.SPP_PERBULAN,
         s.POMG,
-        s.potong_pangkal,
-        s.tot_pangkal,
         s.DAFTAR_ULANG,
         s.potong_du,
         s.tot_du,
@@ -183,7 +175,6 @@ $stmt->close();
 
 $komiteReceipt=komite_receipt_summary($koneksi,$paymentId);
 $primaryLines = [
-    ['Uang Pangkal', $payment['U_PANGKAL']],
     ['Uang PSB', $payment['U_PSB']],
     ['Uang Daftar Ulang' . (!empty($payment['du_tahun_ajaran']) ? ' (TA ' . $payment['du_tahun_ajaran'] . ')' : ''), $payment['uang_du']],
     ['Komite Sekolah'.($komiteReceipt?' ('.$komiteReceipt['label'].')':''), $payment['U_KOMITE']],

@@ -53,11 +53,11 @@ if ($filter_tanggal_awal !== '' && $filter_tanggal_akhir !== '') {
     $startTs = strtotime($filter_tanggal_awal);
     $endTs = strtotime($filter_tanggal_akhir);
     if ($filter_tanggal_awal === $filter_tanggal_akhir) {
-        $periode = date('d M Y', $startTs);
+        $periode = spp_date_label($startTs);
     } elseif (date('Y-m', $startTs) === date('Y-m', $endTs)) {
-        $periode = date('d', $startTs) . ' - ' . date('d M Y', $endTs);
+        $periode = spp_date_label($startTs) . ' - ' . spp_date_label($endTs);
     } else {
-        $periode = date('d M Y', $startTs) . ' - ' . date('d M Y', $endTs);
+        $periode = spp_date_label($startTs) . ' - ' . spp_date_label($endTs);
     }
 } else {
     $periode = trim($bulan_label . ' ' . $filter_tahun);
@@ -149,10 +149,7 @@ $stmt = $koneksi->prepare("
         s.NAMA,
         s.NO_induk_diknas,
         s.KELAS AS KELAS_SISWA,
-        s.PANGKAL,
         s.PSB,
-        s.potong_pangkal,
-        s.tot_pangkal,
         s.DAFTAR_ULANG,
         s.potong_du,
         s.tot_du,
@@ -161,7 +158,6 @@ $stmt = $koneksi->prepare("
         du_bill.id AS du_bill_id,
         du_bill.nominal_tagihan AS du_nominal_tagihan,
         COALESCE((SELECT SUM(bd.jumlah) FROM bayar_du bd WHERE bd.tagihan_daftar_ulang_id=du_bill.id),0) AS du_paid_this_bill,
-        COALESCE(one_paid.total_pangkal_bayar, 0) AS total_pangkal_bayar,
         COALESCE(one_paid.total_psb_bayar, 0) AS total_psb_bayar,
         COALESCE(op.nama, NULLIF(b.user_id, '')) AS operator_name
     FROM bayar b
@@ -170,7 +166,7 @@ $stmt = $koneksi->prepare("
     LEFT JOIN bayar_du du_current ON du_current.bayar_id=b.id
     LEFT JOIN tagihan_daftar_ulang du_bill ON du_bill.id=du_current.tagihan_daftar_ulang_id
     LEFT JOIN (
-        SELECT unit_id,NO_INDUK, SUM(U_PANGKAL) AS total_pangkal_bayar, SUM(U_PSB) AS total_psb_bayar
+        SELECT unit_id,NO_INDUK, SUM(U_PSB) AS total_psb_bayar
         FROM bayar
         GROUP BY unit_id,NO_INDUK
     ) one_paid ON one_paid.NO_INDUK = b.NO_INDUK AND one_paid.unit_id=b.unit_id
@@ -222,7 +218,7 @@ if (!$selected_mode) {
             . '<td>' . e($row['kelas_rombel_snapshot'] ?: ($row['KELAS_SISWA'] ?? '')) . '</td>'
             . '<td>' . e(trim(($row['BULAN'] ?? '') . ' ' . ($row['TAHUN'] ?? ''))) . '</td>'
             . '<td>' . e($row['sistem_pembayaran'] ?? '') . '</td>'
-            . '<td>' . e(date('d/m/Y H:i', strtotime($row['TGL_BYR'] ?? 'now'))) . '</td>'
+            . '<td>' . e(spp_date_label($row['TGL_BYR'] ?? 'now',true)) . '</td>'
             . '<td class="num">Rp ' . money_total($row['total_jumlah'] ?? 0) . '</td>'
             . '</tr>';
     }
@@ -231,7 +227,7 @@ if (!$selected_mode) {
     }
     $logoPath = realpath(__DIR__ . '/../assets/img/school-logo.png');
     $logoData = $logoPath ? 'data:image/png;base64,' . base64_encode((string)file_get_contents($logoPath)) : '';
-    $generated = date('d-m-Y H:i:s');
+    $generated = spp_date_label(new DateTimeImmutable('now'),true);
     $operator = (string)($_SESSION['admin_nama'] ?? $_SESSION['admin_username'] ?? 'Pengguna');
     $html = '<!DOCTYPE html><html lang="id"><head><meta charset="UTF-8"><style>'
         . '@page{margin:14mm;size:A4 landscape}*{box-sizing:border-box}body{font-family:DejaVu Sans,Arial,sans-serif;color:#18281f;font-size:9px;margin:0}.kop{width:100%;border-bottom:3px double #15543c;margin-bottom:10px}.kop td{border:0;padding:0 0 8px}.kop img{width:54px;height:54px;object-fit:contain}.kop h1{font-size:15px;margin:0;text-align:center}.kop p{text-align:center;margin:3px 0;color:#52645b}.title{text-align:center;margin:10px 0}.title h2{font-size:15px;margin:0 0 4px}.title p{margin:0;color:#66766d}.meta{width:100%;margin-bottom:8px}.meta td{border:0;padding:2px}.summary{display:table;width:100%;margin:10px 0 12px;border:1px solid #cfe9dc}.summary div{display:table-cell;padding:9px;border-right:1px solid #e1f1e8}.summary div:last-child{border-right:0}.summary span{display:block;color:#708078;font-size:8px;text-transform:uppercase;font-weight:700}.summary strong{display:block;margin-top:3px;font-size:12px}table{width:100%;border-collapse:collapse}thead{display:table-header-group}tr{page-break-inside:avoid}th{background:#15543c;color:#fff;text-align:left;font-size:8px;text-transform:uppercase;padding:7px;border:1px solid #8fb3a2}td{padding:6px;border:1px solid #d9e9e1;vertical-align:top}tbody tr:nth-child(even){background:#f5faf7}.num{text-align:right;font-weight:700;color:#0b8d4b;white-space:nowrap}.empty{text-align:center;color:#718078;padding:24px}small{color:#708078}.footer{position:fixed;bottom:-8mm;left:0;right:0;border-top:1px solid #b9cec3;padding-top:3px;color:#697970;font-size:7px}.footer:after{content:"SistemSPP - Halaman " counter(page)}'
@@ -280,7 +276,6 @@ if (!$rows && !$selected_mode) {
         'KELAS_SISWA' => '2B',
         'BULAN' => str_pad((string)$filter_bulan, 2, '0', STR_PAD_LEFT),
         'TAHUN' => (string)$filter_tahun,
-        'U_PANGKAL' => 0,
         'U_PSB' => 0,
         'U_SPP' => 495000,
         'U_KOMITE' => 15000,
@@ -288,15 +283,11 @@ if (!$rows && !$selected_mode) {
         'potong_spp' => 0,
         'total_jumlah' => 510000,
         'TGL_BYR' => date('Y-m-d H:i:s'),
-        'PANGKAL' => 0,
         'PSB' => 0,
-        'potong_pangkal' => 0,
-        'tot_pangkal' => 0,
         'DAFTAR_ULANG' => 0,
         'potong_du' => 0,
         'tot_du' => 0,
         'uang_du' => 0,
-        'total_pangkal_bayar' => 0,
         'total_psb_bayar' => 0,
         'total_du_bayar' => 0,
     ];
@@ -304,7 +295,6 @@ if (!$rows && !$selected_mode) {
 
 function primary_lines(array $row, ?array $sppAllocation=null): array {
     $lines=[
-        payment_line('Uang Pangkal', $row['U_PANGKAL']),
         payment_line('Uang PSB', $row['U_PSB']),
         payment_line('Uang Daftar Ulang' . (!empty($row['du_tahun_ajaran']) ? ' (TA ' . $row['du_tahun_ajaran'] . ')' : ''), $row['uang_du']),
         payment_line('Komite Sekolah ('.month_name_id($row['BULAN']).' '.$row['TAHUN'].')', $row['U_KOMITE']),
@@ -332,9 +322,6 @@ function other_lines(array $row, array $details, ?array $sppAllocation=null): ar
     return array_values(array_filter($lines, fn($line) => abs((float)$line['amount']) > 0.001));
 }
 
-function total_pangkal_bill(array $row): float {
-    return max(0, (float)$row['PANGKAL'] - (float)$row['potong_pangkal']);
-}
 
 function total_psb_bill(array $row): float {
     return max(0, (float)($row['PSB'] ?? 0));
@@ -531,7 +518,6 @@ ob_start();
     $sppAllocation=$spp_allocations_by_payment[(int)$row['id']]??null;
     $primary = primary_lines($row,$sppAllocation);
     $others = other_lines($row, $details,$sppAllocation);
-    $sisa_pangkal = max(0, total_pangkal_bill($row) - (float)$row['total_pangkal_bayar']);
     $sisa_psb = max(0, total_psb_bill($row) - (float)$row['total_psb_bayar']);
     $sisa_du = (float)$row['uang_du'] > 0.001 && (int)($row['du_bill_id'] ?? 0) > 0
         ? max(0, (float)$row['du_nominal_tagihan'] - (float)$row['du_paid_this_bill'])
@@ -606,11 +592,6 @@ ob_start();
           <div class="section-label">Sisa Pembayaran :</div>
           <table class="pay-table">
             <tr>
-              <td class="compact-label">Sisa Pangkal</td>
-              <td class="pay-sep">:</td>
-              <td class="pay-amount"><?= e(money_plain($sisa_pangkal)) ?></td>
-            </tr>
-            <tr>
               <td class="compact-label">Sisa PSB</td>
               <td class="pay-sep">:</td>
               <td class="pay-amount"><?= e(money_plain($sisa_psb)) ?></td>
@@ -666,7 +647,7 @@ ob_start();
           </table>
         </td>
         <td class="footer-right">
-          <div>Bekasi, <?= e(date('d-M-Y', strtotime($row['TGL_BYR']))) ?></div>
+          <div>Bekasi, <?= e(spp_date_label($row['TGL_BYR'],true)) ?></div>
           <div>Bagian Keuangan</div>
           <div class="signature-space"></div>
           <div class="signature-name"><?= e($signer) ?></div>
@@ -689,7 +670,7 @@ if ($output_mode === 'preview') {
     render_report_pdf_preview($html, [
         'title' => 'Slip Pembayaran',
         'subtitle' => 'Periode ' . $periode . ' - ' . number_format(count($rows)) . ' transaksi dipilih',
-        'generated' => date('d-m-Y H:i:s'),
+        'generated' => spp_date_label(new DateTimeImmutable('now'),true),
         'row_count' => count($rows),
         'orientation' => 'landscape',
         'download_url' => 'export_pdf.php?' . http_build_query($downloadQuery),

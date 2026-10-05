@@ -53,7 +53,7 @@ try {
         'aksi' => 'input', 'csrf_token' => $csrf[1], 'request_key' => $key[1],
         'no_induk' => $student['NO_INDUK'], 'bulan_bayar' => '09', 'tahun_bayar' => '2026',
         'payment_plan' => 'monthly', 'spp_action' => 'bayar', 'sistem_pembayaran' => 'Tunai',
-        'uang_pangkal' => '0', 'uang_psb' => '0', 'uang_spp' => '0',
+        'uang_psb' => '0', 'uang_spp' => '0',
         'uang_komite' => '0', 'uang_du' => '0',
     ]);
     zero_payment_assert(str_contains($status, '302'), 'Pembayaran nol tidak dialihkan dengan pesan gagal.');

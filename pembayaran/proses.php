@@ -158,7 +158,9 @@ function reject_disabled_payment_savings(float $amount): void {
 }
 
 function reject_removed_payment_components(array $source): void {
+    if(array_key_exists('uang_pangkal',$source)) throw new RuntimeException('Formulir kedaluwarsa: Pangkal sudah digabung ke PSB. Muat ulang halaman.');
     $removed = [
+        'uang_pangkal'=>'Uang Pangkal',
         'uang_bangunan' => 'Uang Bangunan',
         'uang_seragam' => 'Uang Seragam',
         'uang_kegiatan' => 'Uang Kegiatan',
@@ -292,7 +294,7 @@ function validate_component_remaining(
     bool $usePublishedSpp = false
 ): void {
     $stmt = $db->prepare('
-        SELECT s.PANGKAL, s.potong_pangkal, s.tot_pangkal, s.PSB,
+        SELECT s.PSB,
                SPP_PERBULAN, POMG, DAFTAR_ULANG, potong_du, tot_du,
                COALESCE(mk.tingkat, CAST(s.KELAS AS UNSIGNED)) AS tingkat, mk.kode_rombel
         FROM siswa s
@@ -343,11 +345,10 @@ function validate_component_remaining(
         ));
     }
     if ($isPsb && ($annualInputTotal > 0.001 || $uangDu > 0.001)) {
-        throw new RuntimeException('Siswa kelas PSB hanya dapat membayar Uang Pangkal, Uang PSB, dan Biaya Lain.');
+        throw new RuntimeException('Siswa kelas PSB hanya dapat membayar Uang PSB, dan Biaya Lain.');
     }
 
     validate_one_time_fee_payments($db, $noInduk, [
-        'pangkal' => (float)($components['pangkal'] ?? 0),
         'psb' => (float)($components['psb'] ?? 0),
     ], $excludePaymentId);
 
@@ -390,7 +391,7 @@ function validate_component_remaining(
             $label=$limit['label'];
             throw new SppPaymentException(['code'=>'over_limit','severity'=>'error','title'=>'Melebihi sisa tagihan',
                 'message'=>'Sisa '.$label.' Rp '.number_format($remaining,0,',','.').', tetapi yang diisi Rp '.number_format($limit['input'],0,',','.').'. Kurangi nominalnya sebelum menyimpan.',
-                'target'=>in_array($component,['pangkal','psb','komite','spp','du'],true)?$component.'-input':'du-input']);
+                'target'=>in_array($component,['psb','komite','spp','du'],true)?$component.'-input':'du-input']);
         }
     }
 }
@@ -575,8 +576,7 @@ if ($aksi === 'input') {
     $bulan_bayar     = normalize_month_code($_POST['bulan_bayar'] ?? '');
     $tahun_bayar     = $_POST['tahun_bayar'] ?? date('Y');
     $sistem_pembayaran = $_POST['sistem_pembayaran'] ?? '';
-    
-    $uang_pangkal    = parse_amount($_POST['uang_pangkal'] ?? 0);
+
     $uang_psb        = parse_amount($_POST['uang_psb'] ?? 0);
     $uang_spp        = parse_amount($_POST['uang_spp'] ?? 0);
     $uang_komite     = parse_amount($_POST['uang_komite'] ?? 0);
@@ -584,7 +584,7 @@ if ($aksi === 'input') {
     $uang_du         = parse_amount($_POST['uang_du'] ?? 0);
     $ll_1_ket = $ll_2_ket = $ll_3_ket = $ll_4_ket = '';
     $ll_1_nom = $ll_2_nom = $ll_3_nom = $ll_4_nom = 0.0;
-    
+
     $potongan_spp    = parse_amount($_POST['potongan_spp'] ?? 0);
     $legacy_tabungan_input = parse_amount($_POST['tabungan_wajib'] ?? 0);
     $total_jumlah    = 0.0;
@@ -617,13 +617,13 @@ if ($aksi === 'input') {
         reject_removed_payment_components($_POST);
         $sistem_pembayaran = normalize_payment_method($sistem_pembayaran);
         validate_payment_amounts([
-            'Pangkal' => $uang_pangkal, 'PSB' => $uang_psb,
+            'PSB' => $uang_psb,
             'SPP' => $uang_spp, 'Komite' => $uang_komite, 'Daftar Ulang' => $uang_du,
             'Potongan SPP' => $potongan_spp
         ]);
         reject_disabled_payment_savings($legacy_tabungan_input);
         validate_payment_context($tanggal_bayar, $bulan_bayar, (string)$tahun_bayar);
-        if ($usePublishedSpp && $potongan_spp > 0.001) throw new RuntimeException('Potongan manual saat pembayaran SPP sudah tidak didukung. Atur persentasenya pada Master Siswa.');
+        if ($usePublishedSpp && $potongan_spp > 0.001) throw new RuntimeException('Potongan manual saat pembayaran SPP sudah tidak didukung. Atur nominal potongannya pada Master Siswa.');
         if (!$usePublishedSpp && $potongan_spp > $uang_spp) throw new RuntimeException('Potongan SPP tidak boleh melebihi pembayaran SPP.');
         $siswa_data = validate_student_and_komite($koneksi, $no_induk, $bulan_bayar, $tahun_bayar, $uang_komite);
         $kelas_siswa = $siswa_data['KELAS'];
@@ -645,7 +645,7 @@ if ($aksi === 'input') {
             $tahun_ajaran_du = (string)$du_bill['tahun_ajaran'];
         }
         validate_graduate_payment($siswa_data, [
-            $uang_pangkal, $uang_psb, $uang_komite, $potongan_spp
+            $uang_psb, $uang_komite, $potongan_spp
         ], $uang_du, [], $uang_spp);
 
         $periods = [['bulan' => $bulan_bayar, 'tahun' => (string)$tahun_bayar]];
@@ -673,7 +673,6 @@ if ($aksi === 'input') {
         foreach ($periods as $index => $period) {
             $isFirst = $index === 0;
             validate_component_remaining($koneksi, $no_induk, $period['bulan'], $period['tahun'], [
-                'pangkal' => $isFirst ? $uang_pangkal : 0,
                 'psb' => $isFirst ? $uang_psb : 0,
                 'spp' => $spp_parts[$index],
                 'komite' => $isFirst ? $uang_komite : 0,
@@ -685,26 +684,25 @@ if ($aksi === 'input') {
 
         $biaya_lain = collect_biaya_lain($koneksi, $no_induk);
         validate_graduate_payment($siswa_data, [
-            $uang_pangkal, $uang_psb, $uang_komite, $potongan_spp
+            $uang_psb, $uang_komite, $potongan_spp
         ], $uang_du, $biaya_lain, $uang_spp);
         $legacy_biaya_lain = legacy_biaya_lain_values($biaya_lain);
 
         // Satu pembayaran tahunan disimpan sebagai 12 header transaksi agar
         // setiap bulan memiliki nomor dan halaman struk sendiri.
         $sql = "INSERT INTO bayar (
-            NO_INDUK, KELAS, U_PANGKAL, U_PSB, U_SPP, U_KOMITE, U_LAIN, KETERANGAN,
+            NO_INDUK, KELAS, U_PSB, U_SPP, U_KOMITE, U_LAIN, KETERANGAN,
             TGL_BYR, BULAN, TAHUN, user_id, sistem_pembayaran,
             LAIN_LAIN1, JUMLAH1, LAIN_LAIN2, JUMLAH2, LAIN_LAIN3, JUMLAH3, LAIN_LAIN4, JUMLAH4,
             th_ajaran, kelas_du, potong_spp, total_jumlah, payment_link_version,
             payment_batch_token, payment_batch_sequence, payment_batch_count
-        ) VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, 1, ?, ?, ?)";
+        ) VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, 1, ?, ?, ?)";
 
         $stmt = $koneksi->prepare($sql);
         $user_id = current_operator_id();
         $receipt_ids = [];
         foreach ($periods as $index => $period) {
             $isFirst = $index === 0;
-            $row_pangkal = $isFirst ? $uang_pangkal : 0.0;
             $row_psb = $isFirst ? $uang_psb : 0.0;
             $row_spp = $spp_parts[$index];
             $row_komite = $isFirst ? $uang_komite : 0.0;
@@ -716,7 +714,7 @@ if ($aksi === 'input') {
             [$ll_1_ket, $ll_2_ket, $ll_3_ket, $ll_4_ket] = $row_legacy_other['names'];
             [$ll_1_nom, $ll_2_nom, $ll_3_nom, $ll_4_nom] = $row_legacy_other['amounts'];
             $row_total = calculate_payment_total([
-                $row_pangkal, $row_psb, $row_spp, $row_komite
+                $row_psb, $row_spp, $row_komite
             ], $row_du, $row_discount, $row_other);
             if ($row_total <= .001) throw new SppPaymentException(['code'=>'empty_payment','severity'=>'error',
                 'title'=>'Belum ada pembayaran','message'=>'Isi setidaknya satu nominal pembayaran sebelum menyimpan.',
@@ -726,8 +724,8 @@ if ($aksi === 'input') {
             $batch_sequence = $index + 1;
 
             $stmt->bind_param(
-                'ssdddddsssssssdsdsdsdssddsii',
-                $no_induk, $kelas_siswa, $row_pangkal, $row_psb,
+                'ssddddsssssssdsdsdsdssddsii',
+                $no_induk, $kelas_siswa, $row_psb,
                 $row_spp, $row_komite, $uang_lain, $catatan,
                 $tanggal_bayar, $row_month, $row_year, $user_id, $sistem_pembayaran,
                 $ll_1_ket, $ll_1_nom, $ll_2_ket, $ll_2_nom, $ll_3_ket, $ll_3_nom, $ll_4_ket, $ll_4_nom,
@@ -800,8 +798,7 @@ if ($aksi === 'update') {
     $bulan_bayar     = normalize_month_code($_POST['bulan_bayar'] ?? '');
     $tahun_bayar     = $_POST['tahun_bayar'] ?? date('Y');
     $sistem_pembayaran = $_POST['sistem_pembayaran'] ?? 'VA';
-    
-    $uang_pangkal    = parse_amount($_POST['uang_pangkal'] ?? 0);
+
     $uang_psb        = parse_amount($_POST['uang_psb'] ?? 0);
     $uang_spp        = parse_amount($_POST['uang_spp'] ?? 0);
     $uang_komite     = parse_amount($_POST['uang_komite'] ?? 0);
@@ -809,7 +806,7 @@ if ($aksi === 'update') {
     $uang_du         = parse_amount($_POST['uang_du'] ?? 0);
     $ll_1_ket = $ll_2_ket = $ll_3_ket = $ll_4_ket = '';
     $ll_1_nom = $ll_2_nom = $ll_3_nom = $ll_4_nom = 0.0;
-    
+
     $potongan_spp    = parse_amount($_POST['potongan_spp'] ?? 0);
     $legacy_tabungan_input = parse_amount($_POST['tabungan_wajib'] ?? 0);
     $total_jumlah    = 0.0;
@@ -849,13 +846,13 @@ if ($aksi === 'update') {
         reject_removed_payment_components($_POST);
         $sistem_pembayaran = normalize_payment_method($sistem_pembayaran);
         validate_payment_amounts([
-            'Pangkal' => $uang_pangkal, 'PSB' => $uang_psb,
+            'PSB' => $uang_psb,
             'SPP' => $uang_spp, 'Komite' => $uang_komite, 'Daftar Ulang' => $uang_du,
             'Potongan SPP' => $potongan_spp
         ]);
         reject_disabled_payment_savings($legacy_tabungan_input);
         validate_payment_context($tanggal_bayar, $bulan_bayar, (string)$tahun_bayar);
-        if ($usePublishedSpp && $potongan_spp > 0.001) throw new RuntimeException('Potongan manual saat pembayaran SPP sudah tidak didukung. Atur persentasenya pada Master Siswa.');
+        if ($usePublishedSpp && $potongan_spp > 0.001) throw new RuntimeException('Potongan manual saat pembayaran SPP sudah tidak didukung. Atur nominal potongannya pada Master Siswa.');
         if (!$usePublishedSpp && $potongan_spp > $uang_spp) throw new RuntimeException('Potongan SPP tidak boleh melebihi pembayaran SPP.');
         $allowedArchived = $no_induk === $old_bayar['NO_INDUK'] ? $old_bayar['NO_INDUK'] : null;
         $siswa_data = validate_student_and_komite($koneksi, $no_induk, $bulan_bayar, $tahun_bayar, $uang_komite, $id, $allowedArchived);
@@ -871,7 +868,6 @@ if ($aksi === 'update') {
             $tahun_ajaran_du = (string)$du_bill['tahun_ajaran'];
         }
         validate_component_remaining($koneksi, $no_induk, $bulan_bayar, (string)$tahun_bayar, [
-            'pangkal' => $uang_pangkal,
             'psb' => $uang_psb,
             'spp' => $uang_spp,
             'komite' => $uang_komite,
@@ -917,20 +913,20 @@ if ($aksi === 'update') {
         ]);
         $biaya_lain = collect_biaya_lain($koneksi, $no_induk, $id);
         validate_graduate_payment($siswa_data, [
-            $uang_pangkal, $uang_psb, $uang_komite, $potongan_spp
+            $uang_psb, $uang_komite, $potongan_spp
         ], $uang_du, $biaya_lain, $uang_spp);
         $legacy_biaya_lain = legacy_biaya_lain_values($biaya_lain);
         $uang_lain = $legacy_biaya_lain['total'];
         [$ll_1_ket, $ll_2_ket, $ll_3_ket, $ll_4_ket] = $legacy_biaya_lain['names'];
         [$ll_1_nom, $ll_2_nom, $ll_3_nom, $ll_4_nom] = $legacy_biaya_lain['amounts'];
         $total_jumlah = calculate_payment_total([
-            $uang_pangkal, $uang_psb, $uang_spp, $uang_komite
+            $uang_psb, $uang_spp, $uang_komite
         ], $uang_du, $potongan_spp, $biaya_lain);
         if ($total_jumlah <= .001) throw new RuntimeException('Isi setidaknya satu nominal pembayaran sebelum menyimpan.');
 
         // 1. Update data utama ke tabel bayar
         $sql = "UPDATE bayar SET
-            NO_INDUK=?, KELAS=?, U_PANGKAL=?, U_PSB=?, U_SPP=?, U_KOMITE=?, U_LAIN=?, KETERANGAN=?,
+            NO_INDUK=?, KELAS=?, U_PSB=?, U_SPP=?, U_KOMITE=?, U_LAIN=?, KETERANGAN=?,
             TGL_BYR=?, BULAN=?, TAHUN=?, user_id=?, sistem_pembayaran=?,
             LAIN_LAIN1=?, JUMLAH1=?, LAIN_LAIN2=?, JUMLAH2=?, LAIN_LAIN3=?, JUMLAH3=?, LAIN_LAIN4=?, JUMLAH4=?,
             th_ajaran=?, kelas_du=?, potong_spp=?, total_jumlah=?, payment_link_version=1
@@ -938,10 +934,10 @@ if ($aksi === 'update') {
 
         $stmt = $koneksi->prepare($sql);
         $user_id = current_operator_id();
-        
+
         $stmt->bind_param(
-            'ssdddddsssssssdsdsdsdssddi',
-            $no_induk, $kelas_siswa, $uang_pangkal, $uang_psb,
+            'ssddddsssssssdsdsdsdssddi',
+            $no_induk, $kelas_siswa, $uang_psb,
             $uang_spp, $uang_komite, $uang_lain, $catatan,
             $tanggal_bayar, $bulan_bayar, $tahun_bayar, $user_id, $sistem_pembayaran,
             $ll_1_ket, $ll_1_nom, $ll_2_ket, $ll_2_nom, $ll_3_ket, $ll_3_nom, $ll_4_ket, $ll_4_nom,

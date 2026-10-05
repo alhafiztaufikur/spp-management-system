@@ -109,7 +109,7 @@ try {
 
 function authorization_amount_from_payload(array $payload): float
 {
-    $keys = ['uang_pangkal','uang_psb','uang_spp','uang_komite','uang_du'];
+    $keys = ['uang_psb','uang_spp','uang_komite','uang_du'];
     $total = 0.0;
     foreach ($keys as $key) {
         $raw = trim((string)($payload[$key] ?? 0));
@@ -149,6 +149,7 @@ function authorization_request_summary(array $request): array
   <link rel="preconnect" href="https://fonts.googleapis.com" />
   <link href="https://fonts.googleapis.com/css2?family=Inter:wght@300;400;500;600;700;800&display=swap" rel="stylesheet" />
   <link rel="stylesheet" href="assets/css/style.css?v=unitpalette4&amp;mtime=<?= filemtime(__DIR__ . '/assets/css/style.css') ?>" />
+  <link rel="stylesheet" href="assets/css/date_controls.css?v=unitpalette4&amp;mtime=<?= filemtime(__DIR__ . '/assets/css/date_controls.css') ?>" />
 </head>
 <body>
   <div class="layout">
@@ -200,7 +201,7 @@ function authorization_request_summary(array $request): array
             </div>
             <div class="authorization-reason"><span>Alasan pemohon</span><p><?= nl2br(htmlspecialchars($request['request_reason'])) ?></p></div>
             <footer class="authorization-card-footer">
-              <div><strong><?= htmlspecialchars($request['requested_by_name']) ?></strong><span><?= htmlspecialchars(ucfirst($request['requested_by_role'])) ?> &middot; <?= htmlspecialchars(date('d/m/Y H:i', strtotime($request['requested_at']))) ?></span><?php if($request['decided_by_name']): ?><small>Diproses oleh <?= htmlspecialchars($request['decided_by_name']) ?></small><?php endif; ?></div>
+              <div><strong><?= htmlspecialchars($request['requested_by_name']) ?></strong><span><?= htmlspecialchars(ucfirst($request['requested_by_role'])) ?> &middot; <?= htmlspecialchars(spp_date_label($request['requested_at'],true)) ?></span><?php if($request['decided_by_name']): ?><small>Diproses oleh <?= htmlspecialchars($request['decided_by_name']) ?></small><?php endif; ?></div>
               <?php if ($isPending && $isRequester): ?>
                 <form method="post" onsubmit="return confirm('Batalkan permintaan ini?')"><input type="hidden" name="csrf_token" value="<?= htmlspecialchars($csrfToken) ?>"><input type="hidden" name="request_id" value="<?= (int)$request['id'] ?>"><input type="hidden" name="action" value="cancel"><button class="btn btn-ghost" type="submit">Batalkan Permintaan</button></form>
               <?php elseif ($isPending && isRole('admin') && $request['requested_by_role'] === 'kasir'): ?>
@@ -217,6 +218,7 @@ function authorization_request_summary(array $request): array
       </section>
     </main>
   </div>
+  <script src="assets/js/date_format.js?v=<?= filemtime(__DIR__ . '/assets/js/date_format.js') ?>"></script>
   <script src="assets/js/app.js?v=<?= filemtime(__DIR__ . '/assets/js/app.js') ?>"></script>
 </body>
 </html>

@@ -54,6 +54,7 @@ function backup_ui_picker(string $prefix, string $label): void { ?>
   <title>Backup &amp; Restore Database | SistemSPP</title>
   <link rel="icon" href="assets/img/favicon.png?v=2">
   <link rel="stylesheet" href="assets/css/style.css?v=unitpalette4&amp;mtime=<?= filemtime(__DIR__ . '/assets/css/style.css') ?>">
+  <link rel="stylesheet" href="assets/css/date_controls.css?v=unitpalette4&amp;mtime=<?= filemtime(__DIR__ . '/assets/css/date_controls.css') ?>">
   <link rel="stylesheet" href="assets/css/backup_restore.css?v=<?= filemtime(__DIR__ . '/assets/css/backup_restore.css') ?>">
   <script>(function(){document.documentElement.setAttribute('data-theme',localStorage.getItem('spp_theme')||'light');})();</script>
 </head>
@@ -139,7 +140,8 @@ function backup_ui_picker(string $prefix, string $label): void { ?>
     <div class="dbt-dialog-actions"><button type="button" class="dbt-button dbt-button-outline" id="restore-cancel" autofocus>Batal</button><button type="button" class="dbt-button dbt-button-primary" id="restore-apply" disabled aria-describedby="restore-unavailable">Pulihkan Database</button></div>
   </div>
 </dialog>
-<script src="assets/js/app.js?v=<?= filemtime(__DIR__ . '/assets/js/app.js') ?>"></script>
+<script src="assets/js/date_format.js?v=<?= filemtime(__DIR__ . '/assets/js/date_format.js') ?>"></script>
+  <script src="assets/js/app.js?v=<?= filemtime(__DIR__ . '/assets/js/app.js') ?>"></script>
 <script src="assets/js/backup_restore.js?v=<?= filemtime(__DIR__ . '/assets/js/backup_restore.js') ?>"></script>
 
 <dialog id="legacy-dialog" class="dbt-dialog" aria-labelledby="legacy-dialog-title">

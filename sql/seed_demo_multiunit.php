@@ -64,8 +64,8 @@ function demo_existing_or_insert(mysqli $db, string $table, string $condition, a
 }
 
 $profiles = [
-    2 => ['code'=>'SMP','grades'=>[7=>[350000,150000,1600000],8=>[360000,160000,1700000],9=>[375000,175000,1800000]],'pangkal'=>2000000,'psb'=>4100000],
-    3 => ['code'=>'SMA','grades'=>[10=>[450000,200000,2000000],11=>[460000,210000,2100000],12=>[475000,225000,2200000]],'pangkal'=>2500000,'psb'=>4600000],
+    2 => ['code'=>'SMP','grades'=>[7=>[350000,150000,1600000],8=>[360000,160000,1700000],9=>[375000,175000,1800000]],'psb'=>4100000],
+    3 => ['code'=>'SMA','grades'=>[10=>[450000,200000,2000000],11=>[460000,210000,2100000],12=>[475000,225000,2200000]],'psb'=>4600000],
 ];
 $before = [];
 foreach ([1,2,3] as $unitId) {
@@ -131,13 +131,12 @@ function demo_students(mysqli $db, int $unitId, array $profile, string $asOfText
         $classId = (int)$class['id'];
         $nis = $code.'26'.str_pad((string)$number,4,'0',STR_PAD_LEFT);
         [$spp,$komite,$du] = $profile['grades'][$grade];
-        $pangkal = $grade===$grades[0] ? $profile['pangkal'] : 0;
         if (!demo_one($db,'SELECT id FROM siswa WHERE NO_INDUK=?',[$nis])) {
             demo_insert($db,'siswa',[
                 'NO_INDUK'=>$nis,'NO_induk_diknas'=>'D26'.$code.str_pad((string)$number,4,'0',STR_PAD_LEFT),
                 'NAMA'=>'Siswa Demo '.$code.' '.str_pad((string)$number,3,'0',STR_PAD_LEFT),
                 'KELAS'=>(string)$grade,'master_kelas_id'=>$classId,'SPP_PERBULAN'=>$spp,
-                'POMG'=>$komite,'DAFTAR_ULANG'=>$du,'PANGKAL'=>$pangkal,'tot_pangkal'=>$pangkal,'tot_du'=>$du,'is_active'=>1,
+                'POMG'=>$komite,'DAFTAR_ULANG'=>$du,'tot_du'=>$du,'is_active'=>1,
             ]);
         }
         $placement = demo_existing_or_insert($db,'siswa_tahun_ajaran','tahun_ajaran_id=? AND no_induk=?',[$yearId,$nis],[
@@ -162,7 +161,7 @@ function demo_students(mysqli $db, int $unitId, array $profile, string $asOfText
                 'bulan'=>$month,'tahun'=>$calendarYear,'nominal_tagihan'=>$komite,'status'=>'open',
             ]);
         }
-        $regular[] = ['nis'=>$nis,'grade'=>$grade,'class_id'=>$classId,'class_label'=>$grade.$section,'spp'=>$spp,'komite'=>$komite,'du'=>$du,'pangkal'=>$pangkal];
+        $regular[] = ['nis'=>$nis,'grade'=>$grade,'class_id'=>$classId,'class_label'=>$grade.$section,'spp'=>$spp,'komite'=>$komite,'du'=>$du];
     }
     $psbClass = demo_one($db,"SELECT id FROM master_kelas WHERE tingkat=0 AND kode_rombel='PSB'");
     if (!$psbClass) throw new RuntimeException("Kelas PSB {$code} tidak ditemukan.");
@@ -172,8 +171,8 @@ function demo_students(mysqli $db, int $unitId, array $profile, string $asOfText
         if (!demo_one($db,'SELECT id FROM siswa WHERE NO_INDUK=?',[$nis])) demo_insert($db,'siswa',[
             'NO_INDUK'=>$nis,'NO_induk_diknas'=>'D'.$code.'PSB'.str_pad((string)$number,3,'0',STR_PAD_LEFT),
             'NAMA'=>'Calon Demo '.$code.' '.str_pad((string)$number,2,'0',STR_PAD_LEFT),
-            'KELAS'=>'PSB','master_kelas_id'=>(int)$psbClass['id'],'PANGKAL'=>$profile['pangkal'],
-            'tot_pangkal'=>$profile['pangkal'],'PSB'=>$profile['psb'],'asal_psb'=>1,'is_active'=>1,
+            'KELAS'=>'PSB','master_kelas_id'=>(int)$psbClass['id'],
+            'PSB'=>$profile['psb'],'asal_psb'=>1,'is_active'=>1,
         ]);
         $psb[] = ['nis'=>$nis,'grade'=>'PSB','class_id'=>(int)$psbClass['id'],'class_label'=>'PSB'];
     }
@@ -198,7 +197,7 @@ function demo_payments(mysqli $db, string $code, array $regular, array $psb, arr
         $method = ['Tunai','VA','Qris'][($sequence-1)%3];
         $data = [
             'NO_INDUK'=>$student['nis'],'KELAS'=>(string)$student['grade'],'master_kelas_id'=>$student['class_id'],
-            'kelas_rombel_snapshot'=>$student['class_label'], 'U_PANGKAL'=>$amounts['pangkal']??0,
+            'kelas_rombel_snapshot'=>$student['class_label'],
             'U_PSB'=>$amounts['psb']??0,'U_SPP'=>$amounts['spp']??0,
             'U_KOMITE'=>$amounts['komite']??0,
             'U_LAIN'=>$amounts['lain']??0,'KETERANGAN'=>$key,'TGL_BYR'=>$time,
@@ -240,7 +239,6 @@ function demo_payments(mysqli $db, string $code, array $regular, array $psb, arr
         $add('spp',$number,$student,['spp'=>$student['spp'],'komite'=>$student['komite']]);
     }
     for ($number=1; $number<=3; $number++) $add('du',$number,$regular[$number-1],['du'=>$regular[$number-1]['du']*($number===2?.5:1)]);
-    $add('pangkal',1,$regular[0],['pangkal'=>$profile['pangkal']/2]);
     for ($number=1; $number<=2; $number++) $add('psb',$number,$psb[$number-1],['psb'=>$profile['psb']*($number===2?.5:1)]);
     foreach ([4=>'Buku Paket',5=>'Seragam Olahraga'] as $number=>$label) {
         $amount=$label==='Buku Paket'?180000:220000;

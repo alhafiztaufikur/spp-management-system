@@ -17,7 +17,7 @@ SistemSPP adalah aplikasi administrasi pembayaran sekolah berbasis PHP, JavaScri
 
 ## Alur pembayaran aktif
 
-- Master Siswa menyimpan Pangkal dan PSB sebagai kewajiban sekali bayar. Pembayaran keduanya dapat dicicil sesuai sisa tagihan.
+- Master Siswa menyimpan PSB sebagai kewajiban sekali bayar, termasuk Pangkal. Komponen Pangkal terpisah dipensiunkan; PSB dapat dicicil sesuai sisa tagihan. Potongan SPP memakai nominal rupiah per bulan dan DIKNAS opsional.
 - Master Penerbitan SPP membuat tagihan bulanan Juli–Juni berdasarkan penempatan siswa yang tersimpan. Kasir memilih **Bulan Tagihan SPP & Komite** dan **Tahun Tagihan**. Satu transaksi SPP hanya melunasi satu bulan; tunggakan SPP lebih tua diperiksa dahulu.
 - Komite adalah tagihan bulanan dari tarif `siswa.POMG`. Ketika SPP suatu bulan dibayar, Komite bulan yang sama harus sudah lunas atau ikut dilunasi. Jika SPP dan Komite periode yang sama sama-sama masih terutang, keduanya wajib dilunasi bersama. Komite dapat dibayar sendiri jika SPP belum terbit, nol/ditanggung PSB/potongan penuh/dibatalkan, atau telah lunas.
 - **Tanggal Bayar** mencatat hari uang diterima, bukan periode tagihan. SPP wajib tepat sesuai sisa satu tagihan bulanan; nominal kurang/lebih ditolak. Tidak ada Titipan SPP atau saldo uang pembayaran. Pembayaran tahun tujuan dapat dilakukan lebih awal setelah kenaikan resmi membentuk penempatan tujuan dan tagihan diterbitkan; tunggakan lebih tua tetap didahulukan dan konfirmasi periode mendatang tetap muncul. Tidak ada penempatan rencana atau perkiraan kelas tujuan.
@@ -52,7 +52,7 @@ Guard backend berada di `includes/auth.php`. Hak akses harus diperiksa pada endp
 
 ## Lokasi kode utama
 
-- `backup_restore.php`: antarmuka baca khusus Super Admin untuk Backup & Restore serta Import Legacy; belum menyediakan backup/upload/restore/import operasional. CSS/JS terpisah, cakupan pemulihan seluruh database. Lihat [batas tahap UI dan verifikasi](BACKUP_RESTORE_UI_20261003.md) serta [audit kelayakan legacy](LEGACY_IMPORT_FEASIBILITY_20261003.md).
+- `backup_restore.php`: antarmuka baca khusus Super Admin untuk Backup & Restore serta Import Legacy; menyediakan importer identitas Legacy melalui worker privat; backup/restore penuh tetap nonaktif. CSS/JS terpisah, cakupan pemulihan seluruh database. Lihat [batas tahap UI dan verifikasi](BACKUP_RESTORE_UI_20261003.md) serta [audit kelayakan legacy](LEGACY_IMPORT_FEASIBILITY_20261003.md).
 
 - `pembayaran/`: input, histori, edit/hapus, dan struk transaksi.
 - `siswa/`: Data Siswa dan riwayat kelas.

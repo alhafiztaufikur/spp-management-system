@@ -26,18 +26,18 @@ if ($action === 'setup') {
     if ($stmt->affected_rows !== 2) throw new RuntimeException('Two active test accounts required.');
     $stmt->close();
     $class = (int)$koneksi->query("SELECT id FROM master_kelas WHERE tingkat=1 AND kode_rombel='A' AND is_active=1 AND is_placeholder=0 LIMIT 1")->fetch_row()[0];
-    $koneksi->query("INSERT INTO siswa(NO_INDUK,NAMA,KELAS,master_kelas_id,PANGKAL,tot_pangkal) VALUES('$nis','BROWSER OTORISASI','1',$class,1000,1000)");
+    $koneksi->query("INSERT INTO siswa(NO_INDUK,NAMA,KELAS,master_kelas_id,PSB) VALUES('$nis','BROWSER OTORISASI','1',$class,1000)");
     $month = date('m'); $year = date('Y');
-    $koneksi->query("INSERT INTO bayar(NO_INDUK,KELAS,master_kelas_id,U_PANGKAL,TGL_BYR,BULAN,TAHUN,sistem_pembayaran,total_jumlah,payment_link_version) VALUES('$nis','1',$class,100,NOW(),'$month','$year','Tunai',100,1)");
+    $koneksi->query("INSERT INTO bayar(NO_INDUK,KELAS,master_kelas_id,U_PSB,TGL_BYR,BULAN,TAHUN,sistem_pembayaran,total_jumlah,payment_link_version) VALUES('$nis','1',$class,100,NOW(),'$month','$year','Tunai',100,1)");
     $koneksi->commit();
     echo "OK: authorization browser fixture ready.\n";
 } elseif (in_array($action, ['state', 'verify'], true)) {
-    $payment = $koneksi->query("SELECT id,U_PANGKAL,total_jumlah FROM bayar WHERE NO_INDUK='$nis'")->fetch_assoc();
+    $payment = $koneksi->query("SELECT id,U_PSB,total_jumlah FROM bayar WHERE NO_INDUK='$nis'")->fetch_assoc();
     $requests = $koneksi->query("SELECT id,status,action FROM transaksi_otorisasi WHERE no_induk_snapshot='$nis' ORDER BY id")->fetch_all(MYSQLI_ASSOC);
     if ($action === 'state') {
         echo json_encode(['payment'=>$payment, 'requests'=>$requests], JSON_THROW_ON_ERROR) . PHP_EOL;
     } else {
-        if (!$payment || (float)$payment['U_PANGKAL'] !== 200.0 || (float)$payment['total_jumlah'] !== 200.0
+        if (!$payment || (float)$payment['U_PSB'] !== 200.0 || (float)$payment['total_jumlah'] !== 200.0
             || array_column($requests, 'status') !== ['approved','rejected','cancelled']) {
             throw new RuntimeException('Browser decisions did not produce the expected final database state.');
         }

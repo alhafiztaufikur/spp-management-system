@@ -89,7 +89,7 @@ function transaction_authorization_payload(array $source, string $action): array
 
     $allowed = [
         'id','no_induk','tanggal_bayar','bulan_bayar','tahun_bayar','sistem_pembayaran',
-        'uang_pangkal','uang_psb','uang_spp','uang_komite','uang_du','potongan_spp',
+        'uang_psb','uang_spp','uang_komite','uang_du','potongan_spp',
         'tabungan_wajib','total_jumlah','catatan','kelas_du','tahun_ajaran_du',
         'tagihan_daftar_ulang_id','du_expected_total','du_expected_paid',
 

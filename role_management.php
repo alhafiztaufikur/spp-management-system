@@ -201,6 +201,7 @@ $roleLabels = ['super_admin'=>'Super Admin','admin' => 'Admin', 'bendahara' => '
   <link rel="preconnect" href="https://fonts.googleapis.com" />
   <link href="https://fonts.googleapis.com/css2?family=Inter:wght@300;400;500;600;700;800&display=swap" rel="stylesheet" />
   <link rel="stylesheet" href="assets/css/style.css?v=unitpalette4&amp;mtime=<?= filemtime(__DIR__ . '/assets/css/style.css') ?>" />
+  <link rel="stylesheet" href="assets/css/date_controls.css?v=unitpalette4&amp;mtime=<?= filemtime(__DIR__ . '/assets/css/date_controls.css') ?>" />
   <script>(function(){var t=localStorage.getItem('spp_theme')||'light';document.documentElement.setAttribute('data-theme',t);})();</script>
 </head>
 <body>
@@ -339,7 +340,7 @@ $roleLabels = ['super_admin'=>'Super Admin','admin' => 'Admin', 'bendahara' => '
                 <td data-label="Unit"><span class="unit-pill"><?= unit_label((int)($account['unit_id'] ?? 0)) ?></span></td>
                 <td data-label="Role"><span class="badge-role badge-role-<?= htmlspecialchars($account['role']) ?>"><?= htmlspecialchars($roleLabels[$account['role']] ?? $account['role']) ?></span></td>
                 <td data-label="Status"><?= (int)$account['is_active']===1?'Aktif':'Nonaktif' ?></td>
-                <td data-label="Dibuat"><?= date('d/m/Y', strtotime($account['created_at'])) ?></td>
+                <td data-label="Dibuat"><?= spp_date_label($account['created_at']) ?></td>
                 <td data-label="Aksi" class="aksi-col">
                   <div class="savings-row-actions">
                     <button type="button" class="btn-tbl btn-tbl-edit btn-reset-password"
@@ -432,6 +433,7 @@ $roleLabels = ['super_admin'=>'Super Admin','admin' => 'Admin', 'bendahara' => '
     </div>
   </div>
 
+  <script src="assets/js/date_format.js?v=<?= filemtime(__DIR__ . '/assets/js/date_format.js') ?>"></script>
   <script src="assets/js/app.js?v=<?= filemtime(__DIR__ . '/assets/js/app.js') ?>"></script>
   <script>
     (function () {

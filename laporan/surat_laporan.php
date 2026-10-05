@@ -12,6 +12,7 @@ requireRole(['admin','bendahara','kasir']);
   <title>Surat Laporan | SistemSPP</title>
   <link rel="icon" href="../assets/img/favicon.png?v=2">
   <link rel="stylesheet" href="../assets/css/style.css?v=unitpalette4&amp;mtime=<?= filemtime(__DIR__ . '/../assets/css/style.css') ?>">
+  <link rel="stylesheet" href="../assets/css/date_controls.css?v=unitpalette4&amp;mtime=<?= filemtime(__DIR__ . '/../assets/css/date_controls.css') ?>">
   <script>(function(){document.documentElement.setAttribute('data-theme',localStorage.getItem('spp_theme')||'light')})();</script>
 </head>
 <body>
@@ -46,6 +47,7 @@ requireRole(['admin','bendahara','kasir']);
     </div>
   </main>
 </div>
-<script src="../assets/js/app.js?v=<?= filemtime(__DIR__ . '/../assets/js/app.js') ?>"></script>
+<script src="../assets/js/date_format.js?v=<?= filemtime(__DIR__ . '/../assets/js/date_format.js') ?>"></script>
+  <script src="../assets/js/app.js?v=<?= filemtime(__DIR__ . '/../assets/js/app.js') ?>"></script>
 </body>
 </html>

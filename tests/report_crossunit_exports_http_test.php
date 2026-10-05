@@ -203,18 +203,18 @@ try {
         $_SESSION['active_unit_id']=$unit;
         unit_set_context($koneksi, $unit);
         $nis = $fixture['nis'];
-        $stmt = $koneksi->prepare('SELECT PANGKAL,tot_pangkal FROM siswa WHERE NO_INDUK=?');
+        $stmt = $koneksi->prepare('SELECT PSB FROM siswa WHERE NO_INDUK=?');
         $stmt->bind_param('s',$nis);$stmt->execute();
         $original = $stmt->get_result()->fetch_assoc();$stmt->close();
         matrix_assert((bool)$original, 'Siswa fixture kas historis hilang.');
         $paymentIds = [];
         try {
-            $stmt = $koneksi->prepare('UPDATE siswa SET PANGKAL=250,tot_pangkal=250 WHERE NO_INDUK=?');
+            $stmt = $koneksi->prepare('UPDATE siswa SET PSB=250 WHERE NO_INDUK=?');
             $stmt->bind_param('s',$nis);$stmt->execute();$stmt->close();
             foreach ([['2090-07-15 09:00:00',$fixture['oldClass'],$fixture['oldLevel'],'2090',100.0],
                 ['2091-07-15 09:00:00',$fixture['newClass'],$fixture['newLevel'],'2091',150.0]]
                 as [$date,$class,$level,$year,$amount]) {
-                $stmt = $koneksi->prepare("INSERT INTO bayar(NO_INDUK,KELAS,kelas_rombel_snapshot,U_PANGKAL,total_jumlah,TGL_BYR,BULAN,TAHUN,user_id,sistem_pembayaran) VALUES(?,?,?,?,?,?,'07',?,'1','Tunai')");
+                $stmt = $koneksi->prepare("INSERT INTO bayar(NO_INDUK,KELAS,kelas_rombel_snapshot,U_PSB,total_jumlah,TGL_BYR,BULAN,TAHUN,user_id,sistem_pembayaran) VALUES(?,?,?,?,?,?,'07',?,'1','Tunai')");
                 $stmt->bind_param('sssddss',$nis,$level,$class,$amount,$amount,$date,$year);
                 $stmt->execute();$paymentIds[]=(int)$koneksi->insert_id;$stmt->close();
             }
@@ -236,8 +236,8 @@ try {
             $results[] = 'OK ' . unit_label($unit) . ': kas lintas kenaikan 100+150 tampil pada dua kelas historis di layar, Excel, PDF.';
         } finally {
             foreach ($paymentIds as $id) $koneksi->query('DELETE FROM bayar WHERE id=' . $id);
-            $stmt = $koneksi->prepare('UPDATE siswa SET PANGKAL=?,tot_pangkal=? WHERE NO_INDUK=?');
-            $stmt->bind_param('dds',$original['PANGKAL'],$original['tot_pangkal'],$nis);
+            $stmt = $koneksi->prepare('UPDATE siswa SET PSB=? WHERE NO_INDUK=?');
+            $stmt->bind_param('ds',$original['PSB'],$nis);
             $stmt->execute();$stmt->close();
         }
     }

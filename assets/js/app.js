@@ -123,7 +123,7 @@ function updateClock() {
   const el = document.getElementById('liveClock');
   if (!el) return;
   const now = new Date();
-  el.textContent = now.toLocaleTimeString('id-ID', { hour:'2-digit', minute:'2-digit', second:'2-digit' });
+  el.textContent = now.toLocaleTimeString('en-GB', { timeZone:'Asia/Jakarta',hourCycle:'h23',hour:'2-digit', minute:'2-digit', second:'2-digit' }) + ' WIB';
 }
 setInterval(updateClock, 1000);
 updateClock();
@@ -1099,7 +1099,7 @@ function paidDaftarUlangForContext(opt) {
 
 function applyGraduatePaymentLock(opt) {
   const graduateOnly = opt?.dataset.isGraduate === '1';
-  ['pangkal', 'psb', 'spp', 'komite'].forEach(key => {
+  ['psb', 'spp', 'komite'].forEach(key => {
     const input = document.getElementById(key + '-input');
     if (!input) return;
     if (graduateOnly && !(window.sppPublishedBilling && (key === 'spp' || key === 'komite'))) {
@@ -1197,7 +1197,7 @@ function refreshAcademicYearSummary() {
       Object.values(JSON.parse(opt.dataset.komiteBilling || '{}')).forEach(bill => { total += parseNumber(bill.total); paid += parseNumber(bill.paid); });
     } catch (_) { /* no bills */ }
   }
-  ['pangkal', 'psb'].forEach(key => {
+  ['psb'].forEach(key => {
     total += datasetNumber(opt, 'total', key);
     paid += datasetNumber(opt, 'paid', key);
   });
@@ -1233,7 +1233,7 @@ function setPaymentComponent(key, total, paid) {
 function applyStudentPaymentDetails(opt) {
   if (!opt) return;
   ensureDefaultDaftarUlangSelection(opt);
-  ['pangkal','psb','spp','komite','du'].forEach(key => {
+  ['psb','spp','komite','du'].forEach(key => {
     if (window.sppPublishedBilling && (key === 'spp' || key === 'komite')) return;
     const total = key === 'du'
       ? totalDaftarUlangForContext(opt)
@@ -1258,7 +1258,7 @@ function applyStudentPaymentDetails(opt) {
 function clearPaymentDetails() {
   const duBillId = document.getElementById('tagihan-daftar-ulang-id');
   if (duBillId) duBillId.value = '';
-  ['pangkal','psb','spp','komite','du'].forEach(key => {
+  ['psb','spp','komite','du'].forEach(key => {
     ['total','bayar','sisa'].forEach(part => {
       const el = document.getElementById(key + '-' + part);
       if (el) el.value = '0';
@@ -1274,7 +1274,6 @@ function clearPaymentDetails() {
 }
 
 const paymentComponentLabels = {
-  pangkal: 'Uang Pangkal',
   psb: 'Uang PSB',
   spp: 'Uang SPP',
   komite: 'Uang Komite',
@@ -1298,7 +1297,7 @@ function setPaymentInputAvailability(input, locked, message = '', clearWhenLocke
 
 function refreshOptionalOneTimeFeeAvailability() {
   const hasStudent = !!document.getElementById('disp-nis')?.value;
-  ['pangkal', 'psb', 'komite'].forEach(key => {
+  ['psb', 'komite'].forEach(key => {
     const total = parseNumber(document.getElementById(key + '-total')?.value || 0);
     const paid = parseNumber(document.getElementById(key + '-bayar')?.value || 0);
     const inputEl = document.getElementById(key + '-input');
@@ -1306,7 +1305,6 @@ function refreshOptionalOneTimeFeeAvailability() {
     if (!inputEl) return;
 
     const labels = {
-      pangkal: 'Uang Pangkal',
       psb: 'Uang PSB',
       komite: 'Uang Komite'
     };
@@ -1393,7 +1391,7 @@ function closeSppWarning() {
 }
 
 function clearPaymentAmountsOnContextChange(studentChanged = false) {
-  for (const id of ['spp-input','komite-input',...(studentChanged ? ['pangkal-input','psb-input','du-input'] : [])]) {
+  for (const id of ['spp-input','komite-input',...(studentChanged ? ['psb-input','du-input'] : [])]) {
     const input=document.getElementById(id);
     if (input) { input.value='0'; input.setCustomValidity(''); }
   }
@@ -2319,7 +2317,7 @@ async function restorePaymentDraft() {
     setValue('tagihan-daftar-ulang-id', draft.tagihan_daftar_ulang_id);
     if (opt) applyStudentPaymentDetails(opt);
   }
-  for (const [key,id] of Object.entries({uang_pangkal:'pangkal-input',uang_psb:'psb-input',uang_komite:'komite-input',uang_du:'du-input'})) {
+  for (const [key,id] of Object.entries({uang_psb:'psb-input',uang_komite:'komite-input',uang_du:'du-input'})) {
     if (draft[key] !== undefined && !document.getElementById(id)?.readOnly) setValue(id,formatRupiahString(parseNumber(draft[key])));
   }
   if (opt) await requestSppStatus({interactive:false,force:true});
@@ -2335,7 +2333,7 @@ function capturePaymentDraftInBrowser() {
     no_induk:value('disp-nis'),bulan_bayar:value('bulan-bayar'),tahun_bayar:value('tahun-bayar'),
     sistem_pembayaran:value('sistem-pembayaran'),
     tagihan_daftar_ulang_id:value('tagihan-daftar-ulang-id'),catatan:value('catatan')};
-  for (const [key,id] of Object.entries({uang_pangkal:'pangkal-input',uang_psb:'psb-input',uang_spp:'spp-input',uang_komite:'komite-input',uang_du:'du-input'})) draft[key]=value(id);
+  for (const [key,id] of Object.entries({uang_psb:'psb-input',uang_spp:'spp-input',uang_komite:'komite-input',uang_du:'du-input'})) draft[key]=value(id);
   const rows=Array.from(document.querySelectorAll('#biaya-lain-list .biaya-lain-row'));
   draft.biaya_lain_tagihan_id=rows.map(row => row.querySelector('.biaya-lain-select')?.value || '');
   draft.biaya_lain_nominal=rows.map(row => row.querySelector('.biaya-lain-nominal')?.value || '0');
@@ -2708,12 +2706,7 @@ document.addEventListener('DOMContentLoaded', function () {
 });
 
 /* ── Hitung Sisa ─────────────────────────── */
-function reportRangeDateLabel(value) {
-  if (!value) return '';
-  const date = new Date(value + 'T00:00:00');
-  if (Number.isNaN(date.getTime())) return '';
-  return String(date.getDate()).padStart(2, '0') + ' ' + paymentMonthLabelByCode(date.getMonth() + 1) + ' ' + date.getFullYear();
-}
+function reportRangeDateLabel(value) { return value ? sppDateLabel(value) : ''; }
 
 function reportRangeDateValue(date) {
   return date.getFullYear() + '-' + String(date.getMonth() + 1).padStart(2, '0') + '-' + String(date.getDate()).padStart(2, '0');
@@ -2734,10 +2727,6 @@ function reportRangeDisplayLabel(startValue, endValue, emptyLabel) {
   const endDate = reportRangeDateValue(end);
   if (startDate === endDate) return reportRangeDateLabel(startDate);
 
-  if (start.getMonth() === end.getMonth() && start.getFullYear() === end.getFullYear()) {
-    return String(start.getDate()).padStart(2, '0') + '-' + String(end.getDate()).padStart(2, '0') + ' ' +
-      paymentMonthLabelByCode(end.getMonth() + 1) + ' ' + end.getFullYear();
-  }
   return reportRangeDateLabel(startDate) + ' - ' + reportRangeDateLabel(endDate);
 }
 
@@ -2988,7 +2977,7 @@ function updateTotal() {
   document.querySelectorAll('.biaya-lain-row').forEach(row => refreshBiayaLainRow(row, true));
   refreshBiayaLainWarnings();
   applyGraduatePaymentLock(selectedStudentOption());
-  const ids = ['pangkal-input','psb-input','spp-input','komite-input','du-input'];
+  const ids = ['psb-input','spp-input','komite-input','du-input'];
   let total = 0;
   ids.forEach(id => {
     const el = document.getElementById(id);
@@ -3034,7 +3023,7 @@ function resetForm() {
   const hiddenEl = document.getElementById('hidden-total');
   if (hiddenEl) hiddenEl.value = 0;
 
-  ['pangkal','psb','spp','komite','du'].forEach(k => {
+  ['psb','spp','komite','du'].forEach(k => {
     ['total','bayar','sisa','input'].forEach(s => {
       const el = document.getElementById(k + '-' + s);
       if (el) el.value = '0';
@@ -3111,7 +3100,7 @@ function renderLihatTable() {
       <td>${row.kelas || '-'}</td>
       <td>${row.bulan || '-'}</td>
       <td class="nominal">Rp ${formatRupiah(row.total)}</td>
-      <td>${row.tanggal || '-'}</td>
+      <td>${sppDateLabel(row.tanggal,true)}</td>
       <td><span class="badge-count">✓</span></td>
     </tr>
   `).join('');

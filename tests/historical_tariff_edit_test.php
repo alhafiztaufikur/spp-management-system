@@ -42,7 +42,7 @@ try {
     $sourceLevel = '5';
     $sourceClass = $classes[5];
     $currentClass = $classes[6];
-    $stmt = $koneksi->prepare('INSERT INTO siswa(NO_INDUK,NAMA,KELAS,master_kelas_id,SPP_PERBULAN,potongan_spp_persen,POMG,is_active) VALUES(?,?,?,?,250000,0,15000,1)');
+    $stmt = $koneksi->prepare('INSERT INTO siswa(NO_INDUK,NAMA,KELAS,master_kelas_id,SPP_PERBULAN,potongan_spp_nominal,POMG,is_active) VALUES(?,?,?,?,250000,0,15000,1)');
     $stmt->bind_param('sssi', $nis, $name, $sourceLevel, $sourceClass);
     $stmt->execute(); $stmt->close();
 
@@ -83,12 +83,12 @@ try {
         'Tarif tahun tujuan tidak tersinkron setelah kenaikan.');
     historical_tariff_assert(spp_publish_students($koneksi, (int)$newMaster['id'], [$nis])['created'] === 12, 'SPP tahun tujuan tidak terbit.');
 
-    $stmt = $koneksi->prepare('UPDATE siswa SET POMG=30000,potongan_spp_persen=10 WHERE NO_INDUK=?');
+    $stmt = $koneksi->prepare('UPDATE siswa SET POMG=30000,potongan_spp_nominal=30000 WHERE NO_INDUK=?');
     $stmt->bind_param('s', $nis); $stmt->execute(); $stmt->close();
     $sync = null;
     $actualPlacement = class_sync_student_current_year($koneksi, $nis, $currentClass, 300000.0, 30000.0, true, $sync);
     historical_tariff_assert($actualPlacement === $newId, 'Edit Data Siswa tidak memilih penempatan tahun terbaru.');
-    $discount = spp_sync_student_discount($koneksi, $nis, 10.0, $actualPlacement);
+    $discount = spp_sync_student_discount($koneksi, $nis, 30000.0, $actualPlacement);
     historical_tariff_assert($discount['updated'] === 12, 'Potongan SPP tahun yang diedit tidak disinkronkan.');
 
     foreach ([

@@ -65,7 +65,7 @@ $bulanIndo = [
     '11' => 'November',
     '12' => 'Desember',
 ];
-$todayLabel = date('d') . ' ' . ($bulanIndo[date('m')] ?? date('F')) . ' ' . date('Y');
+$todayLabel = spp_date_label($todayDate);
 $reportUnitQuery = '&unit=' . ($reportUnitId===0?'all':'active');
 $exportSetoranPdfUrl = 'laporan/export_global.php?template=setoran&format=preview&tanggal_awal=' . $todayDate . '&tanggal_akhir=' . $todayDate . $reportUnitQuery;
 $exportSetoranExcelUrl = 'laporan/export_global.php?template=setoran&format=excel&tanggal_awal=' . $todayDate . '&tanggal_akhir=' . $todayDate . $reportUnitQuery;
@@ -82,6 +82,7 @@ $exportSetoranExcelUrl = 'laporan/export_global.php?template=setoran&format=exce
   <link rel="preconnect" href="https://fonts.googleapis.com" />
   <link href="https://fonts.googleapis.com/css2?family=Inter:wght@300;400;500;600;700;800&display=swap" rel="stylesheet" />
   <link rel="stylesheet" href="assets/css/style.css?v=unitpalette4&amp;mtime=<?= filemtime(__DIR__ . '/assets/css/style.css') ?>" />
+  <link rel="stylesheet" href="assets/css/date_controls.css?v=unitpalette4&amp;mtime=<?= filemtime(__DIR__ . '/assets/css/date_controls.css') ?>" />
   <!-- Prevent theme flash -->
   <script>(function(){var t=localStorage.getItem('spp_theme')||'light';document.documentElement.setAttribute('data-theme',t);})();</script>
 </head>
@@ -237,6 +238,7 @@ $exportSetoranExcelUrl = 'laporan/export_global.php?template=setoran&format=exce
     </main>
   </div><!-- /layout -->
 
+  <script src="assets/js/date_format.js?v=<?= filemtime(__DIR__ . '/assets/js/date_format.js') ?>"></script>
   <script src="assets/js/app.js?v=<?= filemtime(__DIR__ . '/assets/js/app.js') ?>"></script>
 </body>
 </html>

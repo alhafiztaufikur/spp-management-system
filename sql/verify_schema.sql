@@ -446,7 +446,7 @@ FROM (
              AND rc.DELETE_RULE = 'CASCADE' AND rc.UPDATE_RULE = 'CASCADE'
          )
   UNION ALL
-  SELECT 'siswa.potongan_spp_persen', EXISTS(SELECT 1 FROM information_schema.COLUMNS WHERE TABLE_SCHEMA=DATABASE() AND TABLE_NAME='siswa' AND COLUMN_NAME='potongan_spp_persen')
+  SELECT 'siswa.potongan_spp_nominal', EXISTS(SELECT 1 FROM information_schema.COLUMNS WHERE TABLE_SCHEMA=DATABASE() AND TABLE_NAME='siswa' AND COLUMN_NAME='potongan_spp_nominal')
   UNION ALL
   SELECT 'retired_spp_deposit_absent', NOT EXISTS(SELECT 1 FROM information_schema.COLUMNS WHERE TABLE_SCHEMA=DATABASE() AND COLUMN_NAME IN ('U_TITIPAN_SPP','gunakan_titipan','titipan_digunakan','titipan_baru','nominal_dari_titipan')) AND NOT EXISTS(SELECT 1 FROM information_schema.TABLES WHERE TABLE_SCHEMA=DATABASE() AND TABLE_NAME LIKE 'titipan_spp_mutasi%')
   UNION ALL

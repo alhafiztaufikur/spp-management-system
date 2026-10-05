@@ -13,6 +13,13 @@ File ini mencatat perubahan proyek secara reverse chronological. Baca [PROJECT_C
 - Jangan menghapus atau menulis ulang entri lama. Tambahkan entri koreksi bila diperlukan.
 - Perubahan implementasi dan entri changelog wajib masuk commit yang sama.
 
+## 2026-10-05 - PSB tanpa Pangkal, potongan nominal dan tanggal Indonesia
+
+- Aktor: Codex, implementasi rencana pemilik pada clone sebelum penerapan lokal; Railway tidak dimigrasikan.
+- Perilaku: Pangkal dihapus dari alur operasional dan digabung ke pembayaran PSB lama tanpa mengubah kas/ID/tanggal. Master PSB memakai maksimum nilai lama dan penerimaan hasil konversi, bukan penjumlahan tagihan lama. Potongan SPP rupiah per bulan dengan snapshot nominal ditetapkan/aktual; DIKNAS opsional. Tanggal DD/MM/YYYY dan timestamp WIB melalui formatter serta kontrol kalender terpisah.
+- Database: migrasi CLI dengan backup/maintenance/worker/advisory-lock gate, audit before/after serta checkpoint transaksi-data/DDL. Kolom Pangkal/persen dipensiunkan; schema installer, guard, seed dan diagnostik diselaraskan. Definisi historis yang akan membuat fitur lama kembali ditolak.
+- Verifikasi: tiga unit reguler/PSB/Legacy sampai kelulusan, nominal/DIKNAS, rollback/recovery/rerun/restore/install, otorisasi dan races, 307 akses, layar/Excel/PDF, 96 keadaan UI serta 39 navigasi, preview/kalender/history aktual, lint/CSS, 30 integritas dan FK. Baseline aktual/penerapan akhir dicatat dalam [audit perubahan](PSB_NOMINAL_DATE_AUDIT_20261005.md).
+
 ## 2026-10-03 - Script pemeriksaan db_spp untuk DBeaver
 
 - Aktor: Codex, permintaan pemilik untuk database lokal `db_spp` yang sudah diperbarui.

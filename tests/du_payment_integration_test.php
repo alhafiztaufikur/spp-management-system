@@ -103,9 +103,9 @@ try {
     komite_sync_placement($koneksi,$placementId);
     $master=spp_master_ensure_year($koneksi,$current,true);
     $startYear=(string)$currentStart;$monthCode='07';$classLabel='1A';$rate=250000.0;$discount=0.0;$billStatus='open';$level=1;
-    $stmtSpp=$koneksi->prepare('INSERT INTO tagihan_spp(master_spp_tahun_id,tahun_ajaran_id,penempatan_id,no_induk,tingkat_snapshot,master_kelas_id,kelas_rombel_snapshot,bulan,tahun,tarif_dasar_snapshot,potongan_persen_snapshot,potongan_nominal_snapshot,nominal_tagihan,status) VALUES(?,?,?,?,?,?,?,?,?,?,?,?,?,?)');
+    $stmtSpp=$koneksi->prepare('INSERT INTO tagihan_spp(master_spp_tahun_id,tahun_ajaran_id,penempatan_id,no_induk,tingkat_snapshot,master_kelas_id,kelas_rombel_snapshot,bulan,tahun,tarif_dasar_snapshot,potongan_nominal_snapshot,nominal_tagihan,status) VALUES(?,?,?,?,?,?,?,?,?,?,?,?,?)');
     $masterId=(int)$master['id'];$yearId=$yearIds[$current];
-    $stmtSpp->bind_param('iiisiisssdddds',$masterId,$yearId,$placementId,$students[0],$level,$classId,$classLabel,$monthCode,$startYear,$rate,$discount,$discount,$rate,$billStatus);
+    $stmtSpp->bind_param('iiisiisssddds',$masterId,$yearId,$placementId,$students[0],$level,$classId,$classLabel,$monthCode,$startYear,$rate,$discount,$discount,$rate,$billStatus);
     $stmtSpp->execute();$stmtSpp->close();
 
     $cookies = [];

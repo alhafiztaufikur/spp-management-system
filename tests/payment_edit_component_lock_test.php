@@ -24,7 +24,7 @@ if (!$payment) {
 }
 
 $availability = one_time_fee_status($koneksi, (string)$payment['NO_INDUK'], (int)$payment['id']);
-if ($availability['pangkal']['total'] > .001 || $availability['psb']['total'] > .001) {
+if ($availability['psb']['total'] > .001) {
     echo "SKIPPED: tagihan Pangkal/PSB transaksi #959 sudah berubah.\n";
     exit(0);
 }
@@ -39,7 +39,7 @@ ob_start();
 include 'edit.php';
 $html = ob_get_clean();
 
-foreach (['pangkal', 'psb'] as $key) {
+foreach (['psb'] as $key) {
     if (!preg_match('/<input\b[^>]*\bid="' . $key . '-input"[^>]*>/s', $html, $match)) {
         throw new RuntimeException('Input ' . $key . ' tidak tersedia.');
     }
@@ -57,7 +57,7 @@ foreach (['spp' => 'U_SPP', 'komite' => 'U_KOMITE'] as $key => $column) {
     }
 }
 
-foreach (['pangkal' => 1000.0, 'psb' => 1000.0] as $key => $amount) {
+foreach (['psb' => 1000.0] as $key => $amount) {
     try {
         validate_one_time_fee_payments($koneksi, (string)$payment['NO_INDUK'], [$key => $amount], (int)$payment['id']);
         throw new RuntimeException('Backend menerima nominal ' . $key . ' tanpa tagihan.');

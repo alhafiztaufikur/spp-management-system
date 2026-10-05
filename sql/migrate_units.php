@@ -180,3 +180,6 @@ echo "OK: migrasi unit selesai. Jalankan bootstrap akun dan verifikasi sebelum m
 
 require_once __DIR__.'/../includes/legacy_schema.php';
 legacy_schema_apply($koneksi);
+
+require_once __DIR__.'/../includes/financial_components_schema.php';
+financial_components_apply($koneksi);

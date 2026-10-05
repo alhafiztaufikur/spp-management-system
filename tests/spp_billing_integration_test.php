@@ -13,7 +13,7 @@ $nis=(string)random_int(9300000000,9399999999);$label='2196/2197';
 $koneksi->begin_transaction();
 try{
   $class=$koneksi->query("SELECT id,tingkat,kode_rombel,is_placeholder FROM master_kelas WHERE tingkat BETWEEN 1 AND 6 ORDER BY tingkat,id LIMIT 1")->fetch_assoc();if(!$class)throw new RuntimeException('Master kelas uji tidak tersedia.');$level=(string)$class['tingkat'];$classId=(int)$class['id'];$classLabel=class_label($class);
-  $name='UJI SPP '.$nis;$stmt=$koneksi->prepare('INSERT INTO siswa(NO_INDUK,NAMA,KELAS,master_kelas_id,SPP_PERBULAN,potongan_spp_persen,is_active) VALUES(?,?,?,?,250000,0,1)');$stmt->bind_param('sssi',$nis,$name,$level,$classId);$stmt->execute();$stmt->close();
+  $name='UJI SPP '.$nis;$stmt=$koneksi->prepare('INSERT INTO siswa(NO_INDUK,NAMA,KELAS,master_kelas_id,SPP_PERBULAN,potongan_spp_nominal,is_active) VALUES(?,?,?,?,250000,0,1)');$stmt->bind_param('sssi',$nis,$name,$level,$classId);$stmt->execute();$stmt->close();
   $master=spp_master_ensure_year($koneksi,$label,true);$masterId=(int)$master['id'];$yearId=(int)$master['tahun_ajaran_id'];$status='aktif';$stmt=$koneksi->prepare('INSERT INTO siswa_tahun_ajaran(tahun_ajaran_id,no_induk,kelas,master_kelas_id,kelas_rombel_snapshot,spp_perbulan_snapshot,status) VALUES(?,?,?,?,?,250000,?)');$stmt->bind_param('ississ',$yearId,$nis,$level,$classId,$classLabel,$status);$stmt->execute();$placementId=(int)$koneksi->insert_id;$stmt->close();
   spp_master_save_rates($koneksi,$masterId,[1=>250000,2=>250000,3=>250000,4=>250000,5=>250000,6=>250000]);
   $publish=spp_publish_students($koneksi,$masterId,[$nis]);spp_it_assert($publish['created']===12,'Penerbitan pertama tidak membuat 12 tagihan.');$again=spp_publish_students($koneksi,$masterId,[$nis]);spp_it_assert($again['created']===0&&$again['existing']===12,'Penerbitan ulang tidak idempoten.');
@@ -26,7 +26,7 @@ try{
   $activeRate=(float)$koneksi->query("SELECT SPP_PERBULAN FROM siswa WHERE NO_INDUK='{$nis}'")->fetch_row()[0];
   spp_it_assert($placementRate===250000.0&&$activeRate===300000.0,
     'Tarif aktif tidak mengikuti master baru atau snapshot penempatan berbayar berubah.');
-  $discountChange=spp_sync_student_discount($koneksi,$nis,10,$placementId);spp_it_assert($discountChange['updated']===10&&$discountChange['locked']===2,'Perubahan potongan tidak menjaga snapshot tagihan berbayar.');
+  $discountChange=spp_sync_student_discount($koneksi,$nis,30000,$placementId);spp_it_assert($discountChange['updated']===10&&$discountChange['locked']===2,'Perubahan potongan tidak menjaga snapshot tagihan berbayar.');
   $amounts=$koneksi->query("SELECT bulan,nominal_tagihan FROM tagihan_spp WHERE no_induk='{$nis}' ORDER BY CAST(tahun AS UNSIGNED),CAST(bulan AS UNSIGNED) LIMIT 3")->fetch_all(MYSQLI_ASSOC);spp_it_assert((float)$amounts[0]['nominal_tagihan']===250000.0&&(float)$amounts[1]['nominal_tagihan']===250000.0&&(float)$amounts[2]['nominal_tagihan']===270000.0,'Snapshot tarif lama atau tarif efektif baru berubah tidak tepat.');
   try{spp_allocate_payment($koneksi,$nis,null,'09','2196',100000,'2196-07-03 08:00:00','Tunai','test');throw new RuntimeException('Pembayaran SPP kurang dari sebulan diterima.');}catch(RuntimeException $e){if(str_contains($e->getMessage(),'kurang dari sebulan diterima'))throw $e;}
   $c=spp_allocate_payment($koneksi,$nis,null,'09','2196',270000,'2196-07-04 08:00:00','Tunai','test');spp_it_assert($c['bill_count']===1,'Alokasi uang langsung salah.');

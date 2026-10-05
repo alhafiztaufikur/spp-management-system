@@ -1,0 +1,7 @@
+.id-date-control{display:flex;align-items:center;gap:6px;position:relative;min-width:0;width:100%}
+.id-date-control>input:not(.id-date-native){min-width:0;width:100%}
+.id-date-native{position:absolute!important;opacity:0!important;width:1px!important;height:1px!important;pointer-events:none;left:0;bottom:0}
+.id-date-picker{flex:0 0 44px;height:44px;border:1px solid var(--border-color,#d7e5df);border-radius:10px;background:var(--bg-card,transparent);color:inherit;font-size:24px;cursor:pointer}
+.id-date-picker:focus-visible{outline:2px solid currentColor;outline-offset:2px}
+.id-date-picker:disabled{opacity:.5;cursor:default}
+

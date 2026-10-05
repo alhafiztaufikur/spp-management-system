@@ -1,5 +1,5 @@
 <?php
-if(PHP_SAPI!=='cli'||getenv('SPP_TEST_ALLOW_MUTATION')!=='1'||getenv('SPP_DB_NAME')!=='db_spp_audit_legacy_backend_20261003')exit(1);
+if(PHP_SAPI!=='cli'||getenv('SPP_TEST_ALLOW_MUTATION')!=='1'||!preg_match('/^db_spp_audit_[a-z0-9_]+$/D',(string)getenv('SPP_DB_NAME')))exit(1);
 ob_start();require_once __DIR__.'/../koneksi.php';require_once __DIR__.'/../includes/reports.php';require_once __DIR__.'/http_form_scope.php';
 $base=rtrim(getenv('SPP_TEST_BASE_URL'),'/');spp_test_assert_http_clone($base,DB_NAME);
 function lf_assert($ok,$message){if(!$ok)throw new RuntimeException($message);}
@@ -11,8 +11,8 @@ foreach([1,2,3] as $unit){
  $actor=$koneksi->query("SELECT id,role FROM admin WHERE unit_id=$unit AND role='admin' AND is_active=1 LIMIT 1")->fetch_assoc();$sid='identityfinance'.bin2hex(random_bytes(10));session_id($sid);session_start();$_SESSION=['admin_id'=>$actor['id'],'admin_role'=>$actor['role'],'active_unit_id'=>$unit];session_write_close();$sessions[$unit]=$sid;
  foreach(['bayar','transaksi_m','transaksi_k'] as $table)$koneksi->query("DELETE FROM $table WHERE NO_INDUK='$nis'");$koneksi->query("UPDATE tabungan SET SALDO=0 WHERE NO_INDUK='$nis'");
  $payment=(float)($unit*1000);$sum+=$payment;[$status,$page]=lf_http('/pembayaran/form.php',$sid);lf_assert($status===200&&!str_contains($page,'Fatal error'),'Payment form');
- lf_http('/pembayaran/proses.php',$sid,['aksi'=>'input','payment_plan'=>'monthly','no_induk'=>$nis,'bulan_bayar'=>'07','tahun_bayar'=>'2026','sistem_pembayaran'=>'Tunai','uang_pangkal'=>$payment]+lf_token($page));
- $row=$koneksi->query("SELECT id,total_jumlah,U_PANGKAL,unit_id FROM bayar WHERE NO_INDUK='$nis' ORDER BY id DESC LIMIT 1")->fetch_assoc();lf_assert($row&&(float)$row['total_jumlah']===$payment&&(int)$row['unit_id']===$unit,'Payment crossed student unit');$receipts[$unit]=(int)$row['id'];
+ lf_http('/pembayaran/proses.php',$sid,['aksi'=>'input','payment_plan'=>'monthly','no_induk'=>$nis,'bulan_bayar'=>'07','tahun_bayar'=>'2026','sistem_pembayaran'=>'Tunai','uang_psb'=>$payment]+lf_token($page));
+ $row=$koneksi->query("SELECT id,total_jumlah,U_PSB,unit_id FROM bayar WHERE NO_INDUK='$nis' ORDER BY id DESC LIMIT 1")->fetch_assoc();lf_assert($row&&(float)$row['total_jumlah']===$payment&&(int)$row['unit_id']===$unit,'Payment crossed student unit');$receipts[$unit]=(int)$row['id'];
  [$status,$page]=lf_http('/tabungan/masuk.php',$sid);lf_assert($status===200,'Savings form');lf_http('/tabungan/proses.php',$sid,['aksi'=>'masuk','no_induk'=>$nis,'nominal'=>(string)($unit*10000)]+lf_token($page));
  lf_assert((float)$koneksi->query("SELECT SALDO FROM tabungan WHERE NO_INDUK='$nis'")->fetch_row()[0]===(float)($unit*10000),'Savings shared a crossunit number');
  [$status,$balance]=lf_http('/tabungan/get_saldo.php?nis='.$nis,$sid);lf_assert($status===200&&(float)json_decode($balance,true)['saldo']===(float)($unit*10000),'Balance API wrong identity');

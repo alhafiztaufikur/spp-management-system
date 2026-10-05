@@ -196,9 +196,9 @@ try {
     $studentPost = [
         'aksi' => 'tambah', 'csrf_token' => psb_cycle_token($studentPage['body'], 'form-master-siswa'),
         'no_induk' => $nis, 'nama' => 'UJI SIKLUS PSB', 'master_kelas_id' => $psbClass,
-        'advanced_enabled' => '1', 'potongan_spp_persen' => 0,
-        'pangkal' => 0, 'psb' => 3600000, 'pomg' => 100000, 'daftar_ulang' => 0,
-        'potong_pangkal' => 0, 'potong_du' => 0,
+        'advanced_enabled' => '1', 'potongan_spp_nominal' => 0,
+        'psb' => 3600000, 'pomg' => 100000, 'daftar_ulang' => 0,
+        'potong_du' => 0,
     ];
     $registered = psb_cycle_request($base, '/siswa/daftar.php', $studentPost, $cookies, '2026/2027');
     psb_cycle_assert($registered['status'] === 302, 'PSB registration POST failed.');

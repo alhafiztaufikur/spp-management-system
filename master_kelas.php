@@ -211,6 +211,7 @@ $classFilterQuery = ['q_kelas' => $classSearch, 'tingkat_kelas' => $classLevelFi
   <title>Master Kelas | SistemSPP</title>
   <link rel="icon" type="image/png" href="assets/img/favicon.png?v=2">
   <link rel="stylesheet" href="assets/css/style.css?v=unitpalette4&amp;mtime=<?= filemtime(__DIR__ . '/assets/css/style.css') ?>">
+  <link rel="stylesheet" href="assets/css/date_controls.css?v=unitpalette4&amp;mtime=<?= filemtime(__DIR__ . '/assets/css/date_controls.css') ?>">
   <script>(function(){var t=localStorage.getItem('spp_theme')||'light';document.documentElement.setAttribute('data-theme',t);})();</script>
 </head>
 <body>
@@ -351,5 +352,6 @@ $classFilterQuery = ['q_kelas' => $classSearch, 'tingkat_kelas' => $classLevelFi
     </div>
   </main>
 </div>
-<script src="assets/js/app.js?v=<?= filemtime(__DIR__ . '/assets/js/app.js') ?>"></script><script>document.addEventListener('DOMContentLoaded',function(){autoHideFlash();});</script>
+<script src="assets/js/date_format.js?v=<?= filemtime(__DIR__ . '/assets/js/date_format.js') ?>"></script>
+  <script src="assets/js/app.js?v=<?= filemtime(__DIR__ . '/assets/js/app.js') ?>"></script><script>document.addEventListener('DOMContentLoaded',function(){autoHideFlash();});</script>
 </body></html>

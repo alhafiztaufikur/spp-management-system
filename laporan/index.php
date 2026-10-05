@@ -51,13 +51,7 @@ function report_date_param(string $key): string {
     return preg_match('/^\d{4}-\d{2}-\d{2}$/', $value) ? $value : '';
 }
 
-function report_date_label_id(int $timestamp): string {
-    $months = [
-        1 => 'Januari', 'Februari', 'Maret', 'April', 'Mei', 'Juni',
-        'Juli', 'Agustus', 'September', 'Oktober', 'November', 'Desember'
-    ];
-    return date('d', $timestamp) . ' ' . $months[(int)date('n', $timestamp)] . ' ' . date('Y', $timestamp);
-}
+function report_date_label_id(int $timestamp): string { return spp_date_label($timestamp); }
 
 function report_month_name_id(int $month): string {
     $months = [
@@ -73,9 +67,7 @@ function report_transaction_date_label(string $startDate, string $endDate, strin
     $endTs = strtotime($endDate);
     if (!$startTs || !$endTs) return $fallback;
     if ($startDate === $endDate) return report_date_label_id($startTs);
-    if (date('Y-m', $startTs) === date('Y-m', $endTs)) {
-        return date('d', $startTs) . '-' . date('d', $endTs) . ' ' . report_month_name_id((int)date('n', $endTs)) . ' ' . date('Y', $endTs);
-    }
+
     return report_date_label_id($startTs) . ' - ' . report_date_label_id($endTs);
 }
 
@@ -160,7 +152,6 @@ if(count($displayMatches)===1)$studentSearchDisplay=$displayMatches[0]['NAMA'];
 // Rekap pembayaran pada tanggal/periode transaksi.
 $stmt = $koneksi->prepare("
     SELECT COUNT(*) AS jml_tx,
-           COALESCE(SUM(b.U_PANGKAL), 0) AS pangkal,
            COALESCE(SUM(b.U_PSB), 0) AS psb,
            COALESCE(SUM(b.U_SPP), 0) AS spp,
            COALESCE(SUM(b.U_KOMITE), 0) AS komite,
@@ -268,7 +259,7 @@ if (!$isUnpaidReport) {
         SELECT b.id, s.NO_INDUK, s.NO_induk_diknas, s.NAMA,
                COALESCE(NULLIF(b.kelas_rombel_snapshot,''),NULLIF(b.KELAS,''),s.KELAS) AS KELAS,
                b.BULAN, b.TAHUN,
-               b.U_PANGKAL, b.U_PSB, b.U_SPP, b.U_KOMITE,
+               b.U_PSB, b.U_SPP, b.U_KOMITE,
                b.sistem_pembayaran, b.total_jumlah, b.TGL_BYR
         FROM bayar b
         JOIN siswa s ON s.NO_INDUK = b.NO_INDUK AND s.unit_id=b.unit_id
@@ -409,6 +400,7 @@ $exportQuery = http_build_query([
   <link href="https://fonts.googleapis.com/css2?family=Inter:wght@300;400;500;600;700;800&display=swap" rel="stylesheet" />
   <script>(function(){var t=localStorage.getItem('spp_theme')||'light';document.documentElement.setAttribute('data-theme',t);})();</script>
   <link rel="stylesheet" href="../assets/css/style.css?v=unitpalette4&amp;mtime=<?= filemtime(__DIR__ . '/../assets/css/style.css') ?>" />
+  <link rel="stylesheet" href="../assets/css/date_controls.css?v=unitpalette4&amp;mtime=<?= filemtime(__DIR__ . '/../assets/css/date_controls.css') ?>" />
 </head>
 <body>
 <div class="bg-orbs"><div class="orb orb-1"></div><div class="orb orb-2"></div><div class="orb orb-3"></div></div>
@@ -556,7 +548,6 @@ $exportQuery = http_build_query([
             <tbody>
               <?php
               $komponen_map = [
-                'Uang Pangkal' => $bayar_recap['pangkal'],
                 'Uang PSB' => $bayar_recap['psb'],
                 'Uang SPP' => $bayar_recap['spp'],
                 'Uang Komite' => $bayar_recap['komite'],
@@ -648,7 +639,7 @@ $exportQuery = http_build_query([
                   <td><?= report_e($b['BULAN']) ?> <?= report_e($b['TAHUN']) ?></td>
                   <td><?= report_e($b['sistem_pembayaran'] ?? 'VA') ?></td>
                   <td class="nominal"><?= report_money($b['total_jumlah']) ?></td>
-                  <td><?= date('d M Y H:i', strtotime($b['TGL_BYR'])) ?></td>
+                  <td><?= spp_date_label($b['TGL_BYR'],true) ?></td>
                   <td class="aksi-col"><a class="btn-tbl btn-tbl-print" href="cetak_struk.php?id=<?= (int)$b['id'] ?>" target="_blank" rel="noopener">Cetak</a></td>
                 </tr>
                 <?php endforeach; endif; ?>
@@ -664,7 +655,8 @@ $exportQuery = http_build_query([
 </div>
 
 <div class="toast" id="toast"><span id="toast-icon"></span><span id="toast-msg"></span></div>
-<script src="../assets/js/app.js?v=<?= filemtime(__DIR__ . '/../assets/js/app.js') ?>"></script>
+<script src="../assets/js/date_format.js?v=<?= filemtime(__DIR__ . '/../assets/js/date_format.js') ?>"></script>
+  <script src="../assets/js/app.js?v=<?= filemtime(__DIR__ . '/../assets/js/app.js') ?>"></script>
 <script>
 document.addEventListener('DOMContentLoaded', function(){
   autoHideFlash();

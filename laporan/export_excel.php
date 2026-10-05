@@ -54,11 +54,11 @@ if ($filter_tanggal_awal !== '' && $filter_tanggal_akhir !== '') {
     $startTs = strtotime($filter_tanggal_awal);
     $endTs = strtotime($filter_tanggal_akhir);
     if ($filter_tanggal_awal === $filter_tanggal_akhir) {
-        $period_label = date('d M Y', $startTs);
+        $period_label = spp_date_label($startTs);
     } elseif (date('Y-m', $startTs) === date('Y-m', $endTs)) {
-        $period_label = date('d', $startTs) . ' - ' . date('d M Y', $endTs);
+        $period_label = spp_date_label($startTs) . ' - ' . spp_date_label($endTs);
     } else {
-        $period_label = date('d M Y', $startTs) . ' - ' . date('d M Y', $endTs);
+        $period_label = spp_date_label($startTs) . ' - ' . spp_date_label($endTs);
     }
 } else {
     $period_label = $bulan_label . ' ' . $filter_tahun;
@@ -69,7 +69,7 @@ $stmt = $koneksi->prepare("
     SELECT s.id AS student_id,s.NO_INDUK, s.NO_induk_diknas, s.NAMA,
            COALESCE(NULLIF(b.kelas_rombel_snapshot,''),NULLIF(b.KELAS,''),s.KELAS) AS KELAS,
            b.BULAN, b.TAHUN,
-           b.U_PANGKAL, b.U_PSB, b.U_SPP, b.U_KOMITE,
+           b.U_PSB, b.U_SPP, b.U_KOMITE,
            b.sistem_pembayaran, b.total_jumlah, b.TGL_BYR
     FROM bayar b JOIN siswa s ON s.NO_INDUK = b.NO_INDUK AND s.unit_id=b.unit_id
     WHERE b.TGL_BYR >= ? AND b.TGL_BYR < ? $studentWhere
@@ -81,7 +81,7 @@ $rows = $stmt->get_result()->fetch_all(MYSQLI_ASSOC);
 $stmt->close();
 
 $stmtKomponen = $koneksi->prepare("
-    SELECT SUM(U_PANGKAL) AS pangkal, SUM(U_PSB) AS psb,
+    SELECT SUM(U_PSB) AS psb,
            SUM(U_SPP) AS spp,
            SUM(U_KOMITE) AS komite, SUM(potong_spp) AS potongan_spp
     FROM bayar b JOIN siswa s ON s.NO_INDUK = b.NO_INDUK AND s.unit_id=b.unit_id
@@ -94,7 +94,7 @@ $stmtKomponen->close();
 
 $komponen_rows = [];
 $komponenMap = [
-    'Uang Pangkal' => 'pangkal', 'Uang PSB' => 'psb',
+    'Uang PSB' => 'psb',
     'Uang SPP' => 'spp', 'Uang Komite' => 'komite'
 ];
 foreach ($komponenMap as $nama => $key) {
@@ -382,7 +382,7 @@ ob_start();
 <div class="report-head">
   <div>
     <h2 class="report-title">Laporan Keuangan Sistem SPP · <?= htmlspecialchars(unit_label($reportUnitId), ENT_QUOTES, 'UTF-8') ?></h2>
-    <p class="report-meta">Dicetak: <?= date('d M Y H:i') ?></p>
+    <p class="report-meta">Dicetak: <?= spp_date_label(new DateTimeImmutable('now'),true) ?></p>
   </div>
   <span class="period-pill">Periode <?= htmlspecialchars($period_label) ?></span>
 </div>
@@ -443,7 +443,7 @@ ob_start();
     <td><?= $excelText($r['KELAS']) ?></td>
     <td><?= $excelText($r['BULAN']) ?> <?= $excelText($r['TAHUN']) ?><br>Sistem: <?= $excelText($r['sistem_pembayaran'] ?? 'VA') ?></td>
     <td><?= number_format((float)$r['total_jumlah'],0,',','.') ?></td>
-    <td><?= date('d M Y', strtotime($r['TGL_BYR'])) ?></td>
+    <td><?= spp_date_label($r['TGL_BYR']) ?></td>
   </tr>
   <?php endforeach; ?>
   <tr class="total-row">
@@ -479,7 +479,7 @@ ob_start();
     <td><?= $excelText($t['NO_INDUK']) ?><?= !empty($t['NO_induk_diknas']) ? '<br>Diknas: ' . $excelText($t['NO_induk_diknas']) : '' ?></td>
     <td><?= $excelText($t['NAMA']) ?></td>
     <td><?= $excelText($t['KELAS']) ?></td>
-    <td><?= date('d M Y H:i', strtotime($t['TANGGAL'])) ?></td>
+    <td><?= spp_date_label($t['TANGGAL'],true) ?></td>
     <td><?= $t['jenis'] === 'masuk' ? '↑ Masuk' : '↓ Keluar' ?></td>
     <td><?= number_format((float)$t['nominal'],0,',','.') ?></td>
     <td><?= $excelText($t['keterangan'] ?? '') ?></td>
@@ -515,7 +515,7 @@ render_report_export_preview($excelHtml, [
     'show_print' => false,
     'title' => 'Rekap Laporan Keuangan',
     'subtitle' => 'Periode ' . $period_label,
-    'generated' => date('d-m-Y H:i:s'),
+    'generated' => spp_date_label(new DateTimeImmutable('now'),true),
     'row_count' => count($rows) + count($tab_rows),
     'orientation' => 'landscape',
     'download_url' => 'export_excel.php?' . http_build_query($downloadQuery),

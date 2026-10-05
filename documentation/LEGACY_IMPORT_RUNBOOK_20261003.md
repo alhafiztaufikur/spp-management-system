@@ -6,6 +6,8 @@ PHP 8.3 dengan mysqli, PDO SQLite, mbstring dan proc_open; PowerShell Windows/.N
 
 Storage default: `C:\laragon\data\spp-legacy-import\<database>`. Dapat memakai `SPP_LEGACY_STORAGE` pada worker **dan server HTTP** secara konsisten. Jangan letakkan di repo/document root; jangan memakai path relatif atau `..`. Setup menerapkan ACL pengguna pemilik, SYSTEM dan Administrators; semua file berisi identitas pribadi harus dilindungi. Jangan commit SQLite, `.dat`, SQL dump, CSV detail atau screenshot nama siswa.
 
+> **Pembaruan 5 Oktober:** tarif operasional tidak lagi memiliki Pangkal; potongan SPP nominal dan DIKNAS opsional. DDL komponen dilakukan dengan worker berhenti, mengikuti [runbook perubahan](PSB_NOMINAL_DATE_AUDIT_20261005.md). Raw sumber dan manifest Legacy dipertahankan.
+
 ## Migrasi sebelum worker
 
 1. Hentikan hanya worker milik importer. Cocokkan `worker-process.json`: PID, waktu pembuatan, command line, aplikasi, database, pengguna. Jangan hentikan PID dari catatan lama tanpa pemeriksaan ulang.

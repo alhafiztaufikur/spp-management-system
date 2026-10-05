@@ -26,7 +26,6 @@ function student_snapshots_differ(array $before, array $after): bool {
 function student_tariff_component_changes(array $before, array $after): array {
     $fields = [
         'spp' => ['SPP_PERBULAN'],
-        'pangkal' => ['PANGKAL', 'potong_pangkal', 'tot_pangkal'],
         'psb' => ['PSB'],
         'komite' => ['POMG'],
         'daftar_ulang' => ['DAFTAR_ULANG', 'potong_du', 'tot_du'],
@@ -45,7 +44,7 @@ function student_tariff_component_changes(array $before, array $after): array {
 
 function student_tariff_label(string $component): string {
     $labels = [
-        'spp'=>'SPP', 'pangkal'=>'Pangkal', 'psb'=>'PSB', 'komite'=>'Komite',
+        'spp'=>'SPP', 'psb'=>'PSB', 'komite'=>'Komite',
         'daftar_ulang'=>'Daftar Ulang',
     ];
     return $labels[$component] ?? ucfirst(str_replace('_', ' ', $component));

@@ -33,12 +33,7 @@ function annual_receipt_month($value): string {
     return $months[$code] ?? (string)$value;
 }
 
-function annual_receipt_date($value): string {
-    $timestamp = strtotime((string)$value);
-    if (!$timestamp) return '-';
-    $months = [1=>'Januari','Februari','Maret','April','Mei','Juni','Juli','Agustus','September','Oktober','November','Desember'];
-    return date('j', $timestamp) . ' ' . $months[(int)date('n', $timestamp)] . ' ' . date('Y', $timestamp);
-}
+function annual_receipt_date($value): string { return spp_date_label($value,true); }
 
 function annual_receipt_words(int $number): string {
     $words = ['', 'satu', 'dua', 'tiga', 'empat', 'lima', 'enam', 'tujuh', 'delapan', 'sembilan', 'sepuluh', 'sebelas'];
@@ -108,7 +103,7 @@ function annual_receipt_add_remaining_line(array &$lines, string $label, float $
 function annual_receipt_remaining_lines(mysqli $db, array $payment, array $otherDetails): array {
     $lines = [];
     $oneTime = one_time_fee_status($db, (string)$payment['NO_INDUK']);
-    foreach (['pangkal' => ['Sisa Pangkal', 'U_PANGKAL'], 'psb' => ['Sisa PSB', 'U_PSB']] as $component => [$label, $field]) {
+    foreach (['psb' => ['Sisa PSB', 'U_PSB']] as $component => [$label, $field]) {
         if (abs((float)($payment[$field] ?? 0)) >= 0.005) $lines[] = [$label, (float)$oneTime[$component]['remaining']];
     }
     $komite=komite_receipt_summary($db,(int)$payment['id']);
@@ -135,8 +130,8 @@ if (!$ids) {
 }
 
 $paymentStmt = $koneksi->prepare("
-    SELECT b.*, s.NAMA, s.NO_induk_diknas, s.KELAS AS KELAS_SISWA, s.PANGKAL, s.PSB,
-           s.SPP_PERBULAN, s.POMG, s.potong_pangkal, s.tot_pangkal,
+    SELECT b.*, s.NAMA, s.NO_induk_diknas, s.KELAS AS KELAS_SISWA, s.PSB,
+           s.SPP_PERBULAN, s.POMG,
            s.DAFTAR_ULANG, s.potong_du, s.tot_du,
            du.tagihan_daftar_ulang_id, du.th_ajaran AS du_tahun_ajaran, COALESCE(du.jumlah, 0) AS uang_du,
            COALESCE(tdu.nominal_tagihan, 0) AS du_nominal_tagihan,
@@ -170,7 +165,7 @@ foreach ($ids as $paymentId) {
     $otherDetails = $otherStmt->get_result()->fetch_all(MYSQLI_ASSOC);
 
     $payment['primary_lines'] = array_values(array_filter([
-        ['Uang Pangkal', $payment['U_PANGKAL']], ['Uang PSB', $payment['U_PSB']], ['Uang Daftar Ulang' . (!empty($payment['du_tahun_ajaran']) ? ' (TA ' . $payment['du_tahun_ajaran'] . ')' : ''), $payment['uang_du']],
+        ['Uang PSB', $payment['U_PSB']], ['Uang Daftar Ulang' . (!empty($payment['du_tahun_ajaran']) ? ' (TA ' . $payment['du_tahun_ajaran'] . ')' : ''), $payment['uang_du']],
         ['Uang SPP', $payment['U_SPP']], ['Komite Sekolah'.(($komiteReceipt=komite_receipt_summary($koneksi,$paymentId))?' ('.$komiteReceipt['label'].')':''), $payment['U_KOMITE']],
     ], fn($line) => abs((float)$line[1]) >= 0.005));
     $payment['other_lines'] = [];

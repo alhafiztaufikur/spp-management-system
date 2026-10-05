@@ -114,9 +114,9 @@ try {
     $save = promoted_tariff_request($baseUrl . '/siswa/daftar.php', [
         'aksi' => 'update', 'id' => $studentId, 'csrf_token' => $match[1],
         'no_induk' => $nis, 'nama' => $name, 'master_kelas_id' => $classes[6],
-        'advanced_enabled' => '1', 'potongan_spp_persen' => 10,
-        'pangkal' => 0, 'psb' => 0, 'pomg' => 30000, 'daftar_ulang' => 0,
-        'potong_pangkal' => 0, 'potong_du' => 0, 'komite_mulai_bulan' => '07',
+        'advanced_enabled' => '1', 'potongan_spp_nominal' => 30000,
+        'psb' => 0, 'pomg' => 30000, 'daftar_ulang' => 0,
+        'potong_du' => 0, 'komite_mulai_bulan' => '07',
     ], $cookies);
     promoted_tariff_assert($save['status'] === 302, 'Edit Data Siswa tidak selesai.');
     $student = $koneksi->query('SELECT SPP_PERBULAN,POMG FROM siswa WHERE id=' . $studentId)->fetch_assoc();

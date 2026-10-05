@@ -21,6 +21,7 @@ if ($dbPort === false) {
 }
 
 date_default_timezone_set('Asia/Jakarta');
+require_once __DIR__.'/includes/date_format.php';
 
 try {
     $koneksi = new mysqli(DB_HOST, DB_USER, DB_PASS, DB_NAME, $dbPort);
