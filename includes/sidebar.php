@@ -177,11 +177,11 @@ document.addEventListener('DOMContentLoaded', function () {
 
   <?php if (unit_is_super()): ?>
   <div class="sidebar-unit-panel">
-    <form action="<?= $root ?>unit_switch.php" method="post" class="sidebar-unit-form">
+    <form action="<?= $root ?>unit_switch.php" method="post" class="sidebar-unit-form" data-operational-unit="<?= $activeUnit ?>">
       <input type="hidden" name="csrf_token" value="<?= htmlspecialchars($_SESSION['csrf_unit_switch'],ENT_QUOTES,'UTF-8') ?>">
       <input type="hidden" name="next" value="<?= htmlspecialchars($_SERVER['REQUEST_URI'] ?? '/dashboard.php',ENT_QUOTES,'UTF-8') ?>">
       <span class="sidebar-unit-kicker"><span aria-hidden="true"></span> SUPER ADMIN</span>
-      <label for="sidebar-unit-select">Unit operasional</label>
+      <label for="sidebar-unit-select" class="sidebar-unit-heading"><span class="sidebar-unit-heading-icon" aria-hidden="true"><svg width="22" height="22" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.8" stroke-linecap="round" stroke-linejoin="round"><path d="m3 10 9-7 9 7M5 9v12h14V9M9 21v-7h6v7M10 8h4"/></svg></span>Unit operasional</label>
       <span class="sidebar-unit-select-wrap">
         <select id="sidebar-unit-select" name="unit_id" data-native-select onchange="this.form.submit()">
           <?php if ($transactionUnitOnly && $activeUnit === 0): ?><option value="" selected disabled>Pilih unit</option><?php endif; ?>
@@ -191,13 +191,41 @@ document.addEventListener('DOMContentLoaded', function () {
         </select>
         <svg aria-hidden="true" width="18" height="18" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><path d="m6 9 6 6 6-6"/></svg>
       </span>
-      <small>Pilih satu unit. <?= $current === 'role_management.php' ? ($activeUnit === 0 ? 'Kelola akun semua unit dari halaman ini.' : 'Kelola akun unit yang dipilih.') : ($transactionUnitOnly ? 'Transaksi wajib menggunakan satu unit.' : ($activeUnit === 0 ? 'Semua Unit hanya untuk melihat data dan rekap.' : 'Menu operasional mengikuti unit ini.')) ?></small>
+      <div class="sidebar-unit-segments" role="group" aria-label="Pilih satu unit operasional">
+        <?php foreach ([0=>'Semua Unit',1=>'SD',2=>'SMP',3=>'SMA'] as $id=>$name): $unavailable=$transactionUnitOnly&&$id===0; ?>
+        <button type="button" class="sidebar-unit-choice<?= $activeUnit===$id&&!$unavailable?' is-selected':'' ?>" data-unit-choice="<?= $id ?>" aria-label="<?= htmlspecialchars($name,ENT_QUOTES,'UTF-8') ?>" aria-pressed="<?= $activeUnit===$id&&!$unavailable?'true':'false' ?>" <?= $unavailable?'disabled title="Pilih SD, SMP, atau SMA untuk transaksi"':'' ?>>
+          <svg width="23" height="23" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.8" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true"><?php if($id===0): ?><rect x="3" y="3" width="7" height="7" rx="1"/><rect x="14" y="3" width="7" height="7" rx="1"/><rect x="3" y="14" width="7" height="7" rx="1"/><rect x="14" y="14" width="7" height="7" rx="1"/><?php elseif($id===1): ?><path d="m3 10 9-7 9 7M5 9v12h14V9M9 21v-7h6v7M10 8h4"/><?php elseif($id===2): ?><path d="m2 9 10-5 10 5-10 5L2 9ZM6 11v6c4 3 8 3 12 0v-6M22 9v7"/><?php else: ?><path d="m2 8 10-5 10 5-10 5L2 8ZM6 10v6c4 3 8 3 12 0v-6M22 8v8M4 21h16"/><?php endif; ?></svg>
+          <span><?= $id===0?'Semua':$name ?></span>
+        </button>
+        <?php endforeach; ?>
+      </div>
+      <noscript><button type="submit" class="btn btn-primary btn-sm">Pilih unit</button></noscript>
+      <small><?= $current === 'role_management.php' ? 'Kelola akun sesuai unit terpilih.' : ($transactionUnitOnly ? 'Pilih satu unit untuk transaksi.' : ($activeUnit === 0 ? 'Semua Unit: pemantauan dan rekap.' : 'Pilih satu unit operasional.')) ?></small>
     </form>
   </div>
   <?php endif; ?>
   <?php if (unit_is_super()): ?>
   <script>
   document.addEventListener('DOMContentLoaded', function () {
+    var unitForm = document.querySelector('.sidebar-unit-form');
+    var unitSelect = document.getElementById('sidebar-unit-select');
+    if (unitForm && unitSelect) {
+      unitForm.classList.add('unit-switch-ready');
+      unitSelect.tabIndex = -1;
+      unitSelect.setAttribute('aria-hidden', 'true');
+      unitForm.querySelectorAll('[data-unit-choice]').forEach(function (button) {
+        button.addEventListener('click', function () {
+          if (button.disabled || unitForm.dataset.submitting === '1' || unitSelect.value === button.dataset.unitChoice) return;
+          unitSelect.value = button.dataset.unitChoice;
+          unitForm.dataset.submitting = '1';
+          unitForm.querySelectorAll('[data-unit-choice]').forEach(function (item) { item.disabled = true; });
+          unitForm.requestSubmit();
+        });
+      });
+      window.addEventListener('pageshow', function () {
+        if (unitForm.dataset.submitting === '1') { delete unitForm.dataset.submitting; location.reload(); }
+      });
+    }
     var bar = document.querySelector('.topbar');
     if (!bar || bar.querySelector('.topbar-unit')) return;
     var badge = document.createElement('span');

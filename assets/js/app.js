@@ -364,6 +364,23 @@ function closeStudentSearchPanel(input) {
   input.setAttribute('aria-expanded', 'false');
 }
 
+function fitStudentSearchPanel(input) {
+  if (input.dataset.studentFitViewport !== '1') return;
+  const box = input.closest('.student-combobox');
+  const panel = box?.querySelector('.student-search-panel');
+  if (!panel || panel.hidden) return;
+  const rect = box.getBoundingClientRect();
+  const viewport = window.visualViewport;
+  const bottom = viewport ? viewport.offsetTop + viewport.height : window.innerHeight;
+  const top = viewport ? viewport.offsetTop : 0;
+  const below = bottom - rect.bottom - 16;
+  const above = rect.top - top - 16;
+  const upward = below < 160 && above > below;
+  panel.style.top = upward ? 'auto' : 'calc(100% + 8px)';
+  panel.style.bottom = upward ? 'calc(100% + 8px)' : 'auto';
+  panel.style.maxHeight = Math.max(70, Math.min(320, upward ? above : below)) + 'px';
+}
+
 function renderStudentSearchPanel(input, forceAll) {
   const listId = input.dataset.studentList || input.getAttribute('list') || 'siswa-list';
   const list = document.getElementById(listId);
@@ -392,6 +409,7 @@ function renderStudentSearchPanel(input, forceAll) {
     empty.className = 'student-search-empty';
     empty.textContent = query ? 'Siswa tidak ditemukan' : 'Belum ada data siswa aktif';
     panel.appendChild(empty);
+    fitStudentSearchPanel(input);
     return;
   }
 
@@ -437,6 +455,7 @@ function renderStudentSearchPanel(input, forceAll) {
     });
     panel.appendChild(button);
   });
+  fitStudentSearchPanel(input);
 }
 
 function initStudentSearchCombobox() {
@@ -464,6 +483,11 @@ function initStudentSearchInput(input) {
   panel.className = 'student-search-panel';
   panel.hidden = true;
   box.appendChild(panel);
+  if (input.dataset.studentFitViewport === '1') {
+    window.addEventListener('resize', () => fitStudentSearchPanel(input));
+    window.addEventListener('scroll', () => fitStudentSearchPanel(input), true);
+    window.visualViewport?.addEventListener('resize', () => fitStudentSearchPanel(input));
+  }
 
   input.addEventListener('input', function () {
     delete input.dataset.studentSelected;

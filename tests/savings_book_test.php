@@ -25,6 +25,7 @@ $mixed = savings_book_make([
 ], 25000);
 book_assert(array_column($mixed['entries'], 'saldo') === [1000000, 1500000, 4500000, 2500000], 'Urutan waktu, jenis, ID, atau saldo berjalan keliru.');
 book_assert($mixed['pages'][1]['rows'][4] === null, 'Baris setelah riwayat harus kosong untuk ditulis tangan.');
+book_assert(array_column($mixed['entries'], 'number') === [1,2,3,4], 'Nomor mutasi harus berurutan.');
 
 $many = [];
 for ($i = 1; $i <= 37; $i++) {
@@ -33,6 +34,7 @@ for ($i = 1; $i <= 37; $i++) {
 $large = savings_book_make($many, 37000);
 book_assert($large['pages'][1]['rows'][17]['saldo'] === 1800000, 'Halaman pertama harus memuat tepat 18 transaksi.');
 book_assert($large['pages'][2]['rows'][0]['saldo'] === 1900000, 'Transaksi ke-19 harus berada pada halaman berikutnya.');
+book_assert($large['pages'][2]['rows'][0]['number'] === 19, 'Nomor harus berlanjut antarhalaman.');
 book_assert($large['pages'][3]['rows'][0]['saldo'] === 3700000, 'Riwayat yang melebihi dua halaman tidak lengkap.');
 book_assert(count($large['pages']) % 4 === 0, 'Jumlah halaman buku harus kelipatan empat.');
 book_assert(count($large['pages']) - 2 - (int)ceil(37 / 18) >= 2, 'Kurang dari dua halaman kosong setelah riwayat.');

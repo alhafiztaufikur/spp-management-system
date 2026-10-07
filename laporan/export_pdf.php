@@ -6,6 +6,7 @@ session_start();
 require_once '../koneksi.php';
 require_once '../includes/auth.php';
 require_once '../includes/spp_billing.php';
+require_once '../includes/payment_permissions.php';
 requireRole(['admin', 'bendahara']);
 $reportUnitId=unit_report_scope($koneksi,(string)($_GET['unit']??''));
 
@@ -139,6 +140,7 @@ $period_end = $filter_tanggal_akhir !== ''
     ? date('Y-m-d H:i:s', strtotime($filter_tanggal_akhir . ' +1 day'))
     : date('Y-m-d H:i:s', strtotime($period_start . ' +1 month'));
 $where_sql = 'WHERE b.TGL_BYR >= ? AND b.TGL_BYR < ?';
+$where_sql .= unit_student_selection_where();
 $types = 'ss';
 $params = [$period_start, $period_end];
 if ($filter_q !== '') {
@@ -187,6 +189,19 @@ $stmt->bind_param($types, ...$params);
 $stmt->execute();
 $rows = $stmt->get_result()->fetch_all(MYSQLI_ASSOC);
 $stmt->close();
+
+// Selected slips use the same print permissions as the report's row actions.
+if ($selected_mode) {
+    $events = payment_activity_for_payments($koneksi, array_column($rows, 'id'));
+    $allowed = count($rows) === count($selected_ids);
+    foreach ($rows as $row) {
+        if (!payment_capabilities($koneksi, $row, $events[(int)$row['id']] ?? [], false, [])['can_print']) $allowed = false;
+    }
+    if (!$allowed) {
+        http_response_code(403);
+        exit('Transaksi yang dipilih tidak tersedia atau tidak memiliki izin cetak.');
+    }
+}
 
 if ($selected_mode && !$rows) {
     $_SESSION['flash'] = ['type' => 'error', 'msg' => 'Transaksi yang dipilih tidak ditemukan pada periode ini.'];

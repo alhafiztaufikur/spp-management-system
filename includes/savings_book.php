@@ -24,6 +24,7 @@ function savings_book_make(array $transactions, float $recordedBalance): array
         $outgoing = (int)round((float)$transaction['keluar'] * 100);
         $balance += $incoming - $outgoing;
         $entries[] = [
+            'number' => count($entries) + 1,
             'tanggal' => (string)$transaction['tanggal'],
             'masuk' => $incoming,
             'keluar' => $outgoing,

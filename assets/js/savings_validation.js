@@ -11,7 +11,7 @@
   const hint = document.createElement('p');
   hint.id = 'savings-amount-hint'; hint.className = 'savings-validation-hint'; hint.setAttribute('aria-live','polite');
   amount.after(hint); amount.setAttribute('aria-describedby',hint.id);
-  let state = 'empty', balance = 0, selected = '', generation = 0, controller;
+  let state = 'empty', balance = 0, selected = '', generation = 0, controller, submitting = false;
   const rupiah = value => 'Rp ' + Number(value).toLocaleString('id-ID');
   const value = () => Number(amount.value.replace(/\D/g,''));
   function validate() {
@@ -52,6 +52,7 @@
   });
   const warn = (title,message,target) => showSppWarning({code:'savings_validation',title,message,target:target.id},target,true);
   form.addEventListener('submit',event => {
+    if (submitting) { event.preventDefault(); return; }
     let problem;
     if (!nis.value) problem = ['Pilih siswa','Pilih siswa dari hasil pencarian sebelum menyimpan.',search];
     else if (state !== 'ready') problem = ['Saldo belum tersedia',state === 'loading' ? 'Tunggu sampai pemeriksaan saldo selesai.' : 'Saldo belum dapat diperiksa. Pilih ulang siswa untuk mencoba lagi.',search];
@@ -60,9 +61,12 @@
     else if (form.elements.keterangan.value.length > 255) problem = ['Periksa keterangan','Keterangan maksimal 255 karakter.',form.elements.keterangan];
     if (problem) { event.preventDefault(); validate(); warn(...problem); return; }
     amount.value = String(value());
+    submitting = true;
+    document.getElementById('btn-simpan').disabled = true;
     // Keep a local draft for a server-side balance rejection; it is cleared after success.
     try { sessionStorage.setItem('savings-form-draft',JSON.stringify({path:location.pathname,unit:form.dataset.unit,nis:nis.value,amount:amount.value,note:form.elements.keterangan.value})); } catch (_) { /* Storage is optional. */ }
   });
+  window.addEventListener('pageshow',event=>{if(event.persisted){submitting=false;document.getElementById('btn-simpan').disabled=false;selected='';loadBalance();}});
   document.addEventListener('DOMContentLoaded',() => {
     const flash = document.getElementById('flash-msg');
     if (flash?.classList.contains('alert-error')) {

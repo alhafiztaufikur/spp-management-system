@@ -6,6 +6,7 @@ session_start();
 require_once '../koneksi.php';
 require_once '../includes/auth.php';
 require_once '../includes/payment_permissions.php';
+require_once '../includes/finance_ui.php';
 require_once '../includes/pagination.php';
 require_once '../includes/daftar_ulang.php';
 require_once '../includes/kelas.php';
@@ -195,16 +196,18 @@ $stmtDu->execute();
 $total_du_periode = (float)($stmtDu->get_result()->fetch_assoc()['total_du'] ?? 0);
 $stmtDu->close();
 
-$stmt2 = $koneksi->prepare("SELECT COALESCE(SUM(tm.MASUK),0) AS total_masuk FROM transaksi_m tm JOIN siswa s ON s.NO_INDUK = tm.NO_INDUK AND s.unit_id=tm.unit_id WHERE tm.TANGGAL >= ? AND tm.TANGGAL < ? $studentSearchSql");
+$stmt2 = $koneksi->prepare("SELECT COUNT(*) AS jml_tx, COALESCE(SUM(tm.MASUK),0) AS total_masuk FROM transaksi_m tm JOIN siswa s ON s.NO_INDUK = tm.NO_INDUK AND s.unit_id=tm.unit_id WHERE tm.TANGGAL >= ? AND tm.TANGGAL < ? $studentSearchSql");
 report_bind($stmt2, 'ss' . str_repeat('s', count($studentSearchParams)), array_merge([$periodStart, $periodEnd], $studentSearchParams));
 $stmt2->execute();
-$tab_masuk = (float)$stmt2->get_result()->fetch_assoc()['total_masuk'];
+$savingsIncoming = $stmt2->get_result()->fetch_assoc();
+$tab_masuk = (float)$savingsIncoming['total_masuk'];
 $stmt2->close();
 
-$stmt3 = $koneksi->prepare("SELECT COALESCE(SUM(tk.KELUAR),0) AS total_keluar FROM transaksi_k tk JOIN siswa s ON s.NO_INDUK = tk.NO_INDUK AND s.unit_id=tk.unit_id WHERE tk.TANGGAL >= ? AND tk.TANGGAL < ? $studentSearchSql");
+$stmt3 = $koneksi->prepare("SELECT COUNT(*) AS jml_tx, COALESCE(SUM(tk.KELUAR),0) AS total_keluar FROM transaksi_k tk JOIN siswa s ON s.NO_INDUK = tk.NO_INDUK AND s.unit_id=tk.unit_id WHERE tk.TANGGAL >= ? AND tk.TANGGAL < ? $studentSearchSql");
 report_bind($stmt3, 'ss' . str_repeat('s', count($studentSearchParams)), array_merge([$periodStart, $periodEnd], $studentSearchParams));
 $stmt3->execute();
-$tab_keluar = (float)$stmt3->get_result()->fetch_assoc()['total_keluar'];
+$savingsOutgoing = $stmt3->get_result()->fetch_assoc();
+$tab_keluar = (float)$savingsOutgoing['total_keluar'];
 $stmt3->close();
 
 if ($filter_q === '') {
@@ -235,7 +238,7 @@ if($generalMultiple){
     if ($report_type === 'sudah_bayar') {
         $whereDetail .= ' AND b.total_jumlah > 0';
     }
-    if ($filter_q !== '') {
+    if ($studentSearchSql !== '') {
         $whereDetail .= $studentSearchSql;
         $detailTypes .= str_repeat('s', count($studentSearchParams));
         $detailParams = array_merge($detailParams, $studentSearchParams);
@@ -377,6 +380,13 @@ if($generalMultiple){
     $totalDetailRows = count($unpaid_rows);
 }
 
+$financeTab = is_string($_GET['panel'] ?? null) && in_array($_GET['panel'], ['ringkasan','komponen','transaksi'], true) ? $_GET['panel'] : 'ringkasan';
+$financeTrend = finance_payment_trend($koneksi, $filter_tanggal_akhir, $studentSearchSql, $studentSearchParams);
+$financeTrendMax = max(1, ...array_values($financeTrend));
+$financeReportLabel = $generalMultiple
+    ? (filter_is_all($generalChoices) ? 'Semua jenis laporan' : implode(', ', array_map(static fn($key) => $reportTypes[$key], $generalChoices)))
+    : $reportTypes[$report_type];
+
 $laporanPaginationQuery = pagination_query([
     'unit' => $reportUnitId===0?'all':'active',
     'bulan' => $filter_bulan,
@@ -389,6 +399,7 @@ $laporanPaginationQuery = pagination_query([
     'per_page' => $perPage,
 ]);
 $laporanPaginationQuery=filter_query($laporanPaginationQuery);
+$laporanPaginationQuery['panel']=$financeTab;
 $exportQuery = filter_build_query([
     'jenis_laporan' => $generalMultiple?$generalChoices:$report_type,
     'urut' => $sort,
@@ -398,6 +409,7 @@ $exportQuery = filter_build_query([
     'tanggal_awal' => $filter_tanggal_awal,
     'tanggal_akhir' => $filter_tanggal_akhir,
     'q' => $filter_q,
+    'student_id' => max(0,(int)($_GET['student_id']??0)),
 ]);
 ?>
 <!DOCTYPE html>
@@ -412,6 +424,8 @@ $exportQuery = filter_build_query([
   <script>(function(){var t=localStorage.getItem('spp_theme')||'light';document.documentElement.setAttribute('data-theme',t);})();</script>
   <link rel="stylesheet" href="../assets/css/style.css?v=unitpalette4&amp;mtime=<?= filemtime(__DIR__ . '/../assets/css/style.css') ?>" />
   <link rel="stylesheet" href="../assets/css/date_controls.css?v=unitpalette4&amp;mtime=<?= filemtime(__DIR__ . '/../assets/css/date_controls.css') ?>" />
+  <link rel="stylesheet" href="../assets/css/finance_workspace.css?v=<?= filemtime(__DIR__.'/../assets/css/finance_workspace.css') ?>">
+  <link rel="stylesheet" href="../assets/css/payment_details.css?v=<?= filemtime(__DIR__.'/../assets/css/payment_details.css') ?>">
 </head>
 <body class="report-general-page">
 <div class="bg-orbs"><div class="orb orb-1"></div><div class="orb orb-2"></div><div class="orb orb-3"></div></div>
@@ -431,7 +445,7 @@ $exportQuery = filter_build_query([
       <div class="clock-badge" id="liveClock">--:--:--</div>
     </div>
 
-    <div class="page-content">
+    <div class="page-content finance-workspace">
       <?php if ($flash): ?>
       <div class="alert alert-<?= $flash['type'] === 'success' ? 'success' : 'error' ?>" id="flash-msg" style="margin-bottom:16px;">
         <?= report_e($flash['msg']) ?>
@@ -440,24 +454,36 @@ $exportQuery = filter_build_query([
 
       <section class="main-card class-recap-card recap-report-shell report-general-shell" style="margin-bottom:16px;">
         <div class="recap-report-header">
-          <div class="report-general-heading">
+          <div class="report-general-heading finance-hero">
             <div class="recap-report-copy">
-              <span class="recap-class-overline">Laporan Umum</span>
+              <span class="finance-breadcrumb">SistemSPP <span aria-hidden="true">&rsaquo;</span> Laporan Keuangan</span>
               <h1>Rekap Laporan Keuangan</h1>
-              <p><?= report_e($reportTypes[$report_type]) ?> untuk periode <?= report_e($periodLabel) ?>.</p>
+              <p><?= report_e($financeReportLabel) ?> untuk periode <?= report_e($periodLabel) ?>.</p>
             </div>
-            <a class="report-general-catalog-link" href="global.php?unit=<?= $reportUnitId===0?'all':'active' ?>">Laporan Global <span aria-hidden="true">&rarr;</span></a>
+            <svg class="finance-hero-art" viewBox="0 0 540 110" fill="none" aria-hidden="true"><path d="M0 110Q80 45 150 72T280 35T400 65T540 15V110Z" fill="currentColor" opacity=".07"/><path d="M30 85Q100 45 155 62T280 28T410 60T520 20" stroke="currentColor" opacity=".35"/><g fill="currentColor" opacity=".12"><path d="M60 110V82h16v28M110 110V60h16v50M160 110V75h16v35M210 110V46h16v64M260 110V20h16v90M310 110V52h16v58M360 110V66h16v44M410 110V42h16v68M460 110V27h16v83M510 110V9h16v101"/></g></svg>
+            <a class="report-general-catalog-link finance-catalog" href="global.php?unit=<?= $reportUnitId===0?'all':'active' ?>">
+              <strong><?= finance_icon('chart') ?>Laporan Global <span aria-hidden="true">&rarr;</span></strong>
+              <span class="finance-trend-copy">Pembayaran 7 hari hingga <?= report_e(spp_date_label($filter_tanggal_akhir)) ?></span>
+              <span class="finance-spark" role="img" aria-label="<?= report_e(implode('; ',array_map(static fn($day,$n)=>spp_date_label($day).': '.$n.' transaksi',array_keys($financeTrend),array_values($financeTrend)))) ?>">
+                <?php foreach($financeTrend as $day=>$n): ?><span style="--bar:<?= $n>0?max(8,round($n/$financeTrendMax*100)):2 ?>%" title="<?= report_e(spp_date_label($day).': '.$n.' transaksi') ?>"></span><?php endforeach; ?>
+              </span>
+            </a>
           </div>
         <form method="GET" class="recap-header-controls report-filter-card report-general-filter report-filter-grid<?= unit_is_super() ? ' has-scope' : '' ?>">
           <input type="hidden" name="student_id" data-student-identity="1" value="<?= max(0,(int)($_GET['student_id']??0)) ?>">
-          <?= unit_report_selector($reportUnitId) ?>
+          <input type="hidden" name="panel" value="<?= report_e($financeTab) ?>">
+          <div class="field-row finance-scope-field"><span class="field-label">Cakupan rekap</span>
+            <?php if(unit_is_super() && unit_active_id()!==0): ?>
+            <select name="unit" class="field-input field-select" onchange="unitSwitchReportScope(this)" aria-label="Cakupan rekap"><option value="active" <?= $reportUnitId!==0?'selected':'' ?>>Unit aktif: <?= report_e(unit_label(unit_active_id())) ?></option><option value="all" <?= $reportUnitId===0?'selected':'' ?>>Semua Unit</option></select>
+            <?php else: ?><div class="finance-scope-value"><?= finance_icon('unit') ?><strong><?= report_e(unit_label($reportUnitId)) ?></strong></div><?php if($reportUnitId===0): ?><input type="hidden" name="unit" value="all"><?php endif; ?><?php endif; ?>
+          </div>
           <div class="field-row report-date-range-field">
             <label class="field-label">Tanggal transaksi</label>
             <div class="report-date-range-control report-date-range-picker" data-range-picker data-empty-label="<?= report_e($periodLabel) ?>">
               <input type="hidden" name="tanggal_awal" value="<?= report_e($filter_tanggal_awal) ?>">
               <input type="hidden" name="tanggal_akhir" value="<?= report_e($filter_tanggal_akhir) ?>">
               <button type="button" class="report-date-range-button" aria-expanded="false">
-                <span class="report-date-range-icon">📅</span>
+                <span class="report-date-range-icon"><?= finance_icon('calendar') ?></span>
                 <span class="report-date-range-value"><?= report_e($periodLabel) ?></span>
               </button>
               <div class="report-date-range-popover" hidden>
@@ -503,7 +529,7 @@ $exportQuery = filter_build_query([
             <label class="field-label" for="report-siswa-search">Cari Siswa (Nama / NIS / NIS Diknas)</label>
             <div class="search-box">
               <svg width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.5" stroke-linecap="round" stroke-linejoin="round"><circle cx="11" cy="11" r="8"/><line x1="21" y1="21" x2="16.65" y2="16.65"/></svg>
-              <input type="text" id="report-siswa-search" data-student-search data-student-list="report-siswa-list" data-student-select-callback="selectReportStudentSearchOption" data-student-query-target="report-student-query" value="<?= report_e($studentSearchDisplay) ?>" placeholder="Ketik nama, NIS, atau NIS Diknas..." autocomplete="off">
+              <input type="text" id="report-siswa-search" data-student-fit-viewport="1" data-student-search data-student-list="report-siswa-list" data-student-select-callback="selectReportStudentSearchOption" data-student-query-target="report-student-query" value="<?= report_e($studentSearchDisplay) ?>" placeholder="Ketik nama, NIS, atau NIS Diknas..." autocomplete="off">
               <input type="hidden" id="report-student-query" name="q" value="<?= report_e($filter_q) ?>">
             </div>
             <datalist id="report-siswa-list">
@@ -521,40 +547,35 @@ $exportQuery = filter_build_query([
           </div>
           <div class="report-general-actions">
             <div class="report-filter-actions">
-              <button type="submit" class="btn btn-primary">Tampilkan Rekap</button>
-              <a href="index.php?unit=<?= $reportUnitId===0?'all':'active' ?>" class="btn btn-ghost">Reset</a>
+              <button type="submit" class="btn btn-primary"><?= finance_icon('search') ?>Tampilkan Rekap</button>
+              <a href="index.php?unit=<?= $reportUnitId===0?'all':'active' ?>" class="btn btn-ghost"><?= finance_icon('reload') ?>Reset</a>
             </div>
             <div class="report-export-actions">
-              <a href="export_excel.php?<?= report_e($exportQuery) ?>" class="btn btn-success" target="_blank" rel="noopener">Export Excel</a>
-              <a href="export_pdf.php?<?= report_e($exportQuery) ?>&amp;output=preview" class="btn btn-warning" target="_blank" rel="noopener">Export PDF</a>
+              <a href="export_excel.php?<?= report_e($exportQuery) ?>" class="btn btn-success" target="_blank" rel="noopener"><?= finance_icon('document') ?>Export Excel</a>
+              <a href="export_pdf.php?<?= report_e($exportQuery) ?>&amp;output=preview" class="btn btn-warning" target="_blank" rel="noopener"><?= finance_icon('document') ?>Export PDF</a>
             </div>
           </div>
         </form>
         </div>
       </section>
 
-      <div class="stats-grid report-stats-grid" style="margin-bottom:8px;">
-        <div class="stat-card stat-blue">
-          <div class="stat-icon"><svg width="22" height="22" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><rect x="2" y="5" width="20" height="14" rx="2"/><line x1="2" y1="10" x2="22" y2="10"/></svg></div>
-          <div class="stat-info"><span class="stat-value"><?= report_money($bayar_recap['total'] ?? 0) ?></span><span class="stat-label">Total Pembayaran</span></div>
-        </div>
-        <div class="stat-card stat-green">
-          <div class="stat-icon"><svg width="22" height="22" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><path d="M12 2v20M17 7H9.5a3.5 3.5 0 0 0 0 7h5a3.5 3.5 0 0 1 0 7H6"/></svg></div>
-          <div class="stat-info"><span class="stat-value"><?= report_money($tab_masuk) ?></span><span class="stat-label">Tabungan Masuk</span></div>
-        </div>
-        <div class="stat-card" style="--c:#ef4444;">
-          <div class="stat-icon" style="background:rgba(239,68,68,0.15);color:#ef4444;"><svg width="22" height="22" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><path d="M6 17H18M12 22V2M7 7l5-5 5 5"/></svg></div>
-          <div class="stat-info"><span class="stat-value"><?= report_money($tab_keluar) ?></span><span class="stat-label">Tabungan Keluar</span></div>
-        </div>
-        <div class="stat-card stat-purple">
-          <div class="stat-icon"><svg width="22" height="22" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><circle cx="12" cy="12" r="10"/><path d="M12 8v4l3 3"/></svg></div>
-          <div class="stat-info"><span class="stat-value"><?= number_format((int)($bayar_recap['jml_tx'] ?? 0)) ?></span><span class="stat-label">Transaksi <?= report_e($periodLabel) ?></span></div>
-        </div>
+      <div class="finance-stats">
+        <article class="finance-stat is-payment"><span class="finance-stat-icon"><?= finance_icon('card') ?></span><div><strong><?= report_money($bayar_recap['total']??0) ?></strong><span>Total Pembayaran</span><small><?= number_format((int)($bayar_recap['jml_tx']??0)) ?> transaksi</small></div></article>
+        <article class="finance-stat is-in"><span class="finance-stat-icon"><?= finance_icon('in') ?></span><div><strong><?= report_money($tab_masuk) ?></strong><span>Tabungan Masuk</span><small><?= number_format((int)$savingsIncoming['jml_tx']) ?> transaksi</small></div></article>
+        <article class="finance-stat is-out"><span class="finance-stat-icon"><?= finance_icon('out') ?></span><div><strong><?= report_money($tab_keluar) ?></strong><span>Tabungan Keluar</span><small><?= number_format((int)$savingsOutgoing['jml_tx']) ?> transaksi</small></div></article>
+        <article class="finance-stat is-count"><span class="finance-stat-icon"><?= finance_icon('clock') ?></span><div><strong><?= number_format((int)($bayar_recap['jml_tx']??0)) ?></strong><span>Jumlah Transaksi Pembayaran</span><small><?= report_e($periodLabel) ?></small></div></article>
       </div>
+      <p class="finance-summary-note">Ringkasan seluruh pembayaran dan mutasi tabungan pada periode, siswa, dan cakupan unit yang dipilih. Jenis laporan mengatur tabel hasil di bawah.</p>
+      <nav class="finance-tabs" aria-label="Bagian laporan">
+        <?php foreach(['ringkasan'=>['Ringkasan','pie'],'komponen'=>['Komponen Pembayaran','list'],'transaksi'=>['Daftar Transaksi','document']] as $key=>[$label,$icon]): ?>
+        <a href="index.php?<?= report_e(filter_build_query(array_replace($laporanPaginationQuery,['panel'=>$key,'page'=>$page]))) ?>" data-finance-tab="<?= $key ?>" class="<?= $financeTab===$key?'is-active':'' ?>" <?= $financeTab===$key?'aria-current="page"':'' ?>><?= finance_icon($icon) ?><?= $label ?></a>
+        <?php endforeach; ?>
+      </nav>
+      <div class="finance-results" data-finance-panel="<?= report_e($financeTab) ?>">
+      <div class="main-card finance-components" style="margin-bottom:16px;">
 
-      <div class="main-card" style="margin-bottom:16px;">
         <div class="card-header">
-          <h3 class="card-title">Rekap Komponen Pembayaran - <?= report_e($periodLabel) ?></h3>
+          <div><h3 class="card-title">Rekap Komponen Pembayaran</h3><small class="finance-table-note"><?= report_e($periodLabel) ?></small></div>
         </div>
         <div class="table-container">
           <table class="payment-table">
@@ -590,14 +611,15 @@ $exportQuery = filter_build_query([
         </div>
       </div>
 
-      <div class="main-card">
+      <div class="main-card finance-transactions">
         <div class="card-header laporan-detail-header">
           <div class="laporan-detail-heading">
-            <h3 class="card-title"><?= report_e($reportTypes[$report_type]) ?> - <?= report_e($isUnpaidReport ? ($bulan_label . ' ' . $filter_tahun) : $periodLabel) ?></h3>
+            <h3 class="card-title"><?= $generalMultiple ? 'Hasil Laporan' : ($isUnpaidReport ? report_e($reportTypes[$report_type]) : 'Daftar Transaksi') ?></h3>
             <span class="badge-count"><?= number_format($totalDetailRows) ?> <?= $isUnpaidReport ? 'siswa/tagihan' : 'transaksi' ?></span>
           </div>
+          <small class="finance-table-note"><?= report_e($periodLabel) ?> &middot; Hasil mengikuti jenis laporan yang dipilih.</small>
           <?php if (!$generalMultiple && !$isUnpaidReport && !empty($bayar_detail)): ?>
-          <button type="submit" form="print-selected-form" class="btn btn-warning btn-print-selected" id="btn-print-selected" disabled>Cetak Dipilih</button>
+          <button type="submit" form="print-selected-form" class="btn btn-warning btn-print-selected" id="btn-print-selected" disabled><?= finance_icon('print') ?><span>Cetak Dipilih</span></button>
           <?php endif; ?>
         </div>
 
@@ -633,6 +655,7 @@ $exportQuery = filter_build_query([
           <input type="hidden" name="tanggal_akhir" value="<?= report_e($filter_tanggal_akhir) ?>">
           <input type="hidden" name="q" value="<?= report_e($filter_q) ?>">
           <input type="hidden" name="mode" value="selected">
+          <input type="hidden" name="student_id" value="<?= max(0,(int)($_GET['student_id']??0)) ?>">
           <div class="table-container">
             <table class="payment-table" id="tbl-laporan">
               <thead>
@@ -646,16 +669,16 @@ $exportQuery = filter_build_query([
                 <tr><td colspan="10" style="text-align:center;padding:40px;color:var(--text-muted);">Belum ada data pembayaran pada pilihan laporan ini.</td></tr>
                 <?php else: $receiptGroups=payment_activity_for_payments($koneksi,array_column($bayar_detail,'id')); foreach ($bayar_detail as $i => $b): $receiptCaps=payment_capabilities($koneksi,$b,$receiptGroups[(int)$b['id']]??[],false,[]); ?>
                 <tr class="<?= $i%2===0?'row-highlight':'' ?>">
-                  <td class="select-col"><input type="checkbox" class="select-print-check row-print-check" name="ids[]" value="<?= (int)$b['id'] ?>" aria-label="Pilih transaksi <?= report_e($b['NAMA']) ?>"></td>
+                  <td class="select-col"><input type="checkbox" class="select-print-check row-print-check" name="ids[]" <?= !$receiptCaps['can_print']?'disabled':'' ?> value="<?= (int)$b['id'] ?>" aria-label="Pilih transaksi <?= report_e($b['NAMA']) ?>"></td>
                   <td><?= $offset + $i + 1 ?></td>
-                  <td><span class="badge-nis"><?= report_e($b['NO_INDUK']) ?></span><?php if (!empty($b['NO_induk_diknas'])): ?><small class="report-secondary-id">Diknas <?= report_e($b['NO_induk_diknas']) ?></small><?php endif; ?></td>
+                  <td><span class="badge-nis"><?= report_e($b['NO_INDUK']) ?></span><?php if($reportUnitId===0): ?><small class="report-secondary-id"><?= report_e(unit_label((int)$b['unit_id'])) ?></small><?php endif; ?><?php if (!empty($b['NO_induk_diknas'])): ?><small class="report-secondary-id">Diknas <?= report_e($b['NO_induk_diknas']) ?></small><?php endif; ?></td>
                   <td><?= report_e($b['NAMA']) ?></td>
                   <td class="kelas-col"><span class="kelas-badge">Kelas <?= report_e($b['KELAS']) ?></span></td>
                   <td><?= report_e($b['BULAN']) ?> <?= report_e($b['TAHUN']) ?></td>
                   <td><?= report_e($b['sistem_pembayaran'] ?? 'VA') ?></td>
                   <td class="nominal"><?= report_money($b['total_jumlah']) ?></td>
                   <td><?= spp_date_label($b['TGL_BYR'],true) ?></td>
-                  <td class="aksi-col"><?php if($receiptCaps['can_print']): ?><a class="btn-tbl btn-tbl-print" href="cetak_struk.php?id=<?= (int)$b['id'] ?>" target="_blank" rel="noopener">Cetak</a><?php else: ?><span class="report-secondary-id">Terkunci</span><?php endif; ?></td>
+                  <td class="aksi-col"><?php if($receiptCaps['can_print']): ?><a class="btn-tbl btn-tbl-print" href="cetak_struk.php?id=<?= (int)$b['id'] ?>" target="_blank" rel="noopener"><?= finance_icon('print') ?>Cetak</a><?php else: ?><span class="report-secondary-id">Terkunci</span><?php endif; ?><details class="finance-row-menu"><summary aria-label="Lihat detail transaksi <?= (int)$b['id'] ?>">&middot;&middot;&middot;</summary><button type="button" class="open-payment-activity" hidden data-id="<?= (int)$b['id'] ?>" data-unit="<?= (int)$b['unit_id'] ?>">Riwayat Aktivitas</button><noscript><a href="../pembayaran/lihat.php?search=<?= urlencode($b['NO_INDUK']) ?>">Lihat riwayat siswa</a></noscript></details></td>
                 </tr>
                 <?php endforeach; endif; ?>
               </tbody>
@@ -665,27 +688,48 @@ $exportQuery = filter_build_query([
         <?php render_pagination('index.php', $laporanPaginationQuery, $page, $totalPages, $totalDetailRows, $perPage, 'transaksi'); ?>
         <?php endif; ?>
       </div>
+      </div>
     </div>
   </main>
 </div>
 
 <div class="toast" id="toast"><span id="toast-icon"></span><span id="toast-msg"></span></div>
+<dialog class="payment-activity-dialog" id="payment-activity-dialog" data-endpoint="../pembayaran/aktivitas.php" aria-labelledby="payment-activity-title"><header class="payment-activity-dialog-header"><div><h3 id="payment-activity-title">Riwayat Aktivitas</h3><p data-activity-subtitle></p></div><button type="button" class="btn btn-ghost btn-sm" data-close-activity>Tutup</button></header><div class="payment-activity-content" aria-live="polite"></div></dialog>
+<script src="../assets/js/payment_activity.js?v=<?= filemtime(__DIR__.'/../assets/js/payment_activity.js') ?>"></script>
 <script src="../assets/js/date_format.js?v=<?= filemtime(__DIR__ . '/../assets/js/date_format.js') ?>"></script>
   <script src="../assets/js/app.js?v=<?= filemtime(__DIR__ . '/../assets/js/app.js') ?>"></script>
 <script>
 document.addEventListener('DOMContentLoaded', function(){
   autoHideFlash();
+  document.querySelectorAll('.finance-row-menu .open-payment-activity').forEach(button => button.hidden = false);
+  const results = document.querySelector('.finance-results');
+  function selectPanel(panel) {
+    results.dataset.financePanel = panel;
+    document.querySelectorAll('[data-finance-tab]').forEach(link => {
+      const active = link.dataset.financeTab === panel;
+      link.classList.toggle('is-active', active);
+      if(active) link.setAttribute('aria-current','page'); else link.removeAttribute('aria-current');
+    });
+    const field = document.querySelector('input[name="panel"]'); if(field) field.value = panel;
+    document.querySelectorAll('.finance-transactions .du-pagination-footer a').forEach(link => { const url = new URL(link.href); url.searchParams.set('panel',panel); link.href=url.href; });
+  }
+  document.querySelectorAll('[data-finance-tab]').forEach(link => link.addEventListener('click', event => {
+    if(event.ctrlKey||event.metaKey||event.shiftKey||event.altKey) return;
+    event.preventDefault(); selectPanel(link.dataset.financeTab);
+    const url = new URL(location.href); url.searchParams.set('panel',link.dataset.financeTab); history.pushState(null,'',url);
+  }));
+  addEventListener('popstate',()=>{const panel=new URL(location.href).searchParams.get('panel');selectPanel(['ringkasan','komponen','transaksi'].includes(panel)?panel:'ringkasan');});
 
   const form = document.getElementById('print-selected-form');
   const checkAll = document.getElementById('check-all-print');
-  const rowChecks = Array.from(document.querySelectorAll('.row-print-check'));
+  const rowChecks = Array.from(document.querySelectorAll('.row-print-check:not(:disabled)'));
   const printButton = document.getElementById('btn-print-selected');
 
   function refreshPrintSelection() {
     const selectedCount = rowChecks.filter(check => check.checked).length;
     if (printButton) {
       printButton.disabled = selectedCount === 0;
-      printButton.textContent = selectedCount > 0 ? 'Cetak Dipilih (' + selectedCount + ')' : 'Cetak Dipilih';
+      printButton.querySelector('span').textContent = selectedCount > 0 ? 'Cetak Dipilih (' + selectedCount + ')' : 'Cetak Dipilih';
     }
     if (checkAll) {
       checkAll.checked = selectedCount > 0 && selectedCount === rowChecks.length;

@@ -90,9 +90,9 @@ if ($output === 'preview'):
   </style>
 </head>
 <body><main class="wrap">
-  <div class="head"><div><h1>Buku Tabungan - <?= book_escape($student['NAMA']) ?></h1><p class="muted">Unit <?= book_escape(unit_label((int)$student['unit_id'])) ?> · NIS <?= book_escape($nis) ?> · <?= count($book['entries']) ?> transaksi · <?= count($book['pages']) ?> halaman buku · <?= count($book['sides']) / 2 ?> lembar A5</p></div>
+  <div class="head"><div><h1>Buku Tabungan - <?= book_escape($student['NAMA']) ?></h1><p class="muted">Unit <?= book_escape(unit_label((int)$student['unit_id'])) ?> · NIS <?= book_escape($nis) ?> · <?= count($book['entries']) ?> transaksi · <?= count($book['pages']) ?> halaman buku · <?= count($book['sides']) / 2 ?> lembar A5 potret</p></div>
     <div class="actions"><a class="btn secondary" href="cetak.php">Kembali ke Cetak Tabungan</a><a class="btn" href="<?= book_escape($pdfUrl) ?>" target="_blank" rel="noopener">Buka PDF untuk dicetak</a></div></div>
-  <div class="instructions"><strong>Pengaturan cetak buku lipat</strong>Cetak PDF pada kertas A5 lanskap, skala 100% atau actual size, dua sisi dengan pembalikan pada sisi pendek. Lipat setiap lembar di tengah untuk menghasilkan buku A6. Periksa pratinjau sisi depan dan belakang sebelum mencetak seluruh buku.</div>
+  <div class="instructions"><strong>Pengaturan cetak buku lipat</strong>Cetak PDF pada kertas A5 potret, skala 100% atau actual size, dua sisi dengan pembalikan pada sisi pendek. Lipat lembar secara horizontal untuk menghasilkan buku A6 lanskap yang dibuka ke atas. Periksa pratinjau sisi depan dan belakang sebelum mencetak seluruh buku.</div>
   <iframe src="<?= book_escape($pdfUrl) ?>" title="Pratinjau PDF buku tabungan <?= book_escape($student['NAMA']) ?>"></iframe>
 </main></body></html>
 <?php
@@ -105,63 +105,8 @@ $logoFile = __DIR__ . '/../assets/img/school-logo.png';
 $logo = is_file($logoFile) ? 'data:image/png;base64,' . base64_encode(file_get_contents($logoFile)) : '';
 $school = unit_school_name((int)$student['unit_id']);
 
-function book_page(array $page, array $student, string $school, string $logo, string $position): string
-{
-    $out = '<div class="leaf ' . $position . '">';
-    if ($page['type'] === 'front') {
-        $out .= '<div class="cover"><div class="cover-frame">';
-        if ($logo !== '') $out .= '<img class="school-logo" src="' . $logo . '" alt="">';
-        $out .= '<div class="school-name">' . book_escape($school) . '</div><h1>BUKU<br>TABUNGAN</h1>'
-            . '<div class="identity"><div><span>No. Induk</span><strong>' . book_escape($student['NO_INDUK']) . '</strong></div>'
-            . '<div><span>Nama</span><strong>' . book_escape($student['NAMA']) . '</strong></div>'
-            . '<div><span>Kelas</span><strong>' . book_escape($student['KELAS']) . '</strong></div>';
-        if (!empty($student['NO_induk_diknas'])) $out .= '<div><span>NIS Diknas</span><strong>' . book_escape($student['NO_induk_diknas']) . '</strong></div>';
-        $out .= '</div></div></div>';
-    } elseif ($page['type'] === 'back') {
-        $out .= '<div class="back-cover"><div class="back-frame">';
-        if ($logo !== '') $out .= '<img class="school-logo" src="' . $logo . '" alt="">';
-        $out .= '<strong>' . book_escape($school) . '</strong><p>Buku Tabungan Siswa</p></div></div>';
-    } else {
-        $out .= '<div class="ledger-heading"><strong>BUKU TABUNGAN</strong><span>' . book_escape($student['NAMA']) . ' - NIS ' . book_escape($student['NO_INDUK']) . '</span></div>'
-            . '<table class="ledger"><colgroup><col style="width:16mm"><col style="width:20mm"><col style="width:20mm"><col style="width:22mm"><col style="width:17mm"></colgroup>'
-            . '<thead><tr><th rowspan="2">Tanggal</th><th colspan="2">Tabungan (Rp)</th><th rowspan="2">Saldo (Rp)</th><th rowspan="2">Tanda<br>Tangan</th></tr><tr><th>Masuk</th><th>Keluar</th></tr></thead><tbody>';
-        foreach ($page['rows'] as $entry) {
-            $date = $entry && $entry['tanggal'] !== '' ? spp_date_label($entry['tanggal']) : ($entry ? '-' : '');
-            $out .= '<tr><td>' . book_escape($date) . '</td>'
-                . '<td class="amount">' . ($entry && $entry['masuk'] ? savings_book_money($entry['masuk']) : '') . '</td>'
-                . '<td class="amount">' . ($entry && $entry['keluar'] ? savings_book_money($entry['keluar']) : '') . '</td>'
-                . '<td class="amount">' . ($entry ? savings_book_money($entry['saldo']) : '') . '</td><td></td></tr>';
-        }
-        $out .= '</tbody></table><div class="ledger-footer"><span>' . book_escape($school) . '</span><span>Hal. ' . $page['number'] . '</span></div>';
-    }
-    return $out . '</div>';
-}
-
-$html = '<!doctype html><html lang="id"><head><meta charset="utf-8"><style>
-@page{size:A5 landscape;margin:0}body{margin:0;color:#16352b;font-family:DejaVu Sans,Arial,sans-serif}
-.sheet{width:210mm;height:148mm;position:relative;page-break-after:always;overflow:hidden}.sheet.last{page-break-after:auto}
-.leaf{position:absolute;top:0;width:95mm;height:138mm;padding:5mm;overflow:hidden}.leaf.left{left:0}.leaf.right{left:105mm}
-.ledger-heading{height:11mm;border-bottom:0.7pt solid #2a6950;padding-bottom:1mm}
-.ledger-heading strong{display:block;font-size:8.5pt;letter-spacing:.55pt}.ledger-heading span{display:block;margin-top:.7mm;font-size:5.8pt}
-.ledger{width:100%;table-layout:fixed;border-collapse:collapse;margin-top:1.5mm;font-size:6pt;color:#172b24}
-.ledger th,.ledger td{border:0.35pt solid #567465;padding:0 .4mm;height:5.7mm;vertical-align:middle;overflow:hidden}
-.ledger th{background:#e4f1e8;text-align:center;font-size:5.6pt;height:4.5mm}.ledger td.amount{text-align:right;white-space:nowrap}
-.ledger-footer{margin-top:2mm;border-top:0.4pt solid #a9c7b5;padding-top:1.3mm;font-size:4.6pt;color:#4f6e5d}
-.ledger-footer span:last-child{float:right}.cover,.back-cover{position:relative;height:134mm;background:#d5f1e5;border:1.2pt solid #23805c}
-.cover-frame,.back-frame{position:absolute;top:3mm;right:3mm;bottom:3mm;left:3mm;border:.6pt solid #23805c;text-align:center;padding:5mm}
-.school-logo{width:17mm;height:17mm;object-fit:contain}.school-name{margin:3mm auto 0;max-width:78mm;font-size:6.7pt;font-weight:bold;line-height:1.35}
-.cover h1{margin:13mm 0 10mm;font-size:18pt;line-height:1.2;letter-spacing:1pt;color:#134c38}
-.identity{margin:0 auto;width:78mm;text-align:left;font-size:7pt}.identity div{min-height:9mm;border-bottom:.5pt solid #69a389;padding:1mm 0}
-.identity span{display:inline-block;width:22mm;color:#496b5b}.identity strong{display:inline-block;width:53mm;vertical-align:top;word-wrap:break-word}
-.back-frame{padding-top:43mm}.back-frame strong{display:block;margin:4mm auto;max-width:76mm;font-size:7.5pt;line-height:1.4}.back-frame p{font-size:7pt}
-</style></head><body>';
-foreach ($book['sides'] as $index => $side) {
-    $left = $book['pages'][$side['left']];
-    $right = $book['pages'][$side['right']];
-    $html .= '<div class="sheet' . ($index === count($book['sides']) - 1 ? ' last' : '') . '">'
-        . book_page($left, $student, $school, $logo, 'left') . book_page($right, $student, $school, $logo, 'right') . '</div>';
-}
-$html .= '</body></html>';
+require_once __DIR__.'/../includes/savings_book_render.php';
+$html=savings_book_html($book,$student,$school,$logo);
 
 $options = new \Dompdf\Options();
 $options->set('isRemoteEnabled', false);
@@ -169,7 +114,7 @@ $options->set('isHtml5ParserEnabled', true);
 $options->setDefaultMediaType('print');
 $dompdf = new \Dompdf\Dompdf($options);
 $dompdf->loadHtml($html);
-$dompdf->setPaper('A5', 'landscape');
+$dompdf->setPaper('A5', 'portrait');
 $dompdf->render();
 $filename = 'buku-tabungan-' . preg_replace('/[^A-Za-z0-9_-]/', '', $nis) . '.pdf';
 $dompdf->stream($filename, ['Attachment' => false]);

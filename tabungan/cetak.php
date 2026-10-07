@@ -123,11 +123,11 @@ function print_book_escape($value): string
             <svg width="17" height="17" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" aria-hidden="true"><path d="M6 9V3h12v6M6 18H4a2 2 0 0 1-2-2v-5a2 2 0 0 1 2-2h16a2 2 0 0 1 2 2v5a2 2 0 0 1-2 2h-2"/><path d="M6 14h12v7H6z"/></svg>
             Pratinjau &amp; Cetak
           </button>
-          <p class="savings-print-action-note">PDF disusun pada kertas A5 lanskap untuk dicetak dua sisi dan dilipat menjadi buku A6.</p>
+          <p class="savings-print-action-note">PDF disusun pada kertas A5 potret untuk dicetak dua sisi dan dilipat menjadi buku A6 lanskap.</p>
         </section>
       </div>
 
-      <div class="savings-print-guide"><span class="savings-print-guide-icon">i</span><div><strong>Pengaturan cetak</strong><p>Gunakan kertas A5, skala 100%, cetak dua sisi, dan pilih pembalikan pada sisi pendek. Lipat lembar di tengah setelah dicetak.</p></div></div>
+      <div class="savings-print-guide"><span class="savings-print-guide-icon">i</span><div><strong>Pengaturan cetak</strong><p>Gunakan kertas A5, skala 100%, cetak dua sisi, dan pilih pembalikan pada sisi pendek. Lipat lembar secara horizontal setelah dicetak; buku dibuka ke atas.</p></div></div>
     </div>
   </main>
 </div>

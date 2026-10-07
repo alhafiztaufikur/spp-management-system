@@ -117,12 +117,14 @@ try {
     financial_request_complete($koneksi, $requestKey, $journalId);
     $koneksi->commit();
 
+    $_SESSION['savings_print_prompt'] = ['jenis'=>$aksi, 'id'=>$journalId, 'unit_id'=>unit_active_id()];
+
     $label = $aksi === 'masuk' ? 'masuk' : 'keluar';
     $_SESSION['flash'] = [
         'type' => 'success',
         'msg'  => 'Tabungan ' . $label . ' Rp ' . number_format($nominal, 0, ',', '.') . ' berhasil disimpan!'
     ];
-    header('Location: riwayat.php');
+    header('Location: riwayat.php?' . http_build_query(['jenis'=>$aksi, 'id'=>$journalId]));
     exit;
 
 } catch (Throwable $e) {
