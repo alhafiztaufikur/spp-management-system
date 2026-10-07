@@ -21,6 +21,8 @@ if ($unitId === 0 && unit_transaction_route(rawurldecode((string)$path))) {
     http_response_code(422); exit('Transaksi wajib memilih SD, SMP, atau SMA.');
 }
 parse_str((string)(parse_url($next, PHP_URL_QUERY) ?? ''), $params);
+// The account-list unit filter belongs to the previous operational scope.
+if (str_ends_with((string)$path, '/role_management.php')) unset($params['account_unit']);
 foreach (['unit','unit_id','kelas','master_kelas_id','tingkat_kelas','q_kelas','operator','kategori','komponen_tagihan','q','search','nis','id','edit','action','aksi','page','view','detail','batch'] as $key) unset($params[$key]);
 // An edit page requires a payment ID: switching returns to its safe list.
 if (str_ends_with((string)$path, '/pembayaran/edit.php')) $path=$base.'/pembayaran/lihat.php';

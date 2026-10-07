@@ -1,4 +1,5 @@
 <?php
+require_once __DIR__.'/excel_test_helpers.php';
 /** Reconcile daily receipts with payment headers when SPP has a discount. */
 if (PHP_SAPI !== 'cli'
     || getenv('SPP_TEST_ALLOW_MUTATION') !== '1'
@@ -143,6 +144,7 @@ try {
         'pratinjau PDF' => $base . 'laporan/export_global.php?' . $query . '&format=preview',
     ] as $label => $url) {
         $html = receipt_discount_http($url, $sessionId);
+        if($label==='Excel')$html=test_excel_html($html);
         receipt_discount_assert(str_contains($html, 'Potongan SPP'), $label . ' tidak memuat kolom Potongan SPP.');
         $cells = receipt_discount_row($html, $nis, $label === 'pratinjau PDF');
         foreach (['Rp 300', 'Rp 70', 'Rp -50', 'Rp 320'] as $amount) {

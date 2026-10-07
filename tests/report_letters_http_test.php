@@ -1,4 +1,5 @@
 <?php
+require_once __DIR__.'/excel_test_helpers.php';
 if(PHP_SAPI!=='cli'){http_response_code(404);exit;}
 require_once __DIR__.'/../koneksi.php';
 require_once __DIR__.'/../includes/reports.php';
@@ -62,7 +63,8 @@ try{
         letter_http_assert(str_contains($headers[0]??'','200')&&str_contains($legacyDetail,htmlspecialchars($students[0]['nama'],ENT_QUOTES,'UTF-8')),'Parameter pencarian lama menghilangkan detail tunggakan.');
         preg_match('/href="([^"]*view=detail[^"]*)"[^>]*>Export Excel<\/a>/', $detail, $detailExcelLink);
         letter_http_assert(isset($detailExcelLink[1]),'Tautan Excel detail rombel tidak ditemukan.');
-        [$headers,$detailExcel]=letter_http_get($base.'laporan/'.html_entity_decode($detailExcelLink[1],ENT_QUOTES|ENT_HTML5,'UTF-8'),$id);
+        [$headers,$detailExcel]=letter_http_get($base.'laporan/'.html_entity_decode($detailExcelLink[1],ENT_QUOTES|ENT_HTML5,'UTF-8').'&download=1',$id);
+        $detailExcel=test_excel_html($detailExcel);
         letter_http_assert(str_contains(strtolower(letter_http_header($headers,'Content-Disposition')),'attachment')
             && str_contains($detailExcel,htmlspecialchars($students[0]['nama'],ENT_QUOTES,'UTF-8')),
             'Excel detail rombel tidak sesuai.');
@@ -91,6 +93,7 @@ try{
         letter_http_assert(str_contains(strtolower(letter_http_header($headers,'Content-Disposition')),'inline'),'PDF kepala sekolah tidak inline.');
         [$headers,$body]=letter_http_get($base.'laporan/export_global.php?template=tunggakan-siswa&format=excel&download=1&siswa_status=active',$id);
         letter_http_assert(str_contains(strtolower(letter_http_header($headers,'Content-Disposition')),'attachment'),'Excel tidak langsung diunduh.');
+        $body=test_excel_html($body);
         letter_http_assert(str_contains($body,'Siswa Menunggak')&&str_contains($body,'Total Tunggakan')&&!str_contains($body,htmlspecialchars($students[0]['nama'],ENT_QUOTES,'UTF-8')),'Excel kepala sekolah masih merinci siswa.');
         letter_http_end_session($id);
     }

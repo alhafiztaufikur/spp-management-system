@@ -1,5 +1,6 @@
 <?php
 require_once __DIR__.'/payment_activity.php';
+require_once __DIR__.'/filter_choices.php';
 
 function authorization_history_source(): string
 {
@@ -30,7 +31,7 @@ function authorization_history_can_read(mysqli $db,int $id): bool
     $s->bind_param('ii',$actor,$id);$s->execute();$allowed=(bool)$s->get_result()->fetch_row();$s->close();return $allowed;
 }
 
-function authorization_history_page(mysqli $db,string $status,string $kind,string $search,int $page): array
+function authorization_history_page(mysqli $db,string $status,string $kind,string $search,int $page,array $statuses=['*']): array
 {
     $where='e.payment_id>0';$params=[];$types='';
     if(isRole('kasir')) {
@@ -38,7 +39,8 @@ function authorization_history_page(mysqli $db,string $status,string $kind,strin
             AND COALESCE(owned.bayar_id,CAST(JSON_UNQUOTE(JSON_EXTRACT(owned.before_snapshot,'$.payment.id')) AS UNSIGNED))=e.payment_id)";
         $params[]=(int)$_SESSION['admin_id'];$types.='i';
     }
-    if($status!=='all'){$where.=' AND r.status=?';$params[]=$status;$types.='s';}
+    if(!filter_is_all($statuses))$where.=filter_sql_values($statuses,'r.status');
+    elseif($status!=='all'){$where.=' AND r.status=?';$params[]=$status;$types.='s';}
     if($kind==='edit')$where.=" AND e.action IN ('edited','request_edit','approved','rejected','cancelled','failed') AND (r.action='edit' OR r.id IS NULL)";
     if($kind==='hapus')$where.=" AND e.action IN ('deleted','request_delete','approved','rejected','cancelled','failed') AND (r.action='hapus' OR r.id IS NULL)";
     if($search!==''){

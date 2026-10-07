@@ -2,12 +2,14 @@
 // ============================================
 // laporan/export_excel.php — Export ke Excel
 // ============================================
-session_start();
+if(session_status()!==PHP_SESSION_ACTIVE)session_start();
 require_once '../koneksi.php';
 require_once '../includes/auth.php';
 requireRole(['admin', 'bendahara']);
 $reportUnitId=unit_report_scope($koneksi,(string)($_GET['unit']??''));
 
+require_once '../includes/general_multiple.php';
+$generalChoices=general_choices($_GET);
 $filter_bulan = (int)($_GET['bulan'] ?? date('m'));
 $filter_tahun = (int)($_GET['tahun'] ?? date('Y'));
 $filter_q = mb_substr(trim((string)($_GET['q'] ?? '')), 0, 100);
@@ -24,11 +26,6 @@ if ($filter_tanggal_awal !== '' && $filter_tanggal_akhir !== '' && strtotime($fi
     [$filter_tanggal_awal, $filter_tanggal_akhir] = [$filter_tanggal_akhir, $filter_tanggal_awal];
 }
 $download = isset($_GET['download']) && $_GET['download'] === '1';
-$excelText = static function ($value) use ($download): string {
-    $text = (string)$value;
-    if ($download && preg_match('/^[\p{Z}\x00-\x20]*[=+\-@]/u', $text)) $text = "'" . $text;
-    return htmlspecialchars($text, ENT_QUOTES, 'UTF-8');
-};
 
 $bln_names = ['1'=>'Januari','2'=>'Februari','3'=>'Maret','4'=>'April','5'=>'Mei','6'=>'Juni',
                '7'=>'Juli','8'=>'Agustus','9'=>'September','10'=>'Oktober','11'=>'November','12'=>'Desember'];
@@ -65,15 +62,21 @@ if ($filter_tanggal_awal !== '' && $filter_tanggal_akhir !== '') {
 }
 
 // Ambil data pembayaran
+$paymentOrder=match((string)($_GET['urut']??'terbaru')){
+    'nama'=>'s.NAMA ASC,b.TGL_BYR DESC',
+    'kelas'=>'CAST(b.KELAS AS UNSIGNED) ASC,b.kelas_rombel_snapshot ASC,s.NAMA ASC,b.TGL_BYR DESC',
+    'nominal_terbesar'=>'b.total_jumlah DESC,b.TGL_BYR DESC',
+    default=>'b.TGL_BYR DESC,b.id DESC',
+};
 $stmt = $koneksi->prepare("
-    SELECT s.id AS student_id,s.NO_INDUK, s.NO_induk_diknas, s.NAMA,
+    SELECT b.unit_id,s.id AS student_id,s.NO_INDUK, s.NO_induk_diknas, s.NAMA,
            COALESCE(NULLIF(b.kelas_rombel_snapshot,''),NULLIF(b.KELAS,''),s.KELAS) AS KELAS,
            b.BULAN, b.TAHUN,
            b.U_PSB, b.U_SPP, b.U_KOMITE,
            b.sistem_pembayaran, b.total_jumlah, b.TGL_BYR
     FROM bayar b JOIN siswa s ON s.NO_INDUK = b.NO_INDUK AND s.unit_id=b.unit_id
     WHERE b.TGL_BYR >= ? AND b.TGL_BYR < ? $studentWhere
-    ORDER BY b.TGL_BYR DESC
+    ORDER BY $paymentOrder
 ");
 $bind($stmt, 'ss', [$period_start, $period_end]);
 $stmt->execute();
@@ -131,11 +134,11 @@ if ($totalDiscount > 0.001) $komponen_rows[] = ['nama'=>'Potongan SPP','total'=>
 
 // Ambil data tabungan periode ini
 $stmt2 = $koneksi->prepare("
-    SELECT tm.NO_INDUK, s.NO_induk_diknas, s.NAMA, s.KELAS, tm.TANGGAL, tm.MASUK as nominal, 'masuk' as jenis, tm.keterangan
+    SELECT tm.unit_id,tm.NO_INDUK, s.NO_induk_diknas, s.NAMA, s.KELAS, tm.TANGGAL, tm.MASUK as nominal, 'masuk' as jenis, tm.keterangan
     FROM transaksi_m tm JOIN siswa s ON s.NO_INDUK = tm.NO_INDUK AND s.unit_id=tm.unit_id
     WHERE tm.TANGGAL >= ? AND tm.TANGGAL < ? $studentWhere
     UNION ALL
-    SELECT tk.NO_INDUK, s.NO_induk_diknas, s.NAMA, s.KELAS, tk.TANGGAL, tk.KELUAR as nominal, 'keluar' as jenis, tk.keterangan
+    SELECT tk.unit_id,tk.NO_INDUK, s.NO_induk_diknas, s.NAMA, s.KELAS, tk.TANGGAL, tk.KELUAR as nominal, 'keluar' as jenis, tk.keterangan
     FROM transaksi_k tk JOIN siswa s ON s.NO_INDUK = tk.NO_INDUK AND s.unit_id=tk.unit_id
     WHERE tk.TANGGAL >= ? AND tk.TANGGAL < ? $studentWhere
     ORDER BY TANGGAL DESC
@@ -161,364 +164,27 @@ foreach ($tab_rows as $tab) {
     }
 }
 
-// Set header untuk download Excel
-$filename = 'Laporan_SPP_' . str_replace(' ', '_', $period_label) . '.xls';
-if ($download) {
-    header('Content-Type: application/vnd.ms-excel; charset=UTF-8');
-    header('Content-Disposition: attachment; filename="' . $filename . '"');
-    header('Cache-Control: max-age=0');
+require_once __DIR__.'/../includes/excel.php';
+$paymentColumns=[spp_excel_column('no','No','number')];$savingColumns=$paymentColumns;
+if($reportUnitId===0){$paymentColumns[]=spp_excel_column('export_unit','Unit');$savingColumns[]=spp_excel_column('export_unit','Unit');}
+$identities=[spp_excel_column('NO_INDUK','NIS'),spp_excel_column('NO_induk_diknas','NIS Diknas'),spp_excel_column('NAMA','Nama Siswa'),spp_excel_column('KELAS','Kelas')];
+$paymentColumns=array_merge($paymentColumns,$identities,[spp_excel_column('export_period','Bulan Tagihan'),spp_excel_column('sistem_pembayaran','Sistem Pembayaran'),spp_excel_column('total_jumlah','Total Bayar','money'),spp_excel_column('TGL_BYR','Tanggal Bayar','datetime')]);
+$savingColumns=array_merge($savingColumns,$identities,[spp_excel_column('TANGGAL','Tanggal','datetime'),spp_excel_column('jenis','Jenis'),spp_excel_column('nominal','Nominal','money'),spp_excel_column('keterangan','Keterangan')]);
+foreach($rows as $i=>&$row){$row['no']=$i+1;$row['export_unit']=unit_label((int)$row['unit_id']);$row['export_period']=$row['BULAN'].' '.$row['TAHUN'];}unset($row);
+foreach($tab_rows as $i=>&$row){$row['no']=$i+1;$row['export_unit']=unit_label((int)$row['unit_id']);$row['jenis']=$row['jenis']==='masuk'?'Masuk':'Keluar';}unset($row);
+$totals=[['label'=>'Total Pembayaran','value'=>$preview_total_pembayaran]];
+$tabTotals=[['label'=>'Total Masuk','value'=>$preview_total_tab_masuk],['label'=>'Total Keluar','value'=>$preview_total_tab_keluar]];
+$summary=[['label'=>'Pembayaran','value'=>$preview_total_pembayaran],['label'=>'Tabungan Masuk','value'=>$preview_total_tab_masuk],['label'=>'Tabungan Keluar','value'=>$preview_total_tab_keluar]];
+$sheets=[['name'=>'Ringkasan','sections'=>[spp_excel_section('Ringkasan Keuangan',[spp_excel_column('label','Ringkasan'),spp_excel_column('value','Nominal','money')],$summary,[],false),spp_excel_section('Rincian Komponen Pembayaran',[spp_excel_column('nama','Komponen'),spp_excel_column('total','Nominal','money')],$komponen_rows,$totals,false)]],['name'=>'Pembayaran','sections'=>[spp_excel_section('Transaksi Pembayaran',$paymentColumns,$rows,$totals)]],['name'=>'Tabungan','sections'=>[spp_excel_section('Transaksi Tabungan',$savingColumns,$tab_rows,$tabTotals)]]];
+if(is_array($_GET['jenis_laporan']??null)||($_GET['jenis_laporan']??'semua')!=='semua'){
+    $generalSections=general_sections($koneksi,$generalChoices,$period_start,$period_end,$filter_q,(string)($_GET['urut']??'terbaru'));
+    $sheets[1]['sections']=general_excel_sections($generalSections);
+    foreach($generalSections as $section)foreach($section['totals'] as $total)$summary[]=['label'=>$section['title'].' - '.$total['label'],'value'=>$total['value']];
+    $sheets[0]['sections'][0]['rows']=$summary;
 }
-ob_start();
-?>
-<html xmlns:o="urn:schemas-microsoft-com:office:office" xmlns:x="urn:schemas-microsoft-com:office:excel">
-<head>
-  <meta charset="UTF-8">
-  <title><?= $download ? htmlspecialchars($filename) : 'Preview Excel - ' . htmlspecialchars($period_label) ?></title>
-  <!--[if gte mso 9]>
-  <xml><x:ExcelWorkbook><x:ExcelWorksheets>
-    <x:ExcelWorksheet><x:Name>Pembayaran SPP</x:Name><x:WorksheetOptions><x:Print><x:FitToPage/></x:Print></x:WorksheetOptions></x:ExcelWorksheet>
-  </x:ExcelWorksheets></x:ExcelWorkbook></xml>
-  <![endif]-->
-  <style>
-    html { overflow-x: hidden; }
-    body { margin: 0; font-family: Arial, Helvetica, sans-serif; background: #f3f7f1; color: #17231c; overflow-x: hidden; }
-    .no-print {
-      position: sticky;
-      top: 0;
-      z-index: 10;
-      display: flex;
-      justify-content: flex-end;
-      gap: 8px;
-      padding: 10px 14px;
-      background: #fff;
-      border-bottom: 1px solid #cddccc;
-    }
-    .no-print a {
-      border: 1px solid #1f6f3f;
-      border-radius: 4px;
-      padding: 8px 14px;
-      color: #1f6f3f;
-      background: #fff;
-      font-size: 12px;
-      font-weight: 700;
-      text-decoration: none;
-    }
-    .no-print a.primary { background: #1f6f3f; color: #fff; }
-    .preview-sheet {
-      width: min(1040px, calc(100% - 32px));
-      margin: 18px auto 28px;
-      padding: 18px 22px 22px;
-      background: #fff;
-      border: 1px solid #cddccc;
-      box-shadow: 0 14px 34px rgba(31, 111, 63, .10);
-      overflow-x: auto;
-    }
-    .report-head {
-      display: flex;
-      justify-content: space-between;
-      gap: 16px;
-      align-items: flex-start;
-      margin-bottom: 14px;
-      padding-bottom: 12px;
-      border-bottom: 3px solid #f28c28;
-    }
-    .report-title {
-      margin: 0 0 6px;
-      color: #1f6f3f;
-      font-size: 22px;
-      line-height: 1.2;
-    }
-    .report-meta {
-      margin: 0;
-      color: #506053;
-      font-size: 13px;
-    }
-    .period-pill {
-      display: inline-block;
-      padding: 7px 12px;
-      border-radius: 4px;
-      background: #fff4e6;
-      color: #b45309;
-      border: 1px solid #ffd6a3;
-      font-size: 12px;
-      font-weight: 700;
-      white-space: nowrap;
-    }
-    .summary-grid {
-      display: grid;
-      grid-template-columns: repeat(3, minmax(0, 1fr));
-      gap: 10px;
-      margin-bottom: 14px;
-    }
-    .summary-card {
-      padding: 10px 12px;
-      border: 1px solid #cfe4d2;
-      border-left: 5px solid #1f6f3f;
-      background: #f8fcf8;
-    }
-    .summary-card.orange { border-left-color: #f28c28; background: #fff9f1; }
-    .summary-label {
-      display: block;
-      margin-bottom: 4px;
-      color: #5a695d;
-      font-size: 11px;
-      font-weight: 700;
-      text-transform: uppercase;
-    }
-    .summary-value {
-      display: block;
-      color: #17231c;
-      font-size: 16px;
-      font-weight: 800;
-    }
-    table {
-      width: 100%;
-      min-width: 760px;
-      margin: 0 0 14px;
-      border-collapse: collapse;
-    }
-    th { background: #1f6f3f; color: white; font-weight: bold; padding: 8px 10px; border: 1px solid #8eb99a; }
-    td { padding: 7px 10px; border: 1px solid #cfd8cf; }
-    .total-row { background: #fff4e6; color: #17231c; font-weight: bold; }
-    .header-row { background: #f28c28; color: white; font-size: 12pt; font-weight: bold; }
-    .section-header { background: #e6f3e8; font-weight: bold; font-size: 11pt; }
-    .empty-row { color: #68746a; text-align: center; font-style: italic; background: #fbfdfb; }
-    .table-card {
-      margin: 0 0 14px;
-    }
-    .table-scroll {
-      width: 100%;
-      overflow-x: auto;
-      -webkit-overflow-scrolling: touch;
-    }
-    .table-scroll table {
-      margin-bottom: 0;
-    }
-    @media print {
-      body { background: #fff; }
-      .no-print { display: none !important; }
-      .preview-sheet { width: auto; margin: 0; padding: 0; border: 0; box-shadow: none; }
-    }
-    @media (max-width: 760px) {
-      .no-print {
-        position: static;
-        display: grid;
-        grid-template-columns: 1fr 1fr;
-        gap: 8px;
-        padding: 8px;
-        background: #f7fbf7;
-      }
-      .no-print a {
-        display: flex;
-        justify-content: center;
-        align-items: center;
-        min-height: 42px;
-        padding: 8px 10px;
-        border-radius: 7px;
-        text-align: center;
-      }
-      .preview-sheet {
-        width: 100%;
-        margin: 0;
-        padding: 14px 10px 18px;
-        border-left: 0;
-        border-right: 0;
-        box-shadow: none;
-        overflow-x: hidden;
-      }
-      .summary-grid {
-        grid-template-columns: 1fr;
-        gap: 8px;
-      }
-      .summary-card {
-        padding: 11px 12px;
-      }
-      .report-head {
-        display: block;
-        margin-bottom: 12px;
-        padding-bottom: 12px;
-      }
-      .report-title {
-        font-size: 20px;
-      }
-      .period-pill { margin-top: 10px; }
-      .table-card {
-        border: 1px solid #cfe4d2;
-        border-radius: 8px;
-        overflow: hidden;
-        background: #fff;
-      }
-      .table-scroll {
-        overflow-x: auto;
-      }
-      table {
-        min-width: 720px;
-        table-layout: auto;
-        font-size: 11px;
-      }
-      .table-card.compact table {
-        min-width: 100%;
-      }
-      th,
-      td {
-        padding: 8px 8px;
-        white-space: normal;
-      }
-      .header-row {
-        font-size: 12px;
-      }
-      .empty-row {
-        padding: 14px 10px;
-      }
-    }
-  </style>
-</head>
-<body>
-
-<?php if (!$download): ?>
-<main class="preview-sheet">
-<?php endif; ?>
-
-<div class="report-head">
-  <div>
-    <h2 class="report-title">Laporan Keuangan Sistem SPP · <?= htmlspecialchars(unit_label($reportUnitId), ENT_QUOTES, 'UTF-8') ?></h2>
-    <p class="report-meta">Dicetak: <?= spp_date_label(new DateTimeImmutable('now'),true) ?></p>
-  </div>
-  <span class="period-pill">Periode <?= htmlspecialchars($period_label) ?></span>
-</div>
-
-<?php if (!$download): ?>
-<div class="summary-grid">
-  <div class="summary-card">
-    <span class="summary-label">Total Pembayaran</span>
-    <span class="summary-value">Rp <?= number_format($preview_total_pembayaran, 0, ',', '.') ?></span>
-  </div>
-  <div class="summary-card orange">
-    <span class="summary-label">Tabungan Masuk</span>
-    <span class="summary-value">Rp <?= number_format($preview_total_tab_masuk, 0, ',', '.') ?></span>
-  </div>
-  <div class="summary-card orange">
-    <span class="summary-label">Tabungan Keluar</span>
-    <span class="summary-value">Rp <?= number_format($preview_total_tab_keluar, 0, ',', '.') ?></span>
-  </div>
-</div>
-<?php endif; ?>
-
-<div class="table-card compact">
-<div class="table-scroll">
-<table>
-  <tr class="header-row"><td colspan="2">RINCIAN KOMPONEN PEMBAYARAN</td></tr>
-  <tr><th>Komponen</th><th>Total (Rp)</th></tr>
-  <?php if (empty($komponen_rows)): ?>
-  <tr><td colspan="2" class="empty-row">Belum ada komponen pembayaran pada periode ini.</td></tr>
-  <?php endif; ?>
-  <?php foreach ($komponen_rows as $komponen): ?>
-  <tr><td><?= htmlspecialchars($komponen['nama']) ?></td><td><?= number_format((float)$komponen['total'],0,',','.') ?></td></tr>
-  <?php endforeach; ?>
-</table>
-</div>
-</div>
-
-<!-- Sheet 1: Pembayaran SPP -->
-<div class="table-card">
-<div class="table-scroll">
-<table>
-  <tr class="header-row"><td colspan="7">REKAP PEMBAYARAN SPP — <?= strtoupper($period_label) ?></td></tr>
-  <tr>
-    <th>No</th><th>No. Induk</th><th>Nama Siswa</th><th>Kelas</th>
-    <th>Bulan Tagihan / Sistem</th><th>Total Bayar (Rp)</th><th>Tanggal Bayar</th>
-  </tr>
-  <?php if (empty($rows)): ?>
-  <tr><td colspan="7" class="empty-row">Belum ada transaksi pembayaran pada periode ini.</td></tr>
-  <?php endif; ?>
-  <?php
-  $grand_total = 0;
-  foreach ($rows as $i => $r):
-    $grand_total += (float)$r['total_jumlah'];
-  ?>
-  <tr>
-    <td><?= $i+1 ?></td>
-    <td><?= $excelText($r['NO_INDUK']) ?><?= !empty($r['NO_induk_diknas']) ? '<br>Diknas: ' . $excelText($r['NO_induk_diknas']) : '' ?></td>
-    <td><?= $excelText($r['NAMA']) ?></td>
-    <td><?= $excelText($r['KELAS']) ?></td>
-    <td><?= $excelText($r['BULAN']) ?> <?= $excelText($r['TAHUN']) ?><br>Sistem: <?= $excelText($r['sistem_pembayaran'] ?? 'VA') ?></td>
-    <td><?= number_format((float)$r['total_jumlah'],0,',','.') ?></td>
-    <td><?= spp_date_label($r['TGL_BYR']) ?></td>
-  </tr>
-  <?php endforeach; ?>
-  <tr class="total-row">
-    <td colspan="5">TOTAL</td>
-    <td><?= number_format($grand_total,0,',','.') ?></td>
-    <td></td>
-  </tr>
-</table>
-</div>
-</div>
-
-<!-- Sheet 2: Tabungan -->
-<div class="table-card">
-<div class="table-scroll">
-<table>
-  <tr class="header-row"><td colspan="8">REKAP TABUNGAN — <?= strtoupper($period_label) ?></td></tr>
-  <tr>
-    <th>No</th><th>No. Induk</th><th>Nama Siswa</th><th>Kelas</th>
-    <th>Tanggal</th><th>Jenis</th><th>Nominal (Rp)</th><th>Keterangan</th>
-  </tr>
-  <?php if (empty($tab_rows)): ?>
-  <tr><td colspan="8" class="empty-row">Belum ada transaksi tabungan pada periode ini.</td></tr>
-  <?php endif; ?>
-  <?php
-  $total_masuk_tab = 0;
-  $total_keluar_tab = 0;
-  foreach ($tab_rows as $i => $t):
-    if ($t['jenis'] === 'masuk') $total_masuk_tab += (float)$t['nominal'];
-    else $total_keluar_tab += (float)$t['nominal'];
-  ?>
-  <tr>
-    <td><?= $i+1 ?></td>
-    <td><?= $excelText($t['NO_INDUK']) ?><?= !empty($t['NO_induk_diknas']) ? '<br>Diknas: ' . $excelText($t['NO_induk_diknas']) : '' ?></td>
-    <td><?= $excelText($t['NAMA']) ?></td>
-    <td><?= $excelText($t['KELAS']) ?></td>
-    <td><?= spp_date_label($t['TANGGAL'],true) ?></td>
-    <td><?= $t['jenis'] === 'masuk' ? '↑ Masuk' : '↓ Keluar' ?></td>
-    <td><?= number_format((float)$t['nominal'],0,',','.') ?></td>
-    <td><?= $excelText($t['keterangan'] ?? '') ?></td>
-  </tr>
-  <?php endforeach; ?>
-  <tr class="total-row"><td colspan="6">Total Masuk</td><td><?= number_format($total_masuk_tab,0,',','.') ?></td><td></td></tr>
-  <tr class="total-row"><td colspan="6">Total Keluar</td><td><?= number_format($total_keluar_tab,0,',','.') ?></td><td></td></tr>
-</table>
-</div>
-</div>
-
-<?php if (!$download): ?>
-</main>
-<?php endif; ?>
-
-</body>
-</html>
-<?php
-$excelHtml = ob_get_clean();
-
-if ($download) {
-    echo "\xEF\xBB\xBF" . $excelHtml;
-    exit;
-}
-
-require_once __DIR__ . '/../includes/report_preview.php';
-$downloadQuery = $_GET;
-$downloadQuery['download'] = '1';
-$backQuery = $_GET;
-unset($backQuery['download']);
-render_report_export_preview($excelHtml, [
-    'file_type' => 'EXCEL',
-    'show_print' => false,
-    'title' => 'Rekap Laporan Keuangan',
-    'subtitle' => 'Periode ' . $period_label,
-    'generated' => spp_date_label(new DateTimeImmutable('now'),true),
-    'row_count' => count($rows) + count($tab_rows),
-    'orientation' => 'landscape',
-    'download_url' => 'export_excel.php?' . http_build_query($downloadQuery),
-    'back_url' => 'index.php?' . http_build_query($backQuery),
-]);
-?>
+$doc=spp_excel_document('Rekap Laporan Keuangan','Periode '.$period_label.($filter_q!==''?' | Pencarian: '.$filter_q:''),$reportUnitId,$sheets);
+$downloadQuery=$_GET;$downloadQuery['download']='1';$backQuery=$_GET;unset($backQuery['download']);
+if(!empty($sppGeneralPdf))return;
+$detailCount=0;
+foreach(array_slice($sheets,1) as $sheet)foreach($sheet['sections'] as $section)$detailCount+=count($section['rows']);
+spp_excel_respond($doc,$download,'laporan-keuangan-'.date('Ymd-His'),'export_excel.php?'.filter_build_query($downloadQuery),'index.php?'.filter_build_query($backQuery),$detailCount);

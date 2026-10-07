@@ -53,9 +53,10 @@ activity_assert(payment_activity_actor($koneksi,'unknown-operator')['id']===null
 echo "OK: bukti operator tidak dikenal ditampilkan tanpa tebakan.\n";
 foreach([1,2,3] as $unit) {
     unit_set_context($koneksi,$unit);
-    $p=$koneksi->query("SELECT b.id FROM bayar b WHERE NOT EXISTS(SELECT 1 FROM transaksi_otorisasi r WHERE r.bayar_id=b.id AND r.status='pending') ORDER BY b.id LIMIT 1")->fetch_assoc();
-    $id=(int)$p['id'];
     $cashier=(int)$koneksi->query("SELECT id FROM admin WHERE unit_id=$unit AND role='kasir' ORDER BY id LIMIT 1")->fetch_row()[0];
+    $_SESSION=['admin_id'=>$cashier,'admin_role'=>'kasir','active_unit_id'=>$unit];
+    $p=$koneksi->query("SELECT b.id FROM bayar b JOIN pembayaran_aktivitas e ON e.payment_id=b.id AND e.unit_id=b.unit_id AND e.action='created' AND e.actor_id=$cashier WHERE NOT EXISTS(SELECT 1 FROM transaksi_otorisasi r WHERE r.bayar_id=b.id AND r.status='pending') ORDER BY b.id LIMIT 1")->fetch_assoc();
+    $id=(int)$p['id'];
     $approver=(int)$koneksi->query("SELECT id FROM admin WHERE role='super_admin' LIMIT 1")->fetch_row()[0];
     foreach(['rejected','cancelled','failed'] as $status) {
         $request=transaction_authorization_create($koneksi,$id,'edit',['aksi'=>'update','id'=>$id],'Uji operator dan rollback keputusan',$cashier);

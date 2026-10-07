@@ -24,7 +24,7 @@ $allNavItems = [
 
   ['pembayaran/lihat.php', 'Riwayat Pembayaran',
    '<path d="M1 12s4-8 11-8 11 8 11 8-4 8-11 8-11-8-11-8z"/><circle cx="12" cy="12" r="3"/>',
-   ['admin', 'kasir'], 'Pembayaran'],
+   ['admin', 'kasir', 'bendahara'], 'Pembayaran'],
 
   ['pembayaran/riwayat_daftar_ulang.php', 'Riwayat Daftar Ulang',
    '<path d="M4 19.5A2.5 2.5 0 0 1 6.5 17H20"/><path d="M4 4.5A2.5 2.5 0 0 1 6.5 2H20v20H6.5A2.5 2.5 0 0 1 4 19.5z"/><path d="M9 7h6M9 11h6"/>',
@@ -163,6 +163,8 @@ document.addEventListener('DOMContentLoaded', function () {
 </script>
 <?php endif; ?>
 <!-- Early theme init to prevent flash -->
+<link rel="stylesheet" href="<?= $root ?>assets/css/dropdowns.css?v=<?= filemtime(__DIR__.'/../assets/css/dropdowns.css') ?>">
+<script defer src="<?= $root ?>assets/js/dropdowns.js?v=<?= filemtime(__DIR__.'/../assets/js/dropdowns.js') ?>"></script>
 <script>(function(){document.documentElement.setAttribute('data-palette',<?= json_encode($unitPalette, JSON_HEX_TAG | JSON_HEX_AMP) ?>);try{document.documentElement.setAttribute('data-theme',localStorage.getItem('spp_theme')||'light')}catch(e){document.documentElement.setAttribute('data-theme',document.documentElement.getAttribute('data-theme')||'light')}})();</script>
 
 <aside class="sidebar" id="sidebar">
@@ -181,7 +183,7 @@ document.addEventListener('DOMContentLoaded', function () {
       <span class="sidebar-unit-kicker"><span aria-hidden="true"></span> SUPER ADMIN</span>
       <label for="sidebar-unit-select">Unit operasional</label>
       <span class="sidebar-unit-select-wrap">
-        <select id="sidebar-unit-select" name="unit_id" onchange="this.form.submit()">
+        <select id="sidebar-unit-select" name="unit_id" data-native-select onchange="this.form.submit()">
           <?php if ($transactionUnitOnly && $activeUnit === 0): ?><option value="" selected disabled>Pilih unit</option><?php endif; ?>
           <?php foreach (($transactionUnitOnly ? [1=>'SD',2=>'SMP',3=>'SMA'] : [0=>'Semua Unit',1=>'SD',2=>'SMP',3=>'SMA']) as $id=>$name): ?>
           <option value="<?= $id ?>" <?= $activeUnit===$id?'selected':'' ?>><?= $name ?></option>
@@ -189,7 +191,7 @@ document.addEventListener('DOMContentLoaded', function () {
         </select>
         <svg aria-hidden="true" width="18" height="18" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><path d="m6 9 6 6 6-6"/></svg>
       </span>
-      <small><?= $current === 'role_management.php' ? ($activeUnit === 0 ? 'Kelola akun semua unit dari halaman ini.' : 'Kelola akun unit yang dipilih.') : ($transactionUnitOnly ? 'Transaksi wajib menggunakan satu unit.' : ($activeUnit === 0 ? 'Semua Unit hanya untuk melihat data dan rekap.' : 'Menu operasional mengikuti unit ini.')) ?></small>
+      <small>Pilih satu unit. <?= $current === 'role_management.php' ? ($activeUnit === 0 ? 'Kelola akun semua unit dari halaman ini.' : 'Kelola akun unit yang dipilih.') : ($transactionUnitOnly ? 'Transaksi wajib menggunakan satu unit.' : ($activeUnit === 0 ? 'Semua Unit hanya untuk melihat data dan rekap.' : 'Menu operasional mengikuti unit ini.')) ?></small>
     </form>
   </div>
   <?php endif; ?>

@@ -7,7 +7,7 @@ $registry=report_registry();$template=(string)($_GET['template']??'');if(!isset(
 $format=(string)($_GET['format']??'preview');if(!in_array($format,['preview','print','pdf','excel'],true))$format='preview';
 $excelDownload=$format==='excel'&&($_GET['download']??'')==='1';
 if($format==='pdf'){require_once __DIR__.'/../includes/pdf.php';require_pdf_library();}
-$filters=report_filters($koneksi,$_GET);if($template==='riwayat-tagihan'&&!isset($_GET['siswa_status']))$filters['siswa_status']='all';if(!isset($_GET['kategori'])&&$template==='penerimaan')$filters['kategori']='semua';if($template==='tunggakan-siswa'){$filters['q']='';if(($_GET['mode']??'')==='all')$filters['kelas']='';}
+$filters=report_filters($koneksi,$_GET);if($template==='riwayat-tagihan'&&!isset($_GET['siswa_status']))$filters['siswa_status']='all';if(!isset($_GET['kategori'])&&$template==='penerimaan')$filters['kategori']='semua';if($template==='tunggakan-siswa'){$filters['q']='';if(($_GET['mode']??'')==='all'){$filters['kelas']='';unset($filters['_multi']['kelas']);}}
 $report=report_build($koneksi,$template,$filters);$generated=spp_date_label(new DateTimeImmutable('now'),true);$operator=(string)($_SESSION['admin_nama']??$_SESSION['admin_username']??'Pengguna');
 if($template==='tunggakan-siswa'&&$format==='excel'&&($_GET['view']??'')==='detail'){
     $classId=report_class_filter_rombel_id($filters);
@@ -15,25 +15,19 @@ if($template==='tunggakan-siswa'&&$format==='excel'&&($_GET['view']??'')==='deta
     foreach($report['rows'] as $row)if((int)$row['master_kelas_id']===$classId){$selectedClass=$row;break;}
     if($classId<=0||!$selectedClass){http_response_code(404);exit('Rombel tidak ditemukan pada cakupan laporan.');}
     $students=report_student_debt_groups($koneksi,$filters,'',[],(string)$report['as_of_date']);
-    $safeExcelText=static function($value):string{
-        $text=(string)$value;
-        if(preg_match('/^[=+\-@]/',ltrim($text)))$text="'".$text;
-        return report_e($text);
-    };
+    require_once __DIR__.'/../includes/excel.php';
     $total=array_sum(array_column($students,'total_tunggakan'));
-    header('Content-Type: application/vnd.ms-excel; charset=utf-8');
-    header('Content-Disposition: attachment; filename="rincian-tunggakan-rombel-'.$classId.'-'.date('Ymd').'.xls"');
-    header('Cache-Control: no-store, private');
-    echo "\xEF\xBB\xBF";
-    ?>
-    <!doctype html><html lang="id"><head><meta charset="utf-8"><title>Rincian Tunggakan <?= $safeExcelText($selectedClass['kelas']) ?></title><style>body{font-family:Arial,sans-serif;color:#17231d}h1{font-size:16px}p{font-size:11px}table{border-collapse:collapse;width:100%}th,td{border:1px solid #9bb9aa;padding:6px 8px;text-align:left}th{background:#eaf2ed}.money{text-align:right;white-space:nowrap}.nis{mso-number-format:"\@"}tfoot{font-weight:bold}</style></head><body>
-    <h1>Rincian Tunggakan — <?= $safeExcelText($selectedClass['kelas']) ?></h1><p>Dihitung sampai <?= report_e(report_date_label($report['as_of_date'])) ?> · <?= number_format(count($students)) ?> siswa menunggak</p>
-    <table><thead><tr><th>No</th><th>NIS</th><th>Nama Siswa</th><th>Periode Tagihan</th><th class="money">Jumlah Tunggakan</th></tr></thead><tbody>
-    <?php foreach($students as $index=>$student): $periods=[];foreach($student['items'] as $item){$period=trim((string)($item['periode']??''));if($period!=='')$periods[$period]=true;} ?>
-    <tr><td><?= $index+1 ?></td><td class="nis"><?= $safeExcelText($student['nis']) ?></td><td><?= $safeExcelText($student['nama']) ?></td><td><?= $safeExcelText(implode(', ',array_keys($periods))) ?></td><td class="money"><?= report_e(report_money($student['total_tunggakan'])) ?></td></tr>
-    <?php endforeach; ?>
-    </tbody><tfoot><tr><td colspan="4">Total</td><td class="money"><?= report_e(report_money($total)) ?></td></tr></tfoot></table></body></html>
-    <?php exit;
+    foreach($students as $index=>&$student){$student['no']=$index+1;$periods=[];foreach($student['items'] as $item){$period=trim((string)($item['periode']??''));if($period!=='')$periods[$period]=true;}$student['periods']=implode(', ',array_keys($periods));}unset($student);
+    $columns=[spp_excel_column('no','No','number'),spp_excel_column('nis','NIS'),spp_excel_column('nis_diknas','NIS Diknas'),spp_excel_column('nama','Nama Siswa'),spp_excel_column('periods','Periode Tagihan'),spp_excel_column('total_tunggakan','Jumlah Tunggakan','money')];
+    $doc=spp_excel_document('Rincian Tunggakan - '.$selectedClass['kelas'],$report['subtitle'],$reportUnitId,[['name'=>'Rincian Tunggakan','sections'=>[spp_excel_section('Siswa Menunggak',$columns,$students,[['label'=>'Total Tunggakan','value'=>$total]])]]]);
+    $query=$_GET;$query['download']='1';
+    spp_excel_respond($doc,$excelDownload,'rincian-tunggakan-rombel-'.$classId.'-'.date('Ymd-His'),'export_global.php?'.filter_build_query($query),'template.php?template=tunggakan-siswa&unit='.($reportUnitId===0?'all':'active'),count($students));
+}
+if($format==='excel'){
+    require_once __DIR__.'/../includes/excel.php';$doc=spp_excel_report_document($report,$template,$reportUnitId);
+    $filterText=spp_excel_filter_text($koneksi,$filters,$template);if($filterText!=='')$doc['subtitle'].=' | '.$filterText;
+    $query=$_GET;$query['download']='1';$back=$_GET;unset($back['format'],$back['download']);
+    spp_excel_respond($doc,$excelDownload,$template.'-'.date('Ymd-His'),'export_global.php?'.filter_build_query($query),'template.php?'.filter_build_query($back),$template==='riwayat-tagihan'?count(report_billing_history_group_students($report['rows'])):count($report['rows']));
 }
 if($template==='tunggakan-siswa'&&in_array($format,['preview','print','pdf'],true)){
     require_once __DIR__.'/../includes/report_letters.php';
@@ -55,8 +49,8 @@ if($template==='tunggakan-siswa'&&in_array($format,['preview','print','pdf'],tru
             'row_count'=>count($letterRows),
             'orientation'=>'portrait',
             'stage_width'=>'794px',
-            'download_url'=>'export_global.php?'.http_build_query($downloadQuery),
-            'back_url'=>'template.php?'.http_build_query(array_merge(['template'=>$template],$backQuery)),
+            'download_url'=>'export_global.php?'.filter_build_query($downloadQuery),
+            'back_url'=>'template.php?'.filter_build_query(array_merge(['template'=>$template],$backQuery)),
             'auto_print'=>false,
         ]);
     }
@@ -79,9 +73,7 @@ $billingColumns=$template==='riwayat-tagihan'?report_billing_history_component_c
 $billingColumnWidth=$billingColumns?57/count($billingColumns):0;
 $moneyTotals=report_money_totals($report,$template);if($template==='riwayat-tagihan')$moneyTotals=array_values(array_filter($moneyTotals,static fn($total)=>($total['key']??'')==='tagihan'));
 function export_safe_text($value):string{
-    global $format;
     $text=(string)$value;
-    if($format==='excel'&&preg_match('/^[\p{Z}\x00-\x20]*[=+\-@]/u',$text))$text="'".$text;
     return report_e($text);
 }
 function export_cell($value,string $type,array $row=[],string $key=''):string{
@@ -96,9 +88,8 @@ function export_cell($value,string $type,array $row=[],string $key=''):string{
     return export_safe_text($value);
 }
 $logoPath=realpath(__DIR__.'/../assets/img/school-logo.png');
-// Excel HTML (.xls) tidak stabil untuk image/base64, jadi logo gambar hanya
-// dirender untuk print/PDF. Excel memakai kop teks agar tidak muncul broken logo.
-$canRenderLogo=$format!=='excel'&&($format!=='pdf'||extension_loaded('gd'));
+// PDF requires GD to render the available bitmap logo.
+$canRenderLogo=$format!=='pdf'||extension_loaded('gd');
 $logoData=$logoPath&&$canRenderLogo?'data:image/png;base64,'.base64_encode((string)file_get_contents($logoPath)):'';
 ob_start(); ?>
 <!DOCTYPE html><html lang="id"><head><meta charset="UTF-8"><title><?= report_e($report['title']) ?></title><style>
@@ -146,7 +137,8 @@ thead{display:table-header-group}tfoot{display:table-row-group}tr{page-break-ins
   $totalValue=$isSavingsCashRecap?(float)($report['mutasi_bersih']??0):(float)($report['total_setoran']??$report['component_total']??0);
 ?><h3><?= report_e($componentTitle) ?></h3><table class="data report-component-table"><thead><tr><th>No</th><th><?= report_e($componentTitle) ?></th><th>Nominal</th></tr></thead><tbody><?php if(!$componentRows): ?><tr><td colspan="3" style="text-align:center">Tidak ada transaksi pada filter terpilih.</td></tr><?php else: foreach($componentRows as $index=>$component): ?><tr><td class="report-number"><?= $index+1 ?></td><td><?= export_safe_text($component['komponen']) ?></td><td class="money <?= (float)$component['nominal']<0?'negative':'' ?>"><?= report_money($component['nominal']) ?></td></tr><?php endforeach; endif; ?></tbody><tfoot><tr><th colspan="2"><?= report_e($componentTotalLabel) ?></th><th class="money <?= (float)($report['component_total']??0)<0?'negative':'' ?>"><?= report_money($report['component_total']??0) ?></th></tr></tfoot></table><h3><?= report_e($summaryTitle) ?></h3><table class="data"><thead><tr><th>Ringkasan</th><th>Nilai</th></tr></thead><tbody><?php foreach($summaryItems as $item): ?><tr><td><?= export_safe_text($item['label']) ?></td><td class="money"><?= $item['type']==='money'?report_money($item['value']):number_format((int)$item['value']) ?></td></tr><?php endforeach; ?></tbody></table><table class="data total-table"><caption><?= report_e($totalLabel) ?></caption><tbody><tr><th><?= report_e(ucwords(strtolower($totalLabel))) ?></th><td class="money <?= $totalValue<0?'negative':'' ?>"><?= report_money($totalValue) ?></td></tr></tbody></table><?php endif; ?>
 <?php if(!$isCashRecap): ?>
-<?php if($template==='riwayat-tagihan'): ?>
+<?php if(isset($report['sections'])): $sectionStart=0;foreach($report['sections'] as $section){echo report_section_html($section,$sectionStart);$sectionStart+=count($section['rows']);} ?>
+<?php elseif($template==='riwayat-tagihan'): ?>
 <div class="billing-export-note">Tanggal yang dipilih adalah tanggal tagihan dibuat. Untuk Uang PSB, tanggal mengikuti tanggal data siswa dibuat.</div>
 <table class="data billing-export-table">
 <thead><tr>
@@ -191,27 +183,10 @@ if(in_array($format,['preview','print'],true)){
         'generated'=>$generated,
         'row_count'=>$template==='riwayat-tagihan'?count($billingGroups):(int)($report['total']??count($report['rows']??[])),
         'orientation'=>$registry[$template]['orientation'],
-        'download_url'=>'export_global.php?'.http_build_query($downloadQuery),
-        'back_url'=>'template.php?'.http_build_query(array_merge(['template'=>$template],$backQuery)),
+        'download_url'=>'export_global.php?'.filter_build_query($downloadQuery),
+        'back_url'=>'template.php?'.filter_build_query(array_merge(['template'=>$template],$backQuery)),
         'auto_print'=>$format==='print'||($_GET['preview_action']??'')==='print',
     ]);
 }
-if($format==='excel'&&!$excelDownload){
-    require_once __DIR__.'/../includes/report_preview.php';
-    $downloadQuery=$_GET;$downloadQuery['format']='excel';$downloadQuery['download']='1';
-    $backQuery=$_GET;unset($backQuery['format'],$backQuery['download'],$backQuery['preview_action']);
-    render_report_export_preview($html,[
-        'file_type'=>'EXCEL',
-        'show_print'=>false,
-        'title'=>$report['title'],
-        'subtitle'=>$report['subtitle'],
-        'generated'=>$generated,
-        'row_count'=>$template==='riwayat-tagihan'?count($billingGroups):(int)($report['total']??count($report['rows']??[])),
-        'orientation'=>$registry[$template]['orientation'],
-        'download_url'=>'export_global.php?'.http_build_query($downloadQuery),
-        'back_url'=>'template.php?'.http_build_query(array_merge(['template'=>$template],$backQuery)),
-    ]);
-}
-if($format==='excel'&&$excelDownload){header('Content-Type: application/vnd.ms-excel; charset=UTF-8');header('Content-Disposition: attachment; filename="'.$safeName.'.xls"');echo "\xEF\xBB\xBF".$html;exit;}
 if($format==='pdf'){$options=new \Dompdf\Options();$options->set('isRemoteEnabled',false);$options->set('isHtml5ParserEnabled',true);$options->setDefaultMediaType('print');$options->setChroot(realpath(__DIR__.'/..'));$dompdf=new \Dompdf\Dompdf($options);$dompdf->loadHtml($html,'UTF-8');$dompdf->setPaper($template==='riwayat-tagihan'?'A3':'A4',$registry[$template]['orientation']);$dompdf->render();$dompdf->stream($safeName.'.pdf',['Attachment'=>true]);exit;}
 echo $html;

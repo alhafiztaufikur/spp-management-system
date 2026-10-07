@@ -8,11 +8,12 @@
     dialog.querySelector('[data-close-activity]').addEventListener('click',()=>dialog.close());
     dialog.addEventListener('click',e=>{if(e.target===dialog){const r=dialog.getBoundingClientRect();if(e.clientX<r.left||e.clientX>r.right||e.clientY<r.top||e.clientY>r.bottom)dialog.close();}});
     dialog.addEventListener('close',()=>{controller?.abort();source?.focus();});
-    document.querySelectorAll('.open-payment-activity').forEach(button=>button.addEventListener('click',async e=>{
+    document.addEventListener('click',async e=>{
+      const button=e.target.closest('.open-payment-activity');if(!button)return;
       e.stopPropagation();source=button;controller?.abort();controller=new AbortController();
       subtitle.textContent='Memuat riwayat…';body.replaceChildren(text('p','Memuat aktivitas pembayaran…'));dialog.showModal();
       try{
-        const response=await fetch((dialog.dataset.endpoint || 'aktivitas.php')+'?id='+encodeURIComponent(button.dataset.id),{signal:controller.signal,headers:{Accept:'application/json'}});
+        const response=await fetch((dialog.dataset.endpoint || 'aktivitas.php')+'?id='+encodeURIComponent(button.dataset.id)+(button.dataset.unit?'&unit_id='+encodeURIComponent(button.dataset.unit):''),{signal:controller.signal,headers:{Accept:'application/json'}});
         const data=await response.json();if(!response.ok||!data.ok)throw new Error(data.message||'Riwayat tidak dapat dimuat.');
         subtitle.textContent=[data.reference,data.student,data.unit].filter(Boolean).join(' · ');
         const list=document.createElement('ol');list.className='payment-activity-list';
@@ -32,6 +33,6 @@
           list.append(item);
         });body.replaceChildren(list);
       }catch(error){if(error.name!=='AbortError'){subtitle.textContent='Riwayat aktivitas';body.replaceChildren(text('p',error.message));}}
-    }));
+    });
   });
 })();

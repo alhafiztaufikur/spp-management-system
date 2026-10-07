@@ -7,7 +7,8 @@ require_once __DIR__.'/../includes/pdf.php';
 requireRole(['admin','bendahara','kasir']);
 
 require_once __DIR__.'/../includes/parent_letter_drafts.php';
-$token=(string)($_GET['draft']??'');
+if(isset($_GET['draft'])&&!is_string($_GET['draft'])){http_response_code(400);exit('Draf tidak valid.');}
+$token=$_GET['draft']??'';
 if($token==='') { header('Location: surat_orang_tua_susun.php?'.http_build_query($_GET));exit; }
 try { $draft=parent_letter_draft_read($token); }
 catch(Throwable $e){http_response_code(400);header('Content-Type: text/html; charset=utf-8');exit('<!doctype html><html lang="id"><meta charset="utf-8"><p>'.report_e($e->getMessage()).'</p><a href="surat_orang_tua.php">Kembali ke daftar</a></html>');}

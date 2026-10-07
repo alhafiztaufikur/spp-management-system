@@ -8,6 +8,7 @@ require_once '../includes/tagihan_sekali.php';
 require_once '../includes/spp_billing.php';
 require_once '../includes/komite_billing.php';
 requireRole(['admin', 'bendahara', 'kasir']);
+require_once __DIR__.'/../includes/payment_permissions.php';
 
 header('Cache-Control: no-store, no-cache, must-revalidate, max-age=0');
 
@@ -158,6 +159,8 @@ if (!$payment) {
     header('Location: index.php');
     exit;
 }
+
+if (!payment_capabilities($koneksi,$payment,null,false,[])['can_print']) { http_response_code(403); exit('Struk terkunci: hanya pembuat awal atau Super Admin yang dapat mencetak transaksi ini.'); }
 
 $otherDetails = [];
 $stmt = $koneksi->prepare('

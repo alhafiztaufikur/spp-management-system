@@ -31,7 +31,7 @@ const { chromium } = require(process.env.SPP_PLAYWRIGHT_CORE || 'playwright-core
       return page;
     }
     const cashier = await login('kasir1');
-    const admin = await login('admin');
+    const admin = await login('superadmin');
     async function propose(amount) {
       const before = state();
       await cashier.goto(new URL(`/pembayaran/edit.php?id=${before.payment.id}`, base).href);
@@ -46,10 +46,12 @@ const { chromium } = require(process.env.SPP_PLAYWRIGHT_CORE || 'playwright-core
       return after.requests.at(-1).id;
     }
     async function decision(page, id, action, button) {
-      await page.goto(new URL('/otorisasi_transaksi.php', base).href);
+      await page.goto(new URL('/otorisasi_transaksi.php?selected='+id, base).href);
       const form = page.locator('form').filter({has:page.locator(`input[name="request_id"][value="${id}"]`)}).filter({has:page.locator(action)});
       if (await form.locator('[name="decision_note"]').count()) await form.locator('[name="decision_note"]').fill('Keputusan browser untuk regresi audit');
-      await Promise.all([page.waitForNavigation({waitUntil:'domcontentloaded'}), form.getByRole('button', {name:button, exact:true}).click()]);
+      await form.getByRole('button', {name:button, exact:true}).click();
+      await page.locator('.auth-confirm-dialog[open]').waitFor();
+      await Promise.all([page.waitForNavigation({waitUntil:'domcontentloaded'}),page.locator('[data-confirm-accept]').click()]);
     }
     const approved = await propose(200);
     await decision(admin, approved, 'input[name="aksi"][value="otorisasi_setujui"]', 'Setujui dan Terapkan');
@@ -64,7 +66,7 @@ const { chromium } = require(process.env.SPP_PLAYWRIGHT_CORE || 'playwright-core
     assert.equal(state().requests.at(-1).status, 'cancelled');
     assert.equal(Number(state().payment.total_jumlah), 200);
     assert.deepEqual(errors, []);
-    console.log('OK: Chrome cashier proposal, admin approval/rejection and requester cancellation; final database verified.');
+    console.log('OK: Chrome cashier proposal, Super Admin approval/rejection and requester cancellation; final database verified.');
   } finally {
     await browser.close();
   }

@@ -398,11 +398,9 @@ if ($editId > 0 && !$editStudent) {
 }
 
 $query = trim((string)($_GET['q'] ?? ''));
-$filterClass = (int)($_GET['kelas'] ?? 0);
-$classOptions = class_all($koneksi, true, true);
-if ($filterClass > 0 && !array_filter($classOptions, fn($row) => (int)$row['id'] === $filterClass)) $filterClass = 0;
-$filterStatus = (string)($_GET['status'] ?? 'active');
-if (!in_array($filterStatus, ['active', 'archived', 'legacy', 'all'], true)) $filterStatus = 'active';
+require_once '../includes/student_filters.php';
+[$filterClass,$filterStatus,$classOptions,$studentFilterSql]=student_list_filters($koneksi,$_GET);
+filter_output_start();
 $allowedPageSizes = [10, 25, 50];
 $perPage = page_size_param('per_page', $allowedPageSizes, 10);
 $page = page_int_param('page');
@@ -411,7 +409,7 @@ $listWhereSql = "
     FROM siswa s
     WHERE (? = '' OR s.NO_INDUK LIKE CONCAT('%', ?, '%') OR s.NAMA LIKE CONCAT('%', ?, '%') OR s.NO_induk_diknas LIKE CONCAT('%', ?, '%'))
       AND (? = 0 OR s.master_kelas_id = ?)
-      AND (? = 'all' OR CASE ? WHEN 'legacy' THEN s.legacy_pending=1 WHEN 'archived' THEN s.legacy_pending=0 AND s.is_active=0 ELSE s.legacy_pending=0 AND s.is_active=1 END)
+      AND (? = 'all' OR CASE ? WHEN 'legacy' THEN s.legacy_pending=1 WHEN 'archived' THEN s.legacy_pending=0 AND s.is_active=0 ELSE s.legacy_pending=0 AND s.is_active=1 END) $studentFilterSql
 ";
 $listTypes = 'ssssiiss';
 $listParams = [$query, $query, $query, $query, $filterClass, $filterClass, $filterStatus, $filterStatus];
@@ -437,7 +435,7 @@ $stmtList = $koneksi->prepare("
     LEFT JOIN master_kelas mk ON mk.id = s.master_kelas_id
     WHERE (? = '' OR s.NO_INDUK LIKE CONCAT('%', ?, '%') OR s.NAMA LIKE CONCAT('%', ?, '%') OR s.NO_induk_diknas LIKE CONCAT('%', ?, '%'))
       AND (? = 0 OR s.master_kelas_id = ?)
-      AND (? = 'all' OR CASE ? WHEN 'legacy' THEN s.legacy_pending=1 WHEN 'archived' THEN s.legacy_pending=0 AND s.is_active=0 ELSE s.legacy_pending=0 AND s.is_active=1 END)
+      AND (? = 'all' OR CASE ? WHEN 'legacy' THEN s.legacy_pending=1 WHEN 'archived' THEN s.legacy_pending=0 AND s.is_active=0 ELSE s.legacy_pending=0 AND s.is_active=1 END) $studentFilterSql
     ORDER BY s.is_active DESC,
       CASE WHEN s.KELAS REGEXP '^([1-9]|1[0-2])$' THEN 0 ELSE 1 END,
       CAST(s.KELAS AS UNSIGNED), s.KELAS, s.NAMA ASC
@@ -472,7 +470,7 @@ if ($studentRows) {
     }
     $stmtHistory->close();
 }
-$studentPaginationQuery = pagination_query(['per_page' => $perPage]);
+$studentPaginationQuery = filter_query(pagination_query(['per_page' => $perPage]));
 
 $formStudent = $editStudent ?? [];
 $komiteStartMonth = '07';
@@ -693,11 +691,11 @@ $sppRatesByGrade=[];[$firstGrade,$lastGrade]=unit_level_bounds();foreach(range($
             <svg width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><circle cx="11" cy="11" r="8"/><line x1="21" y1="21" x2="16.65" y2="16.65"/></svg>
             <input type="search" name="q" value="<?= htmlspecialchars($query) ?>" placeholder="Cari nama, NIS, atau NIS Diknas..." />
           </div>
-          <select class="field-input field-select filter-sel" name="kelas">
+          <select class="field-input field-select filter-sel" name="kelas" data-filter-multiple aria-label="Kelas/Rombel">
             <option value="">Semua Kelas</option>
             <?php foreach ($classOptions as $classOption): ?><option value="<?= (int)$classOption['id'] ?>" <?= $filterClass === (int)$classOption['id'] ? 'selected' : '' ?>><?= htmlspecialchars($classOption['label']) ?></option><?php endforeach; ?>
           </select>
-          <select class="field-input field-select filter-sel" name="status">
+          <select class="field-input field-select filter-sel" name="status" data-filter-multiple aria-label="Status">
             <option value="active" <?= $filterStatus === 'active' ? 'selected' : '' ?>>Aktif</option>
             <option value="archived" <?= $filterStatus === 'archived' ? 'selected' : '' ?>>Diarsipkan</option>
             <option value="legacy" <?= $filterStatus === 'legacy' ? 'selected' : '' ?>>Legacy</option><option value="all" <?= $filterStatus === 'all' ? 'selected' : '' ?>>Semua Status</option>
@@ -708,7 +706,7 @@ $sppRatesByGrade=[];[$firstGrade,$lastGrade]=unit_level_bounds();foreach(range($
             <?php endforeach; ?>
           </select>
           <button class="btn btn-primary" type="submit">Filter</button>
-          <a class="btn btn-ghost" target="_blank" rel="noopener" href="export_excel.php?<?= htmlspecialchars(http_build_query($_GET), ENT_QUOTES, 'UTF-8') ?>">Export Excel</a>
+          <a class="btn btn-ghost" target="_blank" rel="noopener" href="export_excel.php?<?= htmlspecialchars(filter_build_query($_GET), ENT_QUOTES, 'UTF-8') ?>">Export Excel</a>
         </form>
         <div class="table-container">
           <table class="payment-table responsive-table">
@@ -723,7 +721,7 @@ $sppRatesByGrade=[];[$firstGrade,$lastGrade]=unit_level_bounds();foreach(range($
                 $isGraduate = $graduateYear !== '';
                 $historyId = 'class-history-' . (int)$student['id'];
               ?>
-              <tr class="clickable-payment-row" data-edit-url="<?= htmlspecialchars($editUrl, ENT_QUOTES, 'UTF-8') ?>" tabindex="0" role="link" aria-label="Edit siswa <?= htmlspecialchars($student['NAMA'], ENT_QUOTES, 'UTF-8') ?>">
+              <tr class="clickable-payment-row" data-student-id="<?= (int)$student['id'] ?>" data-unit-id="<?= (int)$student['unit_id'] ?>" data-edit-url="<?= htmlspecialchars($editUrl, ENT_QUOTES, 'UTF-8') ?>" tabindex="0" role="link" aria-label="Edit siswa <?= htmlspecialchars($student['NAMA'], ENT_QUOTES, 'UTF-8') ?>">
                 <td data-label="No"><?= $offset + $index + 1 ?></td>
                 <td data-label="No. Induk"><span class="badge-nis"><?= htmlspecialchars($student['NO_INDUK']) ?></span><?php if (!empty($student['NO_induk_diknas'])): ?><small class="du-history-nis">Diknas <?= htmlspecialchars($student['NO_induk_diknas']) ?></small><?php endif; ?></td>
                 <td data-label="Nama Siswa"><?= unit_record_badge($student) ?><?= htmlspecialchars($student['NAMA']) ?></td>

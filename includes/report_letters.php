@@ -1,5 +1,6 @@
 <?php
 require_once __DIR__.'/reports.php';
+require_once __DIR__.'/parent_letter_messages.php';
 
 function report_letter_logo(): string {
     $path=__DIR__.'/../assets/img/school-logo.png';
@@ -22,7 +23,7 @@ function report_letter_header(string $logo, ?int $unitId=null): string {
 
 function report_parent_letters_html(array $students,string $today,array $messages=[]): string {
     $logo=report_letter_logo();
-    $html='<!doctype html><html lang="id"><head><meta charset="utf-8"><title>Surat Tunggakan Orang Tua</title><style>'.report_letter_css().'</style></head><body>';
+    $html='<!doctype html><html lang="id"><head><meta charset="utf-8"><title>Surat Tunggakan Orang Tua</title><style>'.report_letter_css().'.parent-custom-message{overflow-wrap:anywhere;word-wrap:break-word}.parent-custom-message p{margin:10px 0}.parent-custom-message ul,.parent-custom-message ol{padding-left:20px;margin:10px 0}.parent-custom-message li{margin:3px 0}.parent-custom-message{page-break-inside:auto}</style></head><body>';
     foreach($students as $student){
         $html.='<section class="letter">'.report_letter_header($logo,(int)($student['unit_id']??report_letter_unit_id()));
         $html.='<div class="date">Tambun Selatan, '.report_e(report_date_label($today)).'</div>';
@@ -38,8 +39,7 @@ function report_parent_letters_html(array $students,string $today,array $message
             $html.='<tr><td>'.($index+1).'</td><td>'.report_e($item['komponen']).'</td><td>'.report_e($item['periode']).'</td><td class="money">'.report_e(report_money($item['sisa'])).'</td></tr>';
         }
         $html.='</tbody><tfoot><tr><td colspan="3">Jumlah tunggakan</td><td class="money">'.report_e(report_money($student['total_tunggakan'])).'</td></tr></tfoot></table>';
-        $message=trim((string)($messages[unit_student_key($student)]??''));
-        if($message!=='')foreach(preg_split('/\n\s*\n/u',$message) as $paragraph)$html.='<p style="overflow-wrap:anywhere;word-wrap:break-word">'.nl2br(report_e($paragraph)).'</p>';
+        $html.=parent_letter_message_html($messages[unit_student_key($student)]??'');
         $html.='<p class="closing">Mohon Bapak/Ibu dapat menyelesaikan kewajiban tersebut melalui bagian pembayaran sekolah. Jika sudah membayar, mohon hubungi petugas agar catatan kami dapat diperiksa kembali.</p>';
         $html.='<p>Demikian pemberitahuan ini kami sampaikan. Terima kasih atas perhatian dan kerja sama Bapak/Ibu.</p>';
         $html.='<p>Wassalamu’alaikum warahmatullahi wabarakatuh.</p>';

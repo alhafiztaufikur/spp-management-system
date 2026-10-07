@@ -120,6 +120,10 @@ $saldo_tertinggi = empty($saldo_list) ? 0 : max(array_map(static fn($row) => (fl
 $kelas_rekap = array_values(array_unique(array_map(static fn($row) => (string)$row['KELAS'], $saldo_list)));
 sort($kelas_rekap, SORT_NATURAL);
 
+require_once '../includes/filter_choices.php';
+filter_register('saldo_kelas',$_GET['saldo_kelas']??null,array_combine(array_map('strval',$kelas_rekap),array_map('strval',$kelas_rekap)));
+filter_register('saldo_status',$_GET['saldo_status']??null,['positive'=>'Ada saldo','zero'=>'Saldo nol']);
+filter_output_start();
 $selected_saldo = null;
 if ($selectedFilterNis !== '') {
     foreach ($saldo_list as $saldo_row) {
@@ -314,11 +318,12 @@ $periodLabel = $filter_tanggal_awal === $filter_tanggal_akhir
             <p>Gunakan nama, NIS, kelas, atau status saldo untuk menemukan siswa lebih cepat.</p>
           </div>
           <div class="savings-recap-total">
-            <span>Total Saldo</span>
+            <span>Total saldo seluruh siswa dalam cakupan unit</span>
             <strong>Rp <?= number_format($total_saldo_semua, 0, ',', '.') ?></strong>
           </div>
         </div>
 
+        <p class="text-muted" style="font-size:12px">Ringkasan seluruh siswa aktif dalam cakupan unit; daftar di bawah mengikuti filter.</p>
         <div class="savings-recap-stats">
           <div><span>Siswa aktif</span><strong><?= number_format(count($saldo_list)) ?></strong></div>
           <div><span>Punya saldo</span><strong><?= number_format($siswa_punya_saldo) ?></strong></div>
@@ -330,13 +335,13 @@ $periodLabel = $filter_tanggal_awal === $filter_tanggal_akhir
             <svg width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.5" stroke-linecap="round" stroke-linejoin="round"><circle cx="11" cy="11" r="8"/><line x1="21" y1="21" x2="16.65" y2="16.65"/></svg>
             <input type="search" id="savings-student-search" placeholder="Cari nama, NIS, atau NIS Diknas..." autocomplete="off" />
           </div>
-          <select class="field-input field-select" id="savings-class-filter" aria-label="Filter kelas">
+          <select class="field-input field-select" id="savings-class-filter" name="saldo_kelas" data-filter-multiple data-filter-persist aria-label="Filter kelas">
             <option value="">Semua kelas</option>
             <?php foreach ($kelas_rekap as $kelas): ?>
             <option value="<?= htmlspecialchars($kelas) ?>">Kelas <?= htmlspecialchars($kelas) ?></option>
             <?php endforeach; ?>
           </select>
-          <select class="field-input field-select" id="savings-status-filter" aria-label="Filter saldo">
+          <select class="field-input field-select" id="savings-status-filter" name="saldo_status" data-filter-multiple data-filter-persist aria-label="Filter saldo">
             <option value="">Semua saldo</option>
             <option value="positive">Ada saldo</option>
             <option value="zero">Saldo kosong</option>
@@ -377,6 +382,7 @@ $periodLabel = $filter_tanggal_awal === $filter_tanggal_akhir
                 $searchText = strtolower($sl['NO_INDUK'] . ' ' . ($sl['NO_induk_diknas'] ?? '') . ' ' . $sl['NAMA'] . ' kelas ' . $sl['KELAS']);
               ?>
               <tr class="<?= $i%2===0?'row-highlight':'' ?>"
+                  data-student-id="<?= (int)$sl['student_id'] ?>" data-unit-id="<?= (int)$sl['unit_id'] ?>"
                   data-search="<?= htmlspecialchars($searchText, ENT_QUOTES, 'UTF-8') ?>"
                   data-class="<?= htmlspecialchars((string)$sl['KELAS'], ENT_QUOTES, 'UTF-8') ?>"
                   data-saldo="<?= htmlspecialchars((string)$saldo, ENT_QUOTES, 'UTF-8') ?>">
@@ -503,16 +509,15 @@ document.addEventListener('DOMContentLoaded', function(){
     if (resetPage) savingsCurrentPage = 1;
 
     const query = searchInput.value.trim().toLowerCase();
-    const selectedClass = classFilter.value;
-    const selectedStatus = statusFilter.value;
+    const selectedClass = window.sppSelectedValues(classFilter);
+    const selectedStatus = window.sppSelectedValues(statusFilter);
 
     const visibleRows = rows.filter(function(row) {
       const saldo = Number(row.dataset.saldo || 0);
       const matchesText = !query || (row.dataset.search || '').includes(query);
-      const matchesClass = !selectedClass || row.dataset.class === selectedClass;
-      const matchesStatus = !selectedStatus ||
-        (selectedStatus === 'positive' && saldo > 0) ||
-        (selectedStatus === 'zero' && saldo <= 0);
+      const matchesClass = selectedClass.includes(row.dataset.class);
+      const matchesStatus = (selectedStatus.includes('positive') && saldo > 0) ||
+        (selectedStatus.includes('zero') && saldo <= 0);
       return matchesText && matchesClass && matchesStatus;
     });
 
@@ -560,8 +565,8 @@ document.addEventListener('DOMContentLoaded', function(){
   if (resetButton) {
     resetButton.addEventListener('click', function () {
       searchInput.value = '';
-      classFilter.value = '';
-      statusFilter.value = '';
+      classFilter.value = '*';classFilter.dispatchEvent(new Event('change'));
+      statusFilter.value = '*';statusFilter.dispatchEvent(new Event('change'));
       if (perPageFilter) perPageFilter.value = '10';
       applySavingsFilter(true);
       searchInput.focus();

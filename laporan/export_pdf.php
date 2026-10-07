@@ -9,6 +9,16 @@ require_once '../includes/spp_billing.php';
 requireRole(['admin', 'bendahara']);
 $reportUnitId=unit_report_scope($koneksi,(string)($_GET['unit']??''));
 
+// Multi-filter recaps use the same three-sheet document as the XLSX export.
+if(($_GET['mode']??'')!=='selected' && (is_array($_GET['jenis_laporan']??null)||($_GET['jenis_laporan']??'semua')!=='semua')){
+    $sppGeneralPdf=true;require __DIR__.'/export_excel.php';$html=general_document_html($doc);
+    if(($_GET['output']??'preview')!=='pdf'){
+        require_once '../includes/report_preview.php';$downloadQuery=$_GET;$downloadQuery['output']='pdf';
+        render_report_pdf_preview($html,['title'=>$doc['title'],'subtitle'=>$doc['subtitle'],'orientation'=>'landscape','row_count'=>array_sum(array_map(static fn($section)=>count($section['rows']),$sheets[1]['sections'])),'download_url'=>'export_pdf.php?'.filter_build_query($downloadQuery),'back_url'=>'index.php?'.filter_build_query($_GET)]);
+    }
+    require_once '../includes/pdf.php';require_pdf_library();$options=new \Dompdf\Options();$options->setIsRemoteEnabled(false);$options->setChroot(realpath(__DIR__.'/..'));$pdf=new \Dompdf\Dompdf($options);$pdf->loadHtml($html,'UTF-8');$pdf->setPaper('A4','landscape');$pdf->render();$pdf->stream('laporan-keuangan-'.date('Ymd-His').'.pdf',['Attachment'=>true]);exit;
+}
+
 $output_mode = (string)($_GET['output'] ?? 'preview');
 if (!in_array($output_mode, ['preview', 'pdf'], true)) {
     $output_mode = 'preview';

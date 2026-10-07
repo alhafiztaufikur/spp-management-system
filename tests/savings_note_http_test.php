@@ -1,4 +1,5 @@
 <?php
+require_once __DIR__.'/excel_test_helpers.php';
 /** Savings note persistence, display, validation, role and unit isolation. */
 require_once __DIR__ . '/../koneksi.php';
 require_once __DIR__ . '/../includes/reports.php';
@@ -166,15 +167,16 @@ try {
               'export_excel.php?' . http_build_query(['tanggal_awal'=>$today,
                   'tanggal_akhir'=>$today,'q'=>$nis,'download'=>'1'])] as $path) {
         $excel = note_http($base . '/laporan/' . $path, null, $admin);
+        $excel['body']=test_excel_html($excel['body']);
         note_assert($excel['status'] === 200
             && str_contains($excel['body'], htmlspecialchars($incoming, ENT_QUOTES, 'UTF-8'))
-            && str_contains($excel['body'], '&#039;=1+1 &amp; buku')
+            && str_contains($excel['body'], '=1+1 &amp; buku')
             && !str_contains($excel['body'], $incoming)
             && str_contains($excel['body'], '2.345'),
             'Excel tabungan tidak mengamankan rumus atau kehilangan catatan/nominal: ' . $path
             . '; cek=' . json_encode(['status'=>$excel['status'],
                 'setoran'=>str_contains($excel['body'], htmlspecialchars($incoming, ENT_QUOTES, 'UTF-8')),
-                'rumus'=>str_contains($excel['body'], '&#039;=1+1 &amp; buku'),
+                'rumus'=>str_contains($excel['body'], '=1+1 &amp; buku'),
                 'nominal'=>str_contains($excel['body'], '2.345'),
                 'cuplikan'=>substr($excel['body'], max(0, (int)strpos($excel['body'], '1+1')-40), 100)]));
     }

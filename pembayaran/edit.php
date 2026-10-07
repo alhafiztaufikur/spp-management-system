@@ -31,6 +31,8 @@ $d = $stmt->get_result()->fetch_assoc();
 $stmt->close();
 
 if (!$d) { $_SESSION['flash'] = ['type'=>'error','msg'=>'Data tidak ditemukan!']; header('Location: lihat.php'); exit; }
+try { payment_assert_owner($koneksi,$id,(int)$_SESSION['admin_id']); }
+catch (Throwable $error) { http_response_code(403); exit(htmlspecialchars($error->getMessage(),ENT_QUOTES,'UTF-8')); }
 if ((int)($d['payment_link_version'] ?? 0) !== 1) {
     $_SESSION['flash'] = ['type'=>'error','msg'=>'Pembayaran legacy tidak dapat diedit. Rekonsiliasi manual diperlukan terlebih dahulu.'];
     header('Location: lihat.php');
@@ -565,11 +567,11 @@ $selectedPaymentMethod = $d['sistem_pembayaran'] ?? 'VA';
             </div>
           </div>
 
-          <?php if (isRole('kasir')): ?>
+          <?php if (transaction_authorization_requires_request()): ?>
           <div class="authorization-request-panel">
             <div>
               <h3>Ajukan perubahan transaksi</h3>
-              <p>Perubahan diterapkan setelah disetujui administrator.</p>
+              <p>Perubahan diterapkan setelah disetujui Super Admin.</p>
             </div>
             <label class="field-row authorization-reason-field">
               <span class="field-label">Alasan perubahan</span>
@@ -582,7 +584,7 @@ $selectedPaymentMethod = $d['sistem_pembayaran'] ?? 'VA';
           <div class="action-bar">
             <button type="submit" class="btn btn-warning" id="btn-update">
               <svg width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.5" stroke-linecap="round" stroke-linejoin="round"><path d="M19 21H5a2 2 0 0 1-2-2V5a2 2 0 0 1 2-2h11l5 5v14a2 2 0 0 1-2 2z"/><polyline points="17 21 17 13 7 13 7 21"/><polyline points="7 3 7 8 15 8"/></svg>
-              <?= isRole('kasir') ? 'Ajukan Perubahan' : 'Simpan Perubahan' ?>
+              <?= transaction_authorization_requires_request() ? 'Ajukan Perubahan' : 'Simpan Perubahan' ?>
             </button>
             <a href="lihat.php" class="btn btn-ghost" id="btn-batal">
               <svg width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.5" stroke-linecap="round" stroke-linejoin="round"><line x1="18" y1="6" x2="6" y2="18"/><line x1="6" y1="6" x2="18" y2="18"/></svg>

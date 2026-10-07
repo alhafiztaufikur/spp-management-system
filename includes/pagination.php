@@ -21,7 +21,7 @@ function page_window(int $page, int $totalPages, int $width = 5): array {
 
 function page_url(string $path, array $query, int $page, string $pageParam = 'page'): string {
     $query[$pageParam] = max(1, $page);
-    return $path . '?' . http_build_query($query);
+    return $path . '?' . http_build_query(function_exists('filter_query')?filter_query($query):$query);
 }
 
 function pagination_query(array $extra = [], string $pageParam = 'page'): array {

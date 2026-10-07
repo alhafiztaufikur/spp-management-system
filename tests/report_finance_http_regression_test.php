@@ -1,4 +1,5 @@
 <?php
+require_once __DIR__.'/excel_test_helpers.php';
 /** Read-only HTTP checks. Point SPP_HTTP_BASE to a server using the same disposable DB. */
 if (PHP_SAPI !== 'cli' || !preg_match('/^db_spp_audit_[a-z0-9_]+$/i', (string)getenv('SPP_DB_NAME'))
     || !preg_match('#^http://127\.0\.0\.1:\d+/?$#', (string)getenv('SPP_HTTP_BASE'))) {
@@ -73,6 +74,7 @@ try {
         && !str_contains($index, 'Titipan SPP')
         && str_contains($index, $totalText), 'Komponen Laporan Umum tidak cocok dengan total transaksi.');
     $excel = finance_http_ok(finance_http_get($base.'laporan/export_excel.php?download=1&'.$query,$sessionId),'Excel Laporan Umum');
+    $excel=test_excel_html($excel,true);
     finance_http_assert(str_contains($excel, '<td>Daftar Ulang</td><td>'.$duText.'</td>')
         && !str_contains($excel, 'Titipan SPP')
         && str_contains($excel, $totalText), 'Rincian Excel tidak cocok dengan komponen dan total transaksi.');
@@ -96,6 +98,7 @@ try {
     finance_http_assert(str_contains($singleIndex,'Kelas '.htmlspecialchars($payment['kelas_rombel_snapshot'],ENT_QUOTES,'UTF-8')),
         'Detail Laporan Umum tidak menampilkan rombel transaksi.');
     $singleExcel = finance_http_ok(finance_http_get($base.'laporan/export_excel.php?download=1&'.$single,$sessionId),'Excel satu siswa');
+    $singleExcel=test_excel_html($singleExcel,true);
     finance_http_assert(str_contains($singleExcel,'<td>'.htmlspecialchars($payment['kelas_rombel_snapshot'],ENT_QUOTES,'UTF-8').'</td>'),
         'Excel satu siswa tidak menampilkan rombel transaksi.');
     $receipt = finance_http_ok(finance_http_get($base.'laporan/export_pdf.php?'.http_build_query(['output'=>'preview','mode'=>'selected','ids'=>[$payment['id']],'tanggal_awal'=>$payment['tanggal'],'tanggal_akhir'=>$payment['tanggal']]),$sessionId),'Pratinjau struk PDF massal');
@@ -120,6 +123,7 @@ try {
         finance_http_assert(str_contains($discountIndex,'Potongan SPP') && str_contains($discountIndex,'Rp -20')
             && str_contains($discountIndex,'Rp 80'),'Laporan Umum tidak merekonsiliasi potongan ke kas Rp 80.');
         $discountExcel = finance_http_ok(finance_http_get($base.'laporan/export_excel.php?download=1&'.$discountQuery,$sessionId),'Excel potongan');
+    $discountExcel=test_excel_html($discountExcel,true);
         finance_http_assert(str_contains($discountExcel,'<td>Potongan SPP</td><td>-20</td>')
             && str_contains($discountExcel,'<td>Uang SPP</td><td>100</td>')
             && str_contains($discountExcel,'<td>80</td>'),'Excel tidak menjumlahkan SPP dan potongan menjadi kas Rp 80.');
@@ -177,6 +181,7 @@ try {
                 'tanggal_awal'=>'2099-12-30','tanggal_akhir'=>'2099-12-30']);
             $screen = finance_http_ok(finance_http_get($base.'laporan/template.php?'.$itemQuery,$sessionId),'Per Item DU '.$yearLabel);
             $excelItem = finance_http_ok(finance_http_get($base.'laporan/export_global.php?'.$itemQuery.'&format=excel&download=1',$sessionId),'Excel Per Item DU '.$yearLabel);
+    $excelItem=test_excel_html($excelItem,true);
             $previewItem = finance_http_ok(finance_http_get($base.'laporan/export_global.php?'.$itemQuery.'&format=preview',$sessionId),'Pratinjau PDF Per Item DU '.$yearLabel);
             foreach ([$screen,$excelItem,$previewItem] as $body) {
                 finance_http_assert(str_contains($body,'UJI STRUK DU HISTORIS')

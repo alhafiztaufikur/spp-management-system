@@ -5,6 +5,7 @@ require_once __DIR__ . '/kelas.php';
 require_once __DIR__ . '/tagihan_tahunan.php';
 require_once __DIR__ . '/tagihan_sekali.php';
 require_once __DIR__ . '/spp_billing.php';
+require_once __DIR__.'/report_multiple.php';
 
 function report_e($value): string { return htmlspecialchars((string)$value, ENT_QUOTES, 'UTF-8'); }
 function report_money($value): string { return 'Rp ' . number_format((float)$value, 0, ',', '.'); }
@@ -64,6 +65,7 @@ function report_billing_date_matches(string $createdAt,array $filters):bool {
     return $date!==''&&$date>=$filters['tanggal_awal']&&$date<=$filters['tanggal_akhir'];
 }
 function report_filters(mysqli $db, array $source): array {
+    $multiple=report_multiple_normalize($db,$source);
     $today = date('Y-m-d');
     if(($source['template']??'')==='riwayat-tagihan')[$start,$end]=report_billing_date_range($source);
     else {
@@ -84,11 +86,11 @@ function report_filters(mysqli $db, array $source): array {
     $academicYear = trim((string)($source['tahun_ajaran'] ?? $currentYear));
     if (!preg_match('/^\d{4}\/\d{4}$/', $academicYear)) $academicYear = $currentYear;
     $requestedOperator = trim((string)($source['operator'] ?? ''));
-    $operator = report_operator_filter_value($db, $requestedOperator);
+    $operator = isset($multiple['operator'])?'':report_operator_filter_value($db, $requestedOperator);
     $selectedId=max(0,(int)($source['student_id']??0));$selected=null;
     if($selectedId){$stmt=$db->prepare('SELECT id,unit_id,NO_INDUK FROM siswa WHERE id=?');$stmt->bind_param('i',$selectedId);$stmt->execute();$selected=$stmt->get_result()->fetch_assoc();$stmt->close();}
     return [
-        'student_id'=>$selectedId,'student_unit'=>(int)($selected['unit_id']??0),'student_nis'=>$selected['NO_INDUK']??null,
+        '_multi'=>$multiple,'student_id'=>$selectedId,'student_unit'=>(int)($selected['unit_id']??0),'student_nis'=>$selected['NO_INDUK']??null,
         'tanggal_awal'=>$start,'tanggal_akhir'=>$end,
         'filter_tanggal_tagihan'=>($source['template']??'')==='riwayat-tagihan',
         'tahun_ajaran'=>$academicYear,
@@ -128,12 +130,18 @@ function report_class_filter_rombel_id(array $filters): int {
     return preg_match('/^rombel:(\d+)$/', (string)($filters['kelas'] ?? ''), $match) ? (int)$match[1] : 0;
 }
 function report_class_where(array $filters, string $alias='sta', string $levelColumn='kelas', string $rombelColumn='master_kelas_id'): string {
+    if(isset($filters['_multi']['kelas'])){
+        if(filter_is_all($filters['_multi']['kelas']))return '';
+        $clauses=[];foreach($filters['_multi']['kelas'] as $value){$one=$filters;unset($one['_multi']['kelas']);$one['kelas']=$value;$clause=report_class_where($one,$alias,$levelColumn,$rombelColumn);if($clause!=='')$clauses[]=substr($clause,5);}
+        return $clauses?' AND ('.implode(' OR ',$clauses).')':'';
+    }
     $rombelId = report_class_filter_rombel_id($filters);
     if ($rombelId > 0) return " AND {$alias}.{$rombelColumn}=" . $rombelId;
     $level = report_class_filter_level($filters);
     return $level > 0 ? " AND CAST({$alias}.{$levelColumn} AS UNSIGNED)=" . $level : '';
 }
 function report_class_matches_row(array $filters, array $row, string $rombelKey='master_kelas_id', string $levelKey='tingkat'): bool {
+    if(isset($filters['_multi']['kelas'])){if(filter_is_all($filters['_multi']['kelas']))return true;foreach($filters['_multi']['kelas'] as $value){$one=$filters;unset($one['_multi']['kelas']);$one['kelas']=$value;if(report_class_matches_row($one,$row,$rombelKey,$levelKey))return true;}return false;}
     $rombelId = report_class_filter_rombel_id($filters);
     if ($rombelId > 0) return (int)($row[$rombelKey] ?? 0) === $rombelId;
     $level = report_class_filter_level($filters);
@@ -234,6 +242,9 @@ function report_operator_params(string $operator): array {
 function report_filter_rows(array $rows, array $filters): array {
     return array_values(array_filter($rows, static function($row) use($filters) {
         $status = (string)($row['_status'] ?? ''); $key=report_status_key($status);
+        if(isset($filters['_multi']['status'])&&!filter_is_all($filters['_multi']['status'])){
+            $found=false;foreach($filters['_multi']['status'] as $wanted){if($wanted===$key||($wanted==='ada_pembayaran'&&in_array($key,['cicilan','lunas'],true))||($wanted==='tunggakan'&&in_array($key,['belum_bayar','cicilan'],true)))$found=true;}if(!$found)return false;
+        }
         if ($filters['status']==='ada_pembayaran' && !in_array($key,['cicilan','lunas'],true)) return false;
         if ($filters['status']==='tunggakan' && !in_array($key,['belum_bayar','cicilan'],true)) return false;
         if ($filters['status']!=='' && !in_array($filters['status'],['ada_pembayaran','tunggakan'],true) && $filters['status']!==$key) return false;
@@ -332,7 +343,9 @@ function report_payment_components(mysqli $db, array $f): array {
     $paymentClassWhere = report_class_where($f,'b','KELAS');
     if($paymentClassWhere!=='')$where[]=substr($paymentClassWhere,5);
     $operatorJoin='';
+    if(isset($f['_multi']['operator'])&&!filter_is_all($f['_multi']['operator']))$where[]=substr(report_multi_operator_sql($f,'b.user_id'),5);
     if($f['operator']!==''){$operatorJoin=report_operator_join('b.user_id','op');$where[]=report_operator_where('b.user_id','op');$types.='ssss';$params=array_merge($params,report_operator_params($f['operator']));}
+    if(isset($f['_multi']['metode'])){$where[]=substr(filter_sql_values($f['_multi']['metode'],'b.sistem_pembayaran')?:' AND 1=1',5);}
     if($f['metode']!==''){$where[]='b.sistem_pembayaran=?';$types.='s';$params[]=$f['metode'];}
     $stmt=$db->prepare('SELECT b.*,s.NAMA,s.NO_induk_diknas FROM bayar b LEFT JOIN siswa s ON s.NO_INDUK=b.NO_INDUK AND s.unit_id=b.unit_id'.$operatorJoin.' WHERE '.implode(' AND ',$where).' ORDER BY b.TGL_BYR,b.id');
     $stmt->bind_param($types,...$params);$stmt->execute();$payments=$stmt->get_result()->fetch_all(MYSQLI_ASSOC);$stmt->close();
@@ -543,6 +556,7 @@ function report_savings_transactions(mysqli $db,string $start,string $end,array 
     $where="x.tanggal>=? AND x.tanggal<?";$types='ss';$params=[$start,$end];$operatorJoin='';if($f['operator']!==''){$operatorJoin=report_operator_join('x.user_id','op');$where.=' AND '.report_operator_where('x.user_id','op');$types.='ssss';$params=array_merge($params,report_operator_params($f['operator']));}
     $studentJoin = report_sql_ci_eq('s.NO_INDUK', 'x.NO_INDUK').' AND s.unit_id=x.unit_id';
     $placementJoin = report_sql_ci_eq('sta.no_induk', 'x.NO_INDUK').' AND sta.unit_id=x.unit_id';
+    $where.=report_multi_operator_sql($f,'x.user_id');
     $sql="SELECT x.*,s.NAMA,s.NO_induk_diknas,COALESCE(sta.master_kelas_id,s.master_kelas_id) master_kelas_id,
       COALESCE(sta.kelas_rombel_snapshot,CASE WHEN mk.is_placeholder=1 THEN CONCAT('Kelas ',COALESCE(mk.tingkat,s.KELAS),' (Belum Ditentukan)') ELSE CONCAT(mk.tingkat,UPPER(mk.kode_rombel)) END) kelas_label,
       mk.tingkat,mk.kode_rombel,mk.is_placeholder FROM (
@@ -583,12 +597,12 @@ function report_savings_class_data(mysqli $db,array $f):array{
 function report_savings_student_data(mysqli $db,array $f):array{
     $start=$f['tanggal_awal'].' 00:00:00';$end=date('Y-m-d H:i:s',strtotime($f['tanggal_akhir'].' +1 day'));
     $transactions=report_savings_transactions($db,$start,$end,$f);
-    $timelineFilters=$f;$timelineFilters['operator']='';$timeline=report_savings_transactions($db,$start,$end,$timelineFilters);
+    $timelineFilters=$f;$timelineFilters['operator']='';unset($timelineFilters['_multi']['operator']);$timeline=report_savings_transactions($db,$start,$end,$timelineFilters);
     $studentIds=array_values(array_unique(array_column($transactions,'NO_INDUK')));$running=report_savings_openings($db,$studentIds,$start);$historicalBalances=[];
     $studentMap=array_fill_keys($studentIds,true);
     foreach($timeline as $transaction){$nis=(string)$transaction['NO_INDUK'];if(!isset($studentMap[$nis]))continue;$running[$nis]=($running[$nis]??0)+(float)$transaction['masuk']-(float)$transaction['keluar'];$historicalBalances[$transaction['jenis'].'#'.$transaction['id']]=(float)$running[$nis];}
     $rows=[];
-    foreach($transactions as $t){if($f['mutasi']==='masuk'&&$t['jenis']!=='Masuk')continue;if($f['mutasi']==='keluar'&&$t['jenis']!=='Keluar')continue;if(!report_class_matches_row($f,$t))continue;$candidate=['nis'=>$t['NO_INDUK'],'nis_diknas'=>$t['NO_induk_diknas']??'','nama'=>$t['NAMA'],'kelas'=>$t['kelas_label']?:class_label($t)];if(!report_row_matches_filters($candidate,$f))continue;$key=$t['jenis'].'#'.$t['id'];$rows[]=$candidate+['tanggal'=>$t['tanggal'],'jenis'=>$t['jenis'],'masuk'=>(float)$t['masuk'],'keluar'=>(float)$t['keluar'],'saldo_saat_ini'=>(float)($historicalBalances[$key]??0),'operator'=>$t['user_id']?:'-','keterangan'=>$t['keterangan']??''];}
+    foreach($transactions as $t){if(isset($f['_multi']['mutasi'])&&!filter_is_all($f['_multi']['mutasi'])&&!in_array(strtolower($t['jenis']),$f['_multi']['mutasi'],true))continue;if($f['mutasi']==='masuk'&&$t['jenis']!=='Masuk')continue;if($f['mutasi']==='keluar'&&$t['jenis']!=='Keluar')continue;if(!report_class_matches_row($f,$t))continue;$candidate=['nis'=>$t['NO_INDUK'],'nis_diknas'=>$t['NO_induk_diknas']??'','nama'=>$t['NAMA'],'kelas'=>$t['kelas_label']?:class_label($t)];if(!report_row_matches_filters($candidate,$f))continue;$key=$t['jenis'].'#'.$t['id'];$rows[]=$candidate+['tanggal'=>$t['tanggal'],'jenis'=>$t['jenis'],'masuk'=>(float)$t['masuk'],'keluar'=>(float)$t['keluar'],'saldo_saat_ini'=>(float)($historicalBalances[$key]??0),'operator'=>$t['user_id']?:'-','keterangan'=>$t['keterangan']??''];}
     return ['title'=>'Rekap Transaksi Tabungan Siswa','subtitle'=>report_date_range_label($f['tanggal_awal'],$f['tanggal_akhir']),'columns'=>[['tanggal','Tanggal/Waktu','datetime'],['nis','NIS'],['nama','Nama Siswa'],['kelas','Kelas'],['jenis','Mutasi'],['masuk','Masuk','money'],['keluar','Keluar','money'],['saldo_saat_ini','Saldo Saat Ini','money'],['operator','Operator'],['keterangan','Keterangan']],'rows'=>$rows];
 }
 function report_savings_student_data_legacy(mysqli $db,array $f):array{
@@ -736,6 +750,7 @@ function report_billing_history_data(mysqli $db,array $f):array{
     $rows=[];$studentWhere=report_student_status_where($f);
     $append=static function(array $row)use(&$rows,$f):void{
         if(!report_billing_date_matches((string)($row['tanggal_dibuat']??''),$f))return;
+        if(isset($f['_multi']['komponen_tagihan'])&&!filter_is_all($f['_multi']['komponen_tagihan'])&&!in_array($row['komponen_key'],$f['_multi']['komponen_tagihan'],true))return;
         if($f['komponen_tagihan']!==''&&$row['komponen_key']!==$f['komponen_tagihan'])return;
         if(!report_class_matches_row($f,$row))return;
         // Keep the issued amount for the audit trail, while a cancelled bill
@@ -782,11 +797,11 @@ function report_student_debt_groups(mysqli $db,array $filters,string $beforeAcad
     }
 
     $sourceFilters=$filters;
-    $sourceFilters['komponen_tagihan']='';
-    $sourceFilters['status']='';
+    $sourceFilters['komponen_tagihan']='';unset($sourceFilters['_multi']['komponen_tagihan']);
+    $sourceFilters['status']='';unset($sourceFilters['_multi']['status']);
     $currentStudents=[];
     if($asOfDate!==''){
-        $sourceFilters['kelas']='';
+        $sourceFilters['kelas']='';unset($sourceFilters['_multi']['kelas']);
         $result=$db->query('SELECT s.NO_INDUK,s.unit_id,s.NAMA,s.NO_induk_diknas,s.KELAS,s.master_kelas_id,s.is_active,mk.tingkat,mk.kode_rombel,mk.is_placeholder FROM siswa s LEFT JOIN master_kelas mk ON mk.id=s.master_kelas_id WHERE s.legacy_pending=0');
         while($student=$result->fetch_assoc()){
             $student['tingkat']=(int)($student['tingkat']??$student['KELAS']);
@@ -798,7 +813,7 @@ function report_student_debt_groups(mysqli $db,array $filters,string $beforeAcad
     foreach($targetNis as $nis){$nis=trim((string)$nis);if($nis!=='')$targetMap[$nis]=true;}
     if($targetMap){
         $sourceFilters['q']='';
-        $sourceFilters['kelas']='';
+        $sourceFilters['kelas']='';unset($sourceFilters['_multi']['kelas']);
         $sourceFilters['siswa_status']='all';
     }
     $targetStart=report_academic_year_start($beforeAcademicYear);
@@ -895,6 +910,7 @@ function report_principal_debt_data(mysqli $db,array $filters):array{
 }
 function report_principal_scope_label(array $filters,array $classes):string{
     $classFilter=(string)($filters['kelas']??'');
+    if(isset($filters['_multi']['kelas'])&&!filter_is_all($filters['_multi']['kelas']))return implode(', ',array_map(static fn($value)=>$GLOBALS['spp_filter_choices']['kelas']['options'][$value]??$value,$filters['_multi']['kelas']));
     if($classFilter==='')return 'Seluruh Kelas/Rombel';
     if(($level=report_class_filter_level($filters))>0)return 'Seluruh Rombel Kelas '.$level;
     $rombelId=report_class_filter_rombel_id($filters);
@@ -1052,6 +1068,7 @@ function report_merge_summary_rows(array $a,array $b):array {
     return array_values($out);
 }
 function report_build(mysqli $db,string $template,array $filters):array{
+    $multiple=report_multiple_sections($db,$template,$filters);if($multiple!==null)return $multiple;
     if (($GLOBALS['app_unit_id']??1)===0) {
         $combined=null;
         try {
@@ -1080,6 +1097,12 @@ function report_savings_transaction_totals(array $rows): array {
     $masuk=0;$keluar=0;foreach($rows as $row){$masuk+=(float)($row['masuk']??0);$keluar+=(float)($row['keluar']??0);}return ['total_masuk'=>$masuk,'total_keluar'=>$keluar,'selisih'=>$masuk-$keluar];
 }
 function report_money_totals(array $report, string $template=''): array {
+    if(isset($report['sections'])){
+        $totals=[];foreach($report['sections'] as $part)foreach(report_money_totals($part,$template) as $total){
+            $key=$total['key']??$total['label'];$key=['total_tagihan'=>'tagihan','total_bayar'=>'terbayar','tunggakan'=>'sisa'][$key]??$key;
+            if(!isset($totals[$key]))$totals[$key]=['key'=>$key,'label'=>['tagihan'=>'Total Tagihan','terbayar'=>'Total Dibayar','sisa'=>'Total Sisa'][$key]??$total['label'],'value'=>0];$totals[$key]['value']+=$total['value'];
+        }return array_values($totals);
+    }
     if($template==='setoran'){
         return [['label'=>'Total Setoran','value'=>(float)($report['total_setoran']??0)]];
     }

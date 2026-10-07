@@ -1,5 +1,10 @@
 // ============================================
 // SistemSPP - app.js
+// Also available to inline list filters before the deferred dropdown renderer runs.
+window.sppSelectedValues = window.sppSelectedValues || (select => !select ? [] :
+  Array.from(select.selectedOptions).some(o => o.value === '*') ?
+    Array.from(select.options).filter(o => o.value !== '*' && !o.disabled && !(o.parentElement.tagName === 'OPTGROUP' && o.parentElement.disabled)).map(o => o.value) :
+    Array.from(select.selectedOptions).map(o => o.value));
 function escapeHtml(value) {
   return String(value ?? '')
     .replace(/&/g, '&amp;')
@@ -285,14 +290,14 @@ function studentSearchOptionLabel(opt) {
 function studentSearchClassFilter(input) {
   const selector = input?.dataset.studentClassFilter || '';
   if (!selector) return { value: '', label: '', type: 'all' };
-  const select = document.querySelector(selector);
+  const select = document.querySelector(selector) || document.querySelector(selector.replace(/name="([^"\]]+)"/g, 'name="$1[]"'));
   if (!select) return { value: '', label: '', type: 'all' };
   const value = String(select.value || '');
   const selected = select.options?.[select.selectedIndex];
   let type = 'rombel';
   let id = value;
   let level = '';
-  if (!value || value === '0') {
+  if (!value || value === '0' || value === '*') {
     type = 'all';
     id = '';
   } else if (value.startsWith('tingkat:')) {
@@ -311,6 +316,16 @@ function studentSearchClassFilter(input) {
 }
 
 function studentSearchOptionsForClass(input, options) {
+  const selector = input?.dataset.studentClassFilter || '';
+  const control = selector && (document.querySelector(selector) || document.querySelector(selector.replace(/name="([^"\]]+)"/g, 'name="$1[]"')));
+  if (control?.multiple) {
+    const values = window.sppSelectedValues(control);
+    return options.filter(opt => values.some(value => {
+      if (value.startsWith('tingkat:')) return String(opt.dataset.tingkat || String(opt.dataset.kelas || '').match(/(?:1[0-2]|[1-9])/)?.[0] || '') === value.slice(8);
+      if (value.startsWith('rombel:')) return String(opt.dataset.kelasId || '') === value.slice(7);
+      return String(opt.dataset.kelasId || '') === value || String(opt.dataset.kelas || '') === value;
+    }));
+  }
   const filter = studentSearchClassFilter(input);
   if (!filter.value) return options;
   if (filter.type === 'tingkat') {
@@ -464,7 +479,7 @@ function initStudentSearchInput(input) {
     renderStudentSearchPanel(input, true);
   });
   const classFilterSelector = input.dataset.studentClassFilter || '';
-  const classFilter = classFilterSelector ? document.querySelector(classFilterSelector) : null;
+  const classFilter = classFilterSelector ? (document.querySelector(classFilterSelector) || document.querySelector(classFilterSelector.replace(/name="([^"\]]+)"/g, 'name="$1[]"'))) : null;
   if (classFilter) {
     classFilter.addEventListener('change', function () {
       const current = input.value.trim();
@@ -1000,7 +1015,7 @@ function refreshDaftarUlangSelector(opt) {
       trigger.setAttribute('aria-expanded', 'false');
       setDaftarUlangContext(record.kelas, record.tahun_ajaran);
       applyStudentPaymentDetails(opt);
-      trigger.focus();
+      trigger.focus({preventScroll:true});
     });
     menu.appendChild(option);
   });
@@ -1011,14 +1026,14 @@ function refreshDaftarUlangSelector(opt) {
       const opening = menu.hidden;
       menu.hidden = !opening;
       trigger.setAttribute('aria-expanded', String(opening));
-      if (opening) menu.querySelector('[aria-selected="true"]')?.focus();
+      if (opening) menu.querySelector('[aria-selected="true"]')?.focus({preventScroll:true});
     });
     trigger.addEventListener('keydown', event => {
       if (event.key === 'ArrowDown' || event.key === 'Enter' || event.key === ' ') {
         event.preventDefault();
         menu.hidden = false;
         trigger.setAttribute('aria-expanded', 'true');
-        menu.querySelector('[aria-selected="true"], .du-selector-option')?.focus();
+        menu.querySelector('[aria-selected="true"], .du-selector-option')?.focus({preventScroll:true});
       }
     });
     document.addEventListener('click', event => {
@@ -1033,11 +1048,11 @@ function refreshDaftarUlangSelector(opt) {
       if (event.key === 'Escape') {
         menu.hidden = true;
         trigger.setAttribute('aria-expanded', 'false');
-        trigger.focus();
+        trigger.focus({preventScroll:true});
       } else if (event.key === 'ArrowDown' || event.key === 'ArrowUp') {
         event.preventDefault();
         const step = event.key === 'ArrowDown' ? 1 : -1;
-        options[(index + step + options.length) % options.length]?.focus();
+        options[(index + step + options.length) % options.length]?.focus({preventScroll:true});
       }
     });
   }
@@ -1920,7 +1935,7 @@ function initPromotionBatchSelector() {
     let shown = 0;
     rows.forEach(row => {
       const matchesSearch = !query || normalize(row.dataset.search).includes(query);
-      const matchesSource = !source || row.dataset.sourceRombel === source;
+      const matchesSource = sourceFilter?.multiple ? window.sppSelectedValues(sourceFilter).includes(row.dataset.sourceRombel) : (!source || row.dataset.sourceRombel === source);
       const visible = matchesSearch && matchesSource;
       row.hidden = !visible;
       if (visible) shown++;
@@ -2030,7 +2045,7 @@ document.addEventListener('DOMContentLoaded', function () {
       const activeOption = syncActiveYear();
       picker.classList.add('is-open');
       requestAnimationFrame(() => {
-        (activeOption || options[0]).scrollIntoView({ block: 'nearest' });
+        if (!picker.querySelector('[data-spp-legacy-ready]')) (activeOption || options[0]).scrollIntoView({ block: 'nearest' });
       });
     };
     const closePicker = () => picker.classList.remove('is-open');
@@ -2050,7 +2065,7 @@ document.addEventListener('DOMContentLoaded', function () {
         input.dispatchEvent(new Event('input', { bubbles: true }));
         input.dispatchEvent(new Event('change', { bubbles: true }));
         closePicker();
-        input.focus();
+        input.focus({preventScroll:true});
       });
     });
     document.addEventListener('click', event => {

@@ -110,7 +110,7 @@ function unit_report_selector(int $reportUnitId): string {
 // Route classification is shared by the sidebar, entry gate and switch endpoint.
 function unit_transaction_route(string $path): bool {
     $path = str_replace('\\', '/', (string)(parse_url($path, PHP_URL_PATH) ?? ''));
-    return preg_match('#/(pembayaran/(form|edit|proses)\.php|tabungan/(masuk|keluar|proses)\.php|otorisasi_transaksi\.php)$#D', $path) === 1;
+    return preg_match('#/(pembayaran/(form|edit|proses)\.php|tabungan/(masuk|keluar|proses)\.php)$#D', $path) === 1;
 }
 
 function unit_all_readonly(): bool {

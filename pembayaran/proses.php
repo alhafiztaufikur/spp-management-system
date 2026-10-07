@@ -25,7 +25,8 @@ $authorizationDecisionNote = '';
 $executionActorId = null;
 
 if ($aksi === 'otorisasi_setujui') {
-    requireRole(['admin']);
+    if (!unit_is_super()) { http_response_code(403); exit('Hanya Super Admin yang dapat memberi keputusan otorisasi.'); }
+    requireRole(['super_admin']);
     $token = (string)($_POST['csrf_token'] ?? '');
     if ($_SERVER['REQUEST_METHOD'] !== 'POST' || empty($_SESSION['csrf_transaction_authorization']) || !hash_equals($_SESSION['csrf_transaction_authorization'], $token)) {
         $_SESSION['flash'] = ['type' => 'error', 'msg' => 'Permintaan persetujuan tidak valid atau sesi telah kedaluwarsa.'];
@@ -38,7 +39,8 @@ if ($aksi === 'otorisasi_setujui') {
     try {
         $authorizationRequest = transaction_authorization_find($koneksi, $authorizationRequestId);
         if (!$authorizationRequest || $authorizationRequest['status'] !== 'pending') throw new RuntimeException('Permintaan otorisasi tidak ditemukan atau sudah diproses.');
-        if ($authorizationRequest['requested_by_role'] !== 'kasir') throw new RuntimeException('Hanya pengajuan kasir yang dapat disetujui administrator.');
+        transaction_authorization_assert_super($koneksi, $authorizationApproverId);
+        if (!in_array($authorizationRequest['requested_by_role'], ['admin','kasir'], true)) throw new RuntimeException('Peran pemohon tidak dapat mengajukan perubahan.');
         if ((int)$authorizationRequest['requested_by'] === $authorizationApproverId) throw new RuntimeException('Pemohon tidak boleh menyetujui permintaannya sendiri.');
         $payload = transaction_authorization_decode_payload($authorizationRequest);
         $_POST = $payload;
@@ -68,7 +70,9 @@ if (in_array($aksi, ['update', 'hapus'], true) && !$authorizationRequest) {
         header('Location: lihat.php');
         exit;
     }
-    if (isRole('kasir')) {
+    try { payment_assert_owner($koneksi,(int)($_POST['id']??0),(int)$_SESSION['admin_id']); }
+    catch (Throwable $error) { http_response_code(403); exit(htmlspecialchars($error->getMessage(),ENT_QUOTES,'UTF-8')); }
+    if (transaction_authorization_requires_request()) {
         try {
             $paymentId = (int)($_POST['id'] ?? 0);
             $actionName = $aksi === 'hapus' ? 'hapus' : 'edit';
@@ -833,7 +837,8 @@ if ($aksi === 'update') {
             $lockedRequest = transaction_authorization_find($koneksi, $authorizationRequestId, true);
             if (!$lockedRequest || $lockedRequest['status'] !== 'pending') throw new RuntimeException('Permintaan sudah diproses atau tidak lagi tersedia.');
             if ((int)$lockedRequest['requested_by'] === $authorizationApproverId) throw new RuntimeException('Pemohon tidak boleh menyetujui permintaannya sendiri.');
-            if ($lockedRequest['requested_by_role'] !== 'kasir') throw new RuntimeException('Hanya pengajuan kasir yang dapat disetujui administrator.');
+            transaction_authorization_assert_super($koneksi, $authorizationApproverId);
+            if (!in_array($lockedRequest['requested_by_role'], ['admin','kasir'], true)) throw new RuntimeException('Peran pemohon tidak dapat mengajukan perubahan.');
             authorization_assert_current_snapshot($koneksi, $lockedRequest);
             $authorizationRequest = $lockedRequest;
         } else authorization_assert_no_pending($koneksi, $id);
@@ -1038,7 +1043,8 @@ if ($aksi === 'hapus') {
             $lockedRequest = transaction_authorization_find($koneksi, $authorizationRequestId, true);
             if (!$lockedRequest || $lockedRequest['status'] !== 'pending') throw new RuntimeException('Permintaan sudah diproses atau tidak lagi tersedia.');
             if ((int)$lockedRequest['requested_by'] === $authorizationApproverId) throw new RuntimeException('Pemohon tidak boleh menyetujui permintaannya sendiri.');
-            if ($lockedRequest['requested_by_role'] !== 'kasir') throw new RuntimeException('Hanya pengajuan kasir yang dapat disetujui administrator.');
+            transaction_authorization_assert_super($koneksi, $authorizationApproverId);
+            if (!in_array($lockedRequest['requested_by_role'], ['admin','kasir'], true)) throw new RuntimeException('Peran pemohon tidak dapat mengajukan perubahan.');
             authorization_assert_current_snapshot($koneksi, $lockedRequest);
             $authorizationRequest = $lockedRequest;
         } else authorization_assert_no_pending($koneksi, $id);

@@ -1,5 +1,25 @@
 <?php
+require_once __DIR__.'/payment_permissions.php';
 require_once __DIR__ . "/payment_activity.php";
+
+function transaction_authorization_requires_request(): bool
+{
+    return in_array($_SESSION['admin_role'] ?? '', ['admin', 'kasir'], true);
+}
+
+/** Check the current account in the database, including calls outside HTTP. */
+function transaction_authorization_assert_super(mysqli $db, int $actorId): void
+{
+    $s = $db->prepare('SELECT role,is_active FROM admin WHERE id=?');
+    $s->bind_param('i', $actorId); $s->execute();
+    $actor = $s->get_result()->fetch_assoc(); $s->close();
+    if (!$actor || $actor['role'] !== 'super_admin' || (int)$actor['is_active'] !== 1) {
+        throw new RuntimeException('Hanya Super Admin yang dapat memberi keputusan otorisasi.');
+    }
+    if (!in_array((int)$db->query('SELECT current_unit_id()')->fetch_row()[0], [1,2,3], true)) {
+        throw new RuntimeException('Pilih SD, SMP, atau SMA sebelum memberi keputusan.');
+    }
+}
 
 function transaction_authorization_schema_ready(mysqli $db): bool
 {
@@ -122,6 +142,8 @@ function transaction_authorization_create(mysqli $db, int $paymentId, string $ac
         $lock->execute();
         if ($lock->get_result()->num_rows === 0) throw new RuntimeException('Transaksi pembayaran tidak ditemukan.');
         $lock->close();
+        if (!in_array($_SESSION['admin_role']??'', ['admin','kasir'],true)) throw new RuntimeException('Peran ini tidak dapat mengajukan perubahan.');
+        payment_assert_owner($db,$paymentId,$requesterId);
 
         $pending = $db->prepare("SELECT id FROM transaksi_otorisasi WHERE bayar_id=? AND status='pending' LIMIT 1 FOR UPDATE");
         $pending->bind_param('i', $paymentId);
@@ -155,7 +177,7 @@ function transaction_authorization_find(mysqli $db, int $requestId, bool $forUpd
 {
     transaction_authorization_assert_ready($db);
     $suffix = $forUpdate ? ' FOR UPDATE' : '';
-    $stmt = $db->prepare("SELECT r.*,req.nama requested_by_name,req.role requested_by_role,reviewer.nama decided_by_name FROM transaksi_otorisasi r JOIN admin req ON req.id=r.requested_by LEFT JOIN admin reviewer ON reviewer.id=r.decided_by WHERE r.id=?$suffix");
+    $stmt = $db->prepare("SELECT r.*,req.nama requested_by_name,req.role requested_by_role,req.username requested_by_username,reviewer.nama decided_by_name FROM transaksi_otorisasi r LEFT JOIN admin req ON req.id=r.requested_by LEFT JOIN admin reviewer ON reviewer.id=r.decided_by WHERE r.id=?$suffix");
     $stmt->bind_param('i', $requestId);
     $stmt->execute();
     $row = $stmt->get_result()->fetch_assoc() ?: null;
@@ -181,6 +203,7 @@ function transaction_authorization_pending_for_payments(mysqli $db, array $payme
 
 function transaction_authorization_mark_failed(mysqli $db, int $requestId, int $approverId, string $note): void
 {
+    transaction_authorization_assert_super($db, $approverId);
     if ($requestId <= 0 || !transaction_authorization_schema_ready($db)) return;
     $note = mb_substr(trim($note), 0, 1000);
     $db->begin_transaction();
@@ -209,11 +232,18 @@ function transaction_authorization_decide(mysqli $db, int $requestId, string $st
     if (!in_array($status, ['approved', 'rejected', 'cancelled'], true)) {
         throw new RuntimeException('Status keputusan otorisasi tidak valid.');
     }
+    if ($status !== 'cancelled') transaction_authorization_assert_super($db, $deciderId);
     $note = trim($note);
     if ($status === 'rejected' && $note === '') throw new RuntimeException('Catatan penolakan wajib diisi.');
     if (mb_strlen($note) > 1000) throw new RuntimeException('Catatan keputusan maksimal 1000 karakter.');
     $request = transaction_authorization_find($db, $requestId, true);
     if (!$request || $request['status'] !== 'pending') throw new RuntimeException('Permintaan sudah diproses.');
+    if ($status === 'cancelled' && (int)$request['requested_by'] !== $deciderId) {
+        throw new RuntimeException('Hanya pemohon yang dapat membatalkan permintaan.');
+    }
+    if ($status !== 'cancelled' && (int)$request['requested_by'] === $deciderId) {
+        throw new RuntimeException('Pemohon tidak boleh memberi keputusan pada pengajuannya sendiri.');
+    }
     $appliedSql = $status === 'approved' ? ',applied_at=NOW()' : '';
     $stmt = $db->prepare("UPDATE transaksi_otorisasi SET status=?,decided_by=?,decision_note=?,decided_at=NOW()$appliedSql WHERE id=? AND status='pending'");
     $stmt->bind_param('sisi', $status, $deciderId, $note, $requestId);

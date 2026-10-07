@@ -5,9 +5,10 @@ function parent_letter_collect(mysqli $db,array $query): array
 {
     $mode=(string)($query['mode']??'single');
     if(!in_array($mode,['single','selected','class','all'],true))throw new InvalidArgumentException('Pilihan cetak tidak dikenal.');
-    $filters=report_filters($db,$query);$filters['status']='';
+    $filters=report_filters($db,$query);$filters['status']='';unset($filters['_multi']['status']);
     $filters['q']=$mode==='class'?$filters['q']:'';$filters['kelas']=$mode==='class'?$filters['kelas']:'';
-    if($mode==='class'&&$filters['kelas']==='')throw new InvalidArgumentException('Pilih kelas atau rombel terlebih dahulu.');
+    if($mode!=='class')unset($filters['_multi']['kelas']);
+    if($mode==='class'&&$filters['kelas']===''&&filter_is_all($filters['_multi']['kelas']??['*']))throw new InvalidArgumentException('Pilih kelas atau rombel terlebih dahulu.');
     $today=report_letter_today();$students=report_student_debt_groups($db,$filters,'',[],$today);
     if(in_array($mode,['single','selected'],true)){
         $raw=(string)($query['students']??$query['student_key']??$query['nis']??'');
@@ -48,9 +49,26 @@ function parent_letter_draft_update(string $token,array $messages): array
     $draft=parent_letter_draft_read($token);$allowed=[];foreach($draft['students'] as $student)$allowed[unit_student_key($student)]=true;
     foreach($messages as $key=>$message){
         if(!isset($allowed[$key]))throw new InvalidArgumentException('Penerima tidak termasuk dalam draf surat.');
-        if(!is_string($message)||!mb_check_encoding($message,'UTF-8')||mb_strlen($message,'UTF-8')>2000)throw new InvalidArgumentException('Pesan setiap siswa maksimal 2.000 karakter.');
-        $message=str_replace(["\r\n","\r"],"\n",$message);
-        $draft['messages'][$key]=trim($message);
+        $draft['messages'][$key]=parent_letter_message_normalize($message);
     }
     $_SESSION['parent_letter_drafts'][$token]=$draft;return $draft;
+}
+
+function parent_letter_draft_apply(string $token,string $source,$message,array $targets,bool $overwrite=false): array {
+    $draft=parent_letter_draft_read($token);$allowed=[];
+    foreach($draft['students'] as $student)$allowed[unit_student_key($student)]=true;
+    if(!isset($allowed[$source])||!$targets||count($targets)>count($allowed))throw new InvalidArgumentException('Pilih penerima yang tersedia dalam draf.');
+    $message=parent_letter_message_normalize($message);
+    if(parent_letter_message_text($message)==='')throw new InvalidArgumentException('Tuliskan pesan sebelum menerapkannya ke penerima lain.');
+    $unique=[];foreach($targets as $key){
+        if(!is_string($key)||!isset($allowed[$key])||$key===$source)throw new InvalidArgumentException('Penerima tidak termasuk dalam pilihan yang diizinkan.');
+        $unique[$key]=true;
+    }
+    $draft['messages'][$source]=$message;$updated=[];$skipped=[];
+    foreach(array_keys($unique) as $key){
+        if(!$overwrite&&parent_letter_message_text($draft['messages'][$key]??'')!==''){$skipped[]=$key;continue;}
+        $draft['messages'][$key]=$message;$updated[$key]=$message;
+    }
+    $_SESSION['parent_letter_drafts'][$token]=$draft;
+    return ['messages'=>[$source=>$message]+$updated,'updated'=>count($updated),'skipped'=>count($skipped)];
 }

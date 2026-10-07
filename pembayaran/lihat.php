@@ -9,7 +9,8 @@ require_once '../includes/auth.php';
 require_once '../includes/pagination.php';
 require_once '../includes/transaction_authorization.php';
 require_once '../includes/payment_archive.php';
-requireRole(['admin', 'kasir']);
+require_once '../includes/payment_history.php';
+requireRole(['admin', 'kasir', 'bendahara']);
 if (empty($_SESSION['csrf_payment'])) $_SESSION['csrf_payment'] = bin2hex(random_bytes(32));
 
 $flash = $_SESSION['flash'] ?? null;
@@ -100,7 +101,7 @@ $offset = ($page - 1) * $perPage;
 $sql = "SELECT p.*, s.NO_INDUK, s.NO_induk_diknas, s.NAMA,
         COALESCE(NULLIF(p.kelas_rombel_snapshot,''),NULLIF(p.KELAS,''),s.KELAS) AS kelas_transaksi FROM bayar p
         JOIN siswa s ON s.NO_INDUK = p.NO_INDUK AND s.unit_id=p.unit_id
-        $where ORDER BY p.created_at DESC
+        $where ORDER BY p.created_at DESC,p.id DESC
         LIMIT ? OFFSET ?";
 
 $stmt = $koneksi->prepare($sql);
@@ -114,10 +115,31 @@ $result = $stmt->get_result();
     $paymentRows = $result->fetch_all(MYSQLI_ASSOC);
 }
 $paymentPaginationQuery = pagination_query(['per_page' => $perPage, 'view'=>$isArchive?'deleted':'active']);
+unset($paymentPaginationQuery['selected']);
 $activityGroups = payment_activity_for_payments($koneksi, array_column($paymentRows, 'id'));
 $tabQuery = $_GET; unset($tabQuery['page']);
 $activeTabUrl = 'lihat.php?' . http_build_query(array_merge($tabQuery,['view'=>'active']));
 $archiveTabUrl = 'lihat.php?' . http_build_query(array_merge($tabQuery,['view'=>'deleted']));
+
+$selectedId=max(0,(int)($_GET['selected']??0));
+$selectedRow=null;
+foreach($paymentRows as $candidate) if((int)$candidate['id']===$selectedId) $selectedRow=$candidate;
+$selectedRow ??= $paymentRows[0]??null;
+$selectedId=(int)($selectedRow['id']??0);
+$selectedModel=null;
+if($selectedRow) {
+    $scope=unit_active_id();
+    unit_set_context($koneksi,(int)$selectedRow['unit_id']);
+    try { $selectedModel=payment_history_model($koneksi,$selectedId,$isArchive); }
+    catch(Throwable $error) { $detailError=$error->getMessage(); }
+    unit_set_context($koneksi,$scope);
+}
+if($showPrintPrompt) {
+    try {
+        payment_assert_owner($koneksi,$printPaymentId,(int)$_SESSION['admin_id']);
+        if($isAnnualPayment && !payment_can_print_batch($koneksi,$printBatchToken)) $showPrintPrompt=false;
+    } catch(Throwable $error) { $showPrintPrompt=false; }
+}
 
 // Months list
 $bln_list = [
@@ -148,10 +170,11 @@ if(count($displayMatches)===1)$studentSearchDisplay=$displayMatches[0]['NAMA'];
   <link rel="stylesheet" href="../assets/css/style.css?v=unitpalette4&amp;mtime=<?= filemtime(__DIR__ . '/../assets/css/style.css') ?>" />
   <link rel="stylesheet" href="../assets/css/date_controls.css?v=unitpalette4&amp;mtime=<?= filemtime(__DIR__ . '/../assets/css/date_controls.css') ?>" />
   <link rel="stylesheet" href="../assets/css/payment_details.css?v=<?= filemtime(__DIR__ . "/../assets/css/payment_details.css") ?>">
+  <link rel="stylesheet" href="../assets/css/payment_history.css?v=<?= filemtime(__DIR__.'/../assets/css/payment_history.css') ?>">
   <!-- Prevent theme flash -->
   <script>(function(){var t=localStorage.getItem('spp_theme')||'light';document.documentElement.setAttribute('data-theme',t);})();</script>
 </head>
-<body>
+<body class="payment-history-page">
 
   <div class="bg-orbs">
     <div class="orb orb-1"></div><div class="orb orb-2"></div><div class="orb orb-3"></div>
@@ -201,18 +224,11 @@ if(count($displayMatches)===1)$studentSearchDisplay=$displayMatches[0]['NAMA'];
       </div>
       <?php endif; ?>
 
-      <section class="main-card class-recap-card recap-report-shell history-recap-shell payment-history-shell">
-        <div class="recap-report-header">
-          <div class="recap-report-copy">
-            <span class="recap-class-overline">Pembayaran</span>
-            <h1>Riwayat Pembayaran Siswa</h1>
-            <p><?= number_format($totalPayments) ?> <?= $isArchive ? "transaksi terhapus; tidak masuk total pembayaran aktif" : "transaksi cocok dengan filter saat ini" ?>.</p>
-          </div>
-
-        <!-- Filter Bar -->
-        <form method="GET" action="lihat.php" class="recap-header-controls history-recap-filter filter-bar"><input type="hidden" name="student_id" data-student-identity="1" value="<?= max(0,(int)($_GET['student_id']??0)) ?>">
+      <div class="ph-page-content">
+      <header class="ph-hero"><div class="ph-hero-copy"><span class="ph-hero-icon"><?= authorization_icon('receipt') ?></span><div><h1>Riwayat Pembayaran Siswa</h1><p>Kelola dan pantau seluruh riwayat transaksi pembayaran siswa.</p></div></div><nav class="ph-tabs" aria-label="Jenis riwayat pembayaran"><a href="<?= htmlspecialchars($activeTabUrl) ?>" <?= !$isArchive?'aria-current="page"':'' ?>>Transaksi Aktif</a><a href="<?= htmlspecialchars($archiveTabUrl) ?>" <?= $isArchive?'aria-current="page"':'' ?>>Transaksi Dihapus</a></nav></header>
+      <section class="ph-filter-card">        <form method="GET" action="lihat.php" class="ph-filter-form"><input type="hidden" name="student_id" data-student-identity="1" value="<?= max(0,(int)($_GET['student_id']??0)) ?>">
           <input type="hidden" name="view" value="<?= $isArchive ? "deleted" : "active" ?>">
-          <span class="recap-filter-label">Filter Riwayat</span>
+          <div class="ph-filter-intro"><?= authorization_icon('filter') ?><div><strong>Filter Riwayat</strong><small>Pilih periode dan siswa yang ingin ditampilkan.</small></div></div>
           <div class="field-row report-date-range-field">
             <label class="field-label"><?= $isArchive ? "Tanggal Penghapusan" : "Tanggal Transaksi" ?></label>
             <div class="report-date-range-control report-date-range-picker" data-range-picker data-empty-label="<?= htmlspecialchars($periodLabel) ?>">
@@ -229,7 +245,7 @@ if(count($displayMatches)===1)$studentSearchDisplay=$displayMatches[0]['NAMA'];
               </div>
             </div>
           </div>
-          <div class="field-row full-span">
+          <div class="field-row ph-search-field">
             <label class="field-label" for="search-lihat">Cari Siswa (Nama / NIS / NIS Diknas)</label>
             <div class="search-box">
               <svg width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.5" stroke-linecap="round" stroke-linejoin="round"><circle cx="11" cy="11" r="8"/><line x1="21" y1="21" x2="16.65" y2="16.65"/></svg>
@@ -242,131 +258,29 @@ if(count($displayMatches)===1)$studentSearchDisplay=$displayMatches[0]['NAMA'];
               <?php endforeach; ?>
             </datalist>
           </div>
-          <select class="field-input field-select filter-sel" name="per_page" aria-label="Jumlah pembayaran per halaman">
+          <div class="field-row"><label class="field-label">Data per halaman</label><select class="field-input field-select filter-sel" name="per_page" aria-label="Jumlah pembayaran per halaman">
             <?php foreach ($allowedPageSizes as $pageSize): ?>
             <option value="<?= $pageSize ?>" <?= $perPage === $pageSize ? 'selected' : '' ?>><?= $pageSize ?> / halaman</option>
             <?php endforeach; ?>
-          </select>
-          <div class="history-recap-actions">
+          </select></div>
+          <div class="ph-filter-actions">
             <button type="submit" class="btn btn-primary" id="btn-filter">Tampilkan Rekap</button>
             <a href="lihat.php?view=<?= $isArchive ? "deleted" : "active" ?>" class="btn btn-ghost" id="btn-reset-filter">Reset</a>
-            <a href="form.php" class="btn btn-primary" id="btn-tambah">Tambah Baru</a>
+            <?php if(hasRole(['admin','kasir']) && !unit_all_readonly()): ?><a href="form.php" class="btn btn-primary" id="btn-tambah">+ Tambah Baru</a><?php endif; ?>
           </div>
-        </form>
-        </div>
-
-        <nav class="payment-history-tabs" aria-label="Jenis riwayat pembayaran">
-          <a href="<?= htmlspecialchars($activeTabUrl) ?>" <?= !$isArchive ? 'aria-current="page"' : '' ?>>Transaksi Aktif</a>
-          <a href="<?= htmlspecialchars($archiveTabUrl) ?>" <?= $isArchive ? 'aria-current="page"' : '' ?>>Transaksi Dihapus</a>
-        </nav>
-        <div class="recap-period-strip history-recap-strip">
-          <div><strong><?= $isArchive ? "Transaksi Dihapus" : "Transaksi Pembayaran" ?> <?= htmlspecialchars($periodLabel) ?></strong><span>Menampilkan <?= number_format($firstShown) ?>–<?= number_format($lastShown) ?> dari <?= number_format($totalPayments) ?> transaksi.</span></div>
-          <span><?= number_format($totalPayments) ?> transaksi</span>
-        </div>
-
-        <!-- Table -->
-        <div class="table-container">
-          <table class="payment-table responsive-table" id="tbl-lihat">
-            <thead>
-              <tr>
-                <th>No</th>
-                <th>NIS</th>
-                <th>Nama Siswa</th>
-                <th class="kelas-col">Kelas</th>
-                <th>Bulan / Tahun</th>
-                <th>SPP</th>
-
-                <th>Sistem</th>
-                <th>Total Bayar</th>
-                <th>Bayar / Update</th>
-                <th>Operator</th>
-                <th>Aksi</th>
-              </tr>
-            </thead>
-            <tbody>
-              <?php
-                $pendingRequests = $isArchive ? [] : transaction_authorization_pending_for_payments($koneksi, array_column($paymentRows, 'id'));
-              ?>
-              <?php if ($paymentRows):
-                $no = $offset + 1;
-                foreach ($paymentRows as $row):
-                  $paymentDateTime = format_payment_datetime($row['TGL_BYR']);
-                  $updatedDateTime = format_payment_datetime($row['updated_at'] ?? null);
-                  $wasUpdated = payment_was_updated($row['created_at'] ?? null, $row['updated_at'] ?? null);
-                  $pendingRequest = $pendingRequests[(int)$row['id']] ?? null;
-                  $operatorSummary = payment_activity_summary($activityGroups[(int)$row['id']] ?? []);
-                  $canEdit = !$isArchive && hasRole(['admin', 'kasir']) && (int)($row['payment_link_version'] ?? 0) === 1 && !$pendingRequest;
-                  $editUrl = 'edit.php?id=' . (int)$row['id'];
-                  $rowAttrs = $canEdit
-                    ? ' class="clickable-payment-row" data-edit-url="' . htmlspecialchars($editUrl, ENT_QUOTES, 'UTF-8') . '" tabindex="0" role="link" aria-label="Edit pembayaran ' . htmlspecialchars($row['NAMA'], ENT_QUOTES, 'UTF-8') . '"'
-                    : '';
-                ?>
-              <tr<?= $rowAttrs ?>>
-                <td data-label="No"><?= $no++ ?></td>
-                <td data-label="NIS"><span class="badge-nis"><?= htmlspecialchars($row['NO_INDUK']) ?></span><?php if (!empty($row['NO_induk_diknas'])): ?><small class="du-history-nis">Diknas <?= htmlspecialchars($row['NO_induk_diknas']) ?></small><?php endif; ?></td>
-                <td data-label="Nama Siswa"><?= unit_record_badge($row) ?><?= htmlspecialchars($row['NAMA']) ?></td>
-                <td data-label="Kelas" class="kelas-col"><span class="kelas-badge">Kelas <?= htmlspecialchars($row['kelas_transaksi']) ?></span></td>
-                <td data-label="Bulan / Tahun">
-                  <?= htmlspecialchars(month_code($row['BULAN'])) ?> <?= $row['TAHUN'] ?>
-                  <?php if ((int)($row['payment_batch_count'] ?? 1) === 12): ?>
-                  <small class="du-history-nis">Struk <?= (int)$row['payment_batch_sequence'] ?>/12</small>
-                  <?php endif; ?>
-                </td>
-                <td data-label="SPP" class="nominal">Rp <?= number_format($row['U_SPP'], 0, ',', '.') ?></td>
-                <td data-label="Sistem"><?= htmlspecialchars($row['sistem_pembayaran'] ?? 'VA') ?></td>
-                <td data-label="Total Bayar" class="nominal">Rp <?= number_format($row['total_jumlah'], 0, ',', '.') ?></td>
-                <td data-label="Bayar / Update">
-                  <span class="date-time-cell">
-                    <strong>Bayar: <?= htmlspecialchars($paymentDateTime['date']) ?></strong>
-                    <small><?= htmlspecialchars($paymentDateTime['time']) ?></small>
-                    <?php if ($isArchive): ?>
-                    <small class="date-time-updated">Dihapus: <?= htmlspecialchars(spp_date_label($row['_deleted_event']['occurred_at'],true)) ?></small>
-                    <?php elseif ($wasUpdated): ?>
-                    <small class="date-time-updated">Diubah: <?= htmlspecialchars($updatedDateTime['date']) ?> <?= htmlspecialchars($updatedDateTime['time']) ?></small>
-                    <?php endif; ?>
-                  </span>
-                </td>
-                <td data-label="Operator" class="payment-operator-cell"><?= payment_operator_html($operatorSummary) ?></td>
-                <td data-label="Aksi" class="aksi-col">
-                  <?php if ($isArchive): ?>
-                  <span class="master-status is-inactive">Transaksi dihapus</span>
-                  <?php elseif ($canEdit): ?>
-                  <a href="<?= htmlspecialchars($editUrl) ?>" class="btn-tbl btn-tbl-edit" title="Edit">
-                    <svg width="13" height="13" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.5" stroke-linecap="round" stroke-linejoin="round"><path d="M11 4H4a2 2 0 0 0-2 2v14a2 2 0 0 0 2 2h14a2 2 0 0 0 2-2v-7"/><path d="M18.5 2.5a2.121 2.121 0 0 1 3 3L12 15l-4 1 1-4 9.5-9.5z"/></svg>
-                    Edit
-                  </a>
-                  <button type="button" class="btn-tbl btn-tbl-del open-payment-delete-request" data-id="<?= (int)$row['id'] ?>" data-student="<?= htmlspecialchars($row['NAMA'], ENT_QUOTES, 'UTF-8') ?>" title="<?= isRole('kasir') ? 'Ajukan penghapusan' : 'Hapus transaksi' ?>">
-                    <svg width="13" height="13" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.5" stroke-linecap="round" stroke-linejoin="round"><polyline points="3 6 5 6 21 6"/><path d="M19 6l-1 14a2 2 0 0 1-2 2H8a2 2 0 0 1-2-2L5 6"/></svg>
-                    <?= isRole('kasir') ? 'Ajukan Hapus' : 'Hapus' ?>
-                  </button>
-                  <?php if ((int)($row['payment_batch_count'] ?? 1) === 12): ?>
-                  <a href="../laporan/cetak_struk_tahunan.php?batch=<?= urlencode((string)$row['payment_batch_token']) ?>" class="btn-tbl btn-tbl-print" target="_blank" rel="noopener" title="Cetak seluruh struk tahunan">12 Struk</a>
-                  <?php endif; ?>
-                  <?php elseif ($pendingRequest): ?>
-                  <span class="authorization-status authorization-status-pending">Menunggu <?= htmlspecialchars(transaction_authorization_action_label($pendingRequest['action'])) ?></span>
-                  <?php elseif ((int)($row['payment_link_version'] ?? 0) !== 1): ?>
-                  <span class="master-status is-inactive" title="Transaksi lama tanpa relasi eksplisit">Legacy — rekonsiliasi manual</span>
-                  <?php else: ?>
-                  <span aria-label="Tidak ada aksi">—</span>
-                  <?php endif; ?>
-                  <button type="button" class="btn-tbl open-payment-activity" data-id="<?= (int)$row['id'] ?>">Riwayat Aktivitas</button>
-                </td>
-              </tr>
-              <?php endforeach;
-              else: ?>
-              <tr><td colspan="11">
-                <div class="empty-state">
-                  <svg width="48" height="48" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.5" stroke-linecap="round" stroke-linejoin="round"><path d="M13 2H6a2 2 0 0 0-2 2v16a2 2 0 0 0 2 2h12a2 2 0 0 0 2-2V9z"/><polyline points="13 2 13 9 20 9"/></svg>
-                  <p><?= $isArchive ? "Belum ada transaksi terhapus pada periode ini" : "Belum ada data pembayaran" ?></p>
-                  <a href="form.php" class="btn btn-primary" style="margin-top:12px">+ Input Pembayaran</a>
-                </div>
-              </td></tr>
-              <?php endif; ?>
-            </tbody>
-          </table>
-        </div>
-        <?php render_pagination('lihat.php', $paymentPaginationQuery, $page, $totalPages, $totalPayments, $perPage, 'transaksi'); ?>
+        </form></section>
+      <div class="ph-workspace" data-payment-workspace data-view="<?= $isArchive?'deleted':'active' ?>">
+      <section class="ph-list-panel"><header class="ph-panel-heading"><div><h3><?= authorization_icon('history') ?> Daftar Transaksi</h3><p>Menampilkan <?= $firstShown ?>&ndash;<?= $lastShown ?> dari <?= number_format($totalPayments) ?> transaksi<?= $isArchive?' dihapus':'' ?>.</p></div><div class="ph-list-nav"><small><?= $firstShown ?>&ndash;<?= $lastShown ?> dari <?= number_format($totalPayments) ?></small><?php foreach(['Sebelumnya'=>$page-1,'Berikutnya'=>$page+1] as $label=>$target): ?><a class="btn btn-ghost btn-sm <?= $target<1||$target>$totalPages?'is-disabled':'' ?>" aria-label="Halaman <?= strtolower($label) ?>" <?= $target<1||$target>$totalPages?'aria-disabled="true" tabindex="-1"':'' ?> href="<?= $target>=1&&$target<=$totalPages?'lihat.php?'.htmlspecialchars(http_build_query(array_merge($_GET,['page'=>$target,'selected'=>null]))):'#' ?>"><?= authorization_icon($label==='Sebelumnya'?'left':'right') ?></a><?php endforeach; ?></div></header>
+      <div class="ph-record-list">
+      <?php foreach($paymentRows as $i=>$row): $id=(int)$row['id'];$href='lihat.php?'.http_build_query(array_merge($_GET,['selected'=>$id])); ?>
+      <a href="<?= authorization_escape($href) ?>" class="ph-record <?= $id===$selectedId?'is-selected':'' ?> <?= $isArchive?'is-deleted':'' ?>" data-payment-record data-id="<?= $id ?>" data-unit="<?= (int)$row['unit_id'] ?>" <?= $id===$selectedId?'aria-current="true"':'' ?>><span class="ph-record-number"><?= $offset+$i+1 ?></span><span class="ph-record-icon"><?= authorization_icon('student') ?></span><div class="ph-record-identity"><strong><?= authorization_escape($row['NO_INDUK']) ?></strong><span><?= authorization_escape($row['NAMA']) ?></span><small>Diknas <?= authorization_escape($row['NO_induk_diknas']??'Tidak tercatat') ?></small><?= unit_record_badge($row) ?></div><span class="kelas-badge">Kelas <?= authorization_escape($row['kelas_transaksi']) ?></span><div class="ph-record-period"><small>Periode</small><span><?= authorization_icon('calendar') ?> <?= authorization_escape(payment_history_period($row)) ?></span></div><div class="ph-record-total"><small>Total Bayar</small><strong><?= payment_history_money($row['total_jumlah']) ?></strong></div><span class="ph-status <?= $isArchive?'is-deleted':'' ?>"><?= $isArchive?'Dihapus':'Aktif' ?></span><?= authorization_icon('right') ?></a>
+      <?php endforeach; ?>
+      <?php if(!$paymentRows): ?><div class="ph-empty"><?= authorization_icon('history') ?><h3>Tidak ada transaksi sesuai filter</h3><p><?= $isArchive?'Arsip menggunakan tanggal penghapusan.':'Ubah periode atau pencarian siswa untuk melihat transaksi lain.' ?></p></div><?php endif; ?>
+      </div>
+      <?php render_pagination('lihat.php',$paymentPaginationQuery,$page,$totalPages,$totalPayments,$perPage,'transaksi'); ?>
       </section>
+      <section class="ph-detail-panel" data-payment-detail-panel><header class="ph-panel-heading"><div><h3><?= authorization_icon('history') ?> Detail Transaksi</h3><p>Informasi lengkap transaksi pembayaran siswa.</p></div><div class="ph-detail-nav"><button type="button" class="btn btn-ghost btn-sm" data-payment-prev aria-label="Transaksi sebelumnya"><?= authorization_icon('left') ?></button><button type="button" class="btn btn-ghost btn-sm" data-payment-next aria-label="Transaksi berikutnya"><?= authorization_icon('right') ?></button><button type="button" class="btn btn-ghost btn-sm" data-payment-close aria-label="Tutup detail"><?= authorization_icon('close') ?></button></div></header><div class="ph-detail-body" data-payment-detail aria-live="polite"><?php if($selectedModel): payment_history_render($selectedModel); else: ?><p class="ph-empty"><?= authorization_escape($detailError??'Pilih transaksi pada daftar untuk melihat detail.') ?></p><?php endif; ?></div></section>
+      </div></div>
     </main>
   </div>
 
@@ -375,9 +289,9 @@ if(count($displayMatches)===1)$studentSearchDisplay=$displayMatches[0]['NAMA'];
       <input type="hidden" name="aksi" value="hapus" />
       <input type="hidden" name="id" id="payment-delete-request-id" value="" />
       <input type="hidden" name="csrf_token" value="<?= htmlspecialchars($_SESSION['csrf_payment']) ?>" />
-      <h3 id="payment-delete-request-title"><?= isRole('kasir') ? 'Ajukan penghapusan transaksi' : 'Hapus transaksi' ?></h3>
-      <p id="payment-delete-request-copy"><?= isRole('kasir') ? 'Transaksi tidak akan dihapus sebelum disetujui administrator.' : 'Transaksi akan langsung dihapus setelah Anda menyimpan tindakan ini.' ?></p>
-      <?php if (isRole('kasir')): ?>
+      <h3 id="payment-delete-request-title"><?= transaction_authorization_requires_request() ? 'Ajukan penghapusan transaksi' : 'Hapus transaksi' ?></h3>
+      <p id="payment-delete-request-copy"><?= transaction_authorization_requires_request() ? 'Transaksi tidak akan dihapus sebelum disetujui Super Admin.' : 'Transaksi akan langsung dihapus setelah Anda menyimpan tindakan ini.' ?></p>
+      <?php if (transaction_authorization_requires_request()): ?>
       <label class="field-row">
         <span class="field-label">Alasan penghapusan</span>
         <textarea class="field-input" name="authorization_reason" rows="4" minlength="5" maxlength="500" required placeholder="Jelaskan alasan transaksi perlu dihapus."></textarea>
@@ -385,7 +299,7 @@ if(count($displayMatches)===1)$studentSearchDisplay=$displayMatches[0]['NAMA'];
       <?php endif; ?>
       <div class="authorization-modal-actions">
         <button type="button" class="btn btn-ghost" id="payment-delete-request-cancel">Batal</button>
-        <button type="submit" class="btn btn-danger"><?= isRole('kasir') ? 'Ajukan Penghapusan' : 'Hapus Transaksi' ?></button>
+        <button type="submit" class="btn btn-danger"><?= transaction_authorization_requires_request() ? 'Ajukan Penghapusan' : 'Hapus Transaksi' ?></button>
       </div>
     </form>
   </div>
@@ -395,6 +309,7 @@ if(count($displayMatches)===1)$studentSearchDisplay=$displayMatches[0]['NAMA'];
       <button type="button" class="btn btn-ghost btn-sm" data-close-activity aria-label="Tutup riwayat aktivitas">Tutup</button>
     </header><div class="payment-activity-content" aria-live="polite"></div>
   </dialog>
+  <script src="../assets/js/payment_history.js?v=<?= filemtime(__DIR__.'/../assets/js/payment_history.js') ?>"></script>
   <script src="../assets/js/payment_activity.js?v=<?= filemtime(__DIR__ . "/../assets/js/payment_activity.js") ?>"></script>
   <script src="../assets/js/date_format.js?v=<?= filemtime(__DIR__ . '/../assets/js/date_format.js') ?>"></script>
   <script src="../assets/js/app.js?v=<?= filemtime(__DIR__ . '/../assets/js/app.js') ?>"></script>
@@ -403,15 +318,19 @@ if(count($displayMatches)===1)$studentSearchDisplay=$displayMatches[0]['NAMA'];
     const modal = document.getElementById('payment-delete-request-modal');
     const idInput = document.getElementById('payment-delete-request-id');
     const copy = document.getElementById('payment-delete-request-copy');
-    const close = () => { modal.hidden = true; document.body.classList.remove('modal-open'); };
-    document.querySelectorAll('.open-payment-delete-request').forEach(button => button.addEventListener('click', event => {
+    const close = () => { modal.hidden = true; document.body.classList.remove('modal-open'); opener?.focus(); };
+    let opener=null;
+    document.addEventListener('click', event => {
+      const button=event.target.closest('.open-payment-delete-request');if(!button)return;opener=button;
       event.stopPropagation();
       idInput.value = button.dataset.id || '';
-      copy.textContent = <?= json_encode(isRole('kasir') ? 'Penghapusan transaksi %s menunggu persetujuan administrator.' : 'Transaksi %s akan langsung dihapus setelah tindakan ini disimpan.') ?>.replace('%s', button.dataset.student || 'siswa');
+      copy.textContent = <?= json_encode(transaction_authorization_requires_request() ? 'Penghapusan transaksi %s menunggu persetujuan Super Admin.' : 'Transaksi %s akan langsung dihapus setelah tindakan ini disimpan.') ?>.replace('%s', button.dataset.student || 'siswa');
       modal.hidden = false;
       document.body.classList.add('modal-open');
       (modal.querySelector('textarea') || modal.querySelector('button[type="submit"]')).focus();
-    }));
+    });
+    modal.addEventListener('keydown',event=>{if(event.key==='Escape')close();if(event.key==='Tab'){const items=[...modal.querySelectorAll('textarea,button')];const first=items[0],last=items.at(-1);if(event.shiftKey&&document.activeElement===first){event.preventDefault();last.focus();}else if(!event.shiftKey&&document.activeElement===last){event.preventDefault();first.focus();}}});
+    modal.querySelector('form').addEventListener('submit',event=>{if(event.target.dataset.sending){event.preventDefault();return;}event.target.dataset.sending='1';event.target.querySelector('[type=submit]').disabled=true;});
     document.getElementById('payment-delete-request-cancel')?.addEventListener('click', close);
     modal?.addEventListener('click', event => { if (event.target === modal) close(); });
   })();

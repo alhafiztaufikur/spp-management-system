@@ -7,6 +7,7 @@ require_once '../includes/tagihan_tahunan.php';
 require_once '../includes/tagihan_sekali.php';
 require_once '../includes/komite_billing.php';
 requireRole(['admin', 'bendahara', 'kasir']);
+require_once __DIR__.'/../includes/payment_permissions.php';
 
 header('Cache-Control: no-store, no-cache, must-revalidate, max-age=0');
 
@@ -128,6 +129,8 @@ if (!$ids) {
     header('Location: index.php');
     exit;
 }
+
+if (!payment_can_print_batch($koneksi,$batchToken)) { http_response_code(403); exit('Kelompok struk terkunci: setiap transaksi harus milik pembuat awal.'); }
 
 $paymentStmt = $koneksi->prepare("
     SELECT b.*, s.NAMA, s.NO_induk_diknas, s.KELAS AS KELAS_SISWA, s.PSB,

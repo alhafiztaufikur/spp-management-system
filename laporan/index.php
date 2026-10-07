@@ -5,6 +5,7 @@
 session_start();
 require_once '../koneksi.php';
 require_once '../includes/auth.php';
+require_once '../includes/payment_permissions.php';
 require_once '../includes/pagination.php';
 require_once '../includes/daftar_ulang.php';
 require_once '../includes/kelas.php';
@@ -102,8 +103,10 @@ $reportTypes = [
     'belum_du' => 'Daftar ulang belum lunas',
     'belum_biaya_lain' => 'Biaya lain belum lunas',
 ];
-$report_type = $_GET['jenis_laporan'] ?? 'semua';
-if (!isset($reportTypes[$report_type])) $report_type = 'semua';
+require_once '../includes/general_multiple.php';
+$generalChoices=general_choices($_GET);$report_type=filter_scalar($generalChoices,'semua');
+$generalMultiple=is_array($_GET['jenis_laporan']??null);
+filter_output_start();
 
 $sortOptions = [
     'terbaru' => 'Terbaru',
@@ -220,7 +223,12 @@ $totalDetailRows = 0;
 $totalPages = 1;
 $offset = 0;
 
-if (!$isUnpaidReport) {
+if($generalMultiple){
+    $generalSections=general_sections($koneksi,$generalChoices,$periodStart,$periodEnd,$filter_q,$sort);
+    $generalAllRows=[];foreach($generalSections as $sectionIndex=>$section)foreach($section['rows'] as $row){$row['_section']=$sectionIndex;$generalAllRows[]=$row;}
+    $totalDetailRows=count($generalAllRows);$totalPages=total_pages($totalDetailRows,$perPage);$page=min($page,$totalPages);$offset=($page-1)*$perPage;
+    $generalPageRows=array_slice($generalAllRows,$offset,$perPage);
+} elseif (!$isUnpaidReport) {
     $whereDetail = 'b.TGL_BYR >= ? AND b.TGL_BYR < ?';
     $detailTypes = 'ss';
     $detailParams = [$periodStart, $periodEnd];
@@ -256,7 +264,7 @@ if (!$isUnpaidReport) {
     $offset = ($page - 1) * $perPage;
 
     $stmt4 = $koneksi->prepare("
-        SELECT b.id, s.NO_INDUK, s.NO_induk_diknas, s.NAMA,
+        SELECT b.id, b.unit_id, s.NO_INDUK, s.NO_induk_diknas, s.NAMA,
                COALESCE(NULLIF(b.kelas_rombel_snapshot,''),NULLIF(b.KELAS,''),s.KELAS) AS KELAS,
                b.BULAN, b.TAHUN,
                b.U_PSB, b.U_SPP, b.U_KOMITE,
@@ -380,7 +388,10 @@ $laporanPaginationQuery = pagination_query([
     'urut' => $sort,
     'per_page' => $perPage,
 ]);
-$exportQuery = http_build_query([
+$laporanPaginationQuery=filter_query($laporanPaginationQuery);
+$exportQuery = filter_build_query([
+    'jenis_laporan' => $generalMultiple?$generalChoices:$report_type,
+    'urut' => $sort,
     'unit' => $reportUnitId===0?'all':'active',
     'bulan' => $filter_bulan,
     'tahun' => $filter_tahun,
@@ -466,7 +477,7 @@ $exportQuery = http_build_query([
           </div>
           <div class="field-row">
             <label class="field-label">Jenis laporan</label>
-            <select class="field-input field-select" name="jenis_laporan">
+            <select class="field-input field-select" name="jenis_laporan" data-filter-multiple>
               <?php foreach ($reportTypes as $key => $label): ?>
               <option value="<?= report_e($key) ?>" <?= $report_type === $key ? 'selected' : '' ?>><?= report_e($label) ?></option>
               <?php endforeach; ?>
@@ -585,12 +596,13 @@ $exportQuery = http_build_query([
             <h3 class="card-title"><?= report_e($reportTypes[$report_type]) ?> - <?= report_e($isUnpaidReport ? ($bulan_label . ' ' . $filter_tahun) : $periodLabel) ?></h3>
             <span class="badge-count"><?= number_format($totalDetailRows) ?> <?= $isUnpaidReport ? 'siswa/tagihan' : 'transaksi' ?></span>
           </div>
-          <?php if (!$isUnpaidReport && !empty($bayar_detail)): ?>
+          <?php if (!$generalMultiple && !$isUnpaidReport && !empty($bayar_detail)): ?>
           <button type="submit" form="print-selected-form" class="btn btn-warning btn-print-selected" id="btn-print-selected" disabled>Cetak Dipilih</button>
           <?php endif; ?>
         </div>
 
-        <?php if ($isUnpaidReport): ?>
+        <?php if($generalMultiple): $sectionStart=$offset;foreach($generalSections as $sectionIndex=>$section){$rows=array_values(array_filter($generalPageRows,static fn($r)=>$r['_section']===$sectionIndex));if(!$rows&&$section['rows'])continue;$section['rows']=$rows;echo general_section_html($section,$sectionStart);$sectionStart+=count($rows);}render_pagination('index.php',$laporanPaginationQuery,$page,$totalPages,$totalDetailRows,$perPage,'baris'); ?>
+        <?php elseif ($isUnpaidReport): ?>
         <div class="table-container">
           <table class="payment-table report-unpaid-table">
             <thead><tr><th>No</th><th>No. Induk</th><th>Nama</th><th class="kelas-col">Kelas</th><?php if ($report_type === 'belum_biaya_lain'): ?><th>Komponen</th><?php endif; ?><th>Tagihan</th><th>Sudah Bayar</th><th>Sisa</th></tr></thead>
@@ -632,7 +644,7 @@ $exportQuery = http_build_query([
               <tbody>
                 <?php if (empty($bayar_detail)): ?>
                 <tr><td colspan="10" style="text-align:center;padding:40px;color:var(--text-muted);">Belum ada data pembayaran pada pilihan laporan ini.</td></tr>
-                <?php else: foreach ($bayar_detail as $i => $b): ?>
+                <?php else: $receiptGroups=payment_activity_for_payments($koneksi,array_column($bayar_detail,'id')); foreach ($bayar_detail as $i => $b): $receiptCaps=payment_capabilities($koneksi,$b,$receiptGroups[(int)$b['id']]??[],false,[]); ?>
                 <tr class="<?= $i%2===0?'row-highlight':'' ?>">
                   <td class="select-col"><input type="checkbox" class="select-print-check row-print-check" name="ids[]" value="<?= (int)$b['id'] ?>" aria-label="Pilih transaksi <?= report_e($b['NAMA']) ?>"></td>
                   <td><?= $offset + $i + 1 ?></td>
@@ -643,7 +655,7 @@ $exportQuery = http_build_query([
                   <td><?= report_e($b['sistem_pembayaran'] ?? 'VA') ?></td>
                   <td class="nominal"><?= report_money($b['total_jumlah']) ?></td>
                   <td><?= spp_date_label($b['TGL_BYR'],true) ?></td>
-                  <td class="aksi-col"><a class="btn-tbl btn-tbl-print" href="cetak_struk.php?id=<?= (int)$b['id'] ?>" target="_blank" rel="noopener">Cetak</a></td>
+                  <td class="aksi-col"><?php if($receiptCaps['can_print']): ?><a class="btn-tbl btn-tbl-print" href="cetak_struk.php?id=<?= (int)$b['id'] ?>" target="_blank" rel="noopener">Cetak</a><?php else: ?><span class="report-secondary-id">Terkunci</span><?php endif; ?></td>
                 </tr>
                 <?php endforeach; endif; ?>
               </tbody>

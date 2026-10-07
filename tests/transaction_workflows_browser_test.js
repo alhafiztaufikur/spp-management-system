@@ -6,6 +6,7 @@ const ids=JSON.parse(fs.readFileSync(process.env.SPP_UI_IDS_FILE,'utf8').replace
 const url=path=>new URL(path,base).href;
 async function login(page,name){await page.goto(url('/login.php'));await page.locator('#username').fill(name);await page.locator('#password').fill(password);await Promise.all([page.waitForNavigation(),page.locator('#btn-login').click()]);assert.ok(!page.url().endsWith('/login.php'));}
 async function unit(page,value){await page.goto(url('/dashboard.php'));await Promise.all([page.waitForNavigation(),page.locator('#sidebar-unit-select').selectOption(String(value))]);}
+async function chooseRecipient(page,index){await page.locator('.parent-recipient').nth(index).click();await page.waitForFunction(i=>document.querySelectorAll('.parent-recipient')[i].getAttribute('aria-pressed')==='true',index);await page.waitForFunction(()=>document.getElementById('parent-message').contentEditable==='true');}
 (async()=>{
  const browser=await chromium.launch({channel:'chrome',headless:true});const errors=[];
  try{
@@ -13,8 +14,8 @@ async function unit(page,value){await page.goto(url('/dashboard.php'));await Pro
   for(const owner of process.env.SPP_TEST_ONLY_COMBINED==='1'?[]:[1,2,3]){
    await unit(page,owner);
    await page.goto(url('/otorisasi_transaksi.php?view=history'));
-   assert.equal(await page.locator('.authorization-history-table tbody tr').count(),25);
-   await page.getByRole('link',{name:'Berikutnya',exact:true}).click();assert.ok((await page.locator('.authorization-history-table tbody tr').count())>0);
+   assert.equal(await page.locator('[data-auth-record]').count(),25);
+   await page.getByRole('link',{name:'Berikutnya',exact:true}).click();assert.ok((await page.locator('[data-auth-record]').count())>0);
    await page.goto(url('/otorisasi_transaksi.php?view=history&q='+ids[owner].nis));
    await page.locator('.open-payment-activity[data-id="'+ids[owner].id+'"]').click();await page.locator('.payment-activity-event').first().waitFor();
    const history=await page.locator('#payment-activity-dialog').innerText();
@@ -36,8 +37,8 @@ async function unit(page,value){await page.goto(url('/dashboard.php'));await Pro
    await page.goto(url('/laporan/surat_orang_tua_susun.php?mode=selected&students='+encodeURIComponent(keys.join(','))));
    assert.equal(await page.locator('.parent-recipient').count(),2);
    await page.locator('#parent-message').fill('Pesan pertama <b>aman</b> & orang tua.\n\nParagraf kedua.');
-   await page.locator('.parent-recipient').nth(1).click();await page.locator('#parent-message').fill('Pesan kedua khusus siswa berbeda.');
-   await page.locator('.parent-recipient').first().click();assert.ok((await page.locator('#parent-message').inputValue()).includes('Pesan pertama'));
+   await chooseRecipient(page,1);await page.locator('#parent-message').fill('Pesan kedua khusus siswa berbeda.');
+   await chooseRecipient(page,0);await page.waitForFunction(()=>document.querySelector('.parent-recipient').getAttribute('aria-pressed')==='true');assert.ok((await page.locator('#parent-message').innerText()).includes('Pesan pertama'));
    const data=JSON.parse(await page.locator('#parent-draft-data').textContent());
    const forbidden=await page.request.post(url('/laporan/surat_orang_tua_draf.php'),{data:{draft:data.token,messages:{}}});assert.equal(forbidden.status(),403);
    const invalid=await page.request.post(url('/laporan/surat_orang_tua_draf.php'),{data:{draft:data.token,messages:{'99|foreign':'malicious'}},headers:{'X-CSRF-Token':data.csrf}});assert.equal(invalid.status(),400);
@@ -45,7 +46,7 @@ async function unit(page,value){await page.goto(url('/dashboard.php'));await Pro
    const pdf=await page.request.get(url('/laporan/surat_orang_tua_pdf.php?draft='+data.token));assert.equal(pdf.status(),200);
    const pdfData=await pdf.body();assert.ok(pdfData.subarray(0,4).toString()==='%PDF');if(output)fs.writeFileSync(output+'/parent-'+owner+'.pdf',pdfData);
    const download=await page.request.get(url('/laporan/surat_orang_tua_pdf.php?draft='+data.token+'&download=1'));assert.ok(download.headers()['content-disposition'].includes('attachment'));
-   await page.getByRole('link',{name:'Kembali ke penyusunan'}).click();await page.locator('.parent-recipient').nth(1).click();assert.equal(await page.locator('#parent-message').inputValue(),'Pesan kedua khusus siswa berbeda.');
+   await page.getByRole('link',{name:'Kembali ke penyusunan'}).click();await chooseRecipient(page,1);await page.waitForFunction(()=>document.querySelectorAll('.parent-recipient')[1].getAttribute('aria-pressed')==='true');assert.equal(await page.locator('#parent-message').innerText(),'Pesan kedua khusus siswa berbeda.');
    // Single, class, and all modes retain the expected recipient selection.
    await page.goto(links[0]);assert.equal(await page.locator('.parent-recipient').count(),1);
    for(const query of ['mode=class&kelas='+encodeURIComponent(classChoice),'mode=all']){await page.goto(url('/laporan/surat_orang_tua_susun.php?'+query));assert.ok(await page.locator('.parent-recipient').count()>0);}
@@ -71,7 +72,7 @@ async function unit(page,value){await page.goto(url('/dashboard.php'));await Pro
   await unit(page,0);
   if(!selectedKeys.length){await page.goto(url('/laporan/surat_orang_tua.php'));const available=await page.locator('.letter-action-cell a').evaluateAll(nodes=>nodes.map(a=>new URL(a.href).searchParams.get('student_key')));for(const owner of [1,2,3])selectedKeys.push(available.find(key=>key.startsWith(owner+'|')));}
   await page.goto(url('/laporan/surat_orang_tua_susun.php?mode=selected&students='+encodeURIComponent(selectedKeys.join(','))));assert.equal(await page.locator('.parent-recipient').count(),3);
-  for(let index=0;index<3;index++){await page.locator('.parent-recipient').nth(index).click();await page.locator('#parent-message').fill('Pesan gabungan unit '+(index+1));}
+  for(let index=0;index<3;index++){await chooseRecipient(page,index);await page.locator('#parent-message').fill('Pesan gabungan unit '+(index+1));}
   await page.locator('#parent-preview').click();await page.waitForURL('**&preview=1');const combinedToken=new URL(page.url()).searchParams.get('draft');
   const combined=await page.request.get(url('/laporan/surat_orang_tua_pdf.php?draft='+combinedToken));assert.equal(combined.status(),200);if(output)fs.writeFileSync(output+'/parent-combined.pdf',await combined.body());
   await page.locator('#parent-print').click();

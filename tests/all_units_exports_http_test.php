@@ -1,4 +1,5 @@
 <?php
+require_once __DIR__.'/excel_test_helpers.php';
 if(PHP_SAPI!=='cli'||getenv('SPP_TEST_ALLOW_MUTATION')!=='1'||!preg_match('/^db_spp_audit_[a-z0-9_]+$/D',(string)getenv('SPP_DB_NAME')))exit(1);
 ob_start();
 require __DIR__.'/../koneksi.php';require __DIR__.'/../includes/reports.php';require __DIR__.'/http_form_scope.php';
@@ -18,7 +19,7 @@ try{
  foreach(array_keys(report_registry()) as $template){
   $params=['template'=>$template,'tanggal_awal'=>'2026-01-01','tanggal_akhir'=>'2026-12-31','tahun_ajaran'=>'2026/2027','siswa_status'=>'all','kategori'=>in_array($template,['status','per-item'],true)?'spp':'semua','bulan_awal'=>'07','bulan_akhir'=>'06','tahun_awal'=>2026,'tahun_akhir'=>2027,'per_page'=>100];
   $report=report_build($koneksi,$template,report_filters($koneksi,$params));$query=http_build_query($params);
-  $screen=export_get($base.'/laporan/template.php?'.$query,$sid);$excel=export_get($base.'/laporan/export_global.php?'.$query.'&format=excel&download=1',$sid);$pdf=export_pdf_text(export_get($base.'/laporan/export_global.php?'.$query.'&format=pdf&download=1',$sid));
+  $screen=export_get($base.'/laporan/template.php?'.$query,$sid);$excel=test_excel_html(export_get($base.'/laporan/export_global.php?'.$query.'&format=excel&download=1',$sid));$pdf=export_pdf_text(export_get($base.'/laporan/export_global.php?'.$query.'&format=pdf&download=1',$sid));
   foreach(['screen'=>$screen,'excel'=>$excel,'pdf'=>$pdf] as $format=>$body){
    export_assert(!str_contains($body,'Gagal memuat laporan')&&!str_contains($body,'Fatal error'),"$template/$format rendering failed");
    $text=$format==='pdf'?$body:html_entity_decode(strip_tags($body),ENT_QUOTES,'UTF-8');$normalized=preg_replace('/\s+/','',$text);
@@ -32,6 +33,7 @@ try{
   }
   echo "OK: $template database/screen/Excel/PDF reconciled\n";
  }
+ if(!in_array('--reports-only',$argv,true)){
  // Combined access must still print the school belonging to each student.
  foreach([1=>'SEKOLAH DASAR',2=>'SEKOLAH MENENGAH PERTAMA',3=>'SEKOLAH MENENGAH ATAS'] as $unitId=>$school){
   $student=$koneksi->query('SELECT s.NO_INDUK,b.id FROM siswa s JOIN bayar b ON b.NO_INDUK=s.NO_INDUK AND b.unit_id=s.unit_id WHERE s.unit_id='.$unitId.' ORDER BY b.id DESC LIMIT 1')->fetch_assoc();
@@ -49,5 +51,6 @@ try{
   $parent=export_pdf_text(export_get($base.'/laporan/surat_orang_tua_pdf.php?draft='.rawurlencode($draftData['token']),$sid));
   export_assert(str_contains(preg_replace('/\s+/',' ',$parent),$school),"Parent PDF school mismatch for unit $unitId");
   echo "OK: unit $unitId receipt and book/parent PDF use owning school in combined scope\n";
+ }
  }
 }finally{session_id($sid);session_start();$_SESSION=[];session_destroy();session_write_close();}

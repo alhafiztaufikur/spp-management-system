@@ -4,7 +4,8 @@
     "license": "proprietary",
     "require": {
         "ext-gd": "*",
-        "dompdf/dompdf": "^3.1.6"
+        "dompdf/dompdf": "^3.1.6",
+        "phpoffice/phpspreadsheet": "^1.30.7"
     },
     "config": {
         "platform": {

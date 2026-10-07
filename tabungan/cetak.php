@@ -18,6 +18,9 @@ $students = $koneksi->query("
 $classes = array_values(array_unique(array_map(static fn(array $student): string => (string)$student['KELAS'], $students)));
 sort($classes, SORT_NATURAL);
 
+require_once '../includes/filter_choices.php';
+filter_register('kelas',$_GET['kelas']??null,array_combine($classes,$classes));filter_output_start();
+
 function print_book_escape($value): string
 {
     return htmlspecialchars((string)$value, ENT_QUOTES, 'UTF-8');
@@ -81,7 +84,7 @@ function print_book_escape($value): string
           <div class="savings-print-fields">
             <div class="field-row">
               <label class="field-label" for="savings-print-class">Kelas</label>
-              <select class="field-input field-select" id="savings-print-class">
+              <select class="field-input field-select" id="savings-print-class" name="kelas" data-filter-multiple data-filter-persist>
                 <option value="">Semua kelas</option>
                 <?php foreach ($classes as $class): ?>
                 <option value="rombel:<?= print_book_escape($class) ?>">Kelas <?= print_book_escape($class) ?></option>

@@ -16,14 +16,14 @@ $sessionId = bin2hex(random_bytes(16));
 $fixtureCreated = false;
 $failure = null;
 try {
-    $account = $koneksi->query("SELECT id FROM admin WHERE role='admin' AND unit_id=1 AND is_active=1 ORDER BY id LIMIT 1")->fetch_assoc();
+    $account = $koneksi->query("SELECT id FROM admin WHERE role='super_admin' AND is_active=1 ORDER BY id LIMIT 1")->fetch_assoc();
     if (!$account) throw new RuntimeException('Akun admin clone tidak tersedia.');
     $stmt = $koneksi->prepare("INSERT INTO siswa(NO_INDUK,NAMA,KELAS,is_active) VALUES(?,?,'1',1)");
     $stmt->bind_param('ss', $nis, $name); $stmt->execute(); $stmt->close();
     $fixtureCreated = true;
 
     session_id($sessionId); session_start();
-    $_SESSION = ['admin_id'=>(int)$account['id'], 'admin_role'=>'admin',
+    $_SESSION = ['admin_id'=>(int)$account['id'], 'admin_role'=>'super_admin',
         'active_unit_id'=>1, 'admin_nama'=>'Uji Ekspor'];
     session_write_close();
     $url = rtrim((string)getenv('SPP_HTTP_BASE'), '/') . '/siswa/export_excel.php?'
@@ -37,13 +37,10 @@ try {
     if ($body === false || !str_contains($headers[0] ?? '', '200')) {
         throw new RuntimeException('Unduhan Excel Data Siswa tidak tersedia.');
     }
-    if ($expectUnsafe) {
-        if (!str_contains($body, '<td>=1+1</td>')) {
-            throw new RuntimeException('Reproduksi sebelum perbaikan tidak menemukan formula pada sel nama.');
-        }
-    } elseif (!str_contains($body, '<td>&#039;=1+1</td>') || str_contains($body, '<td>=1+1</td>')) {
-        throw new RuntimeException('Sel nama di unduhan Excel masih dapat dibaca sebagai formula.');
-    }
+    require_once __DIR__.'/excel_test_helpers.php';
+    $book=test_excel_read($body);$found=false;foreach($book->getAllSheets() as $sheet)foreach($sheet->getCellCollection()->getCoordinates() as $coord){$cell=$sheet->getCell($coord);if($cell->getValue()===$name){$found=$cell->getDataType()==='s';}}$book->disconnectWorksheets();
+    if(!$found)throw new RuntimeException('Formula-like name was not exported as explicit text.');
+    if($expectUnsafe)throw new RuntimeException('XLSX writer does not emit unsafe formulas.');
 } catch (Throwable $error) {
     $failure = $error;
 } finally {

@@ -1,4 +1,5 @@
 <?php
+require_once __DIR__.'/excel_test_helpers.php';
 /**
  * Export reconciliation on a disposable clone after
  * historical_reports_after_promotion_test.php was run with
@@ -62,8 +63,9 @@ function matrix_export(string $template, array $params, string $session, array $
     $query = http_build_query(['template'=>$template] + $params);
     [$headers, $screen] = matrix_get('laporan/template.php?' . $query, $session);
     [$headers, $excel] = matrix_get('laporan/export_global.php?' . $query . '&format=excel&download=1', $session);
-    matrix_assert(str_contains(strtolower(implode("\n", $headers)), 'application/vnd.ms-excel'),
+    matrix_assert(str_contains(strtolower(implode("\n", $headers)), 'application/vnd.openxmlformats-officedocument.spreadsheetml.sheet'),
         "{$template}: respons Excel salah.");
+    $excel=test_excel_html($excel);
     foreach (['layar'=>$screen, 'Excel'=>$excel] as $surface=>$body) {
         foreach ($expected as $value) matrix_assert(str_contains($body, (string)$value),
             "{$template} {$surface} tidak memuat {$value}.");
@@ -150,8 +152,9 @@ try {
         matrix_assert(str_contains($emptyScreen,'0 baris'), "Tahun tanpa penempatan {$label} direkonstruksi.");
         [$headers, $emptyExcel] = matrix_get('laporan/export_global.php?' . http_build_query(['template'=>'spp-tahunan']+$empty)
             . '&format=excel&download=1', $session);
+        $emptyExcel=test_excel_html($emptyExcel);
         matrix_assert(!str_contains($emptyExcel,$nis)
-            && str_contains($emptyExcel,'Tidak ada data pada filter terpilih.'),
+            && str_contains($emptyExcel,'Tidak ada data sesuai filter.'),
             "Excel tahun tanpa penempatan {$label} tidak kosong.");
         if ($unit===3) {
             [$headers, $emptyPdf] = matrix_get('laporan/export_global.php?'
