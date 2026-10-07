@@ -13,6 +13,7 @@ require_once '../includes/tagihan_sekali.php';
 require_once '../includes/spp_billing.php';
 require_once '../includes/komite_billing.php';
 require_once '../includes/transaction_authorization.php';
+require_once '../includes/payment_return.php';
 requireRole(['admin', 'kasir']);
 if (empty($_SESSION['csrf_payment'])) $_SESSION['csrf_payment'] = bin2hex(random_bytes(32));
 $activeAcademicYear = du_current_academic_year();
@@ -22,7 +23,14 @@ $flash = $_SESSION['flash'] ?? null;
 unset($_SESSION['flash']);
 
 $id = (int)($_GET['id'] ?? 0);
-if ($id <= 0) { header('Location: lihat.php'); exit; }
+$returnContext = is_string($_GET['return_context'] ?? null) ? $_GET['return_context'] : '';
+$returnUrl = payment_return_url($returnContext, $id);
+$returnEntry = payment_return_entry($returnContext, $id);
+if (!empty($returnEntry['draft'])) {
+    $restoreDraft = $returnEntry['draft'];
+    ob_start(static fn($html) => payment_edit_restore_markup($html, $restoreDraft));
+}
+if ($id <= 0) { header('Location: ' . $returnUrl); exit; }
 
 $stmt = $koneksi->prepare("SELECT p.*, s.NO_INDUK, s.NAMA, s.KELAS, s.SPP_PERBULAN FROM bayar p JOIN siswa s ON s.NO_INDUK = p.NO_INDUK AND s.unit_id=p.unit_id WHERE p.id = ?");
 $stmt->bind_param('i', $id);
@@ -30,17 +38,17 @@ $stmt->execute();
 $d = $stmt->get_result()->fetch_assoc();
 $stmt->close();
 
-if (!$d) { $_SESSION['flash'] = ['type'=>'error','msg'=>'Data tidak ditemukan!']; header('Location: lihat.php'); exit; }
+if (!$d) { $_SESSION['flash'] = ['type'=>'error','msg'=>'Data tidak ditemukan!']; header('Location: ' . $returnUrl); exit; }
 try { payment_assert_owner($koneksi,$id,(int)$_SESSION['admin_id']); }
 catch (Throwable $error) { http_response_code(403); exit(htmlspecialchars($error->getMessage(),ENT_QUOTES,'UTF-8')); }
 if ((int)($d['payment_link_version'] ?? 0) !== 1) {
     $_SESSION['flash'] = ['type'=>'error','msg'=>'Pembayaran legacy tidak dapat diedit. Rekonsiliasi manual diperlukan terlebih dahulu.'];
-    header('Location: lihat.php');
+    header('Location: ' . $returnUrl);
     exit;
 }
 if (transaction_authorization_pending_for_payments($koneksi, [$id])) {
     $_SESSION['flash'] = ['type'=>'error','msg'=>'Transaksi ini masih menunggu keputusan otorisasi.'];
-    header('Location: lihat.php');
+    header('Location: ' . $returnUrl);
     exit;
 }
 
@@ -222,6 +230,19 @@ $stmt_biaya_lain->bind_param('i', $id);
 $stmt_biaya_lain->execute();
 $biaya_lain_details = $stmt_biaya_lain->get_result()->fetch_all(MYSQLI_ASSOC);
 $stmt_biaya_lain->close();
+if (isset($restoreDraft['biaya_lain_tagihan_id']) && is_array($restoreDraft['biaya_lain_tagihan_id'])) {
+    $originalDetails = array_column($biaya_lain_details, null, 'id');
+    $biaya_lain_details = [];
+    foreach (array_slice($restoreDraft['biaya_lain_tagihan_id'], 0, 100) as $index => $billId) {
+        $detailId = (int)($restoreDraft['biaya_lain_detail_id'][$index] ?? 0);
+        $original = $originalDetails[$detailId] ?? [];
+        $nominal = $restoreDraft['biaya_lain_nominal'][$index] ?? 0;
+        $biaya_lain_details[] = ['id'=>$original['id'] ?? '', 'tagihan_biaya_lain_id'=>is_scalar($billId)?(int)$billId:0,
+            'nama_biaya_snapshot'=>$original['nama_biaya_snapshot'] ?? '',
+            'nominal_snapshot'=>is_scalar($nominal)?(float)str_replace(['.',','],['','.'],(string)$nominal):0,
+            'keterangan'=>is_scalar($restoreDraft['biaya_lain_keterangan'][$index] ?? null)?(string)$restoreDraft['biaya_lain_keterangan'][$index]:''];
+    }
+}
 if (!$biaya_lain_details) {
     $biaya_lain_details[] = [
         'id' => '', 'master_biaya_lain_id' => '', 'tagihan_biaya_lain_id' => '', 'nama_biaya_snapshot' => '',
@@ -307,6 +328,7 @@ $selectedPaymentMethod = $d['sistem_pembayaran'] ?? 'VA';
 
         <form method="POST" action="../pembayaran/proses.php" id="form-bayar">
           <input type="hidden" name="aksi" value="update" />
+          <input type="hidden" name="return_context" value="<?= htmlspecialchars($returnContext, ENT_QUOTES, 'UTF-8') ?>" />
           <input type="hidden" name="id" value="<?= $d['id'] ?>" />
           <input type="hidden" name="csrf_token" value="<?= htmlspecialchars($_SESSION['csrf_payment']) ?>" />
           <input type="hidden" name="activity_request_key" value="<?= bin2hex(random_bytes(16)) ?>" />
@@ -586,7 +608,7 @@ $selectedPaymentMethod = $d['sistem_pembayaran'] ?? 'VA';
               <svg width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.5" stroke-linecap="round" stroke-linejoin="round"><path d="M19 21H5a2 2 0 0 1-2-2V5a2 2 0 0 1 2-2h11l5 5v14a2 2 0 0 1-2 2z"/><polyline points="17 21 17 13 7 13 7 21"/><polyline points="7 3 7 8 15 8"/></svg>
               <?= transaction_authorization_requires_request() ? 'Ajukan Perubahan' : 'Simpan Perubahan' ?>
             </button>
-            <a href="lihat.php" class="btn btn-ghost" id="btn-batal">
+            <a href="<?= htmlspecialchars($returnUrl, ENT_QUOTES, 'UTF-8') ?>" class="btn btn-ghost" id="btn-batal">
               <svg width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.5" stroke-linecap="round" stroke-linejoin="round"><line x1="18" y1="6" x2="6" y2="18"/><line x1="6" y1="6" x2="18" y2="18"/></svg>
               Batal
             </a>

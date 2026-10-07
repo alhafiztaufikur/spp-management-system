@@ -16,6 +16,11 @@ require_once '../includes/komite_billing.php';
 require_once '../includes/payment_form_feedback.php';
 require_once '../includes/transaction_authorization.php';
 require_once '../includes/financial_request.php';
+require_once '../includes/payment_return.php';
+
+$returnContext = is_string($_POST['return_context'] ?? null) ? $_POST['return_context'] : '';
+$returnPaymentId = (int)($_POST['id'] ?? 0);
+$returnUrl = payment_return_url($returnContext, $returnPaymentId);
 
 $aksi = $_POST['aksi'] ?? $_GET['aksi'] ?? '';
 $authorizationRequest = null;
@@ -67,7 +72,7 @@ if (in_array($aksi, ['update', 'hapus'], true) && !$authorizationRequest) {
     $token = (string)($_POST['csrf_token'] ?? '');
     if ($_SERVER['REQUEST_METHOD'] !== 'POST' || empty($_SESSION['csrf_payment']) || !hash_equals($_SESSION['csrf_payment'], $token)) {
         $_SESSION['flash'] = ['type' => 'error', 'msg' => 'Permintaan perubahan transaksi tidak valid atau sesi telah kedaluwarsa.'];
-        header('Location: lihat.php');
+        header('Location: ' . $returnUrl);
         exit;
     }
     try { payment_assert_owner($koneksi,(int)($_POST['id']??0),(int)$_SESSION['admin_id']); }
@@ -84,11 +89,16 @@ if (in_array($aksi, ['update', 'hapus'], true) && !$authorizationRequest) {
                 (string)($_POST['authorization_reason'] ?? ''),
                 (int)$_SESSION['admin_id']
             );
+            if (payment_return_entry($returnContext, $paymentId)) unset($_SESSION['payment_returns'][$returnContext]['draft']);
             $_SESSION['flash'] = ['type' => 'success', 'msg' => 'Permintaan ' . ($actionName === 'hapus' ? 'penghapusan' : 'perubahan') . ' berhasil diajukan dengan nomor #' . $requestId . '. Transaksi belum berubah sampai disetujui.'];
         } catch (Throwable $error) {
             $_SESSION['flash'] = ['type' => 'error', 'msg' => 'Pengajuan gagal: ' . $error->getMessage()];
+            if ($actionName === 'edit') {
+                payment_edit_draft_save($paymentId, $returnContext);
+                header('Location: ' . payment_return_edit_url($returnContext, $paymentId)); exit;
+            }
         }
-        header('Location: lihat.php');
+        header('Location: ' . $returnUrl);
         exit;
     }
 }
@@ -139,6 +149,11 @@ function authorization_abort_before_transaction(mysqli $db, ?array $request, int
         header('Location: ../otorisasi_transaksi.php');
     } else {
         $_SESSION['flash'] = ['type' => 'error', 'msg' => $message];
+        $token = $GLOBALS['returnContext'] ?? '';
+        $id = (int)($_POST['id'] ?? 0);
+        payment_edit_draft_save($id, $token);
+        $fallbackLocation = str_starts_with($fallbackLocation, 'edit.php?')
+            ? payment_return_edit_url($token, $id) : payment_return_url($token, $id);
         header('Location: ' . $fallbackLocation);
     }
     exit;
@@ -854,7 +869,7 @@ if ($aksi === 'update') {
                 if ((int)$applied['payment_id'] !== $id || (int)$applied['actor_id'] !== (int)$_SESSION['admin_id']) throw new RuntimeException('Kunci perubahan tidak sesuai transaksi.');
                 $koneksi->rollback();
                 $_SESSION['flash'] = ['type'=>'success','msg'=>'Perubahan ini sudah tersimpan; tidak diterapkan ulang.'];
-                header('Location: lihat.php');exit;
+                header('Location: ' . $returnUrl);exit;
             }
         }
 
@@ -1010,6 +1025,7 @@ if ($aksi === 'update') {
             $authorizationRequest ? 'applied:' . $authorizationRequestId : $activityEditKey,
             $authorizationRequestId ?: null, $authorizationDecisionNote);
         $koneksi->commit();
+        if (!$authorizationRequest && payment_return_entry($returnContext, $id)) unset($_SESSION['payment_returns'][$returnContext]['draft']);
         $_SESSION['flash'] = [
             'type' => 'success',
             'msg' => $authorizationRequest ? 'Permintaan disetujui dan transaksi berhasil diperbarui.' : 'Data pembayaran berhasil diperbarui!',
@@ -1020,13 +1036,14 @@ if ($aksi === 'update') {
                 'source' => 'update',
             ],
         ];
-        header('Location: ' . ($authorizationRequest ? '../otorisasi_transaksi.php' : 'lihat.php'));
+        header('Location: ' . ($authorizationRequest ? '../otorisasi_transaksi.php' : $returnUrl));
         exit;
     } catch (Throwable $e) {
         $koneksi->rollback();
         authorization_fail_after_rollback($koneksi, $authorizationRequest, $authorizationRequestId, $authorizationApproverId, $e);
         $_SESSION['flash'] = payment_failure_flash($e, 'Gagal memperbarui: ');
-        header('Location: ' . ($authorizationRequest ? '../otorisasi_transaksi.php' : 'edit.php?id=' . $id));
+        if (!$authorizationRequest) payment_edit_draft_save($id, $returnContext);
+        header('Location: ' . ($authorizationRequest ? '../otorisasi_transaksi.php' : payment_return_edit_url($returnContext, $id)));
         exit;
     }
 }
@@ -1100,7 +1117,7 @@ if ($aksi === 'hapus') {
         $_SESSION['flash'] = ['type' => 'error', 'msg' => 'Gagal menghapus data: ' . $e->getMessage()];
     }
 
-    header('Location: ' . ($authorizationRequest ? '../otorisasi_transaksi.php' : 'lihat.php'));
+    header('Location: ' . ($authorizationRequest ? '../otorisasi_transaksi.php' : $returnUrl));
     exit;
 }
 

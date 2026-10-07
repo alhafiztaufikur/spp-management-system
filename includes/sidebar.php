@@ -28,7 +28,7 @@ $allNavItems = [
 
   ['pembayaran/riwayat_daftar_ulang.php', 'Riwayat Daftar Ulang',
    '<path d="M4 19.5A2.5 2.5 0 0 1 6.5 17H20"/><path d="M4 4.5A2.5 2.5 0 0 1 6.5 2H20v20H6.5A2.5 2.5 0 0 1 4 19.5z"/><path d="M9 7h6M9 11h6"/>',
-   ['admin', 'kasir'], 'Pembayaran'],
+   ['admin', 'kasir', 'bendahara'], 'Pembayaran'],
 
 
   ['otorisasi_transaksi.php', $role === 'kasir' ? 'Pengajuan Saya' : ($role === 'bendahara' ? 'Riwayat Otorisasi' : 'Otorisasi Transaksi'),

@@ -1,0 +1,34 @@
+.registration-history-page .layout .du-filter-form{grid-template-columns:minmax(135px,.7fr) minmax(220px,1.6fr) repeat(4,minmax(125px,1fr));gap:14px}
+.du-filter-form .ph-filter-actions{grid-column:1/-1;justify-content:flex-end}
+.registration-history-page .ph-filter-card{overflow:visible}
+.registration-history-page .search-box input{flex:1;border:0;background:transparent;box-shadow:none;outline:0;padding:0;height:auto}
+.registration-history-page .search-box:focus-within{border-color:var(--accent);box-shadow:0 0 0 3px var(--accent-glow)}
+.du-summary{display:grid;grid-template-columns:repeat(4,minmax(0,1fr));gap:12px}
+.du-summary.is-archive{grid-template-columns:repeat(3,minmax(0,1fr))}
+.du-summary>div{border:1px solid var(--border);border-radius:14px;padding:17px;background:var(--bg-card);min-width:0}
+.du-summary small{display:block;color:var(--text-muted);font-size:11px;margin-bottom:8px}
+.du-summary strong{display:block;font-size:19px;color:var(--accent);overflow-wrap:anywhere}
+.du-summary-caption{font-size:11px;color:var(--text-muted);line-height:1.7;margin:10px 0 18px}
+.registration-history-page .du-record{grid-template-columns:26px 38px minmax(105px,1fr) auto auto 16px;gap:12px;padding:16px}
+.du-record-period{display:flex;flex-direction:column;gap:7px;font-size:11px}
+.du-record-period small{color:var(--text-muted)}
+.du-record-amounts{grid-column:3/6;display:flex;flex-wrap:wrap;gap:12px 26px;margin-top:2px;padding-top:9px;border-top:1px solid var(--border)}
+.du-record-amounts small{font-size:10px;color:var(--text-muted);display:block;margin-bottom:4px}
+.du-record-amounts strong{color:var(--accent);font-size:12px}
+.registration-history-page .du-record>.ph-status{grid-column:5;grid-row:1}
+.registration-history-page .du-record>svg{grid-column:6;grid-row:1}
+.du-installment-title{font-size:14px;margin:22px 0 12px;display:flex;justify-content:space-between;gap:8px}
+.du-installment-title small{font-size:11px;color:var(--text-muted);font-weight:400}
+.du-installment{border:1px solid var(--border);border-radius:12px;padding:14px;margin-bottom:13px;background:var(--bg-card)}
+.du-installment>header{display:flex;align-items:center;justify-content:space-between;gap:8px;margin-bottom:12px;font-size:12px}
+.du-transaction-meta{font-size:11px;line-height:1.8;color:var(--text-muted);overflow-wrap:anywhere}
+.du-delete-dialog{max-width:460px;padding:28px;border-radius:20px}
+.du-delete-dialog h3{font-size:20px;color:var(--text-primary);margin:16px 0 12px}
+.du-delete-dialog p{font-size:13px;line-height:1.7;color:var(--text-muted)}
+.du-delete-dialog::backdrop{background:rgba(10,25,20,.5);backdrop-filter:blur(6px)}
+.du-danger-icon{display:grid;place-items:center;background:rgba(239,68,68,.12);color:#df3748;width:50px;height:50px;border-radius:14px}
+.du-danger-icon svg{width:25px;height:25px}
+.du-delete-dialog .authorization-modal-actions{margin-top:20px}
+@media(max-width:1450px){.registration-history-page .layout .du-filter-form{grid-template-columns:repeat(3,minmax(0,1fr))}.registration-history-page .du-filter-form .ph-filter-intro{grid-column:1/-1}}
+@media(max-width:1100px){.registration-history-page .layout .du-filter-form{grid-template-columns:repeat(2,minmax(0,1fr))}}
+@media(max-width:600px){.registration-history-page .layout .du-filter-form{grid-template-columns:minmax(0,1fr)}.du-summary,.du-summary.is-archive{grid-template-columns:repeat(2,minmax(0,1fr))}.du-summary>div{padding:13px}.du-summary strong{font-size:16px}.registration-history-page .du-record{grid-template-columns:24px minmax(0,1fr) auto;padding:12px;gap:9px}.du-record .ph-record-icon{display:none}.registration-history-page .du-record>.ph-status{grid-column:3;grid-row:1;align-self:start}.du-record-identity{grid-column:2;grid-row:1}.du-record-period{grid-column:2/4;flex-direction:row;align-items:center}.du-record-amounts{grid-column:2/4;gap:12px}.du-record-amounts strong{font-size:11px}.du-delete-dialog{padding:20px;max-width:calc(100% - 24px)}.du-installment{padding:11px}.ph-components dd{white-space:normal;text-align:right;overflow-wrap:anywhere}}
