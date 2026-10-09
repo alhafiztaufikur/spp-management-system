@@ -53,29 +53,3 @@ function student_tariff_label(string $component): string {
 function student_tariff_labels(array $components): string {
     return implode(', ', array_map('student_tariff_label', array_values(array_unique($components))));
 }
-
-/** @return array<int,string> */
-function student_advanced_change_attempts(
-    array $post,
-    ?array $oldStudent,
-    array $postMap,
-    array $openingMap = []
-): array {
-    $changes = [];
-    foreach ($postMap as $column => $postName) {
-        if (!array_key_exists($postName, $post)) continue;
-        if (abs(student_amount($post[$postName]) - (float)($oldStudent[$column] ?? 0)) > .001) {
-            $changes[] = $postName;
-        }
-    }
-    foreach ($openingMap as $column => $postName) {
-        if (!array_key_exists($postName, $post)) continue;
-        if (abs(student_amount($post[$postName]) - (float)($oldStudent[$column] ?? 0)) > .001) {
-            $changes[] = $postName;
-        }
-    }
-    $postedDiknas = trim((string)($post['no_induk_diknas'] ?? ''));
-    $oldDiknas = trim((string)($oldStudent['NO_induk_diknas'] ?? ''));
-    if ($postedDiknas !== $oldDiknas) $changes[] = 'no_induk_diknas';
-    return array_values(array_unique($changes));
-}

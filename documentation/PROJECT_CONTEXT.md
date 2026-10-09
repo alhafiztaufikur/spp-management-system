@@ -25,6 +25,7 @@ Tarif target mengikuti master tahun/kelas dan nominal potongan; jika belum siap,
 
 ## Alur pembayaran aktif
 
+- Data Siswa tidak memakai mode Advanced: NIS Diknas, biaya, dan potongan langsung dapat diisi dengan validasi serta perlindungan histori yang sama. Tarif dasar Master SPP terbit terkunci saat halaman dibuka; Super Admin/Admin/Kasir dapat memakai Edit Tarif dan mengonfirmasi perubahan pada tagihan belum dibayar. Tagihan berbayar, dibatalkan, dan ditanggung PSB tetap utuh. Tahun tertutup harus dibuka kembali. Simpan tarif draft dan penerbitan pertama juga meminta konfirmasi; formulir lama ditolak melalui versi tarif. [Verifikasi revisi 10 Oktober 2026](STUDENT_TARIFF_CORRECTION_20261010.md).
 - Master Siswa menyimpan PSB sebagai kewajiban sekali bayar, termasuk Pangkal. Komponen Pangkal terpisah dipensiunkan; PSB dapat dicicil sesuai sisa tagihan. Potongan SPP memakai nominal rupiah per bulan dan DIKNAS opsional.
 - Master Penerbitan SPP membuat tagihan bulanan Juli–Juni berdasarkan penempatan siswa yang tersimpan. Kasir memilih **Bulan Tagihan SPP & Komite** dan **Tahun Tagihan**. Satu transaksi SPP hanya melunasi satu bulan; tunggakan SPP lebih tua diperiksa dahulu.
 - Komite adalah tagihan bulanan dari tarif `siswa.POMG`. Ketika SPP suatu bulan dibayar, Komite bulan yang sama harus sudah lunas atau ikut dilunasi. Jika SPP dan Komite periode yang sama sama-sama masih terutang, keduanya wajib dilunasi bersama. Komite dapat dibayar sendiri jika SPP belum terbit, nol/ditanggung PSB/potongan penuh/dibatalkan, atau telah lunas.

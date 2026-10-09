@@ -1518,6 +1518,9 @@ function showSppWarning(status, sourceElement = null, force = false, onPrimary =
   } else if (['amount_mismatch','komite_amount','over_limit'].includes(code)) {
     close.textContent = 'Perbaiki nominal';
 
+  } else if (code === 'master_spp_confirmation') {
+    secondary.hidden = false;
+    secondary.textContent = 'Kembali';
   } else if (code === 'future_period') {
     secondary.hidden = false;
     sppWarningSecondaryAction = () => document.getElementById('bulan-bayar')?.focus();

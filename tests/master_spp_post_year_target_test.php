@@ -4,6 +4,7 @@
 if (PHP_SAPI !== 'cli') { http_response_code(404); exit(1); }
 session_start();
 require_once __DIR__ . '/../koneksi.php';
+require_once __DIR__ . '/../includes/spp_billing.php';
 if (getenv('SPP_TEST_ALLOW_MUTATION') !== '1'
     || !preg_match('/^db_spp_audit_[a-z0-9_]+$/', DB_NAME)) {
     throw new RuntimeException('Tes ini hanya untuk clone audit dengan flag mutasi tes.');
@@ -41,6 +42,8 @@ $_POST = [
     'aksi' => 'simpan_tarif',
     'csrf_token' => $token,
     'jumlah' => array_fill(1, 6, 250000),
+    'confirm_rate_change' => '1',
+    'expected_rate_version' => spp_master_rate_version(['label'=>$postedYear,'status'=>'draft'],array_fill(1,6,0.0)),
 ];
 
 $warnings = [];

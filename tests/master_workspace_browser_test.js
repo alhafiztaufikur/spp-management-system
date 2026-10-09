@@ -33,19 +33,14 @@ const roman = {1:'I',2:'II',3:'III',4:'IV',5:'V',6:'VI',7:'VII',8:'VIII',9:'IX',
             assert.equal(await page.locator('.student-stat').count(),4);
             assert.equal(await page.locator('.student-stat strong').first().innerText(),String(data.units[unit].students));
             if (unit) {
-              assert.equal(await page.locator('.student-panel').count(),6);
+              assert.equal(await page.locator('.student-panel').count(),5);
               assert.equal(await page.locator('#student-psb').isVisible(),true);
-              assert.equal(await page.locator('#student-psb').isEditable(),false);
-              await page.locator('#advanced-enabled').check();
+              assert.equal(await page.locator('#student-psb').isEditable(),true);
               assert.equal(await page.locator('#student-psb').isEditable(),true);
               await page.locator('#student-daftar_ulang').fill('1000000');
               await page.locator('#student-potong-du').fill('10000');
               assert.equal(await page.locator('#student-total-du').inputValue(),'990.000');
               assert.equal(await page.locator('#student-hero-effective').innerText(),await page.locator('#student-spp-effective').innerText());
-              page.once('dialog',d=>d.dismiss()); await page.locator('#advanced-enabled').click();
-              assert.equal(await page.locator('#advanced-enabled').isChecked(),true);
-              page.once('dialog',d=>d.accept()); await page.locator('#advanced-enabled').uncheck();
-              assert.equal(await page.locator('#student-psb').isEditable(),false);
               await page.locator('[data-class-picker-button]').scrollIntoViewIfNeeded();
               await page.locator('[data-class-picker-button]').click();
               const option=page.locator('.class-picker-option').first(); await option.waitFor({state:'visible'});
@@ -71,7 +66,7 @@ const roman = {1:'I',2:'II',3:'III',4:'IV',5:'V',6:'VI',7:'VII',8:'VIII',9:'IX',
               assert.equal(await page.locator('#form-master-siswa input[name="id"]').inputValue(),'0');
               assert.equal(await page.locator('#student-komite-start').inputValue(),'');
               assert.equal(await page.locator('#kelas-baru').inputValue(),'');
-              assert.equal(await page.locator('#advanced-enabled').isChecked(),false);
+              assert.equal(await page.locator('#advanced-enabled').count(),0);
               for(const input of await page.locator('#form-master-siswa input[type="text"]').all())assert.equal(await input.inputValue(),'');
               assert.equal(await page.locator('input[name="csrf_token"]').first().inputValue(),csrf);
             } else assert.equal(await page.locator('#form-master-siswa').isVisible(),false);
@@ -101,13 +96,13 @@ const roman = {1:'I',2:'II',3:'III',4:'IV',5:'V',6:'VI',7:'VII',8:'VIII',9:'IX',
       if(unit) {
         await page.goto(base+'/siswa/daftar.php?edit='+data.units[unit].edit_id);
         assert.equal(await page.locator('#nis-baru').isEditable(),false);
-        const values=await page.locator('.advanced-field').evaluateAll(inputs=>Object.fromEntries(inputs.map(i=>[i.name,i.value])));
+        const values=await page.locator('#form-master-siswa input[name]').evaluateAll(inputs=>Object.fromEntries(inputs.map(i=>[i.name,i.value])));
         const payload=await page.locator('#form-master-siswa').evaluate(form=>Object.fromEntries(new FormData(form)));
         for(const [name,value] of Object.entries(values))assert.equal(payload[name],value,'Locked field still submits its unchanged value');
         // Failure must recover the draft and Advanced state without writing financial data.
         const failed=await page.request.post(base+'/siswa/daftar.php',{form:{...payload,nama:'',advanced_enabled:'1',psb:'1234500'},maxRedirects:0});
         assert.equal(failed.status(),302);await page.goto(base+'/siswa/daftar.php?edit='+data.units[unit].edit_id);
-        assert.equal(await page.locator('#advanced-enabled').isChecked(),true);
+        assert.equal(await page.locator('#advanced-enabled').count(),0);
         assert.equal(await page.locator('#student-psb').inputValue(),'1.234.500');
         assert.match(await page.locator('#flash-msg').innerText(),/Nama siswa wajib/);
         await page.locator('#student-reset-form').click();

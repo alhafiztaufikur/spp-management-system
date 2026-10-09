@@ -364,8 +364,8 @@ html body[data-readable-workspace="students"] .student-stat {grid-template-rows:
 html body[data-readable-workspace="students"] .student-stat span:not(.master-workspace-icon) {font-size:var(--read-label);line-height:1.5;}
 html body[data-readable-workspace="students"] .student-stat strong,html body[data-readable-workspace="students"] .student-stat:last-child strong {font-size:var(--read-number);line-height:1.4;white-space:normal;}
 html body[data-readable-workspace="students"] .student-stat #student-hero-effective {white-space:normal;font-size:var(--read-number);}
-html body[data-readable-workspace="students"] :is(.student-form-heading h2,.student-panel-heading h3,.advanced-switch strong,.card-title,.student-class-history-copy h4) {font-size:var(--read-panel);line-height:1.4;}
-html body[data-readable-workspace="students"] :is(.student-panel-heading p,.payment-auto-note,.student-advanced-info,.student-locked-note,.advanced-switch small,#student-reset-status,.student-class-history-copy p) {font-size:var(--read-note);line-height:1.6;}
+html body[data-readable-workspace="students"] :is(.student-form-heading h2,.student-panel-heading h3,.card-title,.student-class-history-copy h4) {font-size:var(--read-panel);line-height:1.4;}
+html body[data-readable-workspace="students"] :is(.student-panel-heading p,.payment-auto-note,#student-reset-status,.student-class-history-copy p) {font-size:var(--read-note);line-height:1.6;}
 html body[data-readable-workspace="students"] .spp-student-rate-summary span {font-size:var(--read-label);}
 html body[data-readable-workspace="students"] .spp-student-rate-summary strong {font-size:var(--read-number);line-height:1.4;}
 html body[data-readable-workspace="students"] .student-panel-discounts .student-money-grid .field-label {font-size:var(--read-label);line-height:1.5;min-height:3em;}

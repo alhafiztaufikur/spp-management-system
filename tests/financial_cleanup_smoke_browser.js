@@ -8,7 +8,7 @@ const{chromium}=require(process.env.SPP_PLAYWRIGHT_CORE);const base=new URL(proc
  for(const scope of [1,2,3]){
   await p.goto(new URL('/dashboard.php',base).href);await Promise.all([p.waitForNavigation(),p.locator('#sidebar-unit-select').selectOption(String(scope))]);
   await p.goto(new URL('/siswa/daftar.php',base).href);await p.locator('[data-class-picker-button]').click();await p.locator('[data-class-picker-option][data-label="'+{1:'1A',2:'7A',3:'10A'}[scope]+'"]').click();
-  await p.locator('label[for="advanced-enabled"]').evaluate(e=>e.scrollIntoView({block:'center'}));await p.locator('label[for="advanced-enabled"]').click();await p.locator('#student-potongan-spp').fill('25.000');
+  await p.locator('#student-potongan-spp').fill('25.000');
   const expected=await p.locator('#student-spp-base').evaluate(e=>Number(e.dataset.base)-25000);
   assert.equal(await p.locator('#student-spp-effective').innerText(),'Rp '+Math.max(0,expected).toLocaleString('id-ID'));
   await p.goto(new URL('/pembayaran/edit.php?id='+ids[scope].id,base).href);await p.waitForLoadState('networkidle');

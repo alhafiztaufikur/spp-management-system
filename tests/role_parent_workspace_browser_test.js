@@ -39,11 +39,11 @@ const password=fs.readFileSync(process.env.SPP_TEST_ADMIN_PASSWORD_FILE,'utf8').
    await choose(0);await page.locator('#parent-message').fill('Pengingat kegiatan '+scope+' & pembayaran.');
    await page.locator('#parent-message').focus();await page.keyboard.press('Control+a');await page.getByRole('button',{name:'Tebal',exact:true}).click();assert.ok(await page.locator('#parent-message').evaluate(e=>!!e.querySelector('b,strong')));
    await page.locator('#parent-copy').click();await page.locator('#copy-recipient-search').fill(keys[1].split('|')[1]);await page.locator('#copy-select-all').check();assert.equal(await page.locator('#copy-selected-count').innerText(),'3 penerima dipilih');
-   await page.locator('#copy-apply').click();await page.locator('#parent-copy-dialog').waitFor({state:'hidden'});assert.ok((await page.locator('#parent-save-status').innerText()).includes('2 penerima diperbarui; 1'));
-   await choose(1);assert.equal(await page.locator('#parent-message').innerText(),'Pesan lama khusus.');
+   await page.locator('#copy-apply').click();await page.locator('#parent-copy-dialog').waitFor({state:'hidden'});assert.ok((await page.locator('#parent-save-status').innerText()).includes('Pesan diterapkan ke 3 penerima.'));
+   await choose(1);assert.equal(await page.locator('#parent-message').innerText(),'Pengingat kegiatan '+scope+' & pembayaran.');
    await choose(2);assert.ok((await page.locator('#parent-message').innerText()).includes('Pengingat kegiatan'));assert.ok(await page.locator('#parent-message').evaluate(e=>!!e.querySelector('strong,b')));
    await page.locator('#parent-message').fill('Pesan mandiri siswa ketiga.');await choose(0);assert.ok((await page.locator('#parent-message').innerText()).includes('Pengingat kegiatan'));
-   await page.locator('#parent-copy').click();await page.locator('#copy-select-all').check();await page.locator('#copy-overwrite').check();assert.equal(await page.locator('#copy-apply').isDisabled(),true);assert.equal(await page.locator('#copy-replace-count').innerText(),'3');await page.locator('#copy-confirm').check();await page.locator('#copy-apply').click();await page.locator('#parent-copy-dialog').waitFor({state:'hidden'});
+   await page.locator('#parent-copy').click();await page.locator('#copy-select-all').check();assert.equal(await page.locator('#copy-apply').isDisabled(),false);await page.locator('#copy-apply').click();await page.locator('#parent-copy-dialog').waitFor({state:'hidden'});
    await choose(1);assert.ok((await page.locator('#parent-message').innerText()).includes('Pengingat kegiatan'));
    await page.locator('#parent-copy').click();await page.keyboard.press('Escape');assert.equal(await page.locator('#parent-copy-dialog').isVisible(),false);assert.equal(await page.locator('#parent-copy').evaluate(e=>e===document.activeElement),true);
    // Failed save keeps the edited text and the selected student until retry succeeds.

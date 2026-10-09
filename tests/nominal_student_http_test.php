@@ -22,6 +22,7 @@ function lifecycle_assert(bool $ok, string $message): void {
     if (!$ok) throw new RuntimeException($message);
 }
 
+function lifecycle_version(string $html): string { preg_match('/name="expected_rate_version" value="([a-f0-9]{64})"/',$html,$m);if(!isset($m[1]))throw new RuntimeException('Missing rate version');return $m[1]; }
 function lifecycle_request(string $url, ?array $data, array &$cookies, string $academicYear = ''): array {
     $headers = [];
     if ($data !== null) $headers[] = 'Content-Type: application/x-www-form-urlencoded';
@@ -89,9 +90,9 @@ try{
  lifecycle_assert(lifecycle_request($base.'/login.php',['username'=>$username,'password'=>$password],$cookies)['status']===302,'Login');
  $master=lifecycle_request($base.'/master_spp.php?tahun='.rawurlencode($year),null,$cookies,$year);$rateToken=lifecycle_token($master['body'],'spp-rate-form');
  $rates=array_fill_keys(range($firstLevel,$lastLevel),250000);
- lifecycle_request($base.'/master_spp.php',['aksi'=>'simpan_tarif','csrf_token'=>$rateToken,'tahun_ajaran'=>$year,'jumlah'=>$rates],$cookies,$year);
+ lifecycle_request($base.'/master_spp.php',['aksi'=>'simpan_tarif','csrf_token'=>$rateToken,'tahun_ajaran'=>$year,'jumlah'=>$rates,'expected_rate_version'=>lifecycle_version($master['body']),'confirm_rate_change'=>'1'],$cookies,$year);
  $page=lifecycle_request($base.'/siswa/daftar.php',null,$cookies,$year);$token=lifecycle_token($page['body'],'form-master-siswa');
- $post=['aksi'=>'tambah','csrf_token'=>$token,'no_induk'=>$nis,'nama'=>'TEST NOMINAL '.$unitId,'master_kelas_id'=>lifecycle_class($koneksi,$unitId,$firstLevel),'advanced_enabled'=>'1','potongan_spp_nominal'=>'25.000','psb'=>0,'pomg'=>0,'daftar_ulang'=>0,'potong_du'=>0,'no_induk_diknas'=>''];
+ $post=['aksi'=>'tambah','csrf_token'=>$token,'no_induk'=>$nis,'nama'=>'TEST NOMINAL '.$unitId,'master_kelas_id'=>lifecycle_class($koneksi,$unitId,$firstLevel),'potongan_spp_nominal'=>'25.000','psb'=>0,'pomg'=>0,'daftar_ulang'=>0,'potong_du'=>0,'no_induk_diknas'=>''];
  lifecycle_request($base.'/siswa/daftar.php',$post,$cookies,$year);
  $row=$koneksi->query("SELECT * FROM siswa WHERE NO_INDUK='$nis'")->fetch_assoc();lifecycle_assert($row&&$row['NO_induk_diknas']===null&&(float)$row['potongan_spp_nominal']===25000.0&&(float)$row['SPP_PERBULAN']===225000.0,'Nominal registration/optional Diknas');
  $id=(int)$row['id'];$update=$post;unset($update['no_induk_diknas']);$update['aksi']='update';$update['id']=$id;
@@ -102,13 +103,16 @@ try{
  $diknas='00'.(string)random_int(70000000,79999999);
  lifecycle_request($base.'/siswa/daftar.php',array_replace($update,['no_induk_diknas'=>$diknas]),$cookies,$year);
  lifecycle_assert($koneksi->query("SELECT NO_induk_diknas FROM siswa WHERE id=$id")->fetch_row()[0]===$diknas,'Leading-zero Diknas');
+ $partialBefore=$koneksi->query("SELECT potongan_spp_nominal,PSB,POMG,DAFTAR_ULANG,potong_du,NO_induk_diknas FROM siswa WHERE id=$id")->fetch_assoc();
+ lifecycle_request($base.'/siswa/daftar.php',['aksi'=>'update','id'=>$id,'csrf_token'=>$token,'no_induk'=>$nis,'nama'=>$post['nama'],'master_kelas_id'=>$post['master_kelas_id'],'komite_mulai_bulan'=>'07','advanced_enabled'=>'0'],$cookies,$year);
+ lifecycle_assert($partialBefore===$koneksi->query("SELECT potongan_spp_nominal,PSB,POMG,DAFTAR_ULANG,potong_du,NO_induk_diknas FROM siswa WHERE id=$id")->fetch_assoc(),'Partial update or retired Advanced flag changed missing fields');
  $dupeNis=(string)random_int(9700000000,9799999999);
  lifecycle_request($base.'/siswa/daftar.php',array_replace($post,['no_induk'=>$dupeNis,'no_induk_diknas'=>$diknas]),$cookies,$year);
  lifecycle_assert((int)$koneksi->query("SELECT COUNT(*) FROM siswa WHERE NO_INDUK='$dupeNis'")->fetch_row()[0]===0,'Duplicate Diknas accepted in same unit');
  lifecycle_request($base.'/siswa/daftar.php',array_replace($update,['no_induk_diknas'=>'']),$cookies,$year);
  lifecycle_assert($koneksi->query("SELECT NO_induk_diknas FROM siswa WHERE id=$id")->fetch_row()[0]===null,'Cleared Diknas is not NULL');
  $master=lifecycle_request($base.'/master_spp.php?tahun='.rawurlencode($year),null,$cookies,$year);
- lifecycle_request($base.'/master_spp.php',['aksi'=>'terbitkan','csrf_token'=>lifecycle_token($master['body'],'spp-publish-form'),'tahun_ajaran'=>$year,'selected_students'=>[$nis]],$cookies,$year);
+ lifecycle_request($base.'/master_spp.php',['aksi'=>'terbitkan','csrf_token'=>lifecycle_token($master['body'],'spp-publish-form'),'tahun_ajaran'=>$year,'selected_students'=>[$nis],'expected_rate_version'=>lifecycle_version($master['body']),'confirm_spp_publish'=>'1'],$cookies,$year);
  $bill=$koneksi->query("SELECT id,nominal_tagihan,potongan_nominal_ditetapkan_snapshot FROM tagihan_spp WHERE no_induk='$nis' AND bulan='07'")->fetch_assoc();
  lifecycle_assert($bill&&(float)$bill['nominal_tagihan']===225000.0&&(float)$bill['potongan_nominal_ditetapkan_snapshot']===25000.0,'Published nominal');
  $form=lifecycle_request($base.'/pembayaran/form.php',null,$cookies,$year);preg_match('/name="request_key" value="([a-f0-9]{32})"/',$form['body'],$pk);
@@ -117,16 +121,20 @@ try{
  lifecycle_assert((int)$koneksi->query("SELECT COUNT(*) FROM bayar WHERE NO_INDUK='$nis' AND U_SPP=225000")->fetch_row()[0]===1,'Nominal paid once: '.lifecycle_flash(lifecycle_request($base.'/pembayaran/form.php',null,$cookies,$year)['body']));
  $paidId=(int)$bill['id'];$paidBefore=$koneksi->query("SELECT * FROM tagihan_spp WHERE id=$paidId")->fetch_assoc();
  $masterId=(int)$koneksi->query("SELECT mst.id FROM master_spp_tahun mst JOIN tahun_ajaran y ON y.id=mst.tahun_ajaran_id WHERE y.label='$year'")->fetch_row()[0];
- spp_master_save_rates($koneksi,$masterId,array_fill_keys(range($firstLevel,$lastLevel),300000));
- lifecycle_assert((float)$koneksi->query("SELECT nominal_tagihan FROM tagihan_spp WHERE no_induk='$nis' AND bulan='08'")->fetch_row()[0]===275000.0,'Fixed discount survived rate raise');
- $update['potongan_spp_nominal']='300.000';lifecycle_request($base.'/siswa/daftar.php',$update,$cookies,$year);
+ foreach ([300000,200000,400000] as $attemptedRate) {
+  $koneksi->begin_transaction();$rejected=false;
+  try { spp_master_save_rates($koneksi,$masterId,array_fill_keys(range($firstLevel,$lastLevel),$attemptedRate)); }
+  catch (RuntimeException $error) { $rejected=str_contains($error->getMessage(),'Tarif terkunci'); }
+  finally { $koneksi->rollback(); }
+  lifecycle_assert($rejected,'Published base rate changed');
+ }
+ lifecycle_assert((float)$koneksi->query("SELECT nominal_tagihan FROM tagihan_spp WHERE no_induk='$nis' AND bulan='08'")->fetch_row()[0]===225000.0,'Rejected tariff edit changed bill');
+ $update['potongan_spp_nominal']='250.000';lifecycle_request($base.'/siswa/daftar.php',$update,$cookies,$year);
  lifecycle_assert((float)$koneksi->query("SELECT nominal_tagihan FROM tagihan_spp WHERE no_induk='$nis' AND bulan='08'")->fetch_row()[0]===0.0,'Full nominal discount');
- spp_master_save_rates($koneksi,$masterId,array_fill_keys(range($firstLevel,$lastLevel),200000));
- spp_master_save_rates($koneksi,$masterId,array_fill_keys(range($firstLevel,$lastLevel),400000));
+ $update['potongan_spp_nominal']='30.000';lifecycle_request($base.'/siswa/daftar.php',$update,$cookies,$year);
  $future=$koneksi->query("SELECT nominal_tagihan,potongan_nominal_ditetapkan_snapshot FROM tagihan_spp WHERE no_induk='$nis' AND bulan='08'")->fetch_assoc();
- lifecycle_assert((float)$future['nominal_tagihan']===100000.0&&(float)$future['potongan_nominal_ditetapkan_snapshot']===300000.0,'Requested nominal lost after tariff cap');
+ lifecycle_assert((float)$future['nominal_tagihan']===220000.0&&(float)$future['potongan_nominal_ditetapkan_snapshot']===30000.0,'Individual discount not applied to unpaid bill');
  lifecycle_assert($paidBefore===$koneksi->query("SELECT * FROM tagihan_spp WHERE id=$paidId")->fetch_assoc(),'Paid snapshot changed');
  $q=$koneksi->prepare("SELECT id FROM siswa WHERE NO_INDUK=? AND id<>?");$q->bind_param('si',$nis,$id);$q->execute();lifecycle_assert($q->get_result()->num_rows===0,'Duplicate identity');$q->close();
- echo 'PASS: unit '.$unitId.' nominal SPP, invalid/stale input, optional Diknas, fixed/capped rate and paid snapshot'.PHP_EOL;
+ echo 'PASS: unit '.$unitId.' nominal SPP, invalid/stale input, optional Diknas, locked base, individual discount and paid snapshot'.PHP_EOL;
 }catch(Throwable $e){fwrite(STDERR,'FAILED: '.$e->getMessage().PHP_EOL);exit(1);}
-

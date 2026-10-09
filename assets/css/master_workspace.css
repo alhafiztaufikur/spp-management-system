@@ -54,21 +54,7 @@
 .student-panel-discounts .student-money-grid .payment-auto-note{margin:0;font-size:10px;line-height:1.7;}
 .student-panel-discounts .student-money-grid>.field-row:last-child{background:var(--accent-glow);}
 .student-panel-discounts .student-derived{color:var(--accent);font-weight:750;background:var(--bg-card);}
-.student-workspace .advanced-switch{position:relative;margin:0;display:flex;align-items:center;gap:10px;border:0;background:none;padding:0;}
-.student-workspace .advanced-switch>.student-advanced-title{display:flex;align-items:center;gap:12px;}
-.student-workspace .advanced-switch input{position:absolute;right:0;top:50%;transform:translateY(-50%);width:46px;height:28px;margin:0;opacity:0;pointer-events:auto;cursor:pointer;z-index:1;}
-.student-workspace .advanced-switch input:focus-visible+.advanced-switch-track{outline:2px solid var(--accent);outline-offset:3px;}
-.student-workspace .advanced-switch>span:first-child{flex:1;}
-.student-workspace .advanced-switch strong{font-size:14px;display:block;}
-.student-workspace .advanced-switch small{font-size:11px;line-height:1.6;color:var(--text-secondary);display:block;margin-top:4px;}
-.student-workspace .advanced-switch-track{flex:none;}
-.student-advanced-title{display:flex;align-items:center;gap:12px;}
-.student-advanced-info{display:flex;align-items:flex-start;gap:10px;background:var(--accent-glow);border:1px solid var(--border);border-radius:11px;padding:14px;margin-top:20px;font-size:11px;line-height:1.7;color:var(--text-secondary);}
-.student-advanced-info svg{width:19px;height:19px;flex:none;color:var(--accent);margin-top:2px;}
-.student-locked-note{display:flex;align-items:center;gap:5px;margin-top:7px;font-size:10px;line-height:1.5;color:var(--text-muted);}
-.student-locked-note svg{width:12px;height:12px;flex:none;}
-.student-workspace[data-advanced="true"] .student-locked-note{display:none;}
-.student-workspace .advanced-field:read-only{background:var(--bg-elevated);color:var(--text-secondary);opacity:1;cursor:not-allowed;}
+.student-workspace .student-panel-discounts{grid-column:1/-1;}
 .student-workspace .student-form-footer{display:flex;justify-content:flex-end;align-items:center;gap:12px;padding:16px 18px;margin-top:18px;border:1px solid var(--border);border-radius:13px;background:var(--bg-card);}
 .student-form-footer .btn-ghost{margin-right:auto;}
 .student-reset-group{display:flex;align-items:center;flex-wrap:wrap;gap:10px;margin-right:auto;min-width:0;}
@@ -146,3 +132,5 @@ html[data-palette] .du-workspace .master-modern-hero{background:transparent;}
 @media(max-width:1250px){.student-workspace .student-hero{grid-template-columns:1fr;gap:18px;}.du-workspace .master-modern-hero{grid-template-columns:1fr minmax(180px,.5fr);}.du-workspace .master-modern-stats{grid-column:1/-1;grid-row:2;}.student-workspace .student-filter-bar{grid-template-columns:repeat(3,minmax(0,1fr));}.student-filter-bar .search-box{grid-column:span 2;}}
 @media(max-width:1000px){.student-workspace-grid{gap:14px;grid-template-columns:repeat(2,minmax(0,1fr));}.student-workspace-grid>.student-panel{padding:18px;}.student-workspace .student-money-grid{grid-template-columns:1fr;}.student-start-illustration{display:none;}.du-workspace .du-rate-grid{grid-template-columns:repeat(2,minmax(0,1fr));}.student-workspace .fields-grid{grid-template-columns:1fr;}.student-workspace .spp-student-rate-summary{grid-template-columns:1fr;}}
 @media(max-width:600px){.student-workspace .student-hero{margin-top:20px;}.student-hero-stats{grid-template-columns:repeat(2,minmax(0,1fr));gap:10px;}.student-stat{padding:14px 10px;}.student-workspace-grid{grid-template-columns:1fr;}.student-workspace .fields-grid{grid-template-columns:1fr;}.student-workspace .student-money-grid{grid-template-columns:1fr;}.student-workspace .master-modern-list{padding:16px;}.student-workspace .student-filter-bar{grid-template-columns:1fr;}.student-filter-bar .search-box{grid-column:auto;}.student-workspace .student-form-footer{flex-wrap:wrap;padding:14px;}.student-form-footer .btn{flex:1;justify-content:center;}.du-workspace .du-master-hero,.du-workspace .master-modern-card{padding:16px;}.du-workspace .master-modern-hero{grid-template-columns:1fr;gap:16px;}.du-workspace .master-modern-stats{grid-column:auto;grid-row:auto;grid-template-columns:1fr;}.du-workspace .du-master-year-tools{padding-left:0;border-left:0;}.du-workspace .du-rate-grid{grid-template-columns:1fr;gap:12px;}.du-total-estimate{padding:14px;}.du-total-estimate .btn{width:100%;justify-content:center;}.du-workspace .du-publishing-card .action-bar,.du-workspace .du-publishing-card form,.du-workspace .du-publishing-card .btn{width:100%;}.du-workspace .du-publishing-card .btn{justify-content:center;}.du-overview-workspace .du-overview-heading{align-items:flex-start;}.du-overview-heading h1{font-size:22px;}}
+.student-form-fieldset{display:contents;border:0;padding:0;margin:0;min-width:0;}
+@media(min-width:1001px){.student-workspace .student-panel-discounts .student-money-grid{grid-template-columns:repeat(3,minmax(0,1fr));}}

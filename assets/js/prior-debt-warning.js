@@ -77,6 +77,7 @@
 
     document.querySelectorAll('[data-prior-debt-form]').forEach(function (form) {
       form.addEventListener('submit', async function (event) {
+        if (window.sppConfirmBeforePriorDebt && !window.sppConfirmBeforePriorDebt(form,event)) return;
         const confirmation = form.querySelector('[name="confirm_previous_debt"]');
         if (confirmation && confirmation.value === '1') return;
         event.preventDefault();

@@ -23,7 +23,9 @@ Endpoint POST `laporan/surat_orang_tua_draf.php` menggunakan token draf dan head
 
 Seluruh identitas target divalidasi sebelum penyimpanan. Duplikasi target tidak menggandakan hasil. Target dari luar draf, sumber sebagai target, pesan kosong, atau daftar target kosong ditolak. Token milik sesi lain, unit berbeda, atau kedaluwarsa tidak diterima. Penerapan tidak memperpanjang masa berlaku draf.
 
-Dialog menyediakan pencarian penerima, Pilih Semua (termasuk penerima di luar hasil pencarian), dan jumlah target. Penggantian pesan yang sudah terisi membutuhkan konfirmasi jumlah pada UI. Setelah disalin, pesan tiap siswa berdiri sendiri. Autosave mengirim perubahan per siswa; penyimpanan, pergantian penerima, penerapan massal, dan pratinjau menggunakan antrean yang sama. Jika gagal, isi editor dipertahankan untuk dicoba kembali.
+Dialog menyediakan pencarian penerima, Pilih Semua (termasuk penerima di luar hasil pencarian), dan jumlah target. UI mengirim `overwrite: true`: pesan dan format seluruh target yang dipilih diganti, termasuk target yang sebelumnya sudah mempunyai pesan. Dialog menampilkan satu keterangan penggantian tanpa checkbox tambahan. Bawaan `false` pada API tetap tersedia untuk pemanggilan lama. Setelah disalin, pesan tiap siswa berdiri sendiri. Autosave mengirim perubahan per siswa; penyimpanan, pergantian penerima, penerapan massal, dan pratinjau menggunakan antrean yang sama. Editor dan pemilihan penerima terkunci selama penerapan. Jika gagal, isi editor dipertahankan untuk dicoba kembali.
+
+Halaman penyusunan mempertahankan pencarian, identitas penerima, editor/format, batas karakter, tanggal tunggakan, serta tindakan Simpan Draf dan Pratinjau. Tips dan penjelasan berulang dihapus; tampilan pratinjau/PDF tidak berubah. Lihat [proteksi tarif dan verifikasi pesan 10 Oktober 2026](SPP_RATE_LOCK_PARENT_MESSAGES_20261010.md).
 
 Pratinjau dan unduhan memakai endpoint PDF/Dompdf yang sama. Toolbar/thumbnail viewer mengikuti browser; Buka PDF tersedia sebagai alternatif. Pesan panjang dapat melanjutkan ke halaman berikutnya.
 

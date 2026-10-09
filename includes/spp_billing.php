@@ -45,10 +45,10 @@ function spp_master_ensure_year(mysqli $db, string $label, bool $forUpdate = fal
     return $row;
 }
 
-function spp_master_rates(mysqli $db, int $masterYearId): array {
+function spp_master_rates(mysqli $db, int $masterYearId, bool $forUpdate = false): array {
     [$firstLevel, $lastLevel] = unit_level_bounds();
     $rates = array_fill($firstLevel, $lastLevel - $firstLevel + 1, 0.0);
-    $stmt = $db->prepare('SELECT tingkat,nominal_dasar FROM master_spp_tarif WHERE master_spp_tahun_id=? ORDER BY tingkat');
+    $stmt = $db->prepare('SELECT tingkat,nominal_dasar FROM master_spp_tarif WHERE master_spp_tahun_id=? ORDER BY tingkat'.($forUpdate?' FOR UPDATE':''));
     $stmt->bind_param('i', $masterYearId); $stmt->execute();
     $result = $stmt->get_result();
     while ($row = $result->fetch_assoc()) $rates[(int)$row['tingkat']] = (float)$row['nominal_dasar'];
@@ -184,14 +184,93 @@ function spp_sync_active_placement_rates(mysqli $db, int $yearId, array $rates, 
     $updateStudent->close();
 }
 
-/** Menyimpan tarif dan menyelaraskan hanya tagihan yang belum pernah dialokasikan. */
+/** Published rates are read-only by default; corrections use an explicit confirmed action. */
+function spp_master_rates_editable(array $master): bool {
+    return ($master['status'] ?? '') === 'draft'
+        && empty($master['published_at']) && empty($master['has_bills']);
+}
+
+function spp_master_state(mysqli $db, int $id, bool $lock = false): array {
+    $s=$db->prepare('SELECT mst.*,ta.label,
+        EXISTS(SELECT 1 FROM tagihan_spp ts WHERE ts.master_spp_tahun_id=mst.id) has_bills,
+        COALESCE((SELECT MAX(a.id) FROM spp_audit_log a WHERE a.master_spp_tahun_id=mst.id),0) audit_version
+        FROM master_spp_tahun mst JOIN tahun_ajaran ta ON ta.id=mst.tahun_ajaran_id WHERE mst.id=?'.($lock?' FOR UPDATE':''));
+    $s->bind_param('i',$id);$s->execute();$row=$s->get_result()->fetch_assoc();$s->close();
+    if (!$row) throw new RuntimeException('Master SPP tidak tersedia pada unit ini.');
+    return $row;
+}
+
+function spp_master_rate_version(array $master, array $rates): string {
+    ksort($rates,SORT_NUMERIC);
+    $normalized=array_map(static fn($amount)=>number_format((float)$amount,2,'.',''),$rates);
+    return hash('sha256',json_encode([unit_active_id(),$master['label']??'',
+        $master['status']??'draft',$master['published_at']??null,$master['closed_at']??null,
+        (int)($master['has_bills']??0),(int)($master['audit_version']??0),$normalized],JSON_THROW_ON_ERROR));
+}
+
+function spp_assert_rate_version(string $expected, array $master, array $rates): void {
+    if (!preg_match('/^[a-f0-9]{64}$/D',$expected)
+        || !hash_equals(spp_master_rate_version($master,$rates),$expected))
+        throw new RuntimeException('Tarif atau status tahun sudah berubah. Muat ulang halaman sebelum menyimpan.');
+}
+
+/** Caller owns transaction. Student-before-bill locks agree with the cashier path. */
+function spp_master_correct_published_rates(mysqli $db, int $id, array $rates, string $expected, bool $confirmed): array {
+    if (!$confirmed) throw new RuntimeException('Konfirmasi perubahan tarif diperlukan.');
+    if (!in_array(unit_active_id(),[1,2,3],true)) throw new RuntimeException('Pilih satu unit untuk mengubah tarif.');
+    $actor=(int)($_SESSION['admin_id']??0);
+    $s=$db->prepare('SELECT role,unit_id,is_active FROM admin WHERE id=? FOR UPDATE');$s->bind_param('i',$actor);$s->execute();$account=$s->get_result()->fetch_assoc();$s->close();
+    if (!$account || !(int)$account['is_active'] || $account['role']!==($_SESSION['admin_role']??'')
+        || !in_array($account['role'],['super_admin','admin','kasir'],true)
+        || ($account['role']!=='super_admin' && (int)$account['unit_id']!==unit_active_id()))
+        throw new RuntimeException('Akun tidak diizinkan mengubah tarif SPP.');
+    $master=spp_master_state($db,$id,true);$oldRates=spp_master_rates($db,$id,true);
+    spp_assert_rate_version($expected,$master,$oldRates);
+    if ($master['status']!=='published') throw new RuntimeException('Koreksi tarif hanya tersedia untuk tahun SPP yang terbuka dan sudah terbit.');
+    $changed=[];[$first,$last]=unit_level_bounds();
+    foreach (range($first,$last) as $level) {
+        $new=(float)($rates[$level]??0);
+        if (!is_finite($new) || $new<=0 || $new>9999999999999.99) throw new RuntimeException('Tarif dasar kelas '.$level.' harus berupa nominal positif.');
+        if (abs($new-$oldRates[$level])>.001) $changed[$level]=$new;
+    }
+    if (!$changed) throw new RuntimeException('Belum ada perubahan tarif.');
+    $yearId=(int)$master['tahun_ajaran_id'];
+    $s=$db->prepare('SELECT s.NO_INDUK FROM siswa s JOIN siswa_tahun_ajaran sta ON sta.no_induk=s.NO_INDUK AND sta.unit_id=s.unit_id WHERE sta.tahun_ajaran_id=? ORDER BY s.id');
+    $s->bind_param('i',$yearId);$s->execute();$students=$s->get_result()->fetch_all(MYSQLI_ASSOC);$s->close();
+    // Use the cashier's exact lookup shape. A join can lock a different NIS index
+    // before the primary record, causing a cycle with payment foreign-key checks.
+    $s=$db->prepare('SELECT id FROM siswa WHERE NO_INDUK=? FOR UPDATE');
+    foreach($students as $student){$nis=(string)$student['NO_INDUK'];$s->bind_param('s',$nis);$s->execute();$s->get_result()->fetch_all();}$s->close();
+    $s=$db->prepare('SELECT id,tingkat_snapshot,status,potongan_nominal_ditetapkan_snapshot FROM tagihan_spp WHERE master_spp_tahun_id=? ORDER BY id FOR UPDATE');
+    $s->bind_param('i',$id);$s->execute();$bills=$s->get_result()->fetch_all(MYSQLI_ASSOC);$s->close();
+    $paid=$db->prepare("SELECT a.id FROM spp_alokasi a JOIN spp_alokasi_batch ab ON ab.id=a.batch_id WHERE a.tagihan_spp_id=? AND ab.status='active' LIMIT 1 FOR UPDATE");
+    $update=$db->prepare('UPDATE tagihan_spp SET tarif_dasar_snapshot=?,potongan_nominal_snapshot=?,nominal_tagihan=?,status=? WHERE id=?');
+    $updated=0;$locked=0;
+    foreach ($bills as $bill) {
+        $level=(int)$bill['tingkat_snapshot'];if (!isset($changed[$level])) continue;
+        $billId=(int)$bill['id'];$paid->bind_param('i',$billId);$paid->execute();$allocated=$paid->get_result()->num_rows>0;
+        if ($allocated || !in_array($bill['status'],['open','waived'],true)) { $locked++;continue; }
+        $base=$changed[$level];$net=spp_net_tariff($base,(float)$bill['potongan_nominal_ditetapkan_snapshot']);$status=$net['net']<=.001?'waived':'open';
+        $update->bind_param('dddsi',$base,$net['discount'],$net['net'],$status,$billId);$update->execute();$updated++;
+    }
+    $paid->close();$update->close();
+    $s=$db->prepare('INSERT INTO master_spp_tarif(master_spp_tahun_id,tingkat,nominal_dasar) VALUES(?,?,?) ON DUPLICATE KEY UPDATE nominal_dasar=VALUES(nominal_dasar)');
+    foreach ($changed as $level=>$new) { $s->bind_param('iid',$id,$level,$new);$s->execute(); }
+    $s->close();spp_sync_active_placement_rates($db,$yearId,$rates);
+    spp_write_audit($db,$id,null,'koreksi_tarif_terbit',['tarif'=>$oldRates],['tarif'=>$rates,'tagihan_diubah'=>$updated,'tagihan_dipertahankan'=>$locked],$updated);
+    return ['rates_changed'=>count($changed),'bills_updated'=>$updated,'bills_locked'=>$locked];
+}
+
+/** Caller owns the transaction. Saving and publication lock the same master row. */
 function spp_master_save_rates(mysqli $db, int $masterYearId, array $rates): array {
-    $stmt = $db->prepare('SELECT status,tahun_ajaran_id FROM master_spp_tahun WHERE id=? FOR UPDATE');
+    $stmt = $db->prepare('SELECT mst.status,mst.published_at,mst.tahun_ajaran_id,
+        EXISTS(SELECT 1 FROM tagihan_spp ts WHERE ts.master_spp_tahun_id=mst.id) AS has_bills
+        FROM master_spp_tahun mst WHERE mst.id=? FOR UPDATE');
     $stmt->bind_param('i', $masterYearId); $stmt->execute();
     $master = $stmt->get_result()->fetch_assoc(); $stmt->close();
-    $status = (string)($master['status'] ?? '');
-    if ($status === '' || $status === 'closed') throw new RuntimeException('Tahun SPP sudah ditutup atau tidak tersedia.');
-    $changed = 0; $updatedBills = 0; $lockedBills = 0;
+    if (!$master) throw new RuntimeException('Tahun SPP tidak tersedia.');
+    if (!spp_master_rates_editable($master)) throw new RuntimeException('Tarif terkunci karena SPP sudah diterbitkan atau tahun SPP ditutup.');
+    $changed = 0;
     [$firstLevel, $lastLevel] = unit_level_bounds();
     for ($level=$firstLevel; $level<=$lastLevel; $level++) {
         $new = (float)($rates[$level] ?? 0);
@@ -208,26 +287,11 @@ function spp_master_save_rates(mysqli $db, int $masterYearId, array $rates): arr
         if (abs((float)$old['nominal_dasar']-$new) < .001) continue;
         $stmt = $db->prepare('UPDATE master_spp_tarif SET nominal_dasar=? WHERE id=?');
         $rateId = (int)$old['id']; $stmt->bind_param('di', $new, $rateId); $stmt->execute(); $stmt->close();
-        $stmt = $db->prepare("SELECT ts.id,ts.potongan_nominal_ditetapkan_snapshot,
-             EXISTS(SELECT 1 FROM spp_alokasi a JOIN spp_alokasi_batch ab ON ab.id=a.batch_id AND ab.status='active' WHERE a.tagihan_spp_id=ts.id) allocated
-             FROM tagihan_spp ts WHERE ts.master_spp_tahun_id=? AND ts.tingkat_snapshot=? AND ts.status IN ('open','waived') FOR UPDATE");
-        $stmt->bind_param('ii', $masterYearId, $level); $stmt->execute();
-        $bills = $stmt->get_result()->fetch_all(MYSQLI_ASSOC); $stmt->close();
-        $levelUpdated = 0;
-        $levelLocked = 0;
-        foreach ($bills as $bill) {
-            if ((int)$bill['allocated'] === 1) { $lockedBills++; $levelLocked++; continue; }
-            $net = spp_net_tariff($new, (float)$bill['potongan_nominal_ditetapkan_snapshot']);
-            $newStatus = $net['net'] <= .001 ? 'waived' : 'open';
-            $stmt = $db->prepare('UPDATE tagihan_spp SET tarif_dasar_snapshot=?,potongan_nominal_snapshot=?,nominal_tagihan=?,status=? WHERE id=?');
-            $billId=(int)$bill['id']; $stmt->bind_param('dddsi', $new, $net['discount'], $net['net'], $newStatus, $billId); $stmt->execute(); $stmt->close();
-            $updatedBills++; $levelUpdated++;
-        }
         $changed++;
-        spp_write_audit($db, $masterYearId, null, 'ubah_tarif', ['tingkat'=>$level,'nominal'=>(float)$old['nominal_dasar']], ['tingkat'=>$level,'nominal'=>$new,'tagihan_diubah'=>$levelUpdated,'tagihan_terkunci'=>$levelLocked], count($bills));
+        spp_write_audit($db, $masterYearId, null, 'ubah_tarif', ['tingkat'=>$level,'nominal'=>(float)$old['nominal_dasar']], ['tingkat'=>$level,'nominal'=>$new,'tagihan_diubah'=>0,'tagihan_terkunci'=>0], 0);
     }
     spp_sync_active_placement_rates($db, (int)$master['tahun_ajaran_id'], $rates);
-    return ['rates_changed'=>$changed,'bills_updated'=>$updatedBills,'bills_locked'=>$lockedBills];
+    return ['rates_changed'=>$changed,'bills_updated'=>0,'bills_locked'=>0];
 }
 
 /** @return array<int,array{bulan:string,tahun:string,label:string,order:int}> */

@@ -21,16 +21,16 @@ try{
   try{spp_allocate_payment($koneksi,$nis,null,'07','2196',500000,'2196-07-02 08:00:00','Tunai','test');throw new RuntimeException('Satu pembayaran melunasi dua bulan.');}catch(RuntimeException $e){if(str_contains($e->getMessage(),'melunasi dua bulan'))throw $e;}
   $a=spp_allocate_payment($koneksi,$nis,null,'07','2196',250000,'2196-07-02 08:00:00','Tunai','test');spp_it_assert($a['bill_count']===1,'Pembayaran satu bulan gagal.');
   $a2=spp_allocate_payment($koneksi,$nis,null,'08','2196',250000,'2196-07-02 08:01:00','Tunai','test');spp_it_assert($a2['bill_count']===1,'Pembayaran bulan berikutnya gagal.');
-  $rateChange=spp_master_save_rates($koneksi,$masterId,[1=>300000,2=>250000,3=>250000,4=>250000,5=>250000,6=>250000]);spp_it_assert($rateChange['bills_updated']===10&&$rateChange['bills_locked']===2,'Perubahan tarif tidak memisahkan tagihan terkunci dan belum beralokasi.');
+  $rateRejected=false;try{spp_master_save_rates($koneksi,$masterId,[1=>300000,2=>250000,3=>250000,4=>250000,5=>250000,6=>250000]);}catch(RuntimeException $e){$rateRejected=str_contains($e->getMessage(),'Tarif terkunci');}spp_it_assert($rateRejected,'Tarif terbit masih dapat diubah.');
   $placementRate=(float)$koneksi->query('SELECT spp_perbulan_snapshot FROM siswa_tahun_ajaran WHERE id='.$placementId)->fetch_row()[0];
   $activeRate=(float)$koneksi->query("SELECT SPP_PERBULAN FROM siswa WHERE NO_INDUK='{$nis}'")->fetch_row()[0];
-  spp_it_assert($placementRate===250000.0&&$activeRate===300000.0,
-    'Tarif aktif tidak mengikuti master baru atau snapshot penempatan berbayar berubah.');
+  spp_it_assert($placementRate===250000.0&&$activeRate===250000.0,
+    'Penolakan perubahan tarif mengubah data siswa atau snapshot penempatan.');
   $discountChange=spp_sync_student_discount($koneksi,$nis,30000,$placementId);spp_it_assert($discountChange['updated']===10&&$discountChange['locked']===2,'Perubahan potongan tidak menjaga snapshot tagihan berbayar.');
-  $amounts=$koneksi->query("SELECT bulan,nominal_tagihan FROM tagihan_spp WHERE no_induk='{$nis}' ORDER BY CAST(tahun AS UNSIGNED),CAST(bulan AS UNSIGNED) LIMIT 3")->fetch_all(MYSQLI_ASSOC);spp_it_assert((float)$amounts[0]['nominal_tagihan']===250000.0&&(float)$amounts[1]['nominal_tagihan']===250000.0&&(float)$amounts[2]['nominal_tagihan']===270000.0,'Snapshot tarif lama atau tarif efektif baru berubah tidak tepat.');
+  $amounts=$koneksi->query("SELECT bulan,nominal_tagihan FROM tagihan_spp WHERE no_induk='{$nis}' ORDER BY CAST(tahun AS UNSIGNED),CAST(bulan AS UNSIGNED) LIMIT 3")->fetch_all(MYSQLI_ASSOC);spp_it_assert((float)$amounts[0]['nominal_tagihan']===250000.0&&(float)$amounts[1]['nominal_tagihan']===250000.0&&(float)$amounts[2]['nominal_tagihan']===220000.0,'Snapshot tarif lama atau tarif efektif baru berubah tidak tepat.');
   try{spp_allocate_payment($koneksi,$nis,null,'09','2196',100000,'2196-07-03 08:00:00','Tunai','test');throw new RuntimeException('Pembayaran SPP kurang dari sebulan diterima.');}catch(RuntimeException $e){if(str_contains($e->getMessage(),'kurang dari sebulan diterima'))throw $e;}
-  $c=spp_allocate_payment($koneksi,$nis,null,'09','2196',270000,'2196-07-04 08:00:00','Tunai','test');spp_it_assert($c['bill_count']===1,'Alokasi uang langsung salah.');
+  $c=spp_allocate_payment($koneksi,$nis,null,'09','2196',220000,'2196-07-04 08:00:00','Tunai','test');spp_it_assert($c['bill_count']===1,'Alokasi uang langsung salah.');
   try{spp_allocate_payment($koneksi,$nis,null,'10','2196',320000,'2196-07-05 08:00:00','VA','test');throw new RuntimeException('Kelebihan SPP diterima otomatis.');}catch(RuntimeException $e){if(str_contains($e->getMessage(),'diterima otomatis'))throw $e;}
-  $d=spp_allocate_payment($koneksi,$nis,null,'10','2196',270000,'2196-07-05 08:00:00','VA','test');spp_it_assert($d['bill_count']===1,'Pembayaran bulan keempat salah.');
+  $d=spp_allocate_payment($koneksi,$nis,null,'10','2196',220000,'2196-07-05 08:00:00','VA','test');spp_it_assert($d['bill_count']===1,'Pembayaran bulan keempat salah.');
   $koneksi->rollback();echo "OK: satu bulan per transaksi, urutan tunggakan, nominal tepat, tarif snapshot, dan pembayaran langsung.\n";
 }catch(Throwable $e){$koneksi->rollback();throw $e;}

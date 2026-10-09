@@ -6,7 +6,6 @@
   const messages=data.messages&&!Array.isArray(data.messages)?data.messages:{};
   const changes=new Map(),versions=new Map(),dialog=document.getElementById('parent-copy-dialog');
   const list=document.getElementById('copy-recipient-list'),all=document.getElementById('copy-select-all');
-  const overwrite=document.getElementById('copy-overwrite'),confirmation=document.getElementById('copy-confirm');
   const apply=document.getElementById('copy-apply'),targets=new Set();
   let current='',timer,chain=Promise.resolve(),busy=false,copyBusy=false,range=null,chooseVersion=0;
   const escape=text=>text.replace(/[&<>"']/g,c=>({'&':'&amp;','<':'&lt;','>':'&gt;','"':'&quot;',"'":'&#39;'}[c]));
@@ -103,23 +102,18 @@
   function lock(locked){busy=locked;editor.contentEditable=String(!locked);buttons.forEach(b=>b.disabled=locked);document.querySelectorAll('[data-format],#parent-save,#parent-preview').forEach(b=>b.disabled=locked);count();}
   document.getElementById('parent-save').addEventListener('click',async()=>{lock(true);try{await save();}catch(error){report(error);}finally{lock(false);}});
   document.getElementById('parent-preview').addEventListener('click',async()=>{if(busy)return;lock(true);try{await save();location.href='surat_orang_tua_susun.php?draft='+encodeURIComponent(data.token)+'&preview=1';}catch(error){report(error);lock(false);}});
-  function copyState(resetConfirmation=false){
-    if(resetConfirmation)confirmation.checked=false;
+  function copyState(){
     const others=recipients.filter(r=>r.key!==current);
     all.checked=others.length>0&&others.every(r=>targets.has(r.key));all.indeterminate=targets.size>0&&!all.checked;
-    const replace=others.filter(r=>targets.has(r.key)&&plain(messages[r.key])).length;
-    const requireConfirmation=overwrite.checked&&replace>0;
-    document.getElementById('copy-confirm-wrap').hidden=!requireConfirmation;
-    document.getElementById('copy-replace-count').textContent=replace;
     document.getElementById('copy-selected-count').textContent=targets.size+' penerima dipilih';
     document.getElementById('copy-total').textContent='('+others.length+')';
-    apply.disabled=copyBusy||!targets.size||!plain(value())||(requireConfirmation&&!confirmation.checked);
+    apply.disabled=copyBusy||!targets.size||!plain(value());
     list.querySelectorAll('input').forEach(check=>check.checked=targets.has(check.value));
   }
   function closeCopy(){if(copyBusy)return;dialog.close();document.getElementById('parent-copy').focus();}
   document.getElementById('parent-copy').addEventListener('click',()=>{
     capture();if(!count()||!plain(value()))return;
-    targets.clear();overwrite.checked=false;confirmation.checked=false;
+    targets.clear();
     document.getElementById('copy-result').textContent='';document.getElementById('copy-recipient-search').value='';
     document.getElementById('copy-source-name').textContent=recipients.find(r=>r.key===current).name;
     list.replaceChildren();
@@ -128,28 +122,30 @@
       const check=document.createElement('input');check.type='checkbox';check.value=recipient.key;
       const text=document.createElement('span'),name=document.createElement('strong'),identity=document.createElement('small');
       name.textContent=recipient.name;identity.textContent=recipient.unit+' · '+recipient.nis+' · '+recipient.class+(plain(messages[recipient.key])?' · Pesan sudah terisi':' · Tanpa pesan');
-      text.append(name,identity);row.append(check,text);list.append(row);check.addEventListener('change',()=>{check.checked?targets.add(check.value):targets.delete(check.value);copyState(true);});
+      text.append(name,identity);row.append(check,text);list.append(row);check.addEventListener('change',()=>{check.checked?targets.add(check.value):targets.delete(check.value);copyState();});
     });
     copyState();dialog.showModal();document.getElementById('copy-recipient-search').focus();
   });
-  all.addEventListener('change',()=>{targets.clear();if(all.checked)recipients.filter(r=>r.key!==current).forEach(r=>targets.add(r.key));copyState(true);});
-  overwrite.addEventListener('change',()=>copyState(true));confirmation.addEventListener('change',()=>copyState());
+  all.addEventListener('change',()=>{targets.clear();if(all.checked)recipients.filter(r=>r.key!==current).forEach(r=>targets.add(r.key));copyState();});
   document.getElementById('copy-recipient-search').addEventListener('input',event=>{const query=event.target.value.toLocaleLowerCase('id');list.querySelectorAll('label').forEach(row=>row.hidden=!row.textContent.toLocaleLowerCase('id').includes(query));});
   dialog.querySelectorAll('[data-copy-close]').forEach(button=>button.addEventListener('click',closeCopy));
   dialog.addEventListener('cancel',event=>{event.preventDefault();closeCopy();});
   dialog.addEventListener('click',event=>{const r=dialog.getBoundingClientRect();if(event.target===dialog&&(event.clientX<r.left||event.clientX>r.right||event.clientY<r.top||event.clientY>r.bottom))closeCopy();});
   apply.addEventListener('click',async()=>{
-    if(copyBusy||apply.disabled)return;copyBusy=true;copyState();
+    if(copyBusy||apply.disabled)return;
+    const source=current,selected=[...targets];
+    copyBusy=true;lock(true);copyState();
     dialog.querySelectorAll('input,[data-copy-close]').forEach(e=>e.disabled=true);
     try{
       await save();
-      const payload={action:'apply_message',source_key:current,message:messages[current],targets:[...targets],overwrite:overwrite.checked};
+      const payload={action:'apply_message',source_key:source,message:messages[source],targets:selected,overwrite:true};
       const result=await enqueue(()=>request(payload));
       Object.entries(result.messages).forEach(([key,message])=>{messages[key]=message;changes.delete(key);versions.set(key,(versions.get(key)||0)+1);markRecipient(key);});
-      status.textContent=result.updated+' penerima diperbarui; '+result.skipped+' penerima yang sudah memiliki pesan dilewati.';
+      editor.innerHTML=html(messages[current]||'');range=null;
+      status.textContent='Pesan diterapkan ke '+result.updated+' penerima.';
       copyBusy=false;dialog.close();document.getElementById('parent-copy').focus();
     }catch(error){document.getElementById('copy-result').textContent=error.message+' Coba Terapkan Pesan kembali.';}
-    finally{copyBusy=false;dialog.querySelectorAll('input,[data-copy-close]').forEach(e=>e.disabled=false);copyState();}
+    finally{copyBusy=false;lock(false);dialog.querySelectorAll('input,[data-copy-close]').forEach(e=>e.disabled=false);copyState();}
   });
   window.addEventListener('beforeunload',event=>{if(changes.size){event.preventDefault();event.returnValue='';}});
   if(buttons.length)showRecipient(buttons[0]);
