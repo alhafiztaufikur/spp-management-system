@@ -14,10 +14,10 @@ $_SESSION['admin_role'] = 'super_admin';
 $_SESSION['active_unit_id'] = 1;
 unit_set_context($koneksi, 1);
 $sql = $occupied
-    ? "SELECT mk.id FROM master_kelas mk WHERE mk.is_active=1 AND mk.is_placeholder=0
+    ? "SELECT mk.id FROM master_kelas mk WHERE mk.tingkat>0 AND mk.is_active=1 AND mk.is_placeholder=0
         AND EXISTS(SELECT 1 FROM siswa s WHERE s.master_kelas_id=mk.id AND s.is_active=1)
         ORDER BY mk.id LIMIT 1"
-    : "SELECT mk.id FROM master_kelas mk WHERE mk.is_active=1 AND mk.is_placeholder=0
+    : "SELECT mk.id FROM master_kelas mk WHERE mk.tingkat>0 AND mk.is_active=1 AND mk.is_placeholder=0
         AND NOT EXISTS(SELECT 1 FROM siswa s WHERE s.master_kelas_id=mk.id AND s.is_active=1)
         ORDER BY mk.id DESC LIMIT 1";
 $row = $koneksi->query($sql)->fetch_assoc();

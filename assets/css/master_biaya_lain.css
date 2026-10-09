@@ -1,0 +1,101 @@
+/* Presentation only; scoped to Master Biaya Lain. */
+.fee-workspace-content{display:grid;gap:18px;margin:24px 28px 32px;min-width:0;}
+.fee-workspace .main-card{margin:0;padding:24px;min-width:0;box-sizing:border-box;box-shadow:0 6px 24px rgba(0,0,0,.035);border-radius:18px;}
+.fee-workspace .fee-hero{position:relative;display:grid;grid-template-columns:minmax(0,2fr) minmax(240px,1fr);align-items:center;gap:24px;padding:28px 32px;background:linear-gradient(120deg,var(--bg-card),var(--accent-glow));isolation:isolate;overflow:hidden;}
+.fee-hero::before{content:"";position:absolute;width:460px;height:460px;right:5%;top:-340px;border:60px solid var(--accent-glow);border-radius:50%;z-index:-1;}
+.fee-hero-copy{min-width:0;}
+.fee-hero .recap-class-overline{font-size:11px;font-weight:800;letter-spacing:.08em;color:var(--accent);}
+.fee-hero h1{font-size:clamp(27px,2.5vw,36px);line-height:1.2;letter-spacing:-1px;margin:8px 0 10px;}
+.fee-hero p{max-width:680px;margin:0;color:var(--text-secondary);font-size:13px;line-height:1.7;}
+.fee-hero-stats{display:grid;grid-template-columns:repeat(3,minmax(0,1fr));gap:12px;margin-top:20px;}
+.fee-stat{display:flex;align-items:center;gap:12px;padding:15px;border:1px solid var(--border);border-radius:13px;background:var(--bg-card);min-width:0;}
+.fee-stat>div{min-width:0;}
+.fee-stat>div>span{display:block;font-size:10px;line-height:1.5;font-weight:700;text-transform:uppercase;color:var(--text-secondary);}
+.fee-stat strong{display:block;margin-top:4px;font-size:23px;line-height:1.2;color:var(--accent);}
+.fee-icon{display:inline-flex;align-items:center;justify-content:center;flex:none;width:46px;height:46px;border-radius:12px;background:var(--accent-glow);color:var(--accent);}
+.fee-icon svg{width:24px;height:24px;stroke-width:1.8;}
+.fee-hero-art{color:var(--accent);max-width:340px;width:100%;justify-self:center;}
+.fee-hero-art>svg{display:block;width:100%;height:auto;}
+.fee-art-paper{fill:var(--bg-card);}
+.fee-panel-grid{display:grid;grid-template-columns:minmax(0,.96fr) minmax(0,1.04fr);gap:18px;align-items:stretch;}
+.fee-workspace .fee-panel{padding:24px;display:flex;flex-direction:column;}
+.fee-panel #form-master-biaya,.fee-panel #form-terbit-biaya{display:flex;flex-direction:column;flex:1;}
+.fee-workspace .fee-panel-heading{display:flex;align-items:center;justify-content:flex-start;gap:14px;padding-bottom:20px;margin:0 0 20px;border-bottom:1px solid var(--border);}
+.fee-panel-heading>div{min-width:0;}
+.fee-panel-heading .fee-icon{width:50px;height:50px;}
+.fee-panel-heading h2{margin:0 0 5px;font-size:16px;line-height:1.4;font-weight:800;}
+.fee-panel-heading p{margin:0;font-size:11px;line-height:1.7;color:var(--text-muted);}
+.fee-workspace .master-fee-form{grid-template-columns:1fr;gap:17px;}
+.fee-workspace .field-row{min-width:0;margin:0;}
+.fee-workspace .field-label{display:block;margin:0 0 8px;font-size:10px;font-weight:700;line-height:1.5;letter-spacing:.03em;color:var(--text-secondary);}
+.fee-workspace .field-input,.fee-workspace .custom-select,.fee-workspace .custom-select-trigger{width:100%;min-width:0;box-sizing:border-box;}
+.fee-workspace .field-input{min-height:42px;font-size:12px;border-radius:9px;}
+.fee-amount-control{display:flex;align-items:center;border:1px solid var(--border);border-radius:9px;background:var(--bg-surface);overflow:hidden;}
+.fee-amount-control>span{padding:12px 14px;align-self:stretch;display:flex;align-items:center;border-right:1px solid var(--border);font-size:12px;color:var(--text-secondary);background:var(--accent-glow);}
+.fee-workspace .fee-amount-control .field-input{border:0;border-radius:0;background:transparent;box-shadow:none;}
+.fee-amount-control:focus-within{border-color:var(--accent);box-shadow:0 0 0 3px var(--accent-glow);}
+.fee-workspace .master-active-check{position:relative;display:flex;align-items:flex-start;gap:11px;padding:0;min-height:0;border:0;background:none;font-size:12px;font-weight:500;cursor:pointer;}
+.fee-workspace .master-active-check input{position:absolute;left:0;top:1px;width:36px;height:22px;margin:0;opacity:0;cursor:pointer;z-index:1;}
+.fee-switch-track{width:36px;height:21px;flex:none;position:relative;margin-top:1px;border-radius:999px;background:var(--text-muted);transition:background .15s;}
+.fee-switch-track::after{content:"";position:absolute;top:3px;left:3px;width:15px;height:15px;background:#fff;border-radius:50%;transition:transform .15s;}
+.master-active-check input:checked+.fee-switch-track{background:var(--accent);}
+.master-active-check input:checked+.fee-switch-track::after{transform:translateX(15px);}
+.master-active-check input:focus-visible+.fee-switch-track{outline:2px solid var(--accent);outline-offset:3px;}
+.master-active-check small{display:block;margin-top:5px;font-weight:400;font-size:10px;line-height:1.6;color:var(--text-muted);}
+.fee-workspace .report-filter-grid{grid-template-columns:minmax(0,1.08fr) minmax(0,.92fr);gap:16px 12px;}
+.fee-workspace .publish-target-field{grid-column:1/-1;}
+.fee-workspace .fee-preview-grid{grid-template-columns:repeat(2,minmax(0,1fr));gap:12px;margin-bottom:0;}
+.fee-workspace .fee-preview-grid .report-summary-card{display:flex;align-items:flex-start;gap:12px;min-width:0;padding:15px;background:var(--accent-glow);border-color:var(--border);border-radius:11px;}
+.fee-preview-grid .report-summary-card>div{min-width:0;}
+.fee-workspace .fee-preview-grid .fee-icon{margin:0;width:38px;height:38px;}
+.fee-preview-grid .report-summary-card>div>span{font-size:9px;line-height:1.5;margin:0 0 5px;}
+.fee-preview-grid strong{display:block;font-size:16px;line-height:1.4;overflow-wrap:anywhere;}
+.fee-preview-grid small{display:block;margin-top:5px;font-size:9px;line-height:1.6;color:var(--text-muted);}
+.fee-workspace .fee-panel .action-bar{gap:10px;padding:16px 0 0;border:0;margin-top:auto!important;}
+.fee-workspace .fee-panel .action-bar .btn{min-height:43px;border-radius:10px;justify-content:center;font-size:12px;gap:8px;}
+.fee-panel .action-bar .btn-primary{flex:1;}
+.fee-workspace .btn svg{width:18px;height:18px;flex:none;}
+.fee-workspace .fee-list-panel{scroll-margin-top:95px;}
+.fee-workspace .fee-list-panel .table-container{overflow-x:auto;}
+.fee-workspace .fee-list-panel th{color:var(--accent);background:var(--accent-glow);}
+.fee-workspace .fee-list-panel th,.fee-workspace .fee-list-panel td{padding:13px 15px;}
+.fee-workspace .fee-list-panel .aksi-col{white-space:normal;min-width:240px;}
+.fee-workspace .fee-list-panel .btn-tbl{margin:3px 2px;}
+.fee-workspace .fee-panel[hidden]{display:none!important;}
+/* Compact recipient picker; keep scrolling local and inexpensive to paint. */
+.fee-panel-grid[data-target="siswa"]{align-items:start;}
+.fee-workspace #form-terbit-biaya .report-filter-grid{grid-template-columns:minmax(0,1.08fr) minmax(0,.92fr);min-width:0;}
+.fee-workspace #form-terbit-biaya .fee-preview-grid{grid-template-columns:repeat(2,minmax(0,1fr));}
+.fee-workspace .fee-panel{backdrop-filter:none;-webkit-backdrop-filter:none;}
+.fee-workspace #form-terbit-biaya .publish-students-field{min-width:0;padding:16px;background:var(--bg-surface);border-color:var(--border);border-radius:13px;}
+.fee-recipient-heading{display:flex;align-items:flex-start;justify-content:space-between;gap:12px;margin-bottom:14px;}
+.fee-recipient-heading>div{min-width:0;}
+.fee-workspace .fee-recipient-heading .field-label{margin:0 0 4px;text-transform:none;font-size:12px;letter-spacing:0;color:var(--text-primary);}
+.fee-recipient-heading small{display:block;color:var(--text-muted);font-size:10px;line-height:1.6;}
+.fee-selected-badge{flex:none;display:inline-flex;gap:4px;align-items:center;padding:6px 9px;border-radius:999px;background:var(--accent-glow);color:var(--accent);font-size:10px;font-weight:700;white-space:nowrap;}
+.fee-workspace #form-terbit-biaya .publish-student-toolbar{grid-template-columns:minmax(0,1fr);gap:10px;margin:0;}
+.fee-workspace #form-terbit-biaya .publish-student-search{width:100%;min-width:0;box-sizing:border-box;padding:0 12px;gap:9px;min-height:42px;border-radius:9px;background:var(--bg-card);}
+.fee-workspace #form-terbit-biaya .publish-student-search input{min-width:0;flex:1;width:0;font-size:12px;min-height:42px;}
+.fee-workspace #form-terbit-biaya .publish-student-actions{justify-content:space-between;flex-wrap:wrap;gap:8px;}
+.fee-workspace #form-terbit-biaya .publish-student-actions .btn{display:inline-flex;align-items:center;justify-content:center;gap:6px;min-height:34px;padding:7px 10px;border-radius:8px;font-size:10px;box-shadow:none;}
+.fee-workspace #form-terbit-biaya .publish-student-actions .btn svg{width:14px;height:14px;}
+.fee-workspace #form-terbit-biaya .publish-student-list{display:flex;flex-direction:column;gap:8px;min-width:0;max-height:320px;max-height:min(320px,46vh);overflow-x:hidden;overflow-y:auto;padding:3px 5px 3px 1px;margin-top:12px;contain:layout paint;overscroll-behavior-y:contain;scrollbar-gutter:stable;scrollbar-width:thin;scrollbar-color:var(--border) transparent;scroll-behavior:auto;}
+.fee-workspace #form-terbit-biaya .publish-student-list:focus-visible{outline:2px solid var(--accent);outline-offset:3px;border-radius:9px;}
+.fee-workspace #form-terbit-biaya .publish-student-card{display:grid;grid-template-columns:18px 34px minmax(0,1fr) auto;grid-template-areas:"check avatar main badge";align-items:center;flex:none;min-width:0;min-height:72px;box-sizing:border-box;gap:10px;padding:10px 12px;border-color:var(--border);border-radius:10px;background:var(--bg-card);box-shadow:none!important;transition:none!important;transform:none;}
+.fee-workspace #form-terbit-biaya .publish-student-card:hover{background:var(--bg-surface);border-color:var(--accent);}
+.fee-workspace #form-terbit-biaya .publish-student-card.is-selected{background:var(--accent-glow);border-color:var(--accent);}
+.fee-workspace #form-terbit-biaya .publish-student-card:focus-within{outline:2px solid var(--accent);outline-offset:-2px;}
+.fee-recipient-avatar{grid-area:avatar;display:grid;place-items:center;width:34px;height:34px;border-radius:50%;background:var(--accent-glow);color:var(--accent);font-size:11px;font-weight:750;}
+.fee-workspace #form-terbit-biaya .publish-student-check{margin:0;width:18px;height:18px;accent-color:var(--accent);}
+.fee-workspace #form-terbit-biaya .publish-student-main{gap:2px;}
+.fee-workspace #form-terbit-biaya .publish-student-main strong{font-size:12px;font-weight:700;white-space:normal;overflow-wrap:anywhere;line-height:1.4;}
+.fee-workspace #form-terbit-biaya .publish-student-main small{font-size:10px;font-weight:400;white-space:normal;overflow-wrap:anywhere;line-height:1.4;}
+.fee-workspace #form-terbit-biaya .publish-student-card .kelas-badge{font-size:10px;padding:4px 7px;max-width:90px;justify-self:end;}
+.fee-workspace #form-terbit-biaya .publish-student-hint{display:flex;align-items:flex-start;justify-content:space-between;gap:10px;flex-wrap:wrap;font-size:10px;font-weight:400;line-height:1.6;margin-top:10px;}
+.fee-workspace #form-terbit-biaya .publish-student-hint>span:first-child{font-weight:650;}
+.fee-workspace #form-terbit-biaya .publish-student-empty{background:var(--bg-card);border-color:var(--border);font-size:12px;font-weight:500;padding:18px;}
+@media(max-width:1400px){.fee-workspace #form-terbit-biaya .publish-student-card{grid-template-columns:18px minmax(0,1fr) auto;grid-template-areas:"check main badge";gap:9px;}.fee-recipient-avatar{display:none;}}
+@media(max-width:600px){.fee-workspace #form-terbit-biaya .report-filter-grid,.fee-workspace #form-terbit-biaya .fee-preview-grid{grid-template-columns:minmax(0,1fr);}.fee-workspace #form-terbit-biaya .publish-students-field{padding:12px;}.fee-recipient-heading{flex-wrap:wrap;gap:8px;}.fee-workspace #form-terbit-biaya .publish-student-card{grid-template-columns:18px minmax(0,1fr);grid-template-areas:"check main" ". badge";gap:5px 9px;padding:10px;}.fee-workspace #form-terbit-biaya .publish-student-card .kelas-badge{justify-self:start;}.fee-workspace #form-terbit-biaya .publish-student-actions .btn{flex:1;}}
+@media(max-width:1400px){.fee-workspace .fee-hero{grid-template-columns:minmax(0,2.3fr) minmax(180px,1fr);padding:26px;gap:18px;}.fee-workspace .fee-panel{padding:22px;}.fee-stat{gap:9px;padding:13px;}.fee-stat .fee-icon{width:35px;height:35px;}.fee-workspace .fee-preview-grid .report-summary-card{flex-direction:column;}}
+@media(max-width:1100px){.fee-workspace .fee-hero{grid-template-columns:1fr;}.fee-hero-art{display:none;}.fee-panel-grid{grid-template-columns:1fr;}.fee-workspace .fee-preview-grid .report-summary-card{flex-direction:row;}}
+@media(max-width:600px){.fee-workspace-content{margin:18px 12px 24px;gap:14px;}.fee-workspace .fee-hero,.fee-workspace .fee-panel,.fee-workspace .fee-list-panel{padding:18px;}.fee-hero-stats{gap:8px;}.fee-stat{flex-direction:column;align-items:flex-start;padding:10px;gap:8px;}.fee-stat>div>span{font-size:9px;}.fee-stat strong{font-size:21px;}.fee-workspace .report-filter-grid,.fee-workspace .fee-preview-grid{grid-template-columns:1fr;}.fee-workspace .fee-panel-heading{gap:11px;}.fee-panel-heading .fee-icon{width:40px;height:40px;}.fee-panel-heading h2{font-size:15px;}.fee-panel .action-bar .btn{width:100%;flex:auto;}.fee-workspace .fee-list-panel .aksi-col{min-width:0;}}

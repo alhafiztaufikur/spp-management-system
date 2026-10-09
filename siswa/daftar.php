@@ -5,6 +5,7 @@ require_once '../koneksi.php';
 require_once '../includes/auth.php';
 require_once '../includes/daftar_ulang.php';
 require_once '../includes/kelas.php';
+require_once '../includes/master_workspace_ui.php';
 require_once '../includes/pagination.php';
 require_once '../includes/student_tariff_consistency.php';
 require_once '../includes/tagihan_sekali.php';
@@ -390,7 +391,8 @@ if ($_SERVER['REQUEST_METHOD'] === 'POST') {
     }
 }
 
-$editId = (int)($_GET['edit'] ?? 0);
+$resetForm = ($_SERVER['REQUEST_METHOD'] === 'GET' && ($_GET['reset_form'] ?? '') === '1');
+$editId = $resetForm ? 0 : (int)($_GET['edit'] ?? 0);
 $editStudent = $editId > 0 ? find_student($koneksi, $editId) : null;
 if ($editId > 0 && !$editStudent) {
     $_SESSION['flash'] = ['type' => 'error', 'msg' => 'Data siswa tidak ditemukan.'];
@@ -472,6 +474,14 @@ if ($studentRows) {
 }
 $studentPaginationQuery = filter_query(pagination_query(['per_page' => $perPage]));
 
+if ($resetForm) {
+    $oldInput = array_fill_keys(['no_induk', 'nama', 'no_induk_diknas', 'master_kelas_id', 'komite_mulai_bulan', 'psb', 'pomg', 'daftar_ulang', 'potongan_spp_nominal', 'potong_du'], '');
+    $oldInput['advanced_enabled'] = '0';
+}
+$resetQuery = $_GET;
+unset($resetQuery['edit'], $resetQuery['reset_form']);
+$resetQuery['reset_form'] = '1';
+$resetFormUrl = 'daftar.php?' . http_build_query($resetQuery);
 $formStudent = $editStudent ?? [];
 $komiteStartMonth = '07';
 $editStudentYear = $editStudent
@@ -499,6 +509,7 @@ function form_student_value(string $key, array $oldInput, array $student, array 
     return $student[$column] ?? $default;
 }
 function rupiah_value($value): string {
+    if ($value === '') return '';
     return number_format((float)$value, 0, ',', '.');
 }
 $advancedOpen = isset($oldInput['advanced_enabled']) && $oldInput['advanced_enabled'] === '1';
@@ -518,13 +529,15 @@ $sppRatesByGrade=[];[$firstGrade,$lastGrade]=unit_level_bounds();foreach(range($
   <link href="https://fonts.googleapis.com/css2?family=Inter:wght@300;400;500;600;700;800&display=swap" rel="stylesheet" />
   <link rel="stylesheet" href="../assets/css/style.css?v=unitpalette4&amp;mtime=<?= filemtime(__DIR__ . '/../assets/css/style.css') ?>" />
   <link rel="stylesheet" href="../assets/css/date_controls.css?v=unitpalette4&amp;mtime=<?= filemtime(__DIR__ . '/../assets/css/date_controls.css') ?>" />
+  <link rel="stylesheet" href="../assets/css/master_workspace.css?v=<?= filemtime(__DIR__ . '/../assets/css/master_workspace.css') ?>" />
+  <link rel="stylesheet" href="../assets/css/workspace_readability.css?v=<?= filemtime(__DIR__ . '/../assets/css/workspace_readability.css') ?>" />
   <script>(function(){var t=localStorage.getItem('spp_theme')||'light';document.documentElement.setAttribute('data-theme',t);})();</script>
 </head>
-<body>
+<body data-readable-workspace="students">
   <div class="bg-orbs"><div class="orb orb-1"></div><div class="orb orb-2"></div><div class="orb orb-3"></div></div>
   <div class="layout">
     <?php include '../includes/sidebar.php'; ?>
-    <main class="main-content">
+    <main class="main-content student-workspace" data-advanced="<?= $advancedOpen ? 'true' : 'false' ?>">
       <div class="topbar">
         <button class="sidebar-toggle" onclick="toggleSidebar()" id="btn-sidebar-toggle">
           <svg width="20" height="20" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><line x1="3" y1="12" x2="21" y2="12"/><line x1="3" y1="6" x2="21" y2="6"/><line x1="3" y1="18" x2="21" y2="18"/></svg>
@@ -537,43 +550,53 @@ $sppRatesByGrade=[];[$firstGrade,$lastGrade]=unit_level_bounds();foreach(range($
       <div class="alert alert-<?= htmlspecialchars($flash['type']) ?>" id="flash-msg"><?= htmlspecialchars($flash['msg']) ?></div>
       <?php endif; ?>
 
-      <section class="main-card master-modern-shell student-master-shell">
-        <div class="master-modern-hero">
-          <div>
-            <span class="recap-class-overline">Data Master</span>
-            <h1>Data Siswa</h1>
-            <p>Kelola identitas siswa, rombel, tarif aktif, dan status siswa.</p>
-          </div>
-          <div class="master-modern-stats">
-            <div><span>Hasil Filter</span><strong><?= number_format($totalStudents) ?></strong></div>
-            <div><span>Per Halaman</span><strong><?= number_format($perPage) ?></strong></div>
+      <?php
+      $statusChoices = $GLOBALS['spp_filter_choices']['status']['values'] ?? ['active'];
+      $statusNames = ['active'=>'Aktif', 'archived'=>'Arsip/Lulus', 'legacy'=>'Legacy'];
+      $statusCaption = filter_is_all($statusChoices) ? 'Semua status' : (count($statusChoices) > 1 ? 'Beberapa status' : ($statusNames[$statusChoices[0]] ?? 'Tidak tercatat'));
+      ?>
+      <section class="main-card master-modern-shell student-workspace-shell">
+        <div class="student-hero">
+          <div class="student-hero-copy"><span class="breadcrumb">SistemSPP <span aria-hidden="true">&rsaquo;</span> Data Siswa</span><h1>Data Siswa</h1><p>Kelola identitas siswa, rombel, tarif aktif, dan status siswa.</p></div>
+          <div class="student-hero-stats">
+            <div class="student-stat"><span class="master-workspace-icon"><?= master_workspace_icon('students') ?></span><div><span>Hasil Filter</span><strong><?= number_format($totalStudents) ?></strong><small>siswa ditemukan</small></div></div>
+            <div class="student-stat"><span class="master-workspace-icon"><?= master_workspace_icon('document') ?></span><div><span>Per Halaman</span><strong><?= number_format($perPage) ?></strong><small>data per halaman</small></div></div>
+            <div class="student-stat"><span class="master-workspace-icon"><?= master_workspace_icon('coins') ?></span><div><span>Tarif Efektif</span><strong id="student-hero-effective">Rp <?= number_format((float)$sppRatePreview['net'],0,',','.') ?></strong><small>pratinjau formulir</small></div></div>
+            <div class="student-stat"><span class="master-workspace-icon"><?= master_workspace_icon('check') ?></span><div><span>Status Siswa</span><strong><?= htmlspecialchars($statusCaption,ENT_QUOTES,'UTF-8') ?></strong><small>cakupan filter</small></div></div>
           </div>
         </div>
       </section>
 
-      <div class="main-card master-modern-card master-modern-form">
-        <div class="card-title-row">
-          <div class="card-title"><?= $editStudent ? 'Edit Siswa' : 'Tambah Siswa Baru' ?></div>
-          <?php if ($editStudent): ?><span class="master-status <?= $editStudent['is_active'] ? 'is-active' : 'is-inactive' ?>"><?= $editStudent['is_active'] ? 'Aktif' : 'Diarsipkan' ?></span><?php endif; ?>
+      <div class="main-card master-modern-card master-modern-form student-form-shell">
+        <div class="student-form-heading">
+          <h2 id="student-form-title"><?= $editStudent ? 'Edit Siswa' : 'Tambah Siswa Baru' ?></h2>
+          <?php if ($editStudent): ?><span data-student-edit-only class="master-status <?= $editStudent['is_active'] ? 'is-active' : 'is-inactive' ?>"><?= $editStudent['is_active'] ? 'Aktif' : 'Diarsipkan' ?></span><?php endif; ?>
         </div>
         <form method="POST" action="daftar.php" id="form-master-siswa" novalidate>
           <input type="hidden" name="csrf_token" value="<?= htmlspecialchars($_SESSION['csrf_student']) ?>" />
           <input type="hidden" name="aksi" value="<?= $editStudent ? 'update' : 'tambah' ?>" />
           <input type="hidden" name="id" value="<?= (int)($editStudent['id'] ?? 0) ?>" />
-          <div class="fields-grid">
-            <div class="field-row">
-              <label class="field-label" for="nis-baru">No. Induk</label>
+          <div class="student-workspace-grid" id="student-advanced-panel">
+            <section class="student-panel student-panel-identity">
+<div class="student-panel-heading"><span class="master-workspace-icon"><?= master_workspace_icon('student') ?></span><div><h3>Identitas Siswa</h3><p>Data dasar dan informasi sekolah siswa.</p></div></div><div class="fields-grid">            <div class="field-row">
+              <label class="field-label" for="nis-baru">No. Induk <span class="required-mark" aria-hidden="true">*</span></label>
               <input class="field-input" type="text" inputmode="numeric" maxlength="10" id="nis-baru" name="no_induk" required
                 value="<?= htmlspecialchars((string)($editStudent['NO_INDUK'] ?? form_student_value('no_induk', $oldInput, $formStudent, $fieldMap))) ?>" <?= $editStudent ? 'readonly aria-readonly="true"' : '' ?> />
-              <?php if ($editStudent): ?><small class="payment-auto-note">Nomor induk menjadi penghubung riwayat dan tagihan siswa.</small><?php endif; ?>
+              <?php if ($editStudent): ?><small data-student-edit-only class="payment-auto-note">Nomor induk menjadi penghubung riwayat dan tagihan siswa.</small><?php endif; ?>
             </div>
             <div class="field-row">
-              <label class="field-label" for="nama-baru">Nama Lengkap</label>
+              <label class="field-label" for="nama-baru">Nama Lengkap <span class="required-mark" aria-hidden="true">*</span></label>
               <input class="field-input" type="text" maxlength="100" id="nama-baru" name="nama" required
                 value="<?= htmlspecialchars((string)form_student_value('nama', $oldInput, $formStudent, $fieldMap)) ?>" />
             </div>
+              <div class="field-row">
+                <label class="field-label" for="nis-diknas">No. Induk Diknas (opsional)</label>
+                <input <?= !$advancedOpen ? 'readonly aria-readonly="true"' : '' ?> class="field-input advanced-field" type="text" inputmode="numeric" maxlength="10" id="nis-diknas" name="no_induk_diknas" placeholder="Boleh dikosongkan"
+                  value="<?= htmlspecialchars((string)form_student_value('no_induk_diknas', $oldInput, $formStudent, $fieldMap)) ?>" />
+              <small class="student-locked-note"><?= master_workspace_icon('lock') ?> Aktifkan Advanced untuk mengubah.</small>
+              </div>
             <div class="field-row">
-              <label class="field-label" for="kelas-baru">Kelas/Rombel</label>
+              <label class="field-label" for="kelas-baru">Kelas/Rombel <span class="required-mark" aria-hidden="true">*</span></label>
               <?php
                 $selectedClassId = (int)form_student_value('master_kelas_id', $oldInput, $formStudent, $fieldMap, 0);
                 $selectedClassLabel = '';
@@ -607,40 +630,31 @@ $sppRatesByGrade=[];[$firstGrade,$lastGrade]=unit_level_bounds();foreach(range($
               </div>
               <small class="payment-auto-note">Kelola pilihan melalui menu Master Kelas.</small>
             </div>
-            <div class="field-row">
-              <label class="field-label" for="student-komite-start">Mulai Tagihan Komite</label>
+</div>
+            </section>
+            <section class="student-panel student-panel-start">
+<div class="student-panel-heading"><span class="master-workspace-icon"><?= master_workspace_icon('calendar') ?></span><div><h3>Penagihan Awal</h3><p>Tentukan bulan mulai tagihan Komite siswa.</p></div></div><div class="student-start-content">            <div class="field-row">
+              <label class="field-label" for="student-komite-start">Mulai Tagihan Komite <span class="required-mark" aria-hidden="true">*</span></label>
               <select class="field-input field-select" id="student-komite-start" name="komite_mulai_bulan" required>
+                <option value="" disabled <?= $komiteStartMonth === '' ? 'selected' : '' ?>>Pilih bulan mulai tagihan</option>
                 <?php foreach (spp_academic_periods(du_current_academic_year()) as $period): ?>
                 <option value="<?= htmlspecialchars($period['bulan']) ?>" <?= $komiteStartMonth===$period['bulan']?'selected':'' ?>><?= htmlspecialchars(spp_month_label($period['bulan'])) ?></option>
                 <?php endforeach; ?>
               </select>
               <small class="payment-auto-note">Siswa pindahan: pilih bulan mulai masuk.</small>
             </div>
-          </div>
-
-          <label class="advanced-switch" for="advanced-enabled">
-            <span><strong>Advance</strong><small>Tarif tambahan dan potongan SPP; tagihan yang pernah dibayar tetap terkunci</small></span>
-            <input type="checkbox" id="advanced-enabled" name="advanced_enabled" value="1" <?= $advancedOpen ? 'checked' : '' ?> />
-            <span class="advanced-switch-track"><span></span></span>
-          </label>
-
-          <div class="student-advanced-panel <?= $advancedOpen ? 'is-open' : '' ?>" id="student-advanced-panel">
-            <div class="section-divider"><span>Identitas Sekolah</span></div>
-            <div class="fields-grid">
-              <div class="field-row">
-                <label class="field-label" for="nis-diknas">No. Induk Diknas (opsional)</label>
-                <input class="field-input advanced-field" type="text" inputmode="numeric" maxlength="10" id="nis-diknas" name="no_induk_diknas" placeholder="Boleh dikosongkan"
-                  value="<?= htmlspecialchars((string)form_student_value('no_induk_diknas', $oldInput, $formStudent, $fieldMap)) ?>" />
-              </div>
-            </div>
-
-            <div class="section-divider"><span>Tarif Siswa</span></div>
-            <div class="spp-student-rate-summary">
-              <div><span>Tarif dasar SPP</span><strong id="student-spp-base" data-base="<?= htmlspecialchars((string)$sppRatePreview['base']) ?>">Rp <?= number_format((float)$sppRatePreview['base'],0,',','.') ?></strong></div>
-              <div><span>Tarif efektif</span><strong id="student-spp-effective">Rp <?= number_format((float)$sppRatePreview['net'],0,',','.') ?></strong></div>
+<div class="student-start-illustration" aria-hidden="true"><?= master_workspace_icon('calendar') ?></div></div>
+            </section>
+            <section class="student-panel student-panel-rate">
+<div class="student-panel-heading"><span class="master-workspace-icon"><?= master_workspace_icon('coins') ?></span><div><h3>Tarif Siswa</h3><p>Informasi tarif SPP yang berlaku untuk siswa ini.</p></div></div>            <div class="spp-student-rate-summary">
+              <div><span>Tarif dasar SPP</span><strong id="student-spp-base" data-base="<?= htmlspecialchars((string)$sppRatePreview['base']) ?>">Rp <?= number_format((float)$sppRatePreview['base'],0,',','.') ?></strong><small>Tarif dasar dikelola melalui Master Penerbitan SPP.</small></div>
+              <div><span>Tarif efektif</span><strong id="student-spp-effective">Rp <?= number_format((float)$sppRatePreview['net'],0,',','.') ?></strong><small>Tarif setelah potongan SPP siswa.</small></div>
               <small>TA <span id="student-spp-year"><?= htmlspecialchars((string)$sppRatePreview['year']) ?></span> · tarif dasar dikelola melalui Master Penerbitan SPP.</small>
             </div>
-            <div class="fields-grid student-money-grid">
+
+            </section>
+            <section class="student-panel student-panel-fees">
+<div class="student-panel-heading"><span class="master-workspace-icon"><?= master_workspace_icon('document') ?></span><div><h3>Komponen Biaya</h3><p>Komponen biaya tambahan yang berlaku untuk siswa ini.</p></div></div>            <div class="fields-grid student-money-grid">
               <?php
               $feeFields = [
                 'psb' => 'Uang PSB', 'pomg' => 'Uang Komite / Bulan',
@@ -650,36 +664,48 @@ $sppRatesByGrade=[];[$firstGrade,$lastGrade]=unit_level_bounds();foreach(range($
               ?>
               <div class="field-row">
                 <label class="field-label" for="student-<?= $key ?>"><?= $label ?></label>
-                <input class="field-input rupiah-input advanced-field student-fee-input" type="text" inputmode="numeric" id="student-<?= $key ?>" name="<?= $key ?>"
+                <input <?= !$advancedOpen ? 'readonly aria-readonly="true"' : '' ?> class="field-input rupiah-input advanced-field student-fee-input" type="text" inputmode="numeric" id="student-<?= $key ?>" name="<?= $key ?>"
                   value="<?= rupiah_value(form_student_value($key, $oldInput, $formStudent, $fieldMap, 0)) ?>" />
               </div>
               <?php endforeach; ?>
-            </div>
-
-            <div class="section-divider"><span>Potongan</span></div>
-            <div class="fields-grid student-money-grid">
+            </div><small class="student-locked-note"><?= master_workspace_icon('lock') ?> Aktifkan Advanced untuk mengubah nilai.</small>
+            </section>
+            <section class="student-panel student-panel-discounts">
+<div class="student-panel-heading"><span class="master-workspace-icon"><?= master_workspace_icon('discount') ?></span><div><h3>Potongan</h3><p>Pengaturan potongan biaya siswa.</p></div></div>            <div class="fields-grid student-money-grid">
               <div class="field-row">
                 <label class="field-label" for="student-potongan-spp">Potongan SPP per Bulan (Rp)</label>
-                <input class="field-input rupiah-input advanced-field" type="text" inputmode="numeric" id="student-potongan-spp" name="potongan_spp_nominal"
-                  value="<?= rupiah_value($previewDiscount) ?>" />
+                <input <?= !$advancedOpen ? 'readonly aria-readonly="true"' : '' ?> class="field-input rupiah-input advanced-field" type="text" inputmode="numeric" id="student-potongan-spp" name="potongan_spp_nominal"
+                  value="<?= $resetForm ? '' : rupiah_value($previewDiscount) ?>" />
                 <small class="payment-auto-note">Berlaku pada tagihan yang belum pernah menerima pembayaran.</small>
               </div>
               <div class="field-row">
                 <label class="field-label" for="student-potong-du">Potongan Daftar Ulang</label>
-                <input class="field-input rupiah-input advanced-field derived-source" type="text" inputmode="numeric" id="student-potong-du" name="potong_du"
+                <input <?= !$advancedOpen ? 'readonly aria-readonly="true"' : '' ?> class="field-input rupiah-input advanced-field derived-source" type="text" inputmode="numeric" id="student-potong-du" name="potong_du"
                   value="<?= rupiah_value(form_student_value('potong_du', $oldInput, $formStudent, $fieldMap, 0)) ?>" />
               </div>
               <div class="field-row">
                 <label class="field-label" for="student-total-du">Total Daftar Ulang Setelah Potongan</label>
-                <input class="field-input student-derived" type="text" id="student-total-du" readonly value="<?= rupiah_value($editStudent['tot_du'] ?? 0) ?>" />
+                <input class="field-input student-derived" type="text" id="student-total-du" readonly value="<?= $resetForm ? '' : rupiah_value($editStudent['tot_du'] ?? 0) ?>" />
               </div>
-            </div>
-
+            </div><small class="student-locked-note"><?= master_workspace_icon('lock') ?> Aktifkan Advanced untuk mengubah nilai.</small>
+            </section>
+            <section class="student-panel student-panel-advanced">
+              <label class="advanced-switch" for="advanced-enabled">
+                <span class="student-advanced-title"><span class="master-workspace-icon"><?= master_workspace_icon('settings') ?></span><span><strong>Advanced</strong><small>Tarif tambahan dan potongan SPP; tagihan yang pernah dibayar tetap terkunci.</small></span></span>
+                <input type="checkbox" id="advanced-enabled" name="advanced_enabled" value="1" <?= $advancedOpen ? 'checked' : '' ?> aria-controls="student-advanced-panel" />
+                <span class="advanced-switch-track"><span></span></span>
+              </label>
+              <div class="student-advanced-info"><?= master_workspace_icon('info') ?><span>Ketika fitur ini aktif, Anda dapat mengatur NIS Diknas, komponen biaya, dan potongan secara khusus untuk siswa ini. Tagihan yang sudah dibayar tidak akan berubah.</span></div>
+              <noscript><p class="payment-auto-note">Aktifkan JavaScript untuk membuka bidang Advanced. Identitas dasar tetap dapat disimpan.</p></noscript>
+            </section>
           </div>
-
-          <div class="action-bar" style="margin-top:18px">
-            <button type="submit" class="btn btn-primary"><?= $editStudent ? 'Simpan Perubahan' : 'Tambah Siswa' ?></button>
-            <?php if ($editStudent): ?><a href="daftar.php" class="btn btn-ghost">Batal</a><?php endif; ?>
+          <div class="student-form-footer">
+            <div class="student-reset-group">
+              <?php if ($editStudent): ?><a href="daftar.php" data-student-edit-only class="btn btn-ghost">Batal</a><?php endif; ?>
+              <a href="<?= htmlspecialchars($resetFormUrl, ENT_QUOTES, 'UTF-8') ?>" id="student-reset-form" class="btn btn-ghost"><?= master_workspace_icon('reset') ?>Reset Formulir</a>
+              <span id="student-reset-status" role="status" aria-live="polite"><?= $resetForm ? 'Formulir dikosongkan. Data siswa yang tersimpan tidak berubah.' : '' ?></span>
+            </div>
+            <button type="submit" id="student-submit-form" class="btn btn-primary"><?= master_workspace_icon($editStudent ? 'save' : 'plus') ?><span><?= $editStudent ? 'Simpan Perubahan' : 'Tambah Siswa' ?></span></button>
           </div>
         </form>
       </div>
@@ -781,10 +807,9 @@ $sppRatesByGrade=[];[$firstGrade,$lastGrade]=unit_level_bounds();foreach(range($
   <script>
     document.addEventListener('DOMContentLoaded', function () {
       const toggle = document.getElementById('advanced-enabled');
-      const panel = document.getElementById('student-advanced-panel');
       const advancedFields = Array.from(document.querySelectorAll('.advanced-field'));
       const initialAdvancedValues = new Map(advancedFields.map(input => [input, input.value]));
-      const moneyInputs = Array.from(document.querySelectorAll('.rupiah-input:not(:disabled)'));
+      const moneyInputs = Array.from(document.querySelectorAll('.rupiah-input'));
       const format = value => {
         const clean = String(value || '').replace(/\D/g, '');
         return clean ? Number(clean).toLocaleString('id-ID') : '0';
@@ -794,7 +819,10 @@ $sppRatesByGrade=[];[$firstGrade,$lastGrade]=unit_level_bounds();foreach(range($
         const base=Number(document.getElementById('student-spp-base')?.dataset.base||0);
         const effective=document.getElementById('student-spp-effective');
         if(effective)effective.textContent='Rp '+format(Math.max(0,base-number('student-potongan-spp')));
-        document.getElementById('student-total-du').value = format(Math.max(0, number('student-daftar_ulang') - number('student-potong-du')));
+        const heroEffective = document.getElementById('student-hero-effective');
+        if (heroEffective && effective) heroEffective.textContent = effective.textContent;
+        const hasDuValue = document.getElementById('student-daftar_ulang').value !== '' || document.getElementById('student-potong-du').value !== '';
+        document.getElementById('student-total-du').value = hasDuValue ? format(Math.max(0, number('student-daftar_ulang') - number('student-potong-du'))) : '';
       };
       const classPicker = document.querySelector('[data-class-picker]');
       const classInput = document.getElementById('kelas-baru');
@@ -835,7 +863,48 @@ $sppRatesByGrade=[];[$firstGrade,$lastGrade]=unit_level_bounds();foreach(range($
       document.addEventListener('keydown', function (event) {
         if (event.key === 'Escape') closeClassPicker();
       });
-      const syncPanel = () => panel.classList.toggle('is-open', toggle.checked);
+      const syncPanel = () => {
+        const unlocked = toggle.checked && !<?= unit_all_readonly() ? 'true' : 'false' ?>;
+        document.querySelector('.student-workspace').dataset.advanced = unlocked ? 'true' : 'false';
+        advancedFields.forEach(input => { input.readOnly = !unlocked; input.setAttribute('aria-readonly', String(!unlocked)); });
+      };
+      document.getElementById('student-reset-form').addEventListener('click', function (event) {
+        if (<?= unit_all_readonly() ? 'true' : 'false' ?>) return;
+        // Keep the CSRF token; reset only the unsaved form and its presentation.
+        event.preventDefault();
+        const form = document.getElementById('form-master-siswa');
+        form.querySelectorAll('input[type="text"]').forEach(input => { input.value = ''; });
+        form.elements.aksi.value = 'tambah';
+        form.elements.id.value = '0';
+        const nis = document.getElementById('nis-baru');
+        nis.readOnly = false;
+        nis.removeAttribute('aria-readonly');
+        classInput.value = '';
+        classLabel.textContent = '-- Pilih Kelas/Rombel --';
+        classPicker.classList.remove('has-error');
+        classPicker.querySelectorAll('[data-class-picker-option]').forEach(option => {
+          option.classList.remove('is-selected');
+          option.setAttribute('aria-selected', 'false');
+        });
+        closeClassPicker();
+        document.getElementById('student-komite-start').value = '';
+        toggle.checked = false;
+        advancedFields.forEach(input => initialAdvancedValues.set(input, ''));
+        const base = document.getElementById('student-spp-base');
+        base.dataset.base = '0';
+        base.textContent = 'Rp 0';
+        document.getElementById('student-spp-year').textContent = 'Belum disiapkan';
+        document.getElementById('student-form-title').textContent = 'Tambah Siswa Baru';
+        document.querySelectorAll('[data-student-edit-only]').forEach(element => { element.hidden = true; });
+        document.getElementById('student-submit-form').innerHTML = <?= json_encode(master_workspace_icon('plus') . '<span>Tambah Siswa</span>') ?>;
+        form.querySelectorAll('.has-error, .is-invalid').forEach(element => element.classList.remove('has-error', 'is-invalid'));
+        syncPanel();
+        updateDerived();
+        window.syncSppDropdowns?.();
+        history.replaceState(null, '', this.href);
+        document.getElementById('student-reset-status').textContent = 'Formulir dikosongkan. Data siswa yang tersimpan tidak berubah.';
+        nis.focus();
+      });
       toggle.addEventListener('change', function () {
         if (!toggle.checked) {
           const dirty = advancedFields.some(input => input.value !== initialAdvancedValues.get(input));

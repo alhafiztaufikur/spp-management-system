@@ -1901,6 +1901,10 @@ function initPromotionBatchSelector() {
     context.dataset.ready='1';
     const year=document.getElementById('promotion-source-year'),level=document.getElementById('promotion-source-level');
     const changed=()=>{
+      // PSB is a read-only view of current candidates, without a source placement/year.
+      year.disabled = level.value === 'psb';
+      year.required = !year.disabled;
+      if (level.value === 'psb') { context.requestSubmit(); return; }
       const match=/^(\d{4})\/(\d{4})$/.exec(year.selectedOptions[0]?.textContent.trim()||'');
       const graduation=Number(level.value)===Number(context.dataset.lastLevel);
       document.getElementById('promotion-target-label').textContent=graduation?'Tahun Kelulusan':'Tahun Ajaran Tujuan';

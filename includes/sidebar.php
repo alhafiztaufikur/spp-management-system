@@ -164,15 +164,20 @@ document.addEventListener('DOMContentLoaded', function () {
 <?php endif; ?>
 <!-- Early theme init to prevent flash -->
 <link rel="stylesheet" href="<?= $root ?>assets/css/dropdowns.css?v=<?= filemtime(__DIR__.'/../assets/css/dropdowns.css') ?>">
+<link rel="stylesheet" href="<?= $root ?>assets/css/sidebar_palette.css?v=<?= filemtime(__DIR__.'/../assets/css/sidebar_palette.css') ?>">
 <script defer src="<?= $root ?>assets/js/dropdowns.js?v=<?= filemtime(__DIR__.'/../assets/js/dropdowns.js') ?>"></script>
 <script>(function(){document.documentElement.setAttribute('data-palette',<?= json_encode($unitPalette, JSON_HEX_TAG | JSON_HEX_AMP) ?>);try{document.documentElement.setAttribute('data-theme',localStorage.getItem('spp_theme')||'light')}catch(e){document.documentElement.setAttribute('data-theme',document.documentElement.getAttribute('data-theme')||'light')}})();</script>
 
-<aside class="sidebar" id="sidebar">
+<aside class="sidebar" id="sidebar" data-navigation-unit="<?= (int)$activeUnit ?>">
   <div class="sidebar-brand">
+    <svg class="sidebar-brand-wave" viewBox="0 0 260 110" preserveAspectRatio="none" aria-hidden="true" focusable="false"><path d="M90 0h170v110C185 80 170 30 90 0Z"/><path d="M0 90C65 30 115 130 190 62c30-27 50-33 70-30v78H0Z"/></svg>
     <div class="brand-icon brand-logo-wrap">
       <img src="<?= $root ?>assets/img/school-logo.png" alt="Logo Mutiara Hikmah" class="brand-logo-img" />
     </div>
-    <span class="brand-name">SistemSPP</span>
+    <div class="sidebar-brand-copy">
+      <span class="brand-name">SistemSPP</span>
+      <span class="brand-sub">Sistem Pembayaran Sekolah</span>
+    </div>
   </div>
 
   <?php if (unit_is_super()): ?>

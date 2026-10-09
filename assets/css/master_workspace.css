@@ -1,0 +1,148 @@
+/* Data Siswa and Master Daftar Ulang: presentation scoped to these workspaces. */
+.student-workspace,.du-workspace{--workspace-soft:var(--accent-glow);--workspace-border:var(--border);}
+.du-workspace .recap-status svg{width:16px;height:16px;flex:none;}
+.student-workspace .spp-student-rate-summary>small{grid-column:1/-1;}
+.student-workspace .main-card,.du-workspace .main-card{min-width:0;box-sizing:border-box;}
+.student-workspace .master-modern-shell{padding:0;background:none;border:0;box-shadow:none;}
+.student-workspace .student-hero{display:grid;grid-template-columns:minmax(260px,.8fr) minmax(0,1.8fr);gap:26px;align-items:center;margin:20px 0;}
+.student-hero-copy .breadcrumb{font-size:12px;display:block;margin-bottom:12px;}
+.student-hero-copy h1{font-size:clamp(26px,2.5vw,36px);line-height:1.15;margin:0 0 10px;letter-spacing:-1px;}
+.student-hero-copy p{margin:0;color:var(--text-secondary);font-size:13px;line-height:1.6;}
+.student-hero-stats{display:grid;grid-template-columns:1fr 1fr 1.2fr 1fr;gap:12px;}
+.student-stat{display:grid;grid-template-columns:34px minmax(0,1fr);grid-template-rows:18px minmax(34px,auto) minmax(15px,auto);gap:6px 12px;align-content:center;min-width:0;padding:20px 16px;background:var(--bg-card);border:1px solid var(--border);border-radius:14px;box-shadow:0 4px 18px rgba(0,0,0,.025);}
+.master-workspace-icon{display:inline-flex;align-items:center;justify-content:center;flex:none;width:38px;height:38px;border-radius:11px;background:var(--accent-glow);color:var(--accent);}
+.master-workspace-icon svg{width:21px;height:21px;}
+.student-stat .master-workspace-icon{grid-column:1;grid-row:2;align-self:center;width:34px;height:34px;border-radius:9px;}
+.student-stat .master-workspace-icon svg{width:19px;height:19px;}
+.student-stat>div{display:contents;min-width:0;}
+.student-stat span:not(.master-workspace-icon){grid-column:1/-1;grid-row:1;display:block;font-size:11px;font-weight:700;color:var(--text-secondary);line-height:1.5;}
+.student-stat strong{grid-column:2;grid-row:2;align-self:center;display:block;font-size:clamp(18px,1.3vw,21px);line-height:1.3;color:var(--accent);margin:0;overflow-wrap:anywhere;}
+.student-stat small{grid-column:1/-1;grid-row:3;display:block;font-size:10px;color:var(--text-muted);line-height:1.5;}
+.student-stat:last-child strong{font-size:18px;}
+.student-stat #student-hero-effective{white-space:nowrap;}
+.student-workspace .student-form-shell{padding:0;border:0;background:none;box-shadow:none;}
+.student-form-heading{display:flex;align-items:center;justify-content:space-between;gap:12px;margin-bottom:14px;}
+.student-form-heading h2{font-size:15px;margin:0;}
+.student-workspace-grid{display:grid;grid-template-columns:minmax(0,1.12fr) minmax(0,.94fr);gap:18px;}
+.student-workspace-grid>.student-panel{min-width:0;padding:20px 22px;background:var(--bg-card);border:1px solid var(--border);border-radius:15px;box-shadow:0 5px 20px rgba(0,0,0,.025);}
+.student-panel-heading{display:flex;align-items:center;gap:12px;margin-bottom:18px;}
+.student-panel-heading>div{min-width:0;}
+.student-panel-heading h3{margin:0 0 4px;font-size:14px;font-weight:800;line-height:1.4;}
+.student-panel-heading p{margin:0;color:var(--text-secondary);font-size:11px;line-height:1.6;}
+.student-workspace .fields-grid{display:grid;grid-template-columns:repeat(2,minmax(0,1fr));gap:16px;}
+.student-workspace .field-row{min-width:0;margin:0;}
+.student-workspace .field-label{display:block;font-size:11px;line-height:1.5;margin:0 0 7px;font-weight:700;}
+.student-workspace .field-label .required-mark{color:var(--danger,#ef4444);margin-left:3px;}
+.student-workspace .field-input{width:100%;min-width:0;min-height:42px;font-size:12px;border-radius:9px;box-sizing:border-box;}
+.student-workspace .payment-auto-note{display:block;font-size:10px;line-height:1.6;margin-top:7px;}
+.student-workspace .student-panel-start{background:linear-gradient(120deg,var(--bg-card),var(--accent-glow));display:flex;flex-direction:column;}
+.student-start-content{display:flex;align-items:center;gap:24px;flex:1;}
+.student-start-content .field-row{flex:1;}
+.student-start-illustration{width:94px;height:94px;display:grid;place-items:center;border-radius:26px;background:var(--accent-glow);color:var(--accent);flex:none;}
+.student-start-illustration svg{width:58px;height:58px;stroke-width:1.4;}
+.student-workspace .spp-student-rate-summary{display:grid;grid-template-columns:repeat(2,minmax(0,1fr));gap:12px;padding:0;margin:0;background:none;border:0;}
+.student-workspace .spp-student-rate-summary>div,.student-money-grid>.field-row{min-width:0;background:var(--bg-surface);border:1px solid var(--border);border-radius:11px;padding:12px;}
+.student-workspace .spp-student-rate-summary span{font-size:11px;}
+.student-workspace .spp-student-rate-summary strong{font-size:21px;line-height:1.4;margin:6px 0;color:var(--accent);}
+.student-workspace .spp-student-rate-summary small{display:block;color:var(--text-muted);font-size:10px;line-height:1.6;}
+.student-workspace .student-money-grid{grid-template-columns:repeat(3,minmax(0,1fr));gap:10px;}
+.student-money-grid .field-label{font-size:10px;}
+.student-money-grid .field-input{font-size:12px;min-height:36px;}
+.student-panel-discounts .student-money-grid>.field-row{display:flex;flex-direction:column;gap:10px;padding:16px;}
+.student-panel-discounts .student-money-grid .field-label{min-height:34px;margin:0;font-size:11px;line-height:17px;}
+.student-panel-discounts .student-money-grid .field-input{min-height:42px;}
+.student-panel-discounts .student-money-grid .payment-auto-note{margin:0;font-size:10px;line-height:1.7;}
+.student-panel-discounts .student-money-grid>.field-row:last-child{background:var(--accent-glow);}
+.student-panel-discounts .student-derived{color:var(--accent);font-weight:750;background:var(--bg-card);}
+.student-workspace .advanced-switch{position:relative;margin:0;display:flex;align-items:center;gap:10px;border:0;background:none;padding:0;}
+.student-workspace .advanced-switch>.student-advanced-title{display:flex;align-items:center;gap:12px;}
+.student-workspace .advanced-switch input{position:absolute;right:0;top:50%;transform:translateY(-50%);width:46px;height:28px;margin:0;opacity:0;pointer-events:auto;cursor:pointer;z-index:1;}
+.student-workspace .advanced-switch input:focus-visible+.advanced-switch-track{outline:2px solid var(--accent);outline-offset:3px;}
+.student-workspace .advanced-switch>span:first-child{flex:1;}
+.student-workspace .advanced-switch strong{font-size:14px;display:block;}
+.student-workspace .advanced-switch small{font-size:11px;line-height:1.6;color:var(--text-secondary);display:block;margin-top:4px;}
+.student-workspace .advanced-switch-track{flex:none;}
+.student-advanced-title{display:flex;align-items:center;gap:12px;}
+.student-advanced-info{display:flex;align-items:flex-start;gap:10px;background:var(--accent-glow);border:1px solid var(--border);border-radius:11px;padding:14px;margin-top:20px;font-size:11px;line-height:1.7;color:var(--text-secondary);}
+.student-advanced-info svg{width:19px;height:19px;flex:none;color:var(--accent);margin-top:2px;}
+.student-locked-note{display:flex;align-items:center;gap:5px;margin-top:7px;font-size:10px;line-height:1.5;color:var(--text-muted);}
+.student-locked-note svg{width:12px;height:12px;flex:none;}
+.student-workspace[data-advanced="true"] .student-locked-note{display:none;}
+.student-workspace .advanced-field:read-only{background:var(--bg-elevated);color:var(--text-secondary);opacity:1;cursor:not-allowed;}
+.student-workspace .student-form-footer{display:flex;justify-content:flex-end;align-items:center;gap:12px;padding:16px 18px;margin-top:18px;border:1px solid var(--border);border-radius:13px;background:var(--bg-card);}
+.student-form-footer .btn-ghost{margin-right:auto;}
+.student-reset-group{display:flex;align-items:center;flex-wrap:wrap;gap:10px;margin-right:auto;min-width:0;}
+.student-reset-group .btn-ghost{margin-right:0;}
+.student-reset-group [hidden],.student-form-heading [hidden],.student-panel [data-student-edit-only][hidden]{display:none!important;}
+#student-reset-status{font-size:11px;line-height:1.6;color:var(--text-muted);max-width:330px;}
+@media(max-width:600px){.student-reset-group{width:100%;}#student-reset-status{width:100%;max-width:none;}}
+.student-form-footer svg,.du-workspace .btn svg{width:17px;height:17px;flex:none;}
+.student-workspace .master-modern-list{padding:22px;margin-top:24px!important;}
+.student-workspace .student-filter-bar{display:grid;grid-template-columns:minmax(200px,2fr) repeat(3,minmax(130px,1fr)) auto auto;gap:10px;align-items:center;margin:18px 0;}
+.student-filter-bar>*{min-width:0;width:auto;}
+.student-workspace .student-filter-bar .search-box{width:100%;box-sizing:border-box;}
+.student-workspace .payment-table td,.student-workspace .payment-table th{padding:13px 14px;}
+.student-workspace .table-container{overflow-x:auto;}
+.student-workspace .class-picker{min-width:0;}
+.student-workspace .class-picker-button{display:flex;align-items:center;justify-content:space-between;gap:10px;text-align:left;}
+.student-workspace .class-picker-button span{min-width:0;overflow:hidden;text-overflow:ellipsis;white-space:nowrap;}
+.student-workspace .class-picker-button svg{flex:none;}
+.student-workspace .class-picker-panel:not([hidden]){max-height:min(300px,50vh);overflow-y:auto;}
+.du-workspace .du-master-hero{padding:28px;margin:24px 28px 18px;background:linear-gradient(115deg,var(--accent-glow),var(--bg-card) 60%);border:1px solid var(--border);border-radius:16px;}
+.du-workspace .master-modern-hero{display:grid;grid-template-columns:minmax(190px,1fr) minmax(0,1.7fr) minmax(160px,.65fr);gap:24px;align-items:center;padding:6px;background:none;border:0;}
+html[data-palette] .du-workspace .master-modern-hero{background:transparent;}
+.du-workspace .master-modern-hero h1{font-size:32px;letter-spacing:-1px;margin:10px 0 12px;line-height:1.2;}
+.du-workspace .master-modern-hero p{margin:0;font-size:12px;line-height:1.6;}
+.du-workspace .master-modern-stats{display:grid;grid-template-columns:minmax(100px,1fr) minmax(100px,1fr) minmax(170px,1.8fr);gap:12px;}
+.du-workspace .master-modern-stats>div{display:grid;grid-template-columns:38px minmax(0,1fr);grid-template-rows:18px minmax(38px,auto);align-items:center;align-content:center;gap:12px;padding:20px 18px;min-height:112px;background:var(--bg-card);border:1px solid var(--border);border-radius:12px;min-width:0;}
+.du-workspace .master-modern-stats>div>div{display:contents;min-width:0;padding:0;border:0;border-radius:0;background:none;box-shadow:none;}
+.du-workspace .master-modern-stats>div>.master-workspace-icon{grid-column:1;grid-row:2;align-self:center;}
+.du-workspace .master-modern-stats>div>div>span{grid-column:1/-1;grid-row:1;align-self:end;}
+.du-workspace .master-modern-stats>div>div>strong{grid-column:2;grid-row:2;align-self:center;margin:0;}
+.du-workspace .master-modern-stats .master-workspace-icon{color:var(--accent);}
+.du-workspace .master-modern-stats>div:last-child{grid-column:auto;}
+.du-workspace .master-modern-stats>div:last-child strong{font-size:18px;white-space:normal;}
+.du-workspace .master-modern-stats span:not(.master-workspace-icon){font-size:10px;line-height:1.5;color:var(--text-secondary);}
+.du-workspace .master-modern-stats strong{display:block;margin-top:5px;font-size:21px;line-height:1.3;color:var(--accent);overflow-wrap:anywhere;}
+.du-workspace .du-master-year-tools{display:grid;gap:10px;min-width:0;padding-left:18px;border-left:1px solid var(--border);}
+.du-workspace .du-master-year-tools form,.du-workspace .du-master-year-tools .custom-select{min-width:0;width:100%;}
+.du-workspace .du-master-year-tools .recap-status{justify-content:center;}
+.du-workspace .master-modern-card{padding:26px;}
+.du-workspace .card-title-row{gap:16px;}
+.du-workspace .card-title-row .student-panel-heading{margin:0;}
+.du-workspace .du-rate-grid{display:grid;grid-template-columns:repeat(3,minmax(0,1fr));gap:16px;margin-top:22px;}
+.du-rate-card{min-width:0;border:1px solid var(--border);border-radius:13px;background:linear-gradient(135deg,var(--bg-card),var(--accent-glow));padding:20px;}
+.du-rate-card-heading{display:flex;align-items:center;gap:12px;margin-bottom:16px;}
+.du-class-roman{display:grid;place-items:center;width:44px;height:44px;flex:none;border-radius:12px;background:var(--accent-glow);color:var(--accent);font-family:Georgia,serif;font-size:22px;font-weight:700;}
+.du-rate-card h3{font-size:15px;margin:0 0 5px;}
+.du-rate-card-heading small{font-size:11px;color:var(--text-secondary);}
+.du-rate-input-row{display:grid;grid-template-columns:minmax(80px,.7fr) minmax(0,1.3fr);gap:12px;align-items:center;}
+.du-rate-input-row label{font-size:11px;color:var(--text-secondary);}
+.du-rate-input-wrap{display:flex;align-items:center;gap:7px;background:var(--bg-card);border:1px solid var(--border);border-radius:8px;padding-left:10px;min-width:0;}
+.du-rate-input-wrap>span{font-size:11px;color:var(--text-secondary);}
+.du-workspace .du-rate-input-wrap .field-input{width:100%;min-width:0;border:0;background:transparent;box-shadow:none;min-height:38px;padding:8px;font-size:12px;border-radius:8px;}
+.du-rate-input-wrap:focus-within{border-color:var(--accent);box-shadow:0 0 0 3px var(--accent-glow);}
+.du-rate-estimate{display:flex;align-items:center;flex-wrap:wrap;gap:7px;border-top:1px solid var(--border);padding-top:12px;margin-top:12px;color:var(--text-secondary);font-size:10px;}
+.du-rate-estimate svg{width:15px;height:15px;flex:none;}
+.du-rate-estimate strong{margin-left:auto;color:var(--accent);font-size:13px;overflow-wrap:anywhere;}
+.du-total-estimate{display:flex;align-items:center;justify-content:space-between;gap:20px;flex-wrap:wrap;padding:18px;border-radius:13px;background:var(--accent-glow);margin-top:16px;}
+.du-total-estimate .student-panel-heading{margin:0;}
+.du-total-estimate strong{display:block;font-size:25px;color:var(--accent);line-height:1.4;}
+.du-total-estimate small{font-size:10px;color:var(--text-secondary);line-height:1.5;}
+.du-workspace .du-publishing-card{margin-top:18px;}
+.du-workspace .du-publishing-card .card-title-row{margin:0;display:flex;justify-content:space-between;align-items:center;flex-wrap:wrap;}
+.du-workspace .du-publishing-card .action-bar{margin:0;padding:0;border:0;}
+.du-workspace .du-publishing-card .card-title-row{padding-bottom:0;border:0;}
+.du-overview-workspace .du-overview-heading{display:flex;align-items:center;gap:14px;margin-bottom:20px;}
+.du-overview-heading h1{margin:0 0 7px;font-size:25px;}
+.du-overview-heading p{margin:0;color:var(--text-secondary);font-size:13px;line-height:1.6;}
+@media(max-width:1450px){.student-workspace .student-hero{grid-template-columns:1fr;gap:20px;}.student-workspace .student-filter-bar{grid-template-columns:repeat(3,minmax(0,1fr));}.student-filter-bar .search-box{grid-column:span 2;}}
+@media(min-width:1251px) and (max-width:1450px){.student-panel-discounts .student-money-grid .field-label{min-height:51px;}}
+@media(min-width:1001px) and (max-width:1250px){.student-panel-discounts .student-money-grid{grid-template-columns:1fr;}.student-panel-discounts .student-money-grid .field-label{min-height:0;}}
+@media(max-width:1000px){.student-hero-stats{grid-template-columns:repeat(2,minmax(0,1fr));}.student-panel-discounts .student-money-grid .field-label{min-height:0;}}
+@media(max-width:600px){.student-stat strong{grid-column:1/-1;}.student-stat .master-workspace-icon{grid-column:1;grid-row:1;width:24px;height:24px;}.student-stat span:not(.master-workspace-icon){grid-column:2;font-size:10px;}.student-stat #student-hero-effective{font-size:18px;}.student-stat{grid-template-rows:26px minmax(34px,auto) minmax(15px,auto);gap:8px 7px;}.student-stat:last-child strong{font-size:17px;}}
+@media(max-width:600px){.du-workspace .du-master-hero{margin:18px 12px;}}
+@media(min-width:1600px){.student-hero-stats{gap:16px;}.student-stat{padding:20px 16px;}.student-workspace-grid>.student-panel{padding:24px;}}
+@media(max-width:1250px){.student-workspace .student-hero{grid-template-columns:1fr;gap:18px;}.du-workspace .master-modern-hero{grid-template-columns:1fr minmax(180px,.5fr);}.du-workspace .master-modern-stats{grid-column:1/-1;grid-row:2;}.student-workspace .student-filter-bar{grid-template-columns:repeat(3,minmax(0,1fr));}.student-filter-bar .search-box{grid-column:span 2;}}
+@media(max-width:1000px){.student-workspace-grid{gap:14px;grid-template-columns:repeat(2,minmax(0,1fr));}.student-workspace-grid>.student-panel{padding:18px;}.student-workspace .student-money-grid{grid-template-columns:1fr;}.student-start-illustration{display:none;}.du-workspace .du-rate-grid{grid-template-columns:repeat(2,minmax(0,1fr));}.student-workspace .fields-grid{grid-template-columns:1fr;}.student-workspace .spp-student-rate-summary{grid-template-columns:1fr;}}
+@media(max-width:600px){.student-workspace .student-hero{margin-top:20px;}.student-hero-stats{grid-template-columns:repeat(2,minmax(0,1fr));gap:10px;}.student-stat{padding:14px 10px;}.student-workspace-grid{grid-template-columns:1fr;}.student-workspace .fields-grid{grid-template-columns:1fr;}.student-workspace .student-money-grid{grid-template-columns:1fr;}.student-workspace .master-modern-list{padding:16px;}.student-workspace .student-filter-bar{grid-template-columns:1fr;}.student-filter-bar .search-box{grid-column:auto;}.student-workspace .student-form-footer{flex-wrap:wrap;padding:14px;}.student-form-footer .btn{flex:1;justify-content:center;}.du-workspace .du-master-hero,.du-workspace .master-modern-card{padding:16px;}.du-workspace .master-modern-hero{grid-template-columns:1fr;gap:16px;}.du-workspace .master-modern-stats{grid-column:auto;grid-row:auto;grid-template-columns:1fr;}.du-workspace .du-master-year-tools{padding-left:0;border-left:0;}.du-workspace .du-rate-grid{grid-template-columns:1fr;gap:12px;}.du-total-estimate{padding:14px;}.du-total-estimate .btn{width:100%;justify-content:center;}.du-workspace .du-publishing-card .action-bar,.du-workspace .du-publishing-card form,.du-workspace .du-publishing-card .btn{width:100%;}.du-workspace .du-publishing-card .btn{justify-content:center;}.du-overview-workspace .du-overview-heading{align-items:flex-start;}.du-overview-heading h1{font-size:22px;}}

@@ -233,9 +233,10 @@ while($row=$accountResult->fetch_assoc()){
   <link rel="stylesheet" href="assets/css/style.css?v=unitpalette4&amp;mtime=<?= filemtime(__DIR__ . '/assets/css/style.css') ?>" />
   <link rel="stylesheet" href="assets/css/date_controls.css?v=unitpalette4&amp;mtime=<?= filemtime(__DIR__ . '/assets/css/date_controls.css') ?>" />
   <link rel="stylesheet" href="assets/css/account_workspace.css?v=<?= filemtime(__DIR__.'/assets/css/account_workspace.css') ?>" />
+  <link rel="stylesheet" href="assets/css/workspace_readability.css?v=<?= filemtime(__DIR__.'/assets/css/workspace_readability.css') ?>" />
   <script>(function(){var t=localStorage.getItem('spp_theme')||'light';document.documentElement.setAttribute('data-theme',t);})();</script>
 </head>
-<body class="account-workspace">
+<body class="account-workspace" data-readable-workspace="accounts">
   <div class="bg-orbs">
     <div class="orb orb-1"></div><div class="orb orb-2"></div><div class="orb orb-3"></div>
   </div>

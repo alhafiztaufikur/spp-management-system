@@ -182,9 +182,10 @@ function class_process_year_promotion(mysqli $db,string $targetYear):array {
 function class_disable_empty_rombel(mysqli $db): int {
     $db->begin_transaction();
     try {
+        promotion_actor_lock($db);
         // Promotions and student edits lock this same class row before assigning it.
         $classes = $db->query('SELECT id FROM master_kelas
-            WHERE is_placeholder=0 AND is_active=1 ORDER BY id FOR UPDATE')->fetch_all(MYSQLI_ASSOC);
+            WHERE tingkat>0 AND is_placeholder=0 AND is_active=1 ORDER BY id FOR UPDATE')->fetch_all(MYSQLI_ASSOC);
         $occupied = $db->prepare('SELECT COUNT(*) total FROM siswa WHERE master_kelas_id=? AND is_active=1');
         $disable = $db->prepare('UPDATE master_kelas SET is_active=0 WHERE id=? AND is_active=1');
         $affected = 0;

@@ -320,6 +320,7 @@ if (!isset($_SESSION['fee_publish_request_keys']) || !is_array($_SESSION['fee_pu
 }
 $_SESSION['fee_publish_request_keys'][$publishRequestKey] = true;
 $_SESSION['fee_publish_request_keys'] = array_slice($_SESSION['fee_publish_request_keys'], -20, null, true);
+require_once __DIR__ . '/includes/master_workspace_ui.php';
 ?>
 <!DOCTYPE html>
 <html lang="id" data-palette="<?= unit_palette_for_view(isset($reportUnitId) ? (int)$reportUnitId : null) ?>">
@@ -332,13 +333,15 @@ $_SESSION['fee_publish_request_keys'] = array_slice($_SESSION['fee_publish_reque
   <link href="https://fonts.googleapis.com/css2?family=Inter:wght@300;400;500;600;700;800&display=swap" rel="stylesheet" />
   <link rel="stylesheet" href="assets/css/style.css?v=unitpalette4&amp;mtime=<?= filemtime(__DIR__ . '/assets/css/style.css') ?>" />
   <link rel="stylesheet" href="assets/css/date_controls.css?v=unitpalette4&amp;mtime=<?= filemtime(__DIR__ . '/assets/css/date_controls.css') ?>" />
+  <link rel="stylesheet" href="assets/css/master_biaya_lain.css?v=<?= filemtime(__DIR__ . '/assets/css/master_biaya_lain.css') ?>" />
+  <link rel="stylesheet" href="assets/css/workspace_readability.css?v=<?= filemtime(__DIR__ . '/assets/css/workspace_readability.css') ?>" />
   <script>(function(){var t=localStorage.getItem('spp_theme')||'light';document.documentElement.setAttribute('data-theme',t);})();</script>
 </head>
-<body>
+<body data-readable-workspace="master-fees">
   <div class="bg-orbs"><div class="orb orb-1"></div><div class="orb orb-2"></div><div class="orb orb-3"></div></div>
   <div class="layout">
     <?php include 'includes/sidebar.php'; ?>
-    <main class="main-content">
+    <main class="main-content fee-workspace">
       <div class="topbar">
         <button class="sidebar-toggle" onclick="toggleSidebar()" id="btn-sidebar-toggle" title="Toggle Sidebar">
           <svg width="20" height="20" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><line x1="3" y1="12" x2="21" y2="12"/><line x1="3" y1="6" x2="21" y2="6"/><line x1="3" y1="18" x2="21" y2="18"/></svg>
@@ -351,23 +354,44 @@ $_SESSION['fee_publish_request_keys'] = array_slice($_SESSION['fee_publish_reque
       <div class="alert alert-<?= htmlspecialchars($flash['type']) ?>" id="flash-msg"><?= htmlspecialchars($flash['msg']) ?></div>
       <?php endif; ?>
 
-      <section class="main-card master-modern-shell">
-        <div class="master-modern-hero">
-          <div>
+      <div class="fee-workspace-content">
+      <section class="main-card fee-hero">
+          <div class="fee-hero-copy">
             <span class="recap-class-overline">Data Master</span>
             <h1>Master Biaya Lain</h1>
+            <p>Kelola data biaya tambahan di luar SPP, seperti seragam, buku paket, kegiatan, dan kebutuhan lainnya. Data yang aktif dapat langsung digunakan dalam pembuatan tagihan.</p>
+            <div class="fee-hero-stats">
+              <div class="fee-stat"><span class="fee-icon"><?= master_workspace_icon('document') ?></span><div><span>Biaya Aktif</span><strong><?= number_format(count($activeMasters)) ?></strong></div></div>
+              <div class="fee-stat"><span class="fee-icon"><?= master_workspace_icon('students') ?></span><div><span>Rombel Aktif</span><strong><?= number_format(count($activeClasses)) ?></strong></div></div>
+              <div class="fee-stat"><span class="fee-icon"><?= master_workspace_icon('student') ?></span><div><span>Siswa Aktif</span><strong><?= number_format(count($activeStudents)) ?></strong></div></div>
+            </div>
           </div>
-          <div class="master-modern-stats">
-            <div><span>Biaya Aktif</span><strong><?= number_format(count($activeMasters)) ?></strong></div>
-            <div><span>Rombel Aktif</span><strong><?= number_format(count($activeClasses)) ?></strong></div>
-            <div><span>Siswa Aktif</span><strong><?= number_format(count($activeStudents)) ?></strong></div>
+          <div class="fee-hero-art" aria-hidden="true">
+            <svg viewBox="0 0 340 220" fill="none" xmlns="http://www.w3.org/2000/svg">
+              <circle cx="190" cy="116" r="94" fill="currentColor" opacity=".06"/>
+              <path d="M27 192h291" stroke="currentColor" stroke-width="2" opacity=".2"/>
+              <rect x="81" y="30" width="151" height="158" rx="14" class="fee-art-paper" stroke="currentColor" stroke-opacity=".25" stroke-width="2"/>
+              <rect x="125" y="20" width="62" height="22" rx="7" fill="currentColor" opacity=".2"/>
+              <path d="M107 64h97" stroke="currentColor" stroke-width="7" stroke-linecap="round" opacity=".65"/>
+              <g stroke="currentColor" stroke-width="2.5" stroke-linecap="round" stroke-linejoin="round">
+                <rect x="102" y="88" width="18" height="18" rx="4"/><path d="m107 97 3 3 6-7M134 97h67"/>
+                <rect x="102" y="121" width="18" height="18" rx="4"/><path d="m107 130 3 3 6-7M134 130h53"/>
+                <rect x="102" y="154" width="18" height="18" rx="4"/><path d="m107 163 3 3 6-7M134 163h65"/>
+              </g>
+              <rect x="221" y="105" width="81" height="87" rx="12" class="fee-art-paper" stroke="currentColor" stroke-width="2"/>
+              <rect x="235" y="119" width="53" height="17" rx="4" fill="currentColor" opacity=".18"/>
+              <path d="M239 150h6m15 0h6m15 0h3m-45 16h6m15 0h6m15 0h3" stroke="currentColor" stroke-width="6" stroke-linecap="round" opacity=".7"/>
+              <circle cx="63" cy="171" r="26" class="fee-art-paper" stroke="currentColor" stroke-width="2"/>
+              <path d="M58 161v20m0-20h6a6 6 0 0 1 0 12h-6m6 0 7 8" stroke="currentColor" stroke-width="2.5" stroke-linecap="round" stroke-linejoin="round"/>
+            </svg>
           </div>
-        </div>
       </section>
 
-      <div class="main-card master-modern-card master-modern-form">
-        <div class="card-title-row">
-          <div class="card-title"><?= $editData ? 'Edit Master Biaya' : 'Tambah Master Biaya' ?></div>
+      <div class="fee-panel-grid">
+      <div class="main-card master-modern-card master-modern-form fee-panel">
+        <div class="card-title-row fee-panel-heading">
+          <span class="fee-icon"><?= master_workspace_icon($editData ? 'document' : 'document-add') ?></span>
+          <div><h2><?= $editData ? 'Edit Master Biaya' : 'Tambah Master Biaya' ?></h2><p><?= $editData ? 'Perbarui jenis biaya; transaksi lama tetap memakai tarif sebelumnya.' : 'Tambahkan jenis biaya lain yang akan digunakan untuk tagihan siswa.' ?></p></div>
         </div>
         <form method="POST" action="master_biaya_lain.php" id="form-master-biaya">
           <input type="hidden" name="csrf_token" value="<?= htmlspecialchars($_SESSION['csrf_master_biaya_lain']) ?>" />
@@ -381,23 +405,26 @@ $_SESSION['fee_publish_request_keys'] = array_slice($_SESSION['fee_publish_reque
             </div>
             <div class="field-row">
               <label class="field-label" for="nominal-biaya">Nominal</label>
+              <div class="fee-amount-control"><span aria-hidden="true">Rp</span>
               <input class="field-input rupiah-input" id="nominal-biaya" name="nominal" inputmode="numeric" required
-                placeholder="Rp 0" value="<?= $editData ? number_format((float)$editData['nominal'], 0, ',', '.') : '' ?>" />
+                placeholder="0" value="<?= $editData ? number_format((float)$editData['nominal'], 0, ',', '.') : '' ?>" />
+              </div>
             </div>
             <label class="master-active-check">
               <input type="checkbox" name="is_active" value="1" <?= !$editData || (int)$editData['is_active'] === 1 ? 'checked' : '' ?> />
-              <span>Aktif dan tampil di pembayaran</span>
+              <span class="fee-switch-track" aria-hidden="true"></span>
+              <span>Aktif dan tampil di pembayaran<small>Biaya yang aktif akan tersedia saat penerbitan tagihan.</small></span>
             </label>
           </div>
           <div class="action-bar" style="margin-top:16px">
-            <button type="submit" class="btn btn-primary"><?= $editData ? 'Simpan Perubahan' : 'Tambah Biaya' ?></button>
+            <button type="submit" class="btn btn-primary"><?= master_workspace_icon($editData ? 'save' : 'plus') ?><?= $editData ? 'Simpan Perubahan' : 'Tambah Biaya' ?></button>
             <?php if ($editData): ?><a href="master_biaya_lain.php" class="btn btn-ghost">Batal</a><?php endif; ?>
           </div>
         </form>
       </div>
 
-      <div class="main-card master-modern-card" style="margin-top:0">
-        <div class="card-title-row"><div><div class="card-title">Terbitkan Tagihan Biaya Lain</div></div></div>
+      <div class="main-card master-modern-card master-modern-form fee-panel fee-publish-panel" style="margin-top:0">
+        <div class="card-title-row fee-panel-heading"><span class="fee-icon"><?= master_workspace_icon('send') ?></span><div><h2>Terbitkan Tagihan Biaya Lain</h2><p>Pilih item biaya dan tentukan target penerima untuk menerbitkan tagihan.</p></div></div>
         <?php if (!$activeMasters): ?>
           <div class="empty-state"><p>Belum ada master biaya aktif</p><span>Aktifkan atau tambahkan master biaya terlebih dahulu.</span></div>
         <?php else: ?>
@@ -411,44 +438,53 @@ $_SESSION['fee_publish_request_keys'] = array_slice($_SESSION['fee_publish_reque
             <div class="field-row publish-target-field" data-target="tingkat" hidden><label class="field-label">Tingkat</label><select class="field-input field-select" name="tingkat" id="publish-level"><?php for($i=unit_level_bounds()[0];$i<=unit_level_bounds()[1];$i++): ?><option value="<?= $i ?>">Kelas <?= $i ?></option><?php endfor; ?></select></div>
             <div class="field-row publish-target-field" data-target="rombel" hidden><label class="field-label">Rombel</label><select class="field-input field-select" name="master_kelas_id" id="publish-class"><?php foreach($activeClasses as $class): ?><option value="<?= (int)$class['id'] ?>"><?= htmlspecialchars(class_label($class)) ?></option><?php endforeach; ?></select></div>
             <div class="field-row publish-target-field publish-students-field" data-target="siswa" hidden>
-              <label class="field-label">Siswa (bisa lebih dari satu)</label>
+              <div class="fee-recipient-heading"><div><span class="field-label">Pilih Siswa Penerima</span><small>Centang satu atau beberapa siswa untuk menerima tagihan.</small></div><span class="fee-selected-badge" role="status"><span id="publish-selected-count">0</span> dipilih</span></div>
               <select class="publish-native-select" id="publish-students" multiple aria-hidden="true" tabindex="-1">
                 <?php foreach($activeStudents as $student): ?><option value="<?= htmlspecialchars($student['NO_INDUK']) ?>"><?= htmlspecialchars($student['NAMA']) ?></option><?php endforeach; ?>
               </select>
               <div class="publish-student-toolbar">
                 <div class="search-box publish-student-search">
                   <svg width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.5" stroke-linecap="round" stroke-linejoin="round"><circle cx="11" cy="11" r="8"/><line x1="21" y1="21" x2="16.65" y2="16.65"/></svg>
-                  <input type="text" id="publish-student-search" placeholder="Cari nama, NIS, atau NIS Diknas..." autocomplete="off">
+                  <input type="text" id="publish-student-search" aria-label="Cari siswa penerima berdasarkan nama, NIS, atau NIS Diknas" placeholder="Cari nama, NIS, atau NIS Diknas..." autocomplete="off">
                 </div>
                 <div class="publish-student-actions">
-                  <button class="btn btn-ghost btn-sm" type="button" id="publish-select-visible">Pilih yang tampil</button>
-                  <button class="btn btn-ghost btn-sm" type="button" id="publish-clear-students">Bersihkan</button>
+                  <button class="btn btn-ghost btn-sm" type="button" id="publish-select-visible"><?= master_workspace_icon('check') ?>Pilih yang tampil</button>
+                  <button class="btn btn-ghost btn-sm" type="button" id="publish-clear-students"><?= master_workspace_icon('reset') ?>Bersihkan pilihan</button>
                 </div>
               </div>
-              <div class="publish-student-list" id="publish-student-list">
-                <?php foreach($activeStudents as $student): $studentClassLabel = class_label($student); $studentBadgeLabel = trim(preg_replace('/\s*\(Belum Ditentukan\)$/', '', $studentClassLabel)); $studentDiknas = (string)($student['NO_induk_diknas'] ?? ''); $studentSearch = strtolower(trim($student['NAMA'].' '.$student['NO_INDUK'].' '.$studentDiknas.' '.$studentClassLabel)); ?>
+              <div class="publish-student-list" id="publish-student-list" tabindex="0" aria-label="Daftar siswa penerima, gunakan panah untuk menggulir">
+                <?php foreach($activeStudents as $student): $studentClassLabel = class_label($student); $studentBadgeLabel = trim(preg_replace('/\s*\(Belum Ditentukan\)$/', '', $studentClassLabel)); $studentDiknas = (string)($student['NO_induk_diknas'] ?? ''); $studentSearch = strtolower(trim($student['NAMA'].' '.$student['NO_INDUK'].' '.$studentDiknas.' '.$studentClassLabel));
+                  $studentInitials = '';
+                  foreach (array_slice(preg_split('/\s+/u', trim((string)$student['NAMA'])), 0, 2) as $namePart) $studentInitials .= mb_substr($namePart, 0, 1, 'UTF-8');
+                ?>
                 <label class="publish-student-card" data-search="<?= htmlspecialchars($studentSearch) ?>" data-nis="<?= htmlspecialchars($student['NO_INDUK']) ?>">
                   <input type="checkbox" class="publish-student-check" name="no_induk[]" value="<?= htmlspecialchars($student['NO_INDUK']) ?>">
+                  <span class="fee-recipient-avatar" aria-hidden="true"><?= htmlspecialchars(mb_strtoupper($studentInitials, 'UTF-8')) ?></span>
                   <span class="publish-student-main">
                     <strong><?= htmlspecialchars($student['NAMA']) ?></strong>
-                    <small>NIS <?= htmlspecialchars($student['NO_INDUK']) ?><?= $studentDiknas !== '' ? ' &middot; NIS Diknas ' . htmlspecialchars($studentDiknas) : '' ?></small>
+                    <small>NIS <?= htmlspecialchars($student['NO_INDUK']) ?></small>
+                    <?php if ($studentDiknas !== ''): ?><small>NIS Diknas <?= htmlspecialchars($studentDiknas) ?></small><?php endif; ?>
                   </span>
                   <span class="kelas-badge"><?= htmlspecialchars($studentBadgeLabel !== '' ? $studentBadgeLabel : $studentClassLabel) ?></span>
                 </label>
                 <?php endforeach; ?>
               </div>
               <div class="publish-student-empty" id="publish-student-empty" hidden>Tidak ada siswa yang cocok dengan pencarian.</div>
-              <small class="publish-student-hint"><span id="publish-visible-count"><?= number_format(count($activeStudents)) ?></span> siswa tampil. Centang siswa yang ingin diterbitkan tagihannya.</small>
+              <small class="publish-student-hint"><span><span id="publish-visible-count"><?= number_format(count($activeStudents)) ?></span> siswa tampil</span><span>Pilihan tetap tersimpan saat mencari siswa lain.</span></small>
             </div>
           </div>
-          <div class="report-summary-grid" style="margin-top:16px"><div class="report-summary-card"><span>Pratinjau Siswa</span><strong id="publish-preview-count">0</strong></div><div class="report-summary-card"><span>Total Nominal</span><strong id="publish-preview-total">Rp 0</strong></div></div>
-          <div class="action-bar" style="margin-top:16px"><button class="btn btn-primary" type="submit">Terbitkan Tagihan</button></div>
+          <div class="report-summary-grid fee-preview-grid" style="margin-top:16px">
+            <div class="report-summary-card"><span class="fee-icon"><?= master_workspace_icon('students') ?></span><div><span>Pratinjau Siswa</span><strong id="publish-preview-count">0</strong><small>Jumlah siswa yang akan menerima tagihan.</small></div></div>
+            <div class="report-summary-card"><span class="fee-icon"><?= master_workspace_icon('coins') ?></span><div><span>Total Nominal</span><strong id="publish-preview-total">Rp 0</strong><small>Total tagihan yang akan diterbitkan.</small></div></div>
+          </div>
+          <div class="action-bar" style="margin-top:16px"><button class="btn btn-primary" type="submit"><?= master_workspace_icon('send') ?>Terbitkan Tagihan</button><a href="#daftar-master-biaya" class="btn btn-ghost"><?= master_workspace_icon('document') ?>Lihat Daftar Biaya</a></div>
         </form>
         <?php endif; ?>
       </div>
+      </div>
 
-      <div class="main-card master-modern-card master-modern-list" style="margin-top:0">
-        <div class="card-title-row"><div class="card-title">Daftar Master Biaya (<?= $masterList->num_rows ?>)</div></div>
+      <div class="main-card master-modern-card master-modern-list fee-list-panel" id="daftar-master-biaya" style="margin-top:0">
+        <div class="card-title-row fee-panel-heading"><span class="fee-icon"><?= master_workspace_icon('document') ?></span><div><h2>Daftar Master Biaya (<?= $masterList->num_rows ?>)</h2><p>Kelola nominal, status, dan penggunaan biaya yang sudah tersedia.</p></div></div>
         <div class="table-container">
           <table class="payment-table responsive-table">
             <thead><tr><th>No</th><th>Nama Biaya</th><th>Nominal</th><th>Status</th><th>Tagihan</th><th>Transaksi</th><th>Aksi</th></tr></thead>
@@ -482,6 +518,7 @@ $_SESSION['fee_publish_request_keys'] = array_slice($_SESSION['fee_publish_reque
           </table>
         </div>
       </div>
+      </div>
     </main>
   </div>
   <script src="assets/js/date_format.js?v=<?= filemtime(__DIR__ . '/assets/js/date_format.js') ?>"></script>
@@ -508,17 +545,24 @@ $_SESSION['fee_publish_request_keys'] = array_slice($_SESSION['fee_publish_reque
       var studentEmpty = document.getElementById('publish-student-empty');
       var selectVisible = document.getElementById('publish-select-visible');
       var clearStudents = document.getElementById('publish-clear-students');
+      var selectedCount = document.getElementById('publish-selected-count');
+      var panelGrid = document.querySelector('.fee-panel-grid');
+      // Cache static recipient nodes and normalized identities once, outside scrolling.
+      var studentCards = Array.from(studentList?.querySelectorAll('.publish-student-card') || []);
       function publishStudentCards() {
-        return Array.from(studentList?.querySelectorAll('.publish-student-card') || []);
+        return studentCards;
       }
       function normalizePublishStudentText(value) {
         return String(value || '').normalize('NFD').replace(/[\u0300-\u036f]/g, '').toLowerCase();
       }
-      function matchPublishStudent(card, term) {
-        if (term === '') return { match: true, score: 0 };
+      var searchableStudents = studentCards.map(function(card) {
         var search = normalizePublishStudentText(card.dataset.search || '');
-        var words = search.split(/\s+/).filter(Boolean);
-        var parts = term.split(/\s+/).filter(Boolean);
+        return {card: card, search: search, words: search.split(/\s+/).filter(Boolean)};
+      });
+      function matchPublishStudent(student, term, parts) {
+        if (term === '') return { match: true, score: 0 };
+        var search = student.search;
+        var words = student.words;
         var matched = parts.every(function(part) {
           return search.includes(part) || words.some(function(word){ return word.startsWith(part); });
         });
@@ -531,14 +575,17 @@ $_SESSION['fee_publish_request_keys'] = array_slice($_SESSION['fee_publish_reque
         if (!studentSelect) return;
         var selected = new Set(Array.from(studentList?.querySelectorAll('.publish-student-check:checked') || []).map(function(input){ return input.value; }));
         Array.from(studentSelect.options).forEach(function(option){ option.selected = selected.has(option.value); });
+        if (selectedCount) selectedCount.textContent = selected.size.toLocaleString('id-ID');
       }
       function filterPublishStudents() {
         var term = normalizePublishStudentText((studentSearch?.value || '').trim());
+        var parts = term.split(/\s+/).filter(Boolean);
         var shown = 0;
-        publishStudentCards().forEach(function(card) {
-          var result = matchPublishStudent(card, term);
-          card.hidden = !result.match;
-          card.style.order = String(result.score);
+        searchableStudents.forEach(function(student) {
+          var card = student.card;
+          var result = matchPublishStudent(student, term, parts);
+          if (card.hidden === result.match) card.hidden = !result.match;
+          if (card.style.order !== String(result.score)) card.style.order = String(result.score);
           if (result.match) shown++;
         });
         if (studentList) studentList.scrollTop = 0;
@@ -547,6 +594,7 @@ $_SESSION['fee_publish_request_keys'] = array_slice($_SESSION['fee_publish_reque
       }
       function updatePublishPreview() {
         if (!target || !fee) return;
+        if (panelGrid) panelGrid.dataset.target = target.value;
         document.querySelectorAll('.publish-target-field').forEach(function(field){ field.hidden = field.dataset.target !== target.value; });
         var count = students.length;
         if (target.value === 'tingkat') count = students.filter(function(s){ return s.tingkat === Number(level.value); }).length;
@@ -563,8 +611,15 @@ $_SESSION['fee_publish_request_keys'] = array_slice($_SESSION['fee_publish_reque
         syncPublishStudents();
         updatePublishPreview();
       });
-      studentSearch?.addEventListener('input', filterPublishStudents);
+      var searchFrame = 0;
+      studentSearch?.addEventListener('input', function () {
+        cancelAnimationFrame(searchFrame);
+        searchFrame = requestAnimationFrame(filterPublishStudents);
+      });
       selectVisible?.addEventListener('click', function() {
+        // Apply the latest query even when its animation frame has not run yet.
+        cancelAnimationFrame(searchFrame);
+        filterPublishStudents();
         publishStudentCards().forEach(function(card) {
           if (card.hidden) return;
           var input = card.querySelector('.publish-student-check');

@@ -2,9 +2,9 @@
 <html lang="id" data-palette="<?= unit_palette_for_view() ?>"><head>
 <meta charset="utf-8"><meta name="viewport" content="width=device-width,initial-scale=1"><title>Riwayat Daftar Ulang | SistemSPP</title>
 <link rel="icon" href="../assets/img/favicon.png?v=2"><link rel="preconnect" href="https://fonts.googleapis.com"><link href="https://fonts.googleapis.com/css2?family=Inter:wght@400;500;600;700;800&display=swap" rel="stylesheet">
-<?php foreach(['style','payment_history','payment_details','registration_history'] as $css): ?><link rel="stylesheet" href="../assets/css/<?= $css ?>.css?v=<?= filemtime(__DIR__.'/../assets/css/'.$css.'.css') ?>"><?php endforeach; ?>
+<?php foreach(['style','payment_history','payment_details','registration_history','workspace_readability'] as $css): ?><link rel="stylesheet" href="../assets/css/<?= $css ?>.css?v=<?= filemtime(__DIR__.'/../assets/css/'.$css.'.css') ?>"><?php endforeach; ?>
 <script>document.documentElement.dataset.theme=localStorage.getItem('spp_theme')||'light';</script>
-</head><body class="payment-history-page registration-history-page"><div class="layout">
+</head><body class="payment-history-page registration-history-page" data-readable-workspace="registration-history"><div class="layout">
 <?php include __DIR__.'/sidebar.php'; ?>
 <main class="main-content"><div class="topbar"><button class="sidebar-toggle" onclick="toggleSidebar()" id="btn-sidebar-toggle" aria-label="Buka navigasi"><svg width="20" height="20" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><path d="M4 6h16M4 12h16M4 18h16"/></svg></button><div class="topbar-title"><h2>Riwayat Daftar Ulang</h2><span class="breadcrumb">SistemSPP / Pembayaran / Daftar Ulang</span></div><div class="clock-badge" id="liveClock">--:--:--</div></div>
 <div class="ph-page-content">

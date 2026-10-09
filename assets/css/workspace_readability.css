@@ -1,0 +1,472 @@
+/* Screen typography for marked workspaces only; receipt/PDF renderers do not load this file. */
+body[data-readable-workspace] {
+  --read-body:1rem;--read-table:.9375rem;--read-label:.875rem;--read-note:.8125rem;
+  --read-panel:1.25rem;--read-number:1.5rem;
+  --read-input:var(--read-body);
+}
+/* Compact, readable typography for student/payment and billing workspaces. */
+body:is([data-readable-workspace="payment-history"],[data-readable-workspace="registration-history"],[data-readable-workspace="students"],[data-readable-workspace="master-registration"],[data-readable-workspace="master-fees"],[data-readable-workspace="master-spp"],[data-readable-workspace="master-classes"]) {
+  --read-body:.9375rem;--read-table:.875rem;--read-label:.8125rem;--read-note:.75rem;
+  --read-panel:1.125rem;--read-number:1.375rem;
+}
+html body[data-readable-workspace] :is(.main-content,.modal-overlay,.payment-activity-dialog,.parent-copy-dialog,.toast) {
+  font-size:var(--read-body);line-height:1.5;
+}
+html body[data-readable-workspace] .main-content {min-width:0;}
+html body[data-readable-workspace] .topbar-title h2 {font-size:var(--read-panel);line-height:1.3;white-space:normal;overflow:visible;text-overflow:clip;}
+html body[data-readable-workspace] .topbar :is(.breadcrumb,.unit-badge,.topbar-unit,.clock-badge) {font-size:var(--read-label);line-height:1.5;}
+html body[data-readable-workspace] .topbar .breadcrumb {white-space:normal;overflow:visible;text-overflow:clip;}
+html body[data-readable-workspace] .topbar .topbar-unit {max-width:none;flex-shrink:0;}
+html body[data-readable-workspace] :is(.main-content,.modal-overlay) :is(.field-label,label.field-label) {font-size:var(--read-label);line-height:1.5;}
+html body[data-readable-workspace] :is(.main-content,.modal-overlay,.parent-copy-dialog) :is(.field-input,.spp-select-trigger) {
+  font-size:var(--read-input);line-height:1.5;min-height:3rem;
+}
+html body[data-readable-workspace] :is(.main-content,.modal-overlay) .field-input {padding:.75rem .875rem;}
+html body[data-readable-workspace] .main-content .field-hint {font-size:var(--read-note);line-height:1.6;}
+html body[data-readable-workspace] :is(.main-content,.modal-overlay,.parent-copy-dialog,.payment-activity-dialog) .btn {
+  font-size:var(--read-label)!important;line-height:1.5;min-height:2.75rem;padding:.625rem 1rem;white-space:normal;
+}
+html body[data-readable-workspace] :is(.flash-message,.toast) {font-size:var(--read-table);line-height:1.5;}
+/* Top-layer dropdowns still belong to this body, including menus portaled outside main. */
+html body[data-readable-workspace] .spp-dropdown-panel {font-size:var(--read-input);line-height:1.5;}
+html body[data-readable-workspace] .spp-dropdown-option {font-size:var(--read-input);min-height:2.75rem;line-height:1.5;}
+html body[data-readable-workspace] :is(.spp-dropdown-note,.spp-dropdown-group,.spp-dropdown-status,.spp-dropdown-empty,.spp-multi-footer>span) {font-size:var(--read-note);line-height:1.5;}
+html body[data-readable-workspace] :is(.spp-multi-all,.spp-multi-option) {font-size:var(--read-table);line-height:1.5;min-height:2.75rem;}
+html body[data-readable-workspace] .spp-multi-footer button {font-size:var(--read-label);min-height:2.75rem;line-height:1.5;}
+
+/* Billing masters: the same compact scale as student and payment pages. */
+html body:is([data-readable-workspace="master-fees"],[data-readable-workspace="master-spp"]) :is(.fee-hero h1,.spp-page-heading h1,.spp-overview-workspace h1) {font-size:clamp(1.625rem,2vw,1.75rem);line-height:1.3;}
+html body:is([data-readable-workspace="master-fees"],[data-readable-workspace="master-spp"]) :is(.fee-panel-heading h2,.spp-rates-heading h2,.spp-side-heading h2,.spp-cancel-section h3,.prior-debt-modal__title) {font-size:var(--read-panel);line-height:1.4;}
+html body:is([data-readable-workspace="master-fees"],[data-readable-workspace="master-spp"]) :is(.fee-hero p,.spp-page-heading p,.spp-overview-workspace p,.master-active-check,.spp-year-explanation) {font-size:var(--read-body);line-height:1.6;}
+html body:is([data-readable-workspace="master-fees"],[data-readable-workspace="master-spp"]) :is(.fee-panel-heading p,.fee-stat>div>span,.fee-preview-grid .report-summary-card>div>span,.recap-class-overline,.spp-summary-card>div>span,.spp-workspace-tabs a,.spp-students-table-head,.spp-rates-heading p,.spp-rate-field>span,.spp-rate-field label,.spp-cancel-section p) {font-size:var(--read-label);line-height:1.5;}
+html body:is([data-readable-workspace="master-fees"],[data-readable-workspace="master-spp"]) :is(.fee-stat strong,.fee-preview-grid strong,.spp-summary-card strong) {font-size:var(--read-number);line-height:1.4;}
+html body:is([data-readable-workspace="master-fees"],[data-readable-workspace="master-spp"]) :is(.main-content small,.fee-recipient-heading small,.fee-selected-badge,.publish-student-hint,.publish-student-empty,.spp-page-heading .breadcrumb,.spp-summary-card small,.spp-progress span,.spp-list-note,.spp-info-note,.spp-side-heading p,.spp-side-link,.spp-status-note small,.spp-year-explanation p,.promotion-submit-bar>div>span,.unit-record-pill,.master-status,.recap-status,.kelas-badge,.spp-student-avatar,.fee-recipient-avatar) {font-size:var(--read-note);line-height:1.5;}
+html body:is([data-readable-workspace="master-fees"],[data-readable-workspace="master-spp"]) :is(.publish-student-main strong,.spp-student-nis,.spp-student-rombel,.promotion-student-identity strong,.spp-rate-preview strong,.promotion-submit-bar strong,.spp-rate-list>div,.spp-status-note strong,.prior-debt-student) {font-size:var(--read-table);line-height:1.5;}
+html body:is([data-readable-workspace="master-fees"],[data-readable-workspace="master-spp"]) :is(.main-content,.prior-debt-modal) :is(.field-input,.spp-select-trigger,.search-box input) {font-size:var(--read-input);line-height:1.5;min-height:3rem;height:auto;box-sizing:border-box;}
+html body:is([data-readable-workspace="master-fees"],[data-readable-workspace="master-spp"]) .search-box input {padding:.75rem .875rem .75rem 2.75rem;}
+html body:is([data-readable-workspace="master-fees"],[data-readable-workspace="master-spp"]) .search-box :is(.search-icon,svg) {top:50%;transform:translateY(-50%);}
+html body:is([data-readable-workspace="master-fees"],[data-readable-workspace="master-spp"]) :is(.layout .main-content,.prior-debt-modal) :is(.btn,.btn-tbl) {font-size:var(--read-label)!important;line-height:1.5;min-height:2.75rem;padding:.625rem .875rem;white-space:normal;box-sizing:border-box;}
+html body:is([data-readable-workspace="master-fees"],[data-readable-workspace="master-spp"]) .main-content th {font-size:var(--read-label);line-height:1.5;white-space:normal;padding:.875rem 1rem;}
+html body:is([data-readable-workspace="master-fees"],[data-readable-workspace="master-spp"]) .main-content td {font-size:var(--read-table);line-height:1.5;padding:.875rem 1rem;}
+html body[data-readable-workspace="master-fees"] .fee-amount-control>span {font-size:var(--read-body);}
+html body[data-readable-workspace="master-fees"] #form-terbit-biaya .publish-student-main strong {font-size:var(--read-table);line-height:1.5;}
+html body[data-readable-workspace="master-fees"] #form-terbit-biaya .publish-student-search input {font-size:var(--read-input);line-height:1.5;min-height:3rem;height:auto;padding:.75rem .875rem .75rem 2.75rem;}
+html body[data-readable-workspace="master-fees"] #form-terbit-biaya .publish-student-actions .btn {min-height:2.75rem;}
+html body[data-readable-workspace="master-fees"] #form-terbit-biaya .publish-student-main small {font-size:var(--read-note);line-height:1.5;}
+html body[data-readable-workspace="master-fees"] #form-terbit-biaya :is(.publish-student-card .kelas-badge,.publish-student-hint,.fee-selected-badge) {font-size:var(--read-note);line-height:1.5;}
+html body[data-readable-workspace="master-fees"] .fee-workspace :is(.fee-panel,.fee-list-panel) {padding:1.25rem;}
+html body[data-readable-workspace="master-fees"] .fee-hero-stats {grid-template-columns:repeat(3,minmax(0,1fr));}
+html body[data-readable-workspace="master-spp"] .spp-workspace .promotion-selection-toolbar :is(strong,span) {font-size:var(--read-note);line-height:1.5;}
+html body[data-readable-workspace="master-spp"] .spp-workspace .spp-publish-row :is(.kelas-badge,.master-status) {font-size:var(--read-note);line-height:1.5;}
+html body[data-readable-workspace="master-spp"] .spp-workspace .promotion-student-identity small {font-size:var(--read-note);line-height:1.5;}
+html body[data-readable-workspace="master-spp"] .spp-workspace :is(.spp-rate-preview>span,.spp-start-caption,.spp-section-heading p) {font-size:var(--read-note);line-height:1.5;}
+html body[data-readable-workspace="master-spp"] .spp-section-heading h2 {font-size:var(--read-panel);line-height:1.4;}
+html body[data-readable-workspace="master-spp"] .spp-publish-card .search-box input {padding:.75rem .25rem;}
+html body[data-readable-workspace="master-spp"] .spp-publish-card .search-box :is(.search-icon,svg) {top:auto;transform:none;}
+html body[data-readable-workspace="master-spp"] .prior-debt-modal {font-size:var(--read-body);line-height:1.5;}
+html body[data-readable-workspace="master-spp"] .prior-debt-modal__header h2 {font-size:var(--read-panel);line-height:1.4;}
+html body[data-readable-workspace="master-spp"] :is(.prior-debt-modal__eyebrow,.prior-debt-modal__summary span,.prior-debt-student span) {font-size:var(--read-note);line-height:1.5;}
+html body[data-readable-workspace="master-spp"] .prior-debt-modal__summary strong {font-size:var(--read-number);line-height:1.4;}
+html body[data-readable-workspace="master-spp"] .prior-debt-modal__close {min-width:2.75rem;min-height:2.75rem;flex-shrink:0;}
+html body[data-readable-workspace="master-spp"] .prior-debt-student {flex-wrap:wrap;overflow-wrap:anywhere;}
+html body[data-readable-workspace="master-spp"] .spp-workspace :is(.spp-tab-panel,.spp-side-card) {padding:1.25rem;}
+html body[data-readable-workspace="master-spp"] .spp-year-control form {width:11rem;}
+html body[data-readable-workspace="master-spp"] .spp-icon-button {min-width:2.75rem;min-height:2.75rem;}
+html body[data-readable-workspace="master-spp"] .spp-side-heading>div {min-width:0;}
+html body[data-readable-workspace="master-spp"] .spp-side-heading .spp-workspace-icon {width:2.5rem;height:2.5rem;}
+html body[data-readable-workspace="master-spp"] .spp-workspace-tabs a {min-height:2.75rem;padding:.875rem .75rem;}
+html body[data-readable-workspace="master-spp"] .spp-overview-workspace .table-container {overflow-x:auto;}
+@media(max-width:650px) {
+  html body[data-readable-workspace="master-fees"] :is(.fee-hero-stats,.fee-preview-grid) {grid-template-columns:minmax(0,1fr);}
+  html body[data-readable-workspace="master-fees"] .fee-workspace .report-filter-grid {grid-template-columns:minmax(0,1fr);}
+  html body[data-readable-workspace="master-spp"] .spp-summary-grid {grid-template-columns:minmax(0,1fr);}
+}
+@media(max-width:700px) {
+  html body[data-readable-workspace="master-spp"] .spp-workspace .spp-publish-card .spp-publish-row {grid-template-columns:2rem minmax(0,1fr);gap:.625rem .75rem;}
+}
+
+/* Master Kelas/Rombel uses the same compact scale and scoped dropdown rules. */
+html body[data-readable-workspace="master-classes"] .class-page-heading h1 {font-size:clamp(1.625rem,2vw,1.75rem);line-height:1.3;}
+html body[data-readable-workspace="master-classes"] .class-page-heading p {font-size:var(--read-body);line-height:1.6;}
+html body[data-readable-workspace="master-classes"] :is(.card-title,.class-panel-heading h2) {font-size:var(--read-panel);line-height:1.4;}
+html body[data-readable-workspace="master-classes"] :is(.class-stat>div>span,.class-context-caption,.class-mode-tabs a,.class-view-switch button,.du-page-link) {font-size:var(--read-label);line-height:1.5;}
+html body[data-readable-workspace="master-classes"] :is(.class-stat strong,.master-class-summary strong) {font-size:var(--read-number);line-height:1.4;}
+html body[data-readable-workspace="master-classes"] :is(.class-page-heading .breadcrumb,.main-content small,.payment-auto-note,.class-panel-heading p,.class-card-caption,.unit-record-pill,.master-status,.kelas-badge,.du-pagination-info,.master-class-summary span,.master-rombel-maintenance-copy span,.promotion-stage-overview span,.promotion-selection-toolbar span,.promotion-selection-toolbar strong,.class-roster-number,.class-student-avatar,.promotion-submit-bar span,.promotion-empty-filter) {font-size:var(--read-note);line-height:1.5;}
+html body[data-readable-workspace="master-classes"] :is(.class-context-list strong,.class-context-empty,.master-rombel-maintenance-copy strong,.promotion-stage-overview strong,.promotion-student-identity strong,.promotion-submit-bar strong,.promotion-batch-result,.class-participants-panel .alert,.class-context-panel .alert,.alert) {font-size:var(--read-table);line-height:1.5;}
+html body[data-readable-workspace="master-classes"] .class-workspace .search-box input {font-size:var(--read-input);line-height:1.5;min-height:3rem;padding:.75rem 0;}
+html body[data-readable-workspace="master-classes"] #promotion-target-year {font-size:var(--read-input);line-height:1.5;min-height:3rem;box-sizing:border-box;}
+html body[data-readable-workspace="master-classes"] :is(.class-mode-tabs a,.class-view-switch button,.du-page-link) {min-height:2.75rem;box-sizing:border-box;}
+html body[data-readable-workspace="master-classes"] .class-workspace :is(.btn,.btn-tbl) {font-size:var(--read-label)!important;line-height:1.5;min-height:2.75rem;padding:.625rem .875rem;box-sizing:border-box;white-space:normal;}
+html body[data-readable-workspace="master-classes"] .class-workspace :is(.field-input,.spp-select-trigger) {font-size:var(--read-input);line-height:1.5;min-height:3rem;height:auto;}
+html body[data-readable-workspace="master-classes"] .class-workspace .main-card {padding:1.25rem;}
+html body[data-readable-workspace="master-classes"] .class-list-panel[data-rombel-view="cards"] .rombel-data-table td {font-size:var(--read-table);line-height:1.5;}
+html body[data-readable-workspace="master-classes"] .class-list-panel[data-rombel-view="cards"] td[data-label="Label"] strong {font-size:var(--read-table);line-height:1.5;}
+html body[data-readable-workspace="master-classes"] .class-list-panel[data-rombel-view="cards"] :is(.class-card-caption,.master-status) {font-size:var(--read-note);line-height:1.5;}
+html body[data-readable-workspace="master-classes"] .class-list-panel[data-rombel-view="cards"] td[data-label="Tingkat"] .kelas-badge {font-size:var(--read-note);line-height:1.5;}
+html body[data-readable-workspace="master-classes"] .du-page-mobile-label {font-size:var(--read-note);line-height:1.5;}
+html body[data-readable-workspace="master-classes"] .class-list-panel[data-rombel-view="table"] .rombel-data-table td {font-size:var(--read-table);line-height:1.5;padding:.875rem 1rem;}
+html body[data-readable-workspace="master-classes"] .class-list-panel[data-rombel-view="table"] .rombel-data-table th {font-size:var(--read-label);line-height:1.5;padding:.875rem 1rem;white-space:normal;}
+html body[data-readable-workspace="master-classes"] .class-list-panel[data-rombel-view="table"] .table-container {overflow:auto;}
+html body[data-readable-workspace="master-classes"] .class-roster-head {font-size:var(--read-label);line-height:1.5;}
+html body[data-readable-workspace="master-classes"] .class-workspace .promotion-student-identity small {font-size:var(--read-note);line-height:1.5;}
+html body[data-readable-workspace="master-classes"] .class-workspace .promotion-target-field>label {font-size:var(--read-note);line-height:1.5;}
+html body[data-readable-workspace="master-classes"] .class-context-panel {margin-bottom:1rem;}
+html body[data-readable-workspace="master-classes"] :is(.class-form-summary,.class-level-group>summary>strong,.class-add-shortcut strong,.class-psb-row strong) {font-size:var(--read-table);line-height:1.5;}
+html body[data-readable-workspace="master-classes"] :is(.class-quick-filters a,.class-psb-number,.class-psb-count) {font-size:var(--read-label);line-height:1.5;}
+html body[data-readable-workspace="master-classes"] :is(.class-group-total,.class-group-count,.class-group-students,.class-group-page-note,.class-add-shortcut small,.class-psb-row small) {font-size:var(--read-note);line-height:1.5;}
+html body[data-readable-workspace="master-classes"] .class-level-group .rombel-data-table td {font-size:var(--read-table);line-height:1.5;padding:.75rem;}
+html body[data-readable-workspace="master-classes"] .class-level-group .rombel-data-table th {font-size:var(--read-label);line-height:1.5;padding:.75rem;white-space:normal;}
+html body[data-readable-workspace="master-classes"] :is(.class-destination-panel,.class-filter-panel) .class-panel-heading h2 {font-size:1rem;line-height:1.4;}
+html body[data-readable-workspace="master-classes"] .class-destination-panel .promotion-stage-overview strong {font-size:.875rem;line-height:1.4;}
+html body[data-readable-workspace="master-classes"] .class-destination-panel.main-card {padding:1rem;}
+html body[data-readable-workspace="master-classes"] .class-filter-panel .master-class-summary strong {font-size:var(--read-table);line-height:1.5;}
+@media(max-width:700px) {
+  html body[data-readable-workspace="master-classes"] .class-summary-grid {grid-template-columns:minmax(0,1fr);}
+  html body[data-readable-workspace="master-classes"] .class-list-panel[data-rombel-view="cards"] .rombel-data-table tbody {grid-template-columns:minmax(0,1fr);}
+}
+
+/* Role Management */
+html body[data-readable-workspace="accounts"] .card-title {font-size:var(--read-panel);line-height:1.4;}
+html body[data-readable-workspace="accounts"] :is(.main-content,.modal-overlay) :is(small,.account-results-note,.account-self-badge,.account-username,.field-hint) {font-size:var(--read-note);line-height:1.6;}
+html body[data-readable-workspace="accounts"] .account-create-notice {position:static;max-width:none;margin:0 0 1.5rem;padding:1rem;}
+html body[data-readable-workspace="accounts"] .account-create-card .card-title-row {padding-right:0;}
+html body[data-readable-workspace="accounts"] :is(.account-create-notice strong,.account-access-note strong,.account-step h3) {font-size:var(--read-table);line-height:1.5;}
+html body[data-readable-workspace="accounts"] .account-step h3>span {width:2rem;height:2rem;flex-shrink:0;}
+html body[data-readable-workspace="accounts"] .account-step .fields-grid {gap:1.25rem;}
+html body[data-readable-workspace="accounts"] .password-field-wrap .field-input {padding-right:3rem;}
+html body[data-readable-workspace="accounts"] .account-search>svg {top:50%;transform:translateY(-50%);}
+html body[data-readable-workspace="accounts"] .password-field-wrap .toggle-pw {width:2.75rem;height:2.75rem;right:.25rem;top:50%;transform:translateY(-50%);}
+html body[data-readable-workspace="accounts"] .account-scope {font-size:var(--read-body);min-height:3rem;padding:.75rem;box-sizing:border-box;}
+html body[data-readable-workspace="accounts"] :is(.account-filter-reset,.account-role-tabs a) {font-size:var(--read-label);line-height:1.5;min-height:2.75rem;padding:.625rem .875rem;box-sizing:border-box;}
+html body[data-readable-workspace="accounts"] .account-role-tabs a span {font-size:var(--read-note);}
+html body[data-readable-workspace="accounts"] .payment-table th {font-size:var(--read-label);line-height:1.5;padding:1rem;white-space:normal;}
+html body[data-readable-workspace="accounts"] .payment-table td {font-size:var(--read-table);line-height:1.5;padding:.875rem 1rem;}
+html body[data-readable-workspace="accounts"] .account-name {font-size:var(--read-table);line-height:1.5;overflow-wrap:anywhere;white-space:normal;}
+html body[data-readable-workspace="accounts"] :is(.unit-pill,.badge-role,.account-avatar) {font-size:var(--read-note);}
+html body[data-readable-workspace="accounts"] .account-avatar {width:2.5rem;height:2.5rem;flex-shrink:0;}
+html body[data-readable-workspace="accounts"] .account-summary {min-width:0;}
+html body[data-readable-workspace="accounts"] .account-username {overflow-wrap:anywhere;white-space:normal;}
+html body[data-readable-workspace="accounts"] .savings-row-actions .btn-tbl {font-size:var(--read-label)!important;line-height:1.5;min-height:2.75rem;padding:.625rem .75rem;white-space:normal;}
+html body[data-readable-workspace="accounts"] .aksi-col {padding-right:4rem!important;}
+html body[data-readable-workspace="accounts"] .account-more summary {width:2.75rem;height:2.75rem;font-size:1rem;}
+html body[data-readable-workspace="accounts"] .account-more>div {top:3rem;min-width:12rem;max-width:calc(100vw - 3rem);}
+html body[data-readable-workspace="accounts"] .account-more button {min-height:2.75rem;font-size:var(--read-label);line-height:1.5;}
+html body[data-readable-workspace="accounts"] .modal-box {width:min(32rem,calc(100vw - 2rem));max-height:calc(100dvh - 2rem);overflow-y:auto;box-sizing:border-box;}
+html body[data-readable-workspace="accounts"] .modal-title {font-size:var(--read-panel);line-height:1.4;}
+html body[data-readable-workspace="accounts"] :is(.modal-account,.modal-box p) {font-size:var(--read-body)!important;line-height:1.5;overflow-wrap:anywhere;}
+
+/* Parent letter composition and preview controls. Rich text markup stays intact. */
+html body[data-readable-workspace="parent"] .parent-compose {max-width:1600px;}
+html body[data-readable-workspace="parent"] .parent-compose-header h1 {font-size:clamp(1.75rem,2vw,2rem);line-height:1.3;}
+html body[data-readable-workspace="parent"] .parent-compose-header p {font-size:var(--read-body);line-height:1.6;}
+html body[data-readable-workspace="parent"] .parent-compose-layout {grid-template-columns:minmax(260px,1fr) minmax(360px,1.65fr) minmax(240px,1fr);}
+html body[data-readable-workspace="parent"] :is(.parent-compose-layout h2,.parent-copy-dialog h2) {font-size:var(--read-panel);line-height:1.4;}
+html body[data-readable-workspace="parent"] :is(.parent-overline,.parent-compose-layout h2+p,.parent-recipient small,.parent-recipient-count,.parent-tips,.parent-tips strong,.parent-tips ul,.parent-compose-status,.parent-placement-note,.parent-summary-card dt,.parent-summary-note,.parent-summary-note strong,.parent-copy-action p,.parent-preview-note,.parent-copy-dialog header p,.parent-copy-source small,.parent-copy-help,.parent-copy-target small,.parent-copy-dialog footer>span) {font-size:var(--read-note);line-height:1.6;}
+html body[data-readable-workspace="parent"] :is(.parent-recipient strong,.parent-summary-card h3,.parent-summary-card dd,.parent-copy-action strong,.parent-copy-source strong,.parent-copy-target strong) {font-size:var(--read-table);line-height:1.5;}
+html body[data-readable-workspace="parent"] .main-content .parent-search input {min-height:3rem;font-size:var(--read-body);padding:.75rem .75rem .75rem 2.625rem;}
+html body[data-readable-workspace="parent"] .parent-search>svg {top:50%;transform:translateY(-50%);width:1.125rem;height:1.125rem;}
+html body[data-readable-workspace="parent"] .parent-recipient {padding:.875rem .75rem;}
+html body[data-readable-workspace="parent"] .parent-recipient-avatar {width:2.5rem;height:2.5rem;}
+html body[data-readable-workspace="parent"] .parent-summary-card dl {display:block;}
+html body[data-readable-workspace="parent"] .parent-summary-card dt {margin-top:.75rem;}
+html body[data-readable-workspace="parent"] .parent-message {font-size:var(--read-body);line-height:1.65;padding:1rem;}
+html body[data-readable-workspace="parent"] .parent-message:before {font-size:var(--read-body);line-height:1.65;}
+html body[data-readable-workspace="parent"] .parent-editor-toolbar {gap:.25rem;padding:.5rem;}
+html body[data-readable-workspace="parent"] .parent-editor-toolbar button {font-size:var(--read-label);min-width:2.75rem;height:auto;min-height:2.75rem;padding:.625rem;line-height:1.5;}
+html body[data-readable-workspace="parent"] .parent-copy-button {font-size:var(--read-label);min-height:2.75rem;line-height:1.5;padding:.75rem;white-space:normal;}
+html body[data-readable-workspace="parent"] .parent-copy-action {grid-template-columns:minmax(0,1fr);gap:.875rem;}
+html body[data-readable-workspace="parent"] .parent-copy-dialog {width:min(44rem,calc(100vw - 2rem));}
+html body[data-readable-workspace="parent"] :is(.parent-copy-all,.parent-copy-overwrite,.parent-copy-confirm,.parent-copy-target) {font-size:var(--read-table);line-height:1.6;}
+html body[data-readable-workspace="parent"] .parent-copy-dialog header>button {width:2.75rem;min-width:2.75rem;height:2.75rem;display:grid;place-items:center;}
+html body[data-readable-workspace="parent"] .parent-copy-dialog header>div {min-width:0;}
+html body[data-readable-workspace="parent"] .parent-copy-dialog footer {flex-wrap:wrap;}
+html body[data-readable-workspace="parent"] .parent-copy-target {min-height:2.75rem;}
+html body[data-readable-workspace="parent"] .parent-copy-target>span {min-width:0;overflow-wrap:anywhere;}
+
+/* General finance report */
+html body[data-readable-workspace="finance"] .finance-hero .recap-report-copy h1 {font-size:clamp(1.75rem,2vw,2rem);line-height:1.3;}
+html body[data-readable-workspace="finance"] .finance-hero .recap-report-copy p {font-size:var(--read-body);line-height:1.6;}
+html body[data-readable-workspace="finance"] :is(.finance-breadcrumb,.finance-trend-copy,.finance-summary-note,.finance-table-note,.badge-count,.report-secondary-id,.report-secondary-unit,.finance-stat small) {font-size:var(--read-note);line-height:1.6;}
+html body[data-readable-workspace="finance"] .finance-catalog {font-size:var(--read-label);width:240px;padding:1rem;}
+html body[data-readable-workspace="finance"] .report-general-shell .report-general-filter {grid-template-columns:minmax(180px,1fr) minmax(300px,1.4fr) repeat(3,minmax(150px,1fr))!important;padding:1.5rem!important;gap:1.125rem!important;}
+html body[data-readable-workspace="finance"] .report-general-filter .field-label {font-size:var(--read-label);line-height:1.5;margin-bottom:.5rem;}
+html body[data-readable-workspace="finance"] .report-general-filter .spp-select-trigger {font-size:var(--read-body);height:3rem!important;min-height:3rem!important;max-height:3rem!important;}
+html body[data-readable-workspace="finance"] .report-general-filter :is(.field-input,.report-date-range-button,.finance-scope-value) {font-size:var(--read-body);line-height:1.5;min-height:3rem;height:auto;}
+html body[data-readable-workspace="finance"] .report-general-filter .report-date-range-button {padding:.625rem .75rem;height:auto!important;max-height:none!important;}
+html body[data-readable-workspace="finance"] .report-date-range-value {white-space:normal;overflow:visible;text-overflow:clip;}
+html body[data-readable-workspace="finance"] .report-general-filter .btn {font-size:var(--read-label)!important;min-height:3rem;line-height:1.5;padding:.75rem 1rem;}
+html body[data-readable-workspace="finance"] .finance-workspace .report-general-shell .report-general-filter :is(.field-input,.search-box,.report-date-range-button) {min-height:3rem!important;height:auto!important;}
+html body[data-readable-workspace="finance"] .finance-workspace .report-general-shell .report-general-filter .btn {min-height:3rem!important;}
+html body[data-readable-workspace="finance"] .search-box {min-height:3rem;}
+html body[data-readable-workspace="finance"] .report-general-filter .search-box input:not([type=hidden]) {font-size:var(--read-body);min-height:3rem;}
+html body[data-readable-workspace="finance"] .finance-stat {padding:1.25rem;gap:1rem;}
+html body[data-readable-workspace="finance"] .finance-stat strong {font-size:var(--read-number);line-height:1.3;}
+html body[data-readable-workspace="finance"] .finance-stat div>span {font-size:var(--read-label);line-height:1.5;}
+html body[data-readable-workspace="finance"] .finance-tabs a {font-size:var(--read-label);line-height:1.5;padding:.875rem 1.125rem;min-height:2.75rem;box-sizing:border-box;}
+html body[data-readable-workspace="finance"] .finance-results {grid-template-columns:minmax(280px,.33fr) minmax(0,1fr);gap:1rem;padding:1rem;}
+html body[data-readable-workspace="finance"] .finance-results[data-finance-panel=komponen],html body[data-readable-workspace="finance"] .finance-results[data-finance-panel=transaksi] {grid-template-columns:minmax(0,1fr);}
+html body[data-readable-workspace="finance"] .finance-results .card-header {padding:1.125rem;gap:.75rem;}
+html body[data-readable-workspace="finance"] .finance-results :is(.card-title,.report-multiple-section h3) {font-size:var(--read-panel);line-height:1.4;}
+html body[data-readable-workspace="finance"] .finance-transactions .payment-table {min-width:1100px;}
+html body[data-readable-workspace="finance"] .finance-results .table-container {overflow-x:auto;overscroll-behavior-x:contain;}
+html body[data-readable-workspace="finance"] .finance-results .payment-table td {font-size:var(--read-table);line-height:1.5;padding:1rem .875rem;}
+html body[data-readable-workspace="finance"] .finance-results .payment-table th {font-size:var(--read-label);line-height:1.5;letter-spacing:0;padding:1rem .875rem;white-space:normal;}
+html body[data-readable-workspace="finance"] .finance-results .payment-table :is(.report-secondary-id,.badge-nis,.kelas-badge) {font-size:var(--read-note);line-height:1.5;}
+html body[data-readable-workspace="finance"] .finance-components .payment-table {min-width:0;}
+html body[data-readable-workspace="finance"] .finance-components .payment-table td.nominal {white-space:nowrap;}
+html body[data-readable-workspace="finance"] .finance-components .payment-table tbody tr:last-child td {font-size:var(--read-table);padding-block:1rem;}
+html body[data-readable-workspace="finance"] .finance-results :is(.btn-print-selected,.btn-tbl-print) {font-size:var(--read-label)!important;min-height:2.75rem;padding:.625rem .75rem;line-height:1.5;}
+html body[data-readable-workspace="finance"] .finance-results .du-pagination-footer {font-size:var(--read-label);padding:1.125rem;gap:.75rem;}
+html body[data-readable-workspace="finance"] .du-pagination-footer :is(a,button) {font-size:var(--read-label);min-width:2.75rem;min-height:2.75rem;}
+html body[data-readable-workspace="finance"] :is(.du-pagination-info,.du-pagination-info strong,.du-page-link) {font-size:var(--read-label);line-height:1.5;}
+html body[data-readable-workspace="finance"] .du-page-link {min-width:2.75rem;min-height:2.75rem;}
+html body[data-readable-workspace="finance"] .du-page-mobile-label {font-size:var(--read-note);line-height:1.5;}
+html body[data-readable-workspace="finance"] .finance-row-menu summary {width:2.75rem;height:2.75rem;}
+html body[data-readable-workspace="finance"] .finance-row-menu[open] :is(a,button) {font-size:var(--read-label);min-height:2.75rem;padding:.625rem;line-height:1.5;}
+html body[data-readable-workspace="finance"] :is(.student-search-hint,.student-search-empty,.student-search-main small,.student-search-class,.report-date-range-popover label>span) {font-size:var(--read-note);line-height:1.5;}
+html body[data-readable-workspace="finance"] .student-search-main strong {font-size:var(--read-table);line-height:1.5;white-space:normal;overflow:visible;text-overflow:clip;overflow-wrap:anywhere;}
+html body[data-readable-workspace="finance"] .student-search-option {font-size:var(--read-table);min-height:3rem;padding:.875rem;}
+html body[data-readable-workspace="finance"] .report-date-range-popover input:not([type=hidden]) {font-size:var(--read-body);min-height:3rem;line-height:1.5;}
+html body[data-readable-workspace="finance"] .payment-activity-dialog h3 {font-size:var(--read-panel);line-height:1.4;}
+html body[data-readable-workspace="finance"] :is(.payment-activity-dialog-header p,.payment-activity-event time) {font-size:var(--read-note);line-height:1.6;}
+html body[data-readable-workspace="finance"] :is(.payment-activity-event-heading,.payment-activity-event p,.payment-activity-change) {font-size:var(--read-table);line-height:1.6;}
+
+@media(max-width:1450px) {
+  html body[data-readable-workspace="accounts"] .account-filter-form {grid-template-columns:repeat(2,minmax(0,1fr));}
+  html body[data-readable-workspace="accounts"] .account-search {grid-column:1/-1;}
+  html body[data-readable-workspace="accounts"] .account-steps {grid-template-columns:minmax(0,1fr);}
+  html body[data-readable-workspace="finance"] .finance-results {grid-template-columns:minmax(0,1fr);}
+}
+@media(max-width:1400px) {
+  html body[data-readable-workspace="finance"] .report-general-shell .report-general-filter {grid-template-columns:repeat(2,minmax(0,1fr))!important;}
+  html body[data-readable-workspace="finance"] .report-general-filter>.field-row.full-span,html body[data-readable-workspace="finance"] .report-general-filter>.report-general-actions {grid-column:1/-1!important;}
+  html body[data-readable-workspace="finance"] .report-general-filter>.report-general-actions {grid-template-columns:repeat(2,minmax(0,1fr))!important;}
+  html body[data-readable-workspace="finance"] .finance-stats {grid-template-columns:repeat(2,minmax(0,1fr));}
+}
+@media(max-width:1350px) {
+  html body[data-readable-workspace="parent"] .parent-compose-layout {grid-template-columns:minmax(250px,1fr) minmax(0,1.7fr);}
+  html body[data-readable-workspace="parent"] .parent-summary {grid-column:1/-1;border-top:1px solid var(--border);}
+  html body[data-readable-workspace="parent"] .parent-editor {border-right:0;}
+}
+@media(max-width:900px) {
+  html body[data-readable-workspace="accounts"] .payment-table {display:block;}
+  html body[data-readable-workspace="accounts"] .payment-table :is(thead,tbody,tr,td) {display:block;}
+  html body[data-readable-workspace="accounts"] .payment-table thead {display:none;}
+  html body[data-readable-workspace="accounts"] .payment-table tbody tr {padding:1rem;border-bottom:1px solid var(--border);}
+  html body[data-readable-workspace="accounts"] .payment-table td[data-label] {display:flex;justify-content:space-between;align-items:center;gap:1rem;padding:.625rem 0!important;white-space:normal;}
+  html body[data-readable-workspace="accounts"] .payment-table td[data-label]::before {content:attr(data-label);font-size:var(--read-label);font-weight:600;flex-shrink:0;}
+  html body[data-readable-workspace="accounts"] .payment-table td[data-label=Akun] {justify-content:flex-start;}
+  html body[data-readable-workspace="accounts"] .payment-table td[data-label=Akun]::before {display:none;}
+  html body[data-readable-workspace="accounts"] .payment-table td[data-label=Aksi] {position:relative;display:block;padding-right:3.5rem!important;}
+  html body[data-readable-workspace="accounts"] .payment-table td[data-label=Aksi]::before {display:block;margin-bottom:.625rem;}
+  html body[data-readable-workspace="accounts"] .savings-row-actions {display:flex;flex-wrap:wrap;}
+  html body[data-readable-workspace="accounts"] .savings-row-actions .btn-tbl {width:auto;flex:1;margin:0;}
+  html body[data-readable-workspace="accounts"] .account-more {right:0;}
+  html body[data-readable-workspace="parent"] .parent-compose-layout {grid-template-columns:minmax(0,1fr);}
+  html body[data-readable-workspace="parent"] .parent-recipients {border-right:0;border-bottom:1px solid var(--border);}
+  html body[data-readable-workspace="parent"] .parent-summary {grid-column:auto;}
+  html body[data-readable-workspace="parent"] .parent-recipient-list {max-height:18rem;}
+}
+@media(max-width:650px) {
+  html body[data-readable-workspace="accounts"] :is(.account-step .fields-grid,.account-filter-form) {grid-template-columns:minmax(0,1fr);}
+  html body[data-readable-workspace="accounts"] .account-search {grid-column:auto;}
+  html body[data-readable-workspace="accounts"] .account-more>div {min-width:11rem;}
+  html body[data-readable-workspace="parent"] .parent-compose-header {align-items:flex-start;}
+  html body[data-readable-workspace="parent"] .parent-header-art {display:none;}
+  html body[data-readable-workspace="parent"] .parent-copy-dialog header {gap:.625rem;}
+  html body[data-readable-workspace="parent"] .parent-dialog-icon {display:none;}
+  html body[data-readable-workspace="finance"] .report-general-shell .report-general-filter {grid-template-columns:minmax(0,1fr)!important;padding:1rem!important;}
+  html body[data-readable-workspace="finance"] .finance-catalog {width:100%;}
+  html body[data-readable-workspace="finance"] .report-general-filter>.report-general-actions {grid-template-columns:minmax(0,1fr)!important;}
+  html body[data-readable-workspace="finance"] .finance-stats {grid-template-columns:minmax(0,1fr);}
+  html body[data-readable-workspace="finance"] .finance-stat {flex-direction:row;align-items:center;}
+  html body[data-readable-workspace="finance"] .finance-tabs a {flex:1 1 auto;padding:.75rem;}
+  html body[data-readable-workspace="finance"] .finance-results {padding:.75rem;}
+  html body[data-readable-workspace="finance"] .finance-results .card-header {padding:1rem;}
+}
+
+/* Payment histories: initial HTML, fetched details and top-layer dialogs share this scope. */
+html body:is([data-readable-workspace="payment-history"],[data-readable-workspace="registration-history"]) .main-content {font-size:var(--read-body);line-height:1.5;}
+html body:is([data-readable-workspace="payment-history"],[data-readable-workspace="registration-history"]) .ph-hero h1 {font-size:clamp(1.625rem,2vw,1.75rem);line-height:1.3;}
+html body:is([data-readable-workspace="payment-history"],[data-readable-workspace="registration-history"]) .ph-hero p {font-size:var(--read-body);}
+html body:is([data-readable-workspace="payment-history"],[data-readable-workspace="registration-history"]) .ph-tabs a {font-size:var(--read-label);line-height:1.5;min-height:2.75rem;box-sizing:border-box;white-space:normal;display:flex;align-items:center;justify-content:center;}
+html body:is([data-readable-workspace="payment-history"],[data-readable-workspace="registration-history"]) .layout .ph-filter-form {grid-template-columns:repeat(3,minmax(0,1fr));gap:1rem;}
+html body:is([data-readable-workspace="payment-history"],[data-readable-workspace="registration-history"]) .ph-filter-intro {grid-column:1/-1;border-right:0;}
+html body:is([data-readable-workspace="payment-history"],[data-readable-workspace="registration-history"]) .ph-filter-actions {grid-column:1/-1;justify-content:flex-end;flex-wrap:wrap;}
+html body:is([data-readable-workspace="payment-history"],[data-readable-workspace="registration-history"]) .ph-filter-intro strong {font-size:var(--read-table);}
+html body:is([data-readable-workspace="payment-history"],[data-readable-workspace="registration-history"]) :is(.ph-filter-intro small,.ph-panel-heading p,.ph-list-nav small,.ph-record small,.ph-student small,.ph-payment-overview small,.ph-info-grid small,.ph-lock-note,.ph-note,.du-summary-caption,.du-installment-title small,.du-transaction-meta) {font-size:var(--read-note);line-height:1.6;}
+html body:is([data-readable-workspace="payment-history"],[data-readable-workspace="registration-history"]) .ph-filter-form .field-label {font-size:var(--read-label);line-height:1.5;}
+html body:is([data-readable-workspace="payment-history"],[data-readable-workspace="registration-history"]) .ph-filter-form :is(.field-input,.spp-select-trigger,.search-box,.report-date-range-button) {font-size:var(--read-input);min-height:3rem!important;height:auto!important;max-height:none!important;box-sizing:border-box;}
+html body:is([data-readable-workspace="payment-history"],[data-readable-workspace="registration-history"]) .ph-filter-form .search-box input {font-size:var(--read-input);min-height:3rem;}
+html body:is([data-readable-workspace="payment-history"],[data-readable-workspace="registration-history"]) .report-date-range-value {white-space:normal;overflow:visible;text-overflow:clip;}
+html body:is([data-readable-workspace="payment-history"],[data-readable-workspace="registration-history"]) :is(.ph-panel-heading h3,.ph-payment-box h4,.ph-info-grid h4,.du-installment-title,.ph-empty h3) {font-size:var(--read-panel);line-height:1.4;}
+html body:is([data-readable-workspace="payment-history"],[data-readable-workspace="registration-history"]) .ph-panel-heading {align-items:flex-start;flex-wrap:wrap;gap:.875rem;padding:1.125rem 0;}
+html body:is([data-readable-workspace="payment-history"],[data-readable-workspace="registration-history"]) .ph-panel-heading>div:first-child {min-width:0;flex:1 1 12rem;}
+html body:is([data-readable-workspace="payment-history"],[data-readable-workspace="registration-history"]) :is(.ph-list-nav,.ph-detail-nav) .btn {min-width:2.75rem;min-height:2.75rem;padding:.625rem;}
+html body:is([data-readable-workspace="payment-history"],[data-readable-workspace="registration-history"]) .ph-record {font-size:var(--read-table);line-height:1.5;grid-template-columns:1.75rem 2.625rem minmax(0,1fr) auto auto;gap:.75rem;padding:1rem;}
+html body[data-readable-workspace="payment-history"] .ph-record-identity {grid-column:3;grid-row:1;}
+html body[data-readable-workspace="payment-history"] .ph-record {grid-template-columns:1.75rem 2.625rem minmax(0,1fr) auto minmax(7.5rem,.7fr) 1rem;}
+html body[data-readable-workspace="payment-history"] .ph-record>.kelas-badge {grid-column:4;grid-row:1;justify-self:end;}
+html body[data-readable-workspace="payment-history"] .ph-record>.ph-status {grid-column:4;grid-row:2;justify-self:end;}
+html body[data-readable-workspace="payment-history"] .ph-record>svg {grid-column:6;grid-row:1 / span 2;}
+html body[data-readable-workspace="payment-history"] .ph-record-period {grid-column:3;grid-row:2;}
+html body[data-readable-workspace="payment-history"] .ph-record-total {grid-column:5;grid-row:1 / span 2;text-align:left;overflow-wrap:anywhere;}
+html body:is([data-readable-workspace="payment-history"],[data-readable-workspace="registration-history"]) :is(.ph-record-identity strong,.ph-record-total strong,.du-record-amounts strong,.ph-student h3,.ph-components,.ph-info-grid strong,.ph-info-grid span,.du-installment>header) {font-size:var(--read-table);line-height:1.5;}
+html body:is([data-readable-workspace="payment-history"],[data-readable-workspace="registration-history"]) :is(.ph-record-number,.ph-status,.ph-record .kelas-badge,.ph-student .kelas-badge,.unit-record-badge) {font-size:var(--read-note);line-height:1.5;white-space:normal;}
+html body:is([data-readable-workspace="payment-history"],[data-readable-workspace="registration-history"]) .ph-record-number {width:1.75rem;height:1.75rem;}
+html body:is([data-readable-workspace="payment-history"],[data-readable-workspace="registration-history"]) .ph-student {align-items:flex-start;flex-wrap:wrap;}
+html body:is([data-readable-workspace="payment-history"],[data-readable-workspace="registration-history"]) .ph-student>div:not(.ph-student-period) {flex:1;min-width:8rem;}
+html body:is([data-readable-workspace="payment-history"],[data-readable-workspace="registration-history"]) .ph-student-period {max-width:none;margin-left:0;}
+html body:is([data-readable-workspace="payment-history"],[data-readable-workspace="registration-history"]) .ph-payment-box h4 {flex-wrap:wrap;padding-block:.875rem;}
+html body:is([data-readable-workspace="payment-history"],[data-readable-workspace="registration-history"]) .ph-total {font-size:var(--read-number);line-height:1.4;}
+html body:is([data-readable-workspace="payment-history"],[data-readable-workspace="registration-history"]) .ph-payment-overview {grid-template-columns:minmax(0,1fr);gap:.875rem;}
+html body:is([data-readable-workspace="payment-history"],[data-readable-workspace="registration-history"]) .ph-payment-overview>div+div {border-left:0;border-top:1px solid var(--border);padding:.875rem 0 0;}
+html body:is([data-readable-workspace="payment-history"],[data-readable-workspace="registration-history"]) .ph-components>div {padding:.625rem 0;flex-wrap:wrap;gap:.5rem 1rem;}
+html body:is([data-readable-workspace="payment-history"],[data-readable-workspace="registration-history"]) .ph-components dd {white-space:normal;overflow-wrap:anywhere;margin-left:auto;text-align:right;}
+html body:is([data-readable-workspace="payment-history"],[data-readable-workspace="registration-history"]) .ph-info-grid {grid-template-columns:minmax(0,1fr);}
+html body:is([data-readable-workspace="payment-history"],[data-readable-workspace="registration-history"]) .ph-info-grid :is(h4,strong,span) {overflow-wrap:anywhere;}
+html body:is([data-readable-workspace="payment-history"],[data-readable-workspace="registration-history"]) .ph-detail-actions .btn-tbl {font-size:var(--read-label)!important;min-height:2.75rem;line-height:1.5;padding:.625rem .875rem;white-space:normal;box-sizing:border-box;}
+html body:is([data-readable-workspace="payment-history"],[data-readable-workspace="registration-history"]) .ph-empty {font-size:var(--read-body);line-height:1.6;}
+html body[data-readable-workspace="registration-history"] .du-summary small {font-size:var(--read-label);line-height:1.5;}
+html body[data-readable-workspace="registration-history"] .du-summary strong {font-size:var(--read-number);line-height:1.4;}
+html body[data-readable-workspace="registration-history"] .du-record {grid-template-columns:1.75rem 2.625rem minmax(0,1fr) auto auto;}
+html body[data-readable-workspace="registration-history"] .du-record-identity {grid-column:3;grid-row:1;}
+html body[data-readable-workspace="registration-history"] .du-record-period {grid-column:3;grid-row:2;flex-direction:row;flex-wrap:wrap;align-items:center;}
+html body[data-readable-workspace="registration-history"] .du-record>.ph-status {grid-column:4;grid-row:1;}
+html body[data-readable-workspace="registration-history"] .du-record>svg {grid-column:5;grid-row:1 / span 2;}
+html body[data-readable-workspace="registration-history"] .du-record-amounts {grid-column:3/5;grid-row:3;gap:.875rem 1.5rem;padding-top:.75rem;}
+html body[data-readable-workspace="registration-history"] .du-installment-title {flex-wrap:wrap;align-items:center;}
+
+/* Shared screen controls and overlays on the four additional pages only. */
+html body:is([data-readable-workspace="payment-history"],[data-readable-workspace="registration-history"],[data-readable-workspace="students"],[data-readable-workspace="master-registration"]) .main-content :is(small,.badge-nis,.kelas-badge,.badge-count,.master-status,.recap-status,.unit-record-badge,.du-history-nis) {font-size:var(--read-note);line-height:1.5;}
+html body:is([data-readable-workspace="payment-history"],[data-readable-workspace="registration-history"],[data-readable-workspace="students"]) :is(.du-pagination-info,.du-pagination-info strong,.du-page-link,.du-pagination-footer) {font-size:var(--read-label);line-height:1.5;}
+html body:is([data-readable-workspace="payment-history"],[data-readable-workspace="registration-history"],[data-readable-workspace="students"]) .du-page-link {min-width:2.75rem;min-height:2.75rem;}
+html body:is([data-readable-workspace="payment-history"],[data-readable-workspace="registration-history"],[data-readable-workspace="students"]) :is(.du-page-mobile-label,.student-search-hint,.student-search-empty,.student-search-main small,.student-search-class) {font-size:var(--read-note);line-height:1.5;}
+html body:is([data-readable-workspace="payment-history"],[data-readable-workspace="registration-history"]) .student-search-main strong {font-size:var(--read-table);white-space:normal;overflow:visible;overflow-wrap:anywhere;}
+html body:is([data-readable-workspace="payment-history"],[data-readable-workspace="registration-history"]) .student-search-option {min-height:3rem;padding:.875rem;}
+html body:is([data-readable-workspace="payment-history"],[data-readable-workspace="registration-history"]) .report-date-range-popover label>span {font-size:var(--read-label);line-height:1.5;}
+html body:is([data-readable-workspace="payment-history"],[data-readable-workspace="registration-history"]) .report-date-range-popover input {font-size:var(--read-input);line-height:1.5;min-height:3rem;}
+html body:is([data-readable-workspace="payment-history"],[data-readable-workspace="registration-history"],[data-readable-workspace="master-registration"]) :is(.authorization-modal,.prior-debt-modal,.payment-activity-dialog) {font-size:var(--read-body);line-height:1.5;}
+html body:is([data-readable-workspace="payment-history"],[data-readable-workspace="registration-history"],[data-readable-workspace="master-registration"]) :is(.authorization-modal,.prior-debt-modal,.payment-activity-dialog) :is(h2,h3,.modal-title) {font-size:var(--read-panel);line-height:1.4;}
+html body:is([data-readable-workspace="payment-history"],[data-readable-workspace="registration-history"],[data-readable-workspace="master-registration"]) :is(.payment-activity-dialog-header p,.payment-activity-event time,.prior-debt-modal__eyebrow,.prior-debt-modal__summary span,.prior-debt-student span) {font-size:var(--read-note);line-height:1.6;}
+html body:is([data-readable-workspace="payment-history"],[data-readable-workspace="registration-history"]) :is(.payment-activity-event-heading,.payment-activity-event p,.payment-activity-change,.du-delete-dialog p) {font-size:var(--read-table);line-height:1.6;}
+html body:is([data-readable-workspace="payment-history"],[data-readable-workspace="registration-history"],[data-readable-workspace="master-registration"]) :is(.authorization-modal,.prior-debt-modal) .btn {font-size:var(--read-label)!important;line-height:1.5;min-height:2.75rem;padding:.625rem 1rem;white-space:normal;}
+html body:is([data-readable-workspace="payment-history"],[data-readable-workspace="registration-history"]) :is(.authorization-modal,.payment-activity-dialog) .field-input {font-size:var(--read-input);line-height:1.5;min-height:3rem;}
+html body:is([data-readable-workspace="payment-history"],[data-readable-workspace="registration-history"]) :is(.authorization-modal,.payment-activity-dialog) .field-label {font-size:var(--read-label);line-height:1.5;}
+html body:is([data-readable-workspace="payment-history"],[data-readable-workspace="registration-history"]) .authorization-modal-card {box-sizing:border-box;max-height:calc(100dvh - 2.5rem);overflow-y:auto;}
+html body:is([data-readable-workspace="payment-history"],[data-readable-workspace="registration-history"]) .modal-box :is(h3,.modal-title) {font-size:var(--read-panel);line-height:1.4;}
+html body:is([data-readable-workspace="payment-history"],[data-readable-workspace="registration-history"]) .modal-box p {font-size:var(--read-body)!important;line-height:1.5;}
+
+/* Data Siswa: readable form, locked Advanced values and existing Reset control. */
+html body[data-readable-workspace="students"] .student-hero-copy h1 {font-size:clamp(1.625rem,2vw,1.75rem);line-height:1.3;}
+html body[data-readable-workspace="students"] .student-hero-copy p {font-size:var(--read-body);}
+html body[data-readable-workspace="students"] .student-stat {grid-template-rows:auto minmax(2.75rem,auto) auto;gap:.625rem .75rem;}
+html body[data-readable-workspace="students"] .student-stat span:not(.master-workspace-icon) {font-size:var(--read-label);line-height:1.5;}
+html body[data-readable-workspace="students"] .student-stat strong,html body[data-readable-workspace="students"] .student-stat:last-child strong {font-size:var(--read-number);line-height:1.4;white-space:normal;}
+html body[data-readable-workspace="students"] .student-stat #student-hero-effective {white-space:normal;font-size:var(--read-number);}
+html body[data-readable-workspace="students"] :is(.student-form-heading h2,.student-panel-heading h3,.advanced-switch strong,.card-title,.student-class-history-copy h4) {font-size:var(--read-panel);line-height:1.4;}
+html body[data-readable-workspace="students"] :is(.student-panel-heading p,.payment-auto-note,.student-advanced-info,.student-locked-note,.advanced-switch small,#student-reset-status,.student-class-history-copy p) {font-size:var(--read-note);line-height:1.6;}
+html body[data-readable-workspace="students"] .spp-student-rate-summary span {font-size:var(--read-label);}
+html body[data-readable-workspace="students"] .spp-student-rate-summary strong {font-size:var(--read-number);line-height:1.4;}
+html body[data-readable-workspace="students"] .student-panel-discounts .student-money-grid .field-label {font-size:var(--read-label);line-height:1.5;min-height:3em;}
+html body[data-readable-workspace="students"] .student-workspace .student-money-grid .field-input {font-size:var(--read-input);min-height:3rem;}
+html body[data-readable-workspace="students"] .student-money-grid>.field-row {padding:1rem;}
+html body[data-readable-workspace="students"] .student-filter-bar .search-box {min-height:3rem;height:auto;}
+html body[data-readable-workspace="students"] .student-filter-bar .search-box input {font-size:var(--read-input);min-height:3rem;}
+html body[data-readable-workspace="students"] .main-content :is(.btn-tbl,.student-class-history-toggle) {font-size:var(--read-label)!important;min-height:2.75rem;line-height:1.5;white-space:normal;padding:.625rem .875rem;box-sizing:border-box;}
+html body:is([data-readable-workspace="students"],[data-readable-workspace="master-registration"]) .payment-table th {font-size:var(--read-label);line-height:1.5;padding:1rem;white-space:normal;}
+html body:is([data-readable-workspace="students"],[data-readable-workspace="master-registration"]) .payment-table td {font-size:var(--read-table);line-height:1.5;padding:1rem;}
+html body:is([data-readable-workspace="students"],[data-readable-workspace="master-registration"]) .table-container {max-width:100%;overflow-x:auto;overscroll-behavior-x:contain;}
+
+/* Master Daftar Ulang, including its shared monitoring renderer; SPP is unmarked. */
+html body[data-readable-workspace="master-registration"] :is(.master-modern-hero h1,.du-overview-heading h1) {font-size:clamp(1.625rem,2vw,1.75rem);line-height:1.3;}
+html body[data-readable-workspace="master-registration"] :is(.master-modern-hero p,.du-overview-heading p) {font-size:var(--read-body);line-height:1.6;}
+html body[data-readable-workspace="master-registration"] .master-modern-stats>div {grid-template-rows:auto minmax(2.75rem,auto);gap:.75rem;padding:1.25rem;}
+html body[data-readable-workspace="master-registration"] .master-modern-stats span:not(.master-workspace-icon) {font-size:var(--read-label);line-height:1.5;}
+html body[data-readable-workspace="master-registration"] .du-workspace .master-modern-stats strong {font-size:var(--read-number);line-height:1.4;}
+html body[data-readable-workspace="master-registration"] .master-modern-stats>div {grid-template-rows:minmax(2.5em,auto) minmax(2.75rem,auto);}
+html body[data-readable-workspace="master-registration"] .master-modern-stats>div>div>span {align-self:start;}
+html body[data-readable-workspace="master-registration"] .du-master-year-tools .spp-select-trigger {font-size:var(--read-input);height:auto!important;max-height:none!important;min-height:3rem!important;padding:.75rem;}
+html body[data-readable-workspace="master-registration"] .du-master-year-tools .spp-select-caption {white-space:normal;overflow:visible;text-overflow:clip;overflow-wrap:anywhere;line-height:1.5;}
+html body[data-readable-workspace="master-registration"] :is(.student-panel-heading h3,.du-rate-card h3,.card-title) {font-size:var(--read-panel);line-height:1.4;}
+html body[data-readable-workspace="master-registration"] .student-panel-heading p {font-size:var(--read-note);line-height:1.6;}
+html body[data-readable-workspace="master-registration"] :is(.du-rate-input-row label,.du-rate-input-wrap>span,.master-modern-hero .master-modern-kicker) {font-size:var(--read-label);line-height:1.5;}
+html body[data-readable-workspace="master-registration"] .du-rate-input-row {grid-template-columns:minmax(0,1fr);gap:.5rem;}
+html body[data-readable-workspace="master-registration"] .du-rate-estimate {font-size:var(--read-note);line-height:1.6;gap:.625rem;}
+html body[data-readable-workspace="master-registration"] .du-rate-estimate strong {font-size:var(--read-table);line-height:1.5;}
+html body[data-readable-workspace="master-registration"] .du-total-estimate strong {font-size:var(--read-number);line-height:1.4;}
+html body[data-readable-workspace="master-registration"] .prior-debt-modal__summary strong {font-size:var(--read-number);line-height:1.4;overflow-wrap:anywhere;}
+
+html body:is([data-readable-workspace="payment-history"],[data-readable-workspace="registration-history"]) .main-content .ph-list-panel .du-pagination-info {font-size:var(--read-label);line-height:1.5;}
+html body[data-readable-workspace="students"] .student-hero-copy .breadcrumb {font-size:var(--read-note);line-height:1.5;}
+html body[data-readable-workspace="students"] .class-picker-button span {font-size:var(--read-input);}
+html body[data-readable-workspace="students"] .class-picker-option {font-size:var(--read-input);line-height:1.5;min-height:3rem;padding:.75rem 1rem;}
+html body:is([data-readable-workspace="payment-history"],[data-readable-workspace="registration-history"],[data-readable-workspace="students"]) .main-content .unit-record-pill {font-size:var(--read-note);line-height:1.5;}
+html body[data-readable-workspace="students"] .payment-table td[data-label]::before {font-size:var(--read-label);line-height:1.5;}
+html body[data-readable-workspace="students"] :is(.student-class-history-chevron,.student-class-history-count,.student-class-year,.student-class-timeline-item em) {font-size:var(--read-note);line-height:1.5;}
+html body[data-readable-workspace="students"] .student-class-timeline-item strong {font-size:var(--read-table);white-space:normal;overflow-wrap:anywhere;}
+html body[data-readable-workspace="students"] .student-class-history-copy p {white-space:normal;overflow-wrap:anywhere;}
+html body[data-readable-workspace="students"] .responsive-table .student-class-history-row[hidden] {display:none!important;}
+html body[data-readable-workspace="master-registration"] .recap-class-overline {font-size:var(--read-label);line-height:1.5;}
+html body[data-readable-workspace="master-registration"] .prior-debt-modal__close {min-width:2.75rem;min-height:2.75rem;flex-shrink:0;}
+html body[data-readable-workspace="master-registration"] .prior-debt-student {font-size:var(--read-table);line-height:1.5;flex-wrap:wrap;overflow-wrap:anywhere;}
+html body[data-readable-workspace="payment-history"] .ph-record-period>span {font-size:var(--read-table);}
+/* Keep comfortable controls while trimming excess space around the smaller text. */
+html body:is([data-readable-workspace="payment-history"],[data-readable-workspace="registration-history"]) :is(.ph-detail-body,.du-installment) {padding:1rem;}
+html body:is([data-readable-workspace="payment-history"],[data-readable-workspace="registration-history"]) :is(.authorization-modal-card,.du-delete-dialog,.payment-activity-dialog-header,.payment-activity-content,.modal-box) {padding:1.25rem;}
+html body[data-readable-workspace="students"] .student-workspace-grid {gap:1rem;}
+html body[data-readable-workspace="students"] .student-workspace-grid>.student-panel {padding:1.25rem;}
+html body[data-readable-workspace="students"] .student-workspace .student-money-grid {gap:.75rem;}
+html body[data-readable-workspace="students"] .student-money-grid .field-label {min-height:3em;}
+html body[data-readable-workspace="students"] .student-workspace .master-modern-list {padding:1.25rem;}
+html body[data-readable-workspace="master-registration"] .du-workspace :is(.du-master-hero,.master-modern-card) {padding:1.25rem;}
+@media(max-width:1700px) {
+  html body[data-readable-workspace="master-registration"] .master-modern-hero {grid-template-columns:minmax(0,1fr) minmax(16rem,.65fr);}
+  html body[data-readable-workspace="master-registration"] .master-modern-stats {grid-column:1/-1;grid-row:2;}
+}
+@media(max-width:1450px) {
+  html body[data-readable-workspace="students"] .student-workspace .student-money-grid {grid-template-columns:minmax(0,1fr);}
+  html body[data-readable-workspace="students"] .student-money-grid .field-label {min-height:0;}
+  html body[data-readable-workspace="students"] .student-panel-discounts .student-money-grid .field-label {min-height:0;}
+}
+@media(max-width:1100px) {
+  html body:is([data-readable-workspace="payment-history"],[data-readable-workspace="registration-history"]) .ph-workspace {grid-template-columns:minmax(0,1fr);}
+  html body:is([data-readable-workspace="payment-history"],[data-readable-workspace="registration-history"]) .ph-detail-panel {position:static;}
+  html body:is([data-readable-workspace="payment-history"],[data-readable-workspace="registration-history"]) .layout .ph-filter-form {grid-template-columns:repeat(2,minmax(0,1fr));}
+  html body[data-readable-workspace="registration-history"] .du-summary {grid-template-columns:repeat(2,minmax(0,1fr));}
+}
+@media(max-width:650px) {
+  body:is([data-readable-workspace="payment-history"],[data-readable-workspace="registration-history"],[data-readable-workspace="students"],[data-readable-workspace="master-registration"],[data-readable-workspace="master-fees"],[data-readable-workspace="master-spp"],[data-readable-workspace="master-classes"]) {--read-input:1rem;}
+  html body:is([data-readable-workspace="payment-history"],[data-readable-workspace="registration-history"]) .layout .ph-filter-form {grid-template-columns:minmax(0,1fr);}
+  html body:is([data-readable-workspace="payment-history"],[data-readable-workspace="registration-history"]) .ph-filter-actions {justify-content:flex-start;}
+  html body:is([data-readable-workspace="payment-history"],[data-readable-workspace="registration-history"]) .main-content .ph-record {grid-template-columns:1.75rem minmax(0,1fr);gap:.625rem .75rem;}
+  html body:is([data-readable-workspace="payment-history"],[data-readable-workspace="registration-history"]) .ph-record-icon {display:none;}
+  html body:is([data-readable-workspace="payment-history"],[data-readable-workspace="registration-history"]) .ph-record-identity {grid-column:2;grid-row:1;}
+  html body[data-readable-workspace="payment-history"] .ph-record>.kelas-badge {grid-column:2;grid-row:2;justify-self:start;}
+  html body[data-readable-workspace="payment-history"] .ph-record-period {grid-column:2;grid-row:3;}
+  html body[data-readable-workspace="payment-history"] .ph-record-total {grid-column:2;grid-row:4;display:flex;flex-wrap:wrap;align-items:center;justify-content:space-between;gap:.5rem;border-top:1px solid var(--border);padding-top:.625rem;}
+  html body[data-readable-workspace="payment-history"] .ph-record>.ph-status {grid-column:2;grid-row:5;justify-self:start;}
+  html body:is([data-readable-workspace="payment-history"],[data-readable-workspace="registration-history"]) .ph-record>svg {display:none;}
+  html body[data-readable-workspace="registration-history"] .du-record-period {grid-column:2;grid-row:2;}
+  html body[data-readable-workspace="registration-history"] .du-record>.ph-status {grid-column:2;grid-row:3;justify-self:start;}
+  html body[data-readable-workspace="registration-history"] .du-record-amounts {grid-column:2;grid-row:4;}
+  html body[data-readable-workspace="registration-history"] .du-summary {grid-template-columns:minmax(0,1fr);}
+  html body[data-readable-workspace="students"] .student-stat {grid-template-columns:2.125rem minmax(0,1fr);grid-template-rows:auto minmax(2.75rem,auto) auto;}
+  html body[data-readable-workspace="students"] .student-stat .master-workspace-icon {grid-row:2;width:2.125rem;height:2.125rem;}
+  html body[data-readable-workspace="students"] .student-stat span:not(.master-workspace-icon) {grid-column:1/-1;}
+  html body[data-readable-workspace="students"] .student-stat strong {grid-column:2;}
+  html body[data-readable-workspace="students"] .student-hero-stats {grid-template-columns:minmax(0,1fr);}
+  html body[data-readable-workspace="master-registration"] .master-modern-hero {grid-template-columns:minmax(0,1fr);}
+  html body[data-readable-workspace="master-registration"] .master-modern-stats {grid-column:auto;grid-row:auto;grid-template-columns:minmax(0,1fr);}
+  html body[data-readable-workspace="master-registration"] .du-master-year-tools {padding-left:0;border-left:0;}
+  html body:is([data-readable-workspace="payment-history"],[data-readable-workspace="registration-history"]) .payment-activity-dialog-header {flex-wrap:wrap;padding:1rem;}
+  html body:is([data-readable-workspace="payment-history"],[data-readable-workspace="registration-history"]) .payment-activity-content {padding:1rem;}
+  html body:is([data-readable-workspace="payment-history"],[data-readable-workspace="registration-history"]) .payment-activity-change {grid-template-columns:minmax(0,1fr);}
+}
+
+
+/* Table cell padding must not inflate the compact rombel cards. */
+html body[data-readable-workspace="master-classes"] .class-list-panel[data-rombel-view="cards"] .rombel-data-table td{padding:0!important;height:auto;min-height:0;flex-direction:row;align-items:center;}
+html body[data-readable-workspace="master-classes"] .class-list-panel[data-rombel-view="cards"] td[data-label="Aksi"]{min-height:2.75rem;}
+html body[data-readable-workspace="master-classes"] .class-list-panel[data-rombel-view="cards"] .btn-tbl{padding:.625rem .625rem;}
+html body[data-readable-workspace="master-classes"] .class-list-panel[data-rombel-view="cards"] .aksi-col form{width:auto!important;flex:0 0 auto;}
