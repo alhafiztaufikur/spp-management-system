@@ -38,6 +38,8 @@ Tarif target mengikuti master tahun/kelas dan nominal potongan; jika belum siap,
 
 ## Hak akses
 
+Laporan Global mempunyai cakupan baca tersendiri: Super Admin, Admin, Kasir, dan Bendahara dapat memilih SD/SMP/SMA/Semua Unit pada katalog, sembilan template, dan ekspornya. Pilihan unit laporan tidak mengubah unit operasional atau hak transaksi. Identitas/kelas/operator dan metadata ekspor mengikuti unit laporan; filter yang bergantung pada unit dibersihkan ketika cakupan diganti. Dashboard, surat, dan modul lainnya tetap mengikuti aturan akses sebelumnya. [Verifikasi 10 Oktober 2026](GLOBAL_REPORT_SCOPE_20261010.md).
+
 ### Cakupan Super Admin — 3 Oktober 2026
 
 Sidebar menyimpan SD/SMP/SMA atau **Semua Unit** dalam sesi. Semua Unit hanya untuk baca data, riwayat, laporan, surat, dan pengaturan; baris/rombel/ekspor menyertakan unit. Master tahunan gabungan menampilkan tarif per unit/tahun. Struk, buku Tabungan dan surat individual memakai sekolah pemilik data.

@@ -2,7 +2,10 @@
 session_start();
 require_once '../koneksi.php'; require_once '../includes/auth.php'; require_once '../includes/reports.php';
 requireRole(['admin','bendahara','kasir']);
-$reportUnitId=unit_report_scope($koneksi,(string)($_GET['unit']??''));
+$globalScope=in_array($_GET['template']??'',global_report_templates(),true);
+$unitChoice=global_report_validate_choice($_GET['unit']??'');
+$reportUnitId=$globalScope?global_report_scope($koneksi,$_GET):unit_report_scope($koneksi,$unitChoice);
+$reportScopeQuery=$globalScope?global_report_unit_value($reportUnitId):($reportUnitId===0?'all':'active');
 $registry=report_registry();$template=(string)($_GET['template']??'');if(!isset($registry[$template])){http_response_code(404);exit('Template tidak ditemukan.');}
 $format=(string)($_GET['format']??'preview');if(!in_array($format,['preview','print','pdf','excel'],true))$format='preview';
 $excelDownload=$format==='excel'&&($_GET['download']??'')==='1';

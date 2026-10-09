@@ -1,8 +1,8 @@
 <?php
 require_once __DIR__.'/filter_choices.php';
 function report_multiple_normalize(mysqli $db,array &$source):array{
-    $classes=[];$bounds=($GLOBALS['app_unit_id']??1)===0?[1,12]:unit_level_bounds();foreach(range(...$bounds) as $level)$classes['tingkat:'.$level]='Tingkat '.$level;
-    foreach(report_classes($db) as $class)$classes['rombel:'.$class['id']]=class_label($class);
+    $classes=[];$bounds=($GLOBALS['app_unit_id']??1)===0?[1,12]:report_query_level_bounds();foreach(range(...$bounds) as $level)$classes['tingkat:'.$level]='Tingkat '.$level;
+    foreach(report_classes($db) as $class)$classes['rombel:'.$class['id']]=$class['label'];
     $years=array_column(report_years($db),'label','label');$operators=array_column(report_operator_options($db),'nama','id');
     $spec=[
         'kategori'=>[report_categories($db),($source['template']??'')==='penerimaan'?'semua':'spp','semua'],

@@ -13,7 +13,7 @@ try{
     $categories=report_categories($koneksi);
     modular_assert(isset($categories['psb'])&&$categories['psb']==='Uang PSB','Kategori laporan Uang PSB belum tersedia.');
     foreach(['bangunan','seragam','kegiatan','makan','sorga','infaq'] as $removedCategory)modular_assert(!isset($categories[$removedCategory]),'Kategori lama masih tersedia: '.$removedCategory.'.');
-    modular_assert(array_keys(one_time_fee_components())===['pangkal','psb'],'Registry tagihan satu kali harus hanya memuat Pangkal dan PSB.');
+    modular_assert(array_keys(one_time_fee_components())===['psb'],'Registry tagihan satu kali harus hanya memuat PSB yang sudah mencakup Pangkal.');
     foreach(array_keys(report_registry()) as $template){$f=$filters;if(in_array($template,['penerimaan','setoran'],true))$f['kategori']='semua';if($template==='tabungan-siswa')$f['mode']='buku';$report=report_build($koneksi,$template,$f);modular_assert(isset($report['columns'],$report['rows'],$report['title']),'Kontrak data template '.$template.' tidak lengkap.');}
     $psbStatus=report_status_data($koneksi,array_merge($filters,['kategori'=>'psb']));
     modular_assert($psbStatus['title']==='Uang PSB','Status pembayaran PSB memakai judul yang salah.');

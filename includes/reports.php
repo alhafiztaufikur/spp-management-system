@@ -6,6 +6,7 @@ require_once __DIR__ . '/tagihan_tahunan.php';
 require_once __DIR__ . '/tagihan_sekali.php';
 require_once __DIR__ . '/spp_billing.php';
 require_once __DIR__.'/report_multiple.php';
+require_once __DIR__.'/global_report_scope.php';
 
 function report_e($value): string { return htmlspecialchars((string)$value, ENT_QUOTES, 'UTF-8'); }
 function report_money($value): string { return 'Rp ' . number_format((float)$value, 0, ',', '.'); }
@@ -157,7 +158,7 @@ function report_operator_filter_label(): string {
     return in_array($_SESSION['admin_role'] ?? '', ['admin','super_admin'], true) ? 'Semua admin/kasir' : 'Semua kasir';
 }
 function report_operators(mysqli $db, string $role = ''): array {
-    $unitWhere = ($GLOBALS['app_unit_id'] ?? 1) === 0 ? '' : ' AND unit_id=' . unit_active_id();
+    $unitWhere = ($GLOBALS['app_unit_id'] ?? 1) === 0 ? '' : ' AND unit_id=' . report_query_unit_id();
     if ($role !== '') {
         $stmt = $db->prepare('SELECT id,username,nama,role FROM admin WHERE role=? AND is_active=1' . $unitWhere . ' ORDER BY nama');
         $stmt->bind_param('s', $role);
@@ -166,12 +167,12 @@ function report_operators(mysqli $db, string $role = ''): array {
         $stmt->close();
         return $rows;
     }
-    return $db->query('SELECT id,username,nama,role FROM admin WHERE is_active=1' . ($unitWhere !== '' ? ' AND unit_id='.unit_active_id() : '') . ' ORDER BY nama')->fetch_all(MYSQLI_ASSOC);
+    return $db->query('SELECT id,username,nama,role FROM admin WHERE is_active=1' . ($unitWhere !== '' ? ' AND unit_id='.report_query_unit_id() : '') . ' ORDER BY nama')->fetch_all(MYSQLI_ASSOC);
 }
 function report_operator_options(mysqli $db): array {
     $roles = report_allowed_operator_roles();
     $placeholders = implode(',', array_fill(0, count($roles), '?'));
-    $unitWhere = ($GLOBALS['app_unit_id'] ?? 1) === 0 ? '' : ' AND unit_id=' . unit_active_id();
+    $unitWhere = ($GLOBALS['app_unit_id'] ?? 1) === 0 ? '' : ' AND unit_id=' . report_query_unit_id();
     $stmt = $db->prepare("SELECT id,username,nama,role FROM admin WHERE role IN ($placeholders) AND is_active=1 {$unitWhere} ORDER BY FIELD(role,'admin','kasir'), nama");
     $types = str_repeat('s', count($roles));
     $stmt->bind_param($types, ...$roles);
@@ -185,7 +186,7 @@ function report_operator_filter_value(mysqli $db, string $operator): string {
     if ($operator === '') return '';
     $roles = report_allowed_operator_roles();
     $placeholders = implode(',', array_fill(0, count($roles), '?'));
-    $unitWhere = ($GLOBALS['app_unit_id'] ?? 1) === 0 ? '' : ' AND unit_id=' . unit_active_id();
+    $unitWhere = ($GLOBALS['app_unit_id'] ?? 1) === 0 ? '' : ' AND unit_id=' . report_query_unit_id();
     $stmt = $db->prepare("SELECT id FROM admin WHERE role IN ($placeholders) AND is_active=1 {$unitWhere} AND (CAST(id AS CHAR)=? OR username=? OR nama=?) LIMIT 1");
     $types = str_repeat('s', count($roles)) . 'sss';
     $params = array_merge($roles, [$operator, $operator, $operator]);
@@ -482,7 +483,7 @@ function report_item_data(mysqli $db,array $f):array{
               JOIN siswa s ON s.NO_INDUK=sta.no_induk AND s.unit_id=sta.unit_id
               WHERE ta.label IN ($yearPlaceholders)"
             .report_student_status_where($f).report_class_where($f,'sta')
-            .' AND CAST(sta.kelas AS UNSIGNED) '.($GLOBALS['app_unit_id']===0?'BETWEEN 1 AND 12':unit_level_between_sql())
+            .' AND CAST(sta.kelas AS UNSIGNED) '.($GLOBALS['app_unit_id']===0?'BETWEEN 1 AND 12':report_query_level_sql())
             .' ORDER BY ta.label,sta.kelas_rombel_snapshot,s.NAMA';
         $stmt=$db->prepare($sql);
         $stmt->bind_param(str_repeat('s',count($academicYears)),...$academicYears);
@@ -666,7 +667,7 @@ function report_billing_history_group_students(array $rows): array {
         if($studentNis==='')continue;
         if(!isset($groups[$nis])){
             $groups[$nis]=[
-                'nis'=>$studentNis,'unit_id'=>(int)($row['unit_id']??unit_active_id()),
+                'nis'=>$studentNis,'unit_id'=>(int)($row['unit_id']??report_query_unit_id()),
                 'nis_diknas'=>(string)($row['nis_diknas']??''),
                 'nama'=>(string)($row['nama']??''),
                 'kelas'=>(string)($row['kelas']??'Belum diatur'),
@@ -940,7 +941,7 @@ function report_prior_debt_summary(mysqli $db,string $targetAcademicYear,array $
     ];
 }
 function report_active_regular_student_nis(mysqli $db):array{
-    $rows=$db->query("SELECT NO_INDUK FROM siswa WHERE is_active=1 AND CAST(KELAS AS UNSIGNED) " . ($GLOBALS['app_unit_id'] === 0 ? 'BETWEEN 1 AND 12' : unit_level_between_sql()) . " ORDER BY NO_INDUK")->fetch_all(MYSQLI_ASSOC);
+    $rows=$db->query("SELECT NO_INDUK FROM siswa WHERE is_active=1 AND CAST(KELAS AS UNSIGNED) " . ($GLOBALS['app_unit_id'] === 0 ? 'BETWEEN 1 AND 12' : report_query_level_sql()) . " ORDER BY NO_INDUK")->fetch_all(MYSQLI_ASSOC);
     return array_values(array_filter(array_map(static fn($row)=>(string)($row['NO_INDUK']??''),$rows)));
 }
 function report_settlement_component_summary(array $components): array {
