@@ -3,7 +3,7 @@
 ## Tampilan dan sumber data
 
 - Tab Aktif mempertahankan satu kelompok per tagihan siswa/tahun, termasuk tagihan tanpa pembayaran. Ringkasan menghitung seluruh hasil filter, bukan halaman yang tampil.
-- Daftar kiri dan detail kanan mengikuti komponen visual Riwayat Pembayaran. Filter kelas/tahun/status tetap beberapa pilihan; ukuran halaman tetap tunggal. Nama rombel pada Semua Unit mencantumkan unit.
+- Daftar kiri dan detail kanan mengikuti komponen visual Riwayat Pembayaran. Filter kelas/tahun/status/operator mendukung beberapa pilihan; ukuran halaman tetap tunggal. Nama rombel pada Semua Unit mencantumkan unit.
 - Setiap cicilan menampilkan nominal Daftar Ulang, total transaksi utuh, metode, waktu WIB, pembuat awal, aktivitas terakhir, dan tindakan yang diizinkan.
 - Tab Dihapus membaca snapshot jurnal terakhir per transaksi. Kelompok menggunakan unit, NIS, tahun, dan ID tagihan. Tidak bergantung pada siswa atau pembayaran aktif; tidak menebak rincian dari `U_LAIN`.
 - Arsip menghitung jumlah siswa/periode, transaksi unik, dan nominal Daftar Ulang dihapus. Filter pelunasan hanya berlaku pada Aktif. Arsip tanpa rincian/ID tagihan yang terbukti tidak dihitung; keterangannya tampil pada halaman.
@@ -36,3 +36,11 @@ Pengujian memakai salinan `db_spp_audit_authorization_20261007`; database aktif 
 Fixture HTTP menghapus baris keuangan/pengajuan uji setelah selesai; jurnal uji tetap tersimpan pada salinan karena bersifat tidak dapat dihapus. Fixture model menggunakan rollback. Cookie sesi dan screenshot disimpan di direktori artefak di luar repositori.
 
 Cetak memakai renderer struk yang tersedia; pengujian memeriksa akses dan pratinjau HTML. Hasil kertas fisik/printer belum diuji. Tidak ada migrasi database.
+
+## Filter operator ? 10 Oktober 2026
+
+Pilih satu/beberapa operator lewat dropdown checkbox, lalu Tampilkan Rekap. Pembuat awal transaksi menjadi dasar filter, termasuk arsip yang dihapus oleh petugas lain. Tanpa filter operator, tagihan tanpa pembayaran tetap tampil. Saat filter operator aktif, hanya siswa/periode dengan pembayaran operator terpilih yang tampil dan rincian cicilannya disaring sesuai pilihan.
+
+Ringkasan Pembayaran operator terpilih menjumlahkan komponen Daftar Ulang, bukan total transaksi campuran. Tagihan, total terbayar, sisa, dan status lunas tetap menghitung seluruh pembayaran siswa/periode yang cocok. Arsip menghitung hanya transaksi dan nominal operator terpilih. Parameter `operator[]` diteruskan ke detail awal/AJAX, pagination, tab, dan konteks kembali dari edit/pengajuan.
+
+Verifikasi tambahan: `history_operator_pdf_test.php` dan `history_operator_pdf_browser_test.js` mencakup dua operator pada satu tagihan, saldo utuh, akun nonaktif, dan penghapusan oleh petugas lain.

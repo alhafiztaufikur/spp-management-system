@@ -2,7 +2,7 @@
 
 ## Pemakaian
 
-Pilih tab Transaksi Aktif atau Transaksi Dihapus, atur periode/pencarian, lalu klik kartu transaksi. Detail menampilkan komponen pembayaran, pembuat awal, aktivitas terakhir, waktu, dan nomor transaksi. Pada arsip, periode filter adalah tanggal penghapusan, bukan tanggal bayar.
+Pilih tab Transaksi Aktif atau Transaksi Dihapus, atur periode/pencarian/operator, lalu klik kartu transaksi. Detail menampilkan komponen pembayaran, pembuat awal, aktivitas terakhir, waktu, dan nomor transaksi. Pada arsip, periode filter adalah tanggal penghapusan, bukan tanggal bayar.
 
 Tombol Cetak menghasilkan struk transaksi aktif yang dipilih. Tombol 12 Struk tetap tersedia untuk kelompok tahunan apabila seluruh transaksi boleh dicetak oleh akun tersebut. Transaksi dihapus hanya dapat dibaca; tidak tersedia cetak atau pemulihan.
 
@@ -36,3 +36,11 @@ Pengujian mutasi menggunakan salinan `db_spp_audit_authorization_20261007`; data
 - `readiness_integrity_audit.php`: pemeriksaan integritas keuangan pada salinan sebelum/sesudah.
 
 Tidak ada migrasi, commit, atau push. Perubahan lokal sebelumnya tetap dipertahankan.
+
+## Filter operator ? 10 Oktober 2026
+
+Dropdown Operator menyediakan pencarian nama/username dan checkbox untuk memilih satu atau beberapa petugas. Pilih Semua operator untuk cakupan penuh; Tidak tercatat untuk transaksi tanpa bukti pembuat. Akun nonaktif dan identitas operator historis tetap tersedia dalam cakupan unit. Pilihan baru diterapkan setelah Tampilkan Rekap, kembali ke halaman pertama, dan dipertahankan pada pagination, tab aktif/dihapus, detail, serta kembali dari edit/pengajuan. Reset mengembalikan Semua operator.
+
+Parameter `operator[]` menggunakan ID akun atau `unknown`; `*` berarti semua. Filter memakai event `created` pertama menurut waktu/ID, bukan operator terakhir atau `bayar.user_id`. Filter berlangsung sebelum pagination. Endpoint detail membawa konteks pencarian yang sama; rute kembali hanya `lihat.php` atau `riwayat_daftar_ulang.php` dan dibuat server.
+
+Verifikasi tambahan: `history_operator_pdf_test.php` dan `history_operator_pdf_browser_test.js`, pada salinan database audit terpisah.

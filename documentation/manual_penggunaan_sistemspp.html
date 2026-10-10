@@ -160,7 +160,7 @@
   <section class="page">
     <div class="topline"><strong>SistemSPP</strong><span>06 / Laporan</span></div>
     <div class="eyebrow">PEMERIKSAAN DATA</div><h1>Laporan dan pratinjau ekspor</h1>
-    <p><b>Laporan Umum</b> menyediakan rekap keuangan. <b>Laporan Global</b> berisi laporan khusus sesuai kategori, tanggal, tahun ajaran, kelas, status, operator, dan pencarian siswa. Pilih cakupan unit terlebih dahulu bila memakai Super Admin.</p>
+    <p><b>Laporan Transaksi</b> menyediakan rekap keuangan. <b>Laporan Global</b> berisi laporan khusus sesuai kategori, tanggal, tahun ajaran, kelas, status, operator, dan pencarian siswa. Pilih cakupan unit terlebih dahulu bila memakai Super Admin.</p>
     <div class="steps"><ol><li>Buka <b>Laporan Global</b> dan pilih jenis laporan.</li><li>Atur filter, pilih <b>Baris/Halaman</b>, lalu tekan <b>Tampilkan Rekap</b>.</li><li>Periksa jumlah baris, nama siswa, periode, serta total. Gunakan <b>Reset</b> bila ingin kembali ke filter awal.</li><li>Pilih <b>Cetak</b>, <b>PDF</b>, atau <b>Excel</b>. Periksa halaman pratinjau lebih dahulu, kemudian cetak atau unduh dari halaman itu.</li></ol></div>
     <h2>Jenis Laporan Global</h2>
     <table><tbody>
@@ -212,7 +212,7 @@
       <tr><td>Pembayaran</td><td>Input Pembayaran 12 | Riwayat Pembayaran 13 | Riwayat Daftar Ulang 13 | Titipan SPP 14 | Otorisasi Transaksi / Pengajuan Saya / Riwayat Otorisasi 14</td></tr>
       <tr><td>Data Master</td><td>Data Siswa 15 | Master Kelas/Rombel 16 | Master Penerbitan SPP 16 | Master Biaya Lain 17 | Master Daftar Ulang 17</td></tr>
       <tr><td>Tabungan</td><td>Tabungan Masuk 18 | Tabungan Keluar 18 | Riwayat Tabungan 19 | Cetak Tabungan 19</td></tr>
-      <tr><td>Laporan</td><td>Laporan Umum 20 | Laporan Global 21-32 | Surat Laporan 33</td></tr>
+      <tr><td>Laporan</td><td>Laporan Transaksi 20 | Laporan Global 21-32 | Surat Laporan 33</td></tr>
       <tr><td>Pengaturan</td><td>Role Management 34 (khusus Super Admin)</td></tr>
     </tbody></table>
     <h2>Arti istilah pada laporan</h2>
@@ -328,10 +328,10 @@
     <div class="eyebrow">MUTASI SALDO SISWA</div><h1>Tabungan Masuk dan Tabungan Keluar</h1>
     <p class="lead">Tabungan memakai saldo terpisah dari tagihan sekolah. Pada kedua menu, pilih siswa terlebih dahulu agar NIS, nama, kelas, dan saldo terisi otomatis.</p>
     <h2>Tabungan Masuk</h2>
-    <div class="steps"><ol><li>Cari siswa dengan nama atau NIS; klik hasil yang benar.</li><li>Periksa saldo awal, tanggal setoran, nominal masuk, dan keterangan opsional.</li><li>Simpan setelah uang diterima. Pastikan transaksi muncul di Riwayat Tabungan dan saldo bertambah.</li></ol></div>
+    <div class="steps"><ol><li>Cari siswa dengan nama atau NIS; klik hasil yang benar.</li><li>Periksa saldo awal, tanggal setoran, nominal masuk, dan keterangan opsional.</li><li>Simpan setelah uang diterima. Pastikan transaksi muncul di Riwayat Tabungan dan saldo bertambah. Tawaran <b>Ya, cetak buku</b> membuka buku tabungan lengkap.</li></ol></div>
     <h2>Tabungan Keluar</h2>
-    <div class="steps"><ol><li>Pilih siswa dan periksa saldo tabungan saat ini.</li><li>Isi tanggal penarikan, nominal keluar, dan keterangan yang menjelaskan penyerahan uang.</li><li>Pastikan nominal tidak melebihi saldo tersedia, lalu simpan. Periksa saldo sesudahnya di riwayat.</li></ol></div>
-    <div class="card"><h3>Contoh</h3><p>Saldo awal Rp100.000; setoran Rp20.000; penarikan Rp30.000. Saldo akhir Rp90.000. Laporan Kas Tabungan Harian menunjukkan arus masuk dan keluar pada tanggal transaksi, sedangkan Rekap Saldo Tabungan menunjukkan saldo saat ini.</p></div>
+    <div class="steps"><ol><li>Pilih siswa dan periksa saldo tabungan saat ini.</li><li>Isi tanggal penarikan, nominal keluar, dan keterangan yang menjelaskan penyerahan uang.</li><li>Pastikan nominal tidak melebihi saldo tersedia, lalu simpan. Periksa saldo sesudahnya di riwayat; cetak buku lengkap bila diperlukan.</li></ol></div>
+    <div class="card"><h3>Contoh</h3><p>Saldo awal Rp500.000; setoran Rp100.000 tercatat pada baris baru dengan saldo Rp600.000. Bila saldo Rp500.000 ditarik Rp100.000, baris baru menunjukkan saldo Rp400.000. Laporan Kas Tabungan Harian menunjukkan arus masuk dan keluar pada tanggal transaksi, sedangkan Rekap Saldo Tabungan menunjukkan saldo saat ini.</p></div>
     <div class="warning">Jika siswa salah dipilih, hentikan sebelum menyimpan. Jangan gunakan menu tabungan untuk melunasi SPP atau Daftar Ulang.</div>
     <div class="footer">Manual Penggunaan SistemSPP | 18</div>
   </section>
@@ -343,14 +343,14 @@
     <p>Atur rentang tanggal transaksi dan cari siswa untuk melihat setoran serta penarikan. Bagian ringkasan menunjukkan total masuk, total keluar, dan jumlah transaksi sesuai filter. Daftar saldo siswa membantu menemukan siswa dengan saldo tertentu.</p>
     <div class="steps"><ol><li>Pilih rentang tanggal dan siswa, lalu tampilkan riwayat.</li><li>Baca tanggal, jenis mutasi, nominal masuk/keluar, dan saldo setelah transaksi bila tersedia.</li><li>Jika perlu laporan formal, buka <b>Cetak Laporan</b> atau jenis tabungan di Laporan Global.</li></ol></div>
     <h2>Cetak Tabungan</h2>
-    <p>Menu ini menyiapkan buku tabungan untuk seorang siswa. Pilih kelas bila perlu, cari siswa, lalu periksa identitas dan pratinjau buku. Tekan <b>Pratinjau &amp; Cetak</b> setelah siswa dan mutasinya benar; cetak dari halaman pratinjau sesuai kebutuhan.</p>
+    <p>Menu ini menyiapkan buku tabungan untuk seorang siswa. Pilih kelas bila perlu, cari siswa, lalu periksa identitas dan pratinjau buku. Tekan <b>Pratinjau &amp; Cetak</b> setelah siswa dan mutasinya benar; buka PDF dari halaman pratinjau. Tombol <b>Cetak Buku Tabungan</b> pada riwayat/detail transaksi menghasilkan buku lengkap yang sama. Kolom Jumlah menunjukkan saldo berjalan per baris; cetak ulang tidak menambah transaksi. Cetak pada kertas A5 potret, skala 100%, dua sisi dengan pembalikan sisi pendek, lalu lipat menjadi buku A6 lanskap.</p>
     <div class="card"><h3>Jika saldo tidak cocok</h3><p>Samakan unit, siswa, dan rentang tanggal. Riwayat yang difilter tanggal bisa hanya menampilkan sebagian mutasi; saldo terkini dihitung dari seluruh transaksi siswa.</p></div>
     <div class="footer">Manual Penggunaan SistemSPP | 19</div>
   </section>
 
   <section class="page">
     <div class="topline"><strong>SistemSPP</strong><span>Laporan / Umum</span></div>
-    <div class="eyebrow">REKAP KEUANGAN</div><h1>Laporan Umum</h1>
+    <div class="eyebrow">REKAP KEUANGAN</div><h1>Laporan Transaksi</h1>
     <p class="lead">Menu ini memberi rekap keuangan berdasarkan tanggal transaksi atau periode terpilih. Gunakan ketika perlu melihat pembayaran secara umum sebelum membuka laporan khusus.</p>
     <h2>Memakai filter</h2>
     <div class="steps"><ol><li>Tentukan tanggal mulai dan akhir transaksi.</li><li>Pilih <b>Jenis laporan</b>, pengurutan, dan <b>Per Halaman</b>. Cari siswa bila hanya ingin transaksi satu siswa.</li><li>Tampilkan hasil dan baca kartu total serta rincian komponen.</li><li>Untuk bukti transaksi, gunakan <b>Cetak</b> pada baris yang sesuai. Gunakan <b>Cetak Dipilih</b> setelah mencentang baris yang benar.</li></ol></div>

@@ -2,7 +2,7 @@
 /** Exercises real handlers against a disposable clone; restores every fixture. */
 if(PHP_SAPI!=='cli'||getenv('SPP_TEST_ALLOW_MUTATION')!=='1'||!preg_match('/^db_spp_audit_[a-z0-9_]+$/D',(string)getenv('SPP_DB_NAME')))exit(1);
 ob_start();
-require_once __DIR__.'/../koneksi.php';require_once __DIR__.'/http_form_scope.php';
+require_once __DIR__.'/../koneksi.php';require_once __DIR__.'/http_form_scope.php';require_once __DIR__.'/../includes/savings_book_print.php';
 $base=rtrim((string)getenv('SPP_HTTP_BASE'),'/');spp_test_assert_http_clone($base,DB_NAME);
 function sw_assert(bool $ok,string $why):void{if(!$ok)throw new RuntimeException($why);}
 function sw_session(int $actor,int $unit):array{
@@ -24,10 +24,55 @@ $artifacts=[];$cleanup=[];$keys=[];$added=[];
 try{
 foreach([1,2,3] as $unit){
     unit_set_context($koneksi,$unit);
-    $student=$koneksi->query('SELECT id,NO_INDUK,NAMA FROM siswa WHERE is_active=1 ORDER BY id LIMIT 1')->fetch_assoc();$nis=$student['NO_INDUK'];
+    $student=$koneksi->query('SELECT s.id,s.NO_INDUK,s.NAMA FROM siswa s WHERE s.is_active=1 AND NOT EXISTS(SELECT 1 FROM transaksi_m m WHERE m.NO_INDUK=s.NO_INDUK AND m.unit_id=s.unit_id) AND NOT EXISTS(SELECT 1 FROM transaksi_k k WHERE k.NO_INDUK=s.NO_INDUK AND k.unit_id=s.unit_id) AND NOT EXISTS(SELECT 1 FROM tabungan t WHERE t.NO_INDUK=s.NO_INDUK AND t.unit_id=s.unit_id AND t.SALDO<>0) ORDER BY s.id LIMIT 1')->fetch_assoc();sw_assert((bool)$student,'No zero-balance student available for savings fixture');$nis=$student['NO_INDUK'];
     $s=$koneksi->prepare('SELECT SALDO FROM tabungan WHERE NO_INDUK=?');$s->bind_param('s',$nis);$s->execute();$old=$s->get_result()->fetch_assoc();$s->close();$cleanup[$unit]=['nis'=>$nis,'old'=>$old];
     $accounts=[];foreach(['admin','kasir','bendahara'] as $role){$s=$koneksi->prepare('SELECT id FROM admin WHERE unit_id=? AND role=? AND is_active=1 ORDER BY id LIMIT 1');$s->bind_param('is',$unit,$role);$s->execute();$accounts[$role]=(int)$s->get_result()->fetch_row()[0];$s->close();}
     $cookies=[];foreach($accounts+['super_admin'=>$super] as $role=>$id)$cookies[$role]=sw_session($id,$unit);
+    // Every save appends a new row; both print entrypoints show the complete current book.
+    foreach ([['masuk',500000,500000],['masuk',100000,600000],['keluar',100000,500000],['keluar',100000,400000]] as $step=>$mutation) {
+        [$kind,$amount,$expectedBalance]=$mutation;
+        $fields=sw_form($cookies['kasir'],$kind);$keys[]=$fields['request_key'];
+        $post=$fields+['no_induk'=>$nis,'nominal'=>(string)$amount,'keterangan'=>'UJI BUKU SALDO BERJALAN'];
+        $saved=sw_http('tabungan/proses.php',$cookies['kasir'],$post);
+        sw_assert($saved['status']===302&&str_contains($saved['location'],'jenis='.$kind),'Running balance save failed');
+        parse_str(parse_url($saved['location'],PHP_URL_QUERY),$selection);
+        $added[$unit][$kind==='masuk'?'transaksi_m':'transaksi_k'][]=(int)$selection['id'];
+        sw_http('tabungan/proses.php',$cookies['kasir'],$post);
+        [$bookStudent,$bookModel]=savings_book_load($koneksi,$nis,(int)$student['id'],$unit);
+        sw_assert(count($bookModel['entries'])===$step+1&&$bookModel['balance']===$expectedBalance*100,'Save/replay did not append exactly one row or balance differs');
+        sw_assert(array_column($bookModel['entries'],'saldo')===array_slice([50000000,60000000,50000000,40000000],0,$step+1),'Prior running balances changed');
+        $route='tabungan/cetak_struk.php?'.http_build_query($selection);
+        $preview=sw_http($route,$cookies['kasir']);
+        sw_assert($preview['status']===200&&str_contains($preview['body'],($step+1).' transaksi')&&str_contains($preview['body'],'<iframe'),'Saved transaction does not print the complete book');
+        sw_assert(str_contains($preview['body'],'cetak_struk.php?')&&str_contains($preview['body'],'output=pdf'),'PDF link bypasses transaction authorization');
+        $history=sw_http('tabungan/'.$saved['location'],$cookies['kasir']);
+        sw_assert(str_contains($history['body'],'id="sw-print-modal"')&&str_contains($history['body'],'Ya, cetak buku'),'Book prompt missing after commit');
+        sw_assert(!str_contains(sw_http('tabungan/'.$saved['location'],$cookies['kasir'])['body'],'id="sw-print-modal"'),'Prompt repeated');
+        if ($step===3) {
+            $bookRoute='tabungan/cetak_buku.php?'.http_build_query(['nis'=>$nis,'student_id'=>$student['id']]);
+            $regular=sw_http($bookRoute,$cookies['kasir']);
+            sw_assert($regular['status']===200&&str_contains($regular['body'],'4 transaksi'),'Regular book preview differs');
+            foreach (['saved'=>$route.'&output=pdf','regular'=>$bookRoute.'&output=pdf'] as $label=>$pdfRoute) {
+                $pdf=sw_http($pdfRoute,$cookies['kasir']);sw_assert($pdf['status']===200&&str_starts_with($pdf['body'],'%PDF'),'Book PDF failed: '.$label);
+                if($dir=getenv('SPP_QA_DIR'))file_put_contents($dir.'/running-'.$unit.'-'.$label.'.pdf',$pdf['body']);
+            }
+            sw_assert(sw_http($route.'&nis=invalid&student_id=999999&unit_id=999',$cookies['kasir'])['status']===200,'URL override changed authorized student');
+            sw_assert(sw_http($route.'&output[]=pdf',$cookies['kasir'])['status']===400,'Array output accepted');
+            sw_assert(sw_http($route.'&output=invalid',$cookies['kasir'])['status']===400,'Invalid output accepted');
+            sw_assert(sw_http($route.'&output=pdf',[])['status']===401,'Anonymous PDF accepted');
+            sw_assert(sw_http($route,$cookies['kasir'],[])['status']===405,'POST print accepted');
+            $foreignId=(int)$koneksi->query("SELECT id FROM admin WHERE role='admin' AND unit_id<>".$unit.' LIMIT 1')->fetch_row()[0];
+            sw_assert(sw_http($route.'&output=pdf',sw_session($foreignId,$unit))['status']===404,'Cross-unit PDF leaked');
+            sw_assert(sw_http($route,sw_session($super,0))['status']===200,'All-units book print failed');
+            [$afterStudent,$afterPrint]=savings_book_load($koneksi,$nis,(int)$student['id'],$unit);
+            sw_assert(count($afterPrint['entries'])===4&&$afterPrint['balance']===40000000,'Printing changed ledger or balance');
+
+            foreach(['admin','bendahara'] as $other)sw_assert(sw_http($route.'&output=pdf',$cookies[$other])['status']===403,'PDF allowed foreign owner');
+            $koneksi->query("UPDATE tabungan SET SALDO=SALDO+1 WHERE NO_INDUK='".$koneksi->real_escape_string($nis)."'");
+            try {sw_assert(sw_http($route,$cookies['kasir'])['status']===409&&sw_http($route.'&output=pdf',$cookies['kasir'])['status']===409,'Balance mismatch not blocked');}
+            finally {$koneksi->query("UPDATE tabungan SET SALDO=SALDO-1 WHERE NO_INDUK='".$koneksi->real_escape_string($nis)."'");}
+        }
+    }
     foreach(['admin','kasir'] as $role){
         $fields=sw_form($cookies[$role],'masuk');$keys[]=$fields['request_key'];
         $post=$fields+['no_induk'=>$nis,'nominal'=>'200','keterangan'=>'UJI STRUK <b>& nominal'];
@@ -35,16 +80,16 @@ foreach([1,2,3] as $unit){
         $result=sw_http('tabungan/proses.php',$cookies[$role],$post);sw_assert($result['status']===302&&str_contains($result['location'],'jenis=masuk'),'Successful save redirect');parse_str(parse_url($result['location'],PHP_URL_QUERY),$ref);$id=(int)$ref['id'];$added[$unit]['transaksi_m'][]=$id;
         sw_assert(sw_http('tabungan/proses.php',$cookies[$role],$post)['status']===302,'Replay response');
         $detail=sw_http('tabungan/detail.php?jenis=masuk&id='.$id,$cookies[$role]);$data=json_decode($detail['body'],true);sw_assert($detail['status']===200&&$data['transaction']['owner_id']===$accounts[$role]&&$data['transaction']['can_print'],'Owner capability');
-        $struk=sw_http('tabungan/cetak_struk.php?jenis=masuk&id='.$id,$cookies[$role]);sw_assert($struk['status']===200&&str_contains($struk['body'],'Rp 200')&&str_contains($struk['body'],'&lt;b&gt;&amp; nominal'),'Receipt content escaping');
+        $struk=sw_http('tabungan/cetak_struk.php?jenis=masuk&id='.$id,$cookies[$role]);sw_assert($struk['status']===200&&str_contains($struk['body'],'Buku Tabungan')&&str_contains($struk['body'],'<iframe'),'Receipt content escaping');
         foreach(['admin','kasir','bendahara'] as $other)if($other!==$role){sw_assert(sw_http('tabungan/cetak_struk.php?jenis=masuk&id='.$id,$cookies[$other])['status']===403,'Foreign owner print permitted');$d=json_decode(sw_http('tabungan/detail.php?jenis=masuk&id='.$id,$cookies[$other])['body'],true);sw_assert($d['ok']&&!$d['transaction']['can_print'],'Foreign owner view/capability');}
         $history=sw_http('tabungan/'.$result['location'],$cookies[$role]);sw_assert(str_contains($history['body'],'id="sw-print-modal"'),'Post-commit prompt absent');sw_assert(!str_contains(sw_http('tabungan/'.$result['location'],$cookies[$role])['body'],'id="sw-print-modal"'),'Prompt repeated');
     }
     // Treasury owns historical numeric-ID transactions; a textual legacy value cannot establish ownership.
     foreach([(string)$accounts['bendahara'],'Unknown legacy account'] as $owner){$s=$koneksi->prepare('INSERT INTO transaksi_m(NO_INDUK,TANGGAL,MASUK,KELUAR,user_id,keterangan) VALUES(?,NOW(),100,0,?,?)');$note='UJI PEMILIK';$s->bind_param('sss',$nis,$owner,$note);$s->execute();$id=(int)$koneksi->insert_id;$s->close();$added[$unit]['transaksi_m'][]=$id;
+        $u=$koneksi->prepare('UPDATE tabungan SET SALDO=SALDO+100 WHERE NO_INDUK=?');$u->bind_param('s',$nis);$u->execute();$u->close();
         $allowed=ctype_digit($owner);sw_assert(sw_http('tabungan/cetak_struk.php?jenis=masuk&id='.$id,$cookies['bendahara'])['status']===($allowed?200:403),'Treasury/legacy ownership');sw_assert(sw_http('tabungan/cetak_struk.php?jenis=masuk&id='.$id,$cookies['super_admin'])['status']===200,'Super print');
     }
-    $s=$koneksi->prepare('UPDATE tabungan SET SALDO=SALDO+200 WHERE NO_INDUK=?');$s->bind_param('s',$nis);$s->execute();$s->close();
-    $fields=sw_form($cookies['kasir'],'keluar');$keys[]=$fields['request_key'];$balance=(float)($old['SALDO']??0)+600;
+    $fields=sw_form($cookies['kasir'],'keluar');$keys[]=$fields['request_key'];$balance=400000.0+600.0;
     $post=$fields+['no_induk'=>$nis,'nominal'=>(string)(int)($balance+1),'keterangan'=>'UJI PENARIKAN'];
     sw_http('tabungan/proses.php',$cookies['kasir'],$post);
     $check=json_decode(sw_http('tabungan/get_saldo.php?nis='.urlencode($nis),$cookies['kasir'])['body'],true);sw_assert((float)$check['saldo']===$balance,'Overdraw changed balance');

@@ -18,7 +18,7 @@ Pemohon dapat membatalkan pengajuan sendiri yang masih menunggu. Semua Unit meru
 3. Super Admin memilih unit pengajuan, memeriksa perbandingan, kemudian menyetujui atau menolak. Catatan penolakan wajib diisi.
 4. Buka tab Riwayat untuk memantau hasil keputusan dan perubahan langsung. Riwayat tetap tersedia setelah pembayaran dihapus.
 5. Gunakan Lihat Riwayat Lengkap untuk melihat operator, alasan/catatan, dan perubahan sebelum/usulan/sesudah.
-6. Khusus Super Admin, Export PDF membuka pratinjau. Dokumen mencakup seluruh transaksi hasil filter, termasuk halaman yang tidak sedang tampil, dengan ringkasan dan kronologi lengkap.
+6. Khusus Super Admin, centang transaksi pada tab Riwayat lalu klik Cetak Terpilih. Pilihan bertahan lintas halaman dan refresh, serta kosong saat filter/unit berubah. Pilih semua di halaman ini dan Bersihkan pilihan memudahkan pengaturan. Cetak Semua Hasil Filter tetap mencakup seluruh halaman. Kedua opsi membuka pratinjau dengan ringkasan dan kronologi lengkap.
 
 Filter mencocokkan aktivitas dalam riwayat; kartu menunjukkan aktivitas terakhir transaksi. Jumlah hasil menghitung transaksi, bukan jumlah kejadian. Nama/operator yang tidak mempunyai bukti ditulis “Tidak tercatat”. Timeline tidak membuat langkah tambahan yang tidak ada dalam sumber.
 
@@ -49,3 +49,11 @@ Tidak ada migrasi, perubahan data keuangan aktif, commit, atau push. Perubahan l
 Persetujuan edit/hapus, penolakan, dan pembatalan menggunakan dialog modern dengan identitas transaksi, dampak tindakan, Batal, serta konfirmasi. Alasan penolakan divalidasi sebelum dialog dibuka. Escape membatalkan konfirmasi dan fokus kembali ke tombol pemicu.
 
 Admin, Kasir, dan Bendahara menerima HTTP 403 pada endpoint PDF untuk seluruh bentuk output. Pembatasan tidak bergantung pada tombol. Riwayat Pembayaran tetap dapat dibaca seluruh petugas dalam unit, tetapi edit/hapus/cetak mengikuti pembuat awal dan hak peran; lihat RIWAYAT_PEMBAYARAN.md.
+
+## Cetak terpilih ? 10 Oktober 2026
+
+`POST otorisasi_export_pdf.php` menerima `csrf_token`, satu field JSON `transactions` berisi daftar `{unit_id, payment_id}`, serta filter `kind`, `status`, dan `q`. Hanya Super Admin yang dapat memakai endpoint; POST pada Semua Unit merupakan pembacaan laporan dan tidak mengubah data keuangan. Pilihan harus cocok dengan filter dan cakupan sesi. Duplikasi dihapus, pilihan kosong/tidak valid ditolak, dan urutan dokumen mengikuti daftar riwayat.
+
+Setelah validasi, server mengalihkan ke pratinjau menggunakan `selection_token` acak yang terikat akun/unit/filter dan berlaku dua jam. Unduhan `output=pdf` memakai token yang sama. Token tidak valid, kedaluwarsa, atau pilihan yang tidak lagi cocok ditolak; tidak pernah dialihkan menjadi cetak semua. Maksimal 10.000 identitas per permintaan dan 32 pilihan cetak tersimpan per sesi. Ringkasan dan kronologi seluruh transaksi terpilih, termasuk yang sudah dihapus, tetap tersedia.
+
+Verifikasi tambahan: `history_operator_pdf_test.php` memeriksa pratinjau/PDF, duplikasi, pilihan di luar filter/unit, token kedaluwarsa, CSRF dan penolakan tiga peran lain. `history_operator_pdf_browser_test.js` memeriksa checkbox terpisah dari detail, pilihan lintas halaman/refresh, reset filter/unit, tema, serta tampilan responsif.

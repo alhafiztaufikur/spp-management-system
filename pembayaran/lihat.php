@@ -10,6 +10,7 @@ require_once '../includes/pagination.php';
 require_once '../includes/transaction_authorization.php';
 require_once '../includes/payment_archive.php';
 require_once '../includes/payment_history.php';
+require_once '../includes/history_operator_filter.php';
 requireRole(['admin', 'kasir', 'bendahara']);
 if (empty($_SESSION['csrf_payment'])) $_SESSION['csrf_payment'] = bin2hex(random_bytes(32));
 
@@ -63,17 +64,21 @@ if ($filter_tanggal_awal > $filter_tanggal_akhir) {
 $allowedPageSizes = [10, 25, 50];
 $perPage = page_size_param('per_page', $allowedPageSizes, 10);
 $page = page_int_param('page');
+$operatorOptions = history_operator_options($koneksi);
+try { $operators = history_operator_choices($_GET['operator'] ?? null, $operatorOptions); }
+catch (InvalidArgumentException $error) { http_response_code(400); exit(htmlspecialchars($error->getMessage(),ENT_QUOTES,'UTF-8')); }
 
 $isArchive = ($_GET['view'] ?? '') === 'deleted';
 if ($isArchive) {
     $archive = payment_archive_page($koneksi, $filter_tanggal_awal, $filter_tanggal_akhir, $search,
-        max(0,(int)($_GET['student_id']??0)), $page, $perPage);
+        max(0,(int)($_GET['student_id']??0)), $page, $perPage, $operators);
     $paymentRows = $archive['rows']; $totalPayments = $archive['total'];
     $totalPages = $archive['pages']; $page = $archive['page']; $offset = $archive['offset'];
 } else {
 $where = "WHERE 1=1".unit_student_selection_where();
 $params = [];
 $types  = '';
+$where .= history_operator_where($koneksi,$operators,'p.id','p.unit_id');
 $where .= " AND p.TGL_BYR >= ? AND p.TGL_BYR < ?";
 $params[] = $filter_tanggal_awal . ' 00:00:00';
 $params[] = date('Y-m-d H:i:s', strtotime($filter_tanggal_akhir . ' +1 day'));
@@ -156,6 +161,7 @@ $studentOptions = $koneksi->query("SELECT s.id AS student_id,s.NO_INDUK,s.unit_i
 $studentSearchDisplay = $search;
 $displayMatches=array_values(array_filter($studentOptions,static fn($o)=>(int)($_GET['student_id']??0)>0 ? (int)$o['student_id']===(int)$_GET['student_id'] : ($search!==''&&($search===$o['NO_INDUK']||$search===(string)($o['NO_induk_diknas']??'')))));
 if(count($displayMatches)===1)$studentSearchDisplay=$displayMatches[0]['NAMA'];
+filter_output_start();
 ?>
 <!DOCTYPE html>
 <html lang="id" data-palette="<?= unit_palette_for_view(isset($reportUnitId) ? (int)$reportUnitId : null) ?>">
@@ -229,7 +235,7 @@ if(count($displayMatches)===1)$studentSearchDisplay=$displayMatches[0]['NAMA'];
       <header class="ph-hero"><div class="ph-hero-copy"><span class="ph-hero-icon"><?= authorization_icon('receipt') ?></span><div><h1>Riwayat Pembayaran Siswa</h1><p>Kelola dan pantau seluruh riwayat transaksi pembayaran siswa.</p></div></div><nav class="ph-tabs" aria-label="Jenis riwayat pembayaran"><a href="<?= htmlspecialchars($activeTabUrl) ?>" <?= !$isArchive?'aria-current="page"':'' ?>>Transaksi Aktif</a><a href="<?= htmlspecialchars($archiveTabUrl) ?>" <?= $isArchive?'aria-current="page"':'' ?>>Transaksi Dihapus</a></nav></header>
       <section class="ph-filter-card">        <form method="GET" action="lihat.php" class="ph-filter-form"><input type="hidden" name="student_id" data-student-identity="1" value="<?= max(0,(int)($_GET['student_id']??0)) ?>">
           <input type="hidden" name="view" value="<?= $isArchive ? "deleted" : "active" ?>">
-          <div class="ph-filter-intro"><?= authorization_icon('filter') ?><div><strong>Filter Riwayat</strong><small>Pilih periode dan siswa yang ingin ditampilkan.</small></div></div>
+          <div class="ph-filter-intro"><?= authorization_icon('filter') ?><div><strong>Filter Riwayat</strong><small>Pilih periode, siswa, dan operator yang ingin ditampilkan.</small></div></div>
           <div class="field-row report-date-range-field">
             <label class="field-label"><?= $isArchive ? "Tanggal Penghapusan" : "Tanggal Transaksi" ?></label>
             <div class="report-date-range-control report-date-range-picker" data-range-picker data-empty-label="<?= htmlspecialchars($periodLabel) ?>">
@@ -259,6 +265,7 @@ if(count($displayMatches)===1)$studentSearchDisplay=$displayMatches[0]['NAMA'];
               <?php endforeach; ?>
             </datalist>
           </div>
+          <?php history_operator_field($operatorOptions,'payment-history-operator'); ?>
           <div class="field-row"><label class="field-label">Data per halaman</label><select class="field-input field-select filter-sel" name="per_page" aria-label="Jumlah pembayaran per halaman">
             <?php foreach ($allowedPageSizes as $pageSize): ?>
             <option value="<?= $pageSize ?>" <?= $perPage === $pageSize ? 'selected' : '' ?>><?= $pageSize ?> / halaman</option>
@@ -280,7 +287,7 @@ if(count($displayMatches)===1)$studentSearchDisplay=$displayMatches[0]['NAMA'];
       </div>
       <?php render_pagination('lihat.php',$paymentPaginationQuery,$page,$totalPages,$totalPayments,$perPage,'transaksi'); ?>
       </section>
-      <section class="ph-detail-panel" data-payment-detail-panel><header class="ph-panel-heading"><div><h3><?= authorization_icon('history') ?> Detail Transaksi</h3><p>Informasi lengkap transaksi pembayaran siswa.</p></div><div class="ph-detail-nav"><button type="button" class="btn btn-ghost btn-sm" data-payment-prev aria-label="Transaksi sebelumnya"><?= authorization_icon('left') ?></button><button type="button" class="btn btn-ghost btn-sm" data-payment-next aria-label="Transaksi berikutnya"><?= authorization_icon('right') ?></button><button type="button" class="btn btn-ghost btn-sm" data-payment-close aria-label="Tutup detail"><?= authorization_icon('close') ?></button></div></header><div class="ph-detail-body" data-payment-detail aria-live="polite"><?php if($selectedModel): payment_history_render($selectedModel); else: ?><p class="ph-empty"><?= authorization_escape($detailError??'Pilih transaksi pada daftar untuk melihat detail.') ?></p><?php endif; ?></div></section>
+      <section class="ph-detail-panel" data-payment-detail-panel><header class="ph-panel-heading"><div><h3><?= authorization_icon('history') ?> Detail Transaksi</h3><p>Informasi lengkap transaksi pembayaran siswa.</p></div><div class="ph-detail-nav"><button type="button" class="btn btn-ghost btn-sm" data-payment-prev aria-label="Transaksi sebelumnya"><?= authorization_icon('left') ?></button><button type="button" class="btn btn-ghost btn-sm" data-payment-next aria-label="Transaksi berikutnya"><?= authorization_icon('right') ?></button><button type="button" class="btn btn-ghost btn-sm" data-payment-close aria-label="Tutup detail"><?= authorization_icon('close') ?></button></div></header><div class="ph-detail-body" data-payment-detail aria-live="polite"><?php if($selectedModel): payment_history_render($selectedModel,array_merge($_GET,['selected'=>$selectedId])); else: ?><p class="ph-empty"><?= authorization_escape($detailError??'Pilih transaksi pada daftar untuk melihat detail.') ?></p><?php endif; ?></div></section>
       </div></div>
     </main>
   </div>
@@ -288,6 +295,7 @@ if(count($displayMatches)===1)$studentSearchDisplay=$displayMatches[0]['NAMA'];
   <div class="authorization-modal" id="payment-delete-request-modal" hidden role="dialog" aria-modal="true" aria-labelledby="payment-delete-request-title">
     <form method="POST" action="proses.php" class="authorization-modal-card">
       <input type="hidden" name="aksi" value="hapus" />
+      <input type="hidden" name="return_context" value="" />
       <input type="hidden" name="id" id="payment-delete-request-id" value="" />
       <input type="hidden" name="csrf_token" value="<?= htmlspecialchars($_SESSION['csrf_payment']) ?>" />
       <h3 id="payment-delete-request-title"><?= transaction_authorization_requires_request() ? 'Ajukan penghapusan transaksi' : 'Hapus transaksi' ?></h3>
@@ -325,6 +333,7 @@ if(count($displayMatches)===1)$studentSearchDisplay=$displayMatches[0]['NAMA'];
       const button=event.target.closest('.open-payment-delete-request');if(!button)return;opener=button;
       event.stopPropagation();
       idInput.value = button.dataset.id || '';
+      modal.querySelector('[name=return_context]').value=button.dataset.context||'';
       copy.textContent = <?= json_encode(transaction_authorization_requires_request() ? 'Penghapusan transaksi %s menunggu persetujuan Super Admin.' : 'Transaksi %s akan langsung dihapus setelah tindakan ini disimpan.') ?>.replace('%s', button.dataset.student || 'siswa');
       modal.hidden = false;
       document.body.classList.add('modal-open');

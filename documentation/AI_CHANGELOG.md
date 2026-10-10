@@ -13,6 +13,24 @@ File ini mencatat perubahan proyek secara reverse chronological. Baca [PROJECT_C
 - Jangan menghapus atau menulis ulang entri lama. Tambahkan entri koreksi bila diperlukan.
 - Perubahan implementasi dan entri changelog wajib masuk commit yang sama.
 
+## 2026-10-10 - Font ringkas Laporan Transaksi dan cetak buku lengkap Tabungan
+
+- Aktor: Codex, implementasi rencana pemilik.
+- Laporan: font khusus workspace Laporan Transaksi menjadi teks/input 15px, tabel 14px, label/tombol 13px, keterangan 12px, judul panel 18px, nominal 22px, dan judul utama 26?28px. Tata letak, area klik, tema dan palette unit dipertahankan.
+- Tabungan: cetak setelah penyimpanan dan tombol riwayat/detail sekarang membuka buku lengkap yang sama dengan menu Cetak Tabungan. Kedua jalur berbagi pemuat snapshot, pratinjau dan renderer PDF A5 potret/buku lipat A6 lanskap. URL cetak transaksi lama tetap dipakai, mendukung output preview/pdf dan memeriksa ulang kepemilikan pada setiap keluaran; siswa/unit berasal dari transaksi tervalidasi. Buku menunjukkan setiap mutasi pada baris baru dan saldo berjalan terbaru.
+- Database/migrasi: tidak ada perubahan skema atau perhitungan penyimpanan. Mutasi pengujian hanya pada db_spp_audit_operator_pdf_20261010, dengan fixture dipulihkan. Database utama tidak ditulis; artefak/sesi tersimpan di luar repositori.
+- Verifikasi: sintaks enam file PHP dan dua tes browser, model buku, PDF kosong/55 mutasi, serta regresi HTTP tiga unit dan pagination empat cakupan lulus. Formulir nyata menghasilkan empat baris bersaldo Rp500.000 ? Rp600.000 ? Rp500.000 ? Rp400.000; replay/cetak ulang tidak menambah transaksi. Penarikan berlebih/penuh, CSRF, pemilik, anonim/nonaktif, isolasi unit, manipulasi parameter, format keluaran dan saldo tidak cocok diperiksa. Teks serta raster seluruh halaman PDF dari kedua jalur identik pada tiga unit. Browser lulus 48 keadaan laporan/pencarian dan 60 keadaan Tabungan, kedua tema, tiga ukuran layar, semua palette unit, ukuran font aktual, detail/AJAX, pratinjau/PDF, dialog sekali, dan fallback tanpa JavaScript. Tes palette sidebar diselaraskan dengan warna sidebar yang sudah berlaku; penentuan tema tes dibuat konsisten.
+- Dokumentasi: panduan Tabungan, manual penggunaan, konteks proyek dan catatan perubahan diperbarui. Cetak fisik pada printer belum dilakukan.
+
+## 2026-10-10 - Filter operator riwayat dan cetak PDF transaksi terpilih
+
+- Aktor: Codex, implementasi rencana pemilik untuk Riwayat Pembayaran, Riwayat Daftar Ulang, penamaan laporan, dan Riwayat Otorisasi.
+- Perilaku: dropdown Operator dengan pencarian/checkbox mengikuti pembuat awal, mencakup akun nonaktif dan identitas historis, serta mempertahankan filter pada pagination, tab, detail dan kembali dari edit/pengajuan. Saldo/status Daftar Ulang tetap menghitung semua pembayaran; nominal operator terpilih menghitung komponen Daftar Ulang saja. Panel filter responsif dan tombol desktop dirapikan.
+- Laporan: Laporan Umum menjadi Laporan Transaksi pada menu, halaman, judul ekspor dan panduan. URL serta perhitungan laporan tetap kompatibel.
+- PDF: Super Admin memilih transaksi lintas halaman/refresh, dapat memilih seluruh halaman atau membersihkan pilihan. Cetak Terpilih memakai POST JSON tervalidasi dan token sesi dua jam untuk pratinjau/unduhan; Cetak Semua Hasil Filter tetap tersedia. Pilihan dihapus ketika filter/unit berubah, termasuk pergantian unit lewat sidebar/laporan. Pilihan kosong, di luar filter/unit, token kedaluwarsa, CSRF tidak valid dan peran lain ditolak.
+- Database/migrasi: Tidak ada perubahan skema atau data keuangan utama. Pengujian mutatif hanya pada salinan audit terpisah; cookie dan screenshot berada di direktori artefak privat di luar repositori.
+- Verifikasi: sintaks PHP/JavaScript dan diff bersih; tes integrasi filter/PDF (identitas tidak tercatat, bukti pembuatan ganda, cicilan campuran, arsip, AJAX, pagination, konteks kembali, pratinjau/unduhan, token/akses), regresi model/SQL empat cakupan, serta regresi edit/pengajuan/persetujuan tiga unit lulus. Browser memeriksa 72 keadaan visual (empat cakupan, dua tema, tiga ukuran layar, tiga halaman) serta checkbox pencarian, pilihan PDF lintas halaman/refresh, reset filter/unit, dan dropdown tanpa JavaScript.
+
 ## 2026-10-06 - Verifikasi penerapan kenaikan fleksibel di Laragon
 
 - Aktor: Codex. Implementasi `7887fc3` dipasang pada main lokal; health OK dan 30 pemeriksaan integritas bersih.

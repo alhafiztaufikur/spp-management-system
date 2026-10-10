@@ -71,7 +71,7 @@ $allNavItems = [
    '<path d="M6 9V3h12v6M6 18H4a2 2 0 0 1-2-2v-5a2 2 0 0 1 2-2h16a2 2 0 0 1 2 2v5a2 2 0 0 1-2 2h-2"/><path d="M6 14h12v7H6z"/>',
    ['admin', 'kasir', 'bendahara'], 'Tabungan'],
 
-  ['laporan/index.php', 'Laporan Umum',
+  ['laporan/index.php', 'Laporan Transaksi',
    '<path d="M9 11l3 3L22 4"/><path d="M21 12v7a2 2 0 0 1-2 2H5a2 2 0 0 1-2-2V5a2 2 0 0 1 2-2h11"/>',
    ['admin', 'bendahara'], 'Laporan'],
 
@@ -115,7 +115,7 @@ $shortLabels = [
   'Tabungan Keluar'   => 'Keluar',
   'Riwayat Tabungan'  => 'Riwayat',
   'Cetak Tabungan'    => 'Cetak',
-  'Laporan Umum'      => 'Umum',
+  'Laporan Transaksi'      => 'Transaksi',
   'Laporan Global'    => 'Global',
   'Surat Laporan' => 'Surat',
 ];
@@ -138,11 +138,14 @@ $unitPalette = unit_palette_for_view(isset($reportUnitId) ? (int)$reportUnitId :
 $navigationPaletteUnit = (int)($GLOBALS['global_report_view_unit'] ?? $activeUnit);
 ?>
 <script>
+function clearAuthorizationPrintSelection() {
+  try { sessionStorage.removeItem('spp.authorization.pdf.selection'); } catch (error) {}
+}
 function unitSwitchReportScope(select) {
   var form=document.createElement('form');form.method='post';form.action=<?= json_encode($root.'unit_switch.php') ?>;
   var fields={csrf_token:<?= json_encode($_SESSION['csrf_unit_switch']) ?>,unit_id:select.value==='all'?'0':<?= json_encode((string)$activeUnit) ?>,next:location.pathname+location.search};
   Object.keys(fields).forEach(function(name){var input=document.createElement('input');input.type='hidden';input.name=name;input.value=fields[name];form.append(input)});
-  document.body.append(form);form.submit();
+  document.body.append(form);clearAuthorizationPrintSelection();form.submit();
 }
 </script>
 <?php if (unit_all_readonly() && !$transactionUnitOnly && $current !== 'role_management.php'): ?>
@@ -187,7 +190,7 @@ document.addEventListener('DOMContentLoaded', function () {
       <span class="sidebar-unit-kicker"><span aria-hidden="true"></span> SUPER ADMIN</span>
       <label for="sidebar-unit-select" class="sidebar-unit-heading"><span class="sidebar-unit-heading-icon" aria-hidden="true"><svg width="22" height="22" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.8" stroke-linecap="round" stroke-linejoin="round"><path d="m3 10 9-7 9 7M5 9v12h14V9M9 21v-7h6v7M10 8h4"/></svg></span>Unit operasional</label>
       <span class="sidebar-unit-select-wrap">
-        <select id="sidebar-unit-select" name="unit_id" data-native-select onchange="this.form.submit()">
+        <select id="sidebar-unit-select" name="unit_id" data-native-select onchange="clearAuthorizationPrintSelection();this.form.submit()">
           <?php if ($transactionUnitOnly && $activeUnit === 0): ?><option value="" selected disabled>Pilih unit</option><?php endif; ?>
           <?php foreach (($transactionUnitOnly ? [1=>'SD',2=>'SMP',3=>'SMA'] : [0=>'Semua Unit',1=>'SD',2=>'SMP',3=>'SMA']) as $id=>$name): ?>
           <option value="<?= $id ?>" <?= $activeUnit===$id?'selected':'' ?>><?= $name ?></option>
@@ -214,6 +217,7 @@ document.addEventListener('DOMContentLoaded', function () {
     var unitForm = document.querySelector('.sidebar-unit-form');
     var unitSelect = document.getElementById('sidebar-unit-select');
     if (unitForm && unitSelect) {
+      unitForm.addEventListener('submit', clearAuthorizationPrintSelection);
       unitForm.classList.add('unit-switch-ready');
       unitSelect.tabIndex = -1;
       unitSelect.setAttribute('aria-hidden', 'true');

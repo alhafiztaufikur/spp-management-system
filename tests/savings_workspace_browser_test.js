@@ -7,9 +7,9 @@ const base=process.env.SPP_HTTP_BASE,dir=process.env.SPP_QA_DIR,fixtures=JSON.pa
   const context=await browser.newContext();await context.addCookies([{name:'PHPSESSID',value:fixtures[unit].cookies.PHPSESSID,url:base}]);
   const page=await context.newPage(),errors=[];page.on('pageerror',error=>errors.push(error.message));
   for(const theme of ['light','dark'])for(const width of [1440,900,390]){
-   await page.setViewportSize({width,height:1000});await page.addInitScript(t=>localStorage.setItem('spp_theme',t),theme);
+   await page.setViewportSize({width,height:1000});
    for(const route of ['riwayat',...(unit?['masuk','keluar']:[])]){
-    await page.goto(base+'/tabungan/'+route+'.php?tanggal_awal=2000-01-01&tanggal_akhir=2030-01-01');await page.waitForTimeout(150);
+    await page.goto(base+'/tabungan/'+route+'.php?tanggal_awal=2000-01-01&tanggal_akhir=2030-01-01');await page.evaluate(t=>{localStorage.setItem('spp_theme',t);document.documentElement.dataset.theme=t},theme);assert.equal(await page.locator('html').getAttribute('data-theme'),theme);await page.waitForTimeout(150);
     assert.equal(await page.evaluate(()=>document.documentElement.scrollWidth>innerWidth+2),false,'Horizontal overflow '+unit+' '+route+' '+width);
     if(route==='riwayat')assert.ok(await page.locator('#savings-recap-table tbody tr[data-search]:visible').count()<=10,'Hidden recap rows must stay hidden on mobile');
     if(unit===1||width===1440)await page.screenshot({path:dir+'/'+route+'-'+unit+'-'+width+'-'+theme+'.png',fullPage:true});
@@ -33,6 +33,15 @@ const base=process.env.SPP_HTTP_BASE,dir=process.env.SPP_QA_DIR,fixtures=JSON.pa
    const first=await cards.first().locator('..').evaluate(e=>e.dataset.kind+':'+e.dataset.id);
    await page.route('**/tabungan/detail.php?*',async route=>{const q=new URL(route.request().url()).searchParams,old=q.get('jenis')+':'+q.get('id')===first;if(old)await new Promise(resolve=>setTimeout(resolve,500));try{await route.fulfill({contentType:'application/json',body:JSON.stringify({ok:true,html:'<p>'+(old?'OLD_DETAIL':'LATEST_DETAIL')+'</p>'})});}catch(_){}});
    await cards.first().click();await cards.nth(1).click();await page.waitForTimeout(650);assert.equal((await page.locator('#sw-history-detail').innerText()).trim(),'LATEST_DETAIL');await page.unroute('**/tabungan/detail.php?*');
+  }
+  const printLink=page.locator('.sw-row-print a').first();
+  if(await printLink.count()){
+   assert.equal((await printLink.innerText()).trim(),'Cetak Buku Tabungan');
+   const [popup]=await Promise.all([page.waitForEvent('popup'),printLink.click()]);await popup.waitForLoadState();
+   assert.match(await popup.locator('h1').innerText(),/Buku Tabungan/);assert.equal(await popup.locator('iframe').count(),1);
+   const pdfUrl=await popup.locator('iframe').getAttribute('src');assert.match(pdfUrl,/cetak_struk\.php\?.*output=pdf/);
+   const pdf=await context.request.get(new URL(pdfUrl,popup.url()).href);assert.equal(pdf.status(),200);assert.equal((await pdf.body()).subarray(0,4).toString(),'%PDF');
+   assert.equal(await popup.evaluate(()=>document.documentElement.scrollWidth>innerWidth+2),false,'Book preview overflow');await popup.close();
   }
   assert.deepEqual(errors,[],'Browser errors unit '+unit);await context.close();console.log('OK browser unit '+unit+': responsive themes, detail, savings validation');
  }

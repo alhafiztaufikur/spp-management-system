@@ -182,7 +182,7 @@ if(is_array($_GET['jenis_laporan']??null)||($_GET['jenis_laporan']??'semua')!=='
     foreach($generalSections as $section)foreach($section['totals'] as $total)$summary[]=['label'=>$section['title'].' - '.$total['label'],'value'=>$total['value']];
     $sheets[0]['sections'][0]['rows']=$summary;
 }
-$doc=spp_excel_document('Rekap Laporan Keuangan','Periode '.$period_label.($filter_q!==''?' | Pencarian: '.$filter_q:''),$reportUnitId,$sheets);
+$doc=spp_excel_document('Rekap Laporan Transaksi','Periode '.$period_label.($filter_q!==''?' | Pencarian: '.$filter_q:''),$reportUnitId,$sheets);
 $downloadQuery=$_GET;$downloadQuery['download']='1';$backQuery=$_GET;unset($backQuery['download']);
 if(!empty($sppGeneralPdf))return;
 $detailCount=0;

@@ -9,6 +9,10 @@
 .du-summary small{display:block;color:var(--text-muted);font-size:11px;margin-bottom:8px}
 .du-summary strong{display:block;font-size:19px;color:var(--accent);overflow-wrap:anywhere}
 .du-summary-caption{font-size:11px;color:var(--text-muted);line-height:1.7;margin:10px 0 18px}
+.du-operator-summary{display:flex;align-items:center;gap:24px;flex-wrap:wrap;padding:18px 20px;margin-top:12px;background:var(--accent-glow);border:1px solid var(--border);border-radius:14px}
+.du-operator-summary small{display:block;color:var(--text-secondary);font-size:13px;margin-bottom:6px}
+.du-operator-summary strong{display:block;color:var(--accent);font-size:22px;overflow-wrap:anywhere}
+.du-operator-summary p{flex:1;min-width:180px;margin:0;color:var(--text-muted);font-size:13px;line-height:1.6}
 .registration-history-page .du-record{grid-template-columns:26px 38px minmax(105px,1fr) auto auto 16px;gap:12px;padding:16px}
 .du-record-period{display:flex;flex-direction:column;gap:7px;font-size:11px}
 .du-record-period small{color:var(--text-muted)}

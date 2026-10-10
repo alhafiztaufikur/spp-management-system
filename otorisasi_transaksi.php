@@ -234,14 +234,26 @@ function authorization_request_summary(array $request): array
       }catch(Throwable $e){$detailError='Detail belum dapat dimuat. Muat ulang halaman untuk mencoba kembali.';error_log($e->getMessage());}
       finally{unit_set_context($koneksi,$originalUnit);}
       ?>
-      <div class="auth-workspace" data-auth-workspace data-view="<?= $historyView?'history':'queue' ?>">
+      <div class="auth-workspace" data-auth-workspace data-export-account="<?= $currentId ?>" data-export-scope="<?= unit_active_id() ?>" data-export-filter="<?= authorization_escape(json_encode(['kind'=>$kindChoices,'status'=>$statusChoices,'q'=>$search])) ?>" data-view="<?= $historyView?'history':'queue' ?>">
         <section class="auth-list-panel main-card">
           <header class="auth-panel-heading"><h3><?= authorization_icon('history') ?> <?= $historyView?'Daftar Riwayat Perubahan Transaksi':'Daftar Pengajuan Otorisasi' ?></h3><span class="auth-count"><?= number_format($total) ?> <?= $historyView?'transaksi':'pengajuan' ?></span></header>
-          <?php if($historyView): ?><div class="auth-list-tools"><small>Filter mencocokkan aktivitas dalam riwayat; kartu menampilkan perubahan terakhir.</small><?php if(unit_is_super()): ?><a class="btn btn-ghost btn-sm" href="otorisasi_export_pdf.php?<?= authorization_escape(filter_build_query(['kind'=>$kind,'status'=>$statusFilter,'q'=>$search])) ?>"><?= authorization_icon('pdf') ?> Export PDF</a><?php endif; ?></div><?php endif; ?>
-          <div class="auth-record-list">
+          <?php if($historyView): ?><div class="auth-list-tools"><small>Filter mencocokkan aktivitas dalam riwayat; kartu menampilkan perubahan terakhir.</small></div>
+          <?php if(unit_is_super()): ?>
+          <form class="auth-export-tools" action="otorisasi_export_pdf.php" method="post" data-export-form>
+            <input type="hidden" name="csrf_token" value="<?= authorization_escape($csrfToken) ?>">
+            <input type="hidden" name="transactions" value="[]">
+            <input type="hidden" name="q" value="<?= authorization_escape($search) ?>">
+            <?php foreach(['kind'=>$kindChoices,'status'=>$statusChoices] as $name=>$choices): foreach($choices as $choice): ?><input type="hidden" name="<?= $name ?>[]" value="<?= authorization_escape($choice) ?>"><?php endforeach; endforeach; ?>
+            <div class="auth-export-selection"><label><input type="checkbox" data-export-all-page <?= !$items?'disabled':'' ?>> Pilih semua di halaman ini</label><span data-export-count role="status">0 transaksi dipilih</span></div>
+            <div class="auth-export-actions"><button class="btn btn-ghost btn-sm" type="button" data-export-clear disabled>Bersihkan pilihan</button><button class="btn btn-primary btn-sm" type="submit" data-export-selected disabled><?= authorization_icon('pdf') ?> Cetak Terpilih</button><a class="btn btn-ghost btn-sm" href="otorisasi_export_pdf.php?<?= authorization_escape(filter_build_query(['kind'=>$kind,'status'=>$statusFilter,'q'=>$search])) ?>"><?= authorization_icon('pdf') ?> Cetak Semua Hasil Filter</a></div>
+            <noscript><small>Aktifkan JavaScript untuk menyimpan pilihan cetak lintas halaman. Cetak Semua Hasil Filter tetap tersedia.</small></noscript>
+          </form>
+          <?php endif; endif; ?>
+          <div class="auth-record-list <?= $historyView && unit_is_super()?'has-export-choices':'' ?>">
           <?php if(!$items): ?><div class="auth-empty"><strong><?= $historyView?'Belum ada riwayat perubahan':'Belum ada pengajuan menunggu' ?></strong><p>Tidak ada data yang cocok dengan filter saat ini.</p></div><?php endif; ?>
           <?php foreach($items as $index=>$item): [$status,$tone,$icon]=authorization_badge($item['action']);
               $query=['view'=>$historyView?'history':'queue','kind'=>$kind,'status'=>$statusFilter,'q'=>$search,'page'=>$page,'selected'=>$item['id'],'selected_unit'=>$item['unit_id']]; ?>
+              <?php if($historyView && unit_is_super()): ?><div class="auth-record-row"><label class="auth-export-check"><input type="checkbox" data-export-choice data-id="<?= $item['id'] ?>" data-unit="<?= $item['unit_id'] ?>" aria-label="Pilih <?= authorization_escape($item['reference'].' '.$item['student']) ?> untuk PDF"></label><?php endif; ?>
               <a class="auth-record <?= $selected===$index?'is-selected':'' ?>" href="?<?= authorization_escape(filter_build_query($query)) ?>" data-auth-record data-index="<?= $index ?>" data-id="<?= $item['id'] ?>" data-unit="<?= $item['unit_id'] ?>" <?= $selected===$index?'aria-current="true"':'' ?>>
                 <span class="auth-action-icon auth-tone-<?= $tone ?>"><?= authorization_icon($icon) ?></span>
                 <div class="auth-record-identity"><strong><?= authorization_escape($item['reference']) ?></strong><span><?= authorization_escape($item['student']) ?></span><small>NIS <?= authorization_escape($item['nis']) ?><?= unit_active_id()===0?' ? '.authorization_escape(unit_label($item['unit_id'])):'' ?></small></div>
@@ -249,7 +261,7 @@ function authorization_request_summary(array $request): array
                 <span class="auth-status auth-tone-<?= $tone ?>"><?= authorization_escape($status) ?></span>
                 <div class="auth-record-actor"><?= authorization_icon('user') ?><div><strong><?= authorization_escape($item['name']) ?></strong><small><?= authorization_escape($item['username']?'@'.$item['username']:'Tidak tercatat') ?></small><small><?= authorization_escape(authorization_role_label($item['role'])) ?></small></div></div>
                 <div class="auth-record-time"><?= authorization_icon('calendar') ?><div><strong><?= authorization_escape(spp_date_label($item['time'])) ?></strong><small><?= authorization_escape(date('H:i:s',strtotime($item['time']))) ?> WIB</small></div></div>
-              </a>
+              </a><?php if($historyView && unit_is_super()): ?></div><?php endif; ?>
           <?php endforeach; ?></div>
         </section>
         <section class="auth-detail-panel main-card" aria-label="Detail transaksi terpilih">

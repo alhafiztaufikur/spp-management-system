@@ -2,6 +2,30 @@
   const root=document.querySelector('[data-auth-workspace]');if(!root)return;
   const cards=[...root.querySelectorAll('[data-auth-record]')];const detail=root.querySelector('[data-auth-detail]');
   const prev=root.querySelector('[data-auth-prev]');const next=root.querySelector('[data-auth-next]');
+  const exportForm=root.querySelector('[data-export-form]');
+  if(exportForm){
+    const boxes=[...root.querySelectorAll('[data-export-choice]')],all=exportForm.querySelector('[data-export-all-page]');
+    const count=exportForm.querySelector('[data-export-count]'),clear=exportForm.querySelector('[data-export-clear]'),print=exportForm.querySelector('[data-export-selected]');
+    const filter=JSON.parse(root.dataset.exportFilter);filter.kind.sort();filter.status.sort();
+    const context=JSON.stringify([root.dataset.exportAccount,root.dataset.exportScope,filter]);
+    const storageKey='spp.authorization.pdf.selection';let choices=new Set();
+    function restore(){choices=new Set();try{const saved=JSON.parse(sessionStorage.getItem(storageKey)||'null');if(saved?.context===context&&Array.isArray(saved.choices))choices=new Set(saved.choices.filter(key=>/^[1-3]\|[1-9]\d*$/.test(key)));}catch{}}
+    restore();
+    const key=box=>box.dataset.unit+'|'+box.dataset.id;
+    function sync(){
+      boxes.forEach(box=>{box.checked=choices.has(key(box));box.closest('.auth-record-row').classList.toggle('is-print-selected',box.checked);});
+      const selectedOnPage=boxes.filter(box=>box.checked).length;
+      all.checked=boxes.length>0&&selectedOnPage===boxes.length;all.indeterminate=selectedOnPage>0&&!all.checked;
+      count.textContent=choices.size+' transaksi dipilih';clear.disabled=print.disabled=choices.size===0;
+      exportForm.elements.transactions.value=JSON.stringify([...choices].map(value=>{const [unit,payment]=value.split('|');return {unit_id:Number(unit),payment_id:Number(payment)};}));
+      try{sessionStorage.setItem(storageKey,JSON.stringify({context,choices:[...choices]}));}catch{}
+    }
+    boxes.forEach(box=>box.addEventListener('change',()=>{box.checked?choices.add(key(box)):choices.delete(key(box));sync();}));
+    all.addEventListener('change',()=>{boxes.forEach(box=>all.checked?choices.add(key(box)):choices.delete(key(box)));sync();});
+    clear.addEventListener('click',()=>{choices.clear();sync();});
+    exportForm.addEventListener('submit',event=>{if(!choices.size)event.preventDefault();});
+    addEventListener('pageshow',()=>{restore();sync();});sync();
+  }
   let selected=cards.findIndex(e=>e.classList.contains('is-selected'));let controller=null;let generation=0;
   const nav=()=>{prev.disabled=selected<=0;next.disabled=selected<0||selected>=cards.length-1;};
   async function select(index,push=true){

@@ -4,11 +4,12 @@ require_once __DIR__.'/payment_history.php';
 require_once __DIR__.'/payment_return.php';
 require_once __DIR__.'/pagination.php';
 require_once __DIR__.'/kelas.php';
+require_once __DIR__.'/history_operator_filter.php';
 
 function registration_filter_query(array $f): array
 {
     return ['view'=>$f['view'],'q'=>$f['q'],'student_id'=>$f['student_id'],'kelas'=>$f['values']['kelas'],
-        'tahun_ajaran'=>$f['values']['tahun_ajaran'],'status'=>$f['values']['status'],'per_page'=>$f['per_page'],'page'=>$f['page']];
+        'tahun_ajaran'=>$f['values']['tahun_ajaran'],'status'=>$f['values']['status'],'operator'=>$f['values']['operator']??['*'],'per_page'=>$f['per_page'],'page'=>$f['page']];
 }
 
 function registration_filters(mysqli $db, array $input): array
@@ -32,6 +33,8 @@ function registration_filters(mysqli $db, array $input): array
     }
     $classInput = $input['kelas'] ?? null;
     if (is_scalar($classInput) && ctype_digit((string)$classInput) && isset($classOptions['tingkat:'.$classInput])) $classInput = 'tingkat:'.$classInput;
+    $operatorOptions=history_operator_options($db);
+    $operators=history_operator_choices($input['operator']??null,$operatorOptions);
     $options = ['kelas'=>$classOptions,'tahun_ajaran'=>array_combine($years,$years),'status'=>['lunas'=>'Lunas','cicilan'=>'Belum Lunas']];
     $values = [];
     foreach ($options as $key=>$allowed) {
@@ -47,6 +50,7 @@ function registration_filters(mysqli $db, array $input): array
         $values[$key] = filter_register($key,$raw,$allowed);
         foreach ($values[$key] as $value) if ($value!=='*' && !array_key_exists($value,$allowed)) throw new InvalidArgumentException('Pilihan '.$key.' tidak tersedia pada unit ini.');
     }
+    $values['operator']=$operators;$options['operator']=$operatorOptions;
     $studentId = max(0,(int)($input['student_id'] ?? 0)); $student = null;
     if ($studentId) {
         $s=$db->prepare('SELECT id,unit_id,NO_INDUK,NAMA FROM siswa WHERE id=?');$s->bind_param('i',$studentId);$s->execute();$student=$s->get_result()->fetch_assoc();$s->close();
@@ -57,7 +61,7 @@ function registration_filters(mysqli $db, array $input): array
         'page'=>max(1,(int)($input['page']??1))];
 }
 
-function registration_active_sql(array $f): array
+function registration_active_sql(array $f, ?mysqli $db=null): array
 {
     $where=["tdu.status='open'"]; $params=[];$types='';
     if ($f['student_id']) {$where[]='s.id=?';$params[]=$f['student_id'];$types.='i';}
@@ -69,10 +73,20 @@ function registration_active_sql(array $f): array
         }$where[]='('.implode(' OR ',$clauses).')';
     }
     if (!filter_is_all($f['values']['tahun_ajaran'])) {$where[]='ta.label IN ('.implode(',',array_fill(0,count($f['values']['tahun_ajaran']),'?')).')';array_push($params,...$f['values']['tahun_ajaran']);$types.=str_repeat('s',count($f['values']['tahun_ajaran']));}
+    $operatorPaid='';
+    if (!filter_is_all($f['values']['operator']??['*'])) {
+        $db??=$GLOBALS['koneksi'];
+        $ownerWhere=history_operator_where($db,$f['values']['operator'],'ob.id','ob.unit_id');
+        $operatorSql="SELECT od.jumlah FROM bayar_du od JOIN bayar ob ON ob.id=od.bayar_id AND ob.unit_id=od.unit_id
+            WHERE od.tagihan_daftar_ulang_id=tdu.id AND od.unit_id=tdu.unit_id".$ownerWhere;
+        $where[]='EXISTS('.$operatorSql.')';
+        $operatorPaid=",COALESCE((SELECT SUM(od.jumlah) FROM bayar_du od JOIN bayar ob ON ob.id=od.bayar_id AND ob.unit_id=od.unit_id
+            WHERE od.tagihan_daftar_ulang_id=tdu.id AND od.unit_id=tdu.unit_id".$ownerWhere."),0) operator_paid";
+    }
     $sql="SELECT tdu.unit_id,tdu.id tagihan_id,tdu.no_induk,ta.label th_ajaran,s.NAMA nama,s.NO_induk_diknas,
         tdu.kelas_snapshot kelas,COALESCE(mk.tingkat,s.KELAS,tdu.kelas_snapshot) tingkat,s.master_kelas_id,
         tdu.nominal_tagihan total,COALESCE(SUM(bd.jumlah),0) paid,
-        GREATEST(0,tdu.nominal_tagihan-COALESCE(SUM(bd.jumlah),0)) remaining
+        GREATEST(0,tdu.nominal_tagihan-COALESCE(SUM(bd.jumlah),0)) remaining $operatorPaid
         FROM tagihan_daftar_ulang tdu JOIN tahun_ajaran ta ON ta.id=tdu.tahun_ajaran_id
         JOIN siswa s ON s.NO_INDUK=tdu.no_induk AND s.unit_id=tdu.unit_id
         LEFT JOIN master_kelas mk ON mk.id=s.master_kelas_id
@@ -90,11 +104,12 @@ function registration_query(mysqli $db,string $sql,array $params=[],string $type
 }
 
 /** Only deletion snapshots with explicit Daftar Ulang detail are evidence of this archive. */
-function registration_archive_groups(mysqli $db): array
+function registration_archive_groups(mysqli $db, array $operators=['*']): array
 {
     $groups=[];
     if (!payment_activity_ready($db)) return [];
-    $events=$db->query("SELECT a.* FROM pembayaran_aktivitas a WHERE a.action='deleted'
+    $ownerWhere=history_operator_where($db,$operators,'a.payment_id','a.unit_id');
+    $events=$db->query("SELECT a.* FROM pembayaran_aktivitas a WHERE a.action='deleted' $ownerWhere
         AND NOT EXISTS(SELECT 1 FROM pembayaran_aktivitas n WHERE n.action='deleted' AND n.unit_id=a.unit_id AND n.payment_id=a.payment_id AND n.id>a.id)
         ORDER BY a.occurred_at DESC,a.id DESC")->fetch_all(MYSQLI_ASSOC);
     foreach ($events as $event) {
@@ -134,38 +149,40 @@ function registration_archive_matches(array $g,array $f): bool
 function registration_page(mysqli $db,array $f): array
 {
     if($f['view']==='deleted') {
-        $all=array_values(array_filter(registration_archive_groups($db),static fn($g)=>registration_archive_matches($g,$f)));
+        $all=array_values(array_filter(registration_archive_groups($db,$f['values']['operator']??['*']),static fn($g)=>registration_archive_matches($g,$f)));
         $transactionIds=[];foreach($all as $g)foreach($g['transactions'] as $t)$transactionIds[$g['unit_id'].'|'.$t['payment']['id']]=true;
         $summary=['students'=>count($all),'transactions'=>count($transactionIds),'deleted_amount'=>array_sum(array_column($all,'deleted_amount'))];
         $pages=total_pages(count($all),$f['per_page']);$page=min($f['page'],$pages);$offset=($page-1)*$f['per_page'];$rows=array_slice($all,$offset,$f['per_page']);
     } else {
-        [$sql,$params,$types]=registration_active_sql($f);
-        $summary=registration_query($db,"SELECT COUNT(*) students,COALESCE(SUM(total),0) bill,COALESCE(SUM(paid),0) paid,COALESCE(SUM(remaining),0) remaining FROM ($sql) x",$params,$types)[0];
+        [$sql,$params,$types]=registration_active_sql($f,$db);
+        $operatorSummary=filter_is_all($f['values']['operator']??['*'])?'':',COALESCE(SUM(operator_paid),0) operator_paid';
+        $summary=registration_query($db,"SELECT COUNT(*) students,COALESCE(SUM(total),0) bill,COALESCE(SUM(paid),0) paid,COALESCE(SUM(remaining),0) remaining $operatorSummary FROM ($sql) x",$params,$types)[0];
         $pages=total_pages((int)$summary['students'],$f['per_page']);$page=min($f['page'],$pages);$offset=($page-1)*$f['per_page'];
         $rows=registration_query($db,"SELECT * FROM ($sql) x ORDER BY th_ajaran DESC,CAST(kelas AS UNSIGNED),nama,tagihan_id LIMIT ? OFFSET ?",array_merge($params,[$f['per_page'],$offset]),$types.'ii');
     }return compact('summary','pages','page','offset','rows');
 }
 
-function registration_detail(mysqli $db,int $bill,int $unit,string $view): array
+function registration_detail(mysqli $db,int $bill,int $unit,string $view,array $operators=['*']): array
 {
     if($bill<=0 || !in_array($unit,[1,2,3],true) || (unit_active_id()!==0 && unit_active_id()!==$unit))throw new OutOfBoundsException('Tagihan tidak ditemukan pada unit ini.');
     if(!in_array($view,['active','deleted'],true))throw new InvalidArgumentException('Jenis riwayat tidak valid.');
     if($view==='deleted') {
-        $matches=array_values(array_filter(registration_archive_groups($db),static fn($g)=>(int)$g['tagihan_id']===$bill && (int)$g['unit_id']===$unit));
+        $matches=array_values(array_filter(registration_archive_groups($db,$operators),static fn($g)=>(int)$g['tagihan_id']===$bill && (int)$g['unit_id']===$unit));
         if(count($matches)!==1)throw new OutOfBoundsException('Arsip tidak ditemukan atau identitasnya tidak lengkap.');$g=$matches[0];
     } else {
-        $f=['q'=>'','student_id'=>0,'values'=>['kelas'=>['*'],'tahun_ajaran'=>['*'],'status'=>['*']]];
-        [$sql,$params,$types]=registration_active_sql($f);
+        $f=['q'=>'','student_id'=>0,'values'=>['kelas'=>['*'],'tahun_ajaran'=>['*'],'status'=>['*'],'operator'=>$operators]];
+        [$sql,$params,$types]=registration_active_sql($f,$db);
         $rows=registration_query($db,"SELECT * FROM ($sql) x WHERE tagihan_id=? AND unit_id=?",[$bill,$unit],'ii');
         if(!$rows)throw new OutOfBoundsException('Tagihan tidak ditemukan pada unit ini.');$g=$rows[0];
-        $rows=registration_query($db,'SELECT b.*,s.NAMA,s.NO_induk_diknas,bd.jumlah FROM bayar_du bd JOIN bayar b ON b.id=bd.bayar_id AND b.unit_id=bd.unit_id LEFT JOIN siswa s ON s.NO_INDUK=b.NO_INDUK AND s.unit_id=b.unit_id WHERE bd.tagihan_daftar_ulang_id=? AND bd.unit_id=? ORDER BY b.TGL_BYR DESC,b.id DESC',[$bill,$unit],'ii');
+        $ownerWhere=history_operator_where($db,$operators,'b.id','b.unit_id');
+        $rows=registration_query($db,'SELECT b.*,s.NAMA,s.NO_induk_diknas,bd.jumlah FROM bayar_du bd JOIN bayar b ON b.id=bd.bayar_id AND b.unit_id=bd.unit_id LEFT JOIN siswa s ON s.NO_INDUK=b.NO_INDUK AND s.unit_id=b.unit_id WHERE bd.tagihan_daftar_ulang_id=? AND bd.unit_id=?'.$ownerWhere.' ORDER BY b.TGL_BYR DESC,b.id DESC',[$bill,$unit],'ii');
         $g['transactions']=array_map(static fn($p)=>['payment'=>$p,'jumlah'=>(float)$p['jumlah']],$rows);
     }
     $events=payment_activity_for_payments($db,array_map(static fn($t)=>(int)$t['payment']['id'],$g['transactions']));
     foreach($g['transactions'] as &$t) {
         $p=$t['payment'];$t['events']=$events[(int)$p['id']]??[];$t['summary']=payment_activity_summary($t['events']);
         $t['capabilities']=payment_capabilities($db,$p,$t['events'],$view==='deleted');
-    }unset($t);$g['view']=$view;return $g;
+    }unset($t);$g['view']=$view;$g['operator_filtered']=!filter_is_all($operators);return $g;
 }
 
 function registration_render_detail(array $g,array $query): void
@@ -175,6 +192,7 @@ function registration_render_detail(array $g,array $query): void
     <div class="ph-student"><span class="ph-student-icon"><?= authorization_icon('student') ?></span><div><h3><?= $e($g['nama']) ?></h3><small>NIS: <?= $e($g['no_induk']) ?></small><small>NIS Diknas: <?= $e($g['NO_induk_diknas']?:'Tidak tercatat') ?></small><?php if(unit_all_readonly()): ?><small>Unit <?= unit_label((int)$g['unit_id']) ?></small><?php endif; ?></div><div class="ph-student-period"><span class="kelas-badge">Kelas <?= $e($g['kelas']) ?></span><small><?= $e($g['th_ajaran']) ?></small></div></div>
     <section class="ph-payment-box"><h4><?= authorization_icon('chart') ?> <?= $deleted?'Daftar Ulang Dihapus':'Rekap Tagihan' ?></h4><dl class="ph-components">
     <?php foreach($deleted?['Nominal Daftar Ulang dihapus'=>$g['deleted_amount']]:['Tagihan'=>$g['total'],'Sudah dibayar'=>$g['paid'],'Sisa'=>$g['remaining']] as $label=>$amount): ?><div><dt><?= $label ?></dt><dd><?= payment_history_money($amount) ?></dd></div><?php endforeach; ?></dl></section>
+    <?php if(!$deleted && !empty($g['operator_filtered'])): ?><p class="du-summary-caption">Saldo tagihan menghitung pembayaran semua operator. Cicilan di bawah hanya dari operator terpilih.</p><section class="du-operator-summary"><small>Pembayaran operator terpilih</small><strong><?= payment_history_money($g['operator_paid']) ?></strong></section><?php endif; ?>
     <h3 class="du-installment-title"><?= $deleted?'Transaksi Dihapus':'Rincian Cicilan' ?> <small><?= count($g['transactions']) ?> transaksi</small></h3>
     <?php if(!$g['transactions']): ?><p class="ph-empty">Belum ada pembayaran untuk tagihan ini.</p><?php endif; ?>
     <?php foreach($g['transactions'] as $t): $p=$t['payment'];$id=(int)$p['id'];$caps=$t['capabilities'];$token=(!$deleted && ($caps['can_edit']||$caps['can_delete']))?payment_return_create($id,(int)$g['unit_id'],$query):''; ?>

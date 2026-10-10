@@ -12,7 +12,8 @@
     if(push)history.pushState(null,'',card.href);
     body.setAttribute('aria-busy','true');body.replaceChildren(Object.assign(document.createElement('p'),{textContent:'Memuat detail transaksi…',className:'ph-empty'}));
     try{
-      const response=await fetch('detail.php?'+new URLSearchParams({id:card.dataset.id,unit_id:card.dataset.unit,view:root.dataset.view}),{signal:controller.signal,headers:{Accept:'application/json'}});
+      const query=new URL(card.href).searchParams;query.set('id',card.dataset.id);query.set('unit_id',card.dataset.unit);query.set('view',root.dataset.view);
+      const response=await fetch('detail.php?'+query,{signal:controller.signal,headers:{Accept:'application/json'}});
       const data=await response.json();if(!response.ok||!data.ok)throw Error(data.message||'Detail belum dapat dimuat.');
       if(version===generation)body.innerHTML=data.html;
     }catch(error){if(error.name!=='AbortError'&&version===generation){const p=document.createElement('p');p.className='ph-empty';p.textContent=error.message;const retry=document.createElement('button');retry.type='button';retry.className='btn btn-ghost';retry.textContent='Coba kembali';retry.addEventListener('click',()=>select(i,false));body.replaceChildren(p,retry);}}

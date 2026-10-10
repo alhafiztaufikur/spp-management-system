@@ -183,8 +183,12 @@ html body[data-readable-workspace="parent"] .parent-copy-dialog footer {flex-wra
 html body[data-readable-workspace="parent"] .parent-copy-target {min-height:2.75rem;}
 html body[data-readable-workspace="parent"] .parent-copy-target>span {min-width:0;overflow-wrap:anywhere;}
 
-/* General finance report */
-html body[data-readable-workspace="finance"] .finance-hero .recap-report-copy h1 {font-size:clamp(1.75rem,2vw,2rem);line-height:1.3;}
+/* Compact typography for Laporan Transaksi, including its dropdowns and dialogs. */
+body[data-readable-workspace="finance"] {
+  --read-body:.9375rem;--read-table:.875rem;--read-label:.8125rem;--read-note:.75rem;
+  --read-panel:1.125rem;--read-number:1.375rem;
+}
+html body[data-readable-workspace="finance"] .finance-hero .recap-report-copy h1 {font-size:clamp(1.625rem,2vw,1.75rem);line-height:1.3;}
 html body[data-readable-workspace="finance"] .finance-hero .recap-report-copy p {font-size:var(--read-body);line-height:1.6;}
 html body[data-readable-workspace="finance"] :is(.finance-breadcrumb,.finance-trend-copy,.finance-summary-note,.finance-table-note,.badge-count,.report-secondary-id,.report-secondary-unit,.finance-stat small) {font-size:var(--read-note);line-height:1.6;}
 html body[data-readable-workspace="finance"] .finance-catalog {font-size:var(--read-label);width:240px;padding:1rem;}

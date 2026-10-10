@@ -9,6 +9,14 @@ SistemSPP adalah aplikasi administrasi pembayaran sekolah berbasis PHP, JavaScri
 
 > **Baseline historis 2 Oktober 2026 setelah penghapusan Titipan SPP:** migrasi lokal `db_spp` sudah diterapkan, dengan 18 CHECK, dua trigger tarif dan 61 FK. Utama: 222 siswa, 1.018 pembayaran, Rp577.145.000 penerimaan. Tabungan tetap 12 rekening/Rp1.050.000; fingerprint rekening dan kedua jurnal tidak berubah. [Audit kesiapan](./READINESS_AUDIT_20261001.md) tetap menilai **siap terbatas dengan syarat** untuk Laragon pada cakupan yang diuji. Seluruh commit audit sampai `6a95cc0` sudah digabung ke `main` tanpa konflik; health dan integritas diperiksa ulang setelah penggabungan. Deployment target dinilai terpisah. Prosedur backup/pemulihan ada di [runbook](./READINESS_MIGRATION_RUNBOOK_20261001.md).
 
+## Riwayat dan laporan ? 10 Oktober 2026
+
+Riwayat Pembayaran dan Riwayat Daftar Ulang menyediakan filter Operator dengan pencarian dan checkbox beberapa petugas. Filter mengikuti pembuat awal, diterapkan lewat Tampilkan Rekap, serta dipertahankan pada pagination/detail/kembali dari edit. Daftar Ulang memisahkan nominal cicilan operator terpilih dari saldo dan status lunas yang tetap menghitung semua pembayaran siswa. Laporan Umum kini bernama **Laporan Transaksi**.
+
+Super Admin dapat memilih transaksi lintas halaman pada Riwayat Otorisasi dan memakai **Cetak Terpilih** atau **Cetak Semua Hasil Filter**. Pilihan terikat filter/unit; pratinjau dan unduhan memakai token sesi tervalidasi dua jam. POST ekspor pada Semua Unit hanya membaca laporan dan menyimpan pilihan sesi. Hak mutasi transaksi dan akses PDF per peran tetap mengikuti kebijakan yang ada. Tidak diperlukan migrasi. Rincian: [Riwayat Pembayaran](RIWAYAT_PEMBAYARAN.md), [Daftar Ulang](RIWAYAT_DAFTAR_ULANG_UI.md), dan [Otorisasi](OTORISASI_TRANSAKSI.md).
+
+Laporan Transaksi memakai font lebih ringkas khusus halaman laporan (teks 15px, tabel 14px, label 13px, keterangan 12px). Cetak setelah setoran/penarikan dan tombol riwayat/detail Tabungan kini membuka buku lengkap yang sama dengan menu Cetak Tabungan, dengan saldo berjalan dan baris terpisah untuk setiap mutasi. URL cetak transaksi lama tetap memeriksa kepemilikan pada pratinjau dan PDF. Tidak ada migrasi. Rincian: [Tabungan](TABUNGAN_WORKSPACE.md).
+
 ## Lingkungan
 
 - **Pemulihan UI 2 Oktober 2026:** desain komponen aktif dikembalikan sesuai `7647608` setelah regresi CSS penghapusan titipan. Tema SD/SMP/SMA, terang/gelap dan responsif dibuktikan lewat 576 perbandingan screenshot serta tes kontrol browser; seluruh aturan bisnis terbaru tetap berlaku. Lihat [audit UI](UI_RECOVERY_AUDIT_20261002.md). Versi stylesheet PHP memakai `filemtime` agar perubahan tidak tertahan cache browser.

@@ -12,6 +12,7 @@
 .ph-filter-card,.ph-list-panel,.ph-detail-panel{background:var(--bg-card);border:1px solid var(--border);border-radius:16px;box-shadow:0 4px 20px rgba(0,0,0,.025)}
 .ph-filter-card{padding:18px;margin-bottom:18px}
 .ph-filter-form{display:grid;grid-template-columns:180px minmax(175px,1fr) minmax(200px,1.25fr) minmax(125px,.65fr) auto;gap:16px;align-items:end}
+@media(min-width:1101px){html body[data-readable-workspace="payment-history"] .layout .ph-filter-form .ph-filter-actions{grid-column:2/-1;align-self:end}}
 .ph-filter-intro{display:flex;gap:10px;align-items:flex-start;border-right:1px solid var(--border);padding-right:12px;align-self:center}
 .ph-filter-intro>svg{color:var(--accent);flex-shrink:0;margin-top:2px}
 .ph-filter-intro strong{display:block;font-size:13px;margin-bottom:5px}

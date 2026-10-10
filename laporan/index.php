@@ -1,6 +1,6 @@
 <?php
 // ============================================
-// laporan/index.php - Rekap Laporan Keuangan
+// laporan/index.php - Rekap Laporan Transaksi
 // ============================================
 session_start();
 require_once '../koneksi.php';
@@ -417,7 +417,7 @@ $exportQuery = filter_build_query([
 <head>
   <meta charset="UTF-8" />
   <meta name="viewport" content="width=device-width, initial-scale=1.0" />
-  <title>Laporan Keuangan | SistemSPP</title>
+  <title>Laporan Transaksi | SistemSPP</title>
   <link rel="icon" type="image/png" href="../assets/img/favicon.png?v=2" />
   <link rel="preconnect" href="https://fonts.googleapis.com" />
   <link href="https://fonts.googleapis.com/css2?family=Inter:wght@300;400;500;600;700;800&display=swap" rel="stylesheet" />
@@ -440,7 +440,7 @@ $exportQuery = filter_build_query([
         <svg width="20" height="20" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><line x1="3" y1="12" x2="21" y2="12"/><line x1="3" y1="6" x2="21" y2="6"/><line x1="3" y1="18" x2="21" y2="18"/></svg>
       </button>
       <div class="topbar-title">
-        <h2>Laporan Keuangan</h2>
+        <h2>Laporan Transaksi</h2>
         <span class="breadcrumb">SistemSPP / Laporan</span>
       </div>
       <div class="clock-badge" id="liveClock">--:--:--</div>
@@ -457,8 +457,8 @@ $exportQuery = filter_build_query([
         <div class="recap-report-header">
           <div class="report-general-heading finance-hero">
             <div class="recap-report-copy">
-              <span class="finance-breadcrumb">SistemSPP <span aria-hidden="true">&rsaquo;</span> Laporan Keuangan</span>
-              <h1>Rekap Laporan Keuangan</h1>
+              <span class="finance-breadcrumb">SistemSPP <span aria-hidden="true">&rsaquo;</span> Laporan Transaksi</span>
+              <h1>Rekap Laporan Transaksi</h1>
               <p><?= report_e($financeReportLabel) ?> untuk periode <?= report_e($periodLabel) ?>.</p>
             </div>
             <svg class="finance-hero-art" viewBox="0 0 540 110" fill="none" aria-hidden="true"><path d="M0 110Q80 45 150 72T280 35T400 65T540 15V110Z" fill="currentColor" opacity=".07"/><path d="M30 85Q100 45 155 62T280 28T410 60T520 20" stroke="currentColor" opacity=".35"/><g fill="currentColor" opacity=".12"><path d="M60 110V82h16v28M110 110V60h16v50M160 110V75h16v35M210 110V46h16v64M260 110V20h16v90M310 110V52h16v58M360 110V66h16v44M410 110V42h16v68M460 110V27h16v83M510 110V9h16v101"/></g></svg>

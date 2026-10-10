@@ -10,7 +10,7 @@ try{
     $f=registration_filters($koneksi,$_GET);$query=registration_filter_query($f);$query['selected']=(int)$raw;
     $unit=authorization_read_unit($koneksi,$_GET['unit_id']??null);
     $query['selected_unit']=$unit;
-    $model=registration_detail($koneksi,(int)$raw,$unit,$f['view']);
+    $model=registration_detail($koneksi,(int)$raw,$unit,$f['view'],$f['values']['operator']);
     if(empty($_SESSION['csrf_payment']))$_SESSION['csrf_payment']=bin2hex(random_bytes(32));
     ob_start();registration_render_detail($model,$query);$html=ob_get_clean();
     echo json_encode(['ok'=>true,'html'=>$html,'capabilities'=>array_map(static fn($t)=>['id'=>(int)$t['payment']['id'],'capabilities'=>$t['capabilities']],array_values($model['transactions']))],JSON_UNESCAPED_UNICODE|JSON_THROW_ON_ERROR);

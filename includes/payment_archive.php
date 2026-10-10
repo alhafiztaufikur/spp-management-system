@@ -1,10 +1,12 @@
 <?php
+require_once __DIR__.'/history_operator_filter.php';
 
 /** Archive filters use deletion time and stored identity, never require a live student row. */
-function payment_archive_page(mysqli $db, string $start, string $end, string $search, int $studentId, int $page, int $perPage): array
+function payment_archive_page(mysqli $db, string $start, string $end, string $search, int $studentId, int $page, int $perPage, array $operators=['*']): array
 {
     if (!payment_activity_ready($db)) return ['rows'=>[],'total'=>0,'page'=>1,'pages'=>1,'offset'=>0];
     $where="a.action='deleted' AND a.occurred_at>=? AND a.occurred_at<?";
+    $where.=history_operator_where($db,$operators,'a.payment_id','a.unit_id');
     $params=[$start.' 00:00:00',date('Y-m-d H:i:s',strtotime($end.' +1 day'))]; $types='ss';
     if ($search!=='') {
         $where.=" AND (JSON_UNQUOTE(JSON_EXTRACT(a.before_snapshot,'$.payment.NAMA')) LIKE ?
@@ -29,7 +31,7 @@ function payment_archive_page(mysqli $db, string $start, string $end, string $se
     foreach($s->get_result()->fetch_all(MYSQLI_ASSOC) as $event) {
         $snap=json_decode($event['before_snapshot'],true);$p=$snap['payment']??[];if(!$p)continue;
         $p['id']=(int)$event['payment_id'];$p['unit_id']=(int)$event['unit_id'];
-        $p['kelas_transaksi']=$p['kelas_rombel_snapshot']?:($p['KELAS']??'');
+        $p['kelas_transaksi']=($p['kelas_rombel_snapshot']??'')?:($p['KELAS']??'');
         $p['NAMA']=$p['NAMA']??'Siswa tidak tercatat';$p['_deleted_event']=$event;$rows[]=$p;
     }
     $s->close();return compact('rows','total','page','pages','offset');

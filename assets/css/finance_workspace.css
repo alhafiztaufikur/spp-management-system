@@ -1,4 +1,4 @@
-/* Laporan Umum: scoped overrides after the shared application stylesheet. */
+/* Laporan Transaksi: scoped overrides after the shared application stylesheet. */
 .finance-workspace{max-width:1800px;margin-inline:auto;min-width:0;padding:24px;box-sizing:border-box;width:100%}
 .finance-workspace svg{flex-shrink:0}
 .finance-workspace [hidden]{display:none!important}

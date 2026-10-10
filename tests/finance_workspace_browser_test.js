@@ -10,7 +10,7 @@ const period='tanggal_awal=2026-10-01&tanggal_akhir=2026-10-07';
   const context=await browser.newContext();await context.addCookies([{name:'PHPSESSID',value:fixture.units[unit].cookies.PHPSESSID,url:base}]);
   const page=await context.newPage(),errors=[];page.on('pageerror',e=>errors.push(e.message));
   for(const theme of ['light','dark'])for(const width of [1600,900,390]){
-   await page.setViewportSize({width,height:1000});await page.addInitScript(t=>localStorage.setItem('spp_theme',t),theme);
+   await page.setViewportSize({width,height:1000});
    for(const path of ['/laporan/index.php?'+period,'/tabungan/riwayat.php?'+period]){
     const response=await page.goto(base+path);assert.equal(response.status(),200);await page.evaluate(t=>{localStorage.setItem('spp_theme',t);document.documentElement.dataset.theme=t},theme);assert.equal(await page.locator('html').getAttribute('data-theme'),theme);await page.waitForTimeout(120);
     assert.doesNotMatch(await page.content(),/Fatal error|Warning:/);assert.equal(await page.evaluate(()=>document.documentElement.scrollWidth>innerWidth+2),false,'Overflow '+unit+' '+width+' '+path);
@@ -22,6 +22,14 @@ const period='tanggal_awal=2026-10-01&tanggal_akhir=2026-10-07';
     await page.screenshot({path:dir+'/'+(path.startsWith('/laporan')?'finance':'savings')+'-'+unit+'-'+width+'-'+theme+'.png'});
     await option.click();assert.ok(Number(await page.locator('input[name="student_id"]').first().inputValue())>0);await input.press('Escape');
     if(path.startsWith('/laporan')){
+     const fonts=await page.evaluate(()=>{
+      const size=selector=>Number.parseFloat(getComputedStyle(document.querySelector(selector)).fontSize);
+      return {input:size('#report-siswa-search'),label:size('.report-general-filter .field-label'),button:size('.report-general-filter .btn'),note:size('.finance-summary-note'),panel:size('.finance-results .card-title'),number:size('.finance-stat strong'),table:size('.finance-results .payment-table td'),title:size('.finance-hero h1')};
+     });
+     assert.deepEqual({...fonts,title:undefined},{input:15,label:13,button:13,note:12,panel:18,number:22,table:14,title:undefined},'Compact report typography '+width);
+     assert.ok(fonts.title>=26&&fonts.title<=28,'Report title size');
+     assert.ok(await input.evaluate(e=>e.getBoundingClientRect().height)>=48,'Report input click area shrank');
+
      await page.goto(base+'/laporan/index.php?'+period);const expected=fixture.units[unit];
      assert.equal(await page.locator('.finance-stat.is-payment strong').innerText(),money(expected.payment_total));
      assert.equal(await page.locator('.finance-stat.is-count strong').innerText(),String(expected.rows.length));
@@ -45,10 +53,10 @@ const period='tanggal_awal=2026-10-01&tanggal_akhir=2026-10-07';
   assert.equal((await page.request.get(base+'/laporan/index.php?jenis_laporan[]=invalid')).status(),400);
   await page.goto(base+'/laporan/index.php?'+period+'&q=NO_MATCH_FINANCE_QA');assert.equal(await page.locator('.finance-stat.is-count strong').innerText(),'0');assert.match(await page.locator('#tbl-laporan').innerText(),/Belum ada data/);
   if(unit===1){
-   await page.evaluate(()=>{localStorage.setItem('spp_theme','light');document.documentElement.dataset.theme='light'});await page.addInitScript(()=>localStorage.setItem('spp_theme','light'));await page.setViewportSize({width:1600,height:1000});
+   await page.evaluate(()=>{localStorage.setItem('spp_theme','light');document.documentElement.dataset.theme='light'});await page.setViewportSize({width:1600,height:1000});
    await page.goto(base+'/laporan/index.php?'+period);await page.locator('.finance-row-menu summary').first().click();await page.locator('.open-payment-activity').first().click();await page.waitForFunction(()=>document.querySelector('.payment-activity-content').textContent&&!document.querySelector('.payment-activity-content').textContent.includes('Memuat'));assert.ok(await page.locator('.payment-activity-list').count()>0);await page.locator('[data-close-activity]').click();
    // Verify the UI switch and its icon color on all units, then reject All on entry forms.
-   for(const target of [2,3,0,1]){await Promise.all([page.waitForNavigation(),page.locator('[data-unit-choice="'+target+'"]').click()]);assert.equal(await page.locator('.sidebar-unit-form').getAttribute('data-operational-unit'),String(target));assert.equal(await page.locator('[data-unit-choice="'+target+'"]').getAttribute('aria-pressed'),'true');const c=await page.locator('.sidebar-unit-heading-icon').evaluate(e=>getComputedStyle(e).color);assert.equal(c,{1:'rgb(21, 140, 73)',2:'rgb(22, 112, 201)',3:'rgb(220, 53, 69)',0:'rgb(124, 58, 237)'}[target]);}
+   for(const target of [2,3,0,1]){await Promise.all([page.waitForNavigation(),page.locator('[data-unit-choice="'+target+'"]').click()]);assert.equal(await page.locator('.sidebar-unit-form').getAttribute('data-operational-unit'),String(target));assert.equal(await page.locator('[data-unit-choice="'+target+'"]').getAttribute('aria-pressed'),'true');const c=await page.locator('.sidebar-unit-heading-icon').evaluate(e=>getComputedStyle(e).color);assert.equal(c,{1:'rgb(98, 221, 177)',2:'rgb(139, 196, 255)',3:'rgb(255, 192, 199)',0:'rgb(210, 182, 255)'}[target]);}
    await page.goto(base+'/tabungan/masuk.php');assert.equal(await page.locator('[data-unit-choice="0"]').isDisabled(),true);
   }
   assert.deepEqual(errors,[]);await context.close();

@@ -22,7 +22,7 @@ try {
     $selectionMissing=$selectedId>0 && !$chosen;
     $chosen??=$rows[0]??null;$selectedId=(int)($chosen['tagihan_id']??0);$selectedUnit=(int)($chosen['unit_id']??unit_active_id());
     $detail=null;
-    if($chosen){try{$detail=registration_detail($koneksi,$selectedId,$selectedUnit,$view);}catch(OutOfBoundsException $error){$detailError=$error->getMessage();}}
+    if($chosen){try{$detail=registration_detail($koneksi,$selectedId,$selectedUnit,$view,$f['values']['operator']);}catch(OutOfBoundsException $error){$detailError=$error->getMessage();}}
     $query['selected_unit']=$selectedUnit;
     $first=$summary['students']?$offset+1:0;$last=$summary['students']?$offset+count($rows):0;
     $students=$koneksi->query("SELECT DISTINCT s.id student_id,s.unit_id,s.NO_INDUK,s.NO_induk_diknas,s.NAMA,s.KELAS FROM siswa s JOIN tagihan_daftar_ulang t ON t.no_induk=s.NO_INDUK AND t.unit_id=s.unit_id WHERE t.status='open' ORDER BY s.NAMA")->fetch_all(MYSQLI_ASSOC);

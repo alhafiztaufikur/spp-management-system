@@ -3,16 +3,34 @@ session_start();
 require_once __DIR__.'/koneksi.php';
 require_once __DIR__.'/includes/auth.php';
 require_once __DIR__.'/includes/authorization_presentation.php';
+require_once __DIR__.'/includes/authorization_export_selection.php';
 if (!unit_is_super()) { http_response_code(403); exit('Hanya Super Admin yang dapat mengekspor PDF Otorisasi.'); }
 requireRole(['super_admin']);
 header('Cache-Control: no-store, private');
-if($_SERVER['REQUEST_METHOD']!=='GET'){http_response_code(405);header('Allow: GET');exit('Gunakan GET untuk membaca laporan.');}
+if(!in_array($_SERVER['REQUEST_METHOD'],['GET','POST'],true)){http_response_code(405);header('Allow: GET, POST');exit('Gunakan GET atau POST untuk membaca laporan.');}
+$selection=null;$selectionToken=null;$scope=unit_active_id();$actor=(int)$_SESSION['admin_id'];
+try {
+    if ($_SERVER['REQUEST_METHOD']==='POST') {
+        $csrf=$_POST['csrf_token']??null;
+        if (!is_string($csrf) || !isset($_SESSION['csrf_transaction_authorization']) || !hash_equals($_SESSION['csrf_transaction_authorization'],$csrf)) {
+            http_response_code(403);exit('Sesi cetak tidak valid. Muat ulang halaman Otorisasi.');
+        }
+        if (!is_string($_POST['transactions']??null)) throw new InvalidArgumentException('Pilih transaksi yang ingin dicetak.');
+        $selection=authorization_export_selection($_POST['transactions']);
+        $_GET=array_intersect_key($_POST,array_flip(['kind','status','q']));
+    } elseif (array_key_exists('selection_token',$_GET)) {
+        $entry=authorization_export_load_token($_GET['selection_token'],$actor,$scope);
+        $selection=$entry['keys'];$selectionToken=$_GET['selection_token'];
+        $_GET=$entry['query']+array_intersect_key($_GET,array_flip(['output']));
+    }
+    if (isset($_GET['q']) && !is_string($_GET['q'])) throw new InvalidArgumentException('Pencarian tidak valid.');
+} catch (InvalidArgumentException $error) {http_response_code(400);exit(authorization_escape($error->getMessage()));}
 $statuses=filter_register('status',$_GET['status']??null,array_fill_keys(['pending','approved','rejected','cancelled','failed'],''),'all','all');
 $kinds=filter_register('kind',$_GET['kind']??null,['edit'=>'Edit','hapus'=>'Hapus'],'all','all');
 foreach($statuses as $choice)if($choice!=='*'&&!in_array($choice,['pending','approved','rejected','cancelled','failed'],true))filter_choice_error('status');
 foreach($kinds as $choice)if($choice!=='*'&&!in_array($choice,['edit','hapus'],true))filter_choice_error('jenis perubahan');
 $status=filter_scalar($statuses,'all');$kind=filter_scalar($kinds,'all');
-$q=trim((string)($_GET['q']??''));$scope=unit_active_id();$models=[];
+$q=trim((string)($_GET['q']??''));$models=[];$unmatched=$selection??[];
 try {
     // All pages and event details belong to the same consistent read snapshot.
     $koneksi->begin_transaction(MYSQLI_TRANS_START_READ_ONLY | MYSQLI_TRANS_START_WITH_CONSISTENT_SNAPSHOT);
@@ -20,13 +38,23 @@ try {
     for($page=1;$page<=$first['pages'];$page++) {
         $result=$page===1?$first:authorization_history_page($koneksi,$status,$kind,$q,$page,$statuses);
         foreach($result['rows'] as $row) {
+            $key=(int)$row['unit_id'].'|'.(int)$row['payment_id'];
+            if ($selection!==null && !isset($selection[$key])) continue;
+            unset($unmatched[$key]);
             authorization_read_unit($koneksi,(string)$row['unit_id']);
             $models[]=authorization_detail_model($koneksi,(int)$row['payment_id'],false);
             unit_set_context($koneksi,$scope);
         }
     }
+    if ($unmatched) throw new InvalidArgumentException('Sebagian pilihan tidak termasuk hasil filter atau unit yang diizinkan. Pilih kembali transaksi.');
     $koneksi->commit();
-}catch(Throwable $e){try{$koneksi->rollback();}catch(Throwable $ignored){}unit_set_context($koneksi,$scope);error_log('PDF otorisasi: '.$e->getMessage());http_response_code(503);exit('Riwayat belum dapat diekspor. Silakan coba kembali.');}
+}catch(InvalidArgumentException $e){$koneksi->rollback();unit_set_context($koneksi,$scope);http_response_code(400);exit(authorization_escape($e->getMessage()));}
+catch(Throwable $e){try{$koneksi->rollback();}catch(Throwable $ignored){}unit_set_context($koneksi,$scope);error_log('PDF otorisasi: '.$e->getMessage());http_response_code(503);exit('Riwayat belum dapat diekspor. Silakan coba kembali.');}
+if ($_SERVER['REQUEST_METHOD']==='POST') {
+    $selectionToken=authorization_export_save_token($selection,['kind'=>$kinds,'status'=>$statuses,'q'=>$q],$actor,$scope);
+    header('Location: otorisasi_export_pdf.php?'.http_build_query(['selection_token'=>$selectionToken]),true,303);exit;
+}
+$selectionLabel=$selection!==null?'transaksi terpilih':'transaksi hasil filter (seluruh halaman)';
 $palette=[0=>'6d28d9',1=>'12844b',2=>'244bb5',3=>'b62735'];$color=$palette[$scope]??$palette[1];
 $kindLabel=filter_is_all($kinds)?'Semua perubahan':implode(', ',array_map(static fn($v)=>$v==='edit'?'Edit':'Hapus',$kinds));
 $statusLabel=filter_is_all($statuses)?'Semua status':implode(', ',array_map('transaction_authorization_status_label',$statuses));
@@ -43,7 +71,7 @@ th { background:#<?= $color ?>;color:white;text-align:center; } td,th { border:1
 </style></head><body><header class="identity">
 <?php $logo=__DIR__.'/assets/img/favicon.png';if(is_file($logo)): ?><img class="logo" src="data:image/png;base64,<?= base64_encode(file_get_contents($logo)) ?>"><?php endif; ?>
 <strong><?= authorization_escape(unit_school_name($scope)) ?></strong><br>Unit: <?= authorization_escape(unit_label($scope)) ?><h1>Riwayat Otorisasi Transaksi</h1></header>
-<div class="meta">Dibuat: <?= authorization_escape($generated) ?> · Petugas: <?= authorization_escape($_SESSION['admin_nama']??'Tidak tercatat') ?><br>Jenis: <?= authorization_escape($kindLabel) ?> · Status: <?= authorization_escape($statusLabel) ?><br>Pencarian: <?= authorization_escape($q?:'Tidak dibatasi') ?> · Total: <?= count($models) ?> transaksi hasil filter (seluruh halaman).</div>
+<div class="meta">Dibuat: <?= authorization_escape($generated) ?> · Petugas: <?= authorization_escape($_SESSION['admin_nama']??'Tidak tercatat') ?><br>Jenis: <?= authorization_escape($kindLabel) ?> · Status: <?= authorization_escape($statusLabel) ?><br>Pencarian: <?= authorization_escape($q?:'Tidak dibatasi') ?> · Total: <?= count($models) ?> <?= authorization_escape($selectionLabel) ?>.</div>
 <p class="muted">Filter mencocokkan aktivitas dalam riwayat. Ringkasan menunjukkan aktivitas terakhir setiap transaksi; kronologi di bawah mencakup seluruh bukti aktivitas yang tersedia.</p>
 <h2>Ringkasan Transaksi</h2><table><thead><tr><th style="width:4%">No.</th><th class="reference">Transaksi / Siswa</th><th style="width:7%">Unit</th><th>Aktivitas terakhir</th><th class="actor">Operator</th><th class="time">Waktu WIB</th></tr></thead><tbody>
 <?php foreach($models as $index=>$model): $event=$model['latest']; ?><tr><td><?= $index+1 ?></td><td><strong><?= authorization_escape($model['reference']) ?></strong><br><?= authorization_escape($model['student']) ?><br>NIS <?= authorization_escape($model['nis']) ?></td><td><?= authorization_escape($model['unit']) ?></td><td><?= authorization_escape($event['label']) ?><br><?= $event['authorization_id']?'Pengajuan #'.(int)$event['authorization_id']:'Perubahan langsung' ?></td><td><?= authorization_escape($event['name']) ?><br><?= authorization_escape($event['username']?'@'.$event['username']:'Tidak tercatat') ?><br><?= authorization_escape(authorization_role_label($event['role'])) ?></td><td><?= authorization_escape($event['time']) ?></td></tr><?php endforeach; ?>
@@ -58,11 +86,12 @@ th { background:#<?= $color ?>;color:white;text-align:center; } td,th { border:1
 <?php endforeach; endforeach; ?></body></html>
 <?php $html=ob_get_clean();
 $query=['kind'=>$kind,'status'=>$status,'q'=>$q];
+$downloadQuery=$selectionToken!==null?['selection_token'=>$selectionToken]:$query;
 if(($_GET['output']??'preview')==='preview') {
     require_once __DIR__.'/includes/report_preview.php';
-    render_report_pdf_preview($html,['title'=>'Riwayat Otorisasi Transaksi','subtitle'=>unit_label($scope).' · '.count($models).' transaksi hasil filter',
+    render_report_pdf_preview($html,['title'=>'Riwayat Otorisasi Transaksi','subtitle'=>unit_label($scope).' · '.count($models).' '.$selectionLabel,
         'generated'=>$generated,'row_count'=>count($models),'orientation'=>'landscape',
-        'download_url'=>'otorisasi_export_pdf.php?'.filter_build_query($query+['output'=>'pdf']),
+        'download_url'=>'otorisasi_export_pdf.php?'.filter_build_query($downloadQuery+['output'=>'pdf']),
         'back_url'=>'otorisasi_transaksi.php?'.filter_build_query($query+['view'=>'history'])]);
 }
 require_once __DIR__.'/includes/pdf.php';require_pdf_library();

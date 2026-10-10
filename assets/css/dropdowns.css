@@ -66,3 +66,7 @@
 
 .spp-dropdown-panel .payment-year-option{justify-content:flex-start!important}
 .student-master-shell + .master-modern-form [data-class-picker-button]{border-radius:10px!important}
+
+/* Search is opt-in for long operator lists. */
+.spp-multi-search{display:block;width:100%;box-sizing:border-box;border:1px solid var(--border);border-radius:9px;background:var(--bg-surface);color:var(--text-primary);padding:11px 12px;margin:0 0 8px;font:inherit;min-height:42px}
+.spp-multi-option[hidden]{display:none!important}
