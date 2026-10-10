@@ -13,6 +13,8 @@ document.addEventListener('DOMContentLoaded', () => {
     inputs.forEach(input=>input.disabled=!editing);
     edit.hidden=editing&&dirty;edit.setAttribute('aria-disabled',String(editing));edit.tabIndex=editing?-1:0;
     save.hidden=!editing||!dirty;save.disabled=!dirty;cancel.hidden=!editing;
+    const note=document.getElementById('spp-rate-note');
+    if(note)note.textContent=!editing?'Tarif terkunci.':(dirty?'Perubahan belum disimpan.':'Tarif siap diedit.');
   }
   edit?.addEventListener('click',event=>{event.preventDefault();if(rate.dataset.editing==='true')return;rate.dataset.editing='true';refresh();inputs[0]?.focus();});
   cancel?.addEventListener('click',event=>{event.preventDefault();inputs.forEach(input=>{input.value=Number(input.dataset.original)>0?Number(input.dataset.original).toLocaleString('id-ID'):'';input.setCustomValidity('');});rate.dataset.editing='false';accepted.delete(rate);rate.elements.confirm_rate_change.value='0';refresh();edit.focus();});

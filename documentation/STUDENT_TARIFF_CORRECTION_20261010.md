@@ -20,6 +20,8 @@ Penguncian siswa memakai bentuk lookup NIS yang sama dengan kasir, lalu mengunci
 
 Simpan draft, penerbitan pertama, dan koreksi terbit menggunakan modal Input Pembayaran. Modal menampilkan unit/tahun, tarif per kelas atau nominal lama–baru, serta jumlah siswa pada penerbitan. Urutan penerbitan: konfirmasi tarif → pemeriksaan/konfirmasi tunggakan existing → penerbitan. Perubahan pilihan membatalkan konfirmasi lama. Formulir tanpa JavaScript memakai layar konfirmasi server dengan gaya yang sama. Input dipertahankan saat kembali/gagal; Batalkan menghapus draft koreksi yang belum disimpan.
 
+Tombol Edit/Simpan Tarif memenuhi lebar grid dan memakai ikon pensil/simpan yang konsisten. Batalkan berada terpisah di bawah tindakan utama. Keterangan pendek mengikuti keadaan form: Tarif terkunci, Tarif siap diedit, atau Perubahan belum disimpan; tahun tertutup tetap menunjukkan cara membuka kembali. Pengingat generik Semua Unit dihapus dari seluruh halaman, dengan guard backend dan penonaktifan form readonly tetap utuh. Pemeriksaan browser membaca 18 keadaan tarif (tiga unit × tiga lebar × dua tema), ikon/alignment/status/modal/Batalkan, lima halaman Semua Unit tanpa banner, dan tata letak native tanpa JavaScript; semuanya lulus. Data operasional tidak berubah.
+
 ## Verifikasi
 
 Semua mutasi QA memakai `db_spp_audit_student_tariff_20261010`, dipulihkan dari backup baru. Artefak/dump/fingerprint/screenshot privat berada di `C:\laragon\backups\spp-management-system\student_tariff_edit_20261010`.

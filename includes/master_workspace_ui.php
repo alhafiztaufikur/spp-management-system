@@ -17,6 +17,7 @@ function master_workspace_icon(string $name): string {
         'info' => '<circle cx="12" cy="12" r="9"/><path d="M12 11v6M12 7h.01"/>',
         'lock' => '<rect x="4" y="10" width="16" height="11" rx="2"/><path d="M8 10V7a4 4 0 0 1 8 0v3M12 14v3"/>',
         'save' => '<path d="M4 3h13l4 4v14H3V3h1ZM7 3v6h9V3M7 21v-8h10v8"/>',
+        'edit' => '<path d="m16 3 5 5-12 12H4v-5L16 3ZM14 5l5 5"/>',
         'plus' => '<path d="M12 4v16M4 12h16"/>',
         'reset' => '<path d="M3 10a9 9 0 1 1 2 8M3 4v6h6"/>',
         'calculator' => '<rect x="5" y="2" width="14" height="20" rx="2"/><path d="M8 5h8v4H8zM8 13h1M12 13h1M16 13h.01M8 17h1M12 17h1M16 17h.01"/>',

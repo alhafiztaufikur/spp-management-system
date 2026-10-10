@@ -150,3 +150,8 @@
 .spp-workspace [aria-disabled="true"]{opacity:.55;cursor:default;}
 body[data-readable-workspace="master-spp"] .spp-warning-amount{white-space:pre-line;max-height:40vh;overflow:auto;}
 body[data-readable-workspace="master-spp"] #spp-rate-form [hidden]{display:none!important;}
+#spp-rate-form .spp-rate-actions{display:grid;grid-template-columns:minmax(0,1fr);gap:10px;}
+#spp-rate-form .spp-rate-actions .btn-primary{display:flex;align-items:center;justify-content:center;gap:8px;width:100%;min-height:48px;border-radius:12px;}
+#spp-rate-form .spp-rate-actions .btn-ghost{justify-self:end;width:auto;min-height:44px;}
+#spp-rate-form .spp-rate-actions .btn svg{width:18px;height:18px;flex:none;}
+#spp-rate-form .spp-rate-note{margin:10px 0 0;}

@@ -64,7 +64,7 @@ try {
         lock_http_assert($before===lock_http_snapshot($koneksi),'Stale form changed published data');
         [$status,$html]=lock_http('master_spp.php?tahun='.urlencode($year),$session);$form=spp_test_form_scope($html,'jumlah['.$first.']');
         lock_http_assert(substr_count($form,' disabled')===$last-$first+1 && str_contains($form,'id="spp-rate-edit"'),'Published form is editable');
-        lock_http_assert(str_contains($html,'Tarif terkunci. Pilih Edit Tarif untuk melakukan koreksi.'),'Lock note missing');
+        lock_http_assert(str_contains($html,'Tarif terkunci.'),'Lock note missing');
         foreach (['tutup','buka'] as $action) {
             lock_http_assert(lock_http('master_spp.php',$session,['aksi'=>$action,'tahun_ajaran'=>$year,'csrf_token'=>$token])[0]===302,'Year transition failed');
             lock_http_assert($koneksi->query('SELECT status FROM master_spp_tahun WHERE id='.$id)->fetch_row()[0]===($action==='tutup'?'closed':'published'),'Wrong year state');

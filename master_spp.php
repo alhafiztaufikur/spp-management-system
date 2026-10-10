@@ -245,16 +245,16 @@ $yearStart = (int)substr($selectedYear, 0, 4);
               <label class="field-row spp-grade-rate"><span class="spp-grade-roman" aria-hidden="true"><?= master_workspace_roman($i) ?></span><span class="field-label">Kelas <?= $i ?></span><input class="field-input rupiah-input" name="jumlah[<?= $i ?>]" inputmode="numeric" data-original="<?= mspp_e($rates[$i]) ?>" data-level="<?= $i ?>" value="<?= $rateValues[$i] > 0 ? mspp_money($rateValues[$i]) : '' ?>" placeholder="Rp 0" required <?= (!$ratesEditable&&!$rateEditing) ? 'disabled' : '' ?>></label>
               <?php endfor; ?>
             </div>
-            <div class="action-bar">
+            <div class="action-bar spp-rate-actions">
             <?php if ($ratesEditable): ?><button class="btn btn-primary" id="spp-rate-save" type="submit"><?= master_workspace_icon('save') ?>Simpan Tarif</button>
             <?php elseif ($master['status']==='published'): ?>
-              <a class="btn btn-primary" id="spp-rate-edit" href="?tahun=<?= urlencode($selectedYear) ?>&amp;edit_tarif=1#spp-rate-panel"><?= master_workspace_icon('edit') ?><span>Edit Tarif</span></a>
-              <button class="btn btn-primary" type="submit" id="spp-rate-save" hidden>Simpan Perubahan Tarif</button>
-              <a class="btn btn-ghost" id="spp-rate-cancel" href="?tahun=<?= urlencode($selectedYear) ?>&amp;cancel_tarif=1#spp-rate-panel" <?= !$rateEditing?'hidden':'' ?>>Batalkan</a>
-              <noscript><?php if($rateEditing): ?><button class="btn btn-primary" type="submit">Simpan Perubahan Tarif</button><?php endif; ?></noscript>
+              <a class="btn btn-primary" id="spp-rate-edit" href="?tahun=<?= urlencode($selectedYear) ?>&amp;edit_tarif=1#spp-rate-panel" <?= $rateEditing?'hidden':'' ?>><?= master_workspace_icon('edit') ?><span>Edit Tarif</span></a>
+              <button class="btn btn-primary" type="submit" id="spp-rate-save" hidden><?= master_workspace_icon('save') ?><span>Simpan Perubahan Tarif</span></button>
+              <noscript><?php if($rateEditing): ?><button class="btn btn-primary" type="submit"><?= master_workspace_icon('save') ?>Simpan Perubahan Tarif</button><?php endif; ?></noscript>
+              <a class="btn btn-ghost" id="spp-rate-cancel" href="?tahun=<?= urlencode($selectedYear) ?>&amp;cancel_tarif=1#spp-rate-panel" <?= !$rateEditing?'hidden':'' ?>><?= master_workspace_icon('reset') ?><span>Batalkan</span></a>
             <?php endif; ?>
             </div>
-            <?php if (!$ratesEditable): ?><p class="spp-info-note"><?= master_workspace_icon('lock') ?><?= $master['status']==='closed'?'Buka kembali tahun untuk mengoreksi tarif.':'Tarif terkunci. Pilih Edit Tarif untuk melakukan koreksi.' ?></p><?php endif; ?>
+            <?php if (!$ratesEditable): ?><p class="spp-info-note spp-rate-note" id="spp-rate-note" role="status" aria-live="polite"><?= $master['status']==='closed'?'Buka kembali tahun untuk mengubah tarif.':($rateEditing?'Tarif siap diedit.':'Tarif terkunci.') ?></p><?php endif; ?>
           </form>
         </section>
         <section class="spp-tab-panel spp-publish-card" id="spp-students-panel" data-spp-panel="students">
