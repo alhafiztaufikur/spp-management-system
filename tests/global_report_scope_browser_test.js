@@ -18,10 +18,18 @@ try{
      for(const width of [1440,900,390])for(const theme of ['light','dark']){
       await page.setViewportSize({width,height:1000});await page.evaluate(t=>{document.documentElement.dataset.theme=t;window.scrollTo(0,0);},theme);await page.waitForFunction(()=>document.documentElement.scrollWidth<=innerWidth+2);
       await page.waitForFunction(()=>{const boxes=[...document.querySelectorAll('.global-unit-choice')].map(e=>e.getBoundingClientRect());return boxes.length===4&&boxes.every(b=>Math.abs(b.height-boxes[0].height)<1&&Math.abs(b.width-boxes[0].width)<1);});
-      const boxes=await page.locator('.global-unit-choice').evaluateAll(nodes=>nodes.map(n=>{const r=n.getBoundingClientRect(),s=getComputedStyle(n);return {x:r.x,y:r.y,w:r.width,h:r.height,bg:s.backgroundColor,color:s.color,active:n.hasAttribute('aria-current')};}));
+      const expectedInk=choice==='1'?(theme==='dark'?'rgb(15, 21, 24)':'rgb(251, 254, 252)'):'rgb(255, 255, 255)';
+      await page.waitForFunction(ink=>getComputedStyle(document.querySelector('.global-unit-choice.is-active')).color===ink,expectedInk);
+      const boxes=await page.locator('.global-unit-choice').evaluateAll(nodes=>nodes.map(n=>{const r=n.getBoundingClientRect(),s=getComputedStyle(n);return {x:r.x,y:r.y,w:r.width,h:r.height,bg:s.backgroundColor,image:s.backgroundImage,color:s.color,active:n.hasAttribute('aria-current')};}));
       assert.ok(boxes.every(b=>b.h>=44&&Math.abs(b.h-boxes[0].h)<1&&Math.abs(b.w-boxes[0].w)<1),'Unequal button dimensions '+route+' '+width+' '+theme+' '+JSON.stringify(boxes));
       assert.ok(width<=650?boxes[0].y===boxes[1].y&&boxes[2].y===boxes[3].y&&boxes[2].y>boxes[0].y:boxes.every(b=>b.y===boxes[0].y),'Incorrect responsive layout');
-      const active=boxes.find(b=>b.active);assert.equal(active.bg,'rgb(33, 75, 224)');assert.equal(active.color,'rgb(255, 255, 255)');
+      const active=boxes.find(b=>b.active),palette={1:'sd',2:'smp',3:'sma',all:'super'}[choice];
+      assert.equal(await page.locator('html').getAttribute('data-palette'),palette);
+      assert.equal(await page.locator('.sidebar').getAttribute('data-palette-unit'),choice==='all'?'0':choice);
+      assert.equal(await page.locator('.sidebar').getAttribute('data-navigation-unit'),'1');
+      const start={1:theme==='dark'?'rgb(52, 211, 153)':'rgb(22, 138, 70)',2:'rgb(30, 64, 175)',3:'rgb(153, 27, 27)',all:'rgb(91, 33, 182)'}[choice];assert.ok(active.image.includes(start),'Wrong active unit button color');
+      assert.equal(active.color,choice==='1'?(theme==='dark'?'rgb(15, 21, 24)':'rgb(251, 254, 252)'):'rgb(255, 255, 255)');
+      assert.equal(await page.locator('.sidebar').evaluate(e=>getComputedStyle(e).getPropertyValue('--nav-accent').trim()),{1:'#62ddb1',2:'#8bc4ff',3:'#ffc0c7',all:'#d2b6ff'}[choice]);
       if(process.env.SPP_UI_OUTPUT&&role==='kasir')await page.screenshot({path:process.env.SPP_UI_OUTPUT+'/global-'+(route.includes('template')?'template':'catalogue')+'-'+choice+'-'+width+'-'+theme+'.png',fullPage:true,animations:'disabled'});
       states++;
      }
@@ -37,6 +45,14 @@ try{
    if(role==='super_admin'){await page.goto(base+'/dashboard.php');assert.equal(await page.locator('#sidebar-unit-select').inputValue(),'1');}else{await page.goto(base+'/laporan/global.php?unit=active');assert.equal(await page.locator('.global-unit-choice[aria-current=true]').getAttribute('data-report-unit'),'1');}
    console.log('PASS: '+role+' four scopes, catalogue/template layouts, keyboard/filter reset, native navigation and operational unit');
   }finally{await context.close();}
+ }
+ for(const owner of [2,3]){
+  const ctx=await browser.newContext(),p=await ctx.newPage();p.on('pageerror',e=>errors.push(e.message));
+  try{await p.goto(base+'/login.php');await p.locator('#username').fill(actors[owner].accounts.find(a=>a.role==='kasir').username);await p.locator('#password').fill(password);await Promise.all([p.waitForNavigation(),p.locator('#btn-login').click()]);
+   for(const choice of ['1','2','3','all']){await p.goto(base+'/laporan/global.php?unit='+choice);assert.equal(await p.locator('html').getAttribute('data-palette'),{1:'sd',2:'smp',3:'sma',all:'super'}[choice]);assert.equal(await p.locator('.sidebar').getAttribute('data-navigation-unit'),String(owner));assert.equal(await p.locator('.sidebar').getAttribute('data-palette-unit'),choice==='all'?'0':choice);}
+   await p.goto(base+'/tabungan/masuk.php');assert.equal(await p.locator('html').getAttribute('data-palette'),owner===2?'smp':'sma');assert.equal(await p.locator('.sidebar').getAttribute('data-palette-unit'),String(owner));
+   console.log('PASS: cashier account unit '+owner+' follows report palette and returns to its operational palette');
+  }finally{await ctx.close();}
  }
  assert.deepEqual(errors,[]);console.log('PASS: '+states+' responsive/theme states; no JavaScript errors');
 }finally{await browser.close();}})().catch(e=>{console.error(e.stack);process.exitCode=1;});

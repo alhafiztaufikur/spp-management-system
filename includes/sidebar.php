@@ -135,6 +135,7 @@ if (empty($_SESSION['csrf_logout'])) $_SESSION['csrf_logout']=bin2hex(random_byt
 $activeUnit=unit_active_id();
 $transactionUnitOnly = unit_transaction_route((string)($_SERVER['SCRIPT_NAME'] ?? ''));
 $unitPalette = unit_palette_for_view(isset($reportUnitId) ? (int)$reportUnitId : null);
+$navigationPaletteUnit = (int)($GLOBALS['global_report_view_unit'] ?? $activeUnit);
 ?>
 <script>
 function unitSwitchReportScope(select) {
@@ -168,7 +169,7 @@ document.addEventListener('DOMContentLoaded', function () {
 <script defer src="<?= $root ?>assets/js/dropdowns.js?v=<?= filemtime(__DIR__.'/../assets/js/dropdowns.js') ?>"></script>
 <script>(function(){document.documentElement.setAttribute('data-palette',<?= json_encode($unitPalette, JSON_HEX_TAG | JSON_HEX_AMP) ?>);try{document.documentElement.setAttribute('data-theme',localStorage.getItem('spp_theme')||'light')}catch(e){document.documentElement.setAttribute('data-theme',document.documentElement.getAttribute('data-theme')||'light')}})();</script>
 
-<aside class="sidebar" id="sidebar" data-navigation-unit="<?= (int)$activeUnit ?>">
+<aside class="sidebar" id="sidebar" data-navigation-unit="<?= (int)$activeUnit ?>" data-palette-unit="<?= $navigationPaletteUnit ?>">
   <div class="sidebar-brand">
     <svg class="sidebar-brand-wave" viewBox="0 0 260 110" preserveAspectRatio="none" aria-hidden="true" focusable="false"><path d="M90 0h170v110C185 80 170 30 90 0Z"/><path d="M0 90C65 30 115 130 190 62c30-27 50-33 70-30v78H0Z"/></svg>
     <div class="brand-icon brand-logo-wrap">

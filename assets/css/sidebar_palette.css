@@ -1,8 +1,8 @@
 /* Local navigation colors; content tokens and sidebar dimensions are preserved. */
 html[data-theme][data-palette] .sidebar{--nav-base:#063c31;--nav-deep:#052f28;--nav-accent:#62ddb1;--nav-rgb:98,221,177;--nav-text:#e5f5ee;--nav-muted:#a3c8bc;background:linear-gradient(160deg,var(--nav-base),var(--nav-deep));color:var(--nav-text);border-right-color:rgba(var(--nav-rgb),.16);}
-html[data-theme][data-palette] .sidebar[data-navigation-unit="2"]{--nav-base:#102d53;--nav-deep:#0b213d;--nav-accent:#8bc4ff;--nav-rgb:139,196,255;--nav-text:#e9f2ff;--nav-muted:#acc1dc;}
-html[data-theme][data-palette] .sidebar[data-navigation-unit="3"]{--nav-base:#6b2b39;--nav-deep:#4f2330;--nav-accent:#ffc0c7;--nav-rgb:255,192,199;--nav-text:#fff4f5;--nav-muted:#e2c0c7;}
-html[data-theme][data-palette] .sidebar[data-navigation-unit="0"]{--nav-base:#36215b;--nav-deep:#25183f;--nav-accent:#d2b6ff;--nav-rgb:210,182,255;--nav-text:#f5eeff;--nav-muted:#c5b5df;}
+html[data-theme][data-palette] .sidebar[data-palette-unit="2"],html[data-theme][data-palette] .sidebar:not([data-palette-unit])[data-navigation-unit="2"]{--nav-base:#102d53;--nav-deep:#0b213d;--nav-accent:#8bc4ff;--nav-rgb:139,196,255;--nav-text:#e9f2ff;--nav-muted:#acc1dc;}
+html[data-theme][data-palette] .sidebar[data-palette-unit="3"],html[data-theme][data-palette] .sidebar:not([data-palette-unit])[data-navigation-unit="3"]{--nav-base:#6b2b39;--nav-deep:#4f2330;--nav-accent:#ffc0c7;--nav-rgb:255,192,199;--nav-text:#fff4f5;--nav-muted:#e2c0c7;}
+html[data-theme][data-palette] .sidebar[data-palette-unit="0"],html[data-theme][data-palette] .sidebar:not([data-palette-unit])[data-navigation-unit="0"]{--nav-base:#36215b;--nav-deep:#25183f;--nav-accent:#d2b6ff;--nav-rgb:210,182,255;--nav-text:#f5eeff;--nav-muted:#c5b5df;}
 html[data-theme][data-palette] .sidebar .sidebar-brand{background:rgba(var(--nav-rgb),.035);border-bottom-color:rgba(var(--nav-rgb),.14);}
 html[data-theme][data-palette] .sidebar .brand-name{background:none;color:var(--nav-text);-webkit-text-fill-color:var(--nav-text);}
 html[data-theme][data-palette] .sidebar .brand-logo-wrap{background:#fff;border-color:rgba(255,255,255,.7);box-shadow:none;}

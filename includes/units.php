@@ -22,6 +22,9 @@ function unit_is_super(): bool {
 }
 
 function unit_palette_for_view(?int $reportUnitId = null): string {
+    if (isset($GLOBALS['global_report_view_unit'])) {
+        return match ((int)$GLOBALS['global_report_view_unit']) { 0=>'super',2=>'smp',3=>'sma',default=>'sd' };
+    }
     if (unit_is_super() && ($reportUnitId === 0 || ($reportUnitId === null && unit_active_id() === 0))) return 'super';
     return match (unit_active_id()) { 2 => 'smp', 3 => 'sma', default => 'sd' };
 }

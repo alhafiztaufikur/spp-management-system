@@ -21,4 +21,16 @@ foreach(['super_admin','admin','kasir','bendahara'] as $role){
     scope_assert(!array_intersect(['kelas','student_id','operator','q','kategori'],array_keys($query)),'Dependent filters survived switch');scope_assert($query['tanggal_awal']==='2026-07-01'&&$query['tahun_ajaran']==='2026/2027','Date/year lost');
     $html=global_report_selector($koneksi,2,$query,'template.php');scope_assert(substr_count($html,'data-report-unit=')===4&&substr_count($html,'aria-current="true"')===1,'Selector state incorrect');scope_assert(report_query_unit_id()===2&&unit_active_id()===1,'Selector changed context/session');
     echo "PASS: $role all nine templates, sums/SQL reconciliation, ownership, selected/operational scope and filter reset\n";
+    foreach([1,2,3] as $owner){
+        $_SESSION['active_unit_id']=$owner;
+        foreach([1=>'sd',2=>'smp',3=>'sma',0=>'super'] as $selected=>$palette){
+            $query=['unit'=>global_report_unit_value($selected)];global_report_scope($koneksi,$query);
+            scope_assert(unit_palette_for_view($selected)===$palette,'Report palette follows the account instead of selected scope');
+            scope_assert(unit_active_id()===$owner,'Presentation changed the operational unit');
+            global_report_selector($koneksi,$selected,$query,'global.php');
+            scope_assert(unit_palette_for_view()===$palette,'Selector temporarily changed the report palette');
+        }
+        unset($GLOBALS['global_report_view_unit']);unit_set_context($koneksi,$owner);
+        scope_assert(unit_palette_for_view()===[1=>'sd',2=>'smp',3=>'sma'][$owner],'Operational palette did not return outside reports');
+    }
 }

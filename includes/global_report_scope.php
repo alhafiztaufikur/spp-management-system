@@ -24,6 +24,8 @@ function global_report_scope(mysqli $db, array &$query): int {
     $choice=global_report_validate_choice($query['unit']??'');
     $unit=in_array($choice,['','active'],true)?unit_active_id():($choice==='all'?0:(int)$choice);
     unit_set_context($db,$unit);$query['unit']=global_report_unit_value($unit);
+    // Presentation follows this report scope for every role, independently of the account unit.
+    $GLOBALS['global_report_view_unit']=$unit;
     if (isset($query['scope_change'])) {
         if ($query['scope_change']!=='1') { http_response_code(400);exit('Pergantian unit laporan tidak valid.'); }
         $query=global_report_preserved_query($db,$query);

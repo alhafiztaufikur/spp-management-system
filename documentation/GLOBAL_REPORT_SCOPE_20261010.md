@@ -2,9 +2,9 @@
 
 ## Penggunaan
 
-Super Admin, Admin, Kasir, dan Bendahara dapat memilih SD, SMP, SMA, atau Semua Unit pada katalog Laporan Global dan template di dalamnya. Empat tombol bersegmen memakai bingkai membulat dan pilihan aktif biru; ukuran seragam minimal 48 px. Desktop/tablet memakai satu baris, ponsel sampai 650 px memakai dua baris/dua kolom. Navigasi GET tetap bekerja melalui keyboard dan tanpa JavaScript.
+Super Admin, Admin, Kasir, dan Bendahara dapat memilih SD, SMP, SMA, atau Semua Unit pada katalog Laporan Global dan template di dalamnya. Empat tombol bersegmen memakai bingkai membulat dan warna unit yang dipilih: SD hijau, SMP biru, SMA merah, Semua Unit ungu. Ukuran seragam minimal 48 px. Desktop/tablet memakai satu baris, ponsel sampai 650 px memakai dua baris/dua kolom. Navigasi GET tetap bekerja melalui keyboard dan tanpa JavaScript.
 
-Pilihan awal mengikuti unit operasional. Pilihan laporan tidak menulis sesi unit operasional dan tidak memberi hak transaksi lintas unit. Unit yang dipilih tetap terbawa pada filter, pagination, Reset, kembali, cetak, PDF, dan Excel. Saat mengganti cakupan, pilihan siswa, kelas/rombel, operator, pencarian, serta kategori dibersihkan; tanggal dan tahun yang tersedia pada target dipertahankan.
+Pilihan awal mengikuti unit operasional. Warna halaman, sidebar, dan tombol mengikuti unit laporan untuk seluruh peran, termasuk akun Kasir SMP yang membuka laporan SD. Sesi unit operasional dan hak transaksi tidak berubah. Sidebar memisahkan `data-navigation-unit` (unit operasional) dari `data-palette-unit` (warna tampilan); di luar Laporan Global, warna kembali mengikuti unit operasional. Unit yang dipilih tetap terbawa pada filter, pagination, Reset, kembali, cetak, PDF, dan Excel. Saat mengganti cakupan, pilihan siswa, kelas/rombel, operator, pencarian, serta kategori dibersihkan; tanggal dan tahun yang tersedia pada target dipertahankan.
 
 ## Kontrak akses
 
@@ -22,7 +22,7 @@ QA memakai clone `db_spp_audit_global_scope_20261010` dari dump baru. Kredensial
 - HTTP: 818 permintaan mencakup empat peran × empat cakupan × sembilan template dan preview/cetak/Excel/PDF. PDF/XLSX biner valid. Cakupan unit bertahan pada formulir; scope salah/array, akses anonim, permintaan mutasi asing, dan batas Dashboard/surat tetap diperiksa.
 - Pemeriksaan tambahan 243 permintaan tanpa ekspor mencakup akun nonaktif, dengan pengembalian fixture akun. Fingerprint seluruh tabel clone identik setelah suite.
 - Readback Excel: 387 permintaan tambahan mencakup seluruh peran/cakupan/template; 144 workbook dimuat kembali dan identitas sekolah setiap sheet cocok dengan unit yang dipilih. Reader juga menolak formula executable yang tidak diharapkan.
-- Browser: 192 keadaan (empat peran × empat cakupan × dua halaman × tiga lebar × dua tema), tanpa galat JavaScript/overflow. Ukuran tombol seragam, satu baris desktop/tablet atau 2×2 ponsel, warna aktif biru/putih, keyboard, tanggal/tahun yang dipertahankan, pembersihan filter, identitas siswa, navigasi native dan unit operasional diuji.
+- Browser: 192 keadaan (empat peran × empat cakupan × dua halaman × tiga lebar × dua tema), tanpa galat JavaScript/overflow. Ukuran tombol seragam, satu baris desktop/tablet atau 2×2 ponsel, palet halaman/sidebar/tombol, keyboard, tanggal/tahun yang dipertahankan, pembersihan filter, identitas siswa, navigasi native dan unit operasional diuji. Tambahan Kasir SMP/SMA membuktikan warna laporan terlepas dari unit akun dan kembali ke palet operasional di halaman transaksi.
 - Seluruh 30 pemeriksaan integritas clone tetap nol.
 
 Regresi sepuluh template/rekap kas, surat, dan draf berformat lulus. Tes modular lama yang masih mengharapkan komponen Pangkal diperbarui agar mengikuti kontrak PSB yang sudah berlaku pada kode asal. Pemeriksaan sintaks PHP/JavaScript dan `git diff --check` lulus. Fingerprint seluruh tabel operasional serta empat berkas lokal yang dikecualikan tetap identik; health lokal `ok`.
