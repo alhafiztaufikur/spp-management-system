@@ -148,8 +148,10 @@ function unitSwitchReportScope(select) {
 <?php if (unit_all_readonly() && !$transactionUnitOnly && $current !== 'role_management.php'): ?>
 <script>
 document.addEventListener('DOMContentLoaded', function () {
+  <?php if (!isset($GLOBALS['global_report_view_unit'])): ?>
   var main=document.querySelector('main');
   if(main && !main.querySelector('.report-general-shell')){var note=document.createElement('div');note.className='alert alert-info';note.textContent='Semua Unit: tampilan baca. Pilih SD, SMP, atau SMA untuk transaksi atau perubahan data.';var content=main.querySelector('.page-content');if(content)content.prepend(note);else main.querySelector('.topbar')?.after(note)}
+  <?php endif; ?>
   document.querySelectorAll('form[method="post" i]').forEach(function(form){
     if(form.classList.contains('sidebar-unit-form') || form.classList.contains('dashboard-unit-switch-form') || form.action.includes('logout.php'))return;
     form.querySelectorAll('input,select,textarea,button').forEach(function(control){control.disabled=true});
