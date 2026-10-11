@@ -237,7 +237,7 @@ function authorization_request_summary(array $request): array
       <div class="auth-workspace" data-auth-workspace data-export-account="<?= $currentId ?>" data-export-scope="<?= unit_active_id() ?>" data-export-filter="<?= authorization_escape(json_encode(['kind'=>$kindChoices,'status'=>$statusChoices,'q'=>$search])) ?>" data-view="<?= $historyView?'history':'queue' ?>">
         <section class="auth-list-panel main-card">
           <header class="auth-panel-heading"><h3><?= authorization_icon('history') ?> <?= $historyView?'Daftar Riwayat Perubahan Transaksi':'Daftar Pengajuan Otorisasi' ?></h3><span class="auth-count"><?= number_format($total) ?> <?= $historyView?'transaksi':'pengajuan' ?></span></header>
-          <?php if($historyView): ?><div class="auth-list-tools"><small>Filter mencocokkan aktivitas dalam riwayat; kartu menampilkan perubahan terakhir.</small></div>
+          <?php if($historyView): ?>
           <?php if(unit_is_super()): ?>
           <form class="auth-export-tools" action="otorisasi_export_pdf.php" method="post" data-export-form>
             <input type="hidden" name="csrf_token" value="<?= authorization_escape($csrfToken) ?>">

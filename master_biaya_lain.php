@@ -391,7 +391,7 @@ require_once __DIR__ . '/includes/master_workspace_ui.php';
       <div class="main-card master-modern-card master-modern-form fee-panel">
         <div class="card-title-row fee-panel-heading">
           <span class="fee-icon"><?= master_workspace_icon($editData ? 'document' : 'document-add') ?></span>
-          <div><h2><?= $editData ? 'Edit Master Biaya' : 'Tambah Master Biaya' ?></h2><p><?= $editData ? 'Perbarui jenis biaya; transaksi lama tetap memakai tarif sebelumnya.' : 'Tambahkan jenis biaya lain yang akan digunakan untuk tagihan siswa.' ?></p></div>
+          <div><h2><?= $editData ? 'Edit Master Biaya' : 'Tambah Master Biaya' ?></h2><?php if($editData): ?><p>Perbarui jenis biaya; transaksi lama tetap memakai tarif sebelumnya.</p><?php endif; ?></div>
         </div>
         <form method="POST" action="master_biaya_lain.php" id="form-master-biaya">
           <input type="hidden" name="csrf_token" value="<?= htmlspecialchars($_SESSION['csrf_master_biaya_lain']) ?>" />
@@ -424,7 +424,7 @@ require_once __DIR__ . '/includes/master_workspace_ui.php';
       </div>
 
       <div class="main-card master-modern-card master-modern-form fee-panel fee-publish-panel" style="margin-top:0">
-        <div class="card-title-row fee-panel-heading"><span class="fee-icon"><?= master_workspace_icon('send') ?></span><div><h2>Terbitkan Tagihan Biaya Lain</h2><p>Pilih item biaya dan tentukan target penerima untuk menerbitkan tagihan.</p></div></div>
+        <div class="card-title-row fee-panel-heading"><span class="fee-icon"><?= master_workspace_icon('send') ?></span><div><h2>Terbitkan Tagihan Biaya Lain</h2></div></div>
         <?php if (!$activeMasters): ?>
           <div class="empty-state"><p>Belum ada master biaya aktif</p><span>Aktifkan atau tambahkan master biaya terlebih dahulu.</span></div>
         <?php else: ?>
@@ -474,8 +474,8 @@ require_once __DIR__ . '/includes/master_workspace_ui.php';
             </div>
           </div>
           <div class="report-summary-grid fee-preview-grid" style="margin-top:16px">
-            <div class="report-summary-card"><span class="fee-icon"><?= master_workspace_icon('students') ?></span><div><span>Pratinjau Siswa</span><strong id="publish-preview-count">0</strong><small>Jumlah siswa yang akan menerima tagihan.</small></div></div>
-            <div class="report-summary-card"><span class="fee-icon"><?= master_workspace_icon('coins') ?></span><div><span>Total Nominal</span><strong id="publish-preview-total">Rp 0</strong><small>Total tagihan yang akan diterbitkan.</small></div></div>
+            <div class="report-summary-card"><span class="fee-icon"><?= master_workspace_icon('students') ?></span><div><span>Pratinjau Siswa</span><strong id="publish-preview-count">0</strong></div></div>
+            <div class="report-summary-card"><span class="fee-icon"><?= master_workspace_icon('coins') ?></span><div><span>Total Nominal</span><strong id="publish-preview-total">Rp 0</strong></div></div>
           </div>
           <div class="action-bar" style="margin-top:16px"><button class="btn btn-primary" type="submit"><?= master_workspace_icon('send') ?>Terbitkan Tagihan</button><a href="#daftar-master-biaya" class="btn btn-ghost"><?= master_workspace_icon('document') ?>Lihat Daftar Biaya</a></div>
         </form>
@@ -484,7 +484,7 @@ require_once __DIR__ . '/includes/master_workspace_ui.php';
       </div>
 
       <div class="main-card master-modern-card master-modern-list fee-list-panel" id="daftar-master-biaya" style="margin-top:0">
-        <div class="card-title-row fee-panel-heading"><span class="fee-icon"><?= master_workspace_icon('document') ?></span><div><h2>Daftar Master Biaya (<?= $masterList->num_rows ?>)</h2><p>Kelola nominal, status, dan penggunaan biaya yang sudah tersedia.</p></div></div>
+        <div class="card-title-row fee-panel-heading"><span class="fee-icon"><?= master_workspace_icon('document') ?></span><div><h2>Daftar Master Biaya (<?= $masterList->num_rows ?>)</h2></div></div>
         <div class="table-container">
           <table class="payment-table responsive-table">
             <thead><tr><th>No</th><th>Nama Biaya</th><th>Nominal</th><th>Status</th><th>Tagihan</th><th>Transaksi</th><th>Aksi</th></tr></thead>

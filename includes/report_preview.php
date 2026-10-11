@@ -24,6 +24,8 @@ function report_preview_url(array $source, array $replace = [], array $remove = 
 
 function render_report_export_preview(string $documentHtml, array $options): void
 {
+    $global=($options['presentation']??'')==='global';
+    $palette=[1=>'165c44',2=>'203e80',3=>'832a35',0=>'513080'][(int)($options['unit']??1)]??'165c44';
     $title = (string)($options['title'] ?? 'Preview Laporan');
     $subtitle = (string)($options['subtitle'] ?? 'Periksa data sebelum mengunduh laporan.');
     $generated = (string)($options['generated'] ?? spp_date_label(new DateTimeImmutable('now'),true));
@@ -38,6 +40,7 @@ function render_report_export_preview(string $documentHtml, array $options): voi
     $documentLabel = $fileType === 'EXCEL'
         ? 'Lembar Excel'
         : ($orientation === 'landscape' ? 'A4 Landscape' : 'A4 Portrait');
+    if(!empty($options['document_label']))$documentLabel=(string)$options['document_label'];
     $frameTitle = 'Dokumen ' . $title;
     $stageWidth = (string)($options['stage_width'] ?? ($orientation === 'landscape' ? '1480px' : '980px'));
     if (!preg_match('/^\d{3,4}px$/', $stageWidth)) $stageWidth = '980px';
@@ -88,7 +91,12 @@ function render_report_export_preview(string $documentHtml, array $options): voi
             .preview-frame{min-height:420px}
         }
         @media print{.preview-toolbar,.preview-meta,.preview-help{display:none!important}.preview-stage{padding:0}.preview-frame-shell{width:100%;border:0;box-shadow:none}}
+        <?php if($global): ?>
+        :root{--green:#<?= $palette ?>;--green-dark:#<?= $palette ?>}body{font-size:14px}.preview-button{font-size:13px;min-height:44px;border-radius:10px}.preview-heading h1{font-size:18px}.preview-eyebrow{display:none}.preview-toolbar{padding:18px 24px}.preview-frame-shell{border-radius:14px}.preview-help{display:none}.preview-button.primary:hover{background:var(--green-dark)}
+        html[data-theme="dark"]{--canvas:#111820;--line:#32404b;--muted:#acb8c3;color-scheme:dark}html[data-theme="dark"] body{color:#eef3f7}html[data-theme="dark"] .preview-toolbar{background:#1b2530}html[data-theme="dark"] .preview-button:not(.primary),html[data-theme="dark"] .preview-back,html[data-theme="dark"] .preview-meta span{background:#25323e;color:#eef3f7;border-color:var(--line)}
+        <?php endif; ?>
     </style>
+    <?php if($global): ?><script>document.documentElement.dataset.theme=localStorage.getItem('spp_theme')||'light';</script><?php endif; ?>
 </head>
 <body>
     <header class="preview-toolbar">
@@ -120,8 +128,8 @@ function render_report_export_preview(string $documentHtml, array $options): voi
         <span><?= number_format($rowCount) ?> data</span>
         <span>Dibuat <?= report_preview_escape($generated) ?></span>
     </div>
-    <div class="preview-help"><svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><circle cx="12" cy="12" r="10"/><path d="M12 16v-4"/><path d="M12 8h.01"/></svg><span>Periksa isi laporan berikut sebelum mengunduh<?= $showPrint ? ' atau mencetak' : '' ?>.</span></div>
-    <main class="preview-stage">
+    <?php if(!$global): ?><div class="preview-help"><svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><circle cx="12" cy="12" r="10"/><path d="M12 16v-4"/><path d="M12 8h.01"/></svg><span>Periksa isi laporan berikut sebelum mengunduh<?= $showPrint ? ' atau mencetak' : '' ?>.</span></div>
+    <?php endif; ?><main class="preview-stage">
         <div class="preview-frame-shell">
             <div class="preview-loading" data-preview-loading>Menyiapkan tampilan dokumen...</div>
             <iframe class="preview-frame" data-preview-frame scrolling="no" title="<?= report_preview_escape($frameTitle) ?>" srcdoc="<?= report_preview_escape($documentHtml) ?>"></iframe>
@@ -146,7 +154,7 @@ function render_report_export_preview(string $documentHtml, array $options): voi
                 );
                 frame.style.height=(height+2)+'px';
             };
-            const printDocument=function(){if(frame&&frame.contentWindow){frame.contentWindow.focus();frame.contentWindow.print();}};
+            const printDocument=function(){<?php if($global&&!empty($options['print_url'])): ?>window.open(<?= json_encode($options['print_url'],JSON_HEX_TAG|JSON_HEX_AMP|JSON_HEX_APOS|JSON_HEX_QUOT) ?>,'_blank','noopener');return;<?php endif; ?>if(frame&&frame.contentWindow){frame.contentWindow.focus();frame.contentWindow.print();}};
             if(frame){
                 frame.addEventListener('load',function(){
                     ready=true;

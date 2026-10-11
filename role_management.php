@@ -279,7 +279,7 @@ while($row=$accountResult->fetch_assoc()){
         <form method="POST" action="<?= htmlspecialchars($accountReturn) ?>" id="form-tambah-akun">
           <input type="hidden" name="csrf_token" value="<?= htmlspecialchars($csrfToken) ?>" />
           <input type="hidden" name="aksi" value="tambah" />
-          <div class="account-steps"><section class="account-step"><h3><span>1</span><div>Informasi Akun<small>Masukkan data dasar petugas.</small></div></h3><div class="fields-grid">
+          <div class="account-steps"><section class="account-step"><h3><span>1</span><div>Informasi Akun</div></h3><div class="fields-grid">
             <div class="field-row">
               <label class="field-label" for="nama"><?= account_letter_icon('user') ?>Nama Lengkap</label>
               <input class="field-input" type="text" id="nama" name="nama" minlength="3" maxlength="100" placeholder="Nama petugas" required autocomplete="name" />
@@ -290,7 +290,7 @@ while($row=$accountResult->fetch_assoc()){
               <input class="field-input" type="text" id="username" name="username" minlength="3" maxlength="50" pattern="[A-Za-z0-9._-]+" placeholder="Contoh: kasir.andi" required autocomplete="username" />
               <span class="field-hint">Huruf, angka, titik, garis bawah, atau tanda hubung.</span>
             </div>
-          </div></section><section class="account-step"><h3><span>2</span><div>Akses &amp; Keamanan<small>Tentukan role, unit, dan password.</small></div></h3><div class="fields-grid">
+          </div></section><section class="account-step"><h3><span>2</span><div>Akses &amp; Keamanan</div></h3><div class="fields-grid">
             <div class="field-row">
               <label class="field-label" for="role"><?= account_letter_icon('shield') ?>Role</label>
               <select class="field-input field-select" id="role" name="role" required>
@@ -330,7 +330,7 @@ while($row=$accountResult->fetch_assoc()){
             </div>
           </div></section></div>
           <div class="action-bar">
-            <div class="account-access-note"><?= account_letter_icon('shield') ?><span><strong>Hak Akses</strong><small>Role menentukan menu dan fitur yang dapat diakses petugas.</small></span></div>
+
             <button type="submit" class="btn btn-primary" id="btn-tambah-akun">
               <svg width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.5" stroke-linecap="round" stroke-linejoin="round"><path d="M16 21v-2a4 4 0 0 0-4-4H6a4 4 0 0 0-4 4v2"/><circle cx="9" cy="7" r="4"/><line x1="19" y1="8" x2="19" y2="14"/><line x1="22" y1="11" x2="16" y2="11"/></svg>
               Buat Akun Petugas
@@ -360,7 +360,7 @@ while($row=$accountResult->fetch_assoc()){
           <a href="role_management.php?<?= htmlspecialchars(http_build_query($tab)) ?>" class="<?= $accountRoles===[$key]?'is-active':'' ?>" <?= $accountRoles===[$key]?'aria-current="true"':'' ?>><?= $label ?><span><?= $key==='*'?array_sum($roleCounts):$roleCounts[$key] ?></span></a>
           <?php endforeach; ?>
         </nav>
-        <p class="account-results-note">Menampilkan <?= count($accountRows) ?> akun hasil filter dalam cakupan <?= htmlspecialchars(unit_label($accountScopeUnit)) ?>. Jumlah tab mengikuti pencarian, unit, dan status.</p>
+
         <div class="table-container">
           <table class="payment-table responsive-table">
             <thead>

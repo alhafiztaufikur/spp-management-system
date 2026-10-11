@@ -277,7 +277,7 @@ require_once __DIR__.'/includes/master_workspace_ui.php';
     <?php endif; ?>
       <div class="class-manage-grid">
     <section class="main-card master-modern-card master-modern-list class-list-panel" data-rombel-view="groups">
-      <div class="card-title-row class-list-heading"><span class="class-workspace-icon"><?= master_workspace_icon('layers') ?></span><div><div class="card-title">Daftar Rombel per Kelas</div><p class="payment-auto-note">Buka kelas untuk melihat dan mengelola rombel.</p></div><span class="class-group-total"><?= number_format($classTotalRows) ?> rombel hasil filter</span></div>
+      <div class="card-title-row class-list-heading"><span class="class-workspace-icon"><?= master_workspace_icon('layers') ?></span><div><div class="card-title">Daftar Rombel per Kelas</div></div><span class="class-group-total"><?= number_format($classTotalRows) ?> rombel hasil filter</span></div>
       <div class="class-view-switch" hidden role="group" aria-label="Tampilan daftar rombel"><button type="button" data-class-view="groups" aria-pressed="true">Per Kelas</button><button type="button" data-class-view="cards" aria-pressed="false">Kartu</button><button type="button" data-class-view="table" aria-pressed="false">Tabel</button></div>
       <div class="class-level-groups">
       <?php if (!$classGroups): ?><div class="empty-state"><p>Rombel tidak ditemukan</p><span>Ubah pencarian atau filter yang dipilih.</span></div><?php endif; ?>
@@ -303,19 +303,19 @@ require_once __DIR__.'/includes/master_workspace_ui.php';
           <form method="post" onsubmit="return confirm('Aktifkan kembali seluruh rombel reguler? Data siswa dan histori tidak diubah.')">
             <input type="hidden" name="csrf_token" value="<?= htmlspecialchars($_SESSION['csrf_master_kelas']) ?>">
             <input type="hidden" name="aksi" value="aktifkan_semua_rombel">
-            <button class="btn btn-primary" type="submit">Aktifkan Semua Rombel</button>
+            <button class="btn btn-primary" type="submit"><?= master_workspace_icon('check') ?><span>Aktifkan Semua Rombel</span></button>
           </form>
           <form method="post" onsubmit="return confirm('Nonaktifkan seluruh rombel reguler tanpa siswa aktif pada unit ini? PSB, placeholder, dan histori tetap aman.')">
             <input type="hidden" name="csrf_token" value="<?= htmlspecialchars($_SESSION['csrf_master_kelas']) ?>">
             <input type="hidden" name="aksi" value="nonaktifkan_kosong">
-            <button class="btn btn-warning" type="submit">Nonaktifkan Rombel Kosong</button>
+            <button class="btn btn-warning" type="submit"><?= master_workspace_icon('lock') ?><span>Nonaktifkan Rombel Kosong</span></button>
           </form>
         </div>
       </div>
       <?php endif; ?>
     </section>
     <aside class="main-card class-filter-panel">
-      <div class="class-panel-heading"><span class="class-workspace-icon"><svg width="22" height="22" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.8"><path d="M3 4h18l-7 8v7l-4 2v-9L3 4Z"/></svg></span><div><h2>Filter &amp; Pencarian</h2><p>Sesuaikan rombel yang ditampilkan.</p></div></div>
+      <div class="class-panel-heading"><span class="class-workspace-icon"><svg width="22" height="22" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.8"><path d="M3 4h18l-7 8v7l-4 2v-9L3 4Z"/></svg></span><div><h2>Filter &amp; Pencarian</h2></div></div>
       <form method="get" class="master-class-filter-bar">
         <div class="field-row"><label class="field-label" for="class-filter-search">Cari Rombel</label>
         <div class="search-box"><svg width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.5" stroke-linecap="round" stroke-linejoin="round"><circle cx="11" cy="11" r="8"/><line x1="21" y1="21" x2="16.65" y2="16.65"/></svg><input type="search" name="q_kelas" id="class-filter-search" value="<?= htmlspecialchars($classSearch) ?>" placeholder="Cari label atau kode rombel..."></div>

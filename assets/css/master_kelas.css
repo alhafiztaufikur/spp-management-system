@@ -326,3 +326,9 @@ html[data-theme="dark"] .class-workspace .class-add-shortcut{background:var(--bg
   .class-workspace #psb-placement-form .class-psb-target-field{grid-column:2;}
   .class-workspace .class-psb-submit{flex-direction:column;align-items:stretch;}
 }
+/* Bulk actions keep a readable label and consistent click area. */
+.class-workspace .master-rombel-maintenance-actions{display:grid;grid-template-columns:repeat(2,minmax(0,1fr));gap:10px;justify-content:stretch;}
+.class-workspace .master-rombel-maintenance-actions form{min-width:0;}
+.class-workspace .master-rombel-maintenance-actions .btn{display:flex;align-items:center;justify-content:center;gap:9px;min-height:44px;padding:11px 15px;border-radius:10px;line-height:1.4;white-space:normal;text-align:center;}
+.class-workspace .master-rombel-maintenance-actions .btn svg{width:18px;height:18px;flex:none;}
+@media(max-width:700px){.class-workspace .master-rombel-maintenance-actions{grid-template-columns:1fr;}}

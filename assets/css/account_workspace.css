@@ -33,3 +33,4 @@
 .account-workspace .account-filter-reset:focus-visible,.account-workspace .savings-row-actions .btn-tbl:focus-visible,.account-workspace .account-more button:focus-visible{outline:2px solid var(--accent);outline-offset:3px}
 @media(max-width:650px){.account-workspace .account-filter-reset{width:100%}.account-workspace .savings-row-actions .btn-tbl{padding:9px 8px;min-height:38px;font-size:11px}.account-workspace .account-activate-form{display:flex;flex:1}}
 .account-workspace .savings-row-actions .btn-tbl{scroll-margin-block:110px}
+.account-workspace .account-create-card .action-bar{justify-content:flex-end;}

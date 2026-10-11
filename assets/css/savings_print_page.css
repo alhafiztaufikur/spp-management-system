@@ -1,0 +1,21 @@
+/* Compact page heading; the book preview and printing flow are unchanged. */
+.page-content.savings-print-page{padding-top:28px;padding-inline:24px;box-sizing:border-box;}
+.savings-print-page .savings-print-hero{grid-template-columns:minmax(0,1fr) 140px;min-height:0;padding:24px 30px;gap:20px;border-radius:18px;background:var(--bg-card);border:1px solid var(--border);box-shadow:none;color:var(--text-primary);}
+.savings-print-page .savings-print-hero::after{display:none;}
+.savings-print-page .savings-print-hero h1{font-size:28px;letter-spacing:-.5px;margin:0 0 8px;}
+.savings-print-page .savings-print-hero p{color:var(--text-secondary);font-size:14px;}
+.savings-print-format{display:flex;gap:10px;flex-wrap:wrap;color:var(--text-muted);font-size:12px;margin-top:12px;}
+.savings-print-page .savings-print-visual{width:140px;height:124px;}
+.savings-print-page .savings-print-visual-page{width:82px;height:112px;box-shadow:0 5px 12px #0001;}
+.savings-print-page .savings-print-visual-back{left:45px;top:7px;}
+.savings-print-page .savings-print-visual-front{left:18px;}
+.savings-print-page .savings-print-visual-border{padding-top:8px;margin:5px;width:calc(100% - 10px);height:calc(100% - 10px);}
+.savings-print-page .savings-print-visual-border img{width:22px;height:22px;}
+.savings-print-page .savings-print-visual-border span{font-size:12px;margin:5px 0;}
+.savings-print-page .savings-print-visual-border i{margin-top:3px;}
+@media(max-width:650px){
+ .page-content.savings-print-page{padding-top:20px;padding-inline:14px;}
+ .savings-print-page .savings-print-hero{grid-template-columns:1fr;padding:22px;}
+ .savings-print-page .savings-print-hero h1{font-size:24px;}
+ .savings-print-page .savings-print-visual{display:none;}
+}

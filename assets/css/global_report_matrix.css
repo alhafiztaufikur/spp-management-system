@@ -1,0 +1,97 @@
+/* The catalogue/header/filter retain their original layout. Scope only Global Reports. */
+.global-report-matrix-workspace .report-template-filters .report-filter-actions{position:static!important;inset:auto!important;transform:none!important;grid-column:1/-1;justify-content:flex-end;z-index:auto}
+.global-report-matrix-workspace .student-search-results:empty{display:none;pointer-events:none}
+.global-report-matrix-workspace{--matrix-stripe:#f3f9f6}
+html[data-palette="smp"] .global-report-matrix-workspace{--matrix-stripe:#f3f6ff}
+html[data-palette="sma"] .global-report-matrix-workspace{--matrix-stripe:#fff4f5}
+html[data-palette="super"] .global-report-matrix-workspace{--matrix-stripe:#f7f3fc}
+html[data-theme="dark"] .global-report-matrix-workspace{--matrix-stripe:var(--bg-elevated)}
+.report-matrix-scroll{overflow:auto;max-width:100%;position:relative;isolation:isolate;overscroll-behavior-x:contain}
+.report-matrix-scroll:focus-visible{outline:2px solid var(--accent);outline-offset:-2px}
+.report-horizontal-matrix{border-collapse:separate!important;border-spacing:0;table-layout:fixed;font-size:14px}
+.report-horizontal-matrix th,.report-horizontal-matrix td{border-right:1px solid var(--border-color,#d3e7df);border-bottom:1px solid var(--border-color,#d3e7df);padding:13px 14px;vertical-align:middle}
+.report-horizontal-matrix thead th{background:var(--unit-table-head-bg,#165c44)!important;color:#fff!important;font-size:13px;text-align:center;white-space:normal;line-height:1.5}
+.report-horizontal-matrix tbody td{background:var(--bg-surface,#fff);color:var(--text-primary);white-space:normal;overflow-wrap:anywhere}
+.report-horizontal-matrix tbody tr:nth-child(even) td{background:var(--matrix-stripe)}
+.report-horizontal-matrix .matrix-identity{position:sticky;left:var(--matrix-left);width:var(--matrix-width);min-width:var(--matrix-width);max-width:var(--matrix-width);z-index:2}
+.report-horizontal-matrix thead .matrix-identity{z-index:3}
+.report-horizontal-matrix .matrix-kelas{box-shadow:3px 0 4px #0000000d;text-align:center}
+.report-horizontal-matrix .matrix-no,.report-horizontal-matrix .matrix-unit{text-align:center;white-space:nowrap;padding-left:8px;padding-right:8px}
+.report-horizontal-matrix .money{white-space:nowrap;text-align:right;font-variant-numeric:tabular-nums}
+.matrix-group-period{display:block;font-size:12px;font-weight:400;text-transform:none;margin-top:3px}
+.report-secondary-id,.matrix-detail{display:block;font-size:12px;color:var(--text-secondary);margin-top:4px}
+.report-horizontal-matrix .badge-nis,.report-horizontal-matrix .kelas-badge,.report-horizontal-matrix .report-status{display:inline-block;border-radius:20px;padding:3px 9px;font-size:12px;font-weight:700;line-height:1.5}
+.report-horizontal-matrix .badge-nis{color:var(--accent);border:1px solid var(--border-hover);background:var(--accent-glow)}
+.report-horizontal-matrix .kelas-badge{background:#fff3e3;color:#b86a00;border:1px solid #ffd39b}
+.report-horizontal-matrix .report-status{background:var(--bg-elevated);color:var(--text-secondary)}
+.report-horizontal-matrix .status-lunas{background:#d9fae7;color:#087943}
+.report-horizontal-matrix .status-cicilan,.report-horizontal-matrix .status-belum_bayar,.report-horizontal-matrix .status-rekonsiliasi{background:#fff0dd;color:#a75c00}
+.report-horizontal-matrix .report-negative{color:#d93939}
+.report-horizontal-matrix tfoot th,.report-horizontal-matrix tfoot td{font-size:13px;background:var(--accent-glow);color:var(--accent);font-weight:700}
+.matrix-empty{color:var(--text-secondary)}
+html[data-palette="smp"] .report-horizontal-matrix thead th{background:#203e80!important}
+html[data-palette="sma"] .report-horizontal-matrix thead th{background:#832a35!important}
+html[data-palette="super"] .report-horizontal-matrix thead th{background:#513080!important}
+@media(max-width:650px){.report-horizontal-matrix .matrix-identity{position:static}.report-horizontal-matrix .matrix-nis{position:sticky;left:0;box-shadow:3px 0 4px #0002}.report-horizontal-matrix th,.report-horizontal-matrix td{padding:10px;font-size:13px}}
+
+/* Explicit columns own geometry; legacy nth-child rules must not pin leaf headers. */
+#global-report-workspace .report-filter-card{z-index:20}
+#global-report-workspace .report-horizontal-matrix{table-layout:fixed!important;max-width:none!important;border-collapse:separate!important;border-spacing:0!important}
+#global-report-workspace .report-horizontal-matrix :is(th,td){box-sizing:border-box!important;position:static!important;left:auto!important;min-width:0!important;max-width:none!important;width:auto!important;overflow:hidden!important}
+#global-report-workspace .report-horizontal-matrix .matrix-identity{position:sticky!important;left:var(--matrix-left)!important;width:var(--matrix-width)!important;max-width:var(--matrix-width)!important;background-clip:border-box!important;z-index:4!important}
+#global-report-workspace .report-horizontal-matrix thead .matrix-identity{z-index:8!important}
+#global-report-workspace .global-layout-table{border-collapse:separate!important;border-spacing:0!important;table-layout:fixed!important}
+#global-report-workspace .report-template-table-wrap{display:block!important;}
+#global-report-workspace .global-layout-table .global-layout-identity{position:sticky!important;left:var(--matrix-left)!important;box-sizing:border-box!important;overflow:hidden!important;z-index:4!important;background:var(--bg-surface,#fff)!important}
+#global-report-workspace .global-layout-table tbody tr:nth-child(even) .global-layout-identity{background:var(--matrix-stripe)!important}
+#global-report-workspace .global-layout-table thead .global-layout-identity{z-index:8!important;background:var(--unit-table-head-bg,#165c44)!important;color:#fff!important}
+@media(max-width:650px){
+ #global-report-workspace :is(.report-horizontal-matrix .matrix-identity,.global-layout-table .global-layout-identity){position:static!important}
+ #global-report-workspace :is(.report-horizontal-matrix .matrix-nis,.global-layout-table .global-layout-nis){position:sticky!important;left:0!important}
+}
+
+#global-report-workspace{--matrix-solid-bg:#fff}
+html[data-theme="dark"] #global-report-workspace{--matrix-solid-bg:#14251f;--matrix-stripe:#20352c}
+#global-report-workspace .report-horizontal-matrix tbody td{background:var(--matrix-solid-bg)!important}
+#global-report-workspace .report-horizontal-matrix tbody tr:nth-child(even) td{background:var(--matrix-stripe)!important}
+#global-report-workspace .global-layout-table .global-layout-identity{background:var(--matrix-solid-bg)!important}
+#global-report-workspace .report-horizontal-matrix thead .matrix-identity{background:var(--unit-table-head-bg,#165c44)!important}
+#global-report-workspace .report-filter-card{z-index:20!important}
+
+#global-report-workspace .global-layout-table thead .global-layout-identity{z-index:80!important}
+
+#global-report-workspace :is(.report-settlement-component-card,.report-settlement-component-table){min-width:0;max-width:100%}
+#global-report-workspace .report-settlement-component-table{overflow-x:auto!important;overscroll-behavior-x:contain}
+
+/* Judge space inside the table, including a visible sidebar, rather than viewport alone. */
+#global-report-workspace .global-layout-narrow :is(.matrix-identity,.global-layout-identity){position:static!important}
+#global-report-workspace .global-layout-narrow :is(.matrix-nis,.global-layout-nis){position:sticky!important;left:0!important}
+
+/* Subtotal identities use the same geometry as the body, with an opaque pinned layer. */
+#global-report-workspace .report-horizontal-matrix tfoot :is(th,td){background:var(--matrix-solid-bg)!important;color:var(--text-primary);}
+#global-report-workspace .report-horizontal-matrix tfoot .matrix-identity{z-index:5!important;background:var(--matrix-solid-bg)!important;white-space:normal;}
+
+/* Frozen and scrolling headers share the report unit palette. */
+#global-report-workspace{--matrix-head-bg:var(--unit-table-head-bg,#165c44);}
+html[data-palette="smp"] #global-report-workspace{--matrix-head-bg:#203e80;}
+html[data-palette="sma"] #global-report-workspace{--matrix-head-bg:#832a35;}
+html[data-palette="super"] #global-report-workspace{--matrix-head-bg:#513080;}
+#global-report-workspace .report-horizontal-matrix thead th,
+#global-report-workspace .report-horizontal-matrix thead th.matrix-identity,
+#global-report-workspace .global-layout-table thead .global-layout-identity{background:var(--matrix-head-bg)!important;}
+
+/* Identity alignment is shared by page and interactive export previews. */
+#global-report-workspace :is(th,td):is(.report-col-no,.report-col-id,.matrix-no,.matrix-nis,.billing-matrix-no,.billing-matrix-nis){text-align:center!important;}
+#global-report-workspace .report-col-id :is(.report-secondary-id,small),
+#global-report-workspace .billing-matrix-nis small{text-align:center;}
+#global-report-workspace .report-col-date{padding:12px 16px!important;line-height:1.5;font-variant-numeric:tabular-nums;}
+.report-date,.report-time{display:block;white-space:nowrap;}
+.report-time{margin-top:4px;}
+
+/* Monthly SPP uses the same per-page/search row as the other reports. */
+html body#global-report-workspace .report-template-shell .report-global-filter-form.report-filter-per-item:not(.report-per-item-compact) > .report-inline-search-row{display:grid;grid-template-columns:minmax(0,1fr) minmax(0,2fr);}
+html body#global-report-workspace .report-template-shell .report-global-filter-form.report-filter-per-item:not(.report-per-item-compact) > .report-inline-search-row > .field-row.report-student-field:has(#global-siswa-search){grid-column:2!important;}
+@media(max-width:640px){
+ html body#global-report-workspace .report-template-shell .report-global-filter-form.report-filter-per-item:not(.report-per-item-compact) > .report-inline-search-row{grid-template-columns:minmax(0,1fr);}
+ html body#global-report-workspace .report-template-shell .report-global-filter-form.report-filter-per-item:not(.report-per-item-compact) > .report-inline-search-row > .field-row.report-student-field:has(#global-siswa-search){grid-column:1!important;}
+}

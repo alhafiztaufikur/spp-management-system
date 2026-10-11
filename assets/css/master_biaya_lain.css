@@ -99,3 +99,9 @@
 @media(max-width:1400px){.fee-workspace .fee-hero{grid-template-columns:minmax(0,2.3fr) minmax(180px,1fr);padding:26px;gap:18px;}.fee-workspace .fee-panel{padding:22px;}.fee-stat{gap:9px;padding:13px;}.fee-stat .fee-icon{width:35px;height:35px;}.fee-workspace .fee-preview-grid .report-summary-card{flex-direction:column;}}
 @media(max-width:1100px){.fee-workspace .fee-hero{grid-template-columns:1fr;}.fee-hero-art{display:none;}.fee-panel-grid{grid-template-columns:1fr;}.fee-workspace .fee-preview-grid .report-summary-card{flex-direction:row;}}
 @media(max-width:600px){.fee-workspace-content{margin:18px 12px 24px;gap:14px;}.fee-workspace .fee-hero,.fee-workspace .fee-panel,.fee-workspace .fee-list-panel{padding:18px;}.fee-hero-stats{gap:8px;}.fee-stat{flex-direction:column;align-items:flex-start;padding:10px;gap:8px;}.fee-stat>div>span{font-size:9px;}.fee-stat strong{font-size:21px;}.fee-workspace .report-filter-grid,.fee-workspace .fee-preview-grid{grid-template-columns:1fr;}.fee-workspace .fee-panel-heading{gap:11px;}.fee-panel-heading .fee-icon{width:40px;height:40px;}.fee-panel-heading h2{font-size:15px;}.fee-panel .action-bar .btn{width:100%;flex:auto;}.fee-workspace .fee-list-panel .aksi-col{min-width:0;}}
+/* Keep the search glyph in the flex row, clear of the input text. */
+.fee-workspace #form-terbit-biaya .publish-student-search{display:flex;align-items:center;}
+.fee-workspace #form-terbit-biaya .publish-student-search>svg{position:static;transform:none;inset:auto;display:block;width:18px;height:18px;flex:0 0 18px;margin:0;color:var(--text-muted);}
+.fee-workspace #form-terbit-biaya .publish-student-search input{padding-inline:0;}
+.fee-workspace .fee-preview-grid .report-summary-card>.fee-icon{display:inline-flex;align-items:center;justify-content:center;padding:0;line-height:1;background:var(--accent-glow);color:var(--accent);}
+.fee-workspace .fee-preview-grid .fee-icon>svg{display:block;width:21px;height:21px;flex:none;margin:0;}

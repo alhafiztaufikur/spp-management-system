@@ -237,7 +237,7 @@ $yearStart = (int)substr($selectedYear, 0, 4);
           <a href="#spp-year-panel" data-spp-tab="year"><?= master_workspace_icon('calendar') ?>Status Tahun</a>
         </nav>
         <section class="spp-tab-panel" id="spp-rate-panel" data-spp-panel="rates">
-          <div class="spp-section-heading"><h2>Tarif Dasar per Tingkat</h2><p>Tarif dasar per kelas. Koreksi tarif terbit hanya memperbarui tagihan yang belum dibayar.</p></div>
+          <div class="spp-section-heading"><h2>Tarif Dasar per Tingkat</h2></div>
           <form method="post" id="spp-rate-form" data-status="<?= mspp_e($master['status']) ?>" data-editing="<?= $rateEditing?'true':'false' ?>">
             <input type="hidden" name="csrf_token" value="<?= mspp_e($_SESSION['csrf_master_spp']) ?>"><input type="hidden" name="aksi" value="<?= $master['status']==='published'?'ubah_tarif_terbit':'simpan_tarif' ?>"><input type="hidden" name="expected_rate_version" value="<?= mspp_e($rateVersion) ?>"><input type="hidden" name="confirm_rate_change" value="0"><input type="hidden" name="tahun_ajaran" value="<?= mspp_e($selectedYear) ?>">
             <div class="spp-rate-grid">
@@ -254,7 +254,7 @@ $yearStart = (int)substr($selectedYear, 0, 4);
               <a class="btn btn-ghost" id="spp-rate-cancel" href="?tahun=<?= urlencode($selectedYear) ?>&amp;cancel_tarif=1#spp-rate-panel" <?= !$rateEditing?'hidden':'' ?>><?= master_workspace_icon('reset') ?><span>Batalkan</span></a>
             <?php endif; ?>
             </div>
-            <?php if (!$ratesEditable): ?><p class="spp-info-note spp-rate-note" id="spp-rate-note" role="status" aria-live="polite"><?= $master['status']==='closed'?'Buka kembali tahun untuk mengubah tarif.':($rateEditing?'Tarif siap diedit.':'Tarif terkunci.') ?></p><?php endif; ?>
+            <?php if (!$ratesEditable): ?><p class="spp-info-note spp-rate-note" id="spp-rate-note" role="status" aria-live="polite" <?= $master['status']!=='closed'?'hidden':'' ?>><?= $master['status']==='closed'?'Buka kembali tahun untuk mengubah tarif.':'' ?></p><?php endif; ?>
           </form>
         </section>
         <section class="spp-tab-panel spp-publish-card" id="spp-students-panel" data-spp-panel="students">
@@ -263,7 +263,7 @@ $yearStart = (int)substr($selectedYear, 0, 4);
             <div class="search-box"><span class="search-icon" aria-hidden="true"><svg width="18" height="18" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><circle cx="11" cy="11" r="7"/><path d="m20 20-4.2-4.2"/></svg></span><input type="search" id="spp-student-search" placeholder="Cari nama, NIS, atau rombel..." aria-label="Cari siswa"></div>
             <select class="field-input field-select" id="spp-rombel-filter" name="rombel_filter" aria-label="Rombel" data-filter-multiple data-filter-persist><option value="">Semua rombel</option><?php $rombel=[];foreach($students as $s)$rombel[$s['kelas_rombel_snapshot']]=$s['kelas_rombel_snapshot'];ksort($rombel);foreach($rombel as $r): ?><option value="<?= mspp_e($r) ?>"><?= mspp_e($r) ?></option><?php endforeach; ?></select>
           </div>
-          <p class="spp-list-note">Hanya siswa dengan penempatan pada tahun ajaran ini yang dapat diterbitkan. Status baris menunjukkan catatan tagihan yang sudah tersedia.</p>
+
           <form method="post" id="spp-publish-form" data-first-publication="<?= $master['status']==='draft'?'true':'false' ?>">
             <input type="hidden" name="csrf_token" value="<?= mspp_e($_SESSION['csrf_master_spp']) ?>"><input type="hidden" name="aksi" value="terbitkan"><input type="hidden" name="expected_rate_version" value="<?= mspp_e($rateVersion) ?>"><input type="hidden" name="confirm_spp_publish" value="0"><input type="hidden" name="tahun_ajaran" value="<?= mspp_e($selectedYear) ?>">
             <div class="promotion-selection-toolbar"><div><strong id="spp-visible-count"><?= count($students) ?> siswa</strong><span id="spp-selected-count">0 siswa dipilih</span></div><div><button class="btn btn-ghost" type="button" id="spp-select-visible"><?= master_workspace_icon('check') ?>Pilih yang Ditampilkan</button><button class="btn btn-ghost" type="button" id="spp-clear-selection"><?= master_workspace_icon('reset') ?>Kosongkan</button></div></div>
@@ -305,7 +305,7 @@ $yearStart = (int)substr($selectedYear, 0, 4);
         </section>
       </section>
       <aside class="spp-aside" aria-label="Informasi tarif dan status tahun">
-        <section class="main-card master-modern-card spp-side-card"><div class="spp-side-heading"><span class="spp-workspace-icon"><?= master_workspace_icon('coins') ?></span><div><h2>Tarif Dasar per Tingkat</h2><p>Tarif tersimpan untuk menentukan tagihan SPP sesuai kelas.</p></div></div><dl class="spp-rate-list"><?php for ($i=$firstLevel;$i<=$lastLevel;$i++): ?><div><dt>Kelas <?= $i ?></dt><dd>Rp <?= mspp_money($rates[$i]) ?></dd></div><?php endfor; ?></dl><a href="#spp-rate-panel" class="spp-side-link" data-spp-tab="rates">Lihat Pengaturan Tarif <span aria-hidden="true">&rarr;</span></a></section>
+        <section class="main-card master-modern-card spp-side-card"><div class="spp-side-heading"><span class="spp-workspace-icon"><?= master_workspace_icon('coins') ?></span><div><h2>Tarif Dasar per Tingkat</h2></div></div><dl class="spp-rate-list"><?php for ($i=$firstLevel;$i<=$lastLevel;$i++): ?><div><dt>Kelas <?= $i ?></dt><dd>Rp <?= mspp_money($rates[$i]) ?></dd></div><?php endfor; ?></dl><a href="#spp-rate-panel" class="spp-side-link" data-spp-tab="rates">Lihat Pengaturan Tarif <span aria-hidden="true">&rarr;</span></a></section>
         <section class="main-card master-modern-card spp-side-card spp-status-card"><div class="spp-side-heading"><span class="spp-workspace-icon"><?= master_workspace_icon('calendar') ?></span><div><h2>Status Tahun SPP</h2><p>Menutup tahun menghentikan penerbitan tambahan. Tunggakan yang sudah terbit tetap bisa dilunasi.</p></div></div>
           <div class="spp-status-note"><?= master_workspace_icon($master['status'] === 'closed' ? 'lock' : 'info') ?><div><strong><?= $master['status'] === 'closed' ? 'Tahun ajaran ini sudah ditutup' : ($master['status'] === 'published' ? 'Tahun ajaran ini sedang terbuka' : 'Tahun ajaran ini masih draft') ?></strong><small><?= $master['status'] === 'closed' ? 'Buka kembali untuk melanjutkan penerbitan atau koreksi tarif.' : ($ratesEditable ? 'Tarif dapat diubah sebelum penerbitan pertama.' : 'Gunakan Edit Tarif untuk mengoreksi tagihan yang belum dibayar.') ?></small></div></div>
           <div class="action-bar">

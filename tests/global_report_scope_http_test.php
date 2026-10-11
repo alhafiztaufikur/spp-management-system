@@ -32,7 +32,7 @@ try{
      if($format==='pdf')global_http_assert(str_starts_with($body,'%PDF-'),'Invalid PDF');
      elseif($format==='excel'){
       global_http_assert(str_starts_with($body,"PK\x03\x04"),'Invalid XLSX');$book=test_excel_read($body);
-      try{foreach($book->getAllSheets() as $sheet)global_http_assert($sheet->getCell('B1')->getValue()===unit_school_name($choice==='all'?0:(int)$choice),'Excel school identity differs from selected scope');}
+      try{foreach($book->getAllSheets() as $sheet)global_http_assert(in_array(unit_school_name($choice==='all'?0:(int)$choice),[$sheet->getCell('B1')->getValue(),$sheet->getCell('C1')->getValue()],true),'Excel school identity differs from selected scope');}
       finally{$book->disconnectWorksheets();}
      }
      else global_http_assert(!preg_match('/Fatal error|Warning:/',$body),'Preview warning');

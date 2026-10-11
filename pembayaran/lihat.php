@@ -235,7 +235,7 @@ filter_output_start();
       <header class="ph-hero"><div class="ph-hero-copy"><span class="ph-hero-icon"><?= authorization_icon('receipt') ?></span><div><h1>Riwayat Pembayaran Siswa</h1><p>Kelola dan pantau seluruh riwayat transaksi pembayaran siswa.</p></div></div><nav class="ph-tabs" aria-label="Jenis riwayat pembayaran"><a href="<?= htmlspecialchars($activeTabUrl) ?>" <?= !$isArchive?'aria-current="page"':'' ?>>Transaksi Aktif</a><a href="<?= htmlspecialchars($archiveTabUrl) ?>" <?= $isArchive?'aria-current="page"':'' ?>>Transaksi Dihapus</a></nav></header>
       <section class="ph-filter-card">        <form method="GET" action="lihat.php" class="ph-filter-form"><input type="hidden" name="student_id" data-student-identity="1" value="<?= max(0,(int)($_GET['student_id']??0)) ?>">
           <input type="hidden" name="view" value="<?= $isArchive ? "deleted" : "active" ?>">
-          <div class="ph-filter-intro"><?= authorization_icon('filter') ?><div><strong>Filter Riwayat</strong><small>Pilih periode, siswa, dan operator yang ingin ditampilkan.</small></div></div>
+          <div class="ph-filter-intro"><?= authorization_icon('filter') ?><div><strong>Filter Riwayat</strong></div></div>
           <div class="field-row report-date-range-field">
             <label class="field-label"><?= $isArchive ? "Tanggal Penghapusan" : "Tanggal Transaksi" ?></label>
             <div class="report-date-range-control report-date-range-picker" data-range-picker data-empty-label="<?= htmlspecialchars($periodLabel) ?>">

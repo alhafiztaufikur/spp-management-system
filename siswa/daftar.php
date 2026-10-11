@@ -545,9 +545,9 @@ $sppRatesByGrade=[];[$firstGrade,$lastGrade]=unit_level_bounds();foreach(range($
         <div class="student-hero">
           <div class="student-hero-copy"><span class="breadcrumb">SistemSPP <span aria-hidden="true">&rsaquo;</span> Data Siswa</span><h1>Data Siswa</h1><p>Kelola identitas siswa, rombel, tarif aktif, dan status siswa.</p></div>
           <div class="student-hero-stats">
-            <div class="student-stat"><span class="master-workspace-icon"><?= master_workspace_icon('students') ?></span><div><span>Hasil Filter</span><strong><?= number_format($totalStudents) ?></strong><small>siswa ditemukan</small></div></div>
-            <div class="student-stat"><span class="master-workspace-icon"><?= master_workspace_icon('document') ?></span><div><span>Per Halaman</span><strong><?= number_format($perPage) ?></strong><small>data per halaman</small></div></div>
-            <div class="student-stat"><span class="master-workspace-icon"><?= master_workspace_icon('coins') ?></span><div><span>Tarif Efektif</span><strong id="student-hero-effective">Rp <?= number_format((float)$sppRatePreview['net'],0,',','.') ?></strong><small>pratinjau formulir</small></div></div>
+            <div class="student-stat"><span class="master-workspace-icon"><?= master_workspace_icon('students') ?></span><div><span>Hasil Filter</span><strong><?= number_format($totalStudents) ?></strong></div></div>
+            <div class="student-stat"><span class="master-workspace-icon"><?= master_workspace_icon('document') ?></span><div><span>Per Halaman</span><strong><?= number_format($perPage) ?></strong></div></div>
+            <div class="student-stat"><span class="master-workspace-icon"><?= master_workspace_icon('coins') ?></span><div><span>Tarif Efektif</span><strong id="student-hero-effective">Rp <?= number_format((float)$sppRatePreview['net'],0,',','.') ?></strong></div></div>
             <div class="student-stat"><span class="master-workspace-icon"><?= master_workspace_icon('check') ?></span><div><span>Status Siswa</span><strong><?= htmlspecialchars($statusCaption,ENT_QUOTES,'UTF-8') ?></strong><small>cakupan filter</small></div></div>
           </div>
         </div>
@@ -564,7 +564,7 @@ $sppRatesByGrade=[];[$firstGrade,$lastGrade]=unit_level_bounds();foreach(range($
           <input type="hidden" name="id" value="<?= (int)($editStudent['id'] ?? 0) ?>" />
           <fieldset class="student-form-fieldset" <?= unit_all_readonly()?'disabled':'' ?>><div class="student-workspace-grid">
             <section class="student-panel student-panel-identity">
-<div class="student-panel-heading"><span class="master-workspace-icon"><?= master_workspace_icon('student') ?></span><div><h3>Identitas Siswa</h3><p>Data dasar dan informasi sekolah siswa.</p></div></div><div class="fields-grid">            <div class="field-row">
+<div class="student-panel-heading"><span class="master-workspace-icon"><?= master_workspace_icon('student') ?></span><div><h3>Identitas Siswa</h3></div></div><div class="fields-grid">            <div class="field-row">
               <label class="field-label" for="nis-baru">No. Induk <span class="required-mark" aria-hidden="true">*</span></label>
               <input class="field-input" type="text" inputmode="numeric" maxlength="10" id="nis-baru" name="no_induk" required
                 value="<?= htmlspecialchars((string)($editStudent['NO_INDUK'] ?? form_student_value('no_induk', $oldInput, $formStudent, $fieldMap))) ?>" <?= $editStudent ? 'readonly aria-readonly="true"' : '' ?> />
@@ -619,7 +619,7 @@ $sppRatesByGrade=[];[$firstGrade,$lastGrade]=unit_level_bounds();foreach(range($
 </div>
             </section>
             <section class="student-panel student-panel-start">
-<div class="student-panel-heading"><span class="master-workspace-icon"><?= master_workspace_icon('calendar') ?></span><div><h3>Penagihan Awal</h3><p>Tentukan bulan mulai tagihan Komite siswa.</p></div></div><div class="student-start-content">            <div class="field-row">
+<div class="student-panel-heading"><span class="master-workspace-icon"><?= master_workspace_icon('calendar') ?></span><div><h3>Penagihan Awal</h3></div></div><div class="student-start-content">            <div class="field-row">
               <label class="field-label" for="student-komite-start">Mulai Tagihan Komite <span class="required-mark" aria-hidden="true">*</span></label>
               <select class="field-input field-select" id="student-komite-start" name="komite_mulai_bulan" required>
                 <option value="" disabled <?= $komiteStartMonth === '' ? 'selected' : '' ?>>Pilih bulan mulai tagihan</option>
@@ -632,7 +632,7 @@ $sppRatesByGrade=[];[$firstGrade,$lastGrade]=unit_level_bounds();foreach(range($
 <div class="student-start-illustration" aria-hidden="true"><?= master_workspace_icon('calendar') ?></div></div>
             </section>
             <section class="student-panel student-panel-rate">
-<div class="student-panel-heading"><span class="master-workspace-icon"><?= master_workspace_icon('coins') ?></span><div><h3>Tarif Siswa</h3><p>Informasi tarif SPP yang berlaku untuk siswa ini.</p></div></div>            <div class="spp-student-rate-summary">
+<div class="student-panel-heading"><span class="master-workspace-icon"><?= master_workspace_icon('coins') ?></span><div><h3>Tarif Siswa</h3></div></div>            <div class="spp-student-rate-summary">
               <div><span>Tarif dasar SPP</span><strong id="student-spp-base" data-base="<?= htmlspecialchars((string)$sppRatePreview['base']) ?>">Rp <?= number_format((float)$sppRatePreview['base'],0,',','.') ?></strong><small>Tarif dasar dikelola melalui Master Penerbitan SPP.</small></div>
               <div><span>Tarif efektif</span><strong id="student-spp-effective">Rp <?= number_format((float)$sppRatePreview['net'],0,',','.') ?></strong><small>Tarif setelah potongan SPP siswa.</small></div>
               <small>TA <span id="student-spp-year"><?= htmlspecialchars((string)$sppRatePreview['year']) ?></span> · tarif dasar dikelola melalui Master Penerbitan SPP.</small>
@@ -640,7 +640,7 @@ $sppRatesByGrade=[];[$firstGrade,$lastGrade]=unit_level_bounds();foreach(range($
 
             </section>
             <section class="student-panel student-panel-fees">
-<div class="student-panel-heading"><span class="master-workspace-icon"><?= master_workspace_icon('document') ?></span><div><h3>Komponen Biaya</h3><p>Komponen biaya tambahan yang berlaku untuk siswa ini.</p></div></div>            <div class="fields-grid student-money-grid">
+<div class="student-panel-heading"><span class="master-workspace-icon"><?= master_workspace_icon('document') ?></span><div><h3>Komponen Biaya</h3></div></div>            <div class="fields-grid student-money-grid">
               <?php
               $feeFields = [
                 'psb' => 'Uang PSB', 'pomg' => 'Uang Komite / Bulan',
@@ -657,7 +657,7 @@ $sppRatesByGrade=[];[$firstGrade,$lastGrade]=unit_level_bounds();foreach(range($
             </div>
             </section>
             <section class="student-panel student-panel-discounts">
-<div class="student-panel-heading"><span class="master-workspace-icon"><?= master_workspace_icon('discount') ?></span><div><h3>Potongan</h3><p>Pengaturan potongan biaya siswa.</p></div></div>            <div class="fields-grid student-money-grid">
+<div class="student-panel-heading"><span class="master-workspace-icon"><?= master_workspace_icon('discount') ?></span><div><h3>Potongan</h3></div></div>            <div class="fields-grid student-money-grid">
               <div class="field-row">
                 <label class="field-label" for="student-potongan-spp">Potongan SPP per Bulan (Rp)</label>
                 <input class="field-input rupiah-input" type="text" inputmode="numeric" id="student-potongan-spp" name="potongan_spp_nominal"

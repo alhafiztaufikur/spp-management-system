@@ -38,6 +38,7 @@ function print_book_escape($value): string
   <script>(function(){var t=localStorage.getItem('spp_theme')||'light';document.documentElement.setAttribute('data-theme',t);})();</script>
   <link rel="stylesheet" href="../assets/css/style.css?v=unitpalette4&amp;mtime=<?= filemtime(__DIR__ . '/../assets/css/style.css') ?>">
   <link rel="stylesheet" href="../assets/css/date_controls.css?v=unitpalette4&amp;mtime=<?= filemtime(__DIR__ . '/../assets/css/date_controls.css') ?>">
+  <link rel="stylesheet" href="../assets/css/savings_print_page.css?v=<?= filemtime(__DIR__ . '/../assets/css/savings_print_page.css') ?>">
 </head>
 <body>
 <div class="bg-orbs"><div class="orb orb-1"></div><div class="orb orb-2"></div><div class="orb orb-3"></div></div>
@@ -55,14 +56,9 @@ function print_book_escape($value): string
     <div class="page-content savings-print-page">
       <section class="savings-print-hero" aria-labelledby="savings-print-title">
         <div class="savings-print-hero-copy">
-          <span class="savings-print-eyebrow">BUKU TABUNGAN SISWA</span>
-          <h1 id="savings-print-title">Siapkan buku tabungan<br>untuk setiap siswa.</h1>
-          <p>Pilih siswa, periksa ringkasan tabungannya, lalu buka pratinjau buku yang siap dicetak dan dilipat.</p>
-          <div class="savings-print-hero-facts">
-            <span><strong><?= number_format(count($students), 0, ',', '.') ?></strong> siswa aktif</span>
-            <span><strong>A5</strong> kertas lanskap</span>
-            <span><strong>A6</strong> ukuran buku</span>
-          </div>
+          <h1 id="savings-print-title">Cetak Buku Tabungan</h1>
+          <p>Pilih siswa untuk membuka buku tabungan.</p>
+          <div class="savings-print-format">A5 potret <span aria-hidden="true">·</span> Buku lipat A6 lanskap</div>
         </div>
         <div class="savings-print-visual" aria-hidden="true">
           <div class="savings-print-visual-page savings-print-visual-back"></div>
