@@ -26,8 +26,13 @@ function global_report_column_class(array $column): string
     if(in_array($type,['money','money_optional'],true))return 'report-col-money';
     if($type==='html')return 'report-col-month';
     if($type==='status'||in_array($key,['kelas','unit','jenis','periode'],true))return 'report-col-center';
-    if($key==='nama')return 'report-col-name';
+    if(in_array($key,['nama','NAMA'],true))return 'report-col-name report-col-center';
     if(in_array($key,['nis','nis_diknas','export_diknas','NO_INDUK','NO_induk_diknas'],true))return 'report-col-id report-col-center';
     if(in_array($type,['date','datetime'],true))return 'report-col-date';
     return 'report-col-text';
+}
+
+/** Opaque subtotal fill differs from both ordinary stripes and the final total. */
+function global_report_summary_palette(int $unit): array {
+    return [1=>['D8ECE1','165C44'],2=>['DDE5F7','203E80'],3=>['F3DDE2','832A35'],0=>['E8DEF3','513080']][$unit] ?? ['D8ECE1','165C44'];
 }

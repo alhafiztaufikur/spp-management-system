@@ -12,6 +12,7 @@ function account_letter_icon(string $name): string {
         'reload'=>'<path d="M20 8a8 8 0 1 0 1 7M20 3v5h-5"/>',
         'external'=>'<path d="M14 3h7v7M21 3l-9 9M10 3H3v18h18v-7"/>',
         'user_off'=>'<circle cx="9" cy="7" r="4"/><path d="M2 21v-3a7 7 0 0 1 14 0v3M17 10l5 5M22 10l-5 5"/>',
+        'trash'=>'<path d="M3 6h18M9 6V3h6v3M5 6l1 15h12l1-15M10 10v7M14 10v7"/>',
         'user_check'=>'<circle cx="9" cy="7" r="4"/><path d="M2 21v-3a7 7 0 0 1 14 0v3m1-9 2 2 4-4"/>',
         'info'=>'<circle cx="12" cy="12" r="9"/><path d="M12 11v6M12 7h.01"/>',
         'document'=>'<path d="M14 2H6a2 2 0 0 0-2 2v16a2 2 0 0 0 2 2h12a2 2 0 0 0 2-2V8l-6-6ZM14 2v6h6M8 12h8M8 16h8"/>',

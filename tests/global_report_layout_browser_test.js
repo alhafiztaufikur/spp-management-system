@@ -13,7 +13,7 @@ async function inspect(page,table,width){
     const row=[...t.tBodies[0]?.rows||[]].find(r=>r.cells.length===t.querySelectorAll('colgroup col').length);
     if(!row)return failures;
     [...t.tHead.rows[0].cells].forEach((head,i)=>{
-      if(/^(No|NIS|NIS Diknas)$/i.test(head.textContent.trim())&&getComputedStyle(row.cells[i]).textAlign!=='center')failures.push('Identity must be centered '+head.textContent);
+      if(/^(No|NIS|NIS Diknas|Nama Siswa)$/i.test(head.textContent.trim())&&getComputedStyle(row.cells[i]).textAlign!=='center')failures.push('Identity must be centered '+head.textContent);
     });
     row.querySelectorAll('.report-col-date').forEach(cell=>{
       if(cell.getBoundingClientRect().width<180)failures.push('Date/time column too narrow');
@@ -42,6 +42,11 @@ async function inspect(page,table,width){
       leaves.forEach((head,i)=>{const a=head.getBoundingClientRect(),b=row.cells[i+identity.length].getBoundingClientRect();if(!near(a.x,b.x)||!near(a.width,b.width))failures.push('leaf header/body mismatch '+head.textContent);});
       const footer=t.tFoot?.rows[0];
       if(footer){
+        const footerColors=[...footer.cells].map(cell=>getComputedStyle(cell).backgroundColor);
+        if(new Set(footerColors).size!==1)failures.push('Subtotal frozen/scrolling palettes differ');
+        if(footerColors[0]===getComputedStyle(row.cells[0]).backgroundColor)failures.push('Subtotal must differ from ordinary rows');
+        const final=document.querySelector('.report-total-grid .report-summary-card');
+        if(final&&getComputedStyle(final).backgroundColor===footerColors[0])failures.push('Final totals must differ from subtotals');
         if(footer.cells.length!==row.cells.length)failures.push('Subtotal columns differ from body');
         [...footer.cells].forEach((cell,i)=>{
           const a=cell.getBoundingClientRect(),b=row.cells[i].getBoundingClientRect();
@@ -107,7 +112,7 @@ async function inspect(page,table,width){
         await page.setViewportSize({width,height:1000});
         const table=frame.locator('.report-horizontal-matrix').first();
         await table.evaluate(t=>t.closest('.report-matrix-scroll').scrollLeft=400);
-        const centered=await table.evaluate(t=>[...t.querySelectorAll('tbody td.report-col-no,tbody td.report-col-id')].every(c=>getComputedStyle(c).textAlign==='center'));assert.ok(centered,'Preview No/NIS alignment');
+        const centered=await table.evaluate(t=>[...t.querySelectorAll('tbody td.report-col-no,tbody td.report-col-id,tbody td.report-col-name')].every(c=>getComputedStyle(c).textAlign==='center'));assert.ok(centered,'Preview No/NIS/name alignment');
         const alignment=await table.evaluate(t=>{const a=[...t.tHead.querySelectorAll('.matrix-identity')],b=t.tBodies[0].rows[0].cells;return a.every((c,i)=>Math.abs(c.getBoundingClientRect().x-b[i].getBoundingClientRect().x)<2);});assert.ok(alignment,'Preview header/body alignment');
         await page.screenshot({path:dir+'/layout-'+name+'-'+format+'-'+width+'.png'});
       }

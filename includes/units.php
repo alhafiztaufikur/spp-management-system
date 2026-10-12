@@ -68,6 +68,22 @@ function unit_bootstrap_context(mysqli $db): void {
         return;
     }
     $id = (int)$_SESSION['admin_id'];
+    // Serialize authenticated writes with permanent account removal. Hold until
+    // request completion, including after session_write_close(); GET exports do not wait.
+    $readOnlyPostRoutes = ['otorisasi_export_pdf.php','export_global.php','unit_switch.php','logout.php'];
+    if (($_SERVER['REQUEST_METHOD'] ?? '') === 'POST'
+        && !in_array(basename((string)($_SERVER['SCRIPT_NAME'] ?? '')), $readOnlyPostRoutes, true)) {
+        require_once __DIR__.'/account_lifecycle.php';
+        try {
+            $accountWriteLock = account_lifecycle_lock($db, $id);
+        } catch (AccountRemovalException $error) {
+            http_response_code(409);
+            exit($error->getMessage());
+        }
+        register_shutdown_function(static function () use ($db, $accountWriteLock): void {
+            try { account_lifecycle_unlock($db, $accountWriteLock); } catch (Throwable $ignored) {}
+        });
+    }
     $stmt = $db->prepare('SELECT id,nama,role,unit_id,is_active FROM admin WHERE id=? LIMIT 1');
     $stmt->bind_param('i', $id); $stmt->execute();
     $account = $stmt->get_result()->fetch_assoc(); $stmt->close();

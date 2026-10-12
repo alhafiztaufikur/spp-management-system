@@ -1,11 +1,12 @@
 <?php
 /** Opt-in finishing for Global Reports; ordinary spreadsheet exports stay untouched. */
+require_once __DIR__.'/global_report_ui.php';
 function global_report_excel_body_style($sheet,array $section,array $positions,int $first,int $last,string $dark,string $pale): void {
     $letter=static fn($c)=>\PhpOffice\PhpSpreadsheet\Cell\Coordinate::stringFromColumnIndex($c);
     foreach($section['columns'] as $i=>$column){
         [$start,$end]=$positions[$i];$key=$column['key'];$type=$column['type'];
         $money=in_array($type,['money','money_optional'],true);
-        $center=in_array($type,['number','count','html','status','kelas'],true)||in_array($key,['no','nis','nis_diknas','export_diknas','NO_INDUK','NO_induk_diknas','kelas','KELAS','export_class','unit','export_unit','jenis','status','periode'],true);
+        $center=in_array($type,['number','count','html','status','kelas'],true)||in_array($key,['no','nis','nis_diknas','export_diknas','NO_INDUK','NO_induk_diknas','nama','NAMA','kelas','KELAS','export_class','unit','export_unit','jenis','status','periode'],true);
         $alignment=$money?'right':($center?'center':'left');
         $style=['alignment'=>['horizontal'=>$alignment,'vertical'=>'center','wrapText'=>true,'indent'=>$center?0:1]];
         if($money)$style['numberFormat']=['formatCode'=>'"Rp "#,##0;[Red]"Rp "-#,##0;"Rp "0'];
@@ -21,6 +22,17 @@ function global_report_excel_body_style($sheet,array $section,array $positions,i
             $sheet->getStyle($letter($start).$row.':'.$letter($end).$row)->getFill()->setFillType('solid')->getStartColor()->setRGB('DFF5E8');
         }
     }
+}
+
+function global_report_excel_total_style($sheet,string $range,int $unit,bool $final=false): void {
+    [$subtotal,$dark]=global_report_summary_palette($unit);
+    $sheet->getStyle($range)->applyFromArray([
+        'font'=>['bold'=>true,'color'=>['rgb'=>$final?'FFFFFF':$dark]],
+        'fill'=>['fillType'=>'solid','startColor'=>['rgb'=>$final?$dark:$subtotal]],
+        'borders'=>['top'=>['borderStyle'=>'thin','color'=>['rgb'=>$dark]]],
+        'alignment'=>['vertical'=>'center','wrapText'=>true],
+    ]);
+    if($final)$sheet->getStyle($range)->getNumberFormat()->setFormatCode('"Rp "#,##0;"Rp "-#,##0;"Rp "0');
 }
 
 function global_report_excel_identity_count(array $section): int {

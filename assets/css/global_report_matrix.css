@@ -68,8 +68,7 @@ html[data-theme="dark"] #global-report-workspace{--matrix-solid-bg:#14251f;--mat
 #global-report-workspace .global-layout-narrow :is(.matrix-nis,.global-layout-nis){position:sticky!important;left:0!important}
 
 /* Subtotal identities use the same geometry as the body, with an opaque pinned layer. */
-#global-report-workspace .report-horizontal-matrix tfoot :is(th,td){background:var(--matrix-solid-bg)!important;color:var(--text-primary);}
-#global-report-workspace .report-horizontal-matrix tfoot .matrix-identity{z-index:5!important;background:var(--matrix-solid-bg)!important;white-space:normal;}
+#global-report-workspace .report-horizontal-matrix tfoot .matrix-identity{z-index:5!important;white-space:normal;}
 
 /* Frozen and scrolling headers share the report unit palette. */
 #global-report-workspace{--matrix-head-bg:var(--unit-table-head-bg,#165c44);}
@@ -95,3 +94,21 @@ html body#global-report-workspace .report-template-shell .report-global-filter-f
  html body#global-report-workspace .report-template-shell .report-global-filter-form.report-filter-per-item:not(.report-per-item-compact) > .report-inline-search-row{grid-template-columns:minmax(0,1fr);}
  html body#global-report-workspace .report-template-shell .report-global-filter-form.report-filter-per-item:not(.report-per-item-compact) > .report-inline-search-row > .field-row.report-student-field:has(#global-siswa-search){grid-column:1!important;}
 }
+
+/* Opaque summaries retain their palette under frozen identities and on both themes. */
+#global-report-workspace{--report-subtotal-bg:#d8ece1;--report-subtotal-text:#165c44;--report-final-bg:#165c44;--report-final-text:#fff;}
+html[data-palette="smp"] #global-report-workspace{--report-subtotal-bg:#dde5f7;--report-subtotal-text:#203e80;--report-final-bg:#203e80;}
+html[data-palette="sma"] #global-report-workspace{--report-subtotal-bg:#f3dde2;--report-subtotal-text:#832a35;--report-final-bg:#832a35;}
+html[data-palette="super"] #global-report-workspace{--report-subtotal-bg:#e8def3;--report-subtotal-text:#513080;--report-final-bg:#513080;}
+html[data-theme="dark"] #global-report-workspace{--report-subtotal-bg:#264d3b;--report-subtotal-text:#e5f6ec;}
+html[data-theme="dark"][data-palette="smp"] #global-report-workspace{--report-subtotal-bg:#283d64;--report-subtotal-text:#e7edff;}
+html[data-theme="dark"][data-palette="sma"] #global-report-workspace{--report-subtotal-bg:#592f3c;--report-subtotal-text:#ffebef;}
+html[data-theme="dark"][data-palette="super"] #global-report-workspace{--report-subtotal-bg:#45325e;--report-subtotal-text:#f3eaff;}
+#global-report-workspace :is(.report-horizontal-matrix,.payment-table,.global-layout-table) tfoot :is(th,td){background:var(--report-subtotal-bg)!important;color:var(--report-subtotal-text)!important;border-top:2px solid var(--report-final-bg);font-weight:700;}
+#global-report-workspace .global-layout-table tfoot .global-layout-identity{background:var(--report-subtotal-bg)!important;color:var(--report-subtotal-text)!important;}
+#global-report-workspace .report-total-grid .report-summary-card{background:var(--report-final-bg);color:var(--report-final-text);border-color:var(--report-final-bg);}
+#global-report-workspace .report-total-grid .report-summary-card :is(span,strong){color:inherit;}
+#global-report-workspace .report-total-grid .report-summary-card.is-primary{background:var(--report-final-bg);color:var(--report-final-text);}
+#global-report-workspace :is(th,td):is(.report-col-name,.matrix-nama,.billing-matrix-name){text-align:center!important;}
+#global-report-workspace .billing-matrix-name :is(strong,small){text-align:center;overflow-wrap:anywhere;}
+#global-report-workspace .excel-total span{background:var(--report-final-bg);color:var(--report-final-text);border-radius:8px;}

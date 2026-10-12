@@ -14,6 +14,7 @@ requireRole(['super_admin']);
 $accountScopeUnit = unit_active_id();
 require_once 'includes/filter_choices.php';
 require_once 'includes/account_letter_ui.php';
+require_once 'includes/account_lifecycle.php';
 $accountRoleLabels=['super_admin'=>'Super Admin','admin'=>'Administrator','bendahara'=>'Bendahara TU','kasir'=>'Kasir'];
 $accountRoles=filter_choices($_GET['account_role']??'*',$accountRoleLabels);
 $accountStatus=filter_choices($_GET['account_status']??'*',['active'=>'Aktif','inactive'=>'Nonaktif']);
@@ -48,13 +49,27 @@ function validPassword(string $password): bool {
 }
 
 if ($_SERVER['REQUEST_METHOD'] === 'POST') {
-    if (!hash_equals($csrfToken, (string)($_POST['csrf_token'] ?? ''))) {
+    if (!is_string($_POST['csrf_token'] ?? null) || !hash_equals($csrfToken, $_POST['csrf_token'])) {
         setAccountFlash('error', 'Permintaan tidak valid. Silakan muat ulang halaman dan coba lagi.');
         header('Location: '.$accountReturn);
         exit;
     }
 
     $aksi = $_POST['aksi'] ?? '';
+
+    if ($aksi === 'hapus') {
+        try {
+            $account = account_delete_unused($koneksi, (int)filter_input(INPUT_POST, 'account_id', FILTER_VALIDATE_INT), (int)$_SESSION['admin_id'], $accountScopeUnit);
+            setAccountFlash('success', "Akun {$account['nama']} (@{$account['username']}) berhasil dihapus.");
+        } catch (AccountRemovalException $error) {
+            setAccountFlash('error', $error->getMessage());
+        } catch (Throwable $error) {
+            error_log('Penghapusan akun gagal: '.$error->getMessage());
+            setAccountFlash('error', 'Akun gagal dihapus. Riwayat dan data akun tetap tersimpan.');
+        }
+        header('Location: '.$accountReturn);
+        exit;
+    }
 
     if ($aksi === 'tambah') {
         $nama                 = trim($_POST['nama'] ?? '');
@@ -219,6 +234,14 @@ while($row=$accountResult->fetch_assoc()){
     $roleCounts[$row['role']]=($roleCounts[$row['role']]??0)+1;
     if(filter_is_all($accountRoles)||in_array($row['role'],$accountRoles,true))$accountRows[]=$row;
 }
+$accountHistoryError = '';
+try {
+    $accountHistory = account_history_usage($koneksi, array_column($accountRows, 'id'));
+} catch (Throwable $error) {
+    $accountHistory = [];
+    $accountHistoryError = 'Pemeriksaan riwayat belum tersedia. Penghapusan akun dinonaktifkan sementara.';
+    error_log('Pemeriksaan riwayat akun gagal: '.$error->getMessage());
+}
 ?>
 <!DOCTYPE html>
 <html lang="id" data-palette="<?= unit_palette_for_view(isset($reportUnitId) ? (int)$reportUnitId : null) ?>">
@@ -274,7 +297,7 @@ while($row=$accountResult->fetch_assoc()){
             <span>Buat Akun Petugas<small>Tambah akun untuk admin, bendahara, atau kasir sesuai unit yang dipilih.</small></span>
           </div>
         </div>
-        <div class="account-create-notice"><?= account_letter_icon('document') ?><span><strong>Hanya Super Admin yang dapat membuat akun.</strong><small>Akun baru mengikuti unit yang dipilih pada formulir.</small></span></div>
+        <div class="account-create-notice"><?= account_letter_icon('document') ?><span><strong>Hanya Super Admin yang dapat membuat akun.</strong></span></div>
 
         <form method="POST" action="<?= htmlspecialchars($accountReturn) ?>" id="form-tambah-akun">
           <input type="hidden" name="csrf_token" value="<?= htmlspecialchars($csrfToken) ?>" />
@@ -343,7 +366,7 @@ while($row=$accountResult->fetch_assoc()){
         <div class="card-title-row">
           <div class="card-title">
             <?= account_letter_icon('users') ?>
-            <span>Daftar Akun (<?= count($accountRows) ?> akun)<small>Kelola akun petugas, ubah password, dan atur status akun.</small></span>
+            <span>Daftar Akun (<?= count($accountRows) ?> akun)</span>
           </div>
           <a class="btn btn-ghost account-reload" href="<?= htmlspecialchars($accountReturn) ?>"><?= account_letter_icon('reload') ?>Muat Ulang</a>
         </div>
@@ -361,13 +384,18 @@ while($row=$accountResult->fetch_assoc()){
           <?php endforeach; ?>
         </nav>
 
+        <?php if ($accountHistoryError): ?><p class="alert alert-error" role="status"><?= htmlspecialchars($accountHistoryError) ?></p><?php endif; ?>
         <div class="table-container">
           <table class="payment-table responsive-table">
             <thead>
               <tr><th>Akun</th><th>Unit</th><th>Role</th><th>Status</th><th>Dibuat</th><th>Aksi</th></tr>
             </thead>
             <tbody>
-              <?php foreach ($accountRows as $account): ?>
+              <?php foreach ($accountRows as $account):
+                $hasHistory = isset($accountHistory[(int)$account['id']]);
+                $isSelf = (int)$account['id'] === (int)$_SESSION['admin_id'];
+                $deleteReason = $isSelf ? 'Akun yang sedang dipakai tidak dapat dihapus.' : ($accountHistoryError ?: ($hasHistory ? 'Memiliki riwayat '.implode(', ', $accountHistory[(int)$account['id']]).'. Gunakan Nonaktifkan.' : ''));
+              ?>
               <tr>
                 <td data-label="Akun">
                   <div class="account-summary">
@@ -375,6 +403,7 @@ while($row=$accountResult->fetch_assoc()){
                     <span>
                       <span class="account-name"><?= htmlspecialchars($account['nama']) ?></span>
                       <span class="account-username">@<?= htmlspecialchars($account['username']) ?></span>
+                      <small class="account-history <?= $hasHistory?'has-history':'no-history' ?>" title="<?= htmlspecialchars($deleteReason ?: 'Belum tercatat dalam transaksi, tagihan, pengajuan, atau audit.') ?>"><?= $accountHistoryError ? 'Riwayat belum diperiksa' : ($hasHistory ? 'Memiliki riwayat' : 'Belum memiliki riwayat') ?></small>
                     </span>
                   </div>
                 </td>
@@ -411,8 +440,11 @@ while($row=$accountResult->fetch_assoc()){
                     <?php else: ?>
                     <span class="account-self-badge"><?= account_letter_icon('user') ?> Akun Anda</span>
                     <?php endif; ?>
+                    <button type="button" class="btn-tbl btn-tbl-del btn-purge-account"
+                      data-account-id="<?= (int)$account['id'] ?>" data-account-name="<?= htmlspecialchars($account['nama']) ?>" data-account-username="<?= htmlspecialchars($account['username']) ?>"
+                      title="<?= htmlspecialchars($deleteReason ?: 'Hapus permanen akun tanpa riwayat') ?>" <?= $deleteReason ? 'disabled' : '' ?>><?= account_letter_icon('trash') ?>Hapus Akun</button>
                   </div>
-                  <details class="account-more"><summary aria-label="Tindakan akun <?= htmlspecialchars($account['nama']) ?>">⋯</summary><div><button type="button" data-account-shortcut="password"><?= account_letter_icon('lock') ?>Ganti Password</button><?php if((int)$account['id']!==(int)$_SESSION['admin_id']): ?><button type="button" data-account-shortcut="status" class="<?= (int)$account['is_active']?'is-danger':'is-success' ?>"><?= account_letter_icon((int)$account['is_active']?'user_off':'user_check') ?><?= (int)$account['is_active']?'Nonaktifkan':'Aktifkan' ?></button><?php endif; ?></div></details>
+                  <details class="account-more"><summary aria-label="Tindakan akun <?= htmlspecialchars($account['nama']) ?>">⋯</summary><div><button type="button" data-account-shortcut="password"><?= account_letter_icon('lock') ?>Ganti Password</button><?php if((int)$account['id']!==(int)$_SESSION['admin_id']): ?><button type="button" data-account-shortcut="status" class="<?= (int)$account['is_active']?'is-danger':'is-success' ?>"><?= account_letter_icon((int)$account['is_active']?'user_off':'user_check') ?><?= (int)$account['is_active']?'Nonaktifkan':'Aktifkan' ?></button><?php endif; ?><button type="button" data-account-shortcut="delete" class="is-danger" title="<?= htmlspecialchars($deleteReason) ?>" <?= $deleteReason ? 'disabled' : '' ?>><?= account_letter_icon('trash') ?>Hapus Akun</button><?php if($deleteReason): ?><small class="account-delete-reason"><?= htmlspecialchars($deleteReason) ?></small><?php endif; ?></div></details>
                 </td>
               </tr>
               <?php endforeach; ?>
@@ -472,6 +504,21 @@ while($row=$accountResult->fetch_assoc()){
           <button type="button" class="btn btn-ghost" id="btn-cancel-delete">Batal</button>
           <button type="submit" class="btn btn-error" style="background:var(--red);color:#fff;border:none;">Nonaktifkan Akun</button>
         </div>
+      </form>
+    </div>
+  </div>
+
+  <div class="modal-overlay" id="purge-account-modal" role="dialog" aria-modal="true" aria-labelledby="purge-modal-title">
+    <div class="modal-box">
+      <div class="modal-icon"><?= account_letter_icon('trash') ?></div>
+      <div class="modal-title" id="purge-modal-title">Hapus Akun Permanen</div>
+      <div class="modal-account" id="purge-account-label"></div>
+      <p class="payment-auto-note">Akun tanpa riwayat ini akan dihapus dan tidak dapat dipulihkan. Untuk menghentikan akses sementara, gunakan Nonaktifkan.</p>
+      <form method="post" action="<?= htmlspecialchars($accountReturn) ?>" id="form-purge-account">
+        <input type="hidden" name="csrf_token" value="<?= htmlspecialchars($csrfToken) ?>">
+        <input type="hidden" name="aksi" value="hapus">
+        <input type="hidden" name="account_id" id="purge-account-id">
+        <div class="modal-actions"><button type="button" class="btn btn-ghost" id="btn-cancel-purge">Batal</button><button type="submit" class="btn btn-error">Hapus Akun</button></div>
       </form>
     </div>
   </div>

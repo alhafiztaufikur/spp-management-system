@@ -146,7 +146,7 @@ h3{font-size:12px;color:#<?= $documentPalette[0] ?>}.data tfoot th,.data tfoot t
  .report-matrix-print .matrix-identity{position:static!important;left:auto!important}
  .report-matrix-print th{background:#e5eee9!important;color:#17231d!important;font-weight:bold;border-color:#7a9186}
  .report-matrix-print tfoot th,.report-matrix-print tfoot td{font-size:9pt}.report-matrix-print .badge-nis,.report-matrix-print .kelas-badge,.report-matrix-print .report-status{padding:1pt 2pt;color:#17231d!important;background:transparent!important;border:0}
-.data td.report-col-money{white-space:nowrap}.report-secondary-id,.matrix-detail{font-size:8pt}.total-table{width:320pt!important;max-width:320pt;margin-left:0}.total-table caption{font-size:10pt}
+.data td.report-col-name,.report-matrix-print .matrix-nama,.billing-matrix-name{text-align:center!important}.data tfoot th,.data tfoot td{background:#<?= global_report_summary_palette($reportUnitId)[0] ?>!important;color:#<?= global_report_summary_palette($reportUnitId)[1] ?>!important;border-top:2px solid #<?= global_report_summary_palette($reportUnitId)[1] ?>}.data.total-table tbody th,.data.total-table tbody td{background:#<?= global_report_summary_palette($reportUnitId)[1] ?>!important;color:#fff!important;font-weight:bold}.data td.report-col-money{white-space:nowrap}.report-secondary-id,.matrix-detail{font-size:8pt}.total-table{width:320pt!important;max-width:320pt;margin-left:0}.total-table caption{font-size:10pt}
  .footer{font-size:8pt;bottom:-9mm}.signatures{font-size:9pt}.data tbody td{color:#17231d}
 }
 @media screen{

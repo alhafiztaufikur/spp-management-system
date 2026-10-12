@@ -11,6 +11,8 @@ SistemSPP adalah aplikasi administrasi pembayaran sekolah berbasis PHP, JavaScri
 
 Perapihan Laporan Global 12 Oktober: pencarian SPP sejajar Baris/Halaman; No/NIS rata tengah pada layar/pratinjau/PDF/XLSX; tanggal/waktu tabungan dua baris. Pembentukan tabel layar dan cetak dipisahkan, style XLSX Global diterapkan per kolom, dan sesi ekspor dilepas setelah otorisasi/cakupan. Tidak ada cache hasil, perubahan model, filter atau hak akses. [Pengukuran dan batas performa](GLOBAL_REPORT_LAYOUT_20261012.md#perataan-identitas-dan-waktu-ekspor--12-oktober-2026).
 
+Perbaikan lanjutan 12 Oktober: subtotal Global memakai latar solid berwarna unit dan total akhir lebih gelap; nama siswa rata tengah pada halaman, pratinjau, PDF dan XLSX. Banner Cetak Tabungan kembali berilustrasi tanpa jumlah siswa aktif. Jarak kontrol SPP dan perataan judul filter Kelas diperbaiki. Role Management menyediakan hapus permanen hanya untuk akun tanpa riwayat di seluruh unit/arsip, dengan penanda riwayat, CSRF, pengaman akun sendiri/Super Admin terakhir, dan lock per akun untuk mencegah benturan dengan penyimpanan baru. Akun bersejarah tetap memakai Nonaktifkan; tidak ada migrasi.
+
 ## Riwayat dan laporan ? 10 Oktober 2026
 
 Riwayat Pembayaran dan Riwayat Daftar Ulang menyediakan filter Operator dengan pencarian dan checkbox beberapa petugas. Filter mengikuti pembuat awal, diterapkan lewat Tampilkan Rekap, serta dipertahankan pada pagination/detail/kembali dari edit. Daftar Ulang memisahkan nominal cicilan operator terpilih dari saldo dan status lunas yang tetap menghitung semua pembayaran siswa. Laporan Umum kini bernama **Laporan Transaksi**.

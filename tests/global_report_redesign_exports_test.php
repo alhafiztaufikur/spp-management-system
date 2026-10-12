@@ -54,15 +54,15 @@ foreach([1,2,3,0] as $unit){
                 foreach($section['columns'] as $i=>$column){
                     $value=array_key_exists($column['key'],$row)?$row[$column['key']]:'';
                     $cell=$sheet->getCellByColumnAndRow(1+(int)floor($i*$n/$count),$cursor);
-                    if(in_array($column['key'],['no','nis','nis_diknas','export_diknas','NO_INDUK','NO_induk_diknas'],true))export_redesign_assert($sheet->getStyle($cell->getCoordinate())->getAlignment()->getHorizontal()==='center','Centered No/NIS identity');
+                    if(in_array($column['key'],['no','nis','nis_diknas','export_diknas','NO_INDUK','NO_induk_diknas','nama','NAMA'],true))export_redesign_assert($sheet->getStyle($cell->getCoordinate())->getAlignment()->getHorizontal()==='center','Centered No/NIS/name identity');
                     if(in_array($column['type'],['money','money_optional','number','count'],true)&&$value!==null&&$value!=='')export_redesign_assert($cell->getDataType()==='n'&&abs((float)$cell->getValue()-(float)$value)<.001,'Export numeric value');
                     elseif(in_array($column['type'],['date','datetime'],true)&&$value)export_redesign_assert(abs((float)$cell->getValue()-\PhpOffice\PhpSpreadsheet\Shared\Date::PHPToExcel(new DateTimeImmutable($value,new DateTimeZone('Asia/Jakarta'))))<.00001,'Export date');
                     else export_redesign_assert((string)$cell->getValue()===($value===null?'—':spp_excel_text($value)),'Export text value');
                 }$cursor++;
             }
             if(!$section['rows'])$cursor++;
-            if(!empty($section['column_totals'])){foreach($section['columns'] as $i=>$column)if(isset($section['column_totals'][$column['key']]))export_redesign_assert((float)$sheet->getCellByColumnAndRow($i+1,$cursor)->getValue()===(float)$section['column_totals'][$column['key']]['value'],'Horizontal subtotals');$cursor++;}
-            foreach($section['totals'] as $total){export_redesign_assert(abs((float)$sheet->getCellByColumnAndRow($totalValueColumn,$cursor)->getValue()-(float)$total['value'])<.001,'Export subtotal');$cursor++;}$cursor+=2;
+            if(!empty($section['column_totals'])){export_redesign_assert($sheet->getStyle('A'.$cursor)->getFill()->getStartColor()->getRGB()===global_report_summary_palette($unit)[0],'Subtotal fill');foreach($section['columns'] as $i=>$column)if(isset($section['column_totals'][$column['key']]))export_redesign_assert((float)$sheet->getCellByColumnAndRow($i+1,$cursor)->getValue()===(float)$section['column_totals'][$column['key']]['value'],'Horizontal subtotals');$cursor++;}
+            foreach($section['totals'] as $total){export_redesign_assert($sheet->getStyle('A'.$cursor)->getFill()->getStartColor()->getRGB()===global_report_summary_palette($unit)[1],'Final total fill');export_redesign_assert(abs((float)$sheet->getCellByColumnAndRow($totalValueColumn,$cursor)->getValue()-(float)$total['value'])<.001,'Export subtotal');$cursor++;}$cursor+=2;
         }$book->disconnectWorksheets();$xlsxCount++;if(in_array('--xlsx-only',$argv,true))continue;
         $pdf=export_redesign_request($params+['format'=>'pdf','download'=>'1']);export_redesign_assert(str_starts_with($pdf,'%PDF-'),'PDF signature');file_put_contents($file.'.pdf',$pdf);
         $manifest[]=['path'=>$file.'.pdf','report'=>$report,'doc'=>$doc,'matrix'=>$matrix,'orientation'=>$matrix?global_report_print_orientation($matrix):($params['template']==='tabungan-siswa'||$params['template']==='riwayat-tagihan'?'landscape':'portrait'),'paper'=>'A4'];

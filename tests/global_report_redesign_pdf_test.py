@@ -32,6 +32,13 @@ for item in manifest:
         assert abs(min(pdf[0].rect.width, pdf[0].rect.height) - (841.89 if item["paper"] == "A3" else 595.28)) < 1
         for page in pdf:
             assert page.get_text().strip(), "Blank page " + item["path"]
+            name_headers = page.search_for("NAMA SISWA")
+            if name_headers:
+                center = (name_headers[0].x0 + name_headers[0].x1) / 2
+                names = {str(row.get("nama", "")) for section in item["doc"]["sheets"][0]["sections"] for row in section["rows"]}
+                for name in names - {""}:
+                    for rect in page.search_for(name):
+                        assert abs((rect.x0 + rect.x1) / 2 - center) < 3, ("Name not centered", item["path"], name)
             words=page.get_text("words")
             nis_header=next((w for w in words if w[4]=="NIS"),None)
             identities={str(row.get("nis","")) for section in item["doc"]["sheets"][0]["sections"] for row in section["rows"]}

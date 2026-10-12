@@ -343,6 +343,7 @@
     <p>Atur rentang tanggal transaksi dan cari siswa untuk melihat setoran serta penarikan. Bagian ringkasan menunjukkan total masuk, total keluar, dan jumlah transaksi sesuai filter. Daftar saldo siswa membantu menemukan siswa dengan saldo tertentu.</p>
     <div class="steps"><ol><li>Pilih rentang tanggal dan siswa, lalu tampilkan riwayat.</li><li>Baca tanggal, jenis mutasi, nominal masuk/keluar, dan saldo setelah transaksi bila tersedia.</li><li>Jika perlu laporan formal, buka <b>Cetak Laporan</b> atau jenis tabungan di Laporan Global.</li></ol></div>
     <h2>Cetak Tabungan</h2>
+    <p>Banner buku kembali memakai ilustrasi dan warna unit, tanpa jumlah siswa aktif. Pilihan siswa dan alur cetak tetap sama.</p>
     <p>Menu ini menyiapkan buku tabungan untuk seorang siswa. Pilih kelas bila perlu, cari siswa, lalu periksa identitas dan pratinjau buku. Tekan <b>Pratinjau &amp; Cetak</b> setelah siswa dan mutasinya benar; buka PDF dari halaman pratinjau. Tombol <b>Cetak Buku Tabungan</b> pada riwayat/detail transaksi menghasilkan buku lengkap yang sama. Kolom Jumlah menunjukkan saldo berjalan per baris; cetak ulang tidak menambah transaksi. Cetak pada kertas A5 potret, skala 100%, dua sisi dengan pembalikan sisi pendek, lalu lipat menjadi buku A6 lanskap.</p>
     <div class="card"><h3>Jika saldo tidak cocok</h3><p>Samakan unit, siswa, dan rentang tanggal. Riwayat yang difilter tanggal bisa hanya menampilkan sebagian mutasi; saldo terkini dihitung dari seluruh transaksi siswa.</p></div>
     <div class="footer">Manual Penggunaan SistemSPP | 19</div>
@@ -378,7 +379,7 @@
       <tr><td>Tagihan atau titipan mana yang berubah?</td><td>Riwayat Tagihan Siswa (28) atau Riwayat Titipan SPP (32).</td></tr>
       <tr><td>Perlu surat untuk pimpinan?</td><td>Cetak Surat ke Kepala Sekolah (29).</td></tr>
     </tbody></table>
-    <p>No dan NIS rata tengah pada tabel serta keluaran PDF/Excel. Tanggal dan waktu tabungan ditampilkan pada dua baris; nilai tanggal Excel tetap dapat diurutkan. Dokumen dengan banyak halaman memerlukan waktu lebih lama untuk dibentuk.</p>
+    <p>No, NIS, dan nama siswa rata tengah pada tabel serta keluaran PDF/Excel. Subtotal memakai warna unit yang lebih tegas daripada baris biasa; total akhir memakai warna lebih gelap. Tanggal dan waktu tabungan ditampilkan pada dua baris; nilai tanggal Excel tetap dapat diurutkan. Dokumen dengan banyak halaman memerlukan waktu lebih lama untuk dibentuk.</p>
     <div class="warning">Data pada pratinjau dihitung saat dibuka. Jika ada transaksi baru setelah itu, ulangi pratinjau untuk memperoleh hasil terbaru.</div>
     <div class="footer">Manual Penggunaan SistemSPP | 21</div>
   </section>
@@ -525,10 +526,10 @@
     <div class="eyebrow">HANYA SUPER ADMIN</div><h1>Role Management</h1>
     <p class="lead">Menu ini mengelola akun pengguna, peran, unit, status aktif, dan kata sandi. Hanya Super Admin yang dapat membukanya.</p>
     <h2>Membuat akun</h2>
-    <div class="steps"><ol><li>Masuk sebagai Super Admin, lalu pilih SD, SMP, atau SMA di sidebar untuk melihat dan mengelola akun unit tersebut saja. Pilih Super Admin (Semua Unit) di sidebar untuk melihat semua akun.</li><li>Isi nama lengkap dan username yang belum dipakai. Pada unit tertentu, akun baru otomatis mengikuti unit tersebut.</li><li>Pilih peran Kasir atau Bendahara TU; pada cakupan Semua Unit Anda juga dapat membuat akun Super Admin. Role Admin unit tidak dibuat lagi.</li><li>Isi kata sandi baru dan konfirmasi; simpan. Berikan kredensial melalui jalur yang aman kepada pemilik akun.</li></ol></div>
+    <div class="steps"><ol><li>Masuk sebagai Super Admin, lalu pilih SD, SMP, atau SMA di sidebar untuk melihat dan mengelola akun unit tersebut saja. Pilih Super Admin (Semua Unit) di sidebar untuk melihat semua akun.</li><li>Isi nama lengkap dan username yang belum dipakai. Pada unit tertentu, akun baru otomatis mengikuti unit tersebut.</li><li>Pilih peran Admin, Kasir, atau Bendahara TU; pada cakupan Semua Unit Anda juga dapat membuat akun Super Admin.</li><li>Isi kata sandi baru dan konfirmasi; simpan. Berikan kredensial melalui jalur yang aman kepada pemilik akun.</li></ol></div>
     <h2>Mengelola akun yang ada</h2>
     <p>Gunakan daftar akun untuk memeriksa nama, username, peran, unit, dan status aktif. Ubah status jika seseorang tidak lagi boleh masuk. Saat mereset kata sandi, pastikan akun yang dipilih benar dan beri tahu pemilik akun bahwa kata sandi sebelumnya tidak berlaku.</p>
-    <div class="card"><h3>Pemisahan tugas</h3><p>Kasir mencatat transaksi dan mengajukan koreksi; Super Admin mengelola akun dan memutuskan otorisasi sesuai unit aktif; bendahara memeriksa laporan. Akun Admin unit lama diarsipkan tanpa menghapus riwayat transaksi.</p></div>
+    <div class="card"><h3>Hapus akun tanpa riwayat</h3><p>Penanda <b>Belum memiliki riwayat</b> berarti akun belum tercatat pada pembayaran, tabungan, tagihan, pengajuan, atau audit; bukan berarti belum pernah login. Pilih <b>Hapus Akun</b>, periksa nama dan username, lalu konfirmasi. Penghapusan permanen tidak dapat dipulihkan. Akun dengan riwayat tetap disimpan dan dapat <b>dinonaktifkan</b>. Akun sendiri, Super Admin aktif terakhir, dan akun di luar cakupan tidak dapat dihapus.</p></div>
     <div class="warning">PDF kredensial memuat informasi sensitif. Simpan di lokasi terbatas; jangan menaruhnya di folder web, mengirim ke grup umum, atau memasukkan kata sandi ke manual ini.</div>
     <div class="footer">Manual Penggunaan SistemSPP | 34</div>
   </section>

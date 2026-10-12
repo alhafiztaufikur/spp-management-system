@@ -2,7 +2,7 @@
 $ErrorActionPreference='Stop'
 if($env:SPP_DB_NAME -notmatch '^db_spp_audit_[a-z0-9_]+$'){throw 'Audit clone required'}
 $qaDir=(Resolve-Path -LiteralPath $env:SPP_QA_DIR).Path
-$names=@('status','penerimaan','spp-tahunan','per-item','tabungan-siswa','saldo-tabungan','riwayat-tagihan','setoran','kas-tabungan','status-multi')
+$names=@('status','penerimaan','spp-tahunan','per-item','tabungan-siswa','saldo-tabungan','riwayat-tagihan','setoran','kas-tabungan','status-multi','tabungan-siswa-populated')
 $excelApp=$null
 $qaBook=$null
 $count=0
@@ -17,6 +17,13 @@ try {
             $source=Join-Path $qaDir ('endpoint-'+$unit+'-'+$name+'.xlsx')
             $qaBook=$excelApp.Workbooks.Open($source,0,$true)
             $qaSheet=$qaBook.Worksheets.Item(1)
+            $nameHeader=$qaSheet.UsedRange.Find('Nama Siswa')
+            if($null -ne $nameHeader -and $nameHeader.Row -lt $qaSheet.UsedRange.Rows.Count){
+                $nameCell=$qaSheet.Cells.Item($nameHeader.Row+1,$nameHeader.Column)
+                if($null -ne $nameCell.Value2 -and $nameCell.HorizontalAlignment -ne -4108){throw ('Student name not centered: '+$source)}
+            }
+            $subtotalCell=$qaSheet.UsedRange.Find('Subtotal seluruh hasil filter')
+            if($null -ne $subtotalCell -and $subtotalCell.Interior.Color -eq 16777215){throw ('White subtotal: '+$source)}
             if($qaSheet.PageSetup.PaperSize -ne 9){throw ('Expected A4: '+$source)}
             if($qaSheet.PageSetup.Orientation -notin @(1,2)){throw 'Invalid orientation'}
             $qaSheet.Activate()
@@ -34,10 +41,16 @@ try {
             $last=[Math]::Min(13,$qaSheet.UsedRange.Columns.Count)
             $rows=[Math]::Min(20,$qaSheet.UsedRange.Rows.Count)
             $qaRange=$qaSheet.Range($qaSheet.Cells.Item(1,1),$qaSheet.Cells.Item($rows,$last))
-            $qaRange.CopyPicture(1,2)
+            for($attempt=0;$attempt -lt 4;$attempt++){
+                try{[void]$qaRange.CopyPicture(1,2);break}catch{
+                    if($attempt -eq 3){throw}
+                    $excelApp.CutCopyMode=0
+                    Start-Sleep -Milliseconds 500
+                }
+            }
             $qaChart=$qaSheet.ChartObjects().Add(0,0,$qaRange.Width,$qaRange.Height)
-            $qaChart.Activate()
-            $qaChart.Chart.Paste()
+            [void]$qaChart.Activate()
+            [void]$qaChart.Chart.Paste()
             $output=Join-Path $qaDir ('excel-screen-'+$unit+'-'+$name+'.png')
             if(-not $qaChart.Chart.Export($output,'PNG')){throw 'Excel image export failed'}
             $qaBook.Close($false)
