@@ -11,6 +11,7 @@ if (($_SERVER['REQUEST_METHOD'] ?? '') !== 'GET') {
 }
 require_once __DIR__.'/includes/legacy_import.php';
 require_once __DIR__.'/includes/database_backup.php';
+require_once __DIR__.'/includes/database_restore_ui.php';
 if(empty($_SESSION['csrf_legacy_import']))$_SESSION['csrf_legacy_import']=bin2hex(random_bytes(32));
 if(empty($_SESSION['csrf_backup']))$_SESSION['csrf_backup']=bin2hex(random_bytes(32));
 if(empty($_SESSION['backup_request_key']))$_SESSION['backup_request_key']=bin2hex(random_bytes(16));
@@ -56,7 +57,7 @@ $backupJobs = array_values(array_filter($backupSummary['jobs'] ?? [], static fun
     return $backupSearch === '' || stripos($haystack, $backupSearch) !== false;
 }));
 $backupActive = $backupSummary['active'] ?? null;
-$backupCanCreate = !empty($backupSummary['ready']) && !$backupActive;
+$backupCanCreate = !empty($backupSummary['can_create']);
 $databaseConnected = false;
 $databaseSize = null;
 try {
@@ -85,7 +86,7 @@ function backup_ui_picker(string $prefix, string $label): void { ?>
     <button type="button" class="dbt-button dbt-button-outline" id="<?= $prefix ?>-choose">Pilih File</button>
     <input type="file" id="<?= $prefix ?>-file" accept="<?= $prefix==='legacy'?'.dat':'.sql' ?>" class="dbt-file-input" aria-label="<?= $label ?>" tabindex="-1">
   </div>
-  <p class="dbt-hint"><?= $prefix==='legacy'?'Backup SQL Server (.dat), maksimal 100 MiB. Diunggah hanya ketika proses dimulai.':'SQL (.sql), maksimal 100 MiB. File tetap di browser dan tidak dikirim.' ?></p>
+  <p class="dbt-hint"><?= $prefix==='legacy'?'Backup SQL Server (.dat), maksimal 100 MiB. Diunggah hanya ketika proses dimulai.':'SQL (.sql), maksimal 100 MiB. Gunakan unduhan cadangan terverifikasi dari riwayat PC ini; file dikirim saat diperiksa.' ?></p>
   <div class="dbt-file-summary" id="<?= $prefix ?>-summary" hidden>
     <?= backup_ui_icon('file') ?><div><strong id="<?= $prefix ?>-name"></strong><span id="<?= $prefix ?>-size"></span></div>
     <button type="button" class="dbt-text-button" id="<?= $prefix ?>-change">Ganti</button>
@@ -102,6 +103,7 @@ function backup_ui_picker(string $prefix, string $label): void { ?>
   <link rel="stylesheet" href="assets/css/style.css?v=unitpalette4&amp;mtime=<?= filemtime(__DIR__ . '/assets/css/style.css') ?>">
   <link rel="stylesheet" href="assets/css/date_controls.css?v=unitpalette4&amp;mtime=<?= filemtime(__DIR__ . '/assets/css/date_controls.css') ?>">
   <link rel="stylesheet" href="assets/css/backup_restore.css?v=<?= filemtime(__DIR__ . '/assets/css/backup_restore.css') ?>">
+  <link rel="stylesheet" href="assets/css/database_restore.css?v=<?= filemtime(__DIR__.'/assets/css/database_restore.css') ?>">
   <script>(function(){document.documentElement.setAttribute('data-theme',localStorage.getItem('spp_theme')||'light');})();</script>
 </head>
 <body>
@@ -124,7 +126,7 @@ function backup_ui_picker(string $prefix, string $label): void { ?>
     <section id="panel-backup" role="tabpanel" aria-labelledby="tab-backup">
       <div class="dbt-notice"><?= backup_ui_icon('info') ?><div><strong>Seluruh Database SistemSPP</strong><p>Cadangan mencakup SD, SMP, dan SMA. Cadangan manual tetap disimpan; penyimpanan cadangan otomatis mengikuti pengaturan di bawah.</p></div></div>
       <div id="backup-alerts" class="dbt-backup-alerts" aria-live="polite">
-        <?php foreach ($backupSummary['alerts'] ?? [] as $alert): ?><div class="dbt-warning"><?= backup_ui_escape($alert) ?></div><?php endforeach; ?>
+        <?php foreach ($backupSummary['alerts'] ?? [] as $alert): if(!empty($backupSummary['configured'])&&empty($backupSummary['service_registered'])&&str_starts_with($alert,'Backup otomatis belum aktif.'))continue; ?><div class="dbt-warning"><?= backup_ui_escape($alert) ?></div><?php endforeach; ?>
       </div>
       <div id="backup-feedback" class="dbt-feedback<?= $backupFlash ? ' is-' . (($backupFlash['type'] ?? '') === 'success' ? 'success' : 'error') : '' ?>" role="status" aria-live="polite"<?= !$backupFlash ? ' hidden' : '' ?>><?= backup_ui_escape($backupFlash['message'] ?? '') ?></div>
       <div class="dbt-metrics">
@@ -139,6 +141,13 @@ function backup_ui_picker(string $prefix, string $label): void { ?>
       </div>
       <section class="dbt-card dbt-settings" aria-labelledby="backup-settings-title">
         <header class="dbt-card-heading"><span class="dbt-icon"><?= backup_ui_icon('clock') ?></span><div><h2 id="backup-settings-title">Pengaturan Backup Harian</h2></div></header>
+        <div id="backup-scheduler-status" class="backup-scheduler-status"<?= empty($backupSummary['configured'])?' hidden':'' ?>>
+          <div class="backup-scheduler-summary"><strong id="backup-scheduler-label"><?= !empty($backupSummary['ready'])?'Backup otomatis aktif':(!empty($backupSummary['service_registered'])?'Jadwal terpasang; menunggu layanan':'Backup otomatis belum aktif') ?></strong><span id="backup-scheduler-note"><?= !empty($backupSummary['service_registered'])?'Jadwal mengikuti jam yang tersimpan.':'Backup manual tetap tersedia.' ?></span></div>
+          <details id="backup-scheduler-help"<?= !empty($backupSummary['service_registered'])?' hidden':'' ?>><summary>Cara mengaktifkan</summary><p>Buka <strong>PowerShell sebagai Administrator</strong> dengan akun Windows pemilik aplikasi, lalu jalankan perintah ini satu kali:</p>
+            <code id="backup-scheduler-command"><?= backup_ui_escape('powershell -NoProfile -ExecutionPolicy Bypass -File "'.str_replace('/','\\',__DIR__). '\scripts\install_database_backup.ps1" -ConfirmMain -RegisterTask') ?></code>
+            <button type="button" id="backup-scheduler-copy" class="dbt-button dbt-button-outline">Salin Perintah</button><span id="backup-scheduler-copy-status" role="status"></span><p>Status berubah otomatis setelah pemasangan berhasil. Jangan gunakan akun Windows yang berbeda.</p>
+          </details>
+        </div>
         <form action="backup_api.php" method="post" id="database-backup-settings-form">
           <input type="hidden" name="action" value="settings"><input type="hidden" name="return" value="page">
           <input type="hidden" name="csrf_token" value="<?= backup_ui_escape($_SESSION['csrf_backup']) ?>">
@@ -164,7 +173,7 @@ function backup_ui_picker(string $prefix, string $label): void { ?>
             <input type="hidden" name="return" value="page">
             <button type="submit" class="dbt-button dbt-button-primary dbt-wide" id="backup-create"<?= !$backupCanCreate ? ' disabled' : '' ?> aria-describedby="backup-create-hint"><?= backup_ui_icon('download') ?> <span>Buat Backup Sekarang</span></button>
           </form>
-          <p class="dbt-hint" id="backup-create-hint"><?= $backupActive ? 'Satu pencadangan sedang berlangsung. Progres tampil di bawah.' : (!empty($backupSummary['ready']) ? 'Cadangan baru akan diproses oleh layanan backup.' : 'Layanan backup belum siap. Periksa informasi di atas.') ?></p>
+          <p class="dbt-hint" id="backup-create-hint"><?= $backupCanCreate ? ($backupActive ? 'Proses sebelumnya terputus. Klik untuk memeriksa dan melanjutkan antrean.' : 'Backup manual langsung diproses tanpa menunggu jadwal harian.') : ($backupActive ? 'Satu pencadangan sedang berlangsung. Progres tampil di bawah.' : 'Pemicu backup manual belum tersedia. Periksa konfigurasi backup pada PC ini.') ?></p>
           <div id="backup-progress" class="dbt-backup-progress" aria-live="polite"<?= !$backupActive ? ' hidden' : '' ?>>
             <div class="dbt-progress-heading"><strong id="backup-progress-state"><?= backup_ui_escape($backupStates[$backupActive['state'] ?? ''] ?? 'Menunggu') ?></strong><a href="backup_restore.php" class="dbt-text-button">Perbarui</a></div>
             <ol aria-label="Tahapan backup"><?php foreach (['queued'=>'Menunggu','dumping'=>'Mencadangkan','verifying'=>'Memverifikasi','verified'=>'Terverifikasi'] as $state=>$label): ?><li data-backup-stage="<?= $state ?>"<?= ($backupActive['state'] ?? '') === $state ? ' aria-current="step"' : '' ?>><?= $label ?></li><?php endforeach; ?></ol>
@@ -172,10 +181,12 @@ function backup_ui_picker(string $prefix, string $label): void { ?>
           </div>
         </article>
         <article class="dbt-card">
-          <header class="dbt-card-heading"><span class="dbt-icon"><?= backup_ui_icon('database') ?></span><div><h2>Restore Database</h2><p>Pilih file untuk meninjau alur pemulihan seluruh database.</p></div></header>
+          <header class="dbt-card-heading"><span class="dbt-icon"><?= backup_ui_icon('database') ?></span><div><h2>Restore Database</h2><p>Periksa cadangan, lalu konfirmasi pemulihan seluruh database.</p></div></header>
           <div class="dbt-warning"><strong>Pemulihan akan menggantikan seluruh data database saat ini.</strong><p>Pemilihan file di tahap ini tidak menjalankan pemulihan.</p></div>
           <?php backup_ui_picker('restore', 'Pilih file SQL untuk pratinjau pemulihan'); ?>
-          <button type="button" class="dbt-button dbt-button-outline" id="restore-review" disabled>Tinjau Pemulihan</button>
+          <button type="button" class="dbt-button dbt-button-outline" id="restore-review" disabled>Periksa File &amp; Tinjau Pemulihan</button>
+          <p class="dbt-file-status" id="restore-job-status" role="status" aria-live="polite"></p>
+          <a href="restore_status.php" class="dbt-text-button" id="restore-progress-link" hidden>Lihat Progres Pemulihan</a>
         </article>
       </div>
       <section class="dbt-card dbt-history" aria-labelledby="history-title">
@@ -208,26 +219,24 @@ function backup_ui_picker(string $prefix, string $label): void { ?>
         <p class="dbt-hint">Kandidat hanya diterapkan setelah pratinjau dan konfirmasi. Lihat <a href="documentation/LEGACY_IMPORT_FEASIBILITY_20261003.md">audit kelayakan impor legacy</a> untuk bukti, kekurangan histori, dan keputusan lanjutan.</p>
       </div>
     </section>
-    <noscript><div class="dbt-warning">Backup tetap dapat dibuat dan diunduh tanpa JavaScript. Muat ulang halaman untuk melihat progres. Import Legacy memerlukan JavaScript; Restore melalui web tetap nonaktif.</div></noscript>
+    <noscript><div class="dbt-warning">Backup tetap dapat dibuat dan diunduh tanpa JavaScript. Muat ulang halaman untuk melihat progres. Import Legacy dan pemulihan database memerlukan JavaScript.</div></noscript>
   </div>
 </main>
 </div>
-<dialog id="restore-dialog" class="dbt-dialog" aria-labelledby="restore-dialog-title" aria-describedby="restore-dialog-description">
+<dialog id="restore-dialog" class="dbt-dialog restore-dialog" aria-labelledby="restore-dialog-title" aria-describedby="restore-dialog-description">
   <div class="dbt-dialog-content">
-    <span class="dbt-icon"><?= backup_ui_icon('info') ?></span>
-    <h2 id="restore-dialog-title">Perhatian: pemulihan mengganti seluruh database</h2>
-    <div id="restore-dialog-description"><p>Pemulihan akan mengganti data siswa, pembayaran, Tabungan, akun, dan pengaturan SD, SMP, serta SMA dengan isi file backup yang dipilih. Data yang dibuat setelah backup tersebut dapat hilang.</p><p>Sebelum pemulihan dijalankan, file harus lolos pemeriksaan dan salinan cadangan terbaru wajib tersedia. Pastikan waktu pemulihan sudah sesuai dan tidak ada transaksi yang sedang diproses.</p></div>
-    <dl class="dbt-definition"><div><dt>File</dt><dd id="restore-dialog-file"></dd></div><div><dt>Cakupan</dt><dd>Seluruh Database SistemSPP</dd></div><div><dt>Status file</dt><dd>Belum divalidasi</dd></div></dl>
-    <label class="dbt-checkbox"><input type="checkbox" id="restore-understood"> Saya memahami bahwa seluruh data akan diganti</label>
-    <label class="dbt-label" for="restore-confirmation">Ketik PULIHKAN DATABASE</label>
-    <input type="text" id="restore-confirmation" autocomplete="off" placeholder="PULIHKAN DATABASE">
-    <p class="dbt-hint" id="restore-unavailable" role="status">Pemulihan belum tersedia; saat ini hanya pratinjau alur.</p>
-    <div class="dbt-dialog-actions"><button type="button" class="dbt-button dbt-button-outline" id="restore-cancel" autofocus>Batal</button><button type="button" class="dbt-button dbt-button-primary" id="restore-apply" disabled aria-describedby="restore-unavailable">Pulihkan Database</button></div>
+    <header class="restore-dialog-heading"><span class="dbt-icon"><?= backup_ui_icon('database') ?></span><div><h2 id="restore-dialog-title" tabindex="-1" autofocus>Pulihkan Database</h2><p>Seluruh unit: SD, SMP, dan SMA</p></div></header>
+    <p id="restore-dialog-description" class="restore-notice">Data dan akun diganti sesuai cadangan yang dipilih. Backup pengaman dibuat otomatis sebelum penggantian.</p>
+    <dl class="restore-file-details"><div><dt>File cadangan</dt><dd id="restore-dialog-file"></dd></div><div><dt>Status</dt><dd id="restore-validation-state">Belum divalidasi</dd></div></dl>
+    <?php database_restore_progress_ui(); database_restore_confirmation_ui(); ?>
+    <div class="dbt-dialog-actions"><button type="button" class="dbt-button dbt-button-outline" id="restore-cancel">Tutup</button><button type="button" class="dbt-button dbt-button-primary" id="restore-apply" disabled aria-describedby="restore-unavailable">Pulihkan Database</button><button type="button" class="dbt-button dbt-button-outline" id="restore-resume" hidden>Lanjutkan Pemulihan Pengaman</button><a href="login.php" class="dbt-button dbt-button-outline" id="restore-login" hidden>Masuk Kembali</a></div>
   </div>
 </dialog>
 <script src="assets/js/date_format.js?v=<?= filemtime(__DIR__ . '/assets/js/date_format.js') ?>"></script>
   <script src="assets/js/app.js?v=<?= filemtime(__DIR__ . '/assets/js/app.js') ?>"></script>
 <script src="assets/js/backup_restore.js?v=<?= filemtime(__DIR__ . '/assets/js/backup_restore.js') ?>"></script>
+<script type="application/json" id="database-restore-config"><?= json_encode(['csrf'=>$_SESSION['csrf_backup'],'job'=>$_SESSION['database_restore_job']??null],JSON_HEX_TAG|JSON_HEX_AMP|JSON_HEX_APOS|JSON_HEX_QUOT) ?></script>
+<script src="assets/js/database_restore.js?v=<?= filemtime(__DIR__.'/assets/js/database_restore.js') ?>"></script>
 <script id="database-backup-config" type="application/json"><?= json_encode(['summary'=>$backupSummary,'search'=>$backupSearch,'type'=>$backupType], JSON_HEX_TAG|JSON_HEX_AMP|JSON_HEX_QUOT|JSON_HEX_APOS|JSON_INVALID_UTF8_SUBSTITUTE) ?></script>
 <script src="assets/js/database_backup.js?v=<?= filemtime(__DIR__ . '/assets/js/database_backup.js') ?>"></script>
 

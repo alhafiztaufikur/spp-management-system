@@ -1,6 +1,27 @@
 # Backup database lokal setiap hari
 
-Pencadangan mengambil seluruh database `db_spp` (SD, SMP, SMA), terlepas dari unit operasional. Super Admin mengatur **Jam Backup (WIB)** dan **Simpan Cadangan Selama (hari)** melalui halaman **Backup & Restore**. Backup manual memakai antrean dan penguncian yang sama; Restore melalui web tetap nonaktif.
+Pencadangan mengambil seluruh database `db_spp` (SD, SMP, SMA), terlepas dari unit operasional. Super Admin mengatur **Jam Backup (WIB)** dan **Simpan Cadangan Selama (hari)** melalui halaman **Backup & Restore**. Backup manual dan pemulihan memakai worker privat, dengan pemeriksaan identitas database serta penguncian proses.
+
+## Memulihkan melalui halaman aplikasi
+
+1. Masuk sebagai **Super Admin aktif**. Pilih SQL hasil unduhan cadangan **Terverifikasi** pada riwayat PC ini, maksimal 100 MiB. File harus cocok persis dengan checksum cadangan yang masih tersedia; SQL asing, berkas yang diedit, dan cadangan dengan skema berbeda ditolak. Impor dari PC lain tetap memakai prosedur administratif terkontrol.
+2. Tekan **Periksa File & Tinjau Pemulihan**. File diunggah ke penyimpanan privat dan dipulihkan pada MySQL terisolasi. Struktur, fingerprint seluruh tabel, relasi, kesehatan aplikasi, keuangan dan cakupan unit dicocokkan dengan bukti cadangan. Database operasional belum diganti pada tahap ini. Hasil pemeriksaan berlaku satu jam.
+3. Setelah **Terverifikasi**, centang persetujuan dan ketik **PULIHKAN DATABASE**. Tombol **Pulihkan Database** baru aktif setelah kedua syarat dipenuhi. Pemulihan mengganti seluruh data siswa, pembayaran, Tabungan, akun dan pengaturan SD/SMP/SMA. Gunakan akun/kata sandi yang tersimpan pada tanggal cadangan setelah selesai.
+4. Worker menghentikan sementara akses aplikasi, menunggu permintaan yang sedang berjalan selesai, lalu membuat **backup pengaman Manual yang terverifikasi**. Jika tahap ini gagal, database tidak diganti. Akun ekspor tetap berizin baca; pemulihan memakai izin koneksi aplikasi yang diperiksa ulang. Akun MySQL aplikasi harus memiliki izin DDL/impor pada database tujuan; server dengan event terjadwal memerlukan event scheduler OFF secara administratif sebelum pemulihan.
+5. Setelah impor, snapshot hasil dipulihkan dan diaudit lagi pada instance terisolasi; seluruh nilai harus cocok. Jika impor/audit gagal, worker mengembalikan backup pengaman dan memeriksanya. Backup pengaman tetap tersedia pada Riwayat Backup dan tidak ikut rotasi otomatis.
+6. Halaman **Lihat Progres Pemulihan** (`restore_status.php`) tetap tersedia selama pemeliharaan, termasuk setelah refresh. Proses tidak bergantung pada tab browser atau task harian. Setelah selesai atau backup pengaman berhasil dikembalikan, masuk kembali; seluruh sesi lama dinyatakan tidak berlaku.
+
+Jika proses terputus setelah penggantian dimulai, penanda pemeliharaan tetap menutup akses database. Polling melanjutkan pemulihan dari backup pengaman, bukan mengulangi impor pilihan secara membabi buta. Status **Pemulihan Pengaman Tertunda** menyediakan **Lanjutkan Pemulihan Pengaman** untuk mencoba kembali setelah gangguan diperbaiki. Jangan menghapus penanda pemeliharaan secara manual. Jika sesi pemilik tidak lagi tersedia, pengelola dapat menjalankan `scripts/database_restore_runner.php --config=<konfigurasi-privat> --job=<id-pemulihan>` dari CLI pada akun Windows pemilik; runner tetap memeriksa identitas/jurnal/backup pengaman. Worker Legacy berhenti setelah generasi database berubah dan harus dimulai ulang setelah antreannya ditinjau.
+
+Unggahan menggunakan batas PHP `upload_max_filesize` dan `post_max_size` selain batas aplikasi 100 MiB. Data SQL dan kredensial sementara tidak disimpan di webroot/Git atau argumen proses. Kredensial impor dibuat hanya sesudah konfirmasi, dihapus setelah pekerjaan terminal, dan dipertahankan privat bila pemulihan pengaman masih memerlukannya. Menutup dialog hanya menutup tampilan; proses yang berjalan tetap dilanjutkan. Restore membutuhkan JavaScript; backup manual dan pengaturan tetap mendukung formulir native.
+
+## Membuat backup manual
+
+Klik **Buat Backup Sekarang** untuk menjalankan backup manual di latar belakang. Tombol tersedia setelah konfigurasi, PHP CLI dan PowerShell siap; **task harian Windows tidak diperlukan untuk backup manual**. Halaman langsung menerima pekerjaan lalu memperbarui tahapan **Menunggu → Mencadangkan → Memverifikasi → Terverifikasi/Gagal**. Setelah Terverifikasi, pilih **Unduh** untuk mengambil SQL.
+
+Menutup atau memuat ulang halaman tidak menghentikan pekerjaan. Pengiriman ulang memakai ID pekerjaan yang sama dan tidak membuat dua snapshot. Jika proses lain memegang penguncian backup, worker manual menunggu di latar belakang tanpa menahan permintaan web. Proses yang terputus dapat diperiksa kembali melalui tombol; kegagalan pemicu menampilkan pesan dan kunci permintaan berikutnya agar dapat dicoba kembali. Formulir native tanpa JavaScript tetap bekerja melalui POST/Redirect/GET.
+
+Backup manual memakai verifikasi pemulihan, checksum, CSRF dan hak Super Admin yang sama. Mode CLI privat `--job=<id>` menjalankan pekerjaan yang sudah diterima, tanpa membuat jadwal baru atau mengubah jam/retensi. Launcher membuka PHP CLI sebagai akun pemilik aplikasi dengan jendela tersembunyi; tidak meminta Administrator atau menyimpan password Windows. Backup manual tidak memperbarui heartbeat task harian dan tidak mengaktifkan rotasi cadangan otomatis. Registrasi task Windows tetap diperlukan untuk backup otomatis saat tidak ada pengguna membuka aplikasi.
 
 ## Mengatur jam dan penyimpanan
 
@@ -118,4 +139,4 @@ Semua dump, password, screenshot, log rinci dan hasil uji berada di direktori QA
 
 Simpan salinan cadangan terverifikasi di media lain bila dibutuhkan perlindungan terhadap kerusakan/kehilangan disk. Penyimpanan pada disk komputer yang sama belum melindungi dari kejadian tersebut.
 
-Lakukan latihan pemulihan ke instance terisolasi secara berkala dan setelah perubahan skema. Untuk pemulihan operasional, administrator harus memilih cadangan terverifikasi, memastikan checksum, membuat cadangan kondisi terkini, menghentikan transaksi melalui maintenance, memulihkan dalam lingkungan terkontrol, lalu memeriksa jumlah data/integritas seluruh unit sebelum membuka layanan. Restore web sengaja tidak tersedia; panduan ini bukan izin menimpa database operasional tanpa keputusan administratif.
+Lakukan latihan pemulihan ke instance terisolasi secara berkala dan setelah perubahan skema. Pemulihan web menjalankan pemeriksaan dan backup pengaman di atas hanya setelah konfirmasi Super Admin. Untuk pemulihan administratif dari instalasi lain atau skema berbeda, administrator harus memeriksa kompatibilitas/checksum, membuat cadangan kondisi terkini, menghentikan transaksi melalui maintenance, lalu mengaudit seluruh unit sebelum membuka layanan. Jangan menjalankan migrasi, impor CLI lain, atau perubahan database langsung bersamaan dengan pemulihan web.

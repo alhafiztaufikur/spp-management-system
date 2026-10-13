@@ -1,7 +1,7 @@
 /* Scoped administrative UI; the shared design and business screens are unchanged. */
 .dbt-main { min-width: 0; }
 .db-tools-page { padding: 28px; width: 100%; min-width: 0; max-width: 1920px; margin: 0 auto; color: var(--text-primary); }
-.db-tools-page [hidden] { display: none !important; }
+.db-tools-page [hidden], .dbt-dialog [hidden] { display: none !important; }
 .dbt-breadcrumb { display: flex; gap: 16px; font-size: 12px; color: var(--text-secondary); margin-bottom: 20px; }
 .dbt-heading { display: flex; align-items: center; gap: 14px; margin-bottom: 22px; }
 .dbt-heading h1 { font-size: clamp(23px, 2vw, 30px); margin: 0 0 5px; }
@@ -113,8 +113,9 @@
 .dbt-label { display: block; font-size: 13px; font-weight: 600; margin-bottom: 8px; }
 .dbt-label span { font-weight: 400; color: var(--text-secondary); }
 #legacy-unit { width: 100%; }
-.dbt-dialog { width: min(640px,calc(100% - 32px)); max-height: calc(100dvh - 32px); padding: 0; border: 1px solid var(--border); border-radius: 18px; background: var(--bg-elevated); color: var(--text-primary); box-shadow: var(--shadow); }
+.dbt-dialog { position:fixed; inset:0; margin:auto; width: min(640px,calc(100% - 32px)); max-height: calc(100dvh - 32px); padding: 0; border: 1px solid var(--border); border-radius: 18px; background: var(--bg-elevated); color: var(--text-primary); box-shadow: var(--shadow); }
 .dbt-dialog::backdrop { background: rgba(12,16,30,.65); }
+.dbt-dialog { overflow-y:auto; overscroll-behavior:contain; }
 .dbt-dialog-content { padding: 26px; }
 .dbt-dialog h2 { font-size: 22px; line-height: 1.4; margin: 14px 0; }
 .dbt-dialog p { font-size: 13px; line-height: 1.7; margin: 12px 0; }
@@ -160,6 +161,16 @@
 #legacy-dialog { width:min(960px,calc(100% - 32px)); }
 #legacy-dialog progress { width:100%;height:14px;accent-color:var(--accent); }
 #legacy-dialog td { padding:10px;vertical-align:top;border-top:1px solid var(--border); }
+.backup-scheduler-status { margin:0 0 20px;padding:12px 14px;border:1px solid var(--border);border-radius:10px;background:var(--bg-surface);font-size:13px; }
+.backup-scheduler-summary { display:flex;align-items:center;flex-wrap:wrap;gap:6px 14px; }
+.backup-scheduler-summary strong { color:var(--warning,#ad6a12); }
+.backup-scheduler-summary span { color:var(--text-secondary);font-size:12px; }
+.backup-scheduler-status.is-ready strong { color:var(--accent); }
+.backup-scheduler-status details { margin-top:8px; }
+.backup-scheduler-status summary { width:fit-content;cursor:pointer;font-weight:600;color:var(--accent); }
+.backup-scheduler-status p { margin:10px 0;font-size:12px;line-height:1.6; }
+.backup-scheduler-status code { display:block;margin:10px 0;padding:12px;border:1px solid var(--border);border-radius:8px;background:var(--bg-elevated);font-size:12px;line-height:1.6;overflow-wrap:anywhere;user-select:all; }
+#backup-scheduler-copy-status { margin-left:10px;font-size:12px; }
 #legacy-preview { max-height:320px;overflow:auto; }
 #legacy-confirm-section { margin-top:18px; }
 .db-tools-page #legacy-activation label { display:block;margin-top:12px;font-weight:600; }

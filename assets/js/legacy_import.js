@@ -3,11 +3,11 @@
   const $ = id => document.getElementById(id);
   const config = JSON.parse($('legacy-config').textContent);
   const storageKey = 'spp-legacy-job:' + config.key;
-  let file = null, category = 'students', ready = false, id = localStorage.getItem(storageKey), timer, state = '', jobUnit=0;
+  let file = null, category = 'students', ready = false, id = localStorage.getItem(storageKey), timer, state = '', jobUnit=0, restoreInProgress=false;
   const start = $('legacy-start'), dialog = $('legacy-dialog');
   const units = {SD: 1, SMP: 2, SMA: 3};
   const refresh = () => {
-    start.disabled = !(ready && file && category === 'students' && units[$('legacy-unit').value] === config.unit);
+    start.disabled = restoreInProgress || !(ready && file && category === 'students' && units[$('legacy-unit').value] === config.unit);
     if (category !== 'students') $('legacy-readiness').textContent = 'Kategori ini belum tersedia; hanya identitas siswa yang dapat diimpor.';
     else if (!config.unit) $('legacy-readiness').textContent = 'Pilih SD, SMP, atau SMA di sidebar. Semua Unit hanya untuk baca.';
     else if (units[$('legacy-unit').value] !== config.unit) $('legacy-readiness').textContent = 'Unit sumber harus sama dengan pilihan sidebar.';
@@ -27,7 +27,7 @@
     progress(job.done, job.total);
     $('legacy-cancel-job').disabled = ['applying', 'imported', 'failed', 'cancelled'].includes(state);
     $('legacy-confirm-section').hidden = state !== 'ready';
-    $('legacy-confirm').disabled = state !== 'ready' || $('legacy-confirmation').value !== 'IMPOR LEGACY' || Number(job.unit) !== config.unit;
+    $('legacy-confirm').disabled = restoreInProgress || state !== 'ready' || $('legacy-confirmation').value !== 'IMPOR LEGACY' || Number(job.unit) !== config.unit;
     const preview = result.preview;
     $('legacy-issues').hidden = !preview;
     $('legacy-issues').href = 'legacy_import_api.php?action=issues&id=' + encodeURIComponent(id);
@@ -40,7 +40,7 @@
     }
   };
   const poll = async () => {
-    clearTimeout(timer); if (!id) return;
+    clearTimeout(timer); if (!id || restoreInProgress) return;
     try {
       const response = await fetch('legacy_import_api.php?action=status&id=' + encodeURIComponent(id), {cache: 'no-store'});
       const result = await response.json();if (!response.ok) throw new Error(result.error || 'Status tidak tersedia.');render(result);
@@ -51,6 +51,12 @@
   document.addEventListener('legacy-category-selected', event => { category = event.detail;refresh(); });
   $('legacy-unit').addEventListener('change', refresh);
   document.addEventListener('legacy-selection-changed',refresh);
+  document.addEventListener('database-restore-active',event=>{
+    const wasActive=restoreInProgress;restoreInProgress=!!event.detail;
+    if(restoreInProgress)clearTimeout(timer);else if(wasActive && id)poll();
+    $('legacy-confirm').disabled=restoreInProgress || state!=='ready' || $('legacy-confirmation').value!=='IMPOR LEGACY' || jobUnit!==config.unit;
+    refresh();
+  });
   start.addEventListener('click', () => {
     if (start.disabled) return;
     start.disabled = true; dialog.showModal();$('legacy-preview').replaceChildren();$('legacy-counts').textContent = '';statusText('Unggah'); progress(0, 1);
@@ -60,7 +66,7 @@
     xhr.addEventListener('load', () => { refresh();if (xhr.status >= 400 || !xhr.response?.id) { statusText(xhr.response?.error || 'Unggahan gagal.');return; }id = xhr.response.id;localStorage.setItem(storageKey, id);$('legacy-reopen').hidden = false;poll(); });
     xhr.addEventListener('error', () => { refresh();statusText('Koneksi terputus. Periksa status pekerjaan sebelum mengunggah ulang.'); });xhr.send(body);
   });
-  $('legacy-confirmation').addEventListener('input', () => { $('legacy-confirm').disabled = state !== 'ready' || jobUnit!==config.unit || $('legacy-confirmation').value !== 'IMPOR LEGACY'; });
+  $('legacy-confirmation').addEventListener('input', () => { $('legacy-confirm').disabled = restoreInProgress || state !== 'ready' || jobUnit!==config.unit || $('legacy-confirmation').value !== 'IMPOR LEGACY'; });
   $('legacy-confirm').addEventListener('click', async () => { $('legacy-confirm').disabled = true;try { await api('confirm', {id, confirmation: $('legacy-confirmation').value});poll(); } catch (e) { statusText(e.message); } });
   $('legacy-cancel-job').addEventListener('click', async () => { try { await api('cancel', {id});poll(); } catch (e) { statusText(e.message); } });
   $('legacy-close').addEventListener('click', () => dialog.close());

@@ -1,6 +1,7 @@
 <?php
-/** Private, all-unit backup queue. No financial writes and no SQL restore over HTTP. */
+/** Private, all-unit snapshot queue. Confirmed restore has a separate endpoint/worker. */
 require_once __DIR__.'/database_backup_policy.php';
+require_once __DIR__.'/database_backup_dispatch.php';
 function db_backup_now(): DateTimeImmutable { return new DateTimeImmutable('now', new DateTimeZone('Asia/Jakarta')); }
 function db_backup_latest_due(DateTimeImmutable $now,string $dailyTime='18:00'): string {
     db_backup_validate_settings($dailyTime,'90','0');[$hour,$minute]=array_map('intval',explode(':',$dailyTime));
@@ -135,7 +136,7 @@ function db_backup_schedule_window(PDO $db,array $job,string $installedAt): ?arr
     return ['first_due'=>$first->format(DATE_ATOM),'last_due'=>$last->format(DATE_ATOM),'count'=>(int)$first->diff($last)->days+1];
 }
 function db_backup_summary(): array {
-    $out=['configured'=>false,'ready'=>false,'service_registered'=>false,'active'=>null,'last_success'=>null,'count'=>0,'total_bytes'=>0,'next_schedule'=>db_backup_next_schedule(),'settings'=>['daily_time'=>'18:00','retention_days'=>90,'version'=>0,'activated'=>false,'effective_from'=>null,'updated_at'=>null],'alerts'=>[],'jobs'=>[],'free_bytes'=>null];
+    $out=['configured'=>false,'ready'=>false,'service_registered'=>false,'manual_available'=>false,'can_create'=>false,'active'=>null,'last_success'=>null,'count'=>0,'total_bytes'=>0,'next_schedule'=>db_backup_next_schedule(),'settings'=>['daily_time'=>'18:00','retention_days'=>90,'version'=>0,'activated'=>false,'effective_from'=>null,'updated_at'=>null],'alerts'=>[],'jobs'=>[],'free_bytes'=>null];
     if(!extension_loaded('pdo_sqlite')){$out['alerts'][]='PDO SQLite belum aktif pada PHP aplikasi. Aktifkan ekstensi tersebut lalu muat ulang server web.';return $out;}
     if(!is_file(db_backup_config_path())){$out['alerts'][]='Layanan backup belum dipasang pada PC ini. Jalankan pemasang backup terlebih dahulu.';return $out;}
     try{
@@ -149,8 +150,10 @@ function db_backup_summary(): array {
             if($job['state']==='verified'){$out['count']++;$out['total_bytes']+=(int)$job['bytes'];if(!$out['last_success'])$out['last_success']=$public;}
             if(!$out['active']&&in_array($job['state'],['queued','dumping','verifying'],true))$out['active']=$public;
         }
+        $out['manual_available']=db_backup_dispatch_tools($c)!==null;
+        $out['can_create']=$out['manual_available']&&(!$out['active']||!db_backup_job_running($c,$out['active']));
         $out['free_bytes']=(int)disk_free_space($c['storage_root']);
-        if(!$out['service_registered'])$out['alerts'][]='Jadwal Windows belum terpasang. Selesaikan pemasangan melalui PowerShell sebagai Administrator. Pengaturan jam tetap dapat disimpan.';
+        if(!$out['service_registered'])$out['alerts'][]='Backup otomatis belum aktif. Jadwal Windows belum terpasang.';
         elseif(!$out['ready'])$out['alerts'][]='Layanan pencadangan belum aktif. Periksa jadwal Windows.';
         if($out['free_bytes']<10737418240)$out['alerts'][]='Ruang penyimpanan cadangan hampir penuh. Periksa ruang disk dan pengaturan penyimpanan.';
         if($db->query('SELECT COUNT(*) FROM backup_expirations WHERE finished_at IS NULL')->fetchColumn())$out['alerts'][]='Pembersihan cadangan kedaluwarsa belum selesai. Berkas yang sedang digunakan akan dicoba kembali.';

@@ -13,6 +13,7 @@ COPY composer.json composer.lock ./
 RUN composer install --no-dev --prefer-dist --no-interaction --no-progress --optimize-autoloader
 
 COPY . .
+RUN mkdir -p /var/www/html/tmp && chown www-data:www-data /var/www/html/tmp && chmod 700 /var/www/html/tmp
 COPY docker/apache-security.conf /etc/apache2/conf-available/sistemspp.conf
 COPY docker/production.ini /usr/local/etc/php/conf.d/sistemspp-production.ini
 RUN a2enconf sistemspp \

@@ -77,6 +77,7 @@ try{
     $unitCounts=[];foreach([1,2,3] as $unit){$db->query('SET @app_unit_id='.$unit);$unitCounts[$unit]=['students'=>(int)$db->query('SELECT COUNT(*) FROM siswa')->fetch_row()[0],'payments'=>(int)$db->query('SELECT COUNT(*) FROM bayar')->fetch_row()[0]];}
     $db->query('SET @app_unit_id=0');$totals=['students'=>(int)$db->query('SELECT COUNT(*) FROM siswa')->fetch_row()[0],'payments'=>(int)$db->query('SELECT COUNT(*) FROM bayar')->fetch_row()[0],'receipts'=>(string)$db->query('SELECT COALESCE(SUM(total_jumlah),0) FROM bayar')->fetch_row()[0],'savings'=>(string)$db->query('SELECT COALESCE(SUM(SALDO),0) FROM tabungan')->fetch_row()[0]];
     if(array_sum(array_column($unitCounts,'students'))!==$totals['students']||array_sum(array_column($unitCounts,'payments'))!==$totals['payments'])throw new RuntimeException('Restored unit scopes differ.');
+    $activeSuperAdmins=(int)$db->query("SELECT COUNT(*) FROM admin WHERE role='super_admin' AND is_active=1")->fetch_row()[0];
     $db->close();
     // All existing audits receive only the isolated connection, never operational defaults.
     foreach(['SPP_DB_HOST'=>$i['host'],'SPP_DB_PORT'=>(string)$i['port'],'SPP_DB_USER'=>$i['username'],'SPP_DB_PASS'=>$i['password'],'SPP_DB_NAME'=>$i['database']] as $key=>$value)putenv($key.'='.$value);
@@ -84,6 +85,6 @@ try{
     $fkReport=json_decode(file_get_contents($job.'/audit-audit_foreign_keys.out.log'),true,64,JSON_THROW_ON_ERROR);
     foreach(['missing','mismatched','unresolved'] as $problem)if(!array_key_exists($problem,$fkReport)||$fkReport[$problem])throw new RuntimeException('Restored foreign-key contract failed.');
     if(trim(file_get_contents($job.'/audit-health.out.log'))!=='ok')throw new RuntimeException('Restored health check failed.');
-    db_backup_atomic_json($job.'/verification.json',['state'=>'verified','verified_at'=>db_backup_now()->format(DATE_ATOM),'sql_sha256'=>hash_file('sha256',$job.'/dump.sql'),'schema_signature'=>$actual['signature'],'object_counts'=>array_map('count',$actual['objects']),'table_counts'=>$metrics,'fingerprints'=>$fingerprints,'fingerprint_algorithms'=>$fingerprintAlgorithms,'units'=>$unitCounts,'totals'=>$totals,'checks'=>['health'=>'ok','financial_integrity'=>'passed','foreign_keys'=>'passed','foreign_key_count'=>count($foreignKeys),'check_constraint_count'=>$checkCount]]);
+    db_backup_atomic_json($job.'/verification.json',['state'=>'verified','verified_at'=>db_backup_now()->format(DATE_ATOM),'sql_sha256'=>hash_file('sha256',$job.'/dump.sql'),'schema_signature'=>$actual['signature'],'object_counts'=>array_map('count',$actual['objects']),'table_counts'=>$metrics,'fingerprints'=>$fingerprints,'fingerprint_algorithms'=>$fingerprintAlgorithms,'units'=>$unitCounts,'totals'=>$totals,'active_super_admins'=>$activeSuperAdmins,'checks'=>['health'=>'ok','financial_integrity'=>'passed','foreign_keys'=>'passed','foreign_key_count'=>count($foreignKeys),'check_constraint_count'=>$checkCount]]);
     echo 'Isolated database audit passed.'.PHP_EOL;
 }catch(Throwable $e){fwrite(STDERR,'Isolated audit failed: '.$e->getMessage().PHP_EOL);exit(1);}

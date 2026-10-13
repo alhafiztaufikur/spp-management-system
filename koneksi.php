@@ -19,6 +19,8 @@ $dbPort = filter_var(getenv('SPP_DB_PORT') ?: '3306', FILTER_VALIDATE_INT, [
 if ($dbPort === false) {
     throw new RuntimeException('Port database tidak valid.');
 }
+require_once __DIR__.'/includes/database_access.php';
+if(PHP_SAPI!=='cli')database_access_http(DB_NAME,(int)$dbPort);
 
 date_default_timezone_set('Asia/Jakarta');
 require_once __DIR__.'/includes/date_format.php';

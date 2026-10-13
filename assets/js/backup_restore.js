@@ -1,4 +1,4 @@
-/* UI preview only: no network, SQL parsing, file-content reads or operation submission. */
+/* Shared file selection and Legacy tabs. SQL restore is handled by database_restore.js. */
 (() => {
   'use strict';
   const byId = id => document.getElementById(id);
@@ -24,6 +24,7 @@
   const selectedFiles = {restore: null, legacy: null};
   const legacyReadiness = () => document.dispatchEvent(new CustomEvent('legacy-selection-changed'));
   const updateSelection = (prefix, files) => {
+    if (prefix === 'restore' && byId('restore-review').dataset.busy === 'true') return;
     selectedFiles[prefix] = null;
     byId(prefix + '-summary').hidden = true;
     const status = byId(prefix + '-status');
@@ -45,6 +46,7 @@
     status.textContent = error || (selectedFiles[prefix] ? (prefix==='legacy'?'Belum diperiksa. Nama, ukuran, dan jumlah file memenuhi pemeriksaan awal; klik Periksa Backup untuk memeriksa sumber.':'Belum divalidasi. Pemeriksaan awal nama, ukuran, dan jumlah file terpenuhi; isi SQL belum diperiksa.') : 'Belum ada file dipilih.');
     if (error) status.classList.add('is-error');
     if (prefix === 'restore') byId('restore-review').disabled = !selectedFiles.restore;
+    if (prefix === 'restore') document.dispatchEvent(new CustomEvent('restore-file-selected', {detail: selectedFiles.restore}));
     legacyReadiness();
     if(prefix === 'legacy') document.dispatchEvent(new CustomEvent('legacy-file-selected', {detail: selectedFiles.legacy}));
   };
@@ -77,14 +79,15 @@
   }));
   byId('legacy-unit').addEventListener('change', legacyReadiness);
   const dialog = byId('restore-dialog');
-  byId('restore-review').addEventListener('click', () => {
-    if (!selectedFiles.restore) return;
-    byId('restore-dialog-file').textContent = selectedFiles.restore.name;
-    byId('restore-understood').checked = false;
-    byId('restore-confirmation').value = '';
-    dialog.showModal();
-  });
   byId('restore-cancel').addEventListener('click', () => dialog.close());
   dialog.addEventListener('close', () => byId('restore-review').focus());
-  // The native modal supplies keyboard focus containment and Escape cancellation.
+  dialog.addEventListener('keydown', event => {
+    if (event.key !== 'Tab') return;
+    const controls = [...dialog.querySelectorAll('button:not(:disabled),input:not(:disabled),a[href]')].filter(node => node.getClientRects().length && !node.closest('[hidden]'));
+    if (!controls.length) return;
+    const first = controls[0], last = controls[controls.length - 1];
+    if (event.shiftKey && (document.activeElement === first || !controls.includes(document.activeElement))) {event.preventDefault();last.focus();}
+    else if (!event.shiftKey && (document.activeElement === last || !controls.includes(document.activeElement))) {event.preventDefault();first.focus();}
+  });
+  // The native modal supplies Escape cancellation; Tab stays within visible enabled controls.
 })();

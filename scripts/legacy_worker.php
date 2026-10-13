@@ -14,18 +14,25 @@ $heartbeat=static function()use($root,$runPowerShell,&$lastHealth,&$sqlReady){
     file_put_contents($root.'/heartbeat.json',json_encode(['time'=>time(),'pid'=>getmypid(),'database'=>DB_NAME,'sql_ready'=>$sqlReady]));
 };
 $q=legacy_queue();
+$restorePaths=database_access_paths(DB_NAME,(int)$dbPort);
+$restoreGeneration=is_file($restorePaths['generation'])?trim(file_get_contents($restorePaths['generation'])):'0';
 // Interrupted pre-commit jobs are held for explicit retry; application is idempotent via manifest.
 foreach($q->query("SELECT id FROM jobs WHERE state='processing'")->fetchAll(PDO::FETCH_COLUMN) as $interrupted){$recovery=$runPowerShell(['-JobDirectory',$root.'/'.$interrupted,'-Unit','1','-Recover']);if($recovery[0]){file_put_contents($root.'/'.$interrupted.'/recovery-error.log',$recovery[2]);throw new RuntimeException('Interrupted source cleanup requires review; private log retained');}}
 $q->exec("UPDATE jobs SET state='failed',message='Worker berhenti. Tinjau hasil dan unggah ulang untuk pemulihan aman.' WHERE state='processing'");
 $q->exec("UPDATE jobs SET state='apply_queued' WHERE state='applying'");
 do {
     $heartbeat();
+    $currentGeneration=is_file($restorePaths['generation'])?trim(file_get_contents($restorePaths['generation'])):'0';
+    if($currentGeneration!==$restoreGeneration){fwrite(STDERR,"Database dipulihkan. Mulai ulang worker setelah meninjau antrean Legacy.\n");break;}
     // The same maintenance gate used by HTTP also pauses queued application during DDL/restore.
-    if(is_file(__DIR__.'/../tmp/financial_migration.lock')){if(in_array('--once',$argv,true))break;usleep(500000);continue;}
+    if(is_file(__DIR__.'/../tmp/financial_migration.lock')||is_file($restorePaths['maintenance'])){if(in_array('--once',$argv,true))break;usleep(500000);continue;}
     $job=$q->query("SELECT * FROM jobs WHERE state IN ('queued','apply_queued') ORDER BY created,id LIMIT 1")->fetch(PDO::FETCH_ASSOC);
     if(!$job){if(in_array('--once',$argv,true))break;usleep(500000);continue;}
     $dir=$root.'/'.$job['id'];
+    $restoreLock=database_access_lock($restorePaths,LOCK_SH|LOCK_NB);
+    if(!$restoreLock){if(in_array('--once',$argv,true))break;usleep(500000);continue;}
     try {
+        if(is_file($restorePaths['maintenance']))continue;
         legacy_actor($koneksi,(int)$job['actor'],(int)$job['unit']);
         if($job['cancel']){legacy_update($job['id'],['state'=>'cancelled','message'=>'Dibatalkan sebelum penerapan.']);continue;}
         if($job['state']==='apply_queued'){
@@ -46,4 +53,5 @@ do {
         $rows=[];$file=fopen($dir.'/rows.jsonl','r');while(($line=fgets($file))!==false)$rows[]=json_decode($line,true,512,JSON_THROW_ON_ERROR);fclose($file);
         legacy_update($job['id'],['stage'=>'Validasi','done'=>0,'total'=>count($rows)]);legacy_stage($koneksi,$job,$rows);
     }catch(Throwable $e){file_put_contents($dir.'/worker-error.log',$e->getMessage()."\n",FILE_APPEND);legacy_update($job['id'],['state'=>'failed','message'=>$e instanceof mysqli_sql_exception?'Penerapan dibatalkan. Identitas atau relasi berubah; tidak ada siswa parsial.':$e->getMessage()]);}
+    finally{database_access_release($restoreLock);}
 }while(!in_array('--once',$argv,true));

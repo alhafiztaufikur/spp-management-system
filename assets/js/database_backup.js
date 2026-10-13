@@ -37,7 +37,7 @@
     try { return await fetch(url, {...options, signal: controller.signal}); }
     finally { clearTimeout(timeout); }
   };
-  let summary = config.summary || {}, submitting = false, polling = false, timer;
+  let summary = config.summary || {}, submitting = false, polling = false, timer, restoreInProgress = false;
   const settingsForm = byId('database-backup-settings-form');
   let settingsDirty = false, settingsSaving = false;
   const settingsFeedback = (message, success = false) => {
@@ -61,8 +61,8 @@
       settingsForm.elements.retention_days.value = settings.retention_days;
       settingsForm.elements.version.value = settings.version;
     }
-    for (const name of ['daily_time', 'retention_days']) settingsForm.elements[name].disabled = settingsSaving || !summary.configured;
-    byId('backup-settings-save').disabled = settingsSaving || !summary.configured;
+    for (const name of ['daily_time', 'retention_days']) settingsForm.elements[name].disabled = settingsSaving || restoreInProgress || !summary.configured;
+    byId('backup-settings-save').disabled = settingsSaving || restoreInProgress || !summary.configured;
   };
   let previousActive = summary.active?.id || null;
   const feedback = (message, type = 'error') => {
@@ -114,11 +114,23 @@
     byId('backup-count').textContent = number.format(Number(summary.count) || 0);
     byId('backup-total-size').textContent = bytes(summary.total_bytes || 0) + ' ukuran terverifikasi';
     byId('backup-free-space').textContent = bytes(summary.free_bytes);
-    byId('backup-create').disabled = submitting || !summary.ready || !!active;
-    byId('backup-create-hint').textContent = active ? 'Satu pencadangan sedang berlangsung. Progres tampil di bawah.' : summary.ready ? 'Cadangan baru akan diproses oleh layanan backup.' : 'Layanan backup belum siap. Periksa informasi di atas.';
+    byId('backup-create').disabled = submitting || restoreInProgress || !summary.can_create;
+    byId('backup-create-hint').textContent = summary.can_create
+      ? (active ? 'Proses sebelumnya terputus. Klik untuk memeriksa dan melanjutkan antrean.' : 'Backup manual langsung diproses tanpa menunggu jadwal harian.')
+      : (active ? 'Satu pencadangan sedang berlangsung. Progres tampil di bawah.' : 'Pemicu backup manual belum tersedia. Periksa konfigurasi backup pada PC ini.');
     const alerts = document.createDocumentFragment();
-    (Array.isArray(summary.alerts) ? summary.alerts : []).forEach(alert => alerts.append(element('div', alert, 'dbt-warning')));
+    (Array.isArray(summary.alerts) ? summary.alerts : []).forEach(alert => {
+      if(summary.configured && !summary.service_registered && alert.startsWith('Backup otomatis belum aktif.'))return;
+      alerts.append(element('div', alert, 'dbt-warning'));
+    });
     byId('backup-alerts').replaceChildren(alerts);
+    const scheduler=byId('backup-scheduler-status');
+    if(scheduler){
+      scheduler.hidden=!summary.configured;scheduler.classList.toggle('is-ready',!!summary.ready);
+      byId('backup-scheduler-label').textContent=summary.ready ? 'Backup otomatis aktif' : summary.service_registered ? 'Jadwal terpasang; menunggu layanan' : 'Backup otomatis belum aktif';
+      byId('backup-scheduler-note').textContent=summary.service_registered ? 'Jadwal mengikuti jam yang tersimpan.' : 'Backup manual tetap tersedia.';
+      byId('backup-scheduler-help').hidden=!!summary.service_registered;
+    }
     byId('backup-progress').hidden = !active;
     if (active) {
       byId('backup-progress-state').textContent = states[active.state] || 'Menunggu';
@@ -135,12 +147,17 @@
     previousActive = active?.id || null;
     renderHistory(Array.isArray(summary.jobs) ? summary.jobs : []);
   };
+  byId('backup-scheduler-copy')?.addEventListener('click',async () => {
+    try{await navigator.clipboard.writeText(byId('backup-scheduler-command').textContent);byId('backup-scheduler-copy-status').textContent='Perintah disalin.';}
+    catch(_){byId('backup-scheduler-copy-status').textContent='Pilih dan salin teks perintah di atas.';}
+  });
   const schedule = () => {
     clearTimeout(timer);
+    if(restoreInProgress)return;
     timer = setTimeout(refresh, summary.active ? 2000 : 30000);
   };
   async function refresh() {
-    if (polling) return;
+    if (polling || restoreInProgress) return;
     polling = true;
     try {
       const response = await request('backup_api.php?action=status', {headers: {'Accept': 'application/json'}, credentials: 'same-origin', cache: 'no-store'});
@@ -154,7 +171,7 @@
   }
   form.addEventListener('submit', async event => {
     event.preventDefault();
-    if (submitting || !summary.ready || summary.active) return;
+    if (submitting || restoreInProgress || !summary.can_create) return;
     submitting = true;
     byId('backup-create').disabled = true;
     byId('backup-create').setAttribute('aria-busy', 'true');
@@ -164,9 +181,9 @@
       payload.delete('return'); // Native submission keeps PRG; fetch requires the JSON acknowledgement.
       const response = await request(form.getAttribute('action'), {method: 'POST', body: payload, headers: {'Accept': 'application/json'}, credentials: 'same-origin'});
       const result = await response.json();
-      if (!response.ok) throw new Error(typeof result.error === 'string' ? result.error : 'Permintaan backup belum berhasil. Coba kembali.');
       if (typeof result.request_key === 'string' && /^[a-f0-9]{32}$/.test(result.request_key)) form.elements.request_key.value = result.request_key;
-      if (result.job) summary.active = result.job;
+      if (!response.ok) throw new Error(typeof result.error === 'string' ? result.error : 'Permintaan backup belum berhasil. Coba kembali.');
+      if (result.job) { summary.active = ['queued','dumping','verifying'].includes(result.job.state) ? result.job : null; summary.can_create = !summary.active && !!summary.manual_available; }
       feedback('Permintaan backup diterima. Progres diperbarui otomatis.', 'success');
       render(summary);
     } catch (error) {
@@ -174,7 +191,7 @@
     } finally {
       submitting = false;
       byId('backup-create').removeAttribute('aria-busy');
-      byId('backup-create').disabled = !summary.ready || !!summary.active;
+      byId('backup-create').disabled = restoreInProgress || !summary.can_create;
       refresh();
     }
   });
@@ -182,7 +199,7 @@
     settingsForm.addEventListener('input', () => { settingsDirty = true; });
     settingsForm.addEventListener('submit', async event => {
       event.preventDefault();
-      if (settingsSaving || !summary.configured || !settingsForm.reportValidity()) return;
+      if (settingsSaving || restoreInProgress || !summary.configured || !settingsForm.reportValidity()) return;
       const payload = new FormData(settingsForm);
       payload.delete('return');
       settingsSaving = true;
@@ -210,6 +227,12 @@
     });
   }
   document.addEventListener('visibilitychange', () => { if (!document.hidden) refresh(); });
+  document.addEventListener('database-restore-active',event=>{
+    restoreInProgress=!!event.detail;clearTimeout(timer);
+    byId('backup-create').disabled=submitting || restoreInProgress || !summary.can_create;
+    renderSettings();
+    if(!restoreInProgress)schedule();
+  });
   render(summary);
   schedule();
 })();

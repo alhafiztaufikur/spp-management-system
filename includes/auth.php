@@ -10,6 +10,7 @@
  * @param array $roles  Contoh: ['admin'], atau ['admin','bendahara']
  */
 function requireRole(array $roles): void {
+    if(PHP_SAPI!=='cli'&&defined('DB_NAME')&&function_exists('database_access_session'))database_access_session(DB_NAME,(int)(getenv('SPP_DB_PORT')?:3306));
     $dir  = basename(dirname($_SERVER['PHP_SELF']));
     $root = in_array($dir, ['pembayaran', 'siswa', 'tabungan', 'laporan'], true) ? '../' : '';
 

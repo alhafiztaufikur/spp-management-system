@@ -55,7 +55,7 @@ fs.mkdirSync(artifactRoot, {recursive: true});
     assert.ok((await page.locator('#backup-next').textContent()).includes(initialSettings.daily_time + ' WIB'));
 
     const actual = await (await page.request.get(new URL('/backup_api.php?action=status', base).href)).json();
-    let summary = {...actual, configured: true, ready: true, active: null, last_success: null,
+    let summary = {...actual, configured: true, ready: false, manual_available: true, can_create: true, active: null, last_success: null,
       count: 0, total_bytes: 0, alerts: [], jobs: []};
     let createRequests = 0;
     let failNext = true;
@@ -76,7 +76,7 @@ fs.mkdirSync(artifactRoot, {recursive: true});
         return route.fulfill({status: 202, contentType: 'application/json', body: JSON.stringify({job, request_key: 'cd'.repeat(16)})});
       }
       if (new URL(request.url()).searchParams.get('action') === 'status') {
-        return route.fulfill({status: 200, contentType: 'application/json', body: JSON.stringify(summary)});
+        return route.fulfill({status: 200, contentType: 'application/json', body: JSON.stringify({...summary,can_create:summary.manual_available&&!summary.active})});
       }
       return route.continue();
     });
@@ -161,7 +161,7 @@ fs.mkdirSync(artifactRoot, {recursive: true});
     assert.equal(await nativePage.locator('#restore-apply').isDisabled(), true);
     assert.equal(await nativePage.locator('text=Reset').count(), 1);
     assert.deepEqual(errors, []);
-    console.log('PASS: native form and GET filtering remain available without JavaScript; Restore disabled');
+    console.log('PASS: native backup form and GET filtering remain available; Restore requires JavaScript and validation');
     await native.close();
     await context.close();
   } finally { await browser.close(); }

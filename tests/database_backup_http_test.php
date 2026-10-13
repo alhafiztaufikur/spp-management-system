@@ -63,6 +63,7 @@ function backup_http_session(?array $account, int $unit, ?string $claimedRole = 
     session_start();
     $_SESSION = $account ? ['admin_id' => (int)$account['id'], 'admin_role' => $claimedRole ?? $account['role'],
         'active_unit_id' => $unit] : [];
+    if($account){$paths=database_access_paths(DB_NAME,(int)(getenv('SPP_DB_PORT')?:3306));$_SESSION['database_generation']=is_file($paths['generation'])?trim(file_get_contents($paths['generation'])):'0';}
     session_write_close();
     return $id;
 }

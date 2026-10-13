@@ -29,6 +29,7 @@ try{
     if($action==='create'){
         if(!is_string($_POST['request_key']??null))backup_api_fail(400,'Kunci permintaan tidak valid.');
         $job=db_backup_enqueue((int)$_SESSION['admin_id'],$_POST['request_key']);$_SESSION['backup_request_key']=bin2hex(random_bytes(16));
+        db_backup_dispatch($job['id']);
         if($return==='page'){$_SESSION['backup_flash']=['type'=>'success','message'=>'Cadangan masuk antrean. Progres akan diperbarui otomatis.'];header('Location: backup_restore.php',true,303);exit;}
         http_response_code(202);header('Content-Type: application/json; charset=utf-8');echo json_encode(['job'=>$job,'request_key'=>$_SESSION['backup_request_key']],JSON_UNESCAPED_UNICODE|JSON_THROW_ON_ERROR);exit;
     }
@@ -47,6 +48,10 @@ try{
     backup_api_fail($status,$e->getMessage());
 }
 catch(BackupExpired $e){backup_api_fail(410,$e->getMessage());}
+catch(BackupDispatchException $e){
+    if($return==='page'){$_SESSION['backup_flash']=['type'=>'error','message'=>$e->getMessage()];header('Location: backup_restore.php',true,303);exit;}
+    http_response_code(503);header('Content-Type: application/json; charset=utf-8');echo json_encode(['error'=>$e->getMessage(),'request_key'=>$_SESSION['backup_request_key']],JSON_UNESCAPED_UNICODE);exit;
+}
 catch(Throwable $e){
     error_log('Database backup request failed ('.get_class($e).').');
     $message=$action==='download'?'Cadangan tidak dapat diunduh karena pemeriksaan berkas gagal.':'Layanan pencadangan belum tersedia. Tidak ada perubahan pada data operasional.';
