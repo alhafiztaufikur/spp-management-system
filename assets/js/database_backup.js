@@ -7,7 +7,7 @@
   let config;
   try { config = JSON.parse(configNode.textContent); } catch (_) { return; }
   const byId = id => document.getElementById(id);
-  const states = {queued: 'Menunggu', dumping: 'Mencadangkan', verifying: 'Memverifikasi', verified: 'Terverifikasi', failed: 'Gagal'};
+  const states = {queued: 'Menunggu', dumping: 'Mencadangkan', verifying: 'Memverifikasi', verified: 'Terverifikasi', failed: 'Gagal', expired: 'Kedaluwarsa'};
   const types = {manual: 'Manual', scheduled: 'Terjadwal', catchup: 'Susulan'};
   const number = new Intl.NumberFormat('id-ID');
   const date = value => {
@@ -38,6 +38,32 @@
     finally { clearTimeout(timeout); }
   };
   let summary = config.summary || {}, submitting = false, polling = false, timer;
+  const settingsForm = byId('database-backup-settings-form');
+  let settingsDirty = false, settingsSaving = false;
+  const settingsFeedback = (message, success = false) => {
+    const node = byId('backup-settings-feedback');
+    if (!node) return;
+    node.textContent = message;
+    node.className = 'dbt-feedback is-' + (success ? 'success' : 'error');
+    node.hidden = !message;
+  };
+  const renderSettings = () => {
+    const settings = summary.settings;
+    if (!settingsForm || !settings) return;
+    const clock = settings.daily_time.replace(':', '.');
+    byId('backup-schedule-badge').textContent = 'Setiap hari · ' + clock + ' WIB';
+    byId('backup-schedule-description').textContent = 'Backup harian pukul ' + clock + ' WIB';
+    byId('backup-settings-status').textContent = settings.activated
+      ? `Aktif: setiap hari pukul ${clock} WIB · penyimpanan ${settings.retention_days} hari.`
+      : 'Pengaturan belum disimpan. Jadwal tetap 18.00 WIB dan cadangan lama tetap disimpan.';
+    if (!settingsDirty && !settingsSaving) {
+      settingsForm.elements.daily_time.value = settings.daily_time;
+      settingsForm.elements.retention_days.value = settings.retention_days;
+      settingsForm.elements.version.value = settings.version;
+    }
+    for (const name of ['daily_time', 'retention_days']) settingsForm.elements[name].disabled = settingsSaving || !summary.configured;
+    byId('backup-settings-save').disabled = settingsSaving || !summary.configured;
+  };
   let previousActive = summary.active?.id || null;
   const feedback = (message, type = 'error') => {
     const node = byId('backup-feedback');
@@ -79,7 +105,9 @@
     byId('backup-history-count').textContent = number.format(filtered.length) + ' cadangan ditampilkan';
   };
   const render = next => {
+    if (Number(next.settings?.version || 0) < Number(summary.settings?.version || 0)) return;
     summary = next;
+    renderSettings();
     const active = summary.active;
     byId('backup-next').textContent = date(summary.next_schedule);
     byId('backup-last').textContent = date(summary.last_success?.finished_at);
@@ -150,6 +178,37 @@
       refresh();
     }
   });
+  if (settingsForm) {
+    settingsForm.addEventListener('input', () => { settingsDirty = true; });
+    settingsForm.addEventListener('submit', async event => {
+      event.preventDefault();
+      if (settingsSaving || !summary.configured || !settingsForm.reportValidity()) return;
+      const payload = new FormData(settingsForm);
+      payload.delete('return');
+      settingsSaving = true;
+      byId('backup-settings-save').setAttribute('aria-busy', 'true');
+      renderSettings();
+      settingsFeedback('Menyimpan pengaturan…', true);
+      try {
+        const response = await request(settingsForm.getAttribute('action'), {method: 'POST', body: payload, headers: {'Accept': 'application/json'}, credentials: 'same-origin'});
+        const result = await response.json();
+        if (!response.ok) throw new Error(result.error || 'Pengaturan belum berhasil disimpan.');
+        if (!result.settings || !result.summary) throw new Error('Jawaban layanan tidak lengkap. Muat ulang halaman untuk memeriksa pengaturan.');
+        settingsDirty = false;
+        settingsSaving = false;
+        render(result.summary);
+        settingsFeedback('Pengaturan backup harian berhasil disimpan.', true);
+      } catch (error) {
+        settingsFeedback(error instanceof SyntaxError || error instanceof TypeError || error.name === 'AbortError'
+          ? 'Koneksi terputus. Muat ulang halaman untuk memeriksa apakah pengaturan sudah tersimpan.' : error.message);
+      } finally {
+        settingsSaving = false;
+        byId('backup-settings-save').removeAttribute('aria-busy');
+        renderSettings();
+        schedule();
+      }
+    });
+  }
   document.addEventListener('visibilitychange', () => { if (!document.hidden) refresh(); });
   render(summary);
   schedule();

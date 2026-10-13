@@ -1,12 +1,15 @@
 <?php
 /** Private, all-unit backup queue. No financial writes and no SQL restore over HTTP. */
+require_once __DIR__.'/database_backup_policy.php';
 function db_backup_now(): DateTimeImmutable { return new DateTimeImmutable('now', new DateTimeZone('Asia/Jakarta')); }
-function db_backup_latest_due(DateTimeImmutable $now): string {
-    $local=$now->setTimezone(new DateTimeZone('Asia/Jakarta')); $due=$local->setTime(18,0);
+function db_backup_latest_due(DateTimeImmutable $now,string $dailyTime='18:00'): string {
+    db_backup_validate_settings($dailyTime,'90','0');[$hour,$minute]=array_map('intval',explode(':',$dailyTime));
+    $local=$now->setTimezone(new DateTimeZone('Asia/Jakarta')); $due=$local->setTime($hour,$minute);
     return ($local<$due?$due->modify('-1 day'):$due)->format(DATE_ATOM);
 }
-function db_backup_next_schedule(?DateTimeImmutable $now=null): string {
-    $local=($now??db_backup_now())->setTimezone(new DateTimeZone('Asia/Jakarta')); $next=$local->setTime(18,0);
+function db_backup_next_schedule(?DateTimeImmutable $now=null,string $dailyTime='18:00'): string {
+    db_backup_validate_settings($dailyTime,'90','0');[$hour,$minute]=array_map('intval',explode(':',$dailyTime));
+    $local=($now??db_backup_now())->setTimezone(new DateTimeZone('Asia/Jakarta')); $next=$local->setTime($hour,$minute);
     return ($next<=$local?$next->modify('+1 day'):$next)->format(DATE_ATOM);
 }
 function db_backup_normal_path(string $path): string { return strtolower(rtrim(str_replace('\\','/', $path),'/')); }
@@ -39,6 +42,7 @@ function db_backup_store(bool $initialize=false): PDO {
         $db->exec('PRAGMA journal_mode=WAL; CREATE TABLE IF NOT EXISTS jobs(id TEXT PRIMARY KEY,manual_key TEXT UNIQUE,slot TEXT,type TEXT NOT NULL,actor INTEGER NOT NULL DEFAULT 0,actor_name TEXT NOT NULL DEFAULT "Sistem",state TEXT NOT NULL DEFAULT "queued",message TEXT NOT NULL DEFAULT "Menunggu layanan pencadangan.",created_at TEXT NOT NULL,started_at TEXT,finished_at TEXT,next_attempt_at INTEGER NOT NULL DEFAULT 0,retryable INTEGER NOT NULL DEFAULT 0,archive_name TEXT,archive_sha256 TEXT,sql_sha256 TEXT,bytes INTEGER NOT NULL DEFAULT 0); CREATE TABLE IF NOT EXISTS schedule_slots(slot TEXT PRIMARY KEY,last_job_id TEXT NOT NULL REFERENCES jobs(id)); CREATE INDEX IF NOT EXISTS jobs_state ON jobs(state,created_at);');
         $db->exec('CREATE TABLE IF NOT EXISTS request_keys(request_key TEXT PRIMARY KEY,job_id TEXT NOT NULL REFERENCES jobs(id));');
     }
+    db_backup_policy_schema($db);
     return $db;
 }
 function db_backup_atomic_json(string $file,array $data): void {
@@ -54,7 +58,7 @@ function db_backup_public_job(array $job): array {
     $date=new DateTimeImmutable($job['started_at']??$job['created_at']);
     $out=['id'=>$job['id'],'name'=>'SistemSPP_'.$date->setTimezone(new DateTimeZone('Asia/Jakarta'))->format('Ymd_His').'_'.substr($job['id'],0,8).'.sql',
         'type'=>$job['type'],'created_at'=>$job['created_at'],'scheduled_for'=>$job['slot']??null,'started_at'=>$job['started_at']??null,'finished_at'=>$job['finished_at']??null,
-        'state'=>$job['state'],'message'=>$job['message'],'bytes'=>(int)($job['bytes']??0),'actor_name'=>$job['actor_name']];
+        'state'=>$job['state']==='expiring'?'expired':$job['state'],'message'=>$job['message'],'bytes'=>(int)($job['bytes']??0),'actor_name'=>$job['actor_name']];
     if($job['state']==='verified')$out['download_url']='backup_api.php?action=download&id='.$job['id'];
     return $out;
 }
@@ -85,13 +89,33 @@ function db_backup_enqueue(int $actor,string $requestKey): array {
         $db->exec('COMMIT');return db_backup_public_job($job);
     }catch(Throwable $e){$db->exec('ROLLBACK');throw $e;}
 }
-/** One slot represents the latest missed 18:00, not fabricated historical snapshots. */
+/** One slot represents the latest missed daily time, not fabricated historical snapshots. */
 function db_backup_schedule_job(PDO $db,DateTimeImmutable $now): ?array {
-    $slot=db_backup_latest_due($now);$db->exec('BEGIN IMMEDIATE');
+    $db->exec('BEGIN IMMEDIATE');
     try{
+        $settings=db_backup_settings($db);$slot=db_backup_policy_due($db,$now,$settings);
+        if($settings['activated']){
+            // Keep already queued jobs; changing the clock never cancels accepted work.
+            if($db->query("SELECT 1 FROM jobs WHERE type IN ('scheduled','catchup') AND state IN ('queued','dumping','verifying') LIMIT 1")->fetchColumn()){$db->exec('COMMIT');return null;}
+            // A pending retry from the previous clock remains valid until a newer daily slot is due.
+            if($slot===null){
+                $s=$db->prepare("SELECT * FROM jobs WHERE type IN ('scheduled','catchup') AND state='failed' AND retryable=1 AND next_attempt_at<=? ORDER BY slot DESC,rowid DESC LIMIT 1");
+                $s->execute([$now->getTimestamp()]);$retry=$s->fetch(PDO::FETCH_ASSOC);
+                if($retry)$slot=$retry['slot'];
+            }
+            if($slot!==null){
+                $s=$db->prepare("SELECT * FROM jobs WHERE type IN ('scheduled','catchup') AND substr(slot,1,10)=? ORDER BY CASE WHEN state IN ('verified','expired','expiring') THEN 0 ELSE 1 END,rowid DESC LIMIT 1");
+                $s->execute([substr($slot,0,10)]);$day=$s->fetch(PDO::FETCH_ASSOC);
+                if($day){
+                    if($day['state']!=='failed'||!(int)$day['retryable']||(int)$day['next_attempt_at']>$now->getTimestamp()){$db->exec('COMMIT');return null;}
+                    $slot=$day['slot'];
+                }
+            }
+        }
+        if($slot===null){$db->exec('COMMIT');return null;}
         $s=$db->prepare('SELECT j.* FROM schedule_slots s JOIN jobs j ON j.id=s.last_job_id WHERE s.slot=?');$s->execute([$slot]);$old=$s->fetch(PDO::FETCH_ASSOC);
         if($old&&($old['state']!=='failed'||!(int)$old['retryable']||(int)$old['next_attempt_at']>$now->getTimestamp())){$db->exec('COMMIT');return null;}
-        $s=$db->prepare("UPDATE jobs SET state='failed',retryable=0,finished_at=?,message='Jadwal terlewat digantikan pencadangan susulan terbaru.' WHERE slot IS NOT NULL AND slot<>? AND state='queued'");$s->execute([$now->format(DATE_ATOM),$slot]);
+        if(!$settings['activated']){$s=$db->prepare("UPDATE jobs SET state='failed',retryable=0,finished_at=?,message='Jadwal terlewat digantikan pencadangan susulan terbaru.' WHERE slot IS NOT NULL AND slot<>? AND state='queued'");$s->execute([$now->format(DATE_ATOM),$slot]);}
         $id=bin2hex(random_bytes(16));$type=$now->getTimestamp()-(new DateTimeImmutable($slot))->getTimestamp()>60?'catchup':'scheduled';
         $s=$db->prepare('INSERT INTO jobs(id,slot,type,created_at) VALUES(?,?,?,?)');$s->execute([$id,$slot,$type,$now->setTimezone(new DateTimeZone('Asia/Jakarta'))->format(DATE_ATOM)]);
         $s=$db->prepare('INSERT INTO schedule_slots(slot,last_job_id) VALUES(?,?) ON CONFLICT(slot) DO UPDATE SET last_job_id=excluded.last_job_id');$s->execute([$slot,$id]);
@@ -104,28 +128,37 @@ function db_backup_schedule_window(PDO $db,array $job,string $installedAt): ?arr
     if(empty($job['slot']))return null;
     $last=new DateTimeImmutable($job['slot']);
     $s=$db->prepare("SELECT MAX(slot) FROM jobs WHERE slot<? AND state='verified'");$s->execute([$job['slot']]);$previous=$s->fetchColumn();
-    $first=$previous?(new DateTimeImmutable($previous))->modify('+1 day'):new DateTimeImmutable(db_backup_next_schedule(new DateTimeImmutable($installedAt)));
+    $settings=db_backup_settings($db);$clock=$last->format('H:i');
+    $first=$previous?(new DateTimeImmutable($previous))->modify('+1 day')->setTime((int)$last->format('H'),(int)$last->format('i')):new DateTimeImmutable(db_backup_next_schedule(new DateTimeImmutable($installedAt),$clock));
+    if($settings['activated']&&$settings['effective_from']<=$job['slot']&&new DateTimeImmutable($settings['effective_from'])>$first)$first=new DateTimeImmutable($settings['effective_from']);
     if($first>$last)$first=$last;
     return ['first_due'=>$first->format(DATE_ATOM),'last_due'=>$last->format(DATE_ATOM),'count'=>(int)$first->diff($last)->days+1];
 }
 function db_backup_summary(): array {
-    $out=['configured'=>false,'ready'=>false,'active'=>null,'last_success'=>null,'count'=>0,'total_bytes'=>0,'next_schedule'=>db_backup_next_schedule(),'alerts'=>[],'jobs'=>[],'free_bytes'=>null];
+    $out=['configured'=>false,'ready'=>false,'service_registered'=>false,'active'=>null,'last_success'=>null,'count'=>0,'total_bytes'=>0,'next_schedule'=>db_backup_next_schedule(),'settings'=>['daily_time'=>'18:00','retention_days'=>90,'version'=>0,'activated'=>false,'effective_from'=>null,'updated_at'=>null],'alerts'=>[],'jobs'=>[],'free_bytes'=>null];
+    if(!extension_loaded('pdo_sqlite')){$out['alerts'][]='PDO SQLite belum aktif pada PHP aplikasi. Aktifkan ekstensi tersebut lalu muat ulang server web.';return $out;}
+    if(!is_file(db_backup_config_path())){$out['alerts'][]='Layanan backup belum dipasang pada PC ini. Jalankan pemasang backup terlebih dahulu.';return $out;}
     try{
         $c=db_backup_config();if(($GLOBALS['koneksi']??null) instanceof mysqli)db_backup_assert_application($c,$GLOBALS['koneksi']);
-        $db=db_backup_store();$out['configured']=true;
+        $db=db_backup_store();$out['configured']=true;$out['settings']=db_backup_settings($db);$out['next_schedule']=db_backup_policy_next($db,db_backup_now(),$out['settings']);
         $heartbeat=is_file($c['storage_root'].'/heartbeat.json')?json_decode(file_get_contents($c['storage_root'].'/heartbeat.json'),true):[];
-        $out['ready']=(int)($heartbeat['time']??0)>time()-180;
+        $out['service_registered']=db_backup_service_registered($c);
+        $out['ready']=$out['service_registered']&&(int)($heartbeat['time']??0)>time()-180;
         $jobs=$db->query('SELECT * FROM jobs ORDER BY created_at DESC,id DESC')->fetchAll(PDO::FETCH_ASSOC);
         foreach($jobs as $job){$public=db_backup_public_job($job);$out['jobs'][]=$public;
             if($job['state']==='verified'){$out['count']++;$out['total_bytes']+=(int)$job['bytes'];if(!$out['last_success'])$out['last_success']=$public;}
             if(!$out['active']&&in_array($job['state'],['queued','dumping','verifying'],true))$out['active']=$public;
         }
         $out['free_bytes']=(int)disk_free_space($c['storage_root']);
-        if(!$out['ready'])$out['alerts'][]='Layanan pencadangan belum aktif. Periksa jadwal Windows.';
-        if($out['free_bytes']<10737418240)$out['alerts'][]='Ruang penyimpanan cadangan hampir penuh. Cadangan lama tetap disimpan.';
+        if(!$out['service_registered'])$out['alerts'][]='Jadwal Windows belum terpasang. Selesaikan pemasangan melalui PowerShell sebagai Administrator. Pengaturan jam tetap dapat disimpan.';
+        elseif(!$out['ready'])$out['alerts'][]='Layanan pencadangan belum aktif. Periksa jadwal Windows.';
+        if($out['free_bytes']<10737418240)$out['alerts'][]='Ruang penyimpanan cadangan hampir penuh. Periksa ruang disk dan pengaturan penyimpanan.';
+        if($db->query('SELECT COUNT(*) FROM backup_expirations WHERE finished_at IS NULL')->fetchColumn())$out['alerts'][]='Pembersihan cadangan kedaluwarsa belum selesai. Berkas yang sedang digunakan akan dicoba kembali.';
+        elseif(is_file($c['storage_root'].'/retention-warning.json'))$out['alerts'][]='Pembersihan cadangan kedaluwarsa belum selesai. Periksa layanan dan berkas privat.';
         $latest=$jobs[0]??null;if($latest&&$latest['state']==='failed')$out['alerts'][]='Cadangan terakhir gagal. '.$latest['message'];
-        $slot=db_backup_latest_due(db_backup_now());$s=$db->prepare("SELECT COUNT(*) FROM jobs WHERE slot=? AND state='verified'");$s->execute([$slot]);
-        if(!$s->fetchColumn()&&time()-(new DateTimeImmutable($slot))->getTimestamp()>1800)$out['alerts'][]='Cadangan harian belum selesai. Sistem akan menjalankan pencadangan susulan.';
+        $slot=db_backup_policy_due($db,db_backup_now(),$out['settings']);
+        if($slot!==null){$s=$db->prepare("SELECT COUNT(*) FROM jobs WHERE substr(slot,1,10)=? AND state IN ('verified','expired','expiring')");$s->execute([substr($slot,0,10)]);
+        if(!$s->fetchColumn()&&time()-(new DateTimeImmutable($slot))->getTimestamp()>1800)$out['alerts'][]='Cadangan harian belum selesai. Sistem akan menjalankan pencadangan susulan.';}
     }catch(Throwable $e){$out['alerts'][]='Pencadangan otomatis belum tersedia. Hubungi pengelola komputer.';}
     return $out;
 }
@@ -191,7 +224,8 @@ function db_backup_process(array $args,string $log,int $seconds=1800,?string $in
     $code=$status['exitcode'];$closed=proc_close($p);if(($code<0?$closed:$code)!==0)throw new RuntimeException('Backup process failed; private diagnostics retained.');
 }
 function db_backup_archive(PDO $db,string $id): array {
-    $job=db_backup_find($db,$id);if($job['state']!=='verified')throw new InvalidArgumentException('Cadangan belum terverifikasi.');
+    $job=db_backup_find($db,$id);if(in_array($job['state'],['expired','expiring'],true))throw new BackupExpired('Cadangan sudah kedaluwarsa sesuai pengaturan penyimpanan dan tidak dapat diunduh.');
+    if($job['state']!=='verified')throw new InvalidArgumentException('Cadangan belum terverifikasi.');
     $expected=db_backup_job_dir($id);$dir=db_backup_private_path($expected);
     if(db_backup_normal_path($dir)!==db_backup_normal_path($expected))throw new RuntimeException('Backup file location differs.');
     $archiveName=$job['archive_name']?:'backup.sql.gz';

@@ -117,6 +117,8 @@ try {
             $requests++;
             backup_http_assert(in_array($status, [302, 401, 403], true), 'Stale Super Admin claim accepted for ' . $role);
         }
+        [$status] = backup_http_request('backup_api.php?action=settings', $session, 'POST', ['csrf_token'=>'invalid','daily_time'=>'20:00','retention_days'=>'90','version'=>'0']);$requests++;
+        backup_http_assert(in_array($status,[302,401,403],true),'Non-Super Admin changed backup settings');
     }
     foreach ([0, 1, 2, 3] as $unit) {
         $session = backup_http_session($super, $unit);
@@ -135,6 +137,29 @@ try {
         $requests++;
         backup_http_assert($status === 200, 'Status inaccessible for unit ' . $unit);
         backup_http_public_payload($body);
+        $currentSettings=json_decode($body,true)['settings'];
+        backup_http_assert(str_contains($html,'database-backup-settings-form'),'Settings form missing');
+        [$status]=backup_http_request('backup_api.php?action=settings',$session);$requests++;
+        backup_http_assert($status===405,'Settings mutation allowed over GET');
+        $settingData=['daily_time'=>'20:'.sprintf('%02d',$unit),'retention_days'=>(string)([0=>1,1=>90,2=>365,3=>90][$unit]),'version'=>(string)$currentSettings['version'],'csrf_token'=>$csrf];
+        foreach(['','invalid'] as $badToken){
+            [$status]=backup_http_request('backup_api.php?action=settings',$session,'POST',array_replace($settingData,['csrf_token'=>$badToken]));$requests++;
+            backup_http_assert($status===403,'Settings CSRF accepted');
+        }
+        foreach([['daily_time'=>['20:00']],['daily_time'=>'24:00'],['daily_time'=>'20:61'],['retention_days'=>'0'],['retention_days'=>'366'],['retention_days'=>['90']],['version'=>['0']],['version'=>'-1']] as $bad){
+            [$status,$body]=backup_http_request('backup_api.php?action=settings',$session,'POST',array_replace($settingData,$bad));$requests++;
+            backup_http_assert($status===400,'Malformed settings accepted');backup_http_public_payload($body);
+        }
+        $jobCountBefore=(int)$store->query('SELECT COUNT(*) FROM jobs')->fetchColumn();
+        [$status,$body]=backup_http_request('backup_api.php?action=settings',$session,'POST',$settingData);$requests++;
+        $settingsResult=backup_http_public_payload($body);
+        backup_http_assert($status===200&&$settingsResult['settings']['daily_time']===$settingData['daily_time']&&$settingsResult['settings']['retention_days']===(int)$settingData['retention_days'],'Saved settings differ');
+        backup_http_assert((int)$store->query('SELECT COUNT(*) FROM jobs')->fetchColumn()===$jobCountBefore,'Settings save unexpectedly created a backup');
+        [$status,$body]=backup_http_request('backup_api.php?action=settings',$session,'POST',$settingData);$requests++;
+        backup_http_assert($status===409&&str_contains($body,'Muat ulang'),'Stale settings version accepted');
+        $settingData['version']=(string)$settingsResult['settings']['version'];
+        [$status,,$headers]=backup_http_request('backup_api.php?action=settings',$session,'POST',$settingData+['return'=>'page']);$requests++;
+        backup_http_assert($status===303&&in_array('Location: backup_restore.php',$headers,true),'Native settings form must redirect safely');
         foreach (['', 'invalid'] as $badToken) {
             [$status] = backup_http_request('backup_api.php?action=create', $session, 'POST', ['csrf_token' => $badToken]);
             $requests++;
@@ -291,9 +316,15 @@ try {
         [$status] = backup_http_request('backup_api.php?action=status', $inactiveSession);
         $requests++;
         backup_http_assert(in_array($status, [302, 401, 403], true), 'Inactive Super Admin retained API access');
+        [$status]=backup_http_request('backup_api.php?action=settings',$inactiveSession,'POST',['csrf_token'=>$csrf,'daily_time'=>'20:00','retention_days'=>'90','version'=>'0']);$requests++;
+        backup_http_assert(in_array($status,[302,401,403],true),'Inactive account changed settings');
     } finally {
         $koneksi->query('UPDATE admin SET is_active=1 WHERE id=' . (int)$super['id']);
     }
+    $store->prepare("UPDATE jobs SET state='expired' WHERE id=?")->execute([$downloadId]);
+    [$status,$body]=backup_http_request('backup_api.php?action=download&id='.$downloadId,$adminSession);$requests++;
+    backup_http_assert($status===410&&str_contains($body,'kedaluwarsa'),'Expired download must clearly return 410');
+    $store->prepare("UPDATE jobs SET state='verified' WHERE id=?")->execute([$downloadId]);
     backup_http_assert(backup_http_fingerprint($koneksi) === $before, 'Backup API changed an application database record');
     echo "PASS: $requests backup API access/input/method/CSRF requests; four units, fresh roles, native PRG, queue deduplication and checksum-protected plain SQL downloads including legacy gzip; database fingerprints unchanged\n";
 } finally {

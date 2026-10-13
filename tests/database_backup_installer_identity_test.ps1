@@ -6,7 +6,7 @@ $installer = Join-Path (Split-Path -Parent $PSScriptRoot) 'scripts\install_datab
 $tokens = $null; $parseErrors = $null
 $ast = [Management.Automation.Language.Parser]::ParseFile($installer, [ref]$tokens, [ref]$parseErrors)
 if ($parseErrors.Count) { throw 'Installer PowerShell syntax is invalid.' }
-foreach ($name in @('Resolve-BackupIdentitySid', 'Test-BackupTaskOwnership', 'Test-BackupTaskSchedule')) {
+foreach ($name in @('Resolve-BackupIdentitySid', 'Test-BackupTaskOwnership', 'Test-BackupTaskSchedule', 'Test-BackupMysqlVersion')) {
     $functionAst = $ast.Find({ param($node) $node -is [Management.Automation.Language.FunctionDefinitionAst] -and $node.Name -eq $name }, $true)
     if (!$functionAst) { throw ('Installer helper missing: ' + $name) }
     Invoke-Expression $functionAst.Extent.Text
@@ -15,6 +15,12 @@ $script:checks = 0
 function Assert-IdentityCase([bool]$Condition, [string]$Message) {
     if (!$Condition) { throw $Message }
     $script:checks++
+}
+foreach ($version in @('8.0.30','8.0.44','8.4.3','8.4.0','8.0.30-commercial')) {
+    Assert-IdentityCase (Test-BackupMysqlVersion $version) ('Supported MySQL refused: '+$version)
+}
+foreach ($version in @('8.0.29','5.7.44','9.0.1','10.11.0-MariaDB','8.4.3-MariaDB','invalid')) {
+    Assert-IdentityCase (!(Test-BackupMysqlVersion $version)) ('Unsupported MySQL accepted: '+$version)
 }
 $identity = [Security.Principal.WindowsIdentity]::GetCurrent()
 $ownerSid = $identity.User.Value
@@ -71,6 +77,10 @@ function New-ScheduleFixture {
     }
 }
 Assert-IdentityCase (Test-BackupTaskSchedule (New-ScheduleFixture) 'C:\app') 'Matching installed task must be reusable without registration.'
+$task=New-ScheduleFixture; $task.Triggers=$task.Triggers[1..2]
+Assert-IdentityCase (Test-BackupTaskSchedule $task 'C:\app') 'Minute/startup task must support application-owned scheduling without a fixed daily trigger.'
+$task=New-ScheduleFixture; $task.Triggers[0].StartBoundary='2026-10-13T20:30:00+07:00'
+Assert-IdentityCase (Test-BackupTaskSchedule $task 'C:\app') 'Legacy wake time must not override application settings.'
 $task=New-ScheduleFixture; $task.Triggers[0].StartBoundary='2026-10-13T18:00:00+00:00'
 Assert-IdentityCase (!(Test-BackupTaskSchedule $task 'C:\app')) 'A different timezone must require repair.'
 $task=New-ScheduleFixture; $task.Triggers[1].Enabled=$false

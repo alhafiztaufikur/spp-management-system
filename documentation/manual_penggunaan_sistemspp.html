@@ -73,7 +73,7 @@
       <tr><td>10. Laporan Global: 9 template dan panduan laporan terkait</td><td>21-32</td></tr>
       <tr><td>11. Surat, akun, contoh alur dan pemecahan masalah</td><td>33-35</td></tr>
     </table>
-    <div class="cover-bottom">Edisi 10 Oktober 2026 | Contoh dalam panduan memakai data demo. Kata sandi tidak dicantumkan di manual ini.</div>
+    <div class="cover-bottom">Edisi 13 Oktober 2026 | Contoh dalam panduan memakai data demo. Kata sandi tidak dicantumkan di manual ini.</div>
   </section>
 
   <section class="page">
@@ -213,7 +213,7 @@
       <tr><td>Data Master</td><td>Data Siswa 15 | Master Kelas/Rombel 16 | Master Penerbitan SPP 16 | Master Biaya Lain 17 | Master Daftar Ulang 17</td></tr>
       <tr><td>Tabungan</td><td>Tabungan Masuk 18 | Tabungan Keluar 18 | Riwayat Tabungan 19 | Cetak Tabungan 19</td></tr>
       <tr><td>Laporan</td><td>Laporan Transaksi 20 | Laporan Global 21-32 | Surat Laporan 33</td></tr>
-      <tr><td>Pengaturan</td><td>Role Management 34 (khusus Super Admin)</td></tr>
+      <tr><td>Pengaturan</td><td>Role Management 34 | Backup &amp; Restore 36 (khusus Super Admin)</td></tr>
     </tbody></table>
     <h2>Arti istilah pada laporan</h2>
     <table class="manual-index"><tbody>
@@ -551,6 +551,20 @@
     </ul>
     <div class="card"><h3>Rujukan cepat</h3><p>Halaman 10 adalah indeks menu. Halaman 21 menjelaskan kontrol umum Laporan Global. Halaman 22-32 menguraikan semua jenis laporan satu per satu.</p></div>
     <div class="footer">Manual Penggunaan SistemSPP | 35</div>
+  </section>
+  <section class="page">
+    <div class="topline"><strong>SistemSPP</strong><span>Pengaturan / Cadangan database</span></div>
+    <div class="eyebrow">HANYA SUPER ADMIN</div><h1>Backup &amp; Restore</h1>
+    <p class="lead">Cadangan mencakup seluruh data SD, SMP, dan SMA. Backup harian berjalan melalui layanan Windows yang dipasang sekali oleh pengelola dengan hak Administrator, tanpa harus membuka halaman aplikasi. Pesan halaman membedakan konfigurasi yang belum tersedia dan task harian yang belum terpasang.</p>
+    <h2>Mengatur backup otomatis setiap hari</h2>
+    <div class="steps"><ol><li>Buka <b>Backup &amp; Restore</b> dan bagian <b>Pengaturan Backup Harian</b>.</li><li>Pilih <b>Jam Backup (WIB)</b> dan <b>Simpan Cadangan Selama (hari)</b>, antara 1 dan 365 hari. Nilai awal formulir adalah 18.00 WIB dan 90 hari.</li><li>Tekan <b>Simpan Pengaturan</b>, lalu periksa pengaturan aktif dan <b>Jadwal Berikutnya</b>. Pengaturan tetap tersimpan setelah refresh dan restart.</li><li>Jika muncul pesan pengaturan sudah berubah, muat ulang halaman sebelum menyimpan kembali.</li></ol></div>
+    <p>Jam baru berlaku pada jadwal berikutnya setelah disimpan, tanpa membuat backup langsung. Pekerjaan yang telah mengantre tetap selesai; perubahan jam tidak menggandakan backup untuk tanggal jadwal yang sama. Sebelum pengaturan pertama disimpan, jadwal tetap 18.00 WIB dan cadangan lama tetap disimpan.</p>
+    <h2>Cadangan otomatis dan manual</h2>
+    <table><thead><tr><th>Jenis</th><th>Penyimpanan</th></tr></thead><tbody><tr><td>Terjadwal / Susulan</td><td>Cadangan yang melewati interval dibersihkan setelah backup otomatis baru berhasil diverifikasi. Cadangan otomatis lama ikut aturan yang disimpan.</td></tr><tr><td>Manual</td><td>Dibuat melalui <b>Buat Backup Sekarang</b> dan tetap disimpan; tidak ikut rotasi otomatis.</td></tr></tbody></table>
+    <p>Periksa tahapan Menunggu, Mencadangkan, Memverifikasi, lalu <b>Terverifikasi</b>. Unduhan tersedia sebagai berkas SQL hanya setelah verifikasi lulus. Riwayat cadangan yang telah dibersihkan tetap ditampilkan sebagai <b>Kedaluwarsa</b>, tanpa tombol unduh.</p>
+    <div class="card"><h3>Ketika komputer mati atau backup gagal</h3><p>Komputer/server dan layanan backup harus aktif. Jika jadwal terlewat, sistem membuat satu backup susulan keadaan terbaru setelah layanan kembali. Kegagalan backup baru tidak menghapus cadangan baik sebelumnya. Pembersihan ditunda bila berkas masih diunduh atau diverifikasi.</p></div>
+    <div class="warning">Rotasi hanya membersihkan berkas cadangan; tidak menimpa database operasional. Restore melalui web tetap nonaktif. Simpan salinan terverifikasi pada media lain untuk melindungi data jika disk komputer rusak.</div>
+    <div class="footer">Manual Penggunaan SistemSPP | 36</div>
   </section>
 </body>
 </html>

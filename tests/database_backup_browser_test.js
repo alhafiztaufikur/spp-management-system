@@ -51,7 +51,8 @@ fs.mkdirSync(artifactRoot, {recursive: true});
     assert.equal(await page.locator('#database-backup-form input[name=return]').inputValue(), 'page');
     assert.match(await page.locator('#database-backup-form input[name=request_key]').inputValue(), /^[a-f0-9]{32}$/);
     assert.equal(await page.locator('#restore-apply').isDisabled(), true);
-    assert.match(await page.locator('#backup-next').textContent(), /18:00 WIB/);
+    const initialSettings = JSON.parse(await page.locator('#database-backup-config').textContent()).summary.settings;
+    assert.ok((await page.locator('#backup-next').textContent()).includes(initialSettings.daily_time + ' WIB'));
 
     const actual = await (await page.request.get(new URL('/backup_api.php?action=status', base).href)).json();
     let summary = {...actual, configured: true, ready: true, active: null, last_success: null,

@@ -1,8 +1,8 @@
 [CmdletBinding()]
 param(
     [string]$ConfigFile = 'C:\laragon\data\spp-backup\db_spp\config.json',
-    [string]$MysqlBin = 'C:\laragon\bin\mysql\mysql-8.4.3-winx64\bin',
-    [string]$PhpExecutable = 'C:\laragon\bin\php\php-8.3.33-Win32-vs16-x64\php.exe',
+    [string]$MysqlBin = '',
+    [string]$PhpExecutable = '',
     [string]$StorageRoot = 'C:\laragon\backups\spp-management-system\daily\db_spp',
     [string]$AdminDefaultsFile = '',
     [string]$TaskName = 'SistemSPP Database Backup',
@@ -87,6 +87,12 @@ function Quote-NativeArgument([string]$Value) {
     return '"' + [regex]::Replace([regex]::Replace($Value, '(\\*)"', '$1$1\"'), '(\\+)$', '$1$1') + '"'
 }
 
+function Test-BackupMysqlVersion([string]$Version) {
+    # Verification uses --innodb-redo-log-capacity (available from MySQL 8.0.30).
+    if ($Version -notmatch '^(8)\.(0|4)\.([0-9]+)(?:$|[-.])' -or $Version -match '(?i)mariadb') { return $false }
+    return ($Matches[2] -eq '4' -or [int]$Matches[3] -ge 30)
+}
+
 # Reusing an unchanged, owned task avoids unnecessary administrator prompts.
 function Test-BackupTaskSchedule($Task, [string]$ApplicationRoot) {
     try {
@@ -97,8 +103,9 @@ function Test-BackupTaskSchedule($Task, [string]$ApplicationRoot) {
         $daily = @($triggers | Where-Object {$_.CimClass.CimClassName -eq 'MSFT_TaskDailyTrigger'})
         $queue = @($triggers | Where-Object {$_.CimClass.CimClassName -eq 'MSFT_TaskTimeTrigger'})
         $boot = @($triggers | Where-Object {$_.CimClass.CimClassName -eq 'MSFT_TaskBootTrigger'})
-        if ($triggers.Count -ne 3 -or $daily.Count -ne 1 -or $queue.Count -ne 1 -or $boot.Count -ne 1) { return $false }
-        if (!$daily[0].Enabled -or $daily[0].DaysInterval -ne 1 -or $daily[0].StartBoundary -notmatch 'T18:00:00\+07:00$' -or $daily[0].EndBoundary) { return $false }
+        if ($triggers.Count -ne (2 + $daily.Count) -or $daily.Count -gt 1 -or $queue.Count -ne 1 -or $boot.Count -ne 1) { return $false }
+        # Older owned installations may keep a daily wake trigger. Only the application decides what is due.
+        if ($daily.Count -and (!$daily[0].Enabled -or $daily[0].DaysInterval -ne 1 -or $daily[0].StartBoundary -notmatch 'T(?:[01][0-9]|2[0-3]):[0-5][0-9]:00\+07:00$' -or $daily[0].EndBoundary)) { return $false }
         if (!$queue[0].Enabled -or $queue[0].Repetition.Interval -ne 'PT1M' -or $queue[0].EndBoundary -or !$boot[0].Enabled -or $boot[0].Delay -ne 'PT1M' -or $boot[0].EndBoundary) { return $false }
         return $true
     } catch { return $false }
@@ -143,6 +150,35 @@ function Escape-Option([string]$Value) {
 
 try {
     $ConfigFile = Assert-PlainPath $ConfigFile
+    # Reuse an installed configuration before detecting Laragon's active runtimes.
+    # Never assume the developer's PHP/MySQL version also exists on another PC.
+    $runtimeConfig = $null
+    if (Test-Path -LiteralPath $ConfigFile -PathType Leaf) { $runtimeConfig = Get-Content -LiteralPath $ConfigFile -Raw | ConvertFrom-Json }
+    if (!$PhpExecutable) {
+        if ($runtimeConfig -and $runtimeConfig.php_executable) { $PhpExecutable = [string]$runtimeConfig.php_executable }
+        else {
+            $moduleFile = 'C:\laragon\etc\apache2\mod_php.conf'
+            if (Test-Path -LiteralPath $moduleFile -PathType Leaf) {
+                $phpMatch = [regex]::Match([IO.File]::ReadAllText($moduleFile), '(?m)^\s*PHPIniDir\s+"([^"]+)"')
+                if ($phpMatch.Success) { $PhpExecutable = Join-Path $phpMatch.Groups[1].Value 'php.exe' }
+            }
+            if (!$PhpExecutable) {
+                $phpCommand = Get-Command php.exe -CommandType Application -ErrorAction SilentlyContinue
+                if ($phpCommand) { $PhpExecutable = $phpCommand.Source }
+            }
+            if (!$PhpExecutable) { throw 'PHP aktif tidak ditemukan. Isi parameter -PhpExecutable sesuai PHP aplikasi.' }
+        }
+    }
+    if (!$MysqlBin) {
+        if ($runtimeConfig -and $runtimeConfig.mysql_bin) { $MysqlBin = [string]$runtimeConfig.mysql_bin }
+        else {
+            $activeMysql = @(Get-CimInstance Win32_Process -Filter "Name='mysqld.exe'" | Where-Object {
+                $_.ExecutablePath -and $_.CommandLine -and $_.CommandLine -notmatch '(?:^|\s)--no-defaults(?:\s|$)'
+            } | Select-Object -ExpandProperty ExecutablePath -Unique)
+            if ($activeMysql.Count -ne 1) { throw 'Lokasi MySQL aktif tidak dapat ditentukan dengan pasti. Isi parameter -MysqlBin.' }
+            $MysqlBin = Split-Path -Parent $activeMysql[0]
+        }
+    }
     $MysqlBin = Assert-PlainPath $MysqlBin
     $PhpExecutable = Assert-PlainPath $PhpExecutable
     foreach ($executable in @($PhpExecutable, (Join-Path $MysqlBin 'mysql.exe'), (Join-Path $MysqlBin 'mysqldump.exe'), (Join-Path $MysqlBin 'mysqld.exe'))) {
@@ -183,7 +219,7 @@ try {
             $AdminDefaultsFile = $temporaryAdminFile
         }
         $identity = (Invoke-Mysql $AdminDefaultsFile 'SELECT @@server_uuid, @@datadir, VERSION();').Split("`t")
-        if ($identity.Count -ne 3 -or $identity[2] -notmatch '^8\.4\.') { throw 'Pencadangan lokal ini memerlukan server MySQL 8.4.' }
+        if ($identity.Count -ne 3 -or !(Test-BackupMysqlVersion $identity[2])) { throw 'Pencadangan lokal ini memerlukan MySQL 8.0.30 atau lebih baru pada seri 8.0, atau MySQL 8.4.' }
         $databaseExists = Invoke-Mysql $AdminDefaultsFile "SELECT COUNT(*) FROM information_schema.SCHEMATA WHERE SCHEMA_NAME='db_spp';"
         if ($databaseExists -ne '1') { throw 'Database lokal db_spp tidak ditemukan.' }
         $otherEngines = Invoke-Mysql $AdminDefaultsFile "SELECT COUNT(*) FROM information_schema.TABLES WHERE TABLE_SCHEMA='db_spp' AND TABLE_TYPE='BASE TABLE' AND ENGINE <> 'InnoDB';"
@@ -252,20 +288,13 @@ try {
                 throw 'Task bernama sama tidak cocok dengan manifest instalasi; tidak ditimpa.'
             }
         }
-        $jakarta = [TimeZoneInfo]::FindSystemTimeZoneById('SE Asia Standard Time')
-        $nowJakarta = [TimeZoneInfo]::ConvertTime([DateTimeOffset]::UtcNow, $jakarta)
-        $nextJakarta = [DateTimeOffset]::new($nowJakarta.Year, $nowJakarta.Month, $nowJakarta.Day, 18, 0, 0, [TimeSpan]::FromHours(7))
-        if ($nextJakarta -le $nowJakarta) { $nextJakarta = $nextJakarta.AddDays(1) }
-        # Boundaries with +07:00 keep the daily trigger at WIB even if the host timezone changes.
-        $dailyBoundary = $nextJakarta.ToString('yyyy-MM-ddTHH:mm:sszzz')
         $queueBoundary = [DateTimeOffset]::UtcNow.AddMinutes(1).ToString('yyyy-MM-ddTHH:mm:sszzz')
         $escape = { param($s) [Security.SecurityElement]::Escape([string]$s) }
         $xml = @"
 <?xml version="1.0" encoding="UTF-16"?>
 <Task version="1.4" xmlns="http://schemas.microsoft.com/windows/2004/02/mit/task">
-  <RegistrationInfo><Description>Backup seluruh db_spp pada 18.00 WIB, antrean manual, dan susulan. Dikelola oleh SistemSPP.</Description></RegistrationInfo>
+  <RegistrationInfo><Description>Backup seluruh db_spp; jadwal harian diatur melalui halaman Backup &amp; Restore. Pemeriksaan antrean per menit dan pemulihan startup.</Description></RegistrationInfo>
   <Triggers>
-    <CalendarTrigger><StartBoundary>$dailyBoundary</StartBoundary><Enabled>true</Enabled><ScheduleByDay><DaysInterval>1</DaysInterval></ScheduleByDay></CalendarTrigger>
     <TimeTrigger><Repetition><Interval>PT1M</Interval><StopAtDurationEnd>false</StopAtDurationEnd></Repetition><StartBoundary>$queueBoundary</StartBoundary><Enabled>true</Enabled></TimeTrigger>
     <BootTrigger><Enabled>true</Enabled><Delay>PT1M</Delay></BootTrigger>
   </Triggers>
@@ -275,18 +304,18 @@ try {
 </Task>
 "@
         if ($existingTask -and (Test-BackupTaskSchedule $existingTask $appRoot)) {
-            Write-Output 'Task milik instalasi ini sudah sesuai: harian 18.00 WIB, antrean per menit, dan pemulihan startup (S4U, hak terbatas).'
+            Write-Output 'Task milik instalasi ini sudah sesuai: antrean per menit dan pemulihan startup. Jam harian mengikuti pengaturan aplikasi.'
         } else {
         # Persist ownership before registration so an interrupted install can resume.
-        Write-PrivateJson $taskManifestFile ([ordered]@{task_name=$TaskName;config_file=$ConfigFile;owner_sid=$ownerSid;owner=$owner.Name;registered_at=$null;daily_timezone='Asia/Jakarta';daily_time='18:00';arguments=$arguments})
+        Write-PrivateJson $taskManifestFile ([ordered]@{task_name=$TaskName;config_file=$ConfigFile;owner_sid=$ownerSid;owner=$owner.Name;registered_at=$null;daily_timezone='Asia/Jakarta';schedule_source='application';arguments=$arguments})
         try {
             Register-ScheduledTask -TaskName $TaskName -TaskPath '\' -Xml $xml -Force | Out-Null
         } catch {
             Write-PrivateJson (Join-Path $configDirectory 'task-registration-error.json') ([ordered]@{time=[DateTimeOffset]::UtcNow.ToString('o');error=$_.Exception.Message})
             throw 'Windows menolak pendaftaran task S4U. Jalankan pemasang sekali dari PowerShell sebagai Administrator dengan akun pemilik yang sama; konfigurasi dan cadangan tetap aman.'
         }
-        Write-PrivateJson $taskManifestFile ([ordered]@{task_name=$TaskName;config_file=$ConfigFile;owner_sid=$ownerSid;owner=$owner.Name;registered_at=[DateTimeOffset]::UtcNow.ToString('o');daily_timezone='Asia/Jakarta';daily_time='18:00';arguments=$arguments})
-        Write-Output 'Task harian 18.00 WIB, antrean per menit, dan pemulihan startup terpasang (S4U, hak terbatas).'
+        Write-PrivateJson $taskManifestFile ([ordered]@{task_name=$TaskName;config_file=$ConfigFile;owner_sid=$ownerSid;owner=$owner.Name;registered_at=[DateTimeOffset]::UtcNow.ToString('o');daily_timezone='Asia/Jakarta';schedule_source='application';arguments=$arguments})
+        Write-Output 'Task antrean per menit dan pemulihan startup terpasang (S4U, hak terbatas). Atur jam backup harian melalui aplikasi.'
         }
         if ($RunNow) {
             Start-ScheduledTask -TaskName $TaskName -TaskPath '\'

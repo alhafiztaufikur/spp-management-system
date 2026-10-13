@@ -46,7 +46,9 @@ function backup_ui_date($value): string {
     try { return (new DateTimeImmutable((string)$value))->setTimezone(new DateTimeZone('Asia/Jakarta'))->format('d/m/Y H:i') . ' WIB'; }
     catch (Throwable $error) { return '—'; }
 }
-$backupStates = ['queued'=>'Menunggu','dumping'=>'Mencadangkan','verifying'=>'Memverifikasi','verified'=>'Terverifikasi','failed'=>'Gagal'];
+$backupSettings = $backupSummary['settings'] ?? ['daily_time'=>'18:00','retention_days'=>90,'version'=>0,'activated'=>false];
+$backupClock = str_replace(':','.', $backupSettings['daily_time']);
+$backupStates = ['queued'=>'Menunggu','dumping'=>'Mencadangkan','verifying'=>'Memverifikasi','verified'=>'Terverifikasi','failed'=>'Gagal','expired'=>'Kedaluwarsa'];
 $backupTypes = ['manual'=>'Manual','scheduled'=>'Terjadwal','catchup'=>'Susulan'];
 $backupJobs = array_values(array_filter($backupSummary['jobs'] ?? [], static function (array $job) use ($backupSearch, $backupType, $backupTypes): bool {
     if ($backupType !== '' && ($job['type'] ?? '') !== $backupType) return false;
@@ -114,27 +116,43 @@ function backup_ui_picker(string $prefix, string $label): void { ?>
   </div>
   <div class="db-tools-page">
     <nav class="dbt-breadcrumb" aria-label="Lokasi halaman">Pengaturan <span aria-hidden="true">›</span> Backup &amp; Restore Database</nav>
-    <header class="dbt-heading"><span class="dbt-icon"><?= backup_ui_icon('database') ?></span><div><h1>Backup &amp; Restore Database</h1><p>Cadangan harian dan pengelolaan data SistemSPP.</p></div><span class="dbt-badge">Setiap hari · 18.00 WIB</span></header>
+    <header class="dbt-heading"><span class="dbt-icon"><?= backup_ui_icon('database') ?></span><div><h1>Backup &amp; Restore Database</h1><p>Cadangan harian dan pengelolaan data SistemSPP.</p></div><span class="dbt-badge" id="backup-schedule-badge">Setiap hari · <?= backup_ui_escape($backupClock) ?> WIB</span></header>
     <div class="dbt-tabs" role="tablist" aria-label="Mode pengelolaan database">
       <button type="button" role="tab" id="tab-backup" aria-controls="panel-backup" aria-selected="true">Backup &amp; Restore</button>
       <button type="button" role="tab" id="tab-legacy" aria-controls="panel-legacy" aria-selected="false" tabindex="-1">Import Legacy</button>
     </div>
     <section id="panel-backup" role="tabpanel" aria-labelledby="tab-backup">
-      <div class="dbt-notice"><?= backup_ui_icon('info') ?><div><strong>Seluruh Database SistemSPP</strong><p>Cadangan mencakup SD, SMP, dan SMA. Cadangan yang tersimpan tidak dihapus otomatis.</p></div></div>
+      <div class="dbt-notice"><?= backup_ui_icon('info') ?><div><strong>Seluruh Database SistemSPP</strong><p>Cadangan mencakup SD, SMP, dan SMA. Cadangan manual tetap disimpan; penyimpanan cadangan otomatis mengikuti pengaturan di bawah.</p></div></div>
       <div id="backup-alerts" class="dbt-backup-alerts" aria-live="polite">
         <?php foreach ($backupSummary['alerts'] ?? [] as $alert): ?><div class="dbt-warning"><?= backup_ui_escape($alert) ?></div><?php endforeach; ?>
       </div>
       <div id="backup-feedback" class="dbt-feedback<?= $backupFlash ? ' is-' . (($backupFlash['type'] ?? '') === 'success' ? 'success' : 'error') : '' ?>" role="status" aria-live="polite"<?= !$backupFlash ? ' hidden' : '' ?>><?= backup_ui_escape($backupFlash['message'] ?? '') ?></div>
       <div class="dbt-metrics">
         <?php foreach ([
-          ['clock', 'Jadwal Berikutnya', backup_ui_date($backupSummary['next_schedule'] ?? null), 'Backup harian pukul 18.00 WIB', 'backup-next'],
+          ['clock', 'Jadwal Berikutnya', backup_ui_date($backupSummary['next_schedule'] ?? null), 'Backup harian pukul '.$backupClock.' WIB', 'backup-next'],
           ['file', 'Backup Terverifikasi Terakhir', backup_ui_date($backupSummary['last_success']['finished_at'] ?? null), 'Sudah diuji melalui pemulihan', 'backup-last'],
           ['database', 'Ukuran Database', $databaseSize ?? 'Belum tersedia', $databaseConnected ? 'Database aktif' : 'Koneksi tidak tersedia', 'backup-db-size'],
           ['file', 'Cadangan Terverifikasi', number_format((int)($backupSummary['count'] ?? 0), 0, ',', '.'), backup_ui_bytes($backupSummary['total_bytes'] ?? 0) . ' ukuran terverifikasi', 'backup-count'],
         ] as [$icon, $title, $value, $description, $id]): ?>
-        <article class="dbt-metric"><span class="dbt-icon"><?= backup_ui_icon($icon) ?></span><div><h2><?= $title ?></h2><strong id="<?= $id ?>"><?= backup_ui_escape($value) ?></strong><p<?= $id === 'backup-count' ? ' id="backup-total-size"' : '' ?>><?= backup_ui_escape($description) ?></p></div></article>
+        <article class="dbt-metric"><span class="dbt-icon"><?= backup_ui_icon($icon) ?></span><div><h2><?= $title ?></h2><strong id="<?= $id ?>"><?= backup_ui_escape($value) ?></strong><p<?= $id === 'backup-count' ? ' id="backup-total-size"' : ($id === 'backup-next' ? ' id="backup-schedule-description"' : '') ?>><?= backup_ui_escape($description) ?></p></div></article>
         <?php endforeach; ?>
       </div>
+      <section class="dbt-card dbt-settings" aria-labelledby="backup-settings-title">
+        <header class="dbt-card-heading"><span class="dbt-icon"><?= backup_ui_icon('clock') ?></span><div><h2 id="backup-settings-title">Pengaturan Backup Harian</h2></div></header>
+        <form action="backup_api.php" method="post" id="database-backup-settings-form">
+          <input type="hidden" name="action" value="settings"><input type="hidden" name="return" value="page">
+          <input type="hidden" name="csrf_token" value="<?= backup_ui_escape($_SESSION['csrf_backup']) ?>">
+          <input type="hidden" name="version" value="<?= (int)$backupSettings['version'] ?>">
+          <div class="dbt-settings-grid">
+            <div><label for="backup-daily-time">Jam Backup (WIB)</label><input id="backup-daily-time" name="daily_time" type="time" step="60" value="<?= backup_ui_escape($backupSettings['daily_time']) ?>" required<?= empty($backupSummary['configured']) ? ' disabled' : '' ?>></div>
+            <div><label for="backup-retention-days">Simpan Cadangan Selama (hari)</label><input id="backup-retention-days" name="retention_days" type="number" min="1" max="365" step="1" value="<?= (int)$backupSettings['retention_days'] ?>" required aria-describedby="backup-retention-hint"<?= empty($backupSummary['configured']) ? ' disabled' : '' ?>></div>
+            <button type="submit" id="backup-settings-save" class="dbt-button dbt-button-primary"<?= empty($backupSummary['configured']) ? ' disabled' : '' ?>>Simpan Pengaturan</button>
+          </div>
+          <p class="dbt-hint" id="backup-retention-hint">1–365 hari. Cadangan otomatis lama dibersihkan setelah backup otomatis baru terverifikasi. Cadangan manual tetap disimpan.</p>
+          <p class="dbt-hint" id="backup-settings-status"><?= !empty($backupSettings['activated']) ? 'Aktif: setiap hari pukul '.backup_ui_escape($backupClock).' WIB · penyimpanan '.(int)$backupSettings['retention_days'].' hari.' : 'Pengaturan belum disimpan. Jadwal tetap 18.00 WIB dan cadangan lama tetap disimpan.' ?></p>
+          <div id="backup-settings-feedback" class="dbt-feedback" role="status" aria-live="polite" hidden></div>
+        </form>
+      </section>
       <div class="dbt-actions">
         <article class="dbt-card">
           <header class="dbt-card-heading"><span class="dbt-icon"><?= backup_ui_icon('download') ?></span><div><h2>Buat Backup Database</h2><p>Cadangan disimpan secara lokal dan diuji sebelum tersedia untuk diunduh.</p></div></header>
@@ -170,7 +188,7 @@ function backup_ui_picker(string $prefix, string $label): void { ?>
           <td><span class="dbt-job-status is-<?= backup_ui_escape($job['state'] ?? 'queued') ?>"><?= backup_ui_escape($backupStates[$job['state'] ?? ''] ?? 'Menunggu') ?></span></td><td><?php if (($job['state'] ?? '') === 'verified' && !empty($job['download_url'])): ?><a class="dbt-button dbt-button-outline dbt-download" href="<?= backup_ui_escape($job['download_url']) ?>"><?= backup_ui_icon('download') ?> Unduh</a><?php else: ?><span class="dbt-hint">—</span><?php endif; ?></td>
         </tr><?php endforeach; ?>
         </tbody></table></div>
-        <p class="dbt-hint">Jika komputer tidak tersedia pukul 18.00 WIB, backup susulan dijalankan setelah layanan kembali tersedia.</p>
+        <p class="dbt-hint">Jika komputer tidak tersedia saat jadwal backup, backup susulan dijalankan setelah layanan kembali tersedia.</p>
       </section>
     </section>
     <section id="panel-legacy" role="tabpanel" aria-labelledby="tab-legacy" hidden>

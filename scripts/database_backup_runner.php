@@ -47,7 +47,7 @@ function db_backup_run_job(array $c,PDO $queue,array $job): void {
         $finished=db_backup_now()->format(DATE_ATOM);
         db_backup_atomic_json($dir.'/manifest.json',['version'=>1,'id'=>$id,'state'=>'verified','archive_name'=>'backup.sql','format'=>'sql','database'=>$c['database'],'source_server_uuid'=>$c['server_uuid'],'type'=>$job['type'],'scheduled_for'=>$job['slot'],'schedule_window'=>db_backup_schedule_window($queue,$job,$c['installed_at']),'created_at'=>$job['created_at'],'finished_at'=>$finished,'archive_sha256'=>$archiveHash,'sql_sha256'=>$sqlHash,'bytes'=>$archiveBytes,'verification'=>$report]);
         db_backup_update($queue,$id,['state'=>'verified','message'=>'Cadangan dan pemulihannya berhasil diverifikasi.','finished_at'=>$finished,'retryable'=>0]);
-        // Only an owned intermediate is removed; the archive and verification are retained forever.
+        // Retention runs separately, after publication; verification failure never removes a good archive.
         if(is_file($dump)&&!is_link($dump)&&hash_equals($sqlHash,hash_file('sha256',$dump)))unlink($dump);
         echo 'VERIFIED '.$id.PHP_EOL;
     }catch(Throwable $e){
@@ -69,6 +69,7 @@ try{
     $GLOBALS['db_backup_heartbeat_file']=$c['storage_root'].'/heartbeat.json';db_backup_atomic_json($GLOBALS['db_backup_heartbeat_file'],['time'=>time(),'pid'=>getmypid()]);$queue=db_backup_store();
     if(in_array('--verify',$argv,true)){
         $id='';foreach($argv as $arg)if(str_starts_with($arg,'--id='))$id=substr($arg,5);
+        db_backup_find($queue,$id);$archiveAccess=db_backup_access_lock($id);
         $archive=db_backup_archive($queue,$id);$dir=db_backup_job_dir($id);$job=db_backup_find($queue,$id);
         if($archive['compressed'])db_backup_expand_archive($archive['file'],$dir.'/dump.sql',$job['sql_sha256']);
         else db_backup_copy_sql($archive['file'],$dir.'/dump.sql',$job['sql_sha256']);
@@ -86,4 +87,14 @@ try{
     db_backup_schedule_job($queue,db_backup_now());
     $job=$queue->query("SELECT * FROM jobs WHERE state='queued' ORDER BY created_at,id LIMIT 1")->fetch(PDO::FETCH_ASSOC);
     if($job)db_backup_run_job($c,$queue,$job);else echo 'No backup due.'.PHP_EOL;
+    // Resumable cleanup also runs on idle ticks, never before a verified automatic replacement.
+    try{
+        $pruned=db_backup_prune($queue);
+        if($pruned['errors'])db_backup_atomic_json($c['storage_root'].'/retention-warning.json',['message'=>'Pembersihan cadangan kedaluwarsa belum selesai. Periksa layanan dan berkas privat.','time'=>time()]);
+        elseif(is_file($c['storage_root'].'/retention-warning.json')){db_backup_private_path($c['storage_root'].'/retention-warning.json');unlink($c['storage_root'].'/retention-warning.json');}
+        if($pruned['expired'])echo 'EXPIRED '.$pruned['expired'].PHP_EOL;
+    }catch(Throwable $e){
+        db_backup_atomic_json($c['storage_root'].'/retention-warning.json',['message'=>'Pembersihan cadangan kedaluwarsa belum selesai. Periksa layanan dan berkas privat.','time'=>time()]);
+        error_log('Backup retention deferred ('.get_class($e).').');
+    }
 }catch(Throwable $e){fwrite(STDERR,$e->getMessage().PHP_EOL);exit(1);}

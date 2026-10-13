@@ -51,9 +51,9 @@ Panduan ini untuk **pemasangan baru di PC Windows**, dengan akses dari jaringan 
    powershell -ExecutionPolicy Bypass -File .\scripts\install_database_backup.ps1 -ConfirmMain -RegisterTask -RunNow
    ```
 
-   Perintah ini memakai lokasi dan versi executable bawaan installer. Jika berbeda, sesuaikan `-PhpExecutable` dan `-MysqlBin` mengikuti [panduan backup](DAILY_DATABASE_BACKUP.md#pemasangan-dan-pemeriksaan). Siapkan kredensial administrator MySQL melalui berkas opsi privat atau environment sesuai panduan tersebut.
+   Pemasang memakai runtime dari konfigurasi existing atau mendeteksi PHP aktif Apache/PATH dan executable MySQL utama. Jika lokasi tidak dapat ditentukan, isi `-PhpExecutable` dan `-MysqlBin` mengikuti [panduan backup](DAILY_DATABASE_BACKUP.md#pemasangan-dan-pemeriksaan). MySQL yang didukung: seri 8.0 mulai 8.0.30 dan seri 8.4. Pastikan PDO SQLite aktif pada PHP Apache maupun CLI. Jika Windows menolak pendaftaran task, jalankan perintah sekali dari PowerShell Administrator dengan akun pemilik yang sama. Siapkan kredensial administrator MySQL melalui berkas opsi privat atau environment sesuai panduan tersebut.
 
-   Jangan menyalin konfigurasi privat atau task backup dari PC pengembangan. Installer membuatnya kembali sesuai identitas PC server. Pastikan backup pertama berstatus **Terverifikasi** dan jadwal berikutnya **18.00 WIB**. Simpan juga salinan backup pada media terpisah.
+   Jangan menyalin konfigurasi privat atau task backup dari PC pengembangan. Installer membuatnya kembali sesuai identitas PC server. Pastikan backup pertama **Terverifikasi**. Pada **Backup & Restore > Pengaturan Backup Harian**, pilih jam WIB dan penyimpanan 1–365 hari, lalu simpan; periksa **Jadwal Berikutnya**. Nilai awal formulir 18.00 WIB/90 hari; sebelum disimpan cadangan lama tetap dipertahankan. Cadangan manual tidak ikut rotasi. Simpan juga salinan backup pada media terpisah.
 
 8. **Siapkan impor data lama jika diperlukan.**
 
