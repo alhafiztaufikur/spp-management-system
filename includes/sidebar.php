@@ -152,7 +152,8 @@ function unitSwitchReportScope(select) {
 <script>
 document.addEventListener('DOMContentLoaded', function () {
   document.querySelectorAll('form[method="post" i]').forEach(function(form){
-    if(form.classList.contains('sidebar-unit-form') || form.classList.contains('dashboard-unit-switch-form') || form.action.includes('logout.php'))return;
+    var action=form.getAttribute('action')||'';
+    if(form.classList.contains('sidebar-unit-form') || form.classList.contains('dashboard-unit-switch-form') || action.includes('logout.php') || (form.id==='database-backup-form' && new URL(action,location.href).pathname.endsWith('/backup_api.php')))return;
     form.querySelectorAll('input,select,textarea,button').forEach(function(control){control.disabled=true});
     form.hidden=true;form.style.setProperty('display','none','important');
     var editor=form.closest('.master-modern-form');if(editor){editor.hidden=true;editor.style.setProperty('display','none','important')}

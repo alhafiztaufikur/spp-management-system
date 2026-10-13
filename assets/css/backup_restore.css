@@ -34,6 +34,8 @@
 .dbt-button-primary { background: var(--accent); color: #fff; border-color: var(--accent); }
 .dbt-button-outline { background: var(--bg-elevated); color: var(--accent); }
 .dbt-button:disabled { cursor: not-allowed; opacity: .55; }
+.dbt-button-primary:hover:not(:disabled) { background: var(--accent-hover); border-color: var(--accent-hover); }
+.dbt-button[aria-busy="true"] { cursor: progress; }
 .dbt-wide { width: 100%; }
 .dbt-hint { font-size: 12px; line-height: 1.6; margin: 10px 0; color: var(--text-secondary); }
 .dbt-hint a { color: var(--accent); text-decoration: underline; }
@@ -54,6 +56,29 @@
 .dbt-history-heading { display: flex; justify-content: space-between; align-items: center; gap: 18px; margin-bottom: 16px; }
 .dbt-history-heading .dbt-card-heading { margin: 0; }
 .dbt-history-controls { display: flex; gap: 10px; }
+.dbt-history-controls { align-items: center; flex-wrap: wrap; }
+.dbt-history-controls select { width: auto; min-width: 145px; }
+.dbt-history-controls button { flex-shrink: 0; }
+.dbt-history-controls .dbt-text-button { white-space: nowrap; }
+.dbt-feedback { padding: 13px 16px; margin-bottom: 18px; border: 1px solid var(--border); border-radius: 10px; font-size: 13px; line-height: 1.6; }
+.dbt-feedback.is-success { background: var(--green-bg); color: var(--green); }
+.dbt-feedback.is-error { background: var(--red-bg); color: var(--red); }
+.dbt-table-scroll tbody td { padding: 13px; vertical-align: top; border-top: 1px solid var(--border); }
+.dbt-table-scroll tbody td:first-child { min-width: 230px; overflow-wrap: anywhere; }
+.dbt-table-scroll tbody td:nth-child(3) { min-width: 145px; }
+.dbt-row-message { display: block; margin-top: 5px; color: var(--text-secondary); font-size: 11px; line-height: 1.6; }
+.dbt-job-status { display: inline-flex; align-items: center; min-height: 28px; padding: 4px 9px; border-radius: 8px; background: var(--accent-glow); color: var(--accent); font-size: 11px; font-weight: 700; white-space: nowrap; }
+.dbt-job-status.is-verified { background: var(--green-bg); color: var(--green); }
+.dbt-job-status.is-failed { background: var(--red-bg); color: var(--red); }
+.dbt-job-status.is-queued { background: var(--orange-bg); color: var(--orange); }
+.dbt-download { text-decoration: none; min-height: 44px; white-space: nowrap; }
+.dbt-backup-progress { border: 1px solid var(--border); border-radius: 12px; padding: 13px 15px; background: var(--bg-surface); margin-top: 15px; }
+.dbt-progress-heading { display: flex; justify-content: space-between; gap: 12px; align-items: center; font-size: 13px; }
+.dbt-backup-progress ol { list-style: none; display: grid; grid-template-columns: repeat(4,minmax(0,1fr)); gap: 8px; padding: 0; margin: 8px 0; }
+.dbt-backup-progress li { font-size: 10px; line-height: 1.5; color: var(--text-secondary); padding-top: 8px; border-top: 3px solid var(--border); }
+.dbt-backup-progress li[aria-current="step"] { color: var(--accent); border-color: var(--accent); font-weight: 700; }
+.dbt-metric > div { min-width: 0; }
+.dbt-metric strong { overflow-wrap: anywhere; }
 .db-tools-page input, .db-tools-page select, .dbt-dialog input[type="text"] { font: inherit; color: var(--text-primary); background: var(--bg-surface); border: 1px solid var(--border); border-radius: 9px; padding: 11px 12px; min-height: 44px; max-width: 100%; }
 .dbt-history-controls input { width: 220px; }
 .db-tools-page input:disabled, .db-tools-page select:disabled { opacity: .55; cursor: not-allowed; }
@@ -89,6 +114,7 @@
 .dbt-dialog input[type="text"] { width: 100%; }
 .dbt-dialog-actions { display: flex; justify-content: flex-end; flex-wrap: wrap; gap: 12px; margin-top: 20px; }
 .db-tools-page button:focus-visible, .db-tools-page a:focus-visible, .db-tools-page select:focus-visible, .dbt-dialog button:focus-visible, .dbt-dialog input:focus-visible { outline: 2px solid var(--accent); outline-offset: 3px; }
+.db-tools-page input:focus-visible { outline: 2px solid var(--accent); outline-offset: 3px; }
 @media (max-width: 1150px) {
   .dbt-metrics { grid-template-columns: repeat(2,minmax(0,1fr)); }
   .dbt-history-heading { align-items: flex-start; flex-direction: column; }
@@ -103,6 +129,7 @@
   .dbt-card { padding: 18px; }
   .dbt-history-controls { width: 100%; flex-wrap: wrap; }
   .dbt-history-controls input { width: 100%; }
+  .dbt-history-controls select { flex: 1; }
   .dbt-file-summary { flex-wrap: wrap; }
   .dbt-file-summary > div { flex-basis: calc(100% - 38px); }
   .dbt-dialog-content { padding: 20px; }
@@ -112,10 +139,15 @@
   .dbt-tabs { width: 100%; }
   .dbt-tabs button { flex: 1; padding: 12px 9px; }
   .dbt-dialog-actions { flex-direction: column-reverse; }
+  .dbt-backup-progress ol { grid-template-columns: repeat(2,minmax(0,1fr)); }
   .dbt-empty-content { max-width: calc(100vw - 126px); margin: 0; }
 }
 
 /* Legacy job state, isolated from shared application CSS. */
+.dbt-history-controls > .spp-select { width: 160px; flex: 0 0 160px; }
+@media (max-width: 760px) {
+  .dbt-history-controls > .spp-select { width: auto; flex: 1 1 145px; }
+}
 #legacy-dialog { width:min(960px,calc(100% - 32px)); }
 #legacy-dialog progress { width:100%;height:14px;accent-color:var(--accent); }
 #legacy-dialog td { padding:10px;vertical-align:top;border-top:1px solid var(--border); }

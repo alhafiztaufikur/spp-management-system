@@ -150,7 +150,8 @@ function unit_guard_request(): void {
     if (!unit_all_readonly()) return;
     $koneksi = $GLOBALS['koneksi'];
     // Export POST only stores a validated read selection; it never mutates financial data.
-    $allowed = ['unit_switch.php', 'logout.php', 'role_management.php', 'otorisasi_export_pdf.php'];
+    // Backup POST only queues an all-database snapshot; endpoint rechecks Super Admin and CSRF.
+    $allowed = ['unit_switch.php', 'logout.php', 'role_management.php', 'otorisasi_export_pdf.php', 'backup_api.php'];
     if (($_SERVER['REQUEST_METHOD'] ?? 'GET') !== 'GET'
         && !in_array(basename($path), $allowed, true)) {
         http_response_code(409);

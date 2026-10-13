@@ -12,6 +12,7 @@ sql/*
 tests
 tmp
 temp
+deployment
 vendor
 *.log
 *.md

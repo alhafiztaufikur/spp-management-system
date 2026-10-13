@@ -2,6 +2,39 @@
 
 File ini mencatat perubahan proyek secara reverse chronological. Baca [PROJECT_CONTEXT.md](./PROJECT_CONTEXT.md) terlebih dahulu untuk memahami arsitektur, aturan bisnis, dan kewajiban dokumentasi.
 
+## 2026-10-13 - Paket deployment lokal dan database bersih
+
+- Aktor: Codex, permintaan pemilik untuk ZIP aplikasi, SQL bersih, pengecualian Git dan push source code.
+- Paket lokal `deployment/`: aplikasi termasuk pustaka PHP, SQL `db_spp` final, 16 akun awal dengan kata sandi acak baru, panduan impor paket, contoh pembatasan Apache, manifest dan checksum. Folder dikecualikan dari Git dan build Docker; SQL/kredensial tidak masuk commit. ZIP dibentuk dari berkas source yang tercatat Git serta `vendor`, tanpa `.git`, penyimpanan privat atau artefak QA.
+- Database: dibuat dari bootstrap produksi dan migrasi multiunit pada instance MySQL terisolasi; hanya master unit/kelas, akun baru dan penanda migrasi struktur yang terisi. Seluruh siswa, tahun, tarif, tagihan, pembayaran, Tabungan dan histori kosong. Definer SQL memakai `CURRENT_USER` agar mengikuti administrator pengimpor di PC tujuan. Panduan membedakan impor SQL paket yang sudah final dari bootstrap database kosong.
+- Verifikasi: SQL 276.210 byte dipulihkan pada instance terpisah; 36 tabel, 31 view, satu routine dan 89 trigger, 64 FK/19 CHECK, health dan integritas lulus. Jumlah serta fingerprint seluruh tabel hasil pemulihan identik dengan database bersih sumber; 16 kata sandi awal cocok dengan hash akun. Platform dependensi PHP dan sintaks contoh Apache lulus. Database operasional seluruh tabel tetap identik.
+- Perlindungan lokal: ACL folder paket dibatasi kepada pemilik Windows, SYSTEM dan Administrators; pembatasan direktori Apache dimuat melalui graceful reload dan akses HTTP langsung SQL/kredensial menghasilkan 403. Penyiapan pada PC yayasan tetap mengikuti panduan dan pengujian di komputer tujuan; tidak ada migrasi database operasional.
+
+## 2026-10-13 - Panduan ringkas pemasangan PC yayasan
+
+- Aktor: Codex, permintaan pemilik untuk tata cara deployment dengan bahasa sederhana.
+- Dokumentasi: menambahkan [panduan PC yayasan](DEPLOY_PC_YAYASAN.md), mencakup runtime/dependensi, instalasi database kosong hingga akun unit, koneksi, startup dan jaringan, pengaturan sekolah, backup harian, Import Legacy opsional, serta pemeriksaan sebelum digunakan. Perintah database terperinci merujuk runbook existing agar konfirmasi target dan prasyarat backup tetap berlaku.
+- Verifikasi: urutan dicocokkan dengan bootstrap, migrasi multiunit, bootstrap akun, konfigurasi koneksi, serta installer backup saat ini. Tautan lokal dan pemeriksaan diff diperiksa. Tidak ada perubahan kode, database, atau konfigurasi server; pemasangan di PC yayasan belum dilakukan.
+
+## 2026-10-13 - Format SQL biasa dan aktivasi task pencadangan
+
+- Aktor: Codex, permintaan lanjutan pemilik untuk berkas backup dan unduhan `.sql`, serta penyelesaian pemasangan task lokal.
+- Format: cadangan baru menggunakan SQL biasa; unduhan web mengirim `.sql`. Arsip `.sql.gz` lama tetap dipertahankan, dibaca dan diperiksa integritasnya untuk unduhan SQL serta verifikasi ulang. Pemeriksaan Super Admin aktif, CSRF, checksum, antrean dan pemulihan terisolasi tetap berlaku; Restore web tetap nonaktif.
+- Pemasangan: task sudah dipasang oleh pemilik, menggunakan trigger harian 18.00 WIB, antrean per menit dan startup berjeda satu menit, S4U/hak terbatas. Pemeriksaan pemilik memakai SID Windows sehingga principal bernama singkat dan nama akun lengkap yang merujuk akun yang sama tidak ditolak saat pemasang dijalankan ulang. Pemasang menggunakan kembali task miliknya dengan jadwal/pengamanan yang sesuai; pengulangan `-ConfirmMain -RegisterTask -RunNow` selesai dengan kode `0` tanpa UAC tambahan. Task hilang atau jadwal tidak sesuai memerlukan perbaikan Administrator. Catatan task belum aktif pada entri sebelumnya merupakan kondisi historis sebelum pemasangan berhasil.
+- Database/migrasi: tidak ada migrasi aplikasi; pencadangan membaca seluruh unit tanpa menulis data siswa, tagihan atau keuangan. Kredensial, dump dan artefak pengujian tetap berada di penyimpanan privat di luar Git/webroot.
+- Verifikasi salinan: 108 permintaan API serta snapshot/pemulihan SQL biasa lulus. Unduhan SQL dari gzip lama, cache berchecksum dan verifikasi ulang gzip lulus. Normalisasi skema lulus 35 kasus dan perbandingan inventaris sumber/pemulihan; pemeriksaan pemasang/identitas/jadwal lulus 34 kasus. Browser memakai nama berkas `.sql`, tanpa perubahan tata letak.
+- Task aktual: pekerjaan Susulan `e3c690811c6335a267448807e7fd4633`, untuk jadwal 12 Oktober pukul 18.00 WIB, dibuat melalui task pada 13 Oktober pukul 10.30.35 dan selesai Terverifikasi pukul 10.30.55 WIB. Berkas `jobs/<id>/backup.sql` berukuran 10.940.780 byte, dengan nama unduhan SQL bertimestamp. Hasil task `0`, layanan siap, peringatan kosong dan jadwal berikutnya 13 Oktober pukul 18.00 WIB. Tiga percobaan gzip awal yang gagal tetap dipertahankan; perbedaan representasi definisi skema pada audit telah dinormalisasi tanpa mengubah data sumber.
+- Dokumentasi: runbook dan konteks proyek diselaraskan dengan format aktif serta status pemasangan; entri awal tetap dipertahankan.
+
+## 2026-10-13 - Backup lokal harian terverifikasi
+
+- Aktor: Codex, berdasarkan rencana pemilik untuk backup seluruh `db_spp` pukul 18.00 WIB, susulan, tanpa penghapusan otomatis dan Restore web nonaktif.
+- Implementasi: antrean SQLite privat, lock manual/terjadwal, snapshot InnoDB penuh termasuk objek skema, gzip/checksum/publikasi atomik, retry 15 menit dan pencatatan rentang jadwal terlewat. Setiap arsip dipulihkan pada instance loopback terpisah dengan nama database asli, event scheduler OFF serta pemeriksaan UUID/datadir/PID sebelum impor/pembersihan. Audit FK/CHECK/health/keuangan/unit dan fingerprint bertahap menentukan status Terverifikasi.
+- Antarmuka: backup manual, status, riwayat/pencarian/filter dan unduhan khusus Super Admin aktif pada seluruh pilihan sidebar, termasuk Semua Unit. CSRF, idempotensi, validasi ulang aktor, checksum unduhan dan peringatan dashboard diterapkan. Formulir tanpa JavaScript tersedia; Restore/Import Legacy tetap mengikuti batas sebelumnya.
+- Pemasangan: installer berulang memakai jurnal kepemilikan, akun MySQL ekspor tanpa DML, ACL privat dan task S4U hak terbatas dengan trigger harian/menit/startup. Konfigurasi/akun/antrean lokal sudah disiapkan. **Task belum aktif:** Windows menolak pendaftaran biasa dan permintaan UAC dibatalkan. Aktivasi `-RegisterTask -RunNow` masih membutuhkan Administrator; backup pertama melalui task belum dijalankan.
+- Verifikasi: model jadwal/susulan/retry/ruang/idempotensi, 105 permintaan API, 24 kombinasi UI, backup/pemulihan nyata dengan grant minimum, kegagalan sumber/disk/dump/skema/verifikasi, lock bersamaan, gzip rusak dan pemulihan proses terputus lulus pada salinan/instance terisolasi. Verifikasi ulang arsip nyata dan fingerprint memori terbatas lulus. Data operasional seluruh tabel identik sebelum/sesudah; tidak ada migrasi aplikasi. Artefak/kredensial di luar Git.
+- Dokumentasi: [runbook pemasangan, diagnosis dan latihan pemulihan](DAILY_DATABASE_BACKUP.md), konteks proyek dan tes diperbarui. Cadangan pada disk yang sama tetap memerlukan salinan media lain untuk perlindungan terhadap kehilangan disk.
+
 
 ## 2026-10-12 - Warna ringkasan, perapihan master, dan hapus akun tanpa riwayat
 
