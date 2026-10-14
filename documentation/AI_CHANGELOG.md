@@ -2,6 +2,14 @@
 
 File ini mencatat perubahan proyek secara reverse chronological. Baca [PROJECT_CONTEXT.md](./PROJECT_CONTEXT.md) terlebih dahulu untuk memahami arsitektur, aturan bisnis, dan kewajiban dokumentasi.
 
+## 2026-10-14 - Menyusun ulang manual pengguna lengkap dengan screenshot
+
+- Manual HTML dan PDF edisi 14 Oktober 2026 disusun ulang menjadi 46 bab: panduan cepat, empat peran/unit, seluruh menu operasional, penempatan PSB, kenaikan/kelulusan, tiga tab SPP, sembilan Laporan Global, surat dan editor pesan, akun, backup, pemulihan, alur harian/tahunan, serta solusi kendala. Bab berulang dan instruksi Titipan SPP/mode Advanced yang sudah tidak berlaku dihapus dari manual aktif; catatan perubahan historis tetap dipertahankan.
+- Setiap panduan menu menjelaskan fungsi, hak pengguna, persiapan, langkah, hasil, dan kendala. Aturan Administrator/Kasir mengajukan koreksi transaksi miliknya, keputusan Super Admin, cakupan baca Laporan Global, batas hapus akun, buku A5 potret/A6 lanskap, dan pemulihan SQL terverifikasi dijelaskan sesuai implementasi aktif. Manual tidak mencantumkan password atau menjanjikan impor sembarang SQL.
+- Sebanyak 26 screenshot diambil melalui peladen loopback dengan database baru `db_spp_audit_manual_20261014`, installer bersih, seeder fiktif dan sesi privat. Semua POST aplikasi diblokir saat pengambilan gambar. Gambar hasil pemulihan menggunakan controller aktif dengan respons pekerjaan simulasi, ditandai sebagai ilustrasi; tidak ada pemulihan operasional yang dilakukan.
+- HTML responsif memiliki daftar isi dan navigasi bab. PDF A4 59 halaman memakai teks isi 10,5 pt, pembuka bab/gambar yang dijaga bersama, header tabel berulang dan nomor halaman. Pembentuk PDF hanya membaca aset lokal; daftar isi dihitung dari posisi bab sebenarnya dan disimpan kembali ke HTML. Tautan lokal sistem berkas tidak disertakan pada PDF portabel.
+- Verifikasi: 220 pemeriksaan baca mencocokkan akses 19 menu pada empat peran serta sembilan laporan pada empat cakupan unit/empat peran. HTML diperiksa pada lebar 320/390/768/1440 px, semua 26 gambar dan tautan internal; PDF dibaca kembali, seluruh 46 tujuan daftar isi, gambar, nomor halaman dan batas teks sesuai, lalu seluruh halaman diperiksa melalui raster. Pemeriksaan sintaks dan diff lulus. Data operasional tidak diubah; tidak ada perubahan fitur, API, hak akses, migrasi database, commit atau push.
+
 ## 2026-10-13 - Mengaktifkan pemulihan database dengan pemeriksaan dan backup pengaman
 
 - Aktor: Codex, menindaklanjuti tombol Pulihkan Database yang sebelumnya hanya berupa pratinjau dan melanjutkan pekerjaan yang diminta pemilik.
