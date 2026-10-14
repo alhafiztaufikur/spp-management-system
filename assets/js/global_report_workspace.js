@@ -3,7 +3,7 @@
   document.querySelectorAll('[data-student-search]').forEach(input => {
     input.addEventListener('blur', () => setTimeout(() => {
       const box = input.closest('.student-combobox');
-      if (box && !box.contains(document.activeElement)) window.closeStudentSearchPanel?.(input);
+      if (box && !(window.sppFloatingPanels?.contains(box,document.activeElement) ?? box.contains(document.activeElement))) window.closeStudentSearchPanel?.(input);
     }, 0));
   });
 })();
