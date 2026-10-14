@@ -7,6 +7,8 @@
 
 SistemSPP adalah aplikasi administrasi pembayaran sekolah berbasis PHP, JavaScript, dan MySQL (`mysqli`). Dokumen ini merangkum alur aktif. Untuk rincian teknis, kode dan schema adalah sumber kebenaran; [AI_CHANGELOG.md](./AI_CHANGELOG.md) adalah arsip perubahan, bukan panduan operasional.
 
+Perbaikan dropdown 14 Oktober menyatukan posisi menu select, pemilih kelas/tahun/Daftar Ulang, rentang laporan dan pencarian siswa. Popover digunakan jika didukung; browser lama memakai lapisan cadangan yang mempertahankan form, warna unit dan panel bertingkat. Posisi mengikuti viewport visual, scroll dan perubahan ukuran, dengan pembukaan ke atas jika ruang bawah sempit. Chromium 109 menjadi acuan kompatibilitas browser Windows 7; bukti pengujian dan batas perangkat fisik ada dalam [catatan dropdown](DROPDOWN_COMPATIBILITY_20261014.md). Tidak ada perubahan database.
+
 Untuk pemasangan baru pada server Windows di jaringan yayasan, gunakan [panduan ringkas PC yayasan](DEPLOY_PC_YAYASAN.md). Panduan memisahkan penyiapan database dan akun awal, layanan/jaringan, serta pemasangan backup khusus PC tujuan; penerapan pada komputer yayasan tetap perlu diverifikasi di sana.
 
 Paket transfer lokal berada pada `deployment/` dan dikecualikan dari Git/Docker: ZIP source beserta `vendor`, SQL bersih final `db_spp`, akun awal privat, panduan paket serta checksum/manifest. SQL dibuat melalui instalasi baru terisolasi, tanpa siswa/transaksi; struktur tiga unit dan 16 akun baru sudah siap. Impor SQL paket tidak menjalankan ulang bootstrap/migrasi akun. Artefak serta kredensial tetap di luar commit; panduan pemasangan dicatat di repository.

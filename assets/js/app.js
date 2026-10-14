@@ -357,18 +357,22 @@ function selectStudentSearchOption(input, opt) {
 
 function closeStudentSearchPanel(input) {
   const box = input?.closest('.student-combobox');
-  const panel = box?.querySelector('.student-search-panel');
+  const panel = input?._studentSearchPanel || box?.querySelector('.student-search-panel');
   if (!panel) return;
   panel.hidden = true;
+  window.sppFloatingPanels?.hide(panel);
   panel.innerHTML = '';
   input.setAttribute('aria-expanded', 'false');
 }
 
 function fitStudentSearchPanel(input) {
-  if (input.dataset.studentFitViewport !== '1') return;
   const box = input.closest('.student-combobox');
-  const panel = box?.querySelector('.student-search-panel');
+  const panel = input?._studentSearchPanel || box?.querySelector('.student-search-panel');
   if (!panel || panel.hidden) return;
+  if (window.sppFloatingPanels) {
+    window.sppFloatingPanels.show(panel, input, {maxHeight:320,onClose:()=>closeStudentSearchPanel(input)});
+    return;
+  }
   const rect = box.getBoundingClientRect();
   const viewport = window.visualViewport;
   const bottom = viewport ? viewport.offsetTop + viewport.height : window.innerHeight;
@@ -385,7 +389,7 @@ function renderStudentSearchPanel(input, forceAll) {
   const listId = input.dataset.studentList || input.getAttribute('list') || 'siswa-list';
   const list = document.getElementById(listId);
   const box = input.closest('.student-combobox');
-  const panel = box?.querySelector('.student-search-panel');
+  const panel = input?._studentSearchPanel || box?.querySelector('.student-search-panel');
   if (!list || !box || !panel) return;
   if (input.dataset.studentSuppressPanel === '1') return;
 
@@ -481,6 +485,7 @@ function initStudentSearchInput(input) {
   box.classList.add('student-combobox');
   const panel = document.createElement('div');
   panel.className = 'student-search-panel';
+  input._studentSearchPanel = panel;
   panel.hidden = true;
   box.appendChild(panel);
   if (input.dataset.studentFitViewport === '1') {
@@ -536,7 +541,7 @@ function initStudentSearchInput(input) {
     first.dispatchEvent(new MouseEvent('mousedown', { bubbles: true, cancelable: true }));
   });
   document.addEventListener('mousedown', function (event) {
-    if (!box.contains(event.target)) closeStudentSearchPanel(input);
+    if (!(window.sppFloatingPanels?.contains(box,event.target) ?? box.contains(event.target))) closeStudentSearchPanel(input);
   });
 }
 
@@ -1061,7 +1066,7 @@ function refreshDaftarUlangSelector(opt) {
       }
     });
     document.addEventListener('click', event => {
-      if (!event.target.closest('.du-bill-selector')) {
+      if (!(window.sppFloatingPanels?.contains(trigger.closest('.du-bill-selector'),event.target) ?? event.target.closest('.du-bill-selector'))) {
         menu.hidden = true;
         trigger.setAttribute('aria-expanded', 'false');
       }
@@ -2060,6 +2065,7 @@ document.addEventListener('DOMContentLoaded', function () {
 
   document.querySelectorAll('.payment-year-picker').forEach(picker => {
     const input = picker.querySelector('.payment-year-select');
+    const yearPanel = picker.querySelector('.payment-year-options');
     const options = Array.from(picker.querySelectorAll('.payment-year-option'));
     if (!input || !options.length) return;
 
@@ -2076,7 +2082,7 @@ document.addEventListener('DOMContentLoaded', function () {
       const activeOption = syncActiveYear();
       picker.classList.add('is-open');
       requestAnimationFrame(() => {
-        if (!picker.querySelector('[data-spp-legacy-ready]')) (activeOption || options[0]).scrollIntoView({ block: 'nearest' });
+        if (!yearPanel?.dataset.sppLegacyReady) (activeOption || options[0]).scrollIntoView({ block: 'nearest' });
       });
     };
     const closePicker = () => picker.classList.remove('is-open');
@@ -2100,7 +2106,7 @@ document.addEventListener('DOMContentLoaded', function () {
       });
     });
     document.addEventListener('click', event => {
-      if (!picker.contains(event.target)) closePicker();
+      if (!(window.sppFloatingPanels?.contains(picker,event.target) ?? picker.contains(event.target))) closePicker();
     });
     syncActiveYear();
   });
@@ -2794,10 +2800,11 @@ function reportRangeDisplayLabel(startValue, endValue, emptyLabel) {
 }
 
 function closeReportDateRangePicker(picker) {
-  const popover = picker?.querySelector('.report-date-range-popover');
+  const popover = picker?._rangePanel || picker?.querySelector('.report-date-range-popover');
   const button = picker?.querySelector('.report-date-range-button');
   if (!popover || !button) return;
   popover.hidden = true;
+  window.sppFloatingPanels?.hide(popover);
   picker.classList.remove('is-open');
   picker.closest('.report-filter-card')?.classList.remove('is-date-picker-open');
   button.setAttribute('aria-expanded', 'false');
@@ -2811,6 +2818,7 @@ function initReportDateRangePickers() {
     const button = picker.querySelector('.report-date-range-button');
     const valueLabel = picker.querySelector('.report-date-range-value');
     const popover = picker.querySelector('.report-date-range-popover');
+    picker._rangePanel = popover;
     const hiddenStart = picker.querySelector('input[type="hidden"][name="tanggal_awal"]');
     const hiddenEnd = picker.querySelector('input[type="hidden"][name="tanggal_akhir"]');
     const startInput = picker.querySelector('[data-range-start]');
@@ -2848,8 +2856,9 @@ function initReportDateRangePickers() {
       picker.closest('.report-filter-card')?.classList.toggle('is-date-picker-open', willOpen);
       button.setAttribute('aria-expanded', willOpen ? 'true' : 'false');
       if (willOpen) {
+        window.sppFloatingPanels?.show(popover,button,{minWidth:320,onClose:()=>closeReportDateRangePicker(picker)});
         syncInputsFromHidden();
-        setTimeout(() => startInput.focus(), 0);
+        setTimeout(() => {if(!popover.hidden)startInput.focus({preventScroll:true});}, 0);
       }
     });
 
@@ -2871,19 +2880,21 @@ function initReportDateRangePickers() {
 }
 
 function closeReportMonthRangePicker(picker) {
-  const popover = picker?.querySelector('.report-month-range-popover');
+  const popover = picker?._rangePanel || picker?.querySelector('.report-month-range-popover');
   const button = picker?.querySelector('.report-month-range-button');
   if (!popover || !button) return;
   popover.hidden = true;
+  window.sppFloatingPanels?.hide(popover);
   picker.classList.remove('is-open');
   button.setAttribute('aria-expanded', 'false');
 }
 
 function closeReportYearRangePicker(picker) {
-  const popover = picker?.querySelector('.report-year-range-popover');
+  const popover = picker?._rangePanel || picker?.querySelector('.report-year-range-popover');
   const button = picker?.querySelector('.report-year-range-button');
   if (!popover || !button) return;
   popover.hidden = true;
+  window.sppFloatingPanels?.hide(popover);
   picker.classList.remove('is-open');
   button.setAttribute('aria-expanded', 'false');
 }
@@ -2901,6 +2912,7 @@ function initReportMonthRangePickers() {
     const button = picker.querySelector('.report-month-range-button');
     const valueLabel = picker.querySelector('.report-month-range-value');
     const popover = picker.querySelector('.report-month-range-popover');
+    picker._rangePanel = popover;
     const hiddenStart = picker.querySelector('input[type="hidden"][name="bulan_awal"]');
     const hiddenEnd = picker.querySelector('input[type="hidden"][name="bulan_akhir"]');
     const startInput = picker.querySelector('[data-month-range-start]');
@@ -2933,7 +2945,10 @@ function initReportMonthRangePickers() {
       popover.hidden = !willOpen;
       picker.classList.toggle('is-open', willOpen);
       button.setAttribute('aria-expanded', willOpen ? 'true' : 'false');
-      if (willOpen) setTimeout(() => startInput.focus(), 0);
+      if (willOpen) {
+        window.sppFloatingPanels?.show(popover,button,{minWidth:300,onClose:()=>closeReportMonthRangePicker(picker)});
+        setTimeout(() => {if(!popover.hidden)startInput.focus({preventScroll:true});}, 0);
+      }
     });
     [startInput, endInput].forEach(input => input.addEventListener('keydown', event => {
       if (event.key === 'Enter') {
@@ -2952,6 +2967,7 @@ function initReportYearRangePickers() {
     const button = picker.querySelector('.report-year-range-button');
     const valueLabel = picker.querySelector('.report-year-range-value');
     const popover = picker.querySelector('.report-year-range-popover');
+    picker._rangePanel = popover;
     const hiddenStart = picker.querySelector('input[type="hidden"][name="tahun_awal"]');
     const hiddenEnd = picker.querySelector('input[type="hidden"][name="tahun_akhir"]');
     const startInput = picker.querySelector('[data-year-range-start]');
@@ -2987,7 +3003,10 @@ function initReportYearRangePickers() {
       popover.hidden = !willOpen;
       picker.classList.toggle('is-open', willOpen);
       button.setAttribute('aria-expanded', willOpen ? 'true' : 'false');
-      if (willOpen) setTimeout(() => startInput.focus(), 0);
+      if (willOpen) {
+        window.sppFloatingPanels?.show(popover,button,{minWidth:300,onClose:()=>closeReportYearRangePicker(picker)});
+        setTimeout(() => {if(!popover.hidden)startInput.focus({preventScroll:true});}, 0);
+      }
     });
     [startInput, endInput].forEach(input => input.addEventListener('keydown', event => {
       if (event.key === 'Enter') {
@@ -3005,13 +3024,13 @@ document.addEventListener('DOMContentLoaded', function () {
   initReportYearRangePickers();
   document.addEventListener('mousedown', function (event) {
     document.querySelectorAll('[data-range-picker]').forEach(picker => {
-      if (!picker.contains(event.target)) closeReportDateRangePicker(picker);
+      if (!(window.sppFloatingPanels?.contains(picker,event.target) ?? picker.contains(event.target))) closeReportDateRangePicker(picker);
     });
     document.querySelectorAll('[data-month-range-picker]').forEach(picker => {
-      if (!picker.contains(event.target)) closeReportMonthRangePicker(picker);
+      if (!(window.sppFloatingPanels?.contains(picker,event.target) ?? picker.contains(event.target))) closeReportMonthRangePicker(picker);
     });
     document.querySelectorAll('[data-year-range-picker]').forEach(picker => {
-      if (!picker.contains(event.target)) closeReportYearRangePicker(picker);
+      if (!(window.sppFloatingPanels?.contains(picker,event.target) ?? picker.contains(event.target))) closeReportYearRangePicker(picker);
     });
   });
   document.addEventListener('keydown', function (event) {

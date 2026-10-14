@@ -2,6 +2,15 @@
 
 File ini mencatat perubahan proyek secara reverse chronological. Baca [PROJECT_CONTEXT.md](./PROJECT_CONTEXT.md) terlebih dahulu untuk memahami arsitektur, aturan bisnis, dan kewajiban dokumentasi.
 
+## 2026-10-14 - Memperbaiki posisi dropdown pada browser lama dan layar responsif
+
+- Masalah posisi berhasil direproduksi pada Chromium 109: koordinat viewport diterapkan pada menu di dalam panel bertransformasi. Selector `:popover-open` yang tidak didukung juga dapat menghentikan alur buka/tutup.
+- Komponen posisi bersama memakai Popover bila didukung dan lapisan cadangan di luar panel induk bila tidak tersedia. Menu mengikuti kolom, memilih bawah/atas sesuai ruang, dibatasi viewport visual dan mengikuti gulir/perubahan ukuran/isi. Modal, form asal, warna unit dan panel bertingkat dipertahankan; kontrol yang hilang atau keluar layar menutup menunya.
+- Pemilih kelas/tahun/Daftar Ulang, select tunggal/multipilihan, panel rentang laporan dan pencarian siswa terintegrasi. Caption tidak ditulis ulang saat nilainya sama agar klik WebKit tetap diterima; fokus menggunakan preventScroll untuk menjaga target mouse Firefox. Blur pencarian laporan mengenali panel yang dipindahkan.
+- Tes komponen, audit halaman aplikasi, hasil filter versus query independen, dan formulir tanpa JavaScript ditambahkan. Seluruh pengujian aplikasi memakai instance MySQL salinan; runtime browser, cakupan dan keterbatasan perangkat fisik dijelaskan dalam [catatan kompatibilitas](DROPDOWN_COMPATIBILITY_20261014.md).
+- Hasil: 515 pemeriksaan posisi/sentuh komponen, 6.090 pemeriksaan dropdown aplikasi pada Chrome/Edge/Firefox/WebKit/Chromium 109, serta 66 pemeriksaan tambahan edit/aktivasi/tampilan terbuka lulus. Filter empat cakupan, reload/pagination dan form native lulus; fingerprint seluruh 36 tabel operasional identik.
+- Tidak ada migrasi, perubahan transaksi/hak akses atau pembaruan ZIP deployment. Kredensial, SQL, log dan screenshot QA tetap di luar Git.
+
 ## 2026-10-13 - Mengaktifkan pemulihan database dengan pemeriksaan dan backup pengaman
 
 - Aktor: Codex, menindaklanjuti tombol Pulihkan Database yang sebelumnya hanya berupa pratinjau dan melanjutkan pekerjaan yang diminta pemilik.

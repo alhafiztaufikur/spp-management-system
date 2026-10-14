@@ -824,7 +824,7 @@ $sppRatesByGrade=[];[$firstGrade,$lastGrade]=unit_level_bounds();foreach(range($
           document.getElementById('student-spp-year').textContent=this.dataset.sppYear||'Belum disiapkan';
           updateDerived();
           classLabel.textContent = this.dataset.label || '-- Pilih Kelas/Rombel --';
-          classPicker.querySelectorAll('[data-class-picker-option]').forEach(item => {
+          classPanel.querySelectorAll('[data-class-picker-option]').forEach(item => {
             const selected = item === this;
             item.classList.toggle('is-selected', selected);
             item.setAttribute('aria-selected', selected ? 'true' : 'false');
@@ -833,7 +833,7 @@ $sppRatesByGrade=[];[$firstGrade,$lastGrade]=unit_level_bounds();foreach(range($
         });
       });
       document.addEventListener('click', function (event) {
-        if (classPicker && !classPicker.contains(event.target)) closeClassPicker();
+        if (classPicker && !(window.sppFloatingPanels?.contains(classPicker,event.target) ?? classPicker.contains(event.target))) closeClassPicker();
       });
       document.addEventListener('keydown', function (event) {
         if (event.key === 'Escape') closeClassPicker();
@@ -852,7 +852,7 @@ $sppRatesByGrade=[];[$firstGrade,$lastGrade]=unit_level_bounds();foreach(range($
         classInput.value = '';
         classLabel.textContent = '-- Pilih Kelas/Rombel --';
         classPicker.classList.remove('has-error');
-        classPicker.querySelectorAll('[data-class-picker-option]').forEach(option => {
+        classPanel.querySelectorAll('[data-class-picker-option]').forEach(option => {
           option.classList.remove('is-selected');
           option.setAttribute('aria-selected', 'false');
         });
