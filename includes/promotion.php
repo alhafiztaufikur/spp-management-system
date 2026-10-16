@@ -53,7 +53,7 @@ function promotion_actor_lock(mysqli $db):array {
         $id=(int)($db->query("SELECT id FROM admin WHERE role='super_admin' AND is_active=1 LIMIT 1")->fetch_row()[0]??0);
     }
     $s=$db->prepare('SELECT id,nama,role,unit_id,is_active FROM admin WHERE id=? FOR UPDATE');$s->bind_param('i',$id);$s->execute();$actor=$s->get_result()->fetch_assoc();$s->close();
-    if(!in_array($unit,[1,2,3],true)||!$actor||!(int)$actor['is_active']||!in_array($actor['role'],['super_admin','admin','kasir'],true)||($actor['role']!=='super_admin'&&(int)$actor['unit_id']!==$unit))throw new RuntimeException('Hak proses atau unit akun sudah berubah.');
+    if(!in_array($unit,[1,2,3],true)||!$actor||!(int)$actor['is_active']||!operational_role($actor['role']))throw new RuntimeException('Hak proses atau unit akun sudah berubah.');
     return $actor;
 }
 function promotion_lock_student(mysqli $db,string $nis):array {

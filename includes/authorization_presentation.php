@@ -44,7 +44,7 @@ function authorization_read_unit(mysqli $db, $raw): int {
     if (!is_scalar($raw) || !preg_match('/^[1-3]$/D',(string)$raw)) throw new InvalidArgumentException('Unit tidak valid.');
     $unit=(int)$raw;
     if ($scope!==0 && $unit!==$scope) throw new RuntimeException('Riwayat tidak ditemukan pada cakupan akses Anda.');
-    if ($scope===0 && !unit_is_super()) throw new RuntimeException('Akses tidak diizinkan.');
+    if ($scope===0 && !operational_role()) throw new RuntimeException('Akses tidak diizinkan.');
     unit_set_context($db,$unit); return $unit;
 }
 function authorization_event_model(array $e): array {

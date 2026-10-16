@@ -142,7 +142,7 @@ h3{font-size:12px;color:#<?= $documentPalette[0] ?>}.data tfoot th,.data tfoot t
  .billing-export-overview strong{font-size:10pt}.billing-export-overview span{font-size:8pt}.billing-export-note{font-size:8pt}.kop h1{font-size:13pt}.kop p,.meta td,.title div{font-size:8pt}.title h2{font-size:15pt}.title p{margin:3px 0}
  h3,.report-section-heading h3{font-size:10pt}.data th,.data td{font-size:9pt;padding:5pt 4pt;line-height:1.3}
  .report-matrix-print th,.report-matrix-print td,.report-matrix-print .money{font-size:9pt;padding:5pt 4pt}
- .report-matrix-print .report-secondary-id,.report-matrix-print .matrix-group-period{font-size:8pt}.report-matrix-print .matrix-detail{font-size:9pt}
+ .report-matrix-print .report-secondary-id,.report-matrix-print .matrix-group-period{font-size:9pt}.report-matrix-print .matrix-detail{font-size:9pt}
  .report-matrix-print .matrix-identity{position:static!important;left:auto!important}
  .report-matrix-print th{background:#e5eee9!important;color:#17231d!important;font-weight:bold;border-color:#7a9186}
  .report-matrix-print tfoot th,.report-matrix-print tfoot td{font-size:9pt}.report-matrix-print .badge-nis,.report-matrix-print .kelas-badge,.report-matrix-print .report-status{padding:1pt 2pt;color:#17231d!important;background:transparent!important;border:0}

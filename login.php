@@ -58,7 +58,7 @@ if ($_SERVER['REQUEST_METHOD'] === 'POST') {
             $_SESSION['active_unit_id'] = $admin['role'] === 'super_admin' ? 1 : (int)$admin['unit_id'];
 
             if ($admin['role'] === 'kasir') {
-                $loginRedirect = 'tabungan/masuk.php';
+                $loginRedirect = 'dashboard.php';
             } elseif ($admin['role'] === 'bendahara') {
                 $loginRedirect = 'laporan/index.php';
             } else {

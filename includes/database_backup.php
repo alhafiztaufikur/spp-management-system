@@ -1,5 +1,6 @@
 <?php
 /** Private, all-unit snapshot queue. Confirmed restore has a separate endpoint/worker. */
+require_once __DIR__.'/operational_access.php';
 require_once __DIR__.'/database_backup_policy.php';
 require_once __DIR__.'/database_backup_dispatch.php';
 function db_backup_now(): DateTimeImmutable { return new DateTimeImmutable('now', new DateTimeZone('Asia/Jakarta')); }
@@ -76,8 +77,8 @@ function db_backup_actor(int $actor): array {
     $db=$GLOBALS['koneksi']??null;
     if(!$db instanceof mysqli)throw new RuntimeException('Active application account required.');
     db_backup_assert_application(db_backup_config(),$db);
-    $s=$db->prepare("SELECT id,nama FROM admin WHERE id=? AND role='super_admin' AND is_active=1");$s->bind_param('i',$actor);$s->execute();$row=$s->get_result()->fetch_assoc();$s->close();
-    if(!$row)throw new RuntimeException('Akun Super Admin aktif diperlukan.');return $row;
+    $s=$db->prepare("SELECT id,nama FROM admin WHERE id=? AND role IN ('super_admin','admin','kasir') AND is_active=1");$s->bind_param('i',$actor);$s->execute();$row=$s->get_result()->fetch_assoc();$s->close();
+    if(!$row)throw new RuntimeException('Akun pengelola operasional aktif diperlukan.');return $row;
 }
 function db_backup_enqueue(int $actor,string $requestKey): array {
     if(!preg_match('/^[a-f0-9]{32}$/D',$requestKey))throw new InvalidArgumentException('Kunci permintaan tidak valid.');

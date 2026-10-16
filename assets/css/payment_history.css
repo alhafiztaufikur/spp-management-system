@@ -103,3 +103,7 @@
 .payment-history-page .ph-list-panel .du-pagination-info{margin:0;font-size:11px}
 .payment-history-page .ph-list-panel .du-pagination{margin-left:auto;max-width:100%}
 @media(max-width:600px){.payment-history-page .ph-list-panel .du-pagination{width:100%;margin-left:0}}
+.ph-request-status{padding:16px;margin:16px 0;border:1px solid var(--border);border-radius:12px;background:var(--bg-surface)}
+.ph-request-status h4{margin:0 0 8px;font-size:14px}
+.ph-request-status p{margin:6px 0;font-size:13px;overflow-wrap:anywhere}
+.ph-request-status form{margin-top:12px}

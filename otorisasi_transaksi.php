@@ -6,7 +6,7 @@ require_once 'koneksi.php';
 require_once 'includes/auth.php';
 require_once 'includes/transaction_authorization.php';
 require_once 'includes/authorization_presentation.php';
-requireRole(['admin', 'bendahara', 'kasir']);
+requireRole(['super_admin']);
 
 if (empty($_SESSION['csrf_transaction_authorization'])) {
     $_SESSION['csrf_transaction_authorization'] = bin2hex(random_bytes(32));

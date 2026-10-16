@@ -1,4 +1,5 @@
 <?php
+require_once __DIR__.'/operational_access.php';
 
 function unit_schema_ready(mysqli $db): bool {
     static $ready = null;
@@ -25,7 +26,7 @@ function unit_palette_for_view(?int $reportUnitId = null): string {
     if (isset($GLOBALS['global_report_view_unit'])) {
         return match ((int)$GLOBALS['global_report_view_unit']) { 0=>'super',2=>'smp',3=>'sma',default=>'sd' };
     }
-    if (unit_is_super() && ($reportUnitId === 0 || ($reportUnitId === null && unit_active_id() === 0))) return 'super';
+    if (operational_role() && ($reportUnitId === 0 || ($reportUnitId === null && unit_active_id() === 0))) return 'super';
     return match (unit_active_id()) { 2 => 'smp', 3 => 'sma', default => 'sd' };
 }
 
@@ -99,25 +100,28 @@ function unit_bootstrap_context(mysqli $db): void {
     $_SESSION['admin_role'] = $account['role'];
     $_SESSION['admin_nama'] = $account['nama'];
     $_SESSION['admin_unit_id'] = $account['unit_id'] === null ? null : (int)$account['unit_id'];
-    if ($account['role'] === 'super_admin') {
-        $selected = (int)($_SESSION['active_unit_id'] ?? 1);
-        if ($selected < 0 || $selected > 3) $selected = 1;
+    if (operational_role($account['role'])) {
+        $initial = $account['role'] === 'super_admin' ? 1 : (int)$account['unit_id'];
+        $selected = (int)($_SESSION['active_unit_id'] ?? $initial);
+        if ($selected < 0 || $selected > 3) $selected = $initial;
     } else {
         $selected = (int)$account['unit_id'];
     }
     $_SESSION['active_unit_id'] = $selected;
     unit_set_context($db, $selected);
+    operational_request_guard();
+    operational_form_scope();
 }
 
 function unit_report_scope(mysqli $db, string $choice): int {
     $unitId = unit_active_id();
-    if (unit_is_super() && $choice === 'all') $unitId = 0;
+    if (operational_role() && $choice === 'all') $unitId = 0;
     unit_set_context($db, $unitId);
     return $unitId;
 }
 
 function unit_report_selector(int $reportUnitId): string {
-    if (!unit_is_super()) return '';
+    if (!operational_role()) return '';
     if (unit_active_id() === 0) return '<span class="unit-report-picker">Cakupan rekap: <strong>Semua Unit</strong></span>';
     $selected = $reportUnitId === 0 ? 'all' : 'active';
     return '<label class="unit-report-picker">Cakupan rekap <select class="field-input field-select" name="unit" onchange="unitSwitchReportScope(this)">'
@@ -133,7 +137,7 @@ function unit_transaction_route(string $path): bool {
 }
 
 function unit_all_readonly(): bool {
-    return unit_is_super() && unit_active_id() === 0;
+    return operational_role() && unit_active_id() === 0;
 }
 
 function unit_guard_request(): void {

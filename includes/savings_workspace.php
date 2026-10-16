@@ -38,7 +38,7 @@ function savings_enrich_rows(mysqli $db, array $rows): array {
         $row['operator_name']=$account['nama']??'Tidak tercatat';
         $row['operator_username']=$account['username']??'';
         $row['operator_role']=$roles[$account['role']??'']??'';
-        $row['can_print']=unit_is_super() || ($owner>0 && $owner===(int)($_SESSION['admin_id']??0));
+        $row['can_print']=operational_role() || ($owner>0 && $owner===(int)($_SESSION['admin_id']??0));
         $row['reference']='TB-'.($row['jenis']==='masuk'?'M':'K').'-'.$row['unit_id'].'-'.str_pad((string)$row['id'],6,'0',STR_PAD_LEFT);
         $row['receipt_url']='cetak_struk.php?'.http_build_query(['jenis'=>$row['jenis'],'id'=>(int)$row['id']]);
     }unset($row);

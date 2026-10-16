@@ -7,8 +7,8 @@ header('Cache-Control: private, no-store');header('X-Content-Type-Options: nosni
 function backup_api_fail(int $status,string $message): never {
     http_response_code($status);header('Content-Type: application/json; charset=utf-8');echo json_encode(['error'=>$message],JSON_UNESCAPED_UNICODE);exit;
 }
-if(empty($_SESSION['admin_id'])||($_SESSION['admin_role']??'')!=='super_admin')backup_api_fail(403,'Hanya Super Admin aktif yang dapat mengelola cadangan.');
-requireRole(['super_admin']);
+if(empty($_SESSION['admin_id'])||!operational_role())backup_api_fail(403,'Hanya Super Admin, Administrator, atau Kasir aktif yang dapat mengelola cadangan.');
+requireRole(['super_admin','admin','kasir']);
 $method=$_SERVER['REQUEST_METHOD']??'GET';
 if(!in_array($method,['GET','POST'],true)){header('Allow: GET, POST');backup_api_fail(405,'Metode tidak diizinkan.');}
 $action=($method==='POST'?$_POST:$_GET)['action']??'status';

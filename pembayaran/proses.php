@@ -60,6 +60,30 @@ if ($aksi === 'otorisasi_setujui') {
     requireRole(['admin', 'kasir']);
 }
 
+if ($aksi === 'batal_pengajuan') {
+    $csrf = $_POST['csrf_token'] ?? null;
+    if ($_SERVER['REQUEST_METHOD'] !== 'POST' || !is_string($csrf) || empty($_SESSION['csrf_payment'])
+        || !hash_equals($_SESSION['csrf_payment'], $csrf)) {
+        http_response_code(403); exit('Permintaan pembatalan tidak valid. Muat ulang halaman.');
+    }
+    try {
+        $koneksi->begin_transaction();
+        $requestId = filter_var($_POST['request_id'] ?? null, FILTER_VALIDATE_INT, ['options'=>['min_range'=>1]]);
+        if (!$requestId) throw new RuntimeException('Pengajuan tidak valid.');
+        $request = transaction_authorization_find($koneksi, $requestId, true);
+        if (!$request || $request['status'] !== 'pending' || (int)$request['requested_by'] !== (int)$_SESSION['admin_id']
+            || (int)$request['bayar_id'] !== $returnPaymentId)
+            throw new RuntimeException('Hanya pemohon yang dapat membatalkan pengajuan yang masih menunggu.');
+        transaction_authorization_decide($koneksi, $requestId, 'cancelled', (int)$_SESSION['admin_id']);
+        $koneksi->commit();
+        $_SESSION['flash'] = ['type'=>'success','msg'=>'Pengajuan dibatalkan. Transaksi tidak diubah.'];
+    } catch (Throwable $error) {
+        $koneksi->rollback();
+        $_SESSION['flash'] = ['type'=>'error','msg'=>$error->getMessage()];
+    }
+    header('Location: '.$returnUrl, true, 303); exit;
+}
+
 // Reject retired balance requests before a cashier proposal can be queued.
 if (array_key_exists('uang_pangkal', $_POST) || (isset($_POST['spp_action']) && $_POST['spp_action'] !== 'bayar')
     || (isset($_POST['gunakan_titipan_spp']) && !in_array((string)$_POST['gunakan_titipan_spp'], ['0',''], true))) {

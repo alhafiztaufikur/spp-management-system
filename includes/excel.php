@@ -71,6 +71,56 @@ function spp_excel_library(): void {
     http_response_code(503);header('Content-Type: text/html; charset=UTF-8');
     echo '<!doctype html><html lang="id"><meta charset="utf-8"><title>Ekspor Excel belum tersedia</title><main style="max-width:620px;margin:10vh auto;font-family:Arial;padding:24px"><h1>Ekspor Excel belum tersedia</h1><p>Komponen Excel belum terpasang. Jalankan <code>composer install</code> dari folder project, lalu coba kembali.</p></main></html>';exit;
 }
+
+/** A merged table heading must not cross a horizontal print page boundary. */
+function spp_excel_print_group_headers($sheet): void {
+    $breaks=[];
+    foreach($sheet->getBreaks() as $cell=>$kind)if($kind===\PhpOffice\PhpSpreadsheet\Worksheet\Worksheet::BREAK_COLUMN){
+        [$column]=\PhpOffice\PhpSpreadsheet\Cell\Coordinate::coordinateFromString($cell);
+        $breaks[]=\PhpOffice\PhpSpreadsheet\Cell\Coordinate::columnIndexFromString($column);
+    }
+    sort($breaks);
+    foreach(array_keys($sheet->getMergeCells()) as $range){
+        [$first,$last]=\PhpOffice\PhpSpreadsheet\Cell\Coordinate::rangeBoundaries($range);
+        if($first[1]<10 || $first[1]!==$last[1])continue;
+        $cuts=array_values(array_filter($breaks,static fn($column)=>$column>$first[0]&&$column<=$last[0]));
+        if(!$cuts)continue;
+        $value=$sheet->getCellByColumnAndRow($first[0],$first[1])->getValue();
+        // Numeric data and their cell types are never duplicated by print formatting.
+        if(!is_string($value)||$value==='')continue;
+        $sheet->unmergeCells($range);$starts=array_merge([$first[0]],$cuts);$ends=array_merge(array_map(static fn($c)=>$c-1,$cuts),[$last[0]]);
+        foreach($starts as $index=>$start){
+            $a=\PhpOffice\PhpSpreadsheet\Cell\Coordinate::stringFromColumnIndex($start).$first[1];
+            $b=\PhpOffice\PhpSpreadsheet\Cell\Coordinate::stringFromColumnIndex($ends[$index]).$first[1];
+            if($a!==$b)$sheet->mergeCells($a.':'.$b);
+            $label=$value.($index?' (lanjutan)':'');
+            $sheet->setCellValueExplicit($a,$label,\PhpOffice\PhpSpreadsheet\Cell\DataType::TYPE_STRING);
+            $width=0;foreach(range($start,$ends[$index]) as $column)$width+=$sheet->getColumnDimensionByColumn($column)->getWidth();
+            $sheet->getStyle($a.':'.$b)->getAlignment()->setWrapText(true);
+            $sheet->getRowDimension($first[1])->setRowHeight(max($sheet->getRowDimension($first[1])->getRowHeight(),16*ceil(mb_strlen($label)/max(8,$width*.85))+8));
+        }
+    }
+}
+
+/** Compact headings fit on the repeated identity side of wide workbooks. */
+function spp_excel_print_heading($sheet,array $doc,array $definition,int $identity): void {
+    $last=\PhpOffice\PhpSpreadsheet\Cell\Coordinate::stringFromColumnIndex(max(3,$identity));
+    foreach(array_keys($sheet->getMergeCells()) as $range)if(preg_match('/^[A-Z]+([1-9]):[A-Z]+([1-9])$/D',$range))$sheet->unmergeCells($range);
+    foreach(['B1','B3','A5','A6','A7','A9'] as $cell)$sheet->setCellValue($cell,null);
+    $start=$identity>=4?'C':'B';
+    $sheet->mergeCells($start.'1:'.$last.'2')->setCellValueExplicit($start.'1',$doc['school'],\PhpOffice\PhpSpreadsheet\Cell\DataType::TYPE_STRING);
+    $sheet->getStyle($start.'1')->getFont()->setSize(12)->setBold(true);
+    $sheet->mergeCells('A3:'.$last.'3')->setCellValue('A3','Perum Bekasi Griya Asri II, Tambun Selatan | Telp. 021-88363466');
+    $sheet->getStyle('A3')->getFont()->setSize(9);
+    foreach([5=>$doc['title'],6=>'Unit: '.$doc['unit_label'].' | '.$doc['subtitle'],7=>'Dibuat: '.$doc['generated'].' | Petugas: '.$doc['operator'],9=>$definition['sections'][0]['title']] as $row=>$value){
+        $sheet->mergeCells('A'.$row.':'.$last.$row)->setCellValueExplicit('A'.$row,$value,\PhpOffice\PhpSpreadsheet\Cell\DataType::TYPE_STRING);
+    }
+    $sheet->getStyle('A5')->getFont()->setSize(12)->setBold(true);$sheet->getStyle('A6:A7')->getFont()->setSize(9);
+    $sheet->getStyle('A1:'.$last.'9')->getAlignment()->setWrapText(true)->setVertical('center');
+    $width=0;foreach(range(1,max(3,$identity)) as $i)$width+=$sheet->getColumnDimensionByColumn($i)->getWidth();
+    foreach([1=>20,2=>20,3=>max(16,12*ceil(62/max(20,$width*.9))),4=>4,5=>max(24,16*ceil(mb_strlen($doc['title'])/max(20,$width*.7))),6=>max(26,12*ceil(mb_strlen('Unit: '.$doc['unit_label'].' | '.$doc['subtitle'])/max(20,$width*.9))),7=>max(18,12*ceil(mb_strlen('Dibuat: '.$doc['generated'].' | Petugas: '.$doc['operator'])/max(20,$width*.9))),8=>4,9=>max(20,16*ceil(mb_strlen($definition['sections'][0]['title'])/max(20,$width*.8)))] as $row=>$height)$sheet->getRowDimension($row)->setRowHeight($height);
+    foreach($sheet->getDrawingCollection() as $drawing)$drawing->setHeight($identity<4?27:42)->setOffsetX(6)->setOffsetY(4);
+}
 function spp_excel_workbook(array $doc): \PhpOffice\PhpSpreadsheet\Spreadsheet {
     spp_excel_library();
     if(($doc['presentation']??'')==='global')require_once __DIR__.'/global_report_excel.php';
@@ -144,17 +194,31 @@ function spp_excel_workbook(array $doc): \PhpOffice\PhpSpreadsheet\Spreadsheet {
                 foreach($section['columns'] as $i=>$column)if(isset($section['column_totals'][$column['key']])){$cell=$letter($i+1).$row;$sheet->setCellValueExplicit($cell,(float)$section['column_totals'][$column['key']]['value'],\PhpOffice\PhpSpreadsheet\Cell\DataType::TYPE_NUMERIC);$sheet->getStyle($cell)->getNumberFormat()->setFormatCode('"Rp "#,##0;[Red]"Rp "-#,##0;"Rp "0');}
                 $sheet->getStyle('A'.$row.':'.$last.$row)->getFont()->setBold(true);if($global)global_report_excel_total_style($sheet,'A'.$row.':'.$last.$row,$doc['unit']);$row++;
             }
-            foreach($section['totals'] as $total){$totalColumn=$global?min($n,max(3,min(6,$globalIdentityLimit))):$n;$totalStart=$global?max(2,$totalColumn-1):$n;$valueCell=$letter($totalStart).$row;if($totalColumn>$totalStart)$sheet->mergeCells($valueCell.':'.$letter($totalColumn).$row);$sheet->mergeCells('A'.$row.':'.$letter($totalStart-1).$row)->setCellValueExplicit('A'.$row,$total['label'],\PhpOffice\PhpSpreadsheet\Cell\DataType::TYPE_STRING);$sheet->setCellValueExplicit($valueCell,(float)$total['value'],\PhpOffice\PhpSpreadsheet\Cell\DataType::TYPE_NUMERIC);$sheet->getStyle($valueCell)->getNumberFormat()->setFormatCode('"Rp "#,##0;[Red]"Rp "-#,##0;"Rp "0');$sheet->getStyle('A'.$row.':'.$last.$row)->applyFromArray(['font'=>['bold'=>true,'color'=>['rgb'=>$dark]],'fill'=>['fillType'=>'solid','startColor'=>['rgb'=>$pale]]]);$sheet->getStyle($valueCell)->getAlignment()->setHorizontal('right');if($global){global_report_excel_total_style($sheet,'A'.$row.':'.$letter($totalColumn).$row,$doc['unit'],true);if($totalColumn<$n)$sheet->getStyle($letter($totalColumn+1).$row.':'.$last.$row)->getFill()->setFillType('none');}$row++;}
+            foreach($section['totals'] as $total){$totalColumn=$global?min($n,max(3,min(6,$globalIdentityLimit))):($n>6?4:$n);$totalStart=($global||$n>6)?max(2,$totalColumn-1):$n;$valueCell=$letter($totalStart).$row;if($totalColumn>$totalStart)$sheet->mergeCells($valueCell.':'.$letter($totalColumn).$row);$sheet->mergeCells('A'.$row.':'.$letter($totalStart-1).$row)->setCellValueExplicit('A'.$row,$total['label'],\PhpOffice\PhpSpreadsheet\Cell\DataType::TYPE_STRING);$sheet->setCellValueExplicit($valueCell,(float)$total['value'],\PhpOffice\PhpSpreadsheet\Cell\DataType::TYPE_NUMERIC);$sheet->getStyle($valueCell)->getNumberFormat()->setFormatCode('"Rp "#,##0;[Red]"Rp "-#,##0;"Rp "0');$sheet->getStyle('A'.$row.':'.$last.$row)->applyFromArray(['font'=>['bold'=>true,'color'=>['rgb'=>$dark]],'fill'=>['fillType'=>'solid','startColor'=>['rgb'=>$pale]]]);$sheet->getStyle($valueCell)->getAlignment()->setHorizontal('right');if($global){global_report_excel_total_style($sheet,'A'.$row.':'.$letter($totalColumn).$row,$doc['unit'],true);if($totalColumn<$n)$sheet->getStyle($letter($totalColumn+1).$row.':'.$last.$row)->getFill()->setFillType('none');}$row++;}
             $row+=2;
         }
         $shortWidths=[1=>8,2=>8,3=>32,4=>32,5=>16,6=>16];foreach(range(1,$n) as $c)$sheet->getColumnDimension($letter($c))->setWidth($widths[$c]??(!$hasDetail&&$n===6?$shortWidths[$c]:($c===1?10:32)));
         if(!empty($definition['signatures'])){$mid=max(1,(int)floor($n/2));$sheet->mergeCells('A'.$row.':'.$letter($mid).$row)->setCellValue('A'.$row,'Kasir/Petugas,');$sheet->mergeCells($letter($mid+1).$row.':'.$last.$row)->setCellValue($letter($mid+1).$row,'Bagian Keuangan,');$sheet->getStyle('A'.$row.':'.$last.($row+3))->getAlignment()->setHorizontal('center');$row+=3;$sheet->mergeCells('A'.$row.':'.$letter($mid).$row)->setCellValue('A'.$row,'(________________________)');$sheet->mergeCells($letter($mid+1).$row.':'.$last.$row)->setCellValue($letter($mid+1).$row,'(________________________)');$row+=2;}
+        $printEndRow=$sheet->getHighestDataRow();
         $sheet->mergeCells('A'.$row.':'.$last.$row)->setCellValue('A'.$row,'SistemSPP | Data mengikuti filter dan catatan transaksi saat laporan dibuat.');$sheet->getStyle('A'.$row)->getFont()->setSize(9)->getColor()->setRGB('64748B');
-        $totalWidth=0;foreach($sheet->getColumnDimensions() as $dimension)$totalWidth+=$dimension->getWidth();$setup=$sheet->getPageSetup();$setup->setOrientation($n>6?'landscape':'portrait')->setPaperSize($n>9||$totalWidth>160?\PhpOffice\PhpSpreadsheet\Worksheet\PageSetup::PAPERSIZE_A3:\PhpOffice\PhpSpreadsheet\Worksheet\PageSetup::PAPERSIZE_A4);
-        if($totalWidth<=220)$setup->setFitToWidth(1)->setFitToHeight(0);else $setup->setScale(90)->setColumnsToRepeatAtLeftByStartAndEnd('A','D');
-        if(isset($doc['matrix_page'])){$setup->setOrientation($doc['matrix_page']['orientation'])->setPaperSize($doc['matrix_page']['paper']==='A3'?\PhpOffice\PhpSpreadsheet\Worksheet\PageSetup::PAPERSIZE_A3:\PhpOffice\PhpSpreadsheet\Worksheet\PageSetup::PAPERSIZE_A4)->setScale(90)->setColumnsToRepeatAtLeftByStartAndEnd('A',$letter($definition['sections'][0]['identity_count']));}
-        $setup->setPrintArea('A1:'.$last.$row);$sheet->getPageMargins()->setTop(.35)->setBottom(.35)->setLeft(.3)->setRight(.3);$sheet->getHeaderFooter()->setOddFooter('&L'.$doc['unit_label'].' | SistemSPP&RHalaman &P / &N');
+        $printWidths=[];foreach(range(1,$n) as $i)$printWidths[$i]=$sheet->getColumnDimension($letter($i))->getWidth()*6;
+        $landscape=array_sum($printWidths)>538;$setup=$sheet->getPageSetup();
+        $setup->setOrientation($landscape?'landscape':'portrait')->setPaperSize(\PhpOffice\PhpSpreadsheet\Worksheet\PageSetup::PAPERSIZE_A4)->setFitToPage(false)->setScale(100);
+        if(!$global && array_sum($printWidths)>($landscape?785:538)){
+            $repeat=min(4,$n-1);$setup->setColumnsToRepeatAtLeftByStartAndEnd('A',$letter($repeat));
+            $budget=($landscape?785:538)-array_sum(array_slice($printWidths,0,$repeat));$printUsed=0;
+            foreach(range($repeat+1,$n) as $i){if($printUsed&&$printUsed+$printWidths[$i]>$budget){$sheet->setBreak($letter($i).'1',\PhpOffice\PhpSpreadsheet\Worksheet\Worksheet::BREAK_COLUMN);$printUsed=0;}$printUsed+=$printWidths[$i];}
+            spp_excel_print_heading($sheet,$doc,$definition,$repeat);
+        }
+        $setup->setPrintArea('A1:'.$last.$printEndRow);$sheet->getPageMargins()->setTop(.35)->setBottom(.35)->setLeft(.3)->setRight(.3);$sheet->getHeaderFooter()->setOddFooter('&L'.$doc['unit_label'].' | SistemSPP&RHalaman &P / &N');
         if($global)global_report_excel_finish($sheet,$doc,$definition,$n);
+        $repeatColumns=$setup->getColumnsToRepeatAtLeft();
+        if(!empty($repeatColumns[1])&&$repeatColumns[1]!==$last){
+            $footer='A'.$row.':'.$last.$row;if(isset($sheet->getMergeCells()[$footer]))$sheet->unmergeCells($footer);
+            $sheet->mergeCells('A'.$row.':'.$repeatColumns[1].$row);
+            $sheet->getStyle('A'.$row)->getAlignment()->setWrapText(true);$sheet->getRowDimension($row)->setRowHeight(30);
+        }
+        spp_excel_print_group_headers($sheet);
     }
     $book->setActiveSheetIndex(0);return $book;
 }
@@ -173,10 +237,35 @@ function spp_excel_preview_html(array $doc): string {
     <?php foreach($doc['sheets'] as $sheet): ?><section class="sheet<?= isset($doc['matrix_page'])?' matrix-excel':'' ?>"><?php if(($doc['presentation']??'')!=='global'): ?><h2><?= $e($sheet['name']) ?></h2><?php endif; ?><?php foreach($sheet['sections'] as $section): ?><h3 class="section-title"><?= $e($section['title']) ?></h3><div class="scroll"><table><thead><?php if(!empty($section['header_groups'])): ?><tr><th colspan="<?= $section['identity_count'] ?>"></th><?php foreach($section['header_groups'] as $group): ?><th colspan="<?= count($group['keys']) ?>"><?= $e($group['label']) ?></th><?php endforeach; ?></tr><?php endif; ?><tr><?php foreach($section['columns'] as $ci=>$col): ?><th<?= spp_excel_matrix_cell_style($section,$ci) ?>><?= $e($col['label']) ?></th><?php endforeach; ?></tr></thead><tbody><?php if(!$section['rows']): ?><tr><td colspan="<?= count($section['columns']) ?>" class="center">Tidak ada data sesuai filter.</td></tr><?php endif; ?><?php foreach($section['rows'] as $row): ?><tr><?php foreach($section['columns'] as $ci=>$col): $v=array_key_exists($col['key'],$row)?$row[$col['key']]:'';$money=in_array($col['type'],['money','money_optional'],true); ?><td class="<?= $money?'money':(in_array($col['key'],['no','kelas','KELAS','export_class','unit','export_unit','jenis','status','periode'],true)||in_array($col['type'],['html','number','count'],true)?'center':'') ?>"<?= spp_excel_matrix_cell_style($section,$ci) ?>><?php if(($doc['presentation']??'')==='global'&&(in_array($col['key'],['nis','kelas','status'],true)||$col['type']==='status')): ?><span class="excel-badge excel-badge-<?= $e($col['key']) ?>"><?= $v===null?'—':$e($v) ?></span><?php else: ?><?= $money&&$v!==''&&$v!==null?'Rp '.number_format((float)$v,0,',','.'):($v===null?'—':(in_array($col['type'],['date','datetime'],true)&&$v?spp_date_label($v,$col['type']==='datetime'):$e($v))) ?><?php endif; ?></td><?php endforeach; ?></tr><?php endforeach; ?><?php if(!empty($section['column_totals'])): ?><tr class="total"><?php foreach($section['columns'] as $i=>$col): ?><td<?= $i>=$section['identity_count']?' class="money"':'' ?>><?= $i===0?'Subtotal seluruh hasil filter':(isset($section['column_totals'][$col['key']])?'Rp '.number_format($section['column_totals'][$col['key']]['value'],0,',','.'):'') ?></td><?php endforeach; ?></tr><?php endif; ?><?php foreach($section['totals'] as $total): ?><tr class="total"><td colspan="<?= max(1,count($section['columns'])-1) ?>"><?= $e($total['label']) ?></td><td class="money">Rp <?= number_format($total['value'],0,',','.') ?></td></tr><?php endforeach; ?></tbody></table></div><?php endforeach; ?><?php if(!empty($sheet['signatures'])): ?><div class="sign"><div>Kasir/Petugas,<p>(________________________)</p></div><div>Bagian Keuangan,<p>(________________________)</p></div></div><?php endif; ?></section><?php endforeach; ?><p class="foot">SistemSPP | Data mengikuti filter dan catatan transaksi saat laporan dibuat.</p></html>
     <?php return ob_get_clean();
 }
+
+/** Serialize real column indices even with the installed 1.30 XLSX writer. */
+function spp_excel_save(\PhpOffice\PhpSpreadsheet\Spreadsheet $book,string $path): void {
+    $writer=new \PhpOffice\PhpSpreadsheet\Writer\Xlsx($book);$writer->setPreCalculateFormulas(false);$writer->save($path);
+    // PhpSpreadsheet 1.30.7 casts the letter part of a column break to int,
+    // producing id=-1. Normalize this small XML block; financial cells are untouched.
+    $zip=new ZipArchive();if($zip->open($path)!==true)throw new RuntimeException('Berkas Excel tidak dapat diselesaikan.');
+    try{
+        foreach($book->getAllSheets() as $index=>$sheet){
+            $breaks=[];foreach($sheet->getBreaks() as $cell=>$kind)if($kind===\PhpOffice\PhpSpreadsheet\Worksheet\Worksheet::BREAK_COLUMN){
+                [$column]=\PhpOffice\PhpSpreadsheet\Cell\Coordinate::coordinateFromString($cell);
+                $breaks[]=\PhpOffice\PhpSpreadsheet\Cell\Coordinate::columnIndexFromString($column)-1;
+            }
+            if(!$breaks)continue;
+            $entry='xl/worksheets/sheet'.($index+1).'.xml';$xml=$zip->getFromName($entry);
+            if($xml===false)throw new RuntimeException('Lembar Excel tidak lengkap.');
+            $dom=new DOMDocument();if(!$dom->loadXML($xml,LIBXML_NONET))throw new RuntimeException('Lembar Excel tidak valid.');
+            $xpath=new DOMXPath($dom);$xpath->registerNamespace('s','http://schemas.openxmlformats.org/spreadsheetml/2006/main');
+            $nodes=$xpath->query('/s:worksheet/s:colBreaks/s:brk');
+            if($nodes->length!==count($breaks))throw new RuntimeException('Batas halaman Excel tidak sesuai.');
+            foreach($nodes as $i=>$node){$node->setAttribute('id',(string)$breaks[$i]);$node->setAttribute('min','0');$node->setAttribute('max','1048575');}
+            if(!$zip->addFromString($entry,$dom->saveXML()))throw new RuntimeException('Batas halaman Excel gagal disimpan.');
+        }
+    }finally{if(!$zip->close())throw new RuntimeException('Berkas Excel gagal diselesaikan.');}
+}
 function spp_excel_respond(array $doc,bool $download,string $filename,string $downloadUrl,string $backUrl,int $rowCount): void {
-    if($download){$book=spp_excel_workbook($doc);$writer=new \PhpOffice\PhpSpreadsheet\Writer\Xlsx($book);$writer->setPreCalculateFormulas(false);
+    if($download){$book=spp_excel_workbook($doc);
         // Finish generation before sending attachment headers; errors cannot become corrupt workbooks.
-        $temp=tempnam(sys_get_temp_dir(),'spp_xlsx_');try{$writer->save($temp);header('Content-Type: application/vnd.openxmlformats-officedocument.spreadsheetml.sheet');header('Content-Disposition: attachment; filename="'.preg_replace('/[^a-zA-Z0-9_-]/','-',$filename).'.xlsx"');header('Cache-Control: no-store, private');header('Content-Length: '.filesize($temp));readfile($temp);}finally{if(is_file($temp))unlink($temp);$book->disconnectWorksheets();}exit;
+        $temp=tempnam(sys_get_temp_dir(),'spp_xlsx_');try{spp_excel_save($book,$temp);header('Content-Type: application/vnd.openxmlformats-officedocument.spreadsheetml.sheet');header('Content-Disposition: attachment; filename="'.preg_replace('/[^a-zA-Z0-9_-]/','-',$filename).'.xlsx"');header('Cache-Control: no-store, private');header('Content-Length: '.filesize($temp));readfile($temp);}finally{if(is_file($temp))unlink($temp);$book->disconnectWorksheets();}exit;
     }
     require_once __DIR__.'/report_preview.php';render_report_export_preview(spp_excel_preview_html($doc),['presentation'=>$doc['presentation']??'','unit'=>$doc['unit'],'file_type'=>'EXCEL','show_print'=>false,'title'=>$doc['title'],'subtitle'=>$doc['subtitle'],'generated'=>$doc['generated'],'row_count'=>$rowCount,'orientation'=>'landscape','download_url'=>$downloadUrl,'back_url'=>$backUrl]);exit;
 }

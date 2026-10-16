@@ -61,7 +61,7 @@ $statusLabel=filter_is_all($statuses)?'Semua status':implode(', ',array_map('tra
 $generated=spp_date_label(new DateTimeImmutable('now'),true);
 ob_start(); ?>
 <!doctype html><html lang="id"><head><meta charset="utf-8"><style>
-@page { margin:22mm 13mm 18mm; } body { font-family:DejaVu Sans,sans-serif;font-size:10px;color:#233642;line-height:1.5; }
+@page { margin:22mm 13mm 18mm; } body { font-family:DejaVu Sans,sans-serif;font-size:9pt;color:#233642;line-height:1.5; }
 h1 { color:#<?= $color ?>;font-size:21px;margin:8px 0; } h2 { font-size:15px;color:#<?= $color ?>;margin:20px 0 8px; } h3 { font-size:12px;margin:12px 0 4px; }
 .identity { border-bottom:2px solid #<?= $color ?>;padding-bottom:10px; } .logo { width:42px;float:left;margin-right:14px; }
 .meta { color:#5a6c78;margin:10px 0 16px; } table { width:100%;border-collapse:collapse;table-layout:fixed;margin:7px 0 14px; } thead { display:table-header-group; }

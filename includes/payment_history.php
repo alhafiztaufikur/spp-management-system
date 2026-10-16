@@ -37,7 +37,12 @@ function payment_history_model(mysqli $db,int $id,bool $deleted): array
     foreach($details['bayar_biaya_lain']??[] as $d) $components[]=[($d['nama_biaya_snapshot']??'')?:'Biaya Lain',(float)($d['nominal_snapshot']??$d['jumlah']??0)];
     if(empty($details['bayar_biaya_lain']) && (float)($p['U_LAIN']??0)-$du>0) $components[]=['Daftar Ulang / Biaya Lain (rincian tidak tercatat)',(float)$p['U_LAIN']-$du];
     if((float)($p['potong_spp']??0)!==0) $components[]=['Potongan SPP',-(float)$p['potong_spp']];
-    return ['payment'=>$p,'deleted'=>$deleted,'events'=>$events,'summary'=>payment_activity_summary($events),'capabilities'=>$caps,
+    $request = null;
+    if (transaction_authorization_schema_ready($db)) {
+        $s=$db->prepare("SELECT id,status,requested_by,request_reason AS reason,decision_note FROM transaksi_otorisasi WHERE bayar_id=? OR (bayar_id IS NULL AND CAST(JSON_UNQUOTE(JSON_EXTRACT(before_snapshot,'$.payment.id')) AS UNSIGNED)=?) ORDER BY id DESC LIMIT 1");
+        $s->bind_param('ii',$id,$id);$s->execute();$request=$s->get_result()->fetch_assoc() ?: null;$s->close();
+    }
+    return ['payment'=>$p,'deleted'=>$deleted,'events'=>$events,'summary'=>payment_activity_summary($events),'capabilities'=>$caps,'request'=>$request,
         'components'=>$components,'batch_print'=>$caps['can_print']&&(int)($p['payment_batch_count']??1)===12&&payment_can_print_batch($db,(string)($p['payment_batch_token']??''))];
 }
 function payment_history_actor(?array $event): void
@@ -53,6 +58,24 @@ function payment_history_render(array $model, ?array $query=null): void
     <section class="ph-payment-box"><h4><?= authorization_icon('chart') ?> Detail Pembayaran <span class="ph-status <?= $deleted?'is-deleted':'' ?>"><?= $deleted?'Dihapus':'Aktif' ?></span></h4><div class="ph-payment-overview"><div><small>Total Bayar</small><strong class="ph-total"><?= payment_history_money($p['total_jumlah']) ?></strong></div><div><small>Metode: <?= authorization_escape($p['sistem_pembayaran']??'Tidak tercatat') ?></small><small>Tanggal bayar: <?= authorization_escape(spp_date_label($p['TGL_BYR'],true)) ?></small></div></div><dl class="ph-components"><?php foreach($model['components'] as [$label,$amount]): if(abs($amount)<.001)continue; ?><div><dt><?= authorization_escape($label) ?></dt><dd><?= payment_history_money($amount) ?></dd></div><?php endforeach; ?></dl><?php if(!empty($p['KETERANGAN'])): ?><p class="ph-note"><?= nl2br(authorization_escape($p['KETERANGAN'])) ?></p><?php endif; ?></section>
     <div class="ph-info-grid"><section><h4><?= authorization_icon('user') ?> Operator</h4><small>Dibuat oleh</small><?php payment_history_actor($summary['creator']); ?><small class="ph-info-label">Aktivitas terakhir</small><?php payment_history_actor($summary['last']); ?><small><?= authorization_escape(payment_activity_labels()[$summary['last']['action']??'']??'Tidak tercatat') ?></small><small><?= !empty($summary['last']['occurred_at'])?authorization_escape(spp_date_label($summary['last']['occurred_at'],true)):'Tidak tercatat' ?></small></section><section><h4><?= authorization_icon('history') ?> Informasi Sistem</h4><small>ID Transaksi</small><strong>TRX-<?= str_pad((string)$id,6,'0',STR_PAD_LEFT) ?></strong><small class="ph-info-label">Dibuat pada</small><span><?= authorization_escape(!empty($p['created_at'])?spp_date_label($p['created_at'],true):'Tidak tercatat') ?></span><small class="ph-info-label">Diubah pada</small><span><?= authorization_escape(!empty($p['updated_at'])?spp_date_label($p['updated_at'],true):'Tidak tercatat') ?></span><?php if($deleted): ?><small class="ph-info-label">Dihapus oleh</small><?php payment_history_actor($p['_deleted_event']); ?><small><?= authorization_escape(spp_date_label($p['_deleted_event']['occurred_at'],true)) ?></small><?php endif; ?></section></div>
     <?php if($caps['reason']): ?><p class="ph-lock-note" <?= $caps['locked']?'data-payment-locked':'' ?>><?= authorization_icon($caps['locked']?'lock':'alert') ?> <?= authorization_escape($caps['reason']) ?></p><?php endif; ?>
+    <?php if (!empty($model['request'])): $request=$model['request']; ?>
+    <section class="ph-request-status" aria-label="Pengajuan koreksi">
+      <h4>Pengajuan #<?= (int)$request['id'] ?> · <?= authorization_escape(['pending'=>'Menunggu Super Admin','approved'=>'Disetujui','rejected'=>'Ditolak','cancelled'=>'Dibatalkan','failed'=>'Gagal'][$request['status']] ?? $request['status']) ?></h4>
+      <p><?= nl2br(authorization_escape($request['reason'])) ?></p>
+      <?php if ($request['decision_note']): ?><p><strong>Catatan keputusan:</strong> <?= nl2br(authorization_escape($request['decision_note'])) ?></p><?php endif; ?>
+      <?php if (!$deleted && !unit_all_readonly() && $request['status']==='pending' && (int)$request['requested_by']===(int)($_SESSION['admin_id']??0)): ?>
+      <form method="post" action="proses.php">
+        <input type="hidden" name="_operational_unit" value="<?= unit_active_id() ?>">
+        <input type="hidden" name="csrf_token" value="<?= authorization_escape($_SESSION['csrf_payment']??'') ?>">
+        <input type="hidden" name="aksi" value="batal_pengajuan">
+        <input type="hidden" name="request_id" value="<?= (int)$request['id'] ?>">
+        <input type="hidden" name="id" value="<?= $id ?>">
+        <input type="hidden" name="return_context" value="<?= authorization_escape(payment_return_create($id,(int)$p['unit_id'],$query??[],'lihat.php')) ?>">
+        <button type="submit" class="btn btn-ghost btn-sm">Batalkan Pengajuan Saya</button>
+      </form>
+      <?php endif; ?>
+    </section>
+    <?php endif; ?>
     <div class="ph-detail-actions">
     <?php if($caps['can_edit']): ?><a class="btn-tbl btn-tbl-edit" href="<?= authorization_escape(payment_return_edit_url($token,$id)) ?>"><?= authorization_icon('edit') ?> <?= transaction_authorization_requires_request()?'Ajukan Edit':'Edit' ?></a><?php endif; ?>
     <?php if($caps['can_delete']): ?><button type="button" class="btn-tbl btn-tbl-del open-payment-delete-request" data-id="<?= $id ?>" data-context="<?= authorization_escape($token) ?>" data-student="<?= authorization_escape($p['NAMA']??$p['NO_INDUK']) ?>"><?= authorization_icon('delete') ?> <?= transaction_authorization_requires_request()?'Ajukan Hapus':'Hapus' ?></button><?php endif; ?>

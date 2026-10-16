@@ -45,32 +45,14 @@ function global_report_excel_finish($sheet,array $doc,array $definition,int $n):
     $letter=static fn($c)=>\PhpOffice\PhpSpreadsheet\Cell\Coordinate::stringFromColumnIndex($c);
     $detail=null;foreach($definition['sections'] as $section)if($section['detail']){$detail=$section;break;}
     $identity=$detail?global_report_excel_identity_count($detail):$n;
-    $headEnd=$letter(max(3,$identity));
-    // All merged heading blocks stay on the frozen side of the worksheet.
-    foreach(array_keys($sheet->getMergeCells()) as $range)if(preg_match('/^[A-Z]+([1-9]):[A-Z]+([1-9])$/D',$range))$sheet->unmergeCells($range);
-    foreach(['B1','B3','A5','A6','A7','A9'] as $cell)$sheet->setCellValue($cell,null);
-    $schoolStart=$identity>=4?'C':'B';
-    $sheet->mergeCells($schoolStart.'1:'.$headEnd.'2')->setCellValueExplicit($schoolStart.'1',$doc['school'],\PhpOffice\PhpSpreadsheet\Cell\DataType::TYPE_STRING);
-    $sheet->getStyle($schoolStart.'1')->getFont()->setSize(12)->setBold(true);
-    $sheet->mergeCells('A3:'.$headEnd.'3')->setCellValue('A3','Perum Bekasi Griya Asri II, Tambun Selatan | Telp. 021-88363466');
-    $sheet->getStyle('A3')->getFont()->setSize(8);
-    foreach([5=>$doc['title'],6=>'Unit: '.$doc['unit_label'].' | '.$doc['subtitle'],7=>'Dibuat: '.$doc['generated'].' | Petugas: '.$doc['operator'],9=>$definition['sections'][0]['title']] as $row=>$value){
-        $sheet->mergeCells('A'.$row.':'.$headEnd.$row)->setCellValueExplicit('A'.$row,$value,\PhpOffice\PhpSpreadsheet\Cell\DataType::TYPE_STRING);
-    }
-    $sheet->getStyle('A5')->getFont()->setSize(12)->setBold(true);
-    $sheet->getStyle('A6:A7')->getFont()->setSize(9);
-    $sheet->getStyle('A1:'.$headEnd.'9')->getAlignment()->setWrapText(true)->setVertical('center');
-    $chars=0;foreach(array_slice($detail['columns']??$definition['sections'][0]['columns'],0,max(3,$identity)) as $column)$chars+=$column['width'];
-    $filterHeight=max(26,12*ceil(mb_strlen('Unit: '.$doc['unit_label'].' | '.$doc['subtitle'])/max(30,$chars)));
-    foreach([1=>19,2=>19,3=>15,4=>4,5=>24,6=>$filterHeight,7=>18,8=>4,9=>20] as $row=>$height)$sheet->getRowDimension($row)->setRowHeight($height);
-    foreach($sheet->getDrawingCollection() as $drawing){$drawing->setHeight(42)->setOffsetX(6)->setOffsetY(4);if($identity<4)$drawing->setHeight(27);}
+    spp_excel_print_heading($sheet,$doc,$definition,$identity);
     $sheet->getDefaultRowDimension()->setRowHeight(25);
     $sheet->getSheetView()->setZoomScale(100);
     $setup=$sheet->getPageSetup();
     $setup->setPaperSize(\PhpOffice\PhpSpreadsheet\Worksheet\PageSetup::PAPERSIZE_A4);
     // Actual sheet widths, font and print scale determine horizontal page ranges.
-    $widths=[];foreach(range(1,$n) as $i)$widths[$i]=$sheet->getColumnDimension($letter($i))->getWidth()*5.25+4;
-    $landscape=array_sum($widths)>538;$setup->setOrientation($landscape?'landscape':'portrait')->setFitToPage(false)->setScale(90);
+    $widths=[];foreach(range(1,$n) as $i)$widths[$i]=$sheet->getColumnDimension($letter($i))->getWidth()*6;
+    $landscape=array_sum($widths)>538;$setup->setOrientation($landscape?'landscape':'portrait')->setFitToPage(false)->setScale(100);
     if($detail&&$identity<$n){
         $setup->setColumnsToRepeatAtLeftByStartAndEnd('A',$letter($identity));
         $budget=($landscape?785:538)-array_sum(array_slice($widths,0,$identity));

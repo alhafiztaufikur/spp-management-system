@@ -5,7 +5,7 @@
 if(session_status()!==PHP_SESSION_ACTIVE)session_start();
 require_once '../koneksi.php';
 require_once '../includes/auth.php';
-requireRole(['admin', 'bendahara']);
+requireRole(['admin', 'bendahara', 'kasir']);
 $reportUnitId=unit_report_scope($koneksi,(string)($_GET['unit']??''));
 
 require_once '../includes/general_multiple.php';

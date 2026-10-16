@@ -221,8 +221,7 @@ function spp_master_correct_published_rates(mysqli $db, int $id, array $rates, s
     $actor=(int)($_SESSION['admin_id']??0);
     $s=$db->prepare('SELECT role,unit_id,is_active FROM admin WHERE id=? FOR UPDATE');$s->bind_param('i',$actor);$s->execute();$account=$s->get_result()->fetch_assoc();$s->close();
     if (!$account || !(int)$account['is_active'] || $account['role']!==($_SESSION['admin_role']??'')
-        || !in_array($account['role'],['super_admin','admin','kasir'],true)
-        || ($account['role']!=='super_admin' && (int)$account['unit_id']!==unit_active_id()))
+        || !operational_role($account['role']))
         throw new RuntimeException('Akun tidak diizinkan mengubah tarif SPP.');
     $master=spp_master_state($db,$id,true);$oldRates=spp_master_rates($db,$id,true);
     spp_assert_rate_version($expected,$master,$oldRates);

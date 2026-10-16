@@ -20,6 +20,11 @@ function requireRole(array $roles): void {
     }
 
     $currentRole = $_SESSION['admin_role'] ?? '';
+    if (in_array(basename($_SERVER['SCRIPT_NAME'] ?? ''), ['role_management.php','otorisasi_transaksi.php','otorisasi_detail.php','otorisasi_aktivitas.php','otorisasi_export_pdf.php'], true)
+        && $currentRole !== 'super_admin') {
+        http_response_code(403);
+        exit('Hanya Super Admin yang dapat mengakses halaman ini.');
+    }
     if (!in_array($currentRole, ['super_admin', 'admin', 'bendahara', 'kasir'], true)) {
         session_unset();
         session_destroy();

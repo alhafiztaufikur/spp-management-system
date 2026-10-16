@@ -15,6 +15,7 @@
   };
   const api = async (action, fields = {}) => {
     const body = new URLSearchParams({action, csrf_token: config.csrf, ...fields});
+    body.set('_operational_unit', String(config.unit));
     const response = await fetch('legacy_import_api.php', {method: 'POST', body});
     const result = await response.json(); if (!response.ok) throw new Error(result.error || 'Permintaan gagal.'); return result;
   };
@@ -60,7 +61,7 @@
   start.addEventListener('click', () => {
     if (start.disabled) return;
     start.disabled = true; dialog.showModal();$('legacy-preview').replaceChildren();$('legacy-counts').textContent = '';statusText('Unggah'); progress(0, 1);
-    const body = new FormData();body.append('action', 'upload');body.append('csrf_token', config.csrf);body.append('unit', config.unit);body.append('category', category);body.append('backup', file);
+    const body = new FormData();body.append('_operational_unit', String(config.unit));body.append('action', 'upload');body.append('csrf_token', config.csrf);body.append('unit', config.unit);body.append('category', category);body.append('backup', file);
     const xhr = new XMLHttpRequest();xhr.open('POST', 'legacy_import_api.php');xhr.responseType = 'json';
     xhr.upload.addEventListener('progress', event => { if (event.lengthComputable) { progress(event.loaded, event.total);statusText(`Unggah: ${Math.round(event.loaded / event.total * 100)}%`); } });
     xhr.addEventListener('load', () => { refresh();if (xhr.status >= 400 || !xhr.response?.id) { statusText(xhr.response?.error || 'Unggahan gagal.');return; }id = xhr.response.id;localStorage.setItem(storageKey, id);$('legacy-reopen').hidden = false;poll(); });

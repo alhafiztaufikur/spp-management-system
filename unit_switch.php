@@ -2,7 +2,7 @@
 session_start();
 require_once 'koneksi.php';
 require_once 'includes/auth.php';
-requireRole(['super_admin']);
+requireRole(['super_admin', 'admin', 'kasir']);
 if ($_SERVER['REQUEST_METHOD'] !== 'POST'
     || empty($_SESSION['csrf_unit_switch'])
     || !hash_equals((string)($_SESSION['csrf_unit_switch'] ?? ''), (string)($_POST['csrf_token'] ?? ''))) {

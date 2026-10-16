@@ -11,7 +11,7 @@ require_once '../includes/pagination.php';
 require_once '../includes/daftar_ulang.php';
 require_once '../includes/kelas.php';
 require_once '../includes/tagihan_tahunan.php';
-requireRole(['admin', 'bendahara']);
+requireRole(['admin', 'bendahara', 'kasir']);
 $reportUnitId=unit_report_scope($koneksi,(string)($_GET['unit']??''));
 
 $flash = $_SESSION['flash'] ?? null;
@@ -470,11 +470,11 @@ $exportQuery = filter_build_query([
               </span>
             </a>
           </div>
-        <form method="GET" class="recap-header-controls report-filter-card report-general-filter report-filter-grid<?= unit_is_super() ? ' has-scope' : '' ?>">
+        <form method="GET" class="recap-header-controls report-filter-card report-general-filter report-filter-grid<?= operational_role() ? ' has-scope' : '' ?>">
           <input type="hidden" name="student_id" data-student-identity="1" value="<?= max(0,(int)($_GET['student_id']??0)) ?>">
           <input type="hidden" name="panel" value="<?= report_e($financeTab) ?>">
           <div class="field-row finance-scope-field"><span class="field-label">Cakupan rekap</span>
-            <?php if(unit_is_super() && unit_active_id()!==0): ?>
+            <?php if(operational_role() && unit_active_id()!==0): ?>
             <select name="unit" class="field-input field-select" onchange="unitSwitchReportScope(this)" aria-label="Cakupan rekap"><option value="active" <?= $reportUnitId!==0?'selected':'' ?>>Unit aktif: <?= report_e(unit_label(unit_active_id())) ?></option><option value="all" <?= $reportUnitId===0?'selected':'' ?>>Semua Unit</option></select>
             <?php else: ?><div class="finance-scope-value"><?= finance_icon('unit') ?><strong><?= report_e(unit_label($reportUnitId)) ?></strong></div><?php if($reportUnitId===0): ?><input type="hidden" name="unit" value="all"><?php endif; ?><?php endif; ?>
           </div>

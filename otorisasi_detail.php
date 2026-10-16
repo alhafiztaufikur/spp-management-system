@@ -6,7 +6,7 @@ if(empty($_SESSION['admin_id'])){http_response_code(401);echo json_encode(['ok'=
 require_once __DIR__.'/koneksi.php';
 require_once __DIR__.'/includes/auth.php';
 require_once __DIR__.'/includes/authorization_presentation.php';
-if(!hasRole(['admin','bendahara','kasir'])){http_response_code(403);echo json_encode(['ok'=>false,'message'=>'Akses tidak diizinkan.']);exit;}
+if(!unit_is_super()){http_response_code(403);echo json_encode(['ok'=>false,'message'=>'Akses tidak diizinkan.']);exit;}
 if($_SERVER['REQUEST_METHOD']!=='GET'){http_response_code(405);header('Allow: GET');echo json_encode(['ok'=>false,'message'=>'Gunakan GET untuk membaca detail.']);exit;}
 try {
     authorization_read_unit($koneksi,$_GET['unit_id']??null);

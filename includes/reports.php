@@ -152,13 +152,13 @@ function report_class_matches_row(array $filters, array $row, string $rombelKey=
     return false;
 }
 function report_allowed_operator_roles(): array {
-    return in_array($_SESSION['admin_role'] ?? '', ['admin','super_admin'], true) ? ['admin', 'kasir'] : ['kasir'];
+    return operational_role() ? ['super_admin','admin','kasir'] : ['kasir'];
 }
 function report_operator_filter_label(): string {
-    return in_array($_SESSION['admin_role'] ?? '', ['admin','super_admin'], true) ? 'Semua admin/kasir' : 'Semua kasir';
+    return operational_role() ? 'Semua petugas' : 'Semua kasir';
 }
 function report_operators(mysqli $db, string $role = ''): array {
-    $unitWhere = ($GLOBALS['app_unit_id'] ?? 1) === 0 ? '' : ' AND unit_id=' . report_query_unit_id();
+    $unitWhere = ($GLOBALS['app_unit_id'] ?? 1) === 0 ? '' : " AND (unit_id=" . report_query_unit_id() . " OR role IN ('super_admin','admin','kasir'))";
     if ($role !== '') {
         $stmt = $db->prepare('SELECT id,username,nama,role FROM admin WHERE role=? AND is_active=1' . $unitWhere . ' ORDER BY nama');
         $stmt->bind_param('s', $role);
@@ -167,12 +167,12 @@ function report_operators(mysqli $db, string $role = ''): array {
         $stmt->close();
         return $rows;
     }
-    return $db->query('SELECT id,username,nama,role FROM admin WHERE is_active=1' . ($unitWhere !== '' ? ' AND unit_id='.report_query_unit_id() : '') . ' ORDER BY nama')->fetch_all(MYSQLI_ASSOC);
+    return $db->query('SELECT id,username,nama,role FROM admin WHERE is_active=1' . $unitWhere . ' ORDER BY nama')->fetch_all(MYSQLI_ASSOC);
 }
 function report_operator_options(mysqli $db): array {
     $roles = report_allowed_operator_roles();
     $placeholders = implode(',', array_fill(0, count($roles), '?'));
-    $unitWhere = ($GLOBALS['app_unit_id'] ?? 1) === 0 ? '' : ' AND unit_id=' . report_query_unit_id();
+    $unitWhere = ($GLOBALS['app_unit_id'] ?? 1) === 0 ? '' : " AND (unit_id=" . report_query_unit_id() . " OR role IN ('super_admin','admin','kasir'))";
     $stmt = $db->prepare("SELECT id,username,nama,role FROM admin WHERE role IN ($placeholders) AND is_active=1 {$unitWhere} ORDER BY FIELD(role,'admin','kasir'), nama");
     $types = str_repeat('s', count($roles));
     $stmt->bind_param($types, ...$roles);
@@ -186,7 +186,7 @@ function report_operator_filter_value(mysqli $db, string $operator): string {
     if ($operator === '') return '';
     $roles = report_allowed_operator_roles();
     $placeholders = implode(',', array_fill(0, count($roles), '?'));
-    $unitWhere = ($GLOBALS['app_unit_id'] ?? 1) === 0 ? '' : ' AND unit_id=' . report_query_unit_id();
+    $unitWhere = ($GLOBALS['app_unit_id'] ?? 1) === 0 ? '' : " AND (unit_id=" . report_query_unit_id() . " OR role IN ('super_admin','admin','kasir'))";
     $stmt = $db->prepare("SELECT id FROM admin WHERE role IN ($placeholders) AND is_active=1 {$unitWhere} AND (CAST(id AS CHAR)=? OR username=? OR nama=?) LIMIT 1");
     $types = str_repeat('s', count($roles)) . 'sss';
     $params = array_merge($roles, [$operator, $operator, $operator]);

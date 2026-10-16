@@ -28,7 +28,7 @@ function legacy_public(array $job):array {
     return array_intersect_key($job,array_flip(['id','unit','name','hash','state','stage','done','total','message','created','updated','cancel']));
 }
 function legacy_actor(mysqli $db,int $actor,int $unit):void {
-    $s=$db->prepare("SELECT id FROM admin WHERE id=? AND role='super_admin' AND is_active=1");$s->bind_param('i',$actor);$s->execute();$ok=$s->get_result()->fetch_assoc();$s->close();
+    $s=$db->prepare("SELECT id FROM admin WHERE id=? AND role IN ('super_admin','admin','kasir') AND is_active=1");$s->bind_param('i',$actor);$s->execute();$ok=$s->get_result()->fetch_assoc();$s->close();
     if(!$ok||!in_array($unit,[1,2,3],true))throw new RuntimeException('Akun atau unit impor tidak lagi diizinkan.');
 }
 function legacy_readiness(mysqli $db):array {
@@ -94,7 +94,7 @@ function legacy_apply(mysqli $db,array $job):void {
     $db->begin_transaction();
     try {
         // Lock authorizing account during commit; revocation cannot race application.
-        $a=$db->prepare("SELECT id FROM admin WHERE id=? AND role='super_admin' AND is_active=1 FOR UPDATE");$actor=(int)$job['actor'];$a->bind_param('i',$actor);$a->execute();if(!$a->get_result()->fetch_assoc())throw new RuntimeException('Hak impor telah berubah.');$a->close();
+        $a=$db->prepare("SELECT id FROM admin WHERE id=? AND role IN ('super_admin','admin','kasir') AND is_active=1 FOR UPDATE");$actor=(int)$job['actor'];$a->bind_param('i',$actor);$a->execute();if(!$a->get_result()->fetch_assoc())throw new RuntimeException('Hak impor telah berubah.');$a->close();
         $insert=$db->prepare("INSERT INTO siswa(NO_INDUK,NAMA,KELAS,is_active,legacy_pending,NO_induk_diknas) VALUES(?,?,'LEGACY',0,1,?)");
         $meta=$db->prepare('INSERT INTO legacy_student_import(student_id,unit_id,source_hash,source_row,source_name,source_class,raw_data,imported_by) VALUES(?,?,?,?,?,?,?,?)');
         $find=$db->prepare('SELECT s.id,m.source_hash,m.source_row FROM siswa s LEFT JOIN legacy_student_import m ON m.student_id=s.id WHERE s.NO_INDUK=? FOR UPDATE');

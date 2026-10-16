@@ -1,5 +1,11 @@
 # Konteks Proyek SistemSPP
 
+> **Kebijakan aktif 16 Oktober 2026:** Super Admin, Administrator, dan Kasir dapat berpindah SD/SMP/SMA tanpa logout serta membaca Semua Unit. Unit asal menjadi pilihan awal login; role akun tidak berubah. Mutasi tetap wajib satu unit, dengan penanda formulir yang menolak kiriman dari tab lama setelah unit sesi berubah. Hanya Super Admin dapat membuka Otorisasi Transaksi/ekspornya dan Role Management. Administrator/Kasir mengajukan koreksi pembayaran petugas lain dari Riwayat Pembayaran; keputusan tetap milik Super Admin. Hak Bendahara tetap, kecuali akses Otorisasi ditutup.
+
+Backup & Restore, termasuk pengaturan, unduhan, pemeriksaan SQL dan penerapan pemulihan, kini tersedia untuk ketiga peran operasional aktif di atas; pemeriksaan ulang akun pada endpoint dan worker tetap berlaku. Kapabilitas sesi pemilik menjaga akses progres saat database ditutup. Ini menggantikan keterangan khusus Super Admin dalam catatan backup historis di bawah. SQL tetap harus cocok dengan cadangan terverifikasi yang masih tersedia pada instalasi yang sama; tidak ada perluasan ke SQL sembarang.
+
+Kwitansi tunggal, tahunan dan PDF terpilih memakai pembentuk yang sama, Letter separo 215,9 × 139,7 mm, margin 10/5 mm dan teks utama 11 pt. Cetak browser membagi rincian menurut tinggi aktual agar identitas berulang; PDF memakai header tabel berulang. Laporan minimal 9 pt, surat 11 pt, isi buku tabungan 8 pt/18 baris. Excel A4 otomatis berskala 100%, mengulang identitas, membagi judul kelompok pada halaman lanjut dan menormalkan indeks pemisah kolom yang salah dari pustaka XLSX 1.30.7. Pengaturan printer fisik satu kali dijelaskan dalam [profil printer kwitansi](PENGATURAN_PRINTER_KWITANSI.md). Manual HTML/PDF tidak diperbarui pada pekerjaan ini sesuai permintaan pemilik; catatan hak akses di manual edisi sebelumnya belum memuat perluasan ini.
+
 > **Status 5 Oktober 2026:** PSB mencakup Pangkal; komponen Pangkal dan persen operasional telah dihapus pada db_spp lokal. Potongan SPP nominal, DIKNAS opsional, tampilan tanggal DD/MM/YYYY dan timestamp WIB. Pembayaran lama digabung ke PSB tanpa menambah kas: 1.359 siswa, 1.020 pembayaran/Rp577.790.000; Tabungan 12/Rp1.050.000 tetap utuh. Health OK dan 30 integritas bersih; worker importer berjalan kembali. [Audit/migrasi/pemulihan](PSB_NOMINAL_DATE_AUDIT_20261005.md) menjadi status terbaru; catatan tanggal sebelumnya adalah bukti historis. Railway tidak dimigrasikan.
 
 > **Status terkini setelah impor Legacy 3 Oktober 2026:** migrasi unit/NIS dan status Legacy sudah terpasang pada trial `db_spp`, implementasi `62dd273` pada main. Total 1.359 siswa (222 existing + 1.137 pending Legacy). Tepat setelah impor, pembayaran 1.018/Rp577.145.000 dan seluruh nilai existing tetap identik. Setelah dua pembayaran operasional berikutnya, total terbaru 1.020 pembayaran/Rp577.790.000; perubahan tarif SD berikutnya tercatat terpisah di audit. Pembayaran/alokasi original dan Tabungan 12 rekening/Rp1.050.000 tetap utuh. Worker LocalDB privat aktif; mulai lagi manual setelah restart Windows. Aktivasi oleh admin/kasir unit membuat hanya satu penempatan awal, tanpa tagihan otomatis; master SPP menyiapkan pasangan Komite saat penerbitan. Histori/alumni/keuangan legacy tidak ditebak atau diimpor. [Audit backend](LEGACY_IMPORT_BACKEND_20261003.md) dan [runbook](LEGACY_IMPORT_RUNBOOK_20261003.md) memuat hasil/batas trial.
@@ -68,7 +74,7 @@ Tarif target mengikuti master tahun/kelas dan nominal potongan; jika belum siap,
 
 Laporan Global mempunyai cakupan baca tersendiri: Super Admin, Admin, Kasir, dan Bendahara dapat memilih SD/SMP/SMA/Semua Unit pada katalog, sembilan template, dan ekspornya. Pilihan unit laporan tidak mengubah unit operasional atau hak transaksi. Identitas/kelas/operator dan metadata ekspor mengikuti unit laporan; filter yang bergantung pada unit dibersihkan ketika cakupan diganti. Dashboard, surat, dan modul lainnya tetap mengikuti aturan akses sebelumnya. [Verifikasi 10 Oktober 2026](GLOBAL_REPORT_SCOPE_20261010.md). Katalog, header, dan filter kembali ke susunan sebelum redesign terakhir (11 Oktober 2026). Status, Penerimaan Harian, Pembayaran per Item, dan SPP Tahunan memakai matriks horizontal komponen/periode; penggabungan unit+siswa+kelas historis berlangsung sebelum pagination, dengan baris lanjutan untuk rincian ganda. Riwayat Tagihan, Tabungan, kas, dan Surat Kepala Sekolah mempertahankan bentuk khusus. Adapter tampilan tidak mengubah model/query bisnis. PDF/cetak membagi kolom lebar dan mengulang identitas/header; Excel memakai pemetaan yang sama, angka/tanggal bertipe, dan pembekuan identitas. [Panduan matriks dan pengujian](GLOBAL_REPORT_MATRIX_20261011.md). Perbaikan 12 Oktober 2026 menyatukan lebar kolom/header, memperbaiki lapisan sticky dan topbar, serta menyesuaikan penguncian NIS dengan ruang panel. Pratinjau tetap interaktif; Cetak membuka PDF inline yang memakai pembentuk dokumen unduhan, A4 otomatis dan teks isi 9 pt. Excel memakai kop ringkas tanpa merge melintasi batas freeze, subtotal sejajar, total ringkas, dan pengaturan cetak A4. [Panduan keluaran dan verifikasi](GLOBAL_REPORT_LAYOUT_20261012.md).
 
-### Cakupan Super Admin — 3 Oktober 2026
+### Cakupan Super Admin - catatan historis 3 Oktober 2026
 
 Sidebar menyimpan SD/SMP/SMA atau **Semua Unit** dalam sesi. Semua Unit hanya untuk baca data, riwayat, laporan, surat, dan pengaturan; baris/rombel/ekspor menyertakan unit. Master tahunan gabungan menampilkan tarif per unit/tahun. Struk, buku Tabungan dan surat individual memakai sekolah pemilik data.
 
@@ -76,22 +82,26 @@ Pada input/edit pembayaran, Tabungan Masuk/Keluar dan otorisasi, opsi Semua Unit
 
 Pemilih cakupan Dashboard/laporan memperbarui sesi melalui POST dengan CSRF. URL laporan lama `unit=all` tetap dapat dibuka sebagai cakupan baca. Palette super yang sudah tersedia dipakai pada gabungan; stylesheet hasil pemulihan tidak berubah. Tidak diperlukan migrasi. Lihat [bukti fitur Semua Unit](ALL_UNITS_AUDIT_20261003.md).
 
-| Aksi | Admin | Kasir | Bendahara |
-| --- | :---: | :---: | :---: |
-| Input, lihat, cetak pembayaran | Ya | Ya | Tidak |
-| Edit pembayaran | Langsung | Ajukan perubahan; berlaku setelah disetujui Admin | Tidak |
-| Hapus pembayaran | Langsung | Ajukan penghapusan; berlaku setelah disetujui Admin | Tidak |
-| Setujui/tolak pengajuan kasir | Ya | Tidak | Tidak |
-| Periksa antrean/riwayat otorisasi | Ya | Pengajuan sendiri | Ya, baca saja |
-| Kelola Data Siswa, Kelas/Rombel, SPP, Biaya Lain, Daftar Ulang | Ya | Ya | Tidak |
-| Kelola akun/role | Super Admin saja | Tidak | Tidak |
-| Laporan Global | Ya | Ya | Ya |
+### Hak akses aktif 16 Oktober 2026
+
+| Aksi | Super Admin | Administrator | Kasir | Bendahara |
+| --- | :---: | :---: | :---: | :---: |
+| Pindah unit operasional / rekap Semua Unit | Ya | Ya | Ya | Unit asal; cakupan Laporan Global tetap tersedia |
+| Input pembayaran / tabungan dan kelola siswa/master | Ya, satu unit | Ya, satu unit | Ya, satu unit | Tidak |
+| Lihat/cetak transaksi petugas lain pada cakupan terpilih | Ya | Ya | Ya | Mengikuti hak baca/cetak sebelumnya |
+| Koreksi pembayaran | Langsung atau putuskan pengajuan | Ajukan; tunggu Super Admin | Ajukan; tunggu Super Admin | Tidak |
+| Status/alasan koreksi dan batalkan pengajuan sendiri | Ya | Riwayat Pembayaran | Riwayat Pembayaran | Hak baca sebelumnya |
+| Otorisasi, keputusan dan ekspor otorisasi | Ya | Tidak | Tidak | Tidak |
+| Role Management / seluruh tindakan akun | Ya | Tidak | Tidak | Tidak |
+| Impor/aktivasi Legacy, kenaikan/kelulusan | Ya, satu unit | Ya, satu unit | Ya, satu unit | Tidak |
+| Backup & Restore seluruh database | Ya | Ya | Ya | Tidak |
+| Laporan Global dan ekspor | Ya | Ya | Ya | Ya |
 
 Guard backend berada di `includes/auth.php`. Hak akses harus diperiksa pada endpoint mutasi, bukan hanya dengan menyembunyikan tombol.
 
 ## Lokasi kode utama
 
-- `backup_restore.php`, `backup_api.php`, `includes/database_backup.php`: backup seluruh database khusus Super Admin aktif, antrean/riwayat/status/unduhan terverifikasi dan peringatan dashboard. Runner `scripts/database_backup_runner.php` dijalankan Task Scheduler atau launcher manual; fungsi snapshot dibagi melalui `scripts/database_backup_worker.php` untuk backup pengaman Restore. `restore_api.php`, `restore_status.php`, `includes/database_restore.php`, `scripts/database_restore_runner.php` menangani pemulihan yang dikonfirmasi; `includes/database_access.php` menutup akses selama penggantian. Konfigurasi/kredensial/SQLite/arsip berada di luar webroot. Verifikasi memakai `scripts/verify_backup_instance.ps1` dan `scripts/backup_verify_audit.php`. [Panduan backup/pemulihan](DAILY_DATABASE_BACKUP.md); dokumen UI 3 Oktober adalah catatan historis.
+- `backup_restore.php`, `backup_api.php`, `includes/database_backup.php`: backup seluruh database untuk Super Admin/Administrator/Kasir aktif, antrean/riwayat/status/unduhan terverifikasi dan peringatan dashboard. Runner `scripts/database_backup_runner.php` dijalankan Task Scheduler atau launcher manual; fungsi snapshot dibagi melalui `scripts/database_backup_worker.php` untuk backup pengaman Restore. `restore_api.php`, `restore_status.php`, `includes/database_restore.php`, `scripts/database_restore_runner.php` menangani pemulihan yang dikonfirmasi; `includes/database_access.php` menutup akses selama penggantian. Konfigurasi/kredensial/SQLite/arsip berada di luar webroot. Verifikasi memakai `scripts/verify_backup_instance.ps1` dan `scripts/backup_verify_audit.php`. [Panduan backup/pemulihan](DAILY_DATABASE_BACKUP.md); dokumen UI 3 Oktober adalah catatan historis.
 
 - `pembayaran/`: input, histori, edit/hapus, dan struk transaksi.
 - `siswa/`: Data Siswa dan riwayat kelas.

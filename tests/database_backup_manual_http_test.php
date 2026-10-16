@@ -92,7 +92,9 @@ try{
     foreach(['admin','kasir','bendahara'] as $role){
         $s=$koneksi->prepare('SELECT id,role FROM admin WHERE role=? AND is_active=1 LIMIT 1');$s->bind_param('s',$role);$s->execute();$other=$s->get_result()->fetch_assoc();
         [$otherSession,$otherCsrf]=manual_session($other,1);
-        [$status]=manual_request($otherSession,'backup_api.php','POST',['action'=>'create','csrf_token'=>$otherCsrf,'request_key'=>bin2hex(random_bytes(16))]);manual_assert(in_array($status,[302,401,403],true),'Unauthorized role dispatched backup');
+        [$status,$body]=manual_request($otherSession,'backup_api.php','POST',['action'=>'create','csrf_token'=>$otherCsrf,'request_key'=>bin2hex(random_bytes(16))]);
+        if($role==='bendahara')manual_assert(in_array($status,[302,401,403],true),'Read-only role dispatched backup');
+        else{$created=json_decode($body,true);manual_assert($status===202,'Operational role cannot dispatch backup');[$otherJob]=manual_wait($otherSession,$created['job']['id']);manual_assert($otherJob['state']==='verified','Operational backup not verified');}
     }
     manual_assert(db_backup_settings($queue)===$settings,'Manual backup changed saved time or retention');
     manual_assert(manual_fingerprint($koneksi)===$before,'Manual backup changed source data');

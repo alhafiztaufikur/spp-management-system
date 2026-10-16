@@ -6,7 +6,7 @@ require_once __DIR__.'/filter_choices.php';
 function history_operator_options(mysqli $db): array
 {
     $scope = unit_active_id();
-    $where = $scope === 0 ? "role IN ('super_admin','admin','kasir','bendahara')" : "(unit_id=".(int)$scope." OR role='super_admin')";
+    $where = $scope === 0 ? "role IN ('super_admin','admin','kasir','bendahara')" : "(unit_id=".(int)$scope." OR role IN ('super_admin','admin','kasir'))";
     $actors = [];
     foreach ($db->query('SELECT id,nama,username FROM admin WHERE '.$where)->fetch_all(MYSQLI_ASSOC) as $actor) {
         $actors[(string)$actor['id']] = $actor['nama'].(!empty($actor['username']) ? ' (@'.$actor['username'].')' : '');

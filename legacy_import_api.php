@@ -2,7 +2,7 @@
 session_start();require_once __DIR__.'/koneksi.php';require_once __DIR__.'/includes/legacy_import.php';
 header('Content-Type: application/json; charset=utf-8');header('Cache-Control: private, no-store');
 function legacy_api_error(int $code,string $message):never{http_response_code($code);echo json_encode(['error'=>$message],JSON_UNESCAPED_UNICODE);exit;}
-if(!isset($_SESSION['admin_id'])||($_SESSION['admin_role']??'')!=='super_admin')legacy_api_error(403,'Hanya Super Admin yang dapat mengakses importer.');
+if(!isset($_SESSION['admin_id'])||!operational_role())legacy_api_error(403,'Akun pengelola operasional diperlukan untuk mengakses importer.');
 $write=($_SERVER['REQUEST_METHOD']??'GET')==='POST';$action=(string)($write?($_POST['action']??''):($_GET['action']??'health'));
 if(!in_array($_SERVER['REQUEST_METHOD'],['GET','POST'],true))legacy_api_error(405,'Metode tidak diizinkan.');
 if($write){

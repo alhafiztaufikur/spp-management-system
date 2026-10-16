@@ -602,11 +602,25 @@ try {
         this.setCustomValidity('');
       });
 
-      document.getElementById('role').addEventListener('change', function () {
+      function syncAccountUnit() {
+        const role = document.getElementById('role');
         const unit = document.getElementById('account-unit');
-        if (this.value === 'super_admin') unit.value = '0';
-        else if (unit.value === '0') unit.value = '';
+        const isSuper = role.value === 'super_admin';
+        if (!isSuper && unit.value && unit.value !== '0') unit.dataset.lastSchoolUnit = unit.value;
+        Array.from(unit.options).forEach(option => {
+          option.disabled = isSuper ? option.value !== '0' : option.value === '0';
+        });
+        if (isSuper) unit.value = '0';
+        else if (unit.value === '0' || !unit.value) unit.value = unit.dataset.lastSchoolUnit || '';
+        unit.setAttribute('aria-label', isSuper ? 'Unit: Semua Unit, ditetapkan untuk Super Admin' : 'Unit akun');
+        window.syncSppDropdowns?.();
+      }
+      document.getElementById('role').addEventListener('change', syncAccountUnit);
+      document.getElementById('account-unit').addEventListener('change', function () {
+        if (this.value && this.value !== '0') this.dataset.lastSchoolUnit = this.value;
       });
+      window.addEventListener('pageshow', syncAccountUnit);
+      syncAccountUnit();
 
       document.getElementById('form-tambah-akun').addEventListener('submit', function (event) {
         const password = document.getElementById('password-baru').value;

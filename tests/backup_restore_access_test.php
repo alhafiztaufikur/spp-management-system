@@ -35,10 +35,11 @@ try {
         $koneksi->query("UPDATE admin SET role='$role',unit_id=1 WHERE id=$id");
         backup_access_session($sid,$id,1); // Intentionally stale session claims Super Admin.
         [$status] = backup_access_request($base,$sid);
-        backup_access_assert($status===302, 'Stale role accessed backup UI');
+        backup_access_assert($status===($role==='bendahara'?302:200), 'Fresh role access incorrect for backup UI');
         $route = $role==='kasir' ? 'tabungan/masuk.php' : ($role==='bendahara' ? 'laporan/index.php' : 'dashboard.php');
         [$status,$body] = backup_access_request($base,$sid,'GET',$route);
-        backup_access_assert($status===200 && !str_contains($body,'href="backup_restore.php"') && !str_contains($body,'href="../backup_restore.php"'), 'Menu leaked to non Super Admin');
+        $visible=str_contains($body,'href="backup_restore.php"') || str_contains($body,'href="../backup_restore.php"');
+        backup_access_assert($status===200 && $visible===($role!=='bendahara'), 'Backup menu differs from operational role');
     }
     $koneksi->query("UPDATE admin SET role='super_admin',unit_id=NULL,is_active=0 WHERE id=$id");
     backup_access_session($sid,$id,0);
@@ -49,4 +50,4 @@ try {
     $koneksi->query("UPDATE admin SET role='$role',unit_id=$unit,is_active=$active WHERE id=$id");
     session_id($sid); session_start(); $_SESSION=[]; session_destroy();
 }
-echo "OK: Super Admin-only URL/menu, fresh role and active-session validation; four read scopes and all write methods rejected\n";
+echo "OK: operational backup URL/menu, fresh role and active-session validation; four read scopes and invalid write methods rejected\n";

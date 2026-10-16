@@ -3,7 +3,7 @@ session_start();
 header('Content-Type: application/json; charset=utf-8');header('Cache-Control: no-store, private');
 if(empty($_SESSION['admin_id'])){http_response_code(401);echo json_encode(['ok'=>false,'message'=>'Silakan masuk kembali.']);exit;}
 require_once __DIR__.'/koneksi.php';require_once __DIR__.'/includes/auth.php';require_once __DIR__.'/includes/authorization_history.php';
-if(!hasRole(['admin','bendahara','kasir'])){http_response_code(403);echo json_encode(['ok'=>false,'message'=>'Akses tidak diizinkan.']);exit;}
+if(!unit_is_super()){http_response_code(403);echo json_encode(['ok'=>false,'message'=>'Akses tidak diizinkan.']);exit;}
 $id=max(0,(int)($_GET['id']??0));
 try{
     require_once __DIR__.'/includes/authorization_presentation.php';
