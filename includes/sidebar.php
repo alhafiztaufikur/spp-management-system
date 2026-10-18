@@ -121,7 +121,7 @@ $shortLabels = [
 ];
 
 // Role label
-$roleLabels = ['super_admin' => 'Super Admin', 'admin' => 'Administrator', 'bendahara' => 'Bendahara TU', 'kasir' => 'Kasir'];
+$roleLabels = ['super_admin' => 'Super Admin', 'admin' => 'Administrator'];
 $roleLabel  = $roleLabels[$role] ?? 'Pengguna';
 $roleAvatars = [
   'super_admin' => 'SA',
@@ -153,6 +153,8 @@ function unitSwitchReportScope(select) {
 document.addEventListener('DOMContentLoaded', function () {
   document.querySelectorAll('form[method="post" i]').forEach(function(form){
     var action=form.getAttribute('action')||'';
+    // This POST exports a read selection; it does not change school transactions.
+    if(form.classList.contains('auth-export-tools') && new URL(action,location.href).pathname.endsWith('/otorisasi_export_pdf.php'))return;
     if(form.classList.contains('sidebar-unit-form') || form.classList.contains('dashboard-unit-switch-form') || action.includes('logout.php') || (['database-backup-form','database-backup-settings-form'].includes(form.id) && new URL(action,location.href).pathname.endsWith('/backup_api.php')))return;
     form.querySelectorAll('input,select,textarea,button').forEach(function(control){control.disabled=true});
     form.hidden=true;form.style.setProperty('display','none','important');

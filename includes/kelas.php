@@ -5,9 +5,20 @@ require_once __DIR__ . '/tagihan_tahunan.php';
 require_once __DIR__ . '/komite_billing.php';
 require_once __DIR__.'/promotion.php';
 
+function class_kind(array $class): string {
+    $code=(string)($class['KELAS']??$class['tingkat']??'');
+    return $class['rombel_jenis'] ?? $class['jenis_rombel'] ?? $class['jenis'] ?? (in_array($code,['CUSTOM','OUT'],true)?strtolower($code):($code==='0'?'psb':'reguler'));
+}
+function class_student_code(array $class): string {
+    $kind=class_kind($class);
+    return in_array($kind,['custom','out'],true)?strtoupper($kind):(string)$class['tingkat'];
+}
 function class_label(array $class): string {
+    $kind=class_kind($class);
+    if ($kind==='out') return 'Out';
+    if ($kind==='custom') return (string)($class['nama_custom']??$class['rombel_nama']??'Custom');
     if (($class['tingkat']??$class['KELAS']??'')==='LEGACY') return 'Legacy';
-    $level = (int)($class['tingkat'] ?? 0);
+    $level = (int)($class['tingkat'] ?? $class['KELAS'] ?? 0);
     $code = strtoupper(trim((string)($class['kode_rombel'] ?? '')));
     if ($level === 0 || $code === 'PSB') {
         return 'PSB';
@@ -19,7 +30,7 @@ function class_label(array $class): string {
 }
 
 function class_find(mysqli $db, int $classId, bool $activeOnly = false, bool $forUpdate = false): ?array {
-    $sql = 'SELECT id, unit_id, tingkat, kode_rombel, is_placeholder, is_active FROM master_kelas WHERE id = ?';
+    $sql = 'SELECT * FROM master_kelas WHERE id = ?';
     if ($activeOnly) $sql .= ' AND is_active = 1';
     $sql .= ' LIMIT 1';
     if ($forUpdate) $sql .= ' FOR UPDATE';
@@ -36,9 +47,9 @@ function class_all(mysqli $db, bool $activeOnly = true, bool $includePlaceholder
     $where = [];
     if ($activeOnly) $where[] = 'is_active = 1';
     if (!$includePlaceholder) $where[] = 'is_placeholder = 0';
-    $sql = 'SELECT id, unit_id, tingkat, kode_rombel, is_placeholder, is_active FROM master_kelas';
+    $sql = 'SELECT * FROM master_kelas';
     if ($where) $sql .= ' WHERE ' . implode(' AND ', $where);
-    $sql .= " ORDER BY CASE WHEN tingkat=0 THEN 0 ELSE 1 END, tingkat, is_placeholder, kode_rombel";
+    $sql .= " ORDER BY CASE WHEN kode_rombel='OUT' AND tingkat IS NULL THEN 0 WHEN tingkat=0 THEN 1 WHEN tingkat IS NULL THEN 3 ELSE 2 END, tingkat, is_placeholder, kode_rombel";
     $rows = $db->query($sql)->fetch_all(MYSQLI_ASSOC);
     foreach ($rows as &$row) $row['label'] = (($GLOBALS['app_unit_id']??1)===0?unit_label((int)$row['unit_id']).' · ':'') . class_label($row);
     unset($row);
@@ -46,7 +57,7 @@ function class_all(mysqli $db, bool $activeOnly = true, bool $includePlaceholder
 }
 
 function class_ensure_psb(mysqli $db): int {
-    $stmt = $db->prepare("INSERT IGNORE INTO master_kelas (tingkat, kode_rombel, is_placeholder, is_active) VALUES (0, 'PSB', 0, 1)");
+    $stmt = $db->prepare("INSERT IGNORE INTO master_kelas (tingkat, kode_rombel, jenis, is_placeholder, is_active) VALUES (0, 'PSB', 'psb', 0, 1)");
     $stmt->execute();
     $created = $stmt->affected_rows > 0 ? 1 : 0;
     $stmt->close();
@@ -276,11 +287,12 @@ function class_sync_student_current_year(
     ];
     $class = class_find($db, $classId);
     if (!$class) throw new RuntimeException('Master kelas/rombel siswa tidak ditemukan.');
-    if ((int)$class['tingkat'] === 0) {
+    if (class_kind($class)!=='reguler') {
+        $s=$db->prepare("UPDATE siswa_tahun_ajaran SET status='pindah' WHERE no_induk=? AND status='aktif'");$s->bind_param('s',$noInduk);$s->execute();$s->close();
         return null;
     }
     $academicLabel = du_current_academic_year();
-    $stmt = $db->prepare('SELECT MAX(ta.label) AS latest_year FROM siswa_tahun_ajaran sta JOIN tahun_ajaran ta ON ta.id=sta.tahun_ajaran_id WHERE sta.no_induk=?');
+    $stmt = $db->prepare('SELECT MAX(ta.label) AS latest_year FROM siswa_tahun_ajaran sta JOIN tahun_ajaran ta ON ta.id=sta.tahun_ajaran_id WHERE sta.no_induk=? AND sta.status<>\'dibatalkan\'');
     $stmt->bind_param('s', $noInduk);
     $stmt->execute();
     $latestYear = (string)($stmt->get_result()->fetch_assoc()['latest_year'] ?? '');

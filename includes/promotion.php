@@ -4,16 +4,16 @@ require_once __DIR__.'/spp_billing.php';
 /** Read only: available history, never create years on GET. */
 function promotion_year_options(mysqli $db):array {
     if(!in_array(unit_active_id(),[1,2,3],true))return [];
-    $today=du_current_academic_year();$unit=unit_active_id();
-    $s=$db->prepare("SELECT y.id,y.label,COUNT(p.id) placements FROM tahun_ajaran y JOIN siswa_tahun_ajaran p ON p.tahun_ajaran_id=y.id AND p.unit_id=y.unit_id WHERE y.unit_id=? AND y.label<=? GROUP BY y.id,y.label ORDER BY y.label DESC");
-    $s->bind_param('is',$unit,$today);$s->execute();$rows=$s->get_result()->fetch_all(MYSQLI_ASSOC);$s->close();return $rows;
+    $unit=unit_active_id();
+    $s=$db->prepare("SELECT y.id,y.label,COUNT(p.id) placements FROM tahun_ajaran y JOIN siswa_tahun_ajaran p ON p.tahun_ajaran_id=y.id AND p.unit_id=y.unit_id WHERE y.unit_id=? GROUP BY y.id,y.label ORDER BY y.label DESC");
+    $s->bind_param('i',$unit);$s->execute();$rows=$s->get_result()->fetch_all(MYSQLI_ASSOC);$s->close();return $rows;
 }
-function promotion_context(mysqli $db,int $sourceYearId,?string $targetYear=null):array {
+function promotion_context(mysqli $db,int $sourceYearId,?string $targetYear=null,bool $browse=false):array {
     $unit=unit_active_id();if(!in_array($unit,[1,2,3],true))throw new RuntimeException('Pilih satu unit untuk proses tahun ajaran.');
     $s=$db->prepare('SELECT id,unit_id,label FROM tahun_ajaran WHERE id=? AND unit_id=?');$s->bind_param('ii',$sourceYearId,$unit);$s->execute();$row=$s->get_result()->fetch_assoc();$s->close();
     if(!$row)throw new RuntimeException('Pilih tahun ajaran asal yang tersedia pada unit ini.');
     $label=du_normalize_academic_year($row['label']);
-    if(strcmp($label,du_current_academic_year())>0)throw new RuntimeException('Tahun asal belum berjalan; siswa tahun tujuan belum dapat diproses untuk siklus berikutnya.');
+    if(!$browse&&strcmp($label,du_current_academic_year())>0)throw new RuntimeException('Tahun asal belum berjalan; siswa tahun tujuan belum dapat diproses untuk siklus berikutnya.');
     $next=class_next_academic_year_label($label);
     if($targetYear!==null&&du_normalize_academic_year($targetYear)!==$next)throw new RuntimeException('Tahun tujuan harus tepat satu tahun setelah tahun asal.');
     return ['source_year_id'=>(int)$row['id'],'source_year'=>$label,'target_year'=>$next,'unit_id'=>$unit];
@@ -24,10 +24,10 @@ function promotion_context_from_target(mysqli $db,string $targetYear):array {
     return promotion_context($db,$id,$targetYear);
 }
 function promotion_roster(mysqli $db,int $sourceYearId,int $level):array {
-    $ctx=promotion_context($db,$sourceYearId);[$first,$last]=unit_level_bounds();if($level<$first||$level>$last)return [];
+    $ctx=promotion_context($db,$sourceYearId,null,true);[$first,$last]=unit_level_bounds();if($level<$first||$level>$last)return [];
     $s=$db->prepare("SELECT s.id student_id,s.unit_id,s.NO_INDUK,s.NO_induk_diknas,s.NAMA,p.kelas KELAS,p.master_kelas_id,p.kelas_rombel_snapshot,p.id source_placement_id,p.status source_status,
       s.is_active,s.legacy_pending,s.KELAS active_level,s.SPP_PERBULAN,s.POMG,mk.tingkat,mk.kode_rombel,mk.is_active source_rombel_active,COALESCE(mk.is_placeholder,1) is_placeholder,
-      am.tingkat active_master_level,am.kode_rombel active_code,am.is_placeholder active_placeholder,am.is_active active_rombel,
+      s.master_kelas_id active_class_id,am.tingkat active_master_level,am.kode_rombel active_code,am.is_placeholder active_placeholder,am.is_active active_rombel,
       EXISTS(SELECT 1 FROM siswa_tahun_ajaran newer JOIN tahun_ajaran ny ON ny.id=newer.tahun_ajaran_id AND ny.unit_id=newer.unit_id WHERE newer.unit_id=p.unit_id AND newer.no_induk=p.no_induk AND ny.label>?) newer
       FROM siswa_tahun_ajaran p JOIN siswa s ON s.NO_INDUK=p.no_induk AND s.unit_id=p.unit_id
       LEFT JOIN master_kelas mk ON mk.id=p.master_kelas_id AND mk.unit_id=p.unit_id
@@ -42,9 +42,13 @@ function promotion_roster(mysqli $db,int $sourceYearId,int $level):array {
         elseif($r['master_kelas_id']!==null&&($r['tingkat']===null||(int)$r['tingkat']!==$level))$r['blocked_reason']='Rombel penempatan asal tidak sesuai tingkatnya.';
         elseif((int)$r['newer'])$r['blocked_reason']='Sudah memiliki penempatan tahun tujuan atau lebih baru.';
         elseif((int)$r['active_level']!==$level||($r['active_master_level']!==null&&(int)$r['active_master_level']!==$level))$r['blocked_reason']='Kelas aktif tidak sesuai penempatan asal.';
+        if($r['blocked_reason']==='' && strcmp($ctx['source_year'],du_current_academic_year())>0)$r['blocked_reason']='Tahun ajaran ini belum berjalan. Peserta dapat dilihat; kenaikan berikutnya belum tersedia.';
         $r['eligible']=$r['blocked_reason']==='';
         $r['promotion_kode_rombel']=((int)$r['active_master_level']===$level&&!(int)$r['active_placeholder']&&(int)$r['active_rombel'])?strtoupper((string)$r['active_code']):($r['active_master_level']===null&&!$r['is_placeholder']&&$r['source_rombel_active']?strtoupper((string)$r['kode_rombel']):'');
         $r['kelas_aktif_label']=$r['promotion_kode_rombel']!==''?$level.$r['promotion_kode_rombel']:'';
+        if($r['source_status']==='aktif' && (int)$r['active_level']===$level && $r['kelas_aktif_label']!=='') {
+            $r['kelas_label']=$r['kelas_aktif_label'];$r['master_kelas_id']=$r['active_class_id'];
+        }
     }unset($r);return $rows;
 }
 function promotion_actor_lock(mysqli $db):array {
@@ -81,14 +85,17 @@ function promotion_write_audit(mysqli $db,array $actor,array $student,array $sou
     $s->bind_param('issssis',$student['id'],$student['NO_INDUK'],$action,$before,$after,$actor['id'],$actor['nama']);$s->execute();$s->close();
 }
 /** Called inside a transaction. Actor → student → target class → source placement/year. */
-function promotion_apply_student(mysqli $db,string $nis,int $targetClassId,array $ctx,?int $placementId=null,?int $level=null,bool $graduate=false):array {
+function promotion_apply_student(mysqli $db,string $nis,int $targetClassId,array $ctx,?int $placementId=null,?int $level=null,bool $graduate=false,bool $custom=false):array {
     $ctx=promotion_context($db,(int)$ctx['source_year_id'],(string)$ctx['target_year']);
     $actor=promotion_actor_lock($db);$student=promotion_lock_student($db,$nis);
     $target=null;
     if(!$graduate){$target=class_find($db,$targetClassId,true,true);if(!$target||$target['is_placeholder'])throw new RuntimeException('Pilih rombel target yang aktif.');}
     $source=promotion_source_lock($db,$student,$ctx,$placementId,$level);[, $last]=unit_level_bounds();
     if($graduate&&(int)$source['kelas']!==$last)throw new RuntimeException('Kelulusan hanya untuk kelas terakhir pada tahun asal.');
-    if(!$graduate&&((int)$source['kelas']===$last||(int)$target['tingkat']!==(int)$source['kelas']+1))throw new RuntimeException('Target wajib tepat satu tingkat di atas penempatan asal.');
+    if(!$graduate&&!$custom&&((int)$source['kelas']===$last||(int)$target['tingkat']!==(int)$source['kelas']+1))throw new RuntimeException('Target wajib tepat satu tingkat di atas penempatan asal.');
+    [$firstLevel,$lastLevel]=unit_level_bounds();
+    if($custom&&(!$target||(int)$target['tingkat']<$firstLevel||(int)$target['tingkat']>$lastLevel))throw new RuntimeException('Tujuan Custom harus rombel reguler dalam unit ini.');
+    $ctx['mode']=$custom?'custom':'regular';
     $sourceId=(int)$source['id'];$status=$graduate?'lulus':'pindah';
     $s=$db->prepare("UPDATE siswa_tahun_ajaran SET status=? WHERE id=? AND unit_id=? AND status='aktif'");$s->bind_param('sii',$status,$sourceId,$ctx['unit_id']);$s->execute();$changed=$s->affected_rows;$s->close();
     if($changed!==1)throw new RuntimeException('Siswa sudah diproses; muat ulang halaman.');
@@ -105,7 +112,7 @@ function promotion_apply_student(mysqli $db,string $nis,int $targetClassId,array
     $result=['student'=>$student['NAMA'],'action'=>'naik','source_year'=>$ctx['source_year'],'target_year'=>$ctx['target_year'],'target'=>$label,'source_placement_id'=>$sourceId,'target_placement_id'=>$destination,'spp_status'=>$rateReady?'Sesuai master':'Belum disiapkan','spp'=>$spp];
     promotion_write_audit($db,$actor,$student,$source,$ctx,$result);return $result;
 }
-function promotion_batch(mysqli $db,array $selected,array $targets,array $ctx,int $level,array $placements=[]):array {
+function promotion_batch(mysqli $db,array $selected,array $targets,array $ctx,int $level,array $placements=[],bool $custom=false):array {
     [$first,$last]=unit_level_bounds();if($level<$first||$level>$last)throw new RuntimeException('Pilih tingkat asal pada unit ini.');
     $selected=array_values(array_unique(array_map('strval',array_filter($selected,'is_scalar'))));if(!$selected)throw new RuntimeException('Pilih minimal satu siswa.');
     promotion_actor_lock($db);
@@ -119,18 +126,18 @@ function promotion_batch(mysqli $db,array $selected,array $targets,array $ctx,in
     foreach($order as $nis){
         $db->query('SAVEPOINT promotion_student');
         try{
-            if($level!==$last&&(!isset($targets[$nis])||!is_scalar($targets[$nis])||!preg_match('/^[0-9]+$/D',(string)$targets[$nis])||(int)$targets[$nis]<=0))throw new RuntimeException('Pilih rombel tujuan yang valid.');
+            if(($custom||$level!==$last)&&(!isset($targets[$nis])||!is_scalar($targets[$nis])||!preg_match('/^[0-9]+$/D',(string)$targets[$nis])||(int)$targets[$nis]<=0))throw new RuntimeException('Pilih rombel tujuan yang valid.');
             $expected=$placements?((int)($placements[$nis]??0)):null;
-            $success[]=promotion_apply_student($db,$nis,(int)($targets[$nis]??0),$ctx,$expected,$level,$level===$last);
+            $success[]=promotion_apply_student($db,$nis,(int)($targets[$nis]??0),$ctx,$expected,$level,!$custom&&$level===$last,$custom);
             $db->query('RELEASE SAVEPOINT promotion_student');
         }catch(mysqli_sql_exception $e){if(in_array($e->getCode(),[1205,1213],true))throw $e;$db->query('ROLLBACK TO SAVEPOINT promotion_student');$db->query('RELEASE SAVEPOINT promotion_student');$fail[]=['no_induk'=>$nis,'student'=>$names[$nis]??$nis,'reason'=>'Relasi siswa berubah; proses siswa dibatalkan.'];}
         catch(Throwable $e){$db->query('ROLLBACK TO SAVEPOINT promotion_student');$db->query('RELEASE SAVEPOINT promotion_student');$fail[]=['no_induk'=>$nis,'student'=>$names[$nis]??$nis,'reason'=>$e->getMessage()];}
     }
     return ['level'=>$level,'source_year'=>$ctx['source_year'],'target_year'=>$ctx['target_year'],'attempted'=>count($selected),'successes'=>$success,'failures'=>$fail];
 }
-function promotion_run_batch(mysqli $db,array $selected,array $targets,int $yearId,string $targetYear,int $level,array $placements):array {
+function promotion_run_batch(mysqli $db,array $selected,array $targets,int $yearId,string $targetYear,int $level,array $placements,bool $custom=false):array {
     for($attempt=0;$attempt<3;$attempt++){
-        $db->begin_transaction();try{$ctx=promotion_context($db,$yearId,$targetYear);$result=promotion_batch($db,$selected,$targets,$ctx,$level,$placements);$db->commit();return $result;}
+        $db->begin_transaction();try{$ctx=promotion_context($db,$yearId,$targetYear);$result=promotion_batch($db,$selected,$targets,$ctx,$level,$placements,$custom);$db->commit();return $result;}
         catch(Throwable $e){$db->rollback();if($e instanceof mysqli_sql_exception&&in_array($e->getCode(),[1205,1213],true)){if($attempt<2){usleep(100000*($attempt+1));continue;}throw new RuntimeException('Proses bersamaan belum selesai; muat ulang halaman dan coba lagi.',0,$e);}throw $e;}
     }throw new RuntimeException('Proses bersamaan belum selesai; muat ulang halaman.');
 }

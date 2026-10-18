@@ -1,36 +1,44 @@
 <?php
-require_once __DIR__.'/date_format.php';
-function savings_book_escape($value): string { return htmlspecialchars((string)$value, ENT_QUOTES, 'UTF-8'); }
-function savings_book_page(array $page, array $student, string $school, string $logo, string $position): string
-{
-    $out='<div class="leaf '.$position.($page['type']==='back'?' back-leaf':'').'">';
-    if($page['type']==='front') {
-        $out.='<div class="cover"><div class="brand">'.($logo?'<img src="'.$logo.'" alt="">':'').'<div><strong>SIMPEL</strong><span>SIMPANAN PELAJAR</span></div></div><h1>BUKU TABUNGAN</h1><div class="school-name">'.savings_book_escape($school).'</div><div class="cover-rule"></div><div class="identity"><div><span>Nama Siswa</span><b>: '.savings_book_escape($student['NAMA']).'</b></div><div><span>No. Induk</span><b>: '.savings_book_escape($student['NO_INDUK']).'</b></div><div><span>Kelas</span><b>: '.savings_book_escape($student['KELAS']).'</b></div></div><p class="motivation">Menabung hari ini, mempersiapkan masa depan yang lebih baik.</p><div class="cover-ornament"></div></div>';
-    } elseif($page['type']==='back') {
-        $out.='<div class="cover back-cover"><div class="back-content">'.($logo?'<img src="'.$logo.'" alt="">':'').'<h2>SIMPEL</h2><p>Simpanan Pelajar</p><strong>'.savings_book_escape($school).'</strong><p>Simpan buku ini dengan baik.<br>Periksa catatan tabungan bersama petugas.</p></div><div class="cover-ornament"></div></div>';
-    } else {
-        $out.='<div class="ledger-heading"><strong>BUKU TABUNGAN</strong><span>'.savings_book_escape($student['NAMA']).' &middot; NIS '.savings_book_escape($student['NO_INDUK']).'</span></div><table class="ledger"><colgroup><col style="width:6mm"><col style="width:20mm"><col style="width:31mm"><col style="width:31mm"><col style="width:31mm"><col style="width:13mm"></colgroup><thead><tr><th rowspan="2" style="width:6mm">No</th><th rowspan="2" style="width:20mm">Tanggal</th><th colspan="2" style="width:62mm">Tabungan</th><th rowspan="2" style="width:31mm">Jumlah</th><th rowspan="2" style="width:13mm">Paraf</th></tr><tr><th>Masuk</th><th>Keluar</th></tr></thead><tbody>';
-        foreach($page['rows'] as $entry) {
-            $out.='<tr><td>'.($entry?(int)$entry['number']:'').'</td><td>'.($entry?savings_book_escape(spp_date_label($entry['tanggal'])):'').'</td><td class="amount">'.($entry&&$entry['masuk']?savings_book_money($entry['masuk']):'').'</td><td class="amount">'.($entry&&$entry['keluar']?savings_book_money($entry['keluar']):'').'</td><td class="amount">'.($entry?savings_book_money($entry['saldo']):'').'</td><td></td></tr>';
-        }
-        $out.='</tbody></table><div class="ledger-footer">Jumlah = saldo berjalan (Rp)<span>Hal. '.$page['number'].'</span></div>';
-    }
-    return $out.'</div>';
-}
-function savings_book_html(array $book,array $student,string $school,string $logo): string {
-$html='<!doctype html><html lang="id"><head><meta charset="utf-8"><style>
-@page{size:A5 portrait;margin:0}*{box-sizing:border-box}body{margin:0;color:#262626;font-family:DejaVu Sans,Arial,sans-serif}
-.sheet{width:148mm;height:210mm;position:relative;page-break-after:always}.sheet.last{page-break-after:auto}
-.leaf{position:absolute;left:0;width:138mm;height:95mm;padding:5mm}.leaf.top{top:0}.leaf.bottom{top:105mm}
-.back-cover .back-content{transform:rotate(180deg);transform-origin:center center}.back-cover .cover-ornament{top:0;bottom:auto}
-.cover{height:86mm;position:relative;background:#fffefa;border:0.7pt solid #dec7c7;color:#873a3a;padding:4mm;overflow:hidden}
-.brand{height:16mm}.brand img{width:15mm;height:15mm;float:left;margin-right:3mm}.brand strong{display:block;font-size:19pt;font-weight:normal;line-height:1.1}.brand span{font-size:8pt}.cover h1{text-align:center;margin:4mm 0 0;font-size:19pt;letter-spacing:.6pt;line-height:1.15}.school-name{text-align:center;font-weight:bold;font-size:8pt;margin-top:1mm;line-height:1.3}.cover-rule{width:90mm;margin:3mm auto;border-bottom:1pt dashed #75444d}.identity{width:112mm;margin:2mm auto;font-size:8pt}.identity div{min-height:7mm}.identity span{vertical-align:top;display:inline-block;width:23mm;font-weight:bold}.identity b{display:inline-block;width:86mm;border-bottom:.5pt solid #b28a8a;vertical-align:top;word-wrap:break-word;font-weight:normal}.motivation{position:absolute;bottom:7mm;left:10mm;right:10mm;text-align:center;font-size:7pt;font-weight:bold;line-height:1.4;z-index:2}.cover-ornament{position:absolute;bottom:0;left:0;right:0;height:6mm;background:#703c4e;border-top:2pt solid #c29375}.back-content{text-align:center;margin:9mm auto;width:115mm;font-size:8pt}.back-content img{width:17mm;height:17mm}.back-content h2{font-size:19pt;margin:2mm 0}.back-content p{font-size:8pt;line-height:1.5}
-.ledger-heading{height:10mm}.ledger-heading strong{font-size:9pt;display:block}.ledger-heading span{font-size:8pt;display:block;margin-top:1mm}.ledger{width:138mm;table-layout:auto;border-collapse:collapse;font-size:8pt}.ledger td,.ledger th{border:.5pt solid #555;height:3.3mm;line-height:1.05;padding:.1mm .4mm;vertical-align:middle}.ledger th{text-align:center;height:3.5mm;font-weight:bold}.ledger td:first-child{text-align:center}.ledger td.amount{text-align:right;white-space:nowrap}.ledger-footer{font-size:8pt;margin-top:2mm}.ledger-footer span{float:right}
-</style></head><body>';
-foreach($book['sides'] as $index=>$side) {
-    $html.='<div class="sheet'.($index===count($book['sides'])-1?' last':'').'">'.savings_book_page($book['pages'][$side['left']],$student,$school,$logo,'top').savings_book_page($book['pages'][$side['right']],$student,$school,$logo,'bottom').'</div>';
-}
-$html.='</body></html>';
+require_once __DIR__.'/savings_book.php';
+require_once __DIR__.'/savings_book_layout.php';
 
-return $html;
+/** Same physical coordinates for guide, production and calibration. */
+function savings_book_pdf(array $book,array $settings,bool $guide=false): \Dompdf\Dompdf {
+    require_once __DIR__.'/pdf.php';require_pdf_library();
+    $pages=savings_book_positioned($book,$settings);$layout=$settings['layout'];
+    $options=new \Dompdf\Options();$options->setIsRemoteEnabled(false);
+    $pdf=new \Dompdf\Dompdf($options);
+    $pdf->loadHtml('<html><head><style>@page{margin:0}body{margin:0}.sheet{page-break-after:always}.sheet:last-child{page-break-after:auto}</style></head><body>'.str_repeat('<div class="sheet">&nbsp;</div>',count($pages)).'</body></html>');
+    $pdf->setPaper([0,0,148*72/25.4,210*72/25.4]);$pdf->render();
+    $pdf->getCanvas()->page_script(static function($number,$count,$canvas,$fonts)use($pages,$layout,$guide,$settings){
+        $mm=72/25.4;$font=$fonts->getFont('DejaVu Sans','bold');$black=[0,0,0];
+        $widths=array_map(static fn($key)=>$layout[$key],['w_no','w_date','w_in','w_out','w_balance','w_sign']);$width=array_sum($widths);
+        $text=static function(float $x,float $y,float $width,string $value,float $size=8.5,bool $right=false)use($canvas,$fonts,$font,$mm,$black){
+            while($size>6.5&&$fonts->getTextWidth($value,$font,$size)>($width-1.6)*$mm)$size-=.25;
+            if($fonts->getTextWidth($value,$font,$size)>($width-1.6)*$mm)throw new InvalidArgumentException('Isi tidak muat pada lebar kolom. Perbesar kolom sebelum mencetak.');
+            $left=($x+$width/2)*$mm-$fonts->getTextWidth($value,$font,$size)/2;
+            $canvas->text($left,$y*$mm,$value,$font,$size,$black);
+        };
+        if($guide||$settings['calibration']){
+            foreach(['top','bottom'] as $side){
+                $x=$layout['x_'.$side];$y=$side==='top'?$layout['y_top']+$layout['header']:$layout['y_bottom'];$rows=$layout['rows_'.$side];$bottom=$y+$rows*$layout['row_height'];
+                for($r=0;$r<=$rows;$r++)$canvas->line($x*$mm,($y+$r*$layout['row_height'])*$mm,($x+$width)*$mm,($y+$r*$layout['row_height'])*$mm,[.5,.5,.5],.35);
+                $cx=$x;foreach(array_merge([0],$widths) as $cw){$cx+=$cw;$canvas->line($cx*$mm,$y*$mm,$cx*$mm,$bottom*$mm,[.5,.5,.5],.35);}
+                if($side==='top'){
+                    $top=$layout['y_top'];$canvas->rectangle($x*$mm,$top*$mm,$width*$mm,$layout['header']*$mm,[.3,.3,.3],.4);
+                    $cx=$x;foreach($widths as $i=>$cw){if($i)$canvas->line($cx*$mm,($i===3?$top+$layout['header']/2:$top)*$mm,$cx*$mm,$y*$mm,[.3,.3,.3],.4);$cx+=$cw;}
+                    $tx=$x;foreach(['No','Tanggal','Masuk','Keluar','Jumlah','Paraf'] as $i=>$label){$text($tx,$top+($i===2||$i===3?$layout['header']*.75-1.3:$layout['header']/2-1.3),$widths[$i],$label,7);$tx+=$widths[$i];}
+                    $gx=$x+$widths[0]+$widths[1];$text($gx,$top+$layout['header']*.25-1.3,$widths[2]+$widths[3],'Tabungan',7.5);
+                    $canvas->line($gx*$mm,($top+$layout['header']/2)*$mm,($gx+$widths[2]+$widths[3])*$mm,($top+$layout['header']/2)*$mm,[.3,.3,.3],.4);
+                }
+            }
+            $canvas->line(3*$mm,105*$mm,145*$mm,105*$mm,[.7,.7,.7],.25);
+        }
+        foreach($pages[$number-1]??[] as $position){
+            $entry=$position['entry'];$side=$position['side'];$x=$layout['x_'.$side];$y=($side==='top'?$layout['y_top']+$layout['header']:$layout['y_bottom'])+($position['row']-1)*$layout['row_height']+$layout['text_offset'];
+            $values=[(string)$entry['number'],date('d/m/Y',strtotime($entry['tanggal'])),$entry['masuk']?savings_book_money($entry['masuk']):'',$entry['keluar']?savings_book_money($entry['keluar']):'',savings_book_money($entry['saldo']),''];
+            foreach($values as $i=>$value){if($value!=='')$text($x,$y,$widths[$i],$value,$i===1?7.5:8.5,$i>=2);$x+=$widths[$i];}
+        }
+    });
+    return $pdf;
 }

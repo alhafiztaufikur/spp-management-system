@@ -7,7 +7,7 @@
  * Pastikan user sudah login dan memiliki role yang diizinkan.
  * Jika tidak, redirect ke halaman yang sesuai.
  *
- * @param array $roles  Contoh: ['admin'], atau ['admin','bendahara']
+ * @param array $roles  Contoh: ['admin'], atau ['super_admin']
  */
 function requireRole(array $roles): void {
     if(PHP_SAPI!=='cli'&&defined('DB_NAME')&&function_exists('database_access_session'))database_access_session(DB_NAME,(int)(getenv('SPP_DB_PORT')?:3306));
@@ -25,7 +25,7 @@ function requireRole(array $roles): void {
         http_response_code(403);
         exit('Hanya Super Admin yang dapat mengakses halaman ini.');
     }
-    if (!in_array($currentRole, ['super_admin', 'admin', 'bendahara', 'kasir'], true)) {
+    if (!in_array($currentRole, ['super_admin', 'admin'], true)) {
         session_unset();
         session_destroy();
         header('Location: ' . $root . 'login.php');
@@ -33,14 +33,7 @@ function requireRole(array $roles): void {
     }
 
     if (!in_array($currentRole, $roles, true) && !($currentRole === 'super_admin' && in_array('admin', $roles, true))) {
-        // Redirect ke halaman default sesuai role
-        if ($currentRole === 'kasir') {
-            header('Location: ' . $root . 'tabungan/masuk.php');
-        } elseif ($currentRole === 'bendahara') {
-            header('Location: ' . $root . 'laporan/index.php');
-        } else {
-            header('Location: ' . $root . 'dashboard.php');
-        }
+        header('Location: ' . $root . 'dashboard.php');
         exit;
     }
     if (function_exists('unit_guard_request')) unit_guard_request();

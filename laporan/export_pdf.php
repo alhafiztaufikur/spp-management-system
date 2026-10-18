@@ -13,11 +13,20 @@ $reportUnitId=unit_report_scope($koneksi,(string)($_GET['unit']??''));
 // Multi-filter recaps use the same three-sheet document as the XLSX export.
 if(($_GET['mode']??'')!=='selected' && (is_array($_GET['jenis_laporan']??null)||($_GET['jenis_laporan']??'semua')!=='semua')){
     $sppGeneralPdf=true;require __DIR__.'/export_excel.php';$html=general_document_html($doc);
-    if(($_GET['output']??'preview')!=='pdf'){
-        require_once '../includes/report_preview.php';$downloadQuery=$_GET;$downloadQuery['output']='pdf';
-        render_report_pdf_preview($html,['title'=>$doc['title'],'subtitle'=>$doc['subtitle'],'orientation'=>'landscape','row_count'=>array_sum(array_map(static fn($section)=>count($section['rows']),$sheets[1]['sections'])),'download_url'=>'export_pdf.php?'.filter_build_query($downloadQuery),'back_url'=>'index.php?'.filter_build_query($_GET)]);
+    $detailCount=0;foreach(array_slice($sheets,1) as $sheet)foreach($sheet['sections'] as $section)$detailCount+=count($section['rows']);
+    if(!in_array($_GET['output']??'preview',['pdf','inline'],true)){
+        require_once '../includes/report_preview.php';$downloadQuery=$_GET;$downloadQuery['output']='pdf';$inlineQuery=$_GET;$inlineQuery['output']='inline';
+        render_report_pdf_preview($html,['title'=>$doc['title'],'subtitle'=>$doc['subtitle'],'orientation'=>'landscape','unit'=>$reportUnitId,'generated'=>$doc['generated'],'pdf_url'=>'export_pdf.php?'.filter_build_query($inlineQuery),'row_count'=>$detailCount,'download_url'=>'export_pdf.php?'.filter_build_query($downloadQuery),'back_url'=>'index.php?'.filter_build_query($_GET)]);
     }
-    require_once '../includes/pdf.php';require_pdf_library();$options=new \Dompdf\Options();$options->setIsRemoteEnabled(false);$options->setChroot(realpath(__DIR__.'/..'));$pdf=new \Dompdf\Dompdf($options);$pdf->loadHtml($html,'UTF-8');$pdf->setPaper('A4','landscape');$pdf->render();$pdf->stream('laporan-keuangan-'.date('Ymd-His').'.pdf',['Attachment'=>true]);exit;
+    require_once '../includes/pdf.php';require_pdf_library();require_once '../includes/report_artifact.php';
+    $stable=$doc;unset($stable['generated']);$query=$_GET;unset($query['output']);
+    $artifact=report_artifact_get(['route'=>'recap','unit'=>$reportUnitId,'query'=>$query],$stable,'pdf',static function()use($html){
+        $options=new \Dompdf\Options();$options->setIsRemoteEnabled(false);$options->setChroot(realpath(__DIR__.'/..'));
+        $pdf=new \Dompdf\Dompdf($options);$pdf->loadHtml($html,'UTF-8');$pdf->setPaper('A4','landscape');$pdf->render();
+        $pdf->getCanvas()->page_text(705,571,'Halaman {PAGE_NUM} / {PAGE_COUNT}',$pdf->getFontMetrics()->getFont('DejaVu Sans'),8,[.3,.4,.35]);
+        $bytes=$pdf->output();report_perf_mark('pdf');return $bytes;
+    });
+    report_artifact_stream($artifact,'rekap-laporan-transaksi.pdf','pdf',($_GET['output']??'pdf')!=='inline');
 }
 
 $output_mode = (string)($_GET['output'] ?? 'preview');
@@ -284,6 +293,7 @@ if (!$selected_mode) {
     $options->set('isRemoteEnabled', false);
     $options->set('isHtml5ParserEnabled', true);
     $options->setDefaultMediaType('print');
+$options->setFontHeightRatio(1.0);
     $dompdf = new \Dompdf\Dompdf($options);
     $dompdf->loadHtml($html);
     $dompdf->setPaper('A4', 'landscape');
@@ -396,6 +406,7 @@ require_pdf_library();
 
 $options = new \Dompdf\Options();
 $options->setDefaultMediaType('print');
+$options->setFontHeightRatio(1.0);
 $options->setIsHtml5ParserEnabled(true);
 $options->setIsRemoteEnabled(false);
 $options->setChroot(realpath(__DIR__ . '/..'));

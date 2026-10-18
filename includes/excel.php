@@ -263,9 +263,16 @@ function spp_excel_save(\PhpOffice\PhpSpreadsheet\Spreadsheet $book,string $path
     }finally{if(!$zip->close())throw new RuntimeException('Berkas Excel gagal diselesaikan.');}
 }
 function spp_excel_respond(array $doc,bool $download,string $filename,string $downloadUrl,string $backUrl,int $rowCount): void {
-    if($download){$book=spp_excel_workbook($doc);
-        // Finish generation before sending attachment headers; errors cannot become corrupt workbooks.
-        $temp=tempnam(sys_get_temp_dir(),'spp_xlsx_');try{spp_excel_save($book,$temp);header('Content-Type: application/vnd.openxmlformats-officedocument.spreadsheetml.sheet');header('Content-Disposition: attachment; filename="'.preg_replace('/[^a-zA-Z0-9_-]/','-',$filename).'.xlsx"');header('Cache-Control: no-store, private');header('Content-Length: '.filesize($temp));readfile($temp);}finally{if(is_file($temp))unlink($temp);$book->disconnectWorksheets();}exit;
+    if($download){
+        require_once __DIR__.'/report_artifact.php';
+        if(session_status()===PHP_SESSION_ACTIVE)session_write_close();
+        $stable=$doc;unset($stable['generated']);$query=$_GET;unset($query['download'],$query['format'],$query['output']);
+        $artifact=report_artifact_get(['route'=>$_SERVER['SCRIPT_NAME']??'excel','unit'=>$doc['unit'],'query'=>$query],$stable,'xlsx',static function()use($doc){
+            $book=spp_excel_workbook($doc);report_perf_mark('workbook');$temp=tempnam(sys_get_temp_dir(),'spp_xlsx_');
+            try{spp_excel_save($book,$temp);$bytes=file_get_contents($temp);report_perf_mark('xlsx');return $bytes;}
+            finally{if(is_file($temp))unlink($temp);$book->disconnectWorksheets();}
+        },($doc['presentation']??'')==='global'||$doc['title']==='Rekap Laporan Transaksi');
+        report_artifact_stream($artifact,preg_replace('/[^a-zA-Z0-9_-]/','-',$filename).'.xlsx','xlsx',true);
     }
     require_once __DIR__.'/report_preview.php';render_report_export_preview(spp_excel_preview_html($doc),['presentation'=>$doc['presentation']??'','unit'=>$doc['unit'],'file_type'=>'EXCEL','show_print'=>false,'title'=>$doc['title'],'subtitle'=>$doc['subtitle'],'generated'=>$doc['generated'],'row_count'=>$rowCount,'orientation'=>'landscape','download_url'=>$downloadUrl,'back_url'=>$backUrl]);exit;
 }

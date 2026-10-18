@@ -15,8 +15,10 @@ $format=(string)($_GET['format']??'preview');if(!in_array($format,['preview','pr
 if($globalScope&&($format==='print'||($_GET['preview_action']??'')==='print')){$format='pdf';$_GET['download']='0';}
 $excelDownload=$format==='excel'&&($_GET['download']??'')==='1';
 if($format==='pdf'){require_once __DIR__.'/../includes/pdf.php';require_pdf_library();}
-$filters=report_filters($koneksi,$_GET);if($template==='riwayat-tagihan'&&!isset($_GET['siswa_status']))$filters['siswa_status']='all';if(!isset($_GET['kategori'])&&$template==='penerimaan')$filters['kategori']='semua';if($template==='tunggakan-siswa'){$filters['q']='';if(($_GET['mode']??'')==='all'){$filters['kelas']='';unset($filters['_multi']['kelas']);}}
-$report=report_build($koneksi,$template,$filters);require_once __DIR__.'/../includes/global_report_matrix.php';$matrix=$globalScope?global_report_matrix($report,$template,$reportUnitId):null;$generated=spp_date_label(new DateTimeImmutable('now'),true);$operator=(string)($_SESSION['admin_nama']??$_SESSION['admin_username']??'Pengguna');
+require_once __DIR__.'/../includes/report_artifact.php';report_perf_mark('validate');
+if($globalScope)$koneksi->begin_transaction(MYSQLI_TRANS_START_READ_ONLY|MYSQLI_TRANS_START_WITH_CONSISTENT_SNAPSHOT);
+$filters=report_filters($koneksi,$_GET);report_perf_mark('filter');if($template==='riwayat-tagihan'&&!isset($_GET['siswa_status']))$filters['siswa_status']='all';if(!isset($_GET['kategori'])&&$template==='penerimaan')$filters['kategori']='semua';if($template==='tunggakan-siswa'){$filters['q']='';if(($_GET['mode']??'')==='all'){$filters['kelas']='';unset($filters['_multi']['kelas']);}}
+$report=report_build($koneksi,$template,$filters);if($globalScope)$koneksi->commit();report_perf_mark('query_model');require_once __DIR__.'/../includes/global_report_matrix.php';$matrix=$globalScope?global_report_matrix($report,$template,$reportUnitId):null;$generated=spp_date_label(new DateTimeImmutable('now'),true);$operator=(string)($_SESSION['admin_nama']??$_SESSION['admin_username']??'Pengguna');
 if($template==='tunggakan-siswa'&&$format==='excel'&&($_GET['view']??'')==='detail'){
     $classId=report_class_filter_rombel_id($filters);
     $selectedClass=null;
@@ -87,6 +89,10 @@ if($isCashRecap)$printOrientation='portrait';
 require_once __DIR__.'/../includes/excel.php';
 $appliedFilterText=global_report_filter_text($koneksi,$filters,$template);
 $documentSubtitle=$appliedFilterText?:$report['subtitle'];
+$artifactIdentity=['route'=>'global','unit'=>$reportUnitId,'template'=>$template,'filters'=>$filters,'orientation'=>$printOrientation];
+$artifactModel=['report'=>$report,'subtitle'=>$documentSubtitle,'school'=>unit_school_name($reportUnitId),'operator'=>$operator];
+report_perf_mark('layout');
+
 
 $moneyTotals=report_money_totals($report,$template);if($template==='riwayat-tagihan')$moneyTotals=array_values(array_filter($moneyTotals,static fn($total)=>($total['key']??'')==='tagihan'));
 function export_safe_text($value):string{
@@ -227,5 +233,9 @@ if(in_array($format,['preview','print'],true)){
         'auto_print'=>$format==='print'||($_GET['preview_action']??'')==='print',
     ]);
 }
-if($format==='pdf'){$options=new \Dompdf\Options();$options->set('isRemoteEnabled',false);$options->set('isHtml5ParserEnabled',true);$options->setDefaultMediaType('print');$options->setChroot(realpath(__DIR__.'/..'));$dompdf=new \Dompdf\Dompdf($options);$dompdf->loadHtml($html,'UTF-8');$dompdf->setPaper('A4',$printOrientation);$dompdf->render();$dompdf->stream($safeName.'.pdf',['Attachment'=>($_GET['download']??'1')!=='0']);exit;}
+if($format==='pdf'){
+    $renderPdf=static function()use($html,$printOrientation){$options=new \Dompdf\Options();$options->set('isRemoteEnabled',false);$options->set('isHtml5ParserEnabled',true);$options->setDefaultMediaType('print');$options->setChroot(realpath(__DIR__.'/..'));$dompdf=new \Dompdf\Dompdf($options);$dompdf->loadHtml($html,'UTF-8');$dompdf->setPaper('A4',$printOrientation);$dompdf->render();$bytes=$dompdf->output();report_perf_mark('pdf');return $bytes;};
+    $artifact=report_artifact_get($artifactIdentity,$artifactModel,'pdf',$renderPdf);
+    report_artifact_stream($artifact,$safeName.'.pdf','pdf',($_GET['download']??'1')!=='0');
+}
 echo $html;

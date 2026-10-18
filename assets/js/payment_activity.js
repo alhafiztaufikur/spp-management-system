@@ -20,7 +20,7 @@
         data.events.forEach(event=>{
           const item=document.createElement('li');item.className='payment-activity-event';
           const heading=document.createElement('div');heading.className='payment-activity-event-heading';heading.append(text('strong',event.label),text('time',event.time));item.append(heading);
-          item.append(text('p',[event.name,event.username?'@'+event.username:'',roles[event.role]||event.role].filter(Boolean).join(' · ')));
+          item.append(text('p',[event.name,roles[event.role]||event.role].filter(Boolean).join(' · ')));
           if(event.authorization_id)item.append(text('p','Pengajuan #'+event.authorization_id));
           if(event.note)item.append(text('p',event.note));
           if(event.reconstructed)item.append(text('p','Direkonstruksi dari bukti data lama.','payment-activity-legacy'));

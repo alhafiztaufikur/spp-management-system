@@ -5,6 +5,8 @@ require_once '../koneksi.php';
 require_once '../includes/auth.php';
 require_once '../includes/tagihan_tahunan.php';
 require_once '../includes/tagihan_sekali.php';
+require_once '../includes/reports.php';
+require_once '../includes/receipt_balances.php';
 require_once '../includes/komite_billing.php';
 requireRole(['admin', 'bendahara', 'kasir']);
 require_once __DIR__.'/../includes/payment_permissions.php';
@@ -101,23 +103,7 @@ function annual_receipt_add_remaining_line(array &$lines, string $label, float $
     $lines[] = [$label, max(0, $total - $paid)];
 }
 
-function annual_receipt_remaining_lines(mysqli $db, array $payment, array $otherDetails): array {
-    $lines = [];
-    $oneTime = one_time_fee_status($db, (string)$payment['NO_INDUK']);
-    foreach (['psb' => ['Sisa PSB', 'U_PSB']] as $component => [$label, $field]) {
-        if (abs((float)($payment[$field] ?? 0)) >= 0.005) $lines[] = [$label, (float)$oneTime[$component]['remaining']];
-    }
-    $komite=komite_receipt_summary($db,(int)$payment['id']);
-    if ($komite) $lines[]=['Sisa Komite '.$komite['label'],$komite['remaining']];
-
-    $duBillId = (int)($payment['tagihan_daftar_ulang_id'] ?? 0);
-    $duTotal = (float)($payment['du_nominal_tagihan'] ?? 0);
-    if ($duTotal <= 0) $duTotal = (float)$payment['tot_du'] > 0 ? (float)$payment['tot_du'] : max(0, (float)$payment['DAFTAR_ULANG'] - (float)$payment['potong_du']);
-    $duPaid = $duBillId > 0 ? annual_receipt_du_paid($db, $duBillId) : (float)($payment['total_du_bayar'] ?? 0);
-    $duYear = trim((string)($payment['du_tahun_ajaran'] ?? ''));
-    annual_receipt_add_remaining_line($lines, 'Sisa DU' . ($duYear !== '' ? ' (TA ' . $duYear . ')' : ''), (float)$payment['uang_du'], $duTotal, $duPaid);
-    return $lines;
-}
+function annual_receipt_remaining_lines(mysqli $db,array $payment,array $otherDetails): array {return payment_receipt_remaining($db,$payment);}
 
 $stmt = $koneksi->prepare("SELECT id FROM bayar WHERE payment_batch_token = ? ORDER BY payment_batch_sequence, id");
 $stmt->bind_param('s', $batchToken);
@@ -167,10 +153,11 @@ foreach ($ids as $paymentId) {
     $otherStmt->execute();
     $otherDetails = $otherStmt->get_result()->fetch_all(MYSQLI_ASSOC);
 
-    $payment['primary_lines'] = array_values(array_filter([
+    $payment['primary_lines'] = [
         ['Uang PSB', $payment['U_PSB']], ['Uang Daftar Ulang' . (!empty($payment['du_tahun_ajaran']) ? ' (TA ' . $payment['du_tahun_ajaran'] . ')' : ''), $payment['uang_du']],
-        ['Uang SPP', $payment['U_SPP']], ['Komite Sekolah'.(($komiteReceipt=komite_receipt_summary($koneksi,$paymentId))?' ('.$komiteReceipt['label'].')':''), $payment['U_KOMITE']],
-    ], fn($line) => abs((float)$line[1]) >= 0.005));
+        ['Uang SPP', $payment['U_SPP']], ['Komite Sekolah', $payment['U_KOMITE']],
+        ['Tabungan Wajib',0],
+    ];
     $payment['other_lines'] = [];
     foreach ($otherDetails as $detail) {
         $label = $detail['nama_biaya_snapshot'];
@@ -195,4 +182,4 @@ foreach($receipts as $receipt) $documents[]=[
     'date'=>annual_receipt_date($receipt['TGL_BYR']),
     'signer'=>$receipt['operator_name'] ?: ($_SESSION['admin_nama']??'Bagian Keuangan'),
 ];
-receipt_print_document($documents, 'Struk Tahunan', count($documents).' struk tahunan siap dicetak');
+receipt_http_output($documents, 'Struk Tahunan', count($documents).' struk tahunan siap dicetak');

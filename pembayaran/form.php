@@ -40,7 +40,7 @@ $siswa_sql = "
         FROM bayar_du
         GROUP BY unit_id,no_induk
     ) du ON du.no_induk = s.NO_INDUK AND du.unit_id=s.unit_id
-    WHERE s.is_active = 1 OR (
+    WHERE s.KELAS NOT IN ('CUSTOM','OUT') AND (s.is_active = 1 OR (
         EXISTS(SELECT 1 FROM siswa_tahun_ajaran sta_l WHERE sta_l.no_induk=s.NO_INDUK AND sta_l.unit_id=s.unit_id AND sta_l.status='lulus')
         AND (EXISTS(
             SELECT 1 FROM tagihan_daftar_ulang tdu_o
@@ -52,7 +52,7 @@ $siswa_sql = "
         ) OR EXISTS(SELECT 1 FROM tagihan_spp ts_o LEFT JOIN spp_alokasi a_o ON a_o.tagihan_spp_id=ts_o.id LEFT JOIN spp_alokasi_batch ab_o ON ab_o.id=a_o.batch_id WHERE ts_o.no_induk=s.NO_INDUK AND ts_o.unit_id=s.unit_id AND ts_o.status='open' GROUP BY ts_o.id HAVING MIN(ts_o.nominal_tagihan)-COALESCE(SUM(CASE WHEN ab_o.status='active' THEN a_o.nominal_dari_bayar ELSE 0 END),0)>.001)
           OR EXISTS(SELECT 1 FROM tagihan_komite tk_o LEFT JOIN bayar_komite bk_o ON bk_o.tagihan_komite_id=tk_o.id WHERE tk_o.no_induk=s.NO_INDUK AND tk_o.unit_id=s.unit_id AND tk_o.status='open' GROUP BY tk_o.id HAVING MIN(tk_o.nominal_tagihan)-COALESCE(SUM(bk_o.nominal),0)>.001))
     )
-    ORDER BY s.NAMA ASC
+    ) ORDER BY s.NAMA ASC
 ";
 $siswa_list = $koneksi->query($siswa_sql);
 
@@ -142,9 +142,13 @@ unset($_SESSION['payment_draft']);
   <link href="https://fonts.googleapis.com/css2?family=Inter:wght@300;400;500;600;700;800&display=swap" rel="stylesheet" />
   <link rel="stylesheet" href="../assets/css/style.css?v=duselector8&amp;mtime=<?= filemtime(__DIR__ . '/../assets/css/style.css') ?>" />
   <link rel="stylesheet" href="../assets/css/date_controls.css?v=duselector8&amp;mtime=<?= filemtime(__DIR__ . '/../assets/css/date_controls.css') ?>" />
+  <link rel="stylesheet" href="../assets/css/payment_history.css?v=<?= filemtime(__DIR__ . "/../assets/css/payment_history.css") ?>">
   <link rel="stylesheet" href="../assets/css/payment_details.css?v=<?= filemtime(__DIR__ . "/../assets/css/payment_details.css") ?>">
   <!-- Prevent theme flash -->
   <script>(function(){var t=localStorage.getItem('spp_theme')||'light';document.documentElement.setAttribute('data-theme',t);})();</script>
+<link rel="stylesheet" href="../assets/css/rombel_payment_refinement.css?v=<?= filemtime(__DIR__.'/../assets/css/rombel_payment_refinement.css') ?>">
+<link rel="stylesheet" href="../assets/css/payment_ui_polish.css?v=<?= filemtime(__DIR__ . '/../assets/css/payment_ui_polish.css') ?>">
+<link rel="stylesheet" href="../assets/css/history_rombel_refinement.css?v=<?= filemtime(__DIR__.'/../assets/css/history_rombel_refinement.css') ?>">
 </head>
 <body>
 
@@ -228,7 +232,7 @@ unset($_SESSION['payment_draft']);
                       ];
                       $cur = date('m');
                       foreach ($month_labels as $code => $label) {
-                          echo "<option value=\"$code\" data-label=\"$label\"" . ($code === $cur ? ' selected' : '') . ">$label</option>";
+                          echo "<option value=\"$code\" data-label=\"$label\"" . ((string)$code === $cur ? ' selected' : '') . ">$label</option>";
                       }
                       ?>
                     </select>
@@ -284,13 +288,13 @@ unset($_SESSION['payment_draft']);
               <datalist id="siswa-list">
                 <?php while ($s = $siswa_list->fetch_assoc()): ?>
                 <option value="<?= htmlspecialchars($s['NAMA']) ?>"
-                  data-nis="<?= htmlspecialchars($s['NO_INDUK']) ?>"
+                  data-nis="<?= htmlspecialchars($s['NO_INDUK']) ?>" data-student-id="<?= (int)$s['id'] ?>"
                   data-diknas="<?= htmlspecialchars((string)($s['NO_induk_diknas'] ?? '')) ?>"
                   data-nama="<?= htmlspecialchars($s['NAMA']) ?>"
                   data-kelas="<?= htmlspecialchars($s['graduation_year'] ? ('LULUS · TA '.$s['graduation_year']) : class_label(['tingkat'=>$s['master_tingkat']?:$s['KELAS'],'kode_rombel'=>$s['kode_rombel']??'BELUM','is_placeholder'=>$s['is_placeholder']??1])) ?>"
                   data-is-graduate="<?= $s['graduation_year'] ? '1' : '0' ?>"
                   data-graduation-year="<?= htmlspecialchars((string)$s['graduation_year']) ?>"
-                  data-total-psb="<?= money_attr($s['PSB']) ?>"
+                  data-total-psb="<?= money_attr(max(0,(float)$s['PSB']-(float)$s['potongan_psb_nominal'])) ?>"
                   data-total-spp="<?= money_attr($s['SPP_PERBULAN']) ?>"
                   data-total-komite="<?= money_attr($s['POMG']) ?>"
                   data-paid-psb="<?= money_attr($s['paid_psb']) ?>"
@@ -376,7 +380,7 @@ unset($_SESSION['payment_draft']);
               <label class="ll-field ll-field-kind">
                 <span class="ll-field-label">Jenis</span>
                 <select class="field-input field-select biaya-lain-select" name="biaya_lain_tagihan_id[]">
-                  <option value="">-- Pilih Tagihan --</option>
+                  <option value="">-- Pilih Biaya / Tagihan Lama --</option>
                 </select>
               </label>
               <label class="ll-field"><span class="ll-field-label">Total</span><input class="field-input biaya-lain-total" type="text" value="0" placeholder="Total" readonly aria-label="Total biaya lain" /></label>
@@ -400,7 +404,7 @@ unset($_SESSION['payment_draft']);
               <label class="ll-field ll-field-kind">
                 <span class="ll-field-label">Jenis</span>
                 <select class="field-input field-select biaya-lain-select" name="biaya_lain_tagihan_id[]">
-                  <option value="">-- Pilih Tagihan --</option>
+                  <option value="">-- Pilih Biaya / Tagihan Lama --</option>
                 </select>
               </label>
               <label class="ll-field"><span class="ll-field-label">Total</span><input class="field-input biaya-lain-total" type="text" value="0" placeholder="Total" readonly aria-label="Total biaya lain" /></label>
@@ -418,31 +422,7 @@ unset($_SESSION['payment_draft']);
 
           <input type="hidden" id="catatan" name="catatan" value="">
           <div class="section-divider"><span>History Transaksi Siswa</span></div>
-          <div class="payment-history-panel" id="payment-history-panel">
-            <div class="payment-history-head">
-              <div>
-                <strong>Riwayat pembayaran siswa</strong>
-                <span id="payment-history-period">Pilih siswa untuk melihat transaksi.</span>
-              </div>
-            </div>
-            <div class="table-container payment-history-table-wrap">
-              <table class="payment-table payment-history-table">
-                <thead>
-                  <tr>
-                    <th>Tanggal</th>
-                    <th>Periode</th>
-                    <th>Komponen</th>
-                    <th>Metode</th>
-                    <th>Operator</th>
-                    <th>Total</th>
-                  </tr>
-                </thead>
-                <tbody id="payment-history-body">
-                  <tr><td colspan="6">Belum ada siswa dipilih.</td></tr>
-                </tbody>
-              </table>
-            </div>
-          </div>
+          <?php require __DIR__.'/../includes/student_payment_history_ui.php'; ?>
 
           <!-- Action Buttons -->
           <div class="action-bar">
@@ -475,7 +455,9 @@ unset($_SESSION['payment_draft']);
     window.sppDaftarUlangMasters = {};
     window.sppDaftarUlangHasMasters = true;
     window.sppPaymentHistoryUrl = 'history_siswa.php';
+    window.sppPaymentHistoryUnit = <?= unit_active_id() ?>;
     window.sppOtherFeeBillsUrl = 'biaya_lain_siswa.php';
+    window.sppOtherFeeMasters = <?= json_encode(other_fee_optional_choices($koneksi),JSON_HEX_TAG|JSON_HEX_AMP|JSON_HEX_APOS|JSON_HEX_QUOT) ?>;
     window.sppPaymentStatusUrl = 'status_spp.php';
     window.sppPublishedBilling = true;
     window.sppFlashWarning = <?= json_encode(
@@ -486,6 +468,7 @@ unset($_SESSION['payment_draft']);
   </script>
   <script src="../assets/js/date_format.js?v=<?= filemtime(__DIR__ . '/../assets/js/date_format.js') ?>"></script>
   <script src="../assets/js/other_fee_picker.js?v=<?= filemtime(__DIR__ . "/../assets/js/other_fee_picker.js") ?>"></script>
+  <script src="../assets/js/student_payment_history.js?v=<?= filemtime(__DIR__ . '/../assets/js/student_payment_history.js') ?>"></script>
   <script src="../assets/js/app.js?v=<?= filemtime(__DIR__ . '/../assets/js/app.js') ?>"></script>
 </body>
 </html>

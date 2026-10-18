@@ -15,7 +15,8 @@ function authorization_export_selection(string $json): array
             || !is_int($row['payment_id']) || $row['payment_id']<=0) {
             throw new InvalidArgumentException('Identitas transaksi terpilih tidak valid.');
         }
-        $keys[$row['unit_id'].'|'.$row['payment_id']]=true;
+        $source=$row['source']??'pembayaran';if(!is_string($source)||!in_array($source,['pembayaran','tabungan_masuk','tabungan_keluar'],true))throw new InvalidArgumentException('Jenis pilihan tidak valid.');
+        $keys[($source==='pembayaran'?'':$source.'|').$row['unit_id'].'|'.$row['payment_id']]=true;
     }
     return $keys;
 }

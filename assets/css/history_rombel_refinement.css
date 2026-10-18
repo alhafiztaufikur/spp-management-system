@@ -1,0 +1,34 @@
+/* Payment controls and form typography; existing values/events are unchanged. */
+.payment-period-inputs{display:grid!important;grid-template-columns:repeat(2,minmax(0,1fr));align-items:end;gap:10px}
+.payment-period-inputs>.spp-select,.payment-year-picker{width:100%;min-width:0;max-width:none;flex:1 1 0!important}
+.payment-period-inputs>.month-code-select{width:100%;min-width:0}
+.payment-period-inputs .payment-year-select{width:100%;max-width:none;height:48px;min-height:48px;padding:11px 14px;border-radius:10px;line-height:1.35;font:inherit;background:var(--bg-elevated);border:1px solid var(--border)}
+.payment-year-picker .payment-year-caption{line-height:1.4;margin-bottom:6px}
+.spp-dropdown-panel .payment-year-option.spp-dropdown-option{min-height:38px;height:auto;padding:9px 10px;border:0;border-radius:7px;font:inherit;text-align:left;color:var(--text-primary);background:transparent;box-shadow:none}
+.spp-dropdown-panel .payment-year-option.spp-dropdown-option:hover,.spp-dropdown-panel .payment-year-option.spp-dropdown-option:focus-visible,.spp-dropdown-panel .payment-year-option.spp-dropdown-option.is-active{background:var(--accent-glow);color:var(--accent);outline:none}
+.spp-dropdown-panel .payment-year-option.spp-dropdown-option.is-active{font-weight:700}
+.student-history .payment-history-table{font-size:14px}
+.student-history .payment-history-table td{font-size:14px}
+.student-history .payment-history-table td.history-total{font-size:15px}
+.student-history .payment-history-table th button{font-size:11px}
+.student-history .history-method{font-size:12px}
+.student-history .payment-history-head h3{font-size:17px}
+.student-history #payment-history-period,.student-history .sh-footer{font-size:13px}
+/* A shared, balanced history toolbar now includes current rombel membership. */
+.ph-filter-form,.sw-filter-form{grid-template-columns:repeat(3,minmax(0,1fr))!important;align-items:end;gap:16px}
+.ph-filter-form .ph-filter-actions,.sw-filter-form .sw-filter-actions{grid-column:1/-1!important;justify-content:flex-end}
+.history-rombel-field{min-width:0}
+@media(max-width:1000px){.ph-filter-form,.sw-filter-form{grid-template-columns:repeat(2,minmax(0,1fr))!important}}
+@media(max-width:600px){.ph-filter-form,.sw-filter-form{grid-template-columns:minmax(0,1fr)!important}.student-history .payment-history-table td{font-size:13px}.student-history .history-method{font-size:12px}}
+/* Student identity controls share baselines; the discount section follows paired rows. */
+.student-workspace .student-panel-identity .fields-grid{align-items:start;gap:18px 16px}
+.student-workspace .student-panel-identity .field-label{min-height:20px;margin-bottom:8px}
+.student-workspace .student-panel-identity .field-input{min-height:48px;height:48px}
+.student-workspace .student-panel-identity .payment-auto-note{display:block;margin-top:8px;line-height:1.5}
+html body[data-readable-workspace="students"] .student-workspace .student-panel-discounts .student-money-grid{grid-template-columns:repeat(2,minmax(0,1fr));gap:14px}
+.student-workspace .student-panel-discounts .student-money-grid>.field-row{min-width:0;gap:10px;padding:20px;border:1px solid var(--border);border-radius:12px;background:var(--bg-surface)}
+.student-workspace .student-panel-discounts .student-money-grid>.field-row:nth-child(even){background:color-mix(in srgb,var(--orange-bg) 55%,var(--bg-card))}
+.student-workspace .student-panel-discounts .student-money-grid .field-label{min-height:0;line-height:1.5;font-size:12px}
+.student-workspace .student-panel-discounts .student-money-grid .field-input{min-height:46px;font-size:16px;background:var(--bg-card)}
+.student-workspace .student-panel-discounts .student-money-grid .payment-auto-note{font-size:12px;line-height:1.6}
+@media(max-width:600px){html body[data-readable-workspace="students"] .student-workspace .student-panel-discounts .student-money-grid{grid-template-columns:minmax(0,1fr)}.student-workspace .student-panel-discounts .student-money-grid>.field-row{padding:16px}}

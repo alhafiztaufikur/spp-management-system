@@ -47,7 +47,7 @@ function payment_history_model(mysqli $db,int $id,bool $deleted): array
 }
 function payment_history_actor(?array $event): void
 {
-    echo '<strong>'.authorization_escape(($event['actor_name']??'')?:'Tidak tercatat').'</strong><small>'.authorization_escape(!empty($event['actor_username'])?'@'.$event['actor_username']:'Username tidak tercatat').'</small><small>'.authorization_escape(authorization_role_label($event['actor_role']??'')).'</small>';
+    echo '<strong>'.authorization_escape(($event['actor_name']??'')?:'Tidak tercatat').'</strong><small>'.authorization_escape(authorization_role_label($event['actor_role']??'')).'</small>';
 }
 function payment_history_render(array $model, ?array $query=null): void
 {
@@ -63,7 +63,7 @@ function payment_history_render(array $model, ?array $query=null): void
       <h4>Pengajuan #<?= (int)$request['id'] ?> · <?= authorization_escape(['pending'=>'Menunggu Super Admin','approved'=>'Disetujui','rejected'=>'Ditolak','cancelled'=>'Dibatalkan','failed'=>'Gagal'][$request['status']] ?? $request['status']) ?></h4>
       <p><?= nl2br(authorization_escape($request['reason'])) ?></p>
       <?php if ($request['decision_note']): ?><p><strong>Catatan keputusan:</strong> <?= nl2br(authorization_escape($request['decision_note'])) ?></p><?php endif; ?>
-      <?php if (!$deleted && !unit_all_readonly() && $request['status']==='pending' && (int)$request['requested_by']===(int)($_SESSION['admin_id']??0)): ?>
+      <?php if (empty($model['readonly']) && !$deleted && !unit_all_readonly() && $request['status']==='pending' && (int)$request['requested_by']===(int)($_SESSION['admin_id']??0)): ?>
       <form method="post" action="proses.php">
         <input type="hidden" name="_operational_unit" value="<?= unit_active_id() ?>">
         <input type="hidden" name="csrf_token" value="<?= authorization_escape($_SESSION['csrf_payment']??'') ?>">
@@ -79,8 +79,8 @@ function payment_history_render(array $model, ?array $query=null): void
     <div class="ph-detail-actions">
     <?php if($caps['can_edit']): ?><a class="btn-tbl btn-tbl-edit" href="<?= authorization_escape(payment_return_edit_url($token,$id)) ?>"><?= authorization_icon('edit') ?> <?= transaction_authorization_requires_request()?'Ajukan Edit':'Edit' ?></a><?php endif; ?>
     <?php if($caps['can_delete']): ?><button type="button" class="btn-tbl btn-tbl-del open-payment-delete-request" data-id="<?= $id ?>" data-context="<?= authorization_escape($token) ?>" data-student="<?= authorization_escape($p['NAMA']??$p['NO_INDUK']) ?>"><?= authorization_icon('delete') ?> <?= transaction_authorization_requires_request()?'Ajukan Hapus':'Hapus' ?></button><?php endif; ?>
-    <?php if($caps['can_print']): ?><a class="btn-tbl btn-tbl-print" data-print-payment href="../laporan/cetak_struk.php?id=<?= $id ?>" target="_blank" rel="noopener"><?= authorization_icon('pdf') ?> Cetak</a><?php endif; ?>
+    <?php if($caps['can_print']): ?><a class="btn-tbl btn-tbl-print history-receipt-button" data-print-payment href="../laporan/cetak_struk.php?id=<?= $id ?>" target="_blank" rel="noopener"><?= authorization_icon('print') ?> Cetak Bukti Transaksi</a><?php endif; ?>
     <?php if($model['batch_print']): ?><a class="btn-tbl btn-tbl-print" href="../laporan/cetak_struk_tahunan.php?batch=<?= authorization_escape($p['payment_batch_token']) ?>" target="_blank" rel="noopener">12 Struk</a><?php endif; ?>
-    <button type="button" class="btn-tbl open-payment-activity" data-id="<?= $id ?>" data-unit="<?= (int)$p['unit_id'] ?>"><?= authorization_icon('history') ?> Riwayat Aktivitas</button></div>
+    <?php if(empty($model['readonly'])): ?><button type="button" class="btn-tbl open-payment-activity" data-id="<?= $id ?>" data-unit="<?= (int)$p['unit_id'] ?>"><?= authorization_icon('history') ?> Riwayat Aktivitas</button><?php endif; ?></div>
     <?php
 }

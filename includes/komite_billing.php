@@ -15,7 +15,7 @@ function komite_sync_placement(mysqli $db, int $placementId): int {
     $stmt->bind_param('i', $placementId); $stmt->execute();
     $placement = $stmt->get_result()->fetch_assoc(); $stmt->close();
     [$firstLevel, $lastLevel] = unit_level_bounds();
-    if (!$placement || $placement['status'] === 'lulus'
+    if (!$placement || in_array($placement['status'],['lulus','dibatalkan'],true)
         || (int)$placement['kelas'] < $firstLevel || (int)$placement['kelas'] > $lastLevel) return 0;
     $periods = spp_academic_periods((string)$placement['label']);
     $start = (string)($placement['komite_mulai_bulan'] ?? '07');

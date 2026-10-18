@@ -5,9 +5,10 @@
     document.querySelectorAll('.receipt-print-page').forEach(page => page.remove());
     document.querySelectorAll('.receipt-original').forEach(page => page.classList.remove('receipt-original'));
   };
-  window.addEventListener('beforeprint', () => {
+  const prepare = () => {
     clean();
     const measure = document.createElement('div');
+    measure.className = 'receipt-pagination-measure';
     measure.style.cssText = 'position:absolute;left:-10000px;top:0;visibility:hidden;width:195.9mm;';
     const ruler = document.createElement('div');ruler.style.height = '129.7mm';measure.append(ruler);document.body.append(measure);
     const available = ruler.getBoundingClientRect().height - 2;ruler.remove();
@@ -34,6 +35,8 @@
       pages.forEach(part => {previous.after(part);previous = part;});
     });
     measure.remove();
-  });
+  };
+  window.receiptPagination = {prepare,clean};
+  window.addEventListener('beforeprint', prepare);
   window.addEventListener('afterprint', clean);
 })();

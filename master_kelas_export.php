@@ -1,0 +1,22 @@
+<?php
+session_start();require_once __DIR__.'/koneksi.php';require_once __DIR__.'/includes/auth.php';requireRole(['admin','kasir']);require_once __DIR__.'/includes/promotion_participants.php';
+if($_SERVER['REQUEST_METHOD']!=='POST'){http_response_code(405);header('Allow: POST');exit('Gunakan tombol Ekspor pada Daftar Peserta.');}
+if(!is_string($_POST['csrf_token']??null)||empty($_SESSION['csrf_master_kelas'])||!hash_equals($_SESSION['csrf_master_kelas'],$_POST['csrf_token'])){http_response_code(403);exit('Sesi ekspor tidak valid. Muat ulang Daftar Peserta.');}
+try{
+    foreach(['format','source_year_id','source_level','promotion_mode','roster_q'] as $key)if(isset($_POST[$key])&&!is_string($_POST[$key]))throw new InvalidArgumentException('Parameter ekspor tidak valid.');
+    if(!preg_match('/^[1-9][0-9]*$/D',$_POST['source_year_id']??'')||!preg_match('/^[1-9][0-9]*$/D',$_POST['source_level']??''))throw new InvalidArgumentException('Pilih tahun dan tingkat asal.');
+    $format=$_POST['format']??'';if(!in_array($format,['excel','pdf'],true))throw new InvalidArgumentException('Format ekspor tidak valid.');
+    $model=participants_model($koneksi,(int)$_POST['source_year_id'],(int)$_POST['source_level'],$_POST['promotion_mode']??'regular');
+    $rows=participants_export_values(participants_export_rows($model,$_POST['selected_placements']??[],trim($_POST['roster_q']??'')));
+}catch(mysqli_sql_exception $e){error_log('Ekspor peserta: '.$e->getMessage());http_response_code(500);exit('Daftar peserta belum dapat dimuat. Coba kembali.');}
+catch(InvalidArgumentException|RuntimeException $e){http_response_code(400);header('Content-Type: text/plain; charset=UTF-8');exit($e->getMessage());}
+$title='Daftar Peserta Tahun Ajaran '.$model['source_year'];$subtitle='Unit '.unit_label($model['unit_id']).' · Kelas '.$model['level'].' · '.count($rows).' peserta · '.(empty($_POST['selected_placements'])?'Seluruh hasil pencarian':'Peserta terpilih');
+$name='peserta-'.str_replace('/','-',$model['source_year']).'-'.unit_label($model['unit_id']).'-kelas-'.$model['level'];
+if(session_status()===PHP_SESSION_ACTIVE)session_write_close();
+require_once __DIR__.'/includes/excel.php';$columns=[];foreach(participants_columns() as $key=>$label)$columns[]=spp_excel_column($key,$label,$key==='no'?'number':'text');
+$doc=spp_excel_document($title,$subtitle,$model['unit_id'],[['name'=>'Peserta','sections'=>[spp_excel_section('Daftar Peserta',$columns,$rows)]]]);
+if($format==='excel')spp_excel_respond($doc,true,$name,'','master_kelas.php#naik-kelas',count($rows));
+require_once __DIR__.'/includes/pdf.php';require_pdf_library();
+$palette=spp_excel_palette($model['unit_id']);
+ob_start();?><!doctype html><html lang="id"><head><meta charset="utf-8"><style>@page{margin:12mm}body{font-family:DejaVu Sans,sans-serif;font-size:9px;color:#172b24}h1{font-size:16px;margin:0 0 8px}p{line-height:1.6;margin:5px 0 12px}table{width:100%;border-collapse:collapse;table-layout:fixed}thead{display:table-header-group}th,td{border:1px solid #d3e3db;padding:7px 5px;vertical-align:top;overflow-wrap:break-word}th{background:#<?= $palette[2] ?>;color:#<?= $palette[1] ?>;text-align:left}tr{page-break-inside:avoid}th:first-child{width:24px}th:nth-child(2){width:115px}th:nth-child(8){width:130px}.foot{font-size:8px;color:#53675c}</style></head><body><h1><?= participants_e($title) ?></h1><p><?= participants_e($doc['school']) ?><br><?= participants_e($subtitle) ?><br>Dibuat: <?= participants_e($doc['generated']) ?></p><table><thead><tr><?php foreach(participants_columns() as $label): ?><th><?= participants_e($label) ?></th><?php endforeach; ?></tr></thead><tbody><?php foreach($rows as $r): ?><tr><?php foreach(participants_columns() as $key=>$label): ?><td><?= participants_e($r[$key]) ?></td><?php endforeach; ?></tr><?php endforeach; ?><?php if(!$rows): ?><tr><td colspan="9">Tidak ada peserta sesuai pencarian.</td></tr><?php endif; ?></tbody></table><p class="foot">Daftar pemantauan. Rombel tujuan bertanda Rencana belum merupakan penempatan tersimpan.</p></body></html><?php $html=ob_get_clean();
+$options=new \Dompdf\Options();$options->set('isRemoteEnabled',false);$options->set('isHtml5ParserEnabled',true);$pdf=new \Dompdf\Dompdf($options);$pdf->loadHtml($html,'UTF-8');$pdf->setPaper('A4','landscape');$pdf->render();header('Cache-Control: no-store, private');$pdf->stream($name.'.pdf',['Attachment'=>true]);

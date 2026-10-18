@@ -1,4 +1,5 @@
 <?php
+require_once __DIR__.'/other_fee_optional.php';
 require_once __DIR__.'/payment_permissions.php';
 require_once __DIR__ . "/payment_activity.php";
 
@@ -67,6 +68,8 @@ function transaction_authorization_snapshot(mysqli $db, int $paymentId): array
     $payment = $stmt->get_result()->fetch_assoc();
     $stmt->close();
     if (!$payment) throw new RuntimeException('Transaksi pembayaran tidak ditemukan.');
+    // Immutable display context is not an editable financial field. Keep pre-migration pending hashes valid.
+    unset($payment['riwayat_tahun_ajaran'],$payment['riwayat_kelas_snapshot']);
 
     $details = [];
     $relations = [
@@ -123,6 +126,7 @@ function transaction_authorization_payload(array $source, string $action): array
     foreach (['biaya_lain_detail_id','biaya_lain_tagihan_id','biaya_lain_nominal','biaya_lain_keterangan'] as $key) {
         if (isset($source[$key]) && is_array($source[$key])) $payload[$key] = array_values($source[$key]);
     }
+    if(isset($source['_other_fee_tariffs'])&&is_array($source['_other_fee_tariffs']))$payload['_other_fee_tariffs']=$source['_other_fee_tariffs'];
     $payload['id'] = (int)($source['id'] ?? 0);
     return $payload;
 }
@@ -152,6 +156,8 @@ function transaction_authorization_create(mysqli $db, int $paymentId, string $ac
         $pending->close();
 
         $snapshot = transaction_authorization_snapshot($db, $paymentId);
+        other_fee_validate_proposal($db,$paymentId,$payload);
+        $payload['_other_fee_names']=other_fee_proposal_names($db,$payload);
         $payloadJson = json_encode($payload, JSON_UNESCAPED_UNICODE | JSON_UNESCAPED_SLASHES);
         if ($payloadJson === false) throw new RuntimeException('Usulan perubahan tidak dapat disimpan.');
         $payment = $snapshot['data']['payment'];

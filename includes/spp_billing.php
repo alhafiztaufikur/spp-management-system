@@ -322,7 +322,7 @@ function spp_publish_students(mysqli $db, int $masterYearId, array $students, ar
     $created=0;$skipped=0;$ineligible=[];
     $find=$db->prepare("SELECT sta.id,sta.no_induk,sta.kelas,sta.master_kelas_id,sta.kelas_rombel_snapshot,sta.spp_covered_by_psb,sta.komite_mulai_bulan,s.potongan_spp_nominal,s.is_active
       FROM siswa_tahun_ajaran sta JOIN siswa s ON s.NO_INDUK=sta.no_induk AND s.unit_id=sta.unit_id
-      WHERE sta.tahun_ajaran_id=? AND sta.no_induk=? AND CAST(sta.kelas AS UNSIGNED) " . unit_level_between_sql() . " LIMIT 1 FOR UPDATE");
+      WHERE sta.status<>'dibatalkan' AND sta.tahun_ajaran_id=? AND sta.no_induk=? AND CAST(sta.kelas AS UNSIGNED) " . unit_level_between_sql() . " LIMIT 1 FOR UPDATE");
     $insert=$db->prepare("INSERT IGNORE INTO tagihan_spp(master_spp_tahun_id,tahun_ajaran_id,penempatan_id,no_induk,tingkat_snapshot,master_kelas_id,kelas_rombel_snapshot,bulan,tahun,tarif_dasar_snapshot,potongan_nominal_ditetapkan_snapshot,potongan_nominal_snapshot,nominal_tagihan,status)
       VALUES(?,?,?,?,?,?,?,?,?,?,?,?,?,?)");
     foreach(array_keys($selected) as $nis){
@@ -343,7 +343,10 @@ function spp_publish_students(mysqli $db, int $masterYearId, array $students, ar
             $placementId=(int)$placement['id'];$classId=(int)($placement['master_kelas_id']??0);$classIdParam=$classId?:null;
             $classLabel=(string)$placement['kelas_rombel_snapshot'];$month=$period['bulan'];$year=$period['tahun'];
             $insert->bind_param('iiisiisssdddds',$masterYearId,$yearId,$placementId,$nis,$level,$classIdParam,$classLabel,$month,$year,$billBase,$discount,$billDiscount,$billNet,$status);
-            $insert->execute(); if($insert->affected_rows===1)$created++;else$skipped++;
+            $insert->execute(); if($insert->affected_rows===1)$created++;else{
+                $restore=$db->prepare("UPDATE tagihan_spp SET status=?,cancel_reason=NULL,tarif_dasar_snapshot=?,potongan_nominal_ditetapkan_snapshot=?,potongan_nominal_snapshot=?,nominal_tagihan=?,tingkat_snapshot=?,master_kelas_id=?,kelas_rombel_snapshot=?,penempatan_id=? WHERE no_induk=? AND bulan=? AND tahun=? AND status='cancelled' AND cancel_reason LIKE 'Koreksi pendaftaran awal PSB:%' AND NOT EXISTS(SELECT 1 FROM spp_alokasi WHERE tagihan_spp_id=tagihan_spp.id)");
+                $restore->bind_param('sddddiisisss',$status,$billBase,$discount,$billDiscount,$billNet,$level,$classIdParam,$classLabel,$placementId,$nis,$month,$year);$restore->execute();if($restore->affected_rows)$created++;else$skipped++;$restore->close();
+            }
         }
     }
     $find->close();$insert->close();
@@ -380,6 +383,10 @@ function spp_published_period_status(mysqli $db, string $noInduk, string $month,
     $paid=(float)($selected['paid']??0);$total=(float)($selected['nominal_tagihan']??0);
     $status=['ok'=>true,'status'=>'payable','code'=>'payable','lock_spp'=>false,'title'=>'','message'=>'','amount_label'=>'','selected'=>['bulan'=>$month,'tahun'=>$year,'label'=>$label,'tariff'=>$total,'paid'=>$paid,'remaining'=>max(0,$total-$paid)],'blocking_period'=>null];
     if (!$selected) return array_merge($status,['status'=>'not_published','code'=>'not_published','lock_spp'=>true,'title'=>'Tagihan SPP belum terbit','message'=>'SPP '.$label.' belum tersedia.','amount_label'=>'Pilih bulan lain atau hubungi admin.']);
+    if(in_array($selected['status'],['covered_psb','waived','cancelled'],true)){
+        $labels=['covered_psb'=>['Tercakup Uang PSB','SPP '.$label.' tercakup Uang PSB tahun pertama. Tidak perlu dibayar terpisah.'],'waived'=>['Potongan Penuh','SPP '.$label.' memiliki potongan penuh.'],'cancelled'=>['Tagihan Dibatalkan','SPP '.$label.' telah dibatalkan.']];
+        return array_merge($status,['status'=>'not_payable','code'=>$selected['status'],'lock_spp'=>true,'title'=>$labels[$selected['status']][0],'message'=>$labels[$selected['status']][1]]);
+    }
     if ($selected['status']!=='open' || $total<=.001) return array_merge($status,['status'=>'not_payable','code'=>'not_payable','lock_spp'=>true,'title'=>'SPP tidak perlu dibayar','message'=>'SPP '.$label.' tidak memiliki tagihan terbuka.']);
     if ($paid+.001>=$total) return array_merge($status,['status'=>'already_paid','code'=>'already_paid','lock_spp'=>true,'title'=>'SPP sudah lunas','message'=>'SPP '.$label.' sudah lunas.']);
     if ($older) {

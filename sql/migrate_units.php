@@ -188,3 +188,6 @@ financial_components_apply($koneksi);
 
 require_once __DIR__ . "/payment_activity_schema.php";
 payment_activity_schema_apply($koneksi);
+
+require_once __DIR__.'/savings_authorization_schema.php';
+savings_authorization_schema_apply($koneksi);

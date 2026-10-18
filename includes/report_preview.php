@@ -24,6 +24,7 @@ function report_preview_url(array $source, array $replace = [], array $remove = 
 
 function render_report_export_preview(string $documentHtml, array $options): void
 {
+    if(!empty($options['pdf_url'])){require_once __DIR__.'/report_pdf_preview.php';render_native_report_preview($options);}
     $global=($options['presentation']??'')==='global';
     $palette=[1=>'165c44',2=>'203e80',3=>'832a35',0=>'513080'][(int)($options['unit']??1)]??'165c44';
     $title = (string)($options['title'] ?? 'Preview Laporan');

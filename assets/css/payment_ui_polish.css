@@ -1,0 +1,86 @@
+/* Receipt actions shared by the payment and registration history, including AJAX details. */
+.history-receipt-button.btn-tbl{display:inline-flex;align-items:center;justify-content:center;gap:8px;min-height:42px;padding:10px 14px;border:1px solid var(--border);border-radius:24px;background:var(--bg-card);color:var(--text-secondary);font-size:12px;font-weight:650;line-height:1.4;text-decoration:none;white-space:nowrap;box-shadow:none}.history-receipt-button.btn-tbl svg{width:16px;height:16px;flex:none}.history-receipt-button.btn-tbl:hover{background:var(--accent-glow);border-color:var(--accent);color:var(--accent);transform:none}.history-receipt-button:focus-visible{outline:2px solid var(--accent);outline-offset:3px}
+.du-record-receipts{justify-content:flex-end;background:transparent;border-top:0;padding:12px 16px 16px}.du-receipt-action{display:flex;flex-direction:column;align-items:flex-end;gap:8px}.du-record-wrap .du-record{margin-bottom:0}
+/* Payment-form history has its own toolbar, without export or pagination. */
+.student-history{--sh-soft:var(--accent-glow);font-family:Inter,Arial,sans-serif;min-width:0}.student-history [hidden],.sh-menu[hidden]{display:none!important}.student-history svg,.sh-menu svg{width:18px;height:18px;fill:none;stroke:currentColor;stroke-width:1.7;stroke-linecap:round;stroke-linejoin:round;flex:none}.sh-toolbar{display:flex;flex-wrap:wrap;align-items:center;justify-content:space-between;gap:18px;padding:18px 20px;margin-bottom:16px;background:var(--bg-card);border:1px solid var(--border);border-radius:12px;box-shadow:0 4px 16px #123c2910}.sh-year{width:36%;max-width:460px;min-width:260px;padding-right:0;font-size:12px;font-weight:650}.sh-year>span{display:block;margin-bottom:7px}.sh-year .field-input{width:100%;min-height:42px;padding:10px 14px;border-radius:9px;font-size:12px;background:var(--bg-card)}.sh-tools{display:flex;align-items:center;justify-content:flex-end;gap:16px;flex:0 0 auto}.sh-filter-button{display:inline-flex;align-items:center;justify-content:center;gap:10px;border:1px solid var(--accent);border-radius:9px;background:var(--accent);color:#fff;min-height:42px;padding:10px 20px;font:600 12px Inter,Arial,sans-serif;cursor:pointer}.sh-filter-button.is-active{box-shadow:0 0 0 3px var(--accent-glow)}.sh-filter{display:flex;align-items:end;flex-wrap:wrap;gap:14px;flex-basis:100%;padding-top:16px;border-top:1px solid var(--border)}.sh-filter label{flex:1;font-size:12px;min-width:180px}.sh-filter select{display:block;width:100%;margin-top:8px;font-size:13px}.sh-filter .btn{min-height:42px;font-size:13px}.student-history .payment-history-panel{border-radius:12px;background:var(--bg-card);padding:12px 14px 0;box-shadow:0 4px 16px #123c2910;overflow:hidden}.student-history .payment-history-head{justify-content:flex-start;padding:0 4px 15px!important;gap:16px;background:transparent;min-height:54px}.sh-heading-icon{display:grid;place-items:center;width:42px;height:42px;border-radius:12px;background:var(--sh-soft);color:var(--accent);flex:none}.student-history .payment-history-head h3{margin:0 0 4px;font-size:15px;line-height:1.4;color:var(--text-primary);font-weight:750}.student-history #payment-history-period{font-size:12px;color:var(--text-muted);line-height:1.5;font-weight:400}.student-history .payment-history-table-wrap{max-height:440px;overflow:auto!important;padding:0;margin:0;border:0;border-radius:0}.student-history .payment-history-table{min-width:850px;width:100%;border-collapse:separate;border-spacing:0;font-size:12px;table-layout:auto}.student-history .payment-history-table thead{position:sticky;top:0;z-index:2;background:var(--bg-card)}.student-history .payment-history-table th{background:var(--sh-soft);padding:0!important;border:0;text-align:left}.student-history .payment-history-table th button{display:flex;align-items:center;gap:10px;width:100%;padding:10px 16px;background:none;border:0;font:650 10px Inter,Arial,sans-serif;text-transform:uppercase;color:var(--accent);cursor:pointer;white-space:nowrap}.student-history th button span{color:var(--text-muted);font-size:13px}.student-history th[aria-sort=ascending] button span,.student-history th[aria-sort=descending] button span{color:var(--accent)}.student-history .payment-history-table td{padding:11px 16px!important;line-height:1.5;border-bottom:1px solid var(--border);color:var(--text-primary);background:transparent}.student-history .payment-history-table tbody tr:hover{background:var(--sh-soft)}.student-history .payment-history-table td.history-total{font-size:13px;font-weight:750;text-align:right;white-space:nowrap;font-variant-numeric:tabular-nums}.student-history th[data-sort-column=total] button{justify-content:flex-end}.student-history .history-tanggal{white-space:nowrap}.student-history .history-method{display:inline-flex;align-items:center;gap:8px;padding:3px 11px;min-width:72px;justify-content:center;font-size:10px;font-weight:650;border:1px solid #bce9d2;background:#e9f9f1;color:#068348;line-height:1.5;border-radius:999px;white-space:nowrap}.student-history .sh-method-qris{border-color:#cbdcff;background:#edf4ff;color:#2563eb}.student-history .sh-method-va{border-color:#e4d6ff;background:#f4eeff;color:#7c3aed}.student-history .sh-row-actions{width:32px;padding-left:0!important;padding-right:8px!important;text-align:center}.sh-more{padding:0 8px;min-height:20px;line-height:1;border:0;border-radius:5px;background:transparent;color:var(--text-primary);font-size:22px;cursor:pointer}.sh-more:hover{background:var(--sh-soft)}.sh-footer{padding:18px 6px;color:var(--text-muted);font-size:12px}.student-history .sh-empty{padding:32px!important;text-align:center;color:var(--text-muted)}.sh-menu{position:fixed;z-index:1050;min-width:150px;padding:6px;background:var(--bg-card);border:1px solid var(--border);border-radius:9px;box-shadow:0 8px 28px #0002}.sh-menu button,.sh-menu a{display:flex;align-items:center;gap:10px;padding:10px;width:100%;border:0;border-radius:5px;text-decoration:none;background:none;color:var(--text-primary);font:500 13px Inter,Arial,sans-serif;text-align:left;cursor:pointer}.sh-menu button:hover,.sh-menu a:hover{background:var(--accent-glow)}.student-history button:focus-visible,.sh-menu :focus-visible{outline:2px solid var(--accent);outline-offset:2px}.sh-sr-only{position:absolute;width:1px;height:1px;overflow:hidden;clip:rect(0,0,0,0)}
+.sh-detail-dialog{width:min(760px,calc(100vw - 28px));max-height:calc(100dvh - 36px);overflow:auto;border:1px solid var(--border);border-radius:16px;margin:auto;padding:24px;background:var(--bg-card);color:var(--text-primary)}.sh-detail-dialog::backdrop{background:#071c18a8;backdrop-filter:blur(3px)}.sh-detail-dialog>header{display:flex;align-items:center;justify-content:space-between;gap:12px;margin-bottom:24px}.sh-detail-dialog h2{margin:0;font-size:22px}.sh-detail-dialog>header button{font-size:28px;border:0;border-radius:6px;background:var(--accent-glow);color:var(--text-primary);width:36px;height:36px;cursor:pointer}
+/* Keep the notice title and actions visible while long obligations scroll. */
+.spp-warning-overlay .spp-warning-dialog,.spp-warning-overlay[data-status-code=obligations_summary] .spp-warning-dialog{display:flex;flex-direction:column;width:min(600px,100%);max-height:calc(100dvh - 32px);overflow:hidden;padding:0}
+.spp-warning-overlay .spp-warning-head{flex:none;padding:22px 24px}
+.spp-warning-overlay #spp-warning-title{font-size:26px;line-height:1.3;margin:0}
+.spp-warning-overlay .spp-warning-content{min-height:0;overflow:auto;padding:22px 24px 24px}
+.spp-warning-overlay .spp-warning-message{font-size:16px;line-height:1.65;margin:0 0 18px}
+.spp-warning-overlay #spp-warning-amount.obligation-summary{max-height:42dvh;overflow:auto;border-radius:12px;margin:0;padding:0}
+.spp-warning-overlay .obligation-summary section{padding:16px 18px}
+.spp-warning-overlay .obligation-summary h4{font-size:13px;line-height:1.5;margin:0 0 8px}
+.spp-warning-overlay .obligation-line{font-size:16px;line-height:1.6;padding:5px 0;gap:20px;align-items:start}
+.spp-warning-overlay .obligation-line>span{min-width:0;overflow-wrap:anywhere}
+.spp-warning-overlay .obligation-line.obligation-total{font-size:16px;line-height:1.6;padding:16px 18px;align-items:center}
+.spp-warning-overlay .spp-warning-actions{margin-top:20px;gap:12px;flex-wrap:wrap}
+.spp-warning-overlay .spp-warning-actions .btn{font-size:16px;line-height:1.4;min-height:44px;padding:11px 22px}
+.workflow-dialog h2{font-size:26px}.workflow-dialog p,.workflow-dialog li,.workflow-dialog .btn{font-size:16px}
+/* Existing history detail components also style the read-only form dialog. */
+.sh-detail-dialog{padding:0;overflow:hidden}
+.sh-detail-dialog>header{padding:20px 24px;margin:0;border-bottom:1px solid var(--border);background:var(--bg-card)}
+.sh-detail-dialog #sh-detail-content{max-height:calc(100dvh - 126px);overflow:auto;padding:24px;line-height:1.6}
+.sh-detail-dialog .ph-student{gap:16px;margin:0 0 22px;align-items:flex-start}
+.sh-detail-dialog .ph-student-icon{width:52px;height:52px}
+.sh-detail-dialog .ph-student-icon svg{width:26px;height:26px}
+.sh-detail-dialog .ph-student h3{font-size:17px;line-height:1.4;margin:0 0 7px}
+.sh-detail-dialog .ph-student small{font-size:12px;line-height:1.7}
+.sh-detail-dialog .ph-payment-box{padding:0 18px 12px}
+.sh-detail-dialog .ph-payment-box h4{margin:0 -18px;padding:14px 18px;font-size:15px}
+.sh-detail-dialog .ph-payment-overview{padding:18px 0;gap:20px}
+.sh-detail-dialog .ph-payment-overview small{font-size:12px;line-height:1.7}
+.sh-detail-dialog .ph-total{font-size:25px;line-height:1.4;margin-top:5px}
+.sh-detail-dialog .ph-components{font-size:14px}
+.sh-detail-dialog .ph-components>div{padding:12px 0}
+.sh-detail-dialog .ph-note{padding-top:12px;border-top:1px solid var(--border);font-size:12px;line-height:1.7;margin:0}
+.sh-detail-dialog .ph-info-grid{gap:16px;margin-top:18px}
+.sh-detail-dialog .ph-info-grid section{padding:0 16px 16px}
+.sh-detail-dialog .ph-info-grid h4{font-size:14px;padding:14px 0}
+.sh-detail-dialog .ph-info-grid strong,.sh-detail-dialog .ph-info-grid span{font-size:13px}
+.sh-detail-dialog .ph-info-grid small{font-size:12px;line-height:1.7}
+.sh-detail-dialog .ph-detail-actions{justify-content:flex-end;margin-top:20px;padding-top:16px;border-top:1px solid var(--border)}
+.sh-detail-dialog .ph-detail-actions .history-receipt-button{flex:0 1 auto}
+/* Match the note input to the fee selection control. */
+.biaya-lain-row .biaya-lain-keterangan{height:48px;min-height:48px;padding:12px 14px;line-height:1.5}
+/* Selection tint covers the receipt footer as part of the same registration card. */
+.du-record-wrap{background:var(--bg-card)}
+.du-record-wrap:has(.du-record.is-selected){background:var(--accent-glow);border-color:var(--accent)}
+.du-record-wrap:has(.du-record.is-selected) .du-record{background:transparent}
+.du-record-wrap:has(.du-record:hover){background:var(--accent-glow);border-color:var(--accent)}
+.du-record-wrap:has(.du-record:hover) .du-record{background:transparent}
+/* Checkbox target list replaces the native Ctrl/Command selector. */
+.fee-picker-toolbar{display:flex;justify-content:space-between;align-items:center;flex-wrap:wrap;gap:10px;padding:14px 0 10px;font-size:12px;color:var(--text-muted)}.fee-picker-toolbar>div{display:flex;gap:10px;flex-wrap:wrap}.fee-picker-toolbar button{padding:5px 0;border:0;background:none;font-family:inherit;font-size:12px;font-weight:600;color:var(--accent);cursor:pointer}.fee-picker-list{max-height:320px;overflow:auto;border:1px solid var(--border);border-radius:10px;background:var(--bg-card)}.fee-workspace .fee-picker-row{display:flex;align-items:center;gap:14px;padding:14px 16px;margin:0;border-bottom:1px solid var(--border);cursor:pointer;background:var(--bg-card)}.fee-picker-row:last-child{border-bottom:0}.fee-workspace .fee-picker-row:hover,.fee-workspace .fee-picker-row.is-selected{background:var(--accent-glow)}.fee-picker-row:focus-within{outline:2px solid var(--accent);outline-offset:-2px}.fee-picker-row input[type=checkbox]{appearance:auto;width:18px;height:18px;accent-color:var(--accent);flex:none;cursor:pointer}.fee-picker-row>span{display:flex;flex-direction:column;gap:5px;min-width:0}.fee-picker-row strong{font-size:14px;color:var(--text-primary);font-weight:600;overflow-wrap:anywhere}.fee-picker-row small{font-size:12px;color:var(--text-muted);font-weight:400}.fee-picker-empty{padding:24px 16px;color:var(--text-muted);text-align:center;font-size:13px}#fee-publish-error{color:var(--red,#c33);font-size:13px}.fee-workspace .fee-publish-form>.btn,.fee-workspace .fee-panel form>.btn-primary{min-height:46px;border-radius:10px;padding:12px 22px;font-size:14px;line-height:1.5;width:100%;font-weight:700}.fee-workspace .fee-publish-form>.btn{margin-top:18px}.fee-picker-toolbar button:focus-visible{outline:2px solid var(--accent);outline-offset:3px}
+html[data-theme=dark] .student-history .history-method{background:#123c2b;border-color:#246647;color:#7ee3ab}html[data-theme=dark] .student-history .sh-method-qris{background:#152d53;border-color:#294e85;color:#92b9ff}html[data-theme=dark] .student-history .sh-method-va{background:#322049;border-color:#54347b;color:#cfb0ff}
+@media(max-width:1000px){.sh-year{width:100%;max-width:none;min-width:0;border-right:0;padding:0}.sh-tools{max-width:none;width:100%}.sh-toolbar{gap:16px}}
+@media(max-width:600px){.sh-toolbar{padding:16px}.sh-tools{gap:10px}.sh-filter-button{padding:10px 12px}.student-history .payment-history-panel{padding:12px 10px 0}.student-history .payment-history-head{gap:10px}.student-history .payment-history-head h3{font-size:15px}.sh-heading-icon{width:36px;height:36px}.sh-detail-dialog{padding:18px}.spp-warning-overlay #spp-warning-title{font-size:24px}.spp-warning-overlay .obligation-line{font-size:15px;gap:12px}.sh-filter label{flex-basis:100%}.du-receipt-action{align-items:flex-end;max-width:100%}.history-receipt-button.btn-tbl{font-size:11px;padding:10px 12px}}
+
+.student-history .payment-history-head{border-bottom:0}.student-history .payment-history-head .sh-heading-icon{display:grid;place-items:center;margin:0;color:var(--accent)}.sh-year{margin:0!important}.sh-toolbar{padding:14px 18px}.student-history .payment-history-table td{padding-top:9px!important;padding-bottom:9px!important}
+@media(min-width:769px) and (max-width:1200px){.form-payment-table{table-layout:fixed;min-width:0;width:100%}.form-payment-table th:first-child,.form-payment-table td:first-child{width:26%}.form-payment-table th,.form-payment-table td{padding:10px 8px;white-space:normal;overflow-wrap:anywhere}.form-payment-table .tbl-input{min-width:0;width:100%;padding:8px 6px;font-size:12px}.form-payment-table .comp-label,.form-payment-table .du-trigger-label{white-space:normal;font-size:12px}.form-payment-table .du-selector-trigger{min-width:0;width:100%}}
+
+.student-history .sh-timezone{display:inline;font-size:10px;color:var(--text-muted);font-weight:400}
+.student-history .sh-year{line-height:1.4}.student-history .sh-year>span{margin-bottom:4px}.student-history .sh-year .field-input{height:42px;min-height:42px;padding:8px 14px;margin:0}.student-history .sh-toolbar{padding:12px 18px}
+.fee-workspace #fee-publish-form{display:flex;flex-direction:column;flex:1;gap:14px}.fee-workspace #fee-publish-form>.btn{margin-top:auto}.fee-workspace #form-master-biaya .action-bar .btn-primary,.fee-workspace #fee-publish-form>.btn{min-height:46px;border-radius:10px;padding:12px 22px;font-size:14px;line-height:1.5;gap:8px}.fee-workspace #form-master-biaya .action-bar .btn-primary svg,.fee-workspace #fee-publish-form>.btn svg{width:18px;height:18px;flex:none}
+@media(min-width:1101px){.fee-workspace .fee-panel-grid{grid-template-columns:repeat(2,minmax(0,1fr))}}
+html[data-theme=dark] .student-history .sh-filter-button{color:var(--bg-base)}
+
+@media(max-width:600px){
+  .spp-warning-overlay .spp-warning-head{padding:18px}
+  .spp-warning-overlay #spp-warning-title{font-size:23px}
+  .spp-warning-overlay .spp-warning-content{padding:18px}
+  .spp-warning-overlay .obligation-summary section{padding:14px}
+  .spp-warning-overlay .obligation-line{font-size:15px;gap:12px}
+  .spp-warning-overlay .obligation-line.obligation-total{padding:14px;font-size:15px}
+  .sh-detail-dialog{padding:0}
+  .sh-detail-dialog>header{padding:18px}
+  .sh-detail-dialog #sh-detail-content{padding:18px}
+  .sh-detail-dialog .ph-student{flex-wrap:wrap;gap:12px}
+  .sh-detail-dialog .ph-student-period{margin-left:64px;flex-basis:100%;max-width:none}
+  .sh-detail-dialog .ph-student-period small{display:inline-flex;margin:0 0 0 8px}
+  .sh-detail-dialog .ph-payment-overview,.sh-detail-dialog .ph-info-grid{grid-template-columns:1fr}
+  .sh-detail-dialog .ph-payment-overview>div+div{padding:12px 0 0;border-left:0;border-top:1px solid var(--border)}
+  .sh-detail-dialog .ph-components>div{gap:12px}
+  .sh-detail-dialog .ph-detail-actions .history-receipt-button{width:100%}
+}

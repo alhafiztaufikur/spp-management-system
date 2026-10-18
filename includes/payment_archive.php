@@ -1,12 +1,14 @@
 <?php
 require_once __DIR__.'/history_operator_filter.php';
+require_once __DIR__.'/history_class_filter.php';
 
 /** Archive filters use deletion time and stored identity, never require a live student row. */
-function payment_archive_page(mysqli $db, string $start, string $end, string $search, int $studentId, int $page, int $perPage, array $operators=['*']): array
+function payment_archive_page(mysqli $db, string $start, string $end, string $search, int $studentId, int $page, int $perPage, array $operators=['*'],?array $rombelFilter=null): array
 {
     if (!payment_activity_ready($db)) return ['rows'=>[],'total'=>0,'page'=>1,'pages'=>1,'offset'=>0];
     $where="a.action='deleted' AND a.occurred_at>=? AND a.occurred_at<?";
     $where.=history_operator_where($db,$operators,'a.payment_id','a.unit_id');
+    if($rombelFilter!==null)$where.=history_class_archive_where($rombelFilter,'a.unit_id',"JSON_UNQUOTE(JSON_EXTRACT(a.before_snapshot,'$.payment.NO_INDUK'))");
     $params=[$start.' 00:00:00',date('Y-m-d H:i:s',strtotime($end.' +1 day'))]; $types='ss';
     if ($search!=='') {
         $where.=" AND (JSON_UNQUOTE(JSON_EXTRACT(a.before_snapshot,'$.payment.NAMA')) LIKE ?

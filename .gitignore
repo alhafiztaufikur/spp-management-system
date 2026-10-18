@@ -25,4 +25,4 @@ sql/backups/
 /deployment/
 
 # Composer dependencies
-vendor/
+/vendor/

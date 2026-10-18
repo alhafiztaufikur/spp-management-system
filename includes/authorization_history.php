@@ -103,10 +103,10 @@ function authorization_proposed_snapshot(array $before,array $payload): array
     $other=0.0;$details=[];
     foreach($payload['biaya_lain_nominal']??[] as $i=>$raw){
         $nominal=$amount($raw);if($nominal<=0)continue;$other+=$nominal;
-        $tag=(int)($payload['biaya_lain_tagihan_id'][$i]??0);$detail=(int)($payload['biaya_lain_detail_id'][$i]??0);$name='';
+        $choice=(string)($payload['biaya_lain_tagihan_id'][$i]??'');$optional=str_starts_with($choice,'master:');$tag=$optional?0:(int)$choice;$detail=(int)($payload['biaya_lain_detail_id'][$i]??0);$name='';
         foreach($before['details']['bayar_biaya_lain']??[] as $old)
             if(($tag>0&&(int)($old['tagihan_biaya_lain_id']??0)===$tag)||($detail>0&&(int)($old['id']??0)===$detail)){$name=$old['nama_biaya_snapshot']??'';break;}
-        $row=['tagihan_biaya_lain_id'=>$tag,'jumlah'=>$nominal,'keterangan'=>$payload['biaya_lain_keterangan'][$i]??''];
+        $name=$name?:($payload['_other_fee_names'][$choice]??'');$row=['master_biaya_lain_id'=>$optional?(int)substr($choice,7):null,'tagihan_biaya_lain_id'=>$optional?null:$tag,'jumlah'=>$nominal,'keterangan'=>$payload['biaya_lain_keterangan'][$i]??''];
         if($name!=='')$row['nama_biaya_snapshot']=$name;$details[]=$row;
     }
     if(array_key_exists('biaya_lain_nominal',$payload))$after['details']['bayar_biaya_lain']=$details;

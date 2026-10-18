@@ -7,6 +7,9 @@ require_once '../koneksi.php';
 require_once '../includes/auth.php';
 requireRole(['admin', 'bendahara', 'kasir']);
 $reportUnitId=unit_report_scope($koneksi,(string)($_GET['unit']??''));
+require_once __DIR__.'/../includes/report_artifact.php';
+if(PHP_SAPI!=='cli'&&session_status()===PHP_SESSION_ACTIVE)session_write_close();
+report_perf_mark('validate');$koneksi->begin_transaction(MYSQLI_TRANS_START_READ_ONLY|MYSQLI_TRANS_START_WITH_CONSISTENT_SNAPSHOT);
 
 require_once '../includes/general_multiple.php';
 $generalChoices=general_choices($_GET);
@@ -182,6 +185,7 @@ if(is_array($_GET['jenis_laporan']??null)||($_GET['jenis_laporan']??'semua')!=='
     foreach($generalSections as $section)foreach($section['totals'] as $total)$summary[]=['label'=>$section['title'].' - '.$total['label'],'value'=>$total['value']];
     $sheets[0]['sections'][0]['rows']=$summary;
 }
+$koneksi->commit();report_perf_mark('query_model');
 $doc=spp_excel_document('Rekap Laporan Transaksi','Periode '.$period_label.($filter_q!==''?' | Pencarian: '.$filter_q:''),$reportUnitId,$sheets);
 $downloadQuery=$_GET;$downloadQuery['download']='1';$backQuery=$_GET;unset($backQuery['download']);
 if(!empty($sppGeneralPdf))return;

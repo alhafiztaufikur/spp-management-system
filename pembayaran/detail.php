@@ -10,6 +10,8 @@ try {
     $view=$_GET['view']??'active';if(!in_array($view,['active','deleted'],true)) throw new InvalidArgumentException('Jenis riwayat tidak valid.');
     $rawId=$_GET['id']??'';if(!is_scalar($rawId)||!preg_match('/^[1-9][0-9]*$/D',(string)$rawId)) throw new InvalidArgumentException('Nomor transaksi tidak valid.');
     $model=payment_history_model($koneksi,(int)$rawId,$view==='deleted');
+    $readonly=$_GET['readonly']??'0';if(!is_string($readonly)||!in_array($readonly,['0','1'],true))throw new InvalidArgumentException('Mode detail tidak valid.');
+    if($readonly==='1'){$model['readonly']=true;$model['capabilities']['can_edit']=false;$model['capabilities']['can_delete']=false;}
     ob_start();payment_history_render($model,array_merge($_GET,['selected'=>(int)$rawId]));$html=ob_get_clean();
     echo json_encode(['ok'=>true,'html'=>$html,'capabilities'=>$model['capabilities']],JSON_UNESCAPED_UNICODE|JSON_THROW_ON_ERROR);
 } catch(Throwable $error) {

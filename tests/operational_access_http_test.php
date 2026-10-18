@@ -74,6 +74,7 @@ foreach([$admin,$cashier] as $session){
 $koneksi->query("INSERT INTO bayar(NO_INDUK,KELAS,U_PSB,TGL_BYR,BULAN,TAHUN,sistem_pembayaran,total_jumlah,payment_link_version) SELECT NO_INDUK,KELAS,100,NOW(),'10','2026','Tunai',100,1 FROM bayar WHERE id=$pid");$pid=(int)$koneksi->insert_id;
 $koneksi->begin_transaction();payment_activity_record($koneksi,$pid,'created',$actors['super_admin']['id'],null,transaction_authorization_snapshot($koneksi,$pid)['data'],'created:'.$pid);$koneksi->commit();$before=$koneksi->query('SELECT * FROM bayar WHERE id='.$pid)->fetch_assoc();
 $super=$sessions['super_admin'];op_http($super['id'],'unit_switch.php',['unit_id'=>'2','csrf_token'=>$super['csrf'],'next'=>'/otorisasi_transaksi.php']);
+op_http($admin['id'],'pembayaran/proses.php',['aksi'=>'hapus','id'=>$pid,'csrf_token'=>$admin['csrf'],'_operational_unit'=>'2','authorization_reason'=>'Siapkan antrean keputusan pada fixture pengujian.']);
 [$code,$body]=op_http($super['id'],'otorisasi_transaksi.php');$decisionForm=spp_test_form_scope($body,'request_id');preg_match('/name="csrf_token" value="([a-f0-9]+)"/',$decisionForm,$decisionToken);op_assert(!empty($decisionToken[1]),'Decision CSRF missing');
 foreach(['rejected'=>$admin,'approved'=>$cashier] as $decision=>$session){
     op_http($session['id'],'pembayaran/proses.php',['aksi'=>'hapus','id'=>$pid,'csrf_token'=>$session['csrf'],'_operational_unit'=>'2','authorization_reason'=>'Pengajuan petugas lain untuk pengujian keputusan.']);

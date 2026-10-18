@@ -1,5 +1,9 @@
 # Riwayat Daftar Ulang
 
+## Cetak bukti setiap cicilan - 17 Oktober 2026
+
+Setiap transaksi aktif pada **Rincian Cicilan** memiliki tombol **Cetak Bukti Transaksi**, dengan ikon printer dan bentuk membulat. Tombol membuka kwitansi transaksi tersebut pada tab baru dan mengikuti hak cetak server. Jika transaksi juga memuat komponen lain, bukti menampilkan seluruh komponen transaksi, bukan hanya nominal DU. Kartu siswa/tahun menyediakan tombol per transaksi/cicilan, tanpa keterangan nomor/tanggal di atas tombol; arsip dihapus tidak menyediakan bukti transaksi aktif.
+
 ## Tampilan dan sumber data
 
 - Tab Aktif mempertahankan satu kelompok per tagihan siswa/tahun, termasuk tagihan tanpa pembayaran. Ringkasan menghitung seluruh hasil filter, bukan halaman yang tampil.
@@ -10,8 +14,8 @@
 
 ## Hak akses dan kembali dari edit
 
-- Kepemilikan tetap berasal dari ID pada kejadian Pembayaran dibuat. Super Admin dapat bertindak dalam cakupannya; Admin/Kasir mengajukan perubahan pada transaksi sendiri; Bendahara hanya membaca dan mencetak transaksi sendiri.
-- Semua transaksi dalam unit tetap terlihat. Akun lain atau pemilik tidak tercatat terkunci bagi non-Super Admin. Arsip tidak memiliki tindakan edit/hapus/cetak.
+- Pembuat awal tetap berasal dari kejadian Pembayaran dibuat. Super Admin mengubah langsung; Administrator mengajukan perubahan pada transaksi dalam unit operasional dan dapat membaca/mencetak. Hanya dua role aktif tersedia.
+- Semua transaksi dalam unit tetap terlihat. Pembuat awal yang tidak jelas tetap diberi label Tidak tercatat; identitas tidak ditebak dari nama. Pending dan transaksi lama yang belum direkonsiliasi tetap terkunci. Arsip tidak memiliki tindakan edit/hapus/cetak.
 - Cetak membuka struk transaksi utuh yang sudah tersedia. Semua Unit tetap memerlukan pemilihan satu unit sebelum perubahan.
 - Konteks kembali berupa token sesi acak, terikat akun/unit/transaksi, maksimum dua jam. Setiap render memperoleh konteks sendiri sehingga dua tab dengan filter sama tidak berbagi draf. Rute hanya dibuat server; tidak menerima URL eksternal.
 - Simpan, pengajuan, hapus, replay, dan Batal dari halaman ini kembali ke filter/halaman/kelompok asal. Kesalahan edit kembali ke formulir dengan isian aman. Konteks kedaluwarsa kembali ke halaman utama Daftar Ulang.
@@ -44,3 +48,7 @@ Pilih satu/beberapa operator lewat dropdown checkbox, lalu Tampilkan Rekap. Pemb
 Ringkasan Pembayaran operator terpilih menjumlahkan komponen Daftar Ulang, bukan total transaksi campuran. Tagihan, total terbayar, sisa, dan status lunas tetap menghitung seluruh pembayaran siswa/periode yang cocok. Arsip menghitung hanya transaksi dan nominal operator terpilih. Parameter `operator[]` diteruskan ke detail awal/AJAX, pagination, tab, dan konteks kembali dari edit/pengajuan.
 
 Verifikasi tambahan: `history_operator_pdf_test.php` dan `history_operator_pdf_browser_test.js` mencakup dua operator pada satu tagihan, saldo utuh, akun nonaktif, dan penghapusan oleh petugas lain.
+
+Tombol cetak pada kartu/detail AJAX memakai gaya netral yang sama dengan Riwayat Pembayaran dan berada di kanan bawah. Tidak ada tombol kuning bertingkat. [Penyempurnaan tampilan 18 Oktober](PENYEMPURNAAN_CETAK_PEMBAYARAN_20261018.md).
+
+Penyempurnaan berikutnya: warna kartu terpilih mencakup footer cetak; nomor/tanggal tetap tersedia di panel detail dan label aksesibilitas masing-masing tombol.

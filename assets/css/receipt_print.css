@@ -1,32 +1,17 @@
 @page{size:215.9mm 139.7mm;margin:5mm 10mm}
 *{box-sizing:border-box}
-body{margin:0;background:#e9efeb;color:#000;font:11pt/1.22 Arial,sans-serif}
-.print-toolbar{position:sticky;top:0;z-index:3;display:flex;align-items:center;justify-content:space-between;gap:12px;padding:12px 18px;background:#143f31;color:white;font:600 14px/1.4 Arial,sans-serif}
-.print-toolbar div{display:flex;gap:8px}
-.print-toolbar button{border:0;border-radius:8px;padding:10px 16px;font:inherit;background:#14874d;color:white;cursor:pointer}
-.print-toolbar .print-secondary{background:white;color:#143f31}
-.receipt-sheet{width:215.9mm;min-height:139.7mm;margin:20px auto;padding:5mm 10mm;background:white;box-shadow:0 8px 30px #143f3120}
-table{width:100%;border-collapse:collapse}
-.receipt-document{table-layout:fixed}
-.receipt-document>thead{display:table-header-group}
-td{vertical-align:top}
-.receipt-header{padding-bottom:2mm}
-h1{margin:0;text-align:center;font:700 13pt/1.15 Arial,sans-serif}
-.address{text-align:center;font-size:9pt;margin:1.5mm 0;line-height:1.2}
-.document-title{text-align:center;border-top:.7pt solid #000;padding-top:1.3mm;margin-bottom:2mm;font-weight:bold;font-size:11pt}
-.identity{border-bottom:.7pt solid #000}
-.identity>tbody>tr>td{width:50%;padding:0 3mm 1.5mm 0}
-dl{margin:0}dl div{display:table;width:100%;margin-bottom:.6mm}dt,dd{display:table-cell;margin:0;vertical-align:top}dt{width:25mm;font-size:10pt}dd{font-weight:bold;overflow-wrap:anywhere}dd:before{content:': ';font-weight:normal}
-.receipt-column-labels th{text-align:left;text-decoration:underline;font-size:10.5pt;padding:0 3mm 1.5mm 0}
-.receipt-line>td{padding:.35mm 3mm .35mm 0;break-inside:avoid;page-break-inside:avoid}
-.receipt-line>td:last-child{padding-left:2mm;padding-right:0}
-.receipt-line{break-inside:avoid;page-break-inside:avoid}
-.payments{table-layout:auto}.payments td{padding:0;overflow-wrap:anywhere}.payments .number{width:5mm}
-.amount{width:28mm;padding-left:1.5mm!important;text-align:right;white-space:nowrap;font-weight:bold;font-variant-numeric:tabular-nums}
-.section-label{display:block;font-size:10.5pt;text-decoration:underline;padding-top:1mm}
-.receipt-closing{break-inside:avoid;page-break-inside:avoid}.receipt-closing>td{padding-top:2mm}
-.total{border-top:1pt solid #000;border-bottom:1pt solid #000;font-size:12pt;font-weight:bold}.total td{padding:1.3mm 0}
-.receipt-footer{margin-top:2mm;font-size:10pt}.receipt-footer p{margin:0 0 2mm}.footer-left{width:64%;padding-right:4mm}.footer-right{width:36%;text-align:center}.words{font-style:italic;min-height:9mm}.signature-space{height:6mm}
-@media screen and (max-width:850px){body{overflow-x:auto}.receipt-sheet{margin:14px auto}.print-toolbar{min-width:320px}}
-.receipt-print-page{display:none}
-@media print{body{background:white}.print-toolbar{display:none!important}.receipt-sheet,.receipt-print-page{width:195.9mm;max-width:100%;min-height:0;margin:0;padding:0;box-shadow:none;break-after:page;page-break-after:always}.receipt-print-page{display:block}.receipt-original{display:none!important}.receipt-sheet.receipt-last,.receipt-print-page.receipt-last{break-after:auto;page-break-after:auto}h1,.receipt-header{break-after:avoid;page-break-after:avoid}}
+body{margin:0;background:#e9efeb;color:#000;font:10.5pt/1.28 "DejaVu Serif","Times New Roman",serif}
+table{width:100%;border-collapse:collapse}td{vertical-align:top}
+.print-toolbar{position:sticky;top:0;z-index:3;display:flex;flex-wrap:wrap;align-items:center;justify-content:space-between;gap:12px;padding:12px 18px;background:#143f31;color:#fff;font:600 14px/1.4 Arial,sans-serif}
+.print-toolbar div{display:flex;flex-wrap:wrap;gap:8px}.print-toolbar button,.print-toolbar a{border:0;border-radius:8px;padding:10px 16px;font:inherit;background:#14874d;color:#fff;cursor:pointer;text-decoration:none}.print-toolbar .print-secondary{background:#fff;color:#143f31}.print-toolbar [data-receipt-export-status]{width:100%;font-weight:normal}.print-toolbar [data-receipt-export-status]:empty{display:none}
+.receipt-sheet{width:215.9mm;min-height:139.7mm;margin:20px auto;padding:5mm 10mm;background:#fff;box-shadow:0 8px 30px #143f3120}
+.receipt-document{table-layout:fixed}.receipt-document>thead{display:table-header-group}.receipt-header{padding-bottom:.8mm}
+h1{margin:0;text-align:center;font:700 12.5pt/1.12 "DejaVu Serif","Times New Roman",serif;letter-spacing:.2pt}.address{text-align:center;font-size:8.5pt;line-height:1.2;margin:1.4mm 0 1.2mm}.document-title{text-align:center;border-top:.7pt solid #000;padding-top:.8mm;margin-bottom:1.2mm;font-size:11.5pt;font-weight:bold}
+.identity{border-bottom:.7pt solid #000;table-layout:auto;font-size:10pt;line-height:1.25}.identity td{padding:.55mm 0;overflow-wrap:anywhere}.identity .identity-value{padding-right:3mm}.receipt-colon{width:3mm!important;text-align:center}
+.receipt-column-labels th{text-align:left;text-decoration:underline;font-size:11pt;padding:.7mm 3mm 1mm 0}.receipt-column-labels th:last-child{padding-left:2mm;padding-right:0}
+.receipt-line{break-inside:avoid;page-break-inside:avoid}.receipt-line>td{padding:.55mm 3mm .55mm 0}.receipt-line>td:last-child{padding-left:2mm;padding-right:0}.payments{font-size:10.5pt;line-height:1.25}.payments td{padding:0;overflow-wrap:anywhere}.payments .number{width:5mm}.amount{width:23mm;padding-left:1.5mm!important;text-align:right;white-space:nowrap;font-variant-numeric:tabular-nums}.section-label{display:block;font-size:10.5pt;text-decoration:underline;padding-top:.6mm}
+.receipt-closing{break-inside:avoid;page-break-inside:avoid}.receipt-closing>td{padding-top:1.2mm}.total{border-top:1pt solid #000;border-bottom:1pt solid #000;font-size:12pt;font-weight:bold}.total td{padding:.5mm 0}
+.receipt-footer{margin-top:1.5mm;font-size:10pt;line-height:1.2}.receipt-footer p{margin:0 0 1.8mm}.footer-left{width:64%;padding-right:4mm}.footer-right{width:36%;text-align:center}.words{font-style:italic}.receipt-pay-time{display:block}.signature-date{margin-bottom:1.8mm}.signature-space{height:7mm}
+.receipt-print-page{display:none}.receipt-pagination-measure .receipt-print-page{display:block!important}.receipt-image-holder{position:absolute;left:-12000px;top:0;pointer-events:none}.receipt-image-paper{width:215.9mm;height:139.7mm;padding:5mm 10mm;background:#fff;color:#000;overflow:visible}.receipt-exporting .receipt-original{display:block}.receipt-exporting .receipt-print-page{display:none}
+@media screen and (max-width:850px){body{overflow-x:auto}.receipt-sheet{margin:14px auto}.print-toolbar{min-width:320px}.receipt-savings-sheet{width:calc(100% - 24px);min-height:0;padding:5mm;margin:14px auto}.receipt-savings-sheet h1{font-size:11pt}.receipt-savings-sheet .identity{font-size:9pt}.receipt-savings-sheet .receipt-footer{font-size:9pt}.receipt-savings-sheet .amount{width:24mm}.receipt-savings-sheet .payments{font-size:10pt}}
+@media print{body{background:#fff}.print-toolbar{display:none!important}.receipt-sheet,.receipt-print-page{width:195.9mm;max-width:100%;min-height:0;margin:0;padding:0;box-shadow:none;break-after:page;page-break-after:always}.receipt-print-page{display:block}.receipt-original{display:none!important}.receipt-sheet.receipt-last,.receipt-print-page.receipt-last{break-after:auto;page-break-after:auto}h1,.receipt-header{break-after:avoid;page-break-after:avoid}}

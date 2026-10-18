@@ -162,9 +162,9 @@ $rateEditing=$master['status']==='published'&&((string)($_GET['edit_tarif']??'')
 $rateValues=$rateDraft&&in_array($rateDraft['action'],['simpan_tarif','ubah_tarif_terbit'],true)?$rateDraft['rates']:$rates;
 $years=[];$currentStart=(int)substr(du_current_academic_year(),0,4);for($offset=-2;$offset<=3;$offset++){$start=$currentStart+$offset;$label=$start.'/'.($start+1);$years[$label]=$label;}$res=$koneksi->query('SELECT label FROM tahun_ajaran ORDER BY label DESC');while($r=$res->fetch_assoc())$years[$r['label']]=$r['label'];krsort($years);
 $stmt=$koneksi->prepare("SELECT sta.no_induk,s.NAMA,s.NO_induk_diknas,sta.kelas,sta.master_kelas_id,sta.kelas_rombel_snapshot,sta.komite_mulai_bulan,s.potongan_spp_nominal,s.is_active,
- COUNT(ts.id) bill_count,SUM(CASE WHEN ts.status='open' THEN 1 ELSE 0 END) open_count
+ COUNT(ts.id) bill_count,SUM(CASE WHEN ts.status='open' THEN 1 ELSE 0 END) open_count,SUM(ts.status='covered_psb') covered_count,SUM(ts.status='waived') waived_count,SUM(ts.status='cancelled') cancelled_count
  FROM siswa_tahun_ajaran sta JOIN tahun_ajaran ta ON ta.id=sta.tahun_ajaran_id JOIN siswa s ON s.NO_INDUK=sta.no_induk AND s.unit_id=sta.unit_id
- LEFT JOIN tagihan_spp ts ON ts.penempatan_id=sta.id WHERE ta.label=? AND CAST(sta.kelas AS UNSIGNED) " . unit_level_between_sql() . "
+ LEFT JOIN tagihan_spp ts ON ts.penempatan_id=sta.id WHERE sta.status<>'dibatalkan' AND ta.label=? AND CAST(sta.kelas AS UNSIGNED) " . unit_level_between_sql() . "
  GROUP BY sta.id,s.NAMA,s.NO_induk_diknas,s.potongan_spp_nominal,s.is_active ORDER BY sta.kelas,sta.kelas_rombel_snapshot,s.NAMA");
 $stmt->bind_param('s',$selectedYear);$stmt->execute();$students=$stmt->get_result()->fetch_all(MYSQLI_ASSOC);$stmt->close();
 $rombelChoices=[];foreach($students as $student)$rombelChoices[(string)$student['kelas_rombel_snapshot']]=(string)$student['kelas_rombel_snapshot'];
@@ -279,7 +279,7 @@ $yearStart = (int)substr($selectedYear, 0, 4);
                   <span class="kelas-badge" data-label="Kelas">Kelas <?= $level ?></span>
                   <div class="spp-rate-preview"><span>Tarif efektif</span><strong>Rp <?= mspp_money($net['net']) ?></strong></div>
                   <label class="promotion-target-field"><span class="spp-start-caption">Mulai tagihan</span><select class="field-input field-select" name="start_month[<?= mspp_e($s['no_induk']) ?>]" aria-label="Mulai tagihan <?= mspp_e($s['NAMA']) ?>"><?php foreach (spp_academic_periods($selectedYear) as $p): ?><option value="<?= $p['bulan'] ?>" <?= $p['bulan'] === ($publishDraft['starts'][$s['no_induk']]??$s['komite_mulai_bulan']) ? 'selected' : '' ?>><?= mspp_e($p['label']) ?></option><?php endforeach; ?></select></label>
-                  <span class="master-status <?= (int)$s['bill_count'] > 0 ? 'is-active' : 'is-inactive' ?>"><?= (int)$s['bill_count'] > 0 ? number_format((int)$s['bill_count']).' bulan' : 'Belum terbit' ?></span>
+                  <span class="master-status <?= (int)$s['bill_count'] > 0 ? 'is-active' : 'is-inactive' ?>"><?= (int)$s['bill_count'] > 0 ? number_format((int)$s['bill_count']).' bulan'.((int)$s['covered_count']>0?' · Tercakup PSB':((int)$s['waived_count']>0?' · Potongan Penuh':((int)$s['cancelled_count']===(int)$s['bill_count']?' · Dibatalkan':' · Lihat rincian tagihan'))) : 'Belum terbit' ?></span>
                 </article>
               <?php endforeach; ?>
               <?php if (!$students): ?><div class="empty-state"><p>Belum ada penempatan siswa</p><span>Proses tahun ajaran pada Master Kelas/Rombel terlebih dahulu.</span></div><?php endif; ?>

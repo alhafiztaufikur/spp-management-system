@@ -91,7 +91,7 @@ function unit_bootstrap_context(mysqli $db): void {
     // A non-super account without a valid unit must never inherit unit 0:
     // current_unit_id()=0 intentionally exposes every unit for global reports.
     if (!$account || (int)$account['is_active'] !== 1
-        || ($account['role'] !== 'super_admin' && !in_array((int)$account['unit_id'], [1, 2, 3], true))) {
+        || !in_array($account['role'], ['super_admin','admin'], true)) {
         unset($_SESSION['admin_id'], $_SESSION['admin_nama'], $_SESSION['admin_role'],
             $_SESSION['admin_unit_id'], $_SESSION['active_unit_id']);
         unit_set_context($db, 4);
@@ -101,7 +101,7 @@ function unit_bootstrap_context(mysqli $db): void {
     $_SESSION['admin_nama'] = $account['nama'];
     $_SESSION['admin_unit_id'] = $account['unit_id'] === null ? null : (int)$account['unit_id'];
     if (operational_role($account['role'])) {
-        $initial = $account['role'] === 'super_admin' ? 1 : (int)$account['unit_id'];
+        $initial = 1;
         $selected = (int)($_SESSION['active_unit_id'] ?? $initial);
         if ($selected < 0 || $selected > 3) $selected = $initial;
     } else {

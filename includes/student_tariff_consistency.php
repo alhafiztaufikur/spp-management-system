@@ -26,7 +26,7 @@ function student_snapshots_differ(array $before, array $after): bool {
 function student_tariff_component_changes(array $before, array $after): array {
     $fields = [
         'spp' => ['SPP_PERBULAN'],
-        'psb' => ['PSB'],
+        'psb' => ['PSB','potongan_psb_nominal'],
         'komite' => ['POMG'],
         'daftar_ulang' => ['DAFTAR_ULANG', 'potong_du', 'tot_du'],
     ];

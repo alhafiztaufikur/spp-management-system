@@ -87,12 +87,25 @@ html[data-palette="super"] #global-report-workspace{--matrix-head-bg:#513080;}
 .report-date,.report-time{display:block;white-space:nowrap;}
 .report-time{margin-top:4px;}
 
-/* Monthly SPP uses the same per-page/search row as the other reports. */
-html body#global-report-workspace .report-template-shell .report-global-filter-form.report-filter-per-item:not(.report-per-item-compact) > .report-inline-search-row{display:grid;grid-template-columns:minmax(0,1fr) minmax(0,2fr);}
-html body#global-report-workspace .report-template-shell .report-global-filter-form.report-filter-per-item:not(.report-per-item-compact) > .report-inline-search-row > .field-row.report-student-field:has(#global-siswa-search){grid-column:2!important;}
+/* Per-item filters: student status and page size share a row; search fills the next. */
+html body#global-report-workspace .report-template-shell .report-global-filter-form.report-filter-per-item {
+  display:grid!important;grid-template-columns:repeat(2,minmax(0,1fr))!important;gap:16px;
+}
+html body#global-report-workspace .report-template-shell .report-global-filter-form.report-filter-per-item > .field-row {
+  grid-column:auto!important;order:0;min-width:0;width:100%;
+}
+html body#global-report-workspace .report-template-shell .report-global-filter-form.report-filter-per-item > :is(.report-student-field,.report-filter-pending,.report-filter-actions,.report-filter-heading) {
+  grid-column:1 / -1!important;order:0;
+}
+html body#global-report-workspace .report-template-shell .report-global-filter-form.report-filter-per-item > .report-field-siswa-status { grid-column:1!important; }
+html body#global-report-workspace .report-template-shell .report-global-filter-form.report-filter-per-item > .report-per-page-field { grid-column:2!important; }
+html body#global-report-workspace .report-template-shell .report-global-filter-form.report-filter-per-item:not(.report-per-item-compact) > .field-row:has([data-report-item-category]) { grid-column:1 / -1!important; }
+.report-filter-pending { margin:0;padding:12px 14px;border:1px solid var(--border-hover);border-radius:10px;background:var(--accent-glow);color:var(--text-primary);font-size:13px;line-height:1.6; }
+.report-filter-pending[hidden] { display:none!important; }
+.report-export-btn[aria-disabled="true"] { opacity:.55;cursor:not-allowed; }
 @media(max-width:640px){
- html body#global-report-workspace .report-template-shell .report-global-filter-form.report-filter-per-item:not(.report-per-item-compact) > .report-inline-search-row{grid-template-columns:minmax(0,1fr);}
- html body#global-report-workspace .report-template-shell .report-global-filter-form.report-filter-per-item:not(.report-per-item-compact) > .report-inline-search-row > .field-row.report-student-field:has(#global-siswa-search){grid-column:1!important;}
+ html body#global-report-workspace .report-template-shell .report-global-filter-form.report-filter-per-item{grid-template-columns:minmax(0,1fr)!important;}
+ html body#global-report-workspace .report-template-shell .report-global-filter-form.report-filter-per-item > :is(.report-field-siswa-status,.report-per-page-field){grid-column:1 / -1!important;}
 }
 
 /* Opaque summaries retain their palette under frozen identities and on both themes. */

@@ -8,7 +8,8 @@
     document.querySelectorAll('.sw-transaction').forEach(row=>{const active=row===card;row.classList.toggle('is-active',active);const a=row.querySelector('a');if(active)a.setAttribute('aria-current','true');else a.removeAttribute('aria-current');});
     detail.setAttribute('aria-busy','true');detail.innerHTML='<p class="sw-empty">Memuat detail transaksi…</p>';
     try {
-      const response=await fetch('detail.php?'+new URLSearchParams({jenis:card.dataset.kind,id:card.dataset.id}),{signal:controller.signal,headers:{Accept:'application/json'}});
+      const params=new URL(link.href).searchParams;params.set('jenis',card.dataset.kind);params.set('id',card.dataset.id);
+      const response=await fetch('detail.php?'+params,{signal:controller.signal,headers:{Accept:'application/json'}});
       const data=await response.json();if(!response.ok||!data.ok)throw new Error(data.error||'Detail tidak tersedia.');
       if(request!==generation)return;detail.innerHTML=data.html;
       history.replaceState(null,'',link.href);

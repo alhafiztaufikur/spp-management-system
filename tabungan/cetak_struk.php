@@ -11,14 +11,10 @@ try {[$kind,$id]=savings_http_identity();$row=savings_transaction($koneksi,$kind
 catch (InvalidArgumentException $e) {http_response_code(400);exit(savings_e($e->getMessage()));}
 if (!$row) {http_response_code(404);exit('Transaksi tidak ditemukan dalam cakupan unit Anda.');}
 if (!$row['can_print']) {http_response_code(403);exit('Anda hanya dapat mencetak transaksi tabungan milik sendiri.');}
+requireRole(['admin','kasir','bendahara']);
 require_once __DIR__.'/../includes/savings_book_print.php';
-$output = $_GET['output'] ?? 'preview';
-if (!is_string($output) || !in_array($output, ['preview', 'pdf'], true)) {
-    book_error(400, 'Format keluaran tidak dikenal.');
-}
-// Student identity comes exclusively from the authorized transaction, never URL overrides.
-[$student, $book] = savings_book_http_load($koneksi, (string)$row['NO_INDUK'], 0, (int)$row['unit_id']);
-$identity = ['jenis'=>$kind, 'id'=>$id];
-$pdfUrl = 'cetak_struk.php?'.http_build_query($identity + ['output'=>'pdf']);
-$backUrl = 'riwayat.php?'.http_build_query($identity);
-savings_book_output($student, $book, $output, $pdfUrl, $backUrl, 'Kembali ke Riwayat');
+$output=$_GET['output']??'preview';if(!is_string($output)||!in_array($output,['preview','pdf'],true))book_error(400,'Format keluaran tidak valid.');
+// Legacy transaction URL resolves identity and permissions before opening the complete book.
+[$student,$book]=savings_book_http_load($koneksi,$row['NO_INDUK'],(int)$row['student_id'],(int)$row['unit_id']);
+$url='cetak_buku.php?'.http_build_query(['nis'=>$student['NO_INDUK'],'student_id'=>(int)$student['id'],'output'=>$output]);
+header('Location: '.$url,true,303);exit;

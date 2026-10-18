@@ -61,8 +61,8 @@ try {
     foreach ($ddl as $statement) $koneksi->query($statement);
     $koneksi->query($masterClasses);
     $hash = password_hash($password, PASSWORD_DEFAULT);
-    $name = 'Administrator';
-    $role = 'admin';
+    $name = 'Super Admin';
+    $role = 'super_admin';
     $stmt = $koneksi->prepare('INSERT INTO admin(username,password,nama,role) VALUES(?,?,?,?)');
     $stmt->bind_param('ssss', $username, $hash, $name, $role);
     $stmt->execute();

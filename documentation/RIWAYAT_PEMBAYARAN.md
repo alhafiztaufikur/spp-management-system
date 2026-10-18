@@ -1,22 +1,23 @@
 # Riwayat Pembayaran dan penguncian operator
 
+## Filter Kelas/Rombel — 18 Oktober 2026
+
+Dropdown beberapa rombel mengikuti keanggotaan siswa sekarang, termasuk PSB, Out, custom dan rombel nonaktif beranggota. Filter diterapkan sebelum ringkasan/pagination aktif dan arsip; snapshot kelas transaksi tidak diubah. Default Semua Kelas/Rombel mempertahankan URL lama. Tautan detail, pagination, tab dan kembali dari edit menyimpan pilihan. [Aturan lengkap](FILTER_ROMBEL_TABUNGAN_CUSTOM_20261018.md).
+
 ## Pemakaian
 
 Pilih tab Transaksi Aktif atau Transaksi Dihapus, atur periode/pencarian/operator, lalu klik kartu transaksi. Detail menampilkan komponen pembayaran, pembuat awal, aktivitas terakhir, waktu, dan nomor transaksi. Pada arsip, periode filter adalah tanggal penghapusan, bukan tanggal bayar.
 
-Tombol Cetak menghasilkan struk transaksi aktif yang dipilih. Tombol 12 Struk tetap tersedia untuk kelompok tahunan apabila seluruh transaksi boleh dicetak oleh akun tersebut. Transaksi dihapus hanya dapat dibaca; tidak tersedia cetak atau pemulihan.
+**Cetak Bukti Transaksi** tersedia pada setiap kartu transaksi aktif dan di panel detail, dengan ikon printer serta tombol membulat. Tombol membuka kwitansi existing pada tab baru tanpa mengubah pilihan detail. Hak cetak diperiksa server; tautan cetak merupakan elemen terpisah dari tautan pemilih kartu, tanpa tautan bersarang. Tombol 12 Struk tetap tersedia untuk kelompok tahunan apabila seluruh transaksi boleh dicetak oleh akun tersebut. Transaksi dihapus hanya dapat dibaca; tidak tersedia cetak atau pemulihan.
 
 ## Hak tindakan
 
-| Peran | Transaksi sendiri | Transaksi akun lain |
-|---|---|---|
-| Super Admin | Edit/hapus langsung dan cetak | Edit/hapus langsung dan cetak |
-| Admin/Kasir | Ajukan edit/hapus dan cetak | Detail dan Riwayat Aktivitas |
-| Bendahara | Detail, Riwayat Aktivitas, dan cetak | Detail dan Riwayat Aktivitas |
+| Peran | Transaksi sendiri maupun petugas lain |
+|---|---|
+| Super Admin | Edit/hapus langsung dan cetak |
+| Administrator | Ajukan edit/hapus, membaca aktivitas, dan cetak |
 
-Pemilik ditentukan dari ID pembuat awal dalam jurnal `created`, termasuk bukti rekonstruksi yang tersedia. Nama dan operator terakhir tidak digunakan untuk memindahkan hak. Pembuat yang tidak dapat dipastikan ditampilkan sebagai “Tidak tercatat”; tindakan hanya tersedia bagi Super Admin.
-
-Hak edit/hapus juga mengikuti batas transaksi lama, pengajuan yang masih menunggu, serta unit operasional. Semua Unit menyediakan pemantauan/cetak bagi Super Admin; pilih SD/SMP/SMA sebelum perubahan. Pemeriksaan berlaku pada halaman edit, pengajuan bersama, POST pembayaran, struk tunggal/kelompok, dan pintasan menu lain.
+Pembuat awal tetap tersimpan di jurnal dan tidak berubah saat koreksi. Identitas tidak jelas ditampilkan sebagai Tidak tercatat. Pending dan transaksi lama yang belum direkonsiliasi tetap terkunci; Semua Unit hanya membaca/mencetak. Administrator tidak dapat memutuskan otorisasi atau mengelola akun. Garis putih di sambungan isi dan tombol cetak dihilangkan; indikator pilihan/fokus dipertahankan.
 
 ## Antarmuka
 
@@ -44,3 +45,5 @@ Dropdown Operator menyediakan pencarian nama/username dan checkbox untuk memilih
 Parameter `operator[]` menggunakan ID akun atau `unknown`; `*` berarti semua. Filter memakai event `created` pertama menurut waktu/ID, bukan operator terakhir atau `bayar.user_id`. Filter berlangsung sebelum pagination. Endpoint detail membawa konteks pencarian yang sama; rute kembali hanya `lihat.php` atau `riwayat_daftar_ulang.php` dan dibuat server.
 
 Verifikasi tambahan: `history_operator_pdf_test.php` dan `history_operator_pdf_browser_test.js`, pada salinan database audit terpisah.
+
+Lihat [penyempurnaan cetak dan histori Input Pembayaran](PENYEMPURNAAN_CETAK_PEMBAYARAN_20261018.md) untuk aturan terbaru jarak struk, Sisa PSB/DU, nama penanda tangan kapital, dan histori tanpa Export/pagination.

@@ -39,8 +39,7 @@ if ($_SERVER['REQUEST_METHOD'] === 'POST') {
             }
         }
 
-        $validAccountUnit = $admin && ($admin['role'] === 'super_admin'
-            || in_array((int)$admin['unit_id'], [1, 2, 3], true));
+        $validAccountUnit = $admin && (in_array($admin['role'], ['super_admin','admin'], true));
         if ($admin && $passwordValid && (int)$admin['is_active'] === 1 && $validAccountUnit) {
             if ($legacyMd5 || password_needs_rehash($admin['password'], PASSWORD_DEFAULT)) {
                 $newHash = password_hash($password, PASSWORD_DEFAULT);
@@ -55,15 +54,9 @@ if ($_SERVER['REQUEST_METHOD'] === 'POST') {
             $_SESSION['admin_nama'] = $admin['nama'];
             $_SESSION['admin_role'] = $admin['role'];
             $_SESSION['admin_unit_id'] = $admin['unit_id'] === null ? null : (int)$admin['unit_id'];
-            $_SESSION['active_unit_id'] = $admin['role'] === 'super_admin' ? 1 : (int)$admin['unit_id'];
+            $_SESSION['active_unit_id'] = 1;
 
-            if ($admin['role'] === 'kasir') {
-                $loginRedirect = 'dashboard.php';
-            } elseif ($admin['role'] === 'bendahara') {
-                $loginRedirect = 'laporan/index.php';
-            } else {
-                $loginRedirect = 'dashboard.php';
-            }
+            $loginRedirect = 'dashboard.php';
             header('Location: ' . $loginRedirect);
             exit;
         } else {

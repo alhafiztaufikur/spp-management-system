@@ -9,12 +9,13 @@ require_once __DIR__.'/includes/authorization_presentation.php';
 if(!unit_is_super()){http_response_code(403);echo json_encode(['ok'=>false,'message'=>'Akses tidak diizinkan.']);exit;}
 if($_SERVER['REQUEST_METHOD']!=='GET'){http_response_code(405);header('Allow: GET');echo json_encode(['ok'=>false,'message'=>'Gunakan GET untuk membaca detail.']);exit;}
 try {
-    authorization_read_unit($koneksi,$_GET['unit_id']??null);
+    $originalScope=unit_active_id();authorization_read_unit($koneksi,$_GET['unit_id']??null);
+    $source=authorization_source($_GET['source']??'pembayaran');
     $id=filter_var($_GET['id']??null,FILTER_VALIDATE_INT,['options'=>['min_range'=>1]]);
     if(!$id)throw new InvalidArgumentException('ID tidak valid.');
     $view=$_GET['view']??'history';
     if(!in_array($view,['history','queue'],true))throw new InvalidArgumentException('Tampilan tidak valid.');
-    $model=authorization_detail_model($koneksi,$id,$view==='queue');
+    $model=authorization_detail_model($koneksi,$id,$view==='queue',$source);$model['readonly']=$originalScope===0;
     ob_start();authorization_render_detail($model);$html=ob_get_clean();
     echo json_encode(['ok'=>true,'html'=>$html],JSON_UNESCAPED_UNICODE|JSON_THROW_ON_ERROR);
 } catch(InvalidArgumentException $e){http_response_code(400);echo json_encode(['ok'=>false,'message'=>$e->getMessage()]);}
