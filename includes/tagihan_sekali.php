@@ -14,7 +14,7 @@ function one_time_fee_components(): array {
 
 function one_time_fee_totals_from_student(array $student): array {
     return [
-        'psb' => max(0, (float)($student['PSB'] ?? 0)),
+        'psb' => max(0, (float)($student['PSB'] ?? 0)-(float)($student['potongan_psb_nominal']??0)),
     ];
 }
 
@@ -23,7 +23,7 @@ function one_time_fee_totals_from_student(array $student): array {
  */
 function one_time_fee_status(mysqli $db, string $noInduk, int $excludePaymentId = 0, bool $forUpdate = false): array {
     $lock = $forUpdate ? ' FOR UPDATE' : '';
-    $stmt = $db->prepare('SELECT PSB FROM siswa WHERE NO_INDUK=? LIMIT 1' . $lock);
+    $stmt = $db->prepare('SELECT PSB,potongan_psb_nominal FROM siswa WHERE NO_INDUK=? LIMIT 1' . $lock);
     $stmt->bind_param('s', $noInduk);
     $stmt->execute();
     $student = $stmt->get_result()->fetch_assoc();
@@ -65,10 +65,10 @@ function one_time_fee_status(mysqli $db, string $noInduk, int $excludePaymentId 
 }
 
 function one_time_fee_payload_for_options(mysqli $db, int $excludePaymentId = 0): array {
-    $stmt = $db->prepare("SELECT s.NO_INDUK,s.PSB,
+    $stmt = $db->prepare("SELECT s.NO_INDUK,s.PSB,s.potongan_psb_nominal,
         COALESCE(SUM(CASE WHEN b.id<>? THEN b.U_PSB ELSE 0 END),0) paid_psb
         FROM siswa s LEFT JOIN bayar b ON b.NO_INDUK=s.NO_INDUK AND b.unit_id=s.unit_id
-        GROUP BY s.NO_INDUK,s.PSB");
+        GROUP BY s.NO_INDUK,s.PSB,s.potongan_psb_nominal");
     $stmt->bind_param('i', $excludePaymentId);
     $stmt->execute();
     $rows = $stmt->get_result();

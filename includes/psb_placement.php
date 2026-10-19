@@ -1,5 +1,6 @@
 <?php
 require_once __DIR__.'/kelas.php';
+require_once __DIR__.'/student_class_transition.php';
 
 /** Initial admission uses the same billing/snapshot helpers as Data Siswa. */
 function psb_placement_apply(mysqli $db, string $nis, int $targetId, string $year, array $actor): array {
@@ -17,11 +18,10 @@ function psb_placement_apply(mysqli $db, string $nis, int $targetId, string $yea
         throw new RuntimeException('Pilih rombel aktif pada kelas '.$first.' di unit ini.');
     }
     $unit = unit_active_id();
-    $check = $db->prepare('SELECT id FROM siswa_tahun_ajaran WHERE unit_id=? AND no_induk=? FOR UPDATE');
-    $check->bind_param('is', $unit, $nis); $check->execute();
-    $hasHistory = $check->get_result()->num_rows > 0; $check->close();
-    if ($hasHistory) throw new RuntimeException('Siswa sudah memiliki penempatan tahun ajaran. Periksa riwayat siswa.');
+    student_restore_regular_membership($db,$student,$target);
 
+    $restore=$db->prepare("SELECT p.id FROM siswa_tahun_ajaran p JOIN tahun_ajaran y ON y.id=p.tahun_ajaran_id AND y.unit_id=p.unit_id WHERE p.no_induk=? AND y.label=? AND p.status='dibatalkan' FOR UPDATE");$restore->bind_param('ss',$nis,$year);$restore->execute();$restoreId=(int)($restore->get_result()->fetch_row()[0]??0);$restore->close();
+    if($restoreId){$label=class_label($target);$level=(string)$first;$restore=$db->prepare("UPDATE siswa_tahun_ajaran SET kelas=?,master_kelas_id=?,kelas_rombel_snapshot=?,status='aktif',spp_covered_by_psb=0 WHERE id=?");$restore->bind_param('sisi',$level,$targetId,$label,$restoreId);$restore->execute();$restore->close();}
     class_ensure_academic_year($db, $year);
     $level = (string)$first;
     $rate = spp_current_effective_rate($db, $level, (float)$student['potongan_spp_nominal'], $year, $nis);
@@ -33,6 +33,7 @@ function psb_placement_apply(mysqli $db, string $nis, int $targetId, string $yea
     $placement = class_sync_student_current_year($db, $nis, $targetId, $spp, (float)$student['POMG'], true, $sync);
     if (!$placement) throw new RuntimeException('Penempatan tahun berjalan tidak berhasil disimpan.');
     spp_sync_student_discount($db, $nis, (float)$student['potongan_spp_nominal'], $placement);
+    if($restoreId){$label=class_label($target);$restore=$db->prepare("UPDATE tagihan_komite SET status='open',kelas_rombel_snapshot=?,nominal_tagihan=? WHERE penempatan_id=? AND status='cancelled'");$restore->bind_param('sdi',$label,$student['POMG'],$restoreId);$restore->execute();$restore->close();}
     du_create_bill_for_placement($db, $placement, false);
     $duSync = du_reconcile_current_student_override($db, $nis);
     $after = promotion_lock_student($db, $nis);

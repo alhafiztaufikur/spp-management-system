@@ -6,14 +6,18 @@ require_once 'includes/kelas.php';
 require_once 'includes/pagination.php';
 require_once __DIR__.'/includes/filter_choices.php';
 require_once __DIR__.'/includes/psb_placement.php';
+require_once __DIR__.'/includes/promotion_participants_ui.php';
 requireRole(['admin', 'kasir']);
 [$unitMinLevel,$unitMaxLevel]=unit_level_bounds();
+$modeInput=($_SERVER['REQUEST_METHOD']??'GET')==='POST'?($_POST['promotion_mode']??'regular'):($_GET['promotion_mode']??'regular');
+$promotionMode=is_string($modeInput)?$modeInput:'invalid';
+$customPromotion=$promotionMode==='custom';
 
 if (empty($_SESSION['csrf_master_kelas'])) $_SESSION['csrf_master_kelas'] = bin2hex(random_bytes(32));
 
 function class_master_redirect(): void {
     $query=[];
-    foreach(['source_year_id','source_level','source_rombel','promotion_q'] as $key)if(isset($_POST[$key])&&is_scalar($_POST[$key]))$query[$key]=(string)$_POST[$key];
+    foreach(['source_year_id','source_level','source_rombel','promotion_q','promotion_mode'] as $key)if(isset($_POST[$key])&&is_scalar($_POST[$key]))$query[$key]=(string)$_POST[$key];
     header('Location: master_kelas.php'.($query?'?'.filter_build_query($query):''));
     exit;
 }
@@ -26,6 +30,7 @@ if ($_SERVER['REQUEST_METHOD'] === 'POST') {
         $action = (string)($_POST['aksi'] ?? '');
         $isPromotion=in_array($action,['proses_siswa_batch','luluskan_siswa','naikkan_siswa'],true);
         if($isPromotion){
+            if(!in_array($promotionMode,['regular','custom'],true))throw new RuntimeException('Mode kenaikan tidak valid.');
             if(!isset($_POST['source_year_id'],$_POST['source_level'],$_POST['target_tahun_ajaran']))throw new RuntimeException('Formulir lama tidak berlaku. Pilih tahun dan tingkat asal.');
             foreach(['source_year_id','source_level','target_tahun_ajaran'] as $field)if(!is_scalar($_POST[$field]))throw new RuntimeException('Konteks proses tidak valid.');
             foreach(['source_year_id','source_level'] as $field)if(!preg_match('/^[0-9]+$/D',(string)$_POST[$field])||(int)$_POST[$field]<=0)throw new RuntimeException('Konteks proses tidak valid.');
@@ -52,7 +57,7 @@ if ($_SERVER['REQUEST_METHOD'] === 'POST') {
             $message = $created > 0 ? $created . ' kelas/template PSB dan rombel A-J berhasil ditambahkan.' : 'Kelas PSB dan template rombel A-J sudah lengkap.';
         } elseif ($isPromotion) {
             $targetClassIds=$action==='proses_siswa_batch'?(is_array($_POST['target_master_kelas_id']??null)?$_POST['target_master_kelas_id']:[]):[(string)($_POST['no_induk']??'')=>(int)($_POST['target_master_kelas_id']??0)];
-            $batchResult=promotion_run_batch($koneksi,$participants,$targetClassIds,$ctx['source_year_id'],$ctx['target_year'],$level,$placements);
+            $batchResult=promotion_run_batch($koneksi,$participants,$targetClassIds,$ctx['source_year_id'],$ctx['target_year'],$level,$placements,$customPromotion);
             $_SESSION['promotion_batch_result']=$batchResult;
             $successCount=count($batchResult['successes']);$failureCount=count($batchResult['failures']);
             $message=$successCount.' siswa berhasil '.($level===$unitMaxLevel?'diluluskan':'dinaikkan').' dari TA '.$ctx['source_year'].'.';
@@ -63,6 +68,20 @@ if ($_SERVER['REQUEST_METHOD'] === 'POST') {
         } elseif ($action === 'aktifkan_semua_rombel') {
             $affected = class_enable_all_rombel($koneksi);
             $message = $affected > 0 ? $affected . ' rombel berhasil diaktifkan kembali.' : 'Seluruh rombel sudah aktif.';
+        } elseif (in_array($action,['tambah_custom','update_custom'],true)) {
+            $name=trim((string)($_POST['nama_custom']??''));
+            if($name===''||mb_strlen($name)>100)throw new RuntimeException('Nama rombel custom wajib diisi, maksimal 100 karakter.');
+            if(in_array(mb_strtolower($name),['psb','out'],true))throw new RuntimeException('Nama tersebut dikelola sistem.');
+            $check=$koneksi->prepare('SELECT id FROM master_kelas WHERE nama_custom=? AND id<>? LIMIT 1');$check->bind_param('si',$name,$id);$check->execute();$duplicate=$check->get_result()->num_rows;$check->close();
+            if($duplicate)throw new RuntimeException('Nama rombel custom sudah tersedia pada unit ini.');
+            if($action==='update_custom'){
+                $class=class_find($koneksi,$id);if(!$class||class_kind($class)!=='custom')throw new RuntimeException('Rombel custom tidak ditemukan.');
+                $stmt=$koneksi->prepare('UPDATE master_kelas SET nama_custom=? WHERE id=?');$stmt->bind_param('si',$name,$id);
+            }else{
+                $code='C'.strtoupper(bin2hex(random_bytes(4)));
+                $stmt=$koneksi->prepare("INSERT INTO master_kelas(tingkat,kode_rombel,jenis,nama_custom,is_placeholder,is_active) VALUES(NULL,?,'custom',?,0,1)");$stmt->bind_param('ss',$code,$name);
+            }
+            $stmt->execute();$stmt->close();$message='Rombel custom berhasil disimpan.';
         } elseif (in_array($action, ['tambah', 'update'], true)) {
             $level = (int)($_POST['tingkat'] ?? 0);
             $code = strtoupper(trim((string)($_POST['kode_rombel'] ?? '')));
@@ -82,7 +101,7 @@ if ($_SERVER['REQUEST_METHOD'] === 'POST') {
                 $message = 'Rombel ' . $level . $code . ' berhasil ditambahkan.';
             } else {
                 $class = class_find($koneksi, $id);
-                if (!$class || (int)$class['is_placeholder'] === 1 || (int)$class['tingkat'] === 0) throw new RuntimeException('Rombel PSB dan placeholder dikelola sistem dan tidak dapat diubah.');
+                if (!$class || (int)$class['is_placeholder'] === 1 || class_kind($class)!=='reguler') throw new RuntimeException('Rombel PSB dan placeholder dikelola sistem dan tidak dapat diubah.');
                 if ((int)$class['tingkat'] !== $level) {
                     $stmt = $koneksi->prepare('SELECT (SELECT COUNT(*) FROM siswa WHERE master_kelas_id=?) + (SELECT COUNT(*) FROM siswa_tahun_ajaran WHERE master_kelas_id=?) total');
                     $stmt->bind_param('ii',$id,$id);$stmt->execute();$usage=(int)$stmt->get_result()->fetch_assoc()['total'];$stmt->close();
@@ -103,7 +122,7 @@ if ($_SERVER['REQUEST_METHOD'] === 'POST') {
             if (!$class || (int)$class['is_placeholder'] === 1) throw new RuntimeException('Rombel placeholder harus selalu aktif.');
             if(($class['legacy_kind']??'')==='alumni')throw new RuntimeException('Kelas Alumni merupakan kelompok nonakademik dan tetap nonaktif.');
             $newStatus = (int)$targetStatus;
-            if ((int)$class['tingkat'] === 0 && $newStatus === 0) throw new RuntimeException('Rombel PSB harus tetap aktif untuk pendaftaran calon siswa.');
+            if (in_array(class_kind($class),['psb','out'],true) && $newStatus === 0) throw new RuntimeException('Rombel PSB harus tetap aktif untuk pendaftaran calon siswa.');
             if ((int)$class['is_active'] === $newStatus) {
                 $koneksi->commit();
                 $message = 'Status rombel sudah sesuai. Tidak ada perubahan.';
@@ -137,7 +156,7 @@ $promotionYears=promotion_year_options($koneksi);
 $sourceYearId=(int)($_GET['source_year_id']??0);
 if(!isset($_GET['source_year_id']))foreach($promotionYears as $year)if($year['label']===du_current_academic_year()){$sourceYearId=(int)$year['id'];break;}
 $sourceYear='';$nextAcademicYear='';$promotionContextError='';
-if($sourceYearId)try{$selectedContext=promotion_context($koneksi,$sourceYearId);$sourceYear=$selectedContext['source_year'];$nextAcademicYear=$selectedContext['target_year'];}catch(Throwable $e){$promotionContextError=$e->getMessage();$sourceYearId=0;}
+if($sourceYearId)try{$selectedContext=promotion_context($koneksi,$sourceYearId,null,true);$sourceYear=$selectedContext['source_year'];$nextAcademicYear=$selectedContext['target_year'];}catch(Throwable $e){$promotionContextError=$e->getMessage();$sourceYearId=0;}
 $monitorPsb = ($_GET['source_level'] ?? null) === 'psb';
 $currentPromotionLevel=(int)($_GET['source_level']??0);
 if($currentPromotionLevel<$unitMinLevel||$currentPromotionLevel>$unitMaxLevel)$currentPromotionLevel=0;
@@ -149,13 +168,15 @@ $promotionHeld=array_values(array_filter($promotionRoster,static fn($r)=>$r['sou
 $editId = (int)($_GET['edit'] ?? 0);
 $editClass = $editId > 0 ? class_find($koneksi, $editId) : null;
 $classEditError='';
-if ($editClass && ((int)$editClass['is_placeholder']===1 || (int)$editClass['tingkat']===0)) { $classEditError='Rombel PSB dan placeholder dikelola sistem. Pilih rombel reguler untuk mengedit.'; $editClass=null; }
+if ($editClass && ((int)$editClass['is_placeholder']===1 || in_array(class_kind($editClass),['psb','out'],true))) { $classEditError='Rombel PSB dan placeholder dikelola sistem. Pilih rombel reguler untuk mengedit.'; $editClass=null; }
 
+$customEdit=$editClass&&class_kind($editClass)==='custom'?$editClass:null;if($customEdit)$editClass=null;
 $promotionStudents=array_values(array_filter($promotionRoster,static fn($r)=>$r['eligible']));
 $studentsMissingSourceYear=$sourceYearId&&!$monitorPsb?class_students_missing_source_year($koneksi,$nextAcademicYear):[];
 $promotionTargets = $currentPromotionLevel >= $unitMinLevel && $currentPromotionLevel < $unitMaxLevel
     ? class_target_rombel_options($koneksi, $currentPromotionLevel + 1)
     : [];
+if($customPromotion)$promotionTargets=array_values(array_filter(class_all($koneksi,true),static fn($c)=>(int)$c['tingkat']>0&&!(int)$c['is_placeholder']));
 $promotionSourceRombels = [];
 foreach ($promotionStudents as &$promotionStudent) {
     $sourceClassId = (int)($promotionStudent['master_kelas_id'] ?? 0);
@@ -179,9 +200,9 @@ foreach ($promotionTargets as $target) {
 $classes = $koneksi->query("SELECT mk.*,
     (SELECT COUNT(*) FROM siswa s WHERE s.master_kelas_id = mk.id AND s.is_active=1) AS siswa_count,
     (SELECT COUNT(*) FROM siswa_tahun_ajaran sta WHERE sta.master_kelas_id = mk.id) AS history_count
-    FROM master_kelas mk ORDER BY CASE WHEN mk.tingkat=0 THEN 0 ELSE 1 END, mk.tingkat, mk.is_placeholder, mk.kode_rombel")->fetch_all(MYSQLI_ASSOC);
+    FROM master_kelas mk ORDER BY CASE WHEN mk.jenis='out' THEN 0 WHEN mk.jenis='psb' THEN 1 WHEN mk.jenis='custom' THEN 3 ELSE 2 END, mk.tingkat, mk.is_placeholder, mk.kode_rombel")->fetch_all(MYSQLI_ASSOC);
 $classSearch = trim((string)($_GET['q_kelas'] ?? ''));
-$levelOptions=['psb'=>'PSB','alumni'=>'Alumni'];foreach(range($unitMinLevel,$unitMaxLevel) as $level)$levelOptions[(string)$level]='Kelas '.$level;
+$levelOptions=['out'=>'Out','psb'=>'PSB','custom'=>'Custom','alumni'=>'Alumni'];foreach(range($unitMinLevel,$unitMaxLevel) as $level)$levelOptions[(string)$level]='Kelas '.$level;
 $classLevels=filter_register('tingkat_kelas',$_GET['tingkat_kelas']??null,$levelOptions);
 $classStatuses=filter_register('status_kelas',$_GET['status_kelas']??null,['aktif'=>'Aktif','nonaktif'=>'Nonaktif','placeholder'=>'Placeholder']);
 $classLevelFilter=filter_scalar($classLevels);$classStatusFilter=filter_scalar($classStatuses);
@@ -189,8 +210,8 @@ filter_register('source_rombel_filter',$_GET['source_rombel_filter']??null,array
 filter_output_start();
 $classRows = array_values(array_filter($classes, static function (array $class) use ($classSearch, $classLevels, $classStatuses): bool {
     $label = class_label($class);
-    $isAlumni=class_is_alumni($class);$isPsb = (int)$class['tingkat'] === 0&&!$isAlumni;
-    if(!filter_is_all($classLevels)&&!in_array($isAlumni?'alumni':($isPsb?'psb':(string)(int)$class['tingkat']),$classLevels,true))return false;
+    $kind=class_kind($class);
+    if(!filter_is_all($classLevels)&&!in_array($kind==='reguler'?(string)(int)$class['tingkat']:$kind,$classLevels,true))return false;
     $matchesStatus=filter_is_all($classStatuses)||array_filter($classStatuses,static fn($v)=>
         ($v==='aktif'&&(int)$class['is_active']===1&&(int)$class['is_placeholder']!==1)||
         ($v==='nonaktif'&&(int)$class['is_active']===0)||($v==='placeholder'&&(int)$class['is_placeholder']===1));
@@ -207,18 +228,24 @@ $classInactiveCount = count(array_filter($classRows, static fn(array $class): bo
 // Every filtered rombel is rendered once, in the established source order.
 $classGroups = [];
 foreach ($classRows as $class) {
-    $grade = class_is_alumni($class)?-1:(int)$class['tingkat'];
+    $grade = class_kind($class)==='reguler'?(int)$class['tingkat']:class_kind($class);
     if (!isset($classGroups[$grade])) $classGroups[$grade] = ['count'=>0,'students'=>0,'rows'=>[]];
     $classGroups[$grade]['count']++;
     $classGroups[$grade]['students'] += (int)$class['siswa_count'];
 }
-foreach ($classRows as $index=>$class) $classGroups[class_is_alumni($class)?-1:(int)$class['tingkat']]['rows'][$index] = $class;
+foreach ($classRows as $index=>$class) $classGroups[class_kind($class)==='reguler'?(int)$class['tingkat']:class_kind($class)]['rows'][$index] = $class;
 $firstVisibleGroup = null;
-foreach ($classGroups as $grade=>$group) if ($group['rows']) { $firstVisibleGroup=$grade; if ($grade>0) break; }
+foreach ($classGroups as $grade=>$group) if ($group['rows']) { $firstVisibleGroup=$grade; if (is_int($grade)&&$grade>0) break; }
 $classQuickUrl = static function (?array $levels=null, ?array $statuses=null) use ($classSearch,$classLevels,$classStatuses): string {
     return 'master_kelas.php?'.filter_build_query(['q_kelas'=>$classSearch,'tingkat_kelas'=>$levels??$classLevels,'status_kelas'=>$statuses??$classStatuses]).'#kelola-rombel';
 };
 $psbStudents = $monitorPsb ? $koneksi->query("SELECT s.id,s.unit_id,s.NO_INDUK,s.NO_induk_diknas,s.NAMA FROM siswa s WHERE s.KELAS IN ('0','PSB') AND s.is_active=1 AND s.legacy_pending=0 ORDER BY s.unit_id,s.NAMA,s.NO_INDUK")->fetch_all(MYSQLI_ASSOC) : [];
+$promotionLookup=trim((string)($_GET['promotion_lookup']??''));$promotionMatches=[];
+if($promotionLookup!==''){
+    $like='%'.$promotionLookup.'%';$q=$koneksi->prepare("SELECT s.NAMA,s.NO_INDUK,p.kelas,p.kelas_rombel_snapshot,p.status,p.tahun_ajaran_id,y.label FROM siswa s JOIN siswa_tahun_ajaran p ON p.no_induk=s.NO_INDUK AND p.unit_id=s.unit_id JOIN tahun_ajaran y ON y.id=p.tahun_ajaran_id AND y.unit_id=p.unit_id WHERE (s.NAMA LIKE ? OR s.NO_INDUK LIKE ? OR s.NO_induk_diknas LIKE ?) AND p.status<>'dibatalkan' ORDER BY s.NAMA,y.label DESC LIMIT 100");$q->bind_param('sss',$like,$like,$like);$q->execute();$promotionMatches=$q->get_result()->fetch_all(MYSQLI_ASSOC);$q->close();
+}
+$participantsModel=$sourceYearId&&$currentPromotionLevel?participants_model($koneksi,$sourceYearId,$currentPromotionLevel,$customPromotion?'custom':'regular',$promotionRoster):null;
+$participantsOpen=($_GET['show_participants']??'')==='1'||$promotionLookup!=='';
 $psbYear=du_current_academic_year();
 $psbTargets=$monitorPsb&&!unit_all_readonly()?class_target_rombel_options($koneksi,$unitMinLevel):[];
 require_once __DIR__.'/includes/master_workspace_ui.php';
@@ -235,6 +262,8 @@ require_once __DIR__.'/includes/master_workspace_ui.php';
   <link rel="stylesheet" href="assets/css/master_kelas.css?v=<?= filemtime(__DIR__ . '/assets/css/master_kelas.css') ?>">
   <link rel="stylesheet" href="assets/css/workspace_readability.css?v=<?= filemtime(__DIR__ . '/assets/css/workspace_readability.css') ?>">
   <script>(function(){var t=localStorage.getItem('spp_theme')||'light';document.documentElement.setAttribute('data-theme',t);})();</script>
+<link rel="stylesheet" href="assets/css/promotion_participants.css?v=<?= filemtime(__DIR__.'/assets/css/promotion_participants.css') ?>">
+<link rel="stylesheet" href="assets/css/rombel_payment_refinement.css?v=<?= filemtime(__DIR__.'/assets/css/rombel_payment_refinement.css') ?>">
 </head>
 <body data-readable-workspace="master-classes">
 <div class="bg-orbs"><div class="orb orb-1"></div><div class="orb orb-2"></div><div class="orb orb-3"></div></div>
@@ -258,7 +287,7 @@ require_once __DIR__.'/includes/master_workspace_ui.php';
       </nav>
     <section class="class-summary-grid" aria-label="Ringkasan kelas dan rombel">
       <div class="class-stat"><span class="class-workspace-icon"><?= master_workspace_icon('layers') ?></span><div><span>Total Rombel</span><strong><?= number_format(count($classes)) ?></strong><small>Seluruh rombel yang terdaftar.</small></div></div>
-      <div class="class-stat"><span class="class-workspace-icon"><?= master_workspace_icon('students') ?></span><div><span>Siswa Aktif</span><strong><?= number_format(array_sum(array_map(fn($row)=>(int)$row['siswa_count'], $classes))) ?></strong><small>Total siswa aktif dalam rombel.</small></div></div>
+      <div class="class-stat"><span class="class-workspace-icon"><?= master_workspace_icon('students') ?></span><div><span>Siswa Aktif</span><strong><?= number_format(array_sum(array_map(fn($row)=>in_array(class_kind($row),['reguler','psb'],true)?(int)$row['siswa_count']:0, $classes))) ?></strong><small>Total siswa aktif dalam rombel.</small></div></div>
       <div class="class-stat"><span class="class-workspace-icon"><?= master_workspace_icon('calendar') ?></span><div><span>Histori</span><strong><?= number_format(array_sum(array_map(fn($row)=>(int)$row['history_count'], $classes))) ?></strong><small>Seluruh catatan penempatan siswa.</small></div></div>
       <div class="class-stat"><span class="class-workspace-icon"><?= master_workspace_icon('document') ?></span><div><span>Rombel Aktif / Nonaktif</span><strong><span><?= number_format(count(array_filter($classes, static fn($row)=>(int)$row['is_active']===1))) ?></span><span class="class-stat-divider"> / </span><span><?= number_format(count(array_filter($classes, static fn($row)=>(int)$row['is_active']===0))) ?></span></strong><small>Termasuk placeholder yang dikelola sistem.</small></div></div>
       <?php if (!unit_all_readonly()): ?><a class="class-add-shortcut" href="#class-rombel-form" data-open-class-form><span class="class-shortcut-icon" aria-hidden="true"><?= master_workspace_icon('plus') ?></span><div><strong>Tambah Rombel</strong><small>Buat rombel baru untuk kelas pada unit ini.</small></div><span aria-hidden="true">&#8594;</span></a><?php endif; ?>
@@ -277,6 +306,15 @@ require_once __DIR__.'/includes/master_workspace_ui.php';
     </div></details>
     <?php endif; ?>
       <div class="class-manage-grid">
+    <?php if(!unit_all_readonly()): ?>
+    <section class="main-card master-modern-card class-custom-panel">
+      <div class="card-title-row"><span class="class-workspace-icon"><?= master_workspace_icon('plus') ?></span><div><h2><?= $customEdit?'Edit':'Tambah' ?> Rombel Custom</h2><p>Nama bebas tanpa tingkat, untuk tabungan dan kebutuhan nonakademik.</p></div></div>
+      <form method="post" class="class-custom-form">
+        <input type="hidden" name="csrf_token" value="<?= htmlspecialchars($_SESSION['csrf_master_kelas']) ?>"><input type="hidden" name="aksi" value="<?= $customEdit?'update_custom':'tambah_custom' ?>"><input type="hidden" name="id" value="<?= (int)($customEdit['id']??0) ?>">
+        <label class="field-row"><span class="field-label">Nama Rombel Custom</span><input class="field-input" name="nama_custom" maxlength="100" required placeholder="Contoh: Tabungan Guru" value="<?= htmlspecialchars($customEdit['nama_custom']??'') ?>"></label><button type="submit" class="btn btn-primary"><?= master_workspace_icon('plus') ?> Simpan Rombel Custom</button>
+      </form>
+    </section>
+    <?php endif; ?>
     <section class="main-card master-modern-card master-modern-list class-list-panel" data-rombel-view="groups">
       <div class="card-title-row class-list-heading"><span class="class-workspace-icon"><?= master_workspace_icon('layers') ?></span><div><div class="card-title">Daftar Rombel per Kelas</div></div><span class="class-group-total"><?= number_format($classTotalRows) ?> rombel hasil filter</span></div>
       <div class="class-view-switch" hidden role="group" aria-label="Tampilan daftar rombel"><button type="button" data-class-view="groups" aria-pressed="true">Per Kelas</button><button type="button" data-class-view="cards" aria-pressed="false">Kartu</button><button type="button" data-class-view="table" aria-pressed="false">Tabel</button></div>
@@ -284,12 +322,12 @@ require_once __DIR__.'/includes/master_workspace_ui.php';
       <?php if (!$classGroups): ?><div class="empty-state"><p>Rombel tidak ditemukan</p><span>Ubah pencarian atau filter yang dipilih.</span></div><?php endif; ?>
       <?php foreach ($classGroups as $grade=>$group): ?>
         <details class="class-level-group" data-level-group <?= $grade===$firstVisibleGroup?'open':'' ?>>
-          <summary><span class="class-rombel-icon" aria-hidden="true"><?= master_workspace_icon('layers') ?></span><strong><?= $grade===-1?'Alumni':($grade===0?'PSB':'Kelas '.$grade) ?></strong><span class="class-group-count"><?= number_format($group['count']) ?> rombel</span><span class="class-group-students"><?= number_format($group['students']) ?> siswa aktif</span><svg class="class-group-chevron" aria-hidden="true" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><path d="m6 9 6 6 6-6"/></svg></summary>
+          <summary><span class="class-rombel-icon" aria-hidden="true"><?= master_workspace_icon('layers') ?></span><strong><?= is_int($grade)?'Kelas '.$grade:($grade==='psb'?'PSB':ucfirst($grade)) ?></strong><span class="class-group-count"><?= number_format($group['count']) ?> rombel</span><span class="class-group-students"><?= number_format($group['students']) ?> siswa aktif</span><svg class="class-group-chevron" aria-hidden="true" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><path d="m6 9 6 6 6-6"/></svg></summary>
           <?php if ($group['rows']): ?>
-          <div class="table-container" tabindex="0" aria-label="Rombel <?= $grade===-1?'Alumni':($grade===0?'PSB':'Kelas '.$grade) ?>"><table class="payment-table responsive-table rombel-data-table"><thead><tr><th>No</th><th>Label</th><th>Tingkat</th><th>Status</th><th>Siswa Aktif</th><th>Histori</th><th>Aksi</th></tr></thead><tbody>
+          <div class="table-container" tabindex="0" aria-label="Rombel <?= is_int($grade)?'Kelas '.$grade:($grade==='psb'?'PSB':ucfirst($grade)) ?>"><table class="payment-table responsive-table rombel-data-table"><thead><tr><th>No</th><th>Label</th><th>Tingkat</th><th>Status</th><th>Siswa Aktif</th><th>Histori</th><th>Aksi</th></tr></thead><tbody>
           <?php foreach ($group['rows'] as $i=>$class): $label=class_label($class); ?>
-        <tr data-class-id="<?= (int)$class['id'] ?>"><td data-label="No"><?= $i+1 ?></td><td data-label="Label"><span class="class-rombel-icon" aria-hidden="true"><?= master_workspace_icon('students') ?></span><strong><?= unit_record_badge($class) ?><?= htmlspecialchars($label) ?></strong></td><td data-label="Tingkat"><span class="kelas-badge"><?= class_is_alumni($class)?'Alumni':((int)$class['tingkat']===0?'PSB':'Kelas '.(int)$class['tingkat']) ?></span></td><td data-label="Status"><span class="master-status <?= (int)$class['is_active']===1?'is-active':'is-inactive' ?>"><?= (int)$class['is_placeholder']===1?'Placeholder':((int)$class['is_active']===1?'Aktif':'Nonaktif') ?></span></td><td data-label="Siswa Aktif" class="text-center"><span class="class-card-caption">Siswa Aktif</span><?= number_format((int)$class['siswa_count']) ?></td><td data-label="Histori" class="text-center"><span class="class-card-caption">Histori</span><?= number_format((int)$class['history_count']) ?></td><td data-label="Aksi" class="aksi-col">
-        <?php if(!unit_all_readonly() && (int)$class['is_placeholder']!==1 && (int)$class['tingkat']>0): ?><a class="btn-tbl btn-tbl-edit" href="master_kelas.php?edit=<?= (int)$class['id'] ?>">Edit</a><form method="post" style="display:inline"><input type="hidden" name="csrf_token" value="<?= htmlspecialchars($_SESSION['csrf_master_kelas']) ?>"><input type="hidden" name="aksi" value="toggle"><input type="hidden" name="id" value="<?= (int)$class['id'] ?>"><input type="hidden" name="target_active" value="<?= (int)$class['is_active']===1?'0':'1' ?>"><button class="btn-tbl btn-tbl-toggle <?= (int)$class['is_active']===1?'is-deactivate':'is-activate' ?>" type="submit"><?= (int)$class['is_active']===1?'Nonaktifkan':'Aktifkan' ?></button></form><?php elseif (!unit_all_readonly() && !class_is_alumni($class) && (int)$class['tingkat']===0 && !(int)$class['is_active']): ?><form method="post"><input type="hidden" name="csrf_token" value="<?= htmlspecialchars($_SESSION['csrf_master_kelas']) ?>"><input type="hidden" name="aksi" value="toggle"><input type="hidden" name="id" value="<?= (int)$class['id'] ?>"><input type="hidden" name="target_active" value="1"><button class="btn-tbl btn-tbl-toggle is-activate" type="submit">Aktifkan PSB</button></form><?php else: ?><span class="payment-auto-note"><?= !unit_all_readonly()?'Dikelola sistem':'Pilih satu unit untuk mengubah rombel' ?></span><?php endif; ?>
+        <tr data-class-id="<?= (int)$class['id'] ?>"><td data-label="No"><?= $i+1 ?></td><td data-label="Label"><span class="class-rombel-icon" aria-hidden="true"><?= master_workspace_icon('students') ?></span><strong><?= unit_record_badge($class) ?><?= htmlspecialchars($label) ?></strong></td><td data-label="Tingkat"><span class="kelas-badge"><?= class_kind($class)==='reguler'?'Kelas '.(int)$class['tingkat']:ucfirst(class_kind($class)) ?></span></td><td data-label="Status"><span class="master-status <?= (int)$class['is_active']===1?'is-active':'is-inactive' ?>"><?= (int)$class['is_placeholder']===1?'Placeholder':((int)$class['is_active']===1?'Aktif':'Nonaktif') ?></span></td><td data-label="Siswa Aktif" class="text-center"><span class="class-card-caption">Siswa Aktif</span><?= number_format((int)$class['siswa_count']) ?></td><td data-label="Histori" class="text-center"><span class="class-card-caption">Histori</span><?= number_format((int)$class['history_count']) ?></td><td data-label="Aksi" class="aksi-col">
+        <?php if(!unit_all_readonly() && (int)$class['is_placeholder']!==1 && in_array(class_kind($class),['reguler','custom'],true)): ?><a class="btn-tbl btn-tbl-edit" href="master_kelas.php?edit=<?= (int)$class['id'] ?>">Edit</a><form method="post" style="display:inline"><input type="hidden" name="csrf_token" value="<?= htmlspecialchars($_SESSION['csrf_master_kelas']) ?>"><input type="hidden" name="aksi" value="toggle"><input type="hidden" name="id" value="<?= (int)$class['id'] ?>"><input type="hidden" name="target_active" value="<?= (int)$class['is_active']===1?'0':'1' ?>"><button class="btn-tbl btn-tbl-toggle <?= (int)$class['is_active']===1?'is-deactivate':'is-activate' ?>" type="submit"><?= (int)$class['is_active']===1?'Nonaktifkan':'Aktifkan' ?></button></form><?php elseif (!unit_all_readonly() && class_kind($class)==='psb' && !(int)$class['is_active']): ?><form method="post"><input type="hidden" name="csrf_token" value="<?= htmlspecialchars($_SESSION['csrf_master_kelas']) ?>"><input type="hidden" name="aksi" value="toggle"><input type="hidden" name="id" value="<?= (int)$class['id'] ?>"><input type="hidden" name="target_active" value="1"><button class="btn-tbl btn-tbl-toggle is-activate" type="submit">Aktifkan PSB</button></form><?php else: ?><span class="payment-auto-note"><?= !unit_all_readonly()?'Dikelola sistem':'Pilih satu unit untuk mengubah rombel' ?></span><?php endif; ?>
         </td></tr>
           <?php endforeach; ?>
           </tbody></table></div>
@@ -338,18 +376,20 @@ require_once __DIR__.'/includes/master_workspace_ui.php';
       <div class="card-title-row"><span class="class-workspace-icon"><?= master_workspace_icon('reset') ?></span><div><div class="card-title">Proses Tahun Ajaran</div><p class="payment-auto-note">Pilih tahun dan tingkat asal. Setiap tingkat dapat diproses tanpa menunggu tingkat lain selesai.</p></div></div>
       <?php if($promotionContextError): ?><div class="alert alert-warning"><?= htmlspecialchars($promotionContextError) ?></div><?php endif; ?>
       <?php if(!unit_all_readonly()): ?>
-      <form method="get" id="promotion-context-form" class="report-filter-grid" data-last-level="<?= $unitMaxLevel ?>">
-        <div class="field-row"><label class="field-label" for="promotion-source-year"><?= $monitorPsb?'Tahun Penempatan':'Tahun Ajaran Asal' ?></label><select id="promotion-source-year" name="source_year_id" class="field-input field-select" <?= $monitorPsb?'disabled':'required' ?>><?php if ($monitorPsb): ?><option value="<?= $sourceYearId ?>"><?= htmlspecialchars($psbYear) ?></option><?php else: ?><option value="">Pilih tahun asal</option><?php foreach($promotionYears as $year): ?><option value="<?= (int)$year['id'] ?>" <?= $sourceYearId===(int)$year['id']?'selected':'' ?>><?= htmlspecialchars($year['label']) ?></option><?php endforeach; endif; ?></select></div>
-        <div class="field-row"><label class="field-label" for="promotion-source-level">Tingkat Asal</label><select id="promotion-source-level" name="source_level" class="field-input field-select" required><option value="">Pilih tingkat</option><option value="psb" <?= $monitorPsb?'selected':'' ?>>PSB</option><?php foreach(range($unitMinLevel,$unitMaxLevel) as $grade): ?><option value="<?= $grade ?>" <?= $currentPromotionLevel===$grade?'selected':'' ?>>Kelas <?= $grade ?><?= $grade===$unitMaxLevel?' — Kelulusan':'' ?></option><?php endforeach; ?></select></div>
-        <div class="field-row"><span class="field-label" id="promotion-target-label"><?= $monitorPsb?(unit_all_readonly()?'Mode Tampilan':'Kelas Tujuan'):($currentPromotionLevel===$unitMaxLevel?'Tahun Kelulusan':'Tahun Ajaran Tujuan') ?></span><strong id="promotion-target-year"><?= $monitorPsb?(unit_all_readonly()?'Pemantauan PSB':'Kelas '.$unitMinLevel):htmlspecialchars(($currentPromotionLevel===$unitMaxLevel?$sourceYear:$nextAcademicYear)?:'Pilih tahun asal') ?></strong><small><?= $monitorPsb?(unit_all_readonly()?'Pilih satu unit untuk menempatkan siswa PSB.':'Penempatan awal pada tahun ajaran '.$psbYear.'.'):($currentPromotionLevel===$unitMaxLevel?'Kelulusan memakai tahun asal, tanpa membuat penempatan tahun berikutnya.':'Tepat satu tahun berikutnya; tahun mendatang belum boleh menjadi asal.') ?></small></div>
+      <form method="get" id="promotion-context-form" data-custom="<?= $customPromotion?'1':'0' ?>" class="report-filter-grid" data-last-level="<?= $unitMaxLevel ?>">
+        <div class="field-row"><label class="field-label" for="promotion-mode">Sistem Kenaikan</label><select class="field-input field-select" id="promotion-mode" name="promotion_mode"><option value="regular" <?= !$customPromotion?'selected':'' ?>>Reguler satu tingkat</option><option value="custom" <?= $customPromotion?'selected':'' ?>>Custom pilih tingkat/rombel</option></select></div><div class="field-row"><label class="field-label" for="promotion-source-year"><?= $monitorPsb?'Tahun Penempatan':'Tahun Ajaran Asal' ?></label><select id="promotion-source-year" name="source_year_id" class="field-input field-select" <?= $monitorPsb?'disabled':'required' ?>><?php if ($monitorPsb): ?><option value="<?= $sourceYearId ?>"><?= htmlspecialchars($psbYear) ?></option><?php else: ?><option value="">Pilih tahun asal</option><?php foreach($promotionYears as $year): ?><option value="<?= (int)$year['id'] ?>" <?= $sourceYearId===(int)$year['id']?'selected':'' ?>><?= htmlspecialchars($year['label']) ?></option><?php endforeach; endif; ?></select></div>
+        <div class="field-row"><label class="field-label" for="promotion-source-level">Tingkat Asal</label><select id="promotion-source-level" name="source_level" class="field-input field-select" required><option value="">Pilih tingkat</option><option value="psb" <?= $monitorPsb?'selected':'' ?>>PSB</option><?php foreach(range($unitMinLevel,$unitMaxLevel) as $grade): ?><option value="<?= $grade ?>" <?= $currentPromotionLevel===$grade?'selected':'' ?>>Kelas <?= $grade ?><?= $grade===$unitMaxLevel?' (Kelulusan)':'' ?></option><?php endforeach; ?></select></div>
+        <div class="field-row"><span class="field-label" id="promotion-target-label"><?= $monitorPsb?(unit_all_readonly()?'Mode Tampilan':'Kelas Tujuan'):((!$customPromotion && $currentPromotionLevel===$unitMaxLevel)?'Tahun Kelulusan':'Tahun Ajaran Tujuan') ?></span><strong id="promotion-target-year"><?= $monitorPsb?(unit_all_readonly()?'Pemantauan PSB':'Kelas '.$unitMinLevel):htmlspecialchars(((!$customPromotion && $currentPromotionLevel===$unitMaxLevel)?$sourceYear:$nextAcademicYear)?:'Pilih tahun asal') ?></strong><small><?= $monitorPsb?(unit_all_readonly()?'Pilih satu unit untuk menempatkan siswa PSB.':'Penempatan awal pada tahun ajaran '.$psbYear.'.'):((!$customPromotion && $currentPromotionLevel===$unitMaxLevel)?'Kelulusan memakai tahun asal, tanpa membuat penempatan tahun berikutnya.':'Tepat satu tahun berikutnya; tahun mendatang belum boleh menjadi asal.') ?></small></div>
         <div class="report-filter-actions"><button class="btn btn-primary" type="submit"><?= master_workspace_icon('send') ?>Tampilkan Peserta</button></div>
       </form>
       <noscript><a class="btn btn-ghost" href="master_kelas.php?source_level=psb#naik-kelas">Lihat Siswa PSB</a></noscript>
       <?php else: ?><p class="payment-auto-note">Pilih SD, SMP, atau SMA untuk mengelola rombel dan memproses tahun ajaran. Semua Unit digunakan untuk pemantauan.</p><a class="btn btn-ghost" href="master_kelas.php?source_level=psb#naik-kelas">Lihat PSB</a><?php endif; ?>
     </section>
     <div class="class-participants-panel">
+      <?php participants_panel($participantsModel,$promotionLookup,$promotionMatches,$sourceYearId,$currentPromotionLevel,$customPromotion?'custom':'regular',$participantsOpen); ?>
       <?php if ($promotionBatchResult): ?>
       <div class="promotion-batch-result <?= count($promotionBatchResult['failures']) > 0 ? 'has-failures' : '' ?>">
+        <?php foreach($promotionBatchResult['successes'] as $success): if(empty($success['target_placement_id']))continue;$destId=(int)$success['target_placement_id'];$dest=$koneksi->query("SELECT p.tahun_ajaran_id,p.kelas FROM siswa_tahun_ajaran p WHERE p.id=$destId")->fetch_assoc();if(!$dest)continue; ?><p><?= htmlspecialchars($success['student'].' ? '.$success['target'].' ? '.$success['target_year']) ?> <a class="btn btn-ghost" href="master_kelas.php?source_year_id=<?= (int)$dest['tahun_ajaran_id'] ?>&amp;source_level=<?= (int)$dest['kelas'] ?>&amp;show_participants=1#naik-kelas">Lihat Peserta Tujuan</a></p><?php endforeach; ?>
         <div><strong><?= number_format(count($promotionBatchResult['successes'])) ?> berhasil</strong><span>dari <?= number_format((int)$promotionBatchResult['attempted']) ?> siswa yang dipilih.</span></div>
         <?php if ($promotionBatchResult['failures']): ?>
         <details><summary>Lihat <?= number_format(count($promotionBatchResult['failures'])) ?> siswa yang belum berhasil</summary><ul><?php foreach ($promotionBatchResult['failures'] as $failure): ?><li><strong><?= htmlspecialchars($failure['student']) ?></strong><span><?= htmlspecialchars($failure['reason']) ?></span></li><?php endforeach; ?></ul></details>
@@ -399,9 +439,9 @@ require_once __DIR__.'/includes/master_workspace_ui.php';
           </div>
         </section>
         <?php elseif(!unit_all_readonly() && $currentPromotionLevel >= $unitMinLevel && $currentPromotionLevel <= $unitMaxLevel): ?>
-        <form method="post" id="promotion-batch-form" class="promotion-batch-form" data-graduation="<?= $currentPromotionLevel===$unitMaxLevel?'1':'0' ?>" data-source-year="<?= htmlspecialchars($sourceYear) ?>" data-target-year="<?= htmlspecialchars($nextAcademicYear) ?>" data-promotion-action="<?= $currentPromotionLevel === $unitMaxLevel ? 'Luluskan' : 'Naikkan' ?>">
+        <form method="post" id="promotion-batch-form" class="promotion-batch-form" data-graduation="<?= (!$customPromotion && $currentPromotionLevel===$unitMaxLevel)?'1':'0' ?>" data-source-year="<?= htmlspecialchars($sourceYear) ?>" data-target-year="<?= htmlspecialchars($nextAcademicYear) ?>" data-promotion-action="<?= (!$customPromotion && $currentPromotionLevel === $unitMaxLevel) ? 'Luluskan' : 'Naikkan' ?>">
           <input type="hidden" name="csrf_token" value="<?= htmlspecialchars($_SESSION['csrf_master_kelas']) ?>">
-          <input type="hidden" name="aksi" value="proses_siswa_batch">
+          <input type="hidden" name="aksi" value="proses_siswa_batch"><input type="hidden" name="promotion_mode" value="<?= $customPromotion?'custom':'regular' ?>">
           <input type="hidden" name="target_tahun_ajaran" value="<?= htmlspecialchars($nextAcademicYear) ?>">
           <input type="hidden" name="source_year_id" value="<?= $sourceYearId ?>">
           <input type="hidden" name="source_level" value="<?= $currentPromotionLevel ?>">
@@ -428,11 +468,11 @@ require_once __DIR__.'/includes/master_workspace_ui.php';
           </div>
 
           <div class="promotion-student-list" id="promotion-student-list" tabindex="0" aria-label="Daftar peserta tahun ajaran">
-          <div class="class-roster-head" aria-hidden="true"><span></span><span>No</span><span>Nama Siswa / NIS / NIS Diknas</span><span>Rombel Asal</span><?php if($currentPromotionLevel < $unitMaxLevel): ?><span>Rombel Tujuan</span><?php endif; ?></div>
+          <div class="class-roster-head" aria-hidden="true"><span></span><span>No</span><span>Nama Siswa / NIS / NIS Diknas</span><span>Rombel Asal</span><?php if($customPromotion || $currentPromotionLevel < $unitMaxLevel): ?><span>Rombel Tujuan</span><?php endif; ?></div>
             <?php foreach($promotionStudents as $index => $student):
               $studentNis = (string)$student['NO_INDUK'];
               $studentDiknas = trim((string)($student['NO_induk_diknas'] ?? ''));
-              $defaultTargetId = $currentPromotionLevel < $unitMaxLevel ? ($promotionTargetByCode[strtoupper((string)($student['promotion_kode_rombel'] ?? ''))] ?? 0) : 0;
+              $defaultTargetId = !$customPromotion && $currentPromotionLevel < $unitMaxLevel ? ($promotionTargetByCode[strtoupper((string)($student['promotion_kode_rombel'] ?? ''))] ?? 0) : 0;
               $searchText = strtolower(trim($student['NAMA'] . ' ' . $studentNis . ' ' . $studentDiknas . ' ' . $student['kelas_label'] . ' ' . $student['kelas_aktif_label']));
             ?>
             <input type="hidden" name="source_placement_id[<?= htmlspecialchars($studentNis) ?>]" value="<?= (int)$student['source_placement_id'] ?>">
@@ -441,7 +481,7 @@ require_once __DIR__.'/includes/master_workspace_ui.php';
               <span class="class-roster-number"><?= $index+1 ?></span>
               <label class="promotion-student-identity" for="promotion-student-<?= (int)$index ?>"><span class="class-student-avatar" aria-hidden="true"><?php $initials='';foreach(array_slice(preg_split('/\s+/u',trim((string)$student['NAMA'])),0,2) as $word)$initials.=mb_substr($word,0,1,'UTF-8');echo htmlspecialchars(mb_strtoupper($initials,'UTF-8')); ?></span><span><strong><?= htmlspecialchars($student['NAMA']) ?></strong><small>NIS <?= htmlspecialchars($studentNis) ?><?= $studentDiknas !== '' ? ' · NIS Diknas ' . htmlspecialchars($studentDiknas) : '' ?><?= $student['kelas_aktif_label'] !== '' && $student['kelas_aktif_label'] !== $student['kelas_label'] ? ' · Rombel aktif ' . htmlspecialchars($student['kelas_aktif_label']) : '' ?></small></span></label>
               <span class="kelas-badge"><?= htmlspecialchars($student['kelas_label']) ?></span>
-              <?php if($currentPromotionLevel < $unitMaxLevel): ?>
+              <?php if($customPromotion || $currentPromotionLevel < $unitMaxLevel): ?>
               <div class="promotion-target-field"><label for="promotion-target-<?= (int)$index ?>">Rombel Tujuan</label><select class="field-input field-select" id="promotion-target-<?= (int)$index ?>" name="target_master_kelas_id[<?= htmlspecialchars($studentNis) ?>]" disabled><option value="">Pilih rombel</option><?php foreach($promotionTargets as $target): ?><option value="<?= (int)$target['id'] ?>" <?= $defaultTargetId === (int)$target['id'] ? 'selected' : '' ?>><?= htmlspecialchars($target['label']) ?></option><?php endforeach; ?></select></div>
               <?php endif; ?>
             </article>
@@ -451,21 +491,21 @@ require_once __DIR__.'/includes/master_workspace_ui.php';
 
           </section>
           <aside class="main-card class-destination-panel">
-            <div class="class-panel-heading"><span class="class-workspace-icon"><?= master_workspace_icon('calendar') ?></span><div><h2><?= $currentPromotionLevel === $unitMaxLevel ? 'Kelulusan' : 'Tujuan dan Ringkasan' ?></h2><p><?= $currentPromotionLevel === $unitMaxLevel ? 'Siswa diproses pada tahun ajaran asal.' : 'Atur rombel tujuan pada setiap baris siswa.' ?></p></div></div>
+            <div class="class-panel-heading"><span class="class-workspace-icon"><?= master_workspace_icon('calendar') ?></span><div><h2><?= (!$customPromotion && $currentPromotionLevel === $unitMaxLevel) ? 'Kelulusan' : 'Tujuan dan Ringkasan' ?></h2><p><?= (!$customPromotion && $currentPromotionLevel === $unitMaxLevel) ? 'Siswa diproses pada tahun ajaran asal.' : 'Atur rombel tujuan pada setiap baris siswa.' ?></p></div></div>
           <div class="promotion-stage-overview">
-            <div><span>Tingkat Asal</span><strong><?= $currentPromotionLevel === $unitMaxLevel ? 'Kelulusan Kelas '.$unitMaxLevel : 'Kenaikan Kelas ' . (int)$currentPromotionLevel ?></strong></div>
+            <div><span>Tingkat Asal</span><strong><?= (!$customPromotion && $currentPromotionLevel === $unitMaxLevel) ? 'Kelulusan Kelas '.$unitMaxLevel : 'Kenaikan Kelas ' . (int)$currentPromotionLevel ?></strong></div>
             <div><span>Siswa Tersisa</span><strong><?= number_format(count($promotionStudents)) ?> siswa</strong></div>
-            <div><span><?= $currentPromotionLevel === $unitMaxLevel ? 'Tahun Ajaran Kelulusan' : 'Tahun Ajaran Tujuan' ?></span><strong><?= htmlspecialchars($currentPromotionLevel === $unitMaxLevel ? $sourceYear : $nextAcademicYear) ?></strong></div>
+            <div><span><?= (!$customPromotion && $currentPromotionLevel === $unitMaxLevel) ? 'Tahun Ajaran Kelulusan' : 'Tahun Ajaran Tujuan' ?></span><strong><?= htmlspecialchars((!$customPromotion && $currentPromotionLevel === $unitMaxLevel) ? $sourceYear : $nextAcademicYear) ?></strong></div>
           </div>
 
-            <?php if ($currentPromotionLevel < $unitMaxLevel): ?>
+            <?php if ($customPromotion || $currentPromotionLevel < $unitMaxLevel): ?>
             <h3 class="class-context-caption">Rombel Tujuan Tersedia</h3>
             <ul class="class-context-list class-target-list" aria-label="Rombel tujuan tersedia">
               <?php foreach ($promotionTargets as $target): ?><li><span class="class-rombel-icon" aria-hidden="true"><?= master_workspace_icon('layers') ?></span><div><strong><?= htmlspecialchars($target['label']) ?></strong><small>Kelas <?= (int)$target['tingkat'] ?></small></div></li><?php endforeach; ?>
               <?php if (!$promotionTargets): ?><li class="class-context-empty">Belum ada rombel aktif pada tingkat tujuan.</li><?php endif; ?>
             </ul>
             <?php else: ?><div class="alert alert-info">Kelulusan mengarsipkan siswa terpilih tanpa membuat penempatan tahun berikutnya.</div><?php endif; ?>
-          <div class="promotion-submit-bar"><div><strong id="promotion-submit-summary">Belum ada siswa dipilih</strong><span><?= $currentPromotionLevel === $unitMaxLevel ? 'Siswa terpilih akan diarsipkan sebagai lulusan.' : 'Rombel tujuan dapat diatur berbeda untuk setiap siswa.' ?></span></div><button class="btn btn-primary" id="promotion-submit-button" type="submit" disabled><?= $currentPromotionLevel === $unitMaxLevel ? 'Luluskan' : 'Naikkan' ?> 0 Siswa</button></div>
+          <div class="promotion-submit-bar"><div><strong id="promotion-submit-summary">Belum ada siswa dipilih</strong><span><?= (!$customPromotion && $currentPromotionLevel === $unitMaxLevel) ? 'Siswa terpilih akan diarsipkan sebagai lulusan.' : 'Rombel tujuan dapat diatur berbeda untuk setiap siswa.' ?></span></div><button class="btn btn-primary" id="promotion-submit-button" type="submit" disabled><?= (!$customPromotion && $currentPromotionLevel === $unitMaxLevel) ? 'Luluskan' : 'Naikkan' ?> 0 Siswa</button></div>
           </aside>
         </form>
         <?php else: ?>
@@ -475,7 +515,7 @@ require_once __DIR__.'/includes/master_workspace_ui.php';
         </section>
         <?php endif; ?>
       </div>
-      <?php if($promotionHeld): ?><details class="alert alert-warning"><summary><?= count($promotionHeld) ?> siswa ditahan karena riwayat/status tidak sesuai</summary><ul><?php foreach($promotionHeld as $held): ?><li><?= htmlspecialchars($held['NAMA'].' — '.$held['blocked_reason']) ?></li><?php endforeach; ?></ul></details><?php endif; ?>
+      <?php participants_held($promotionHeld,$participantsModel); ?>
     </div>
     </section>
     </div>
@@ -483,6 +523,8 @@ require_once __DIR__.'/includes/master_workspace_ui.php';
   </main>
 </div>
 <script src="assets/js/date_format.js?v=<?= filemtime(__DIR__ . '/assets/js/date_format.js') ?>"></script>
+  <script src="assets/js/workflow_dialogs.js?v=<?= filemtime(__DIR__.'/assets/js/workflow_dialogs.js') ?>"></script>
   <script src="assets/js/app.js?v=<?= filemtime(__DIR__ . '/assets/js/app.js') ?>"></script><script>document.addEventListener('DOMContentLoaded',function(){autoHideFlash();});</script>
 <script src="assets/js/master_kelas.js?v=<?= filemtime(__DIR__ . '/assets/js/master_kelas.js') ?>"></script>
+<script src="assets/js/promotion_participants.js?v=<?= filemtime(__DIR__.'/assets/js/promotion_participants.js') ?>"></script>
 </body></html>

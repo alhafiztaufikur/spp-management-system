@@ -105,3 +105,4 @@
 .fee-workspace #form-terbit-biaya .publish-student-search input{padding-inline:0;}
 .fee-workspace .fee-preview-grid .report-summary-card>.fee-icon{display:inline-flex;align-items:center;justify-content:center;padding:0;line-height:1;background:var(--accent-glow);color:var(--accent);}
 .fee-workspace .fee-preview-grid .fee-icon>svg{display:block;width:21px;height:21px;flex:none;margin:0;}
+.fee-optional-guide p,.fee-optional-guide li{font-size:14px;line-height:1.8;color:var(--text-muted)}.fee-optional-guide p{margin:0 0 16px}.fee-optional-guide ol{padding-left:20px;margin:0 0 18px}.fee-optional-guide li+li{margin-top:8px}.fee-optional-guide .btn{margin-top:4px}

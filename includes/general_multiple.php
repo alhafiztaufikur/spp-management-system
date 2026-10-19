@@ -44,11 +44,8 @@ function general_excel_sections(array $sections):array{
     $result=[];foreach($sections as $section){$columns=[spp_excel_column('no','No','number')];foreach($section['columns'] as $column)$columns[]=spp_excel_column($column[0],$column[1],$column[2]??'text');foreach($section['rows'] as $i=>&$row)$row['no']=$i+1;unset($row);$result[]=spp_excel_section($section['title'],$columns,$section['rows'],$section['totals']);}return $result;
 }
 function general_document_html(array $doc):string{
-    $e=static fn($v)=>htmlspecialchars((string)$v,ENT_QUOTES,'UTF-8');
-    [$accent,$dark,$pale]=spp_excel_palette($doc['unit']);
-    $html='<!doctype html><html><meta charset="utf-8"><style>@page{margin:14mm}body{font:11px DejaVu Sans;color:#233344}h1{font-size:20px;color:#'.$dark.'}h2{margin-top:22px}h3{padding:8px;background:#'.$pale.'}table{width:100%;border-collapse:collapse;table-layout:fixed}th{background:#'.$dark.';color:white;text-align:center}th,td{border:1px solid #dde4ea;padding:6px;overflow-wrap:break-word}tbody tr:nth-child(even){background:#'.$pale.'}.nominal{text-align:right}.report-multiple-subtotals{margin:10px 0 20px}.report-multiple-subtotals span{display:block;margin:4px}thead{display:table-header-group}tr{page-break-inside:avoid}</style><body><h1>'.$e($doc['school']).'</h1><h2>'.$e($doc['title']).'</h2><p>'.$e($doc['subtitle']).'</p><p>Unit: '.$e($doc['unit_label']).' | '.$e($doc['generated']).' | Petugas: '.$e($doc['operator']).'</p>';
-    foreach($doc['sheets'] as $sheet){$html.='<h2>'.$e($sheet['name']).'</h2>';foreach($sheet['sections'] as $section){$section['columns']=array_map(static fn($c)=>[$c['key'],$c['label'],$c['type']],$section['columns']);$section['columns']=array_values(array_filter($section['columns'],static fn($c)=>$c[0]!=='no'));$html.=general_section_html($section);}}
-    return $html.'</body></html>';
+    require_once __DIR__.'/transaction_report_pdf.php';
+    return transaction_report_document_html($doc);
 }
 function general_unpaid(mysqli $koneksi,string $report_type,string $filter_bulan,string $filter_tahun,string $bulan_label,string $academicYear,string $studentSearchSql,array $studentSearchParams,string $sort):array{
     $periodMonthCode = $filter_bulan;

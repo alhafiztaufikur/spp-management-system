@@ -488,6 +488,7 @@ function du_create_bill_for_placement(mysqli $db, int $placementId, bool $syncLe
         $stmt->bind_param('i', $rowPlacementId); $stmt->execute();
         $id = (int)($stmt->get_result()->fetch_assoc()['id'] ?? 0); $stmt->close();
     }
+    if($id>0){$restore=$db->prepare("UPDATE tagihan_daftar_ulang SET status='open',cancel_reason=NULL,master_daftar_ulang_id=?,kelas_snapshot=?,nominal_awal=?,nominal_tagihan=? WHERE id=? AND status='cancelled' AND cancel_reason LIKE 'Koreksi pendaftaran awal PSB:%' AND NOT EXISTS(SELECT 1 FROM bayar_du WHERE tagihan_daftar_ulang_id=?)");$restore->bind_param('isddii',$masterId,$class,$initial,$total,$id,$id);$restore->execute();$restore->close();}
     if ($syncLegacy && $id > 0 && $label === du_current_academic_year()) du_sync_student_legacy_from_bill($db, $id);
     return $id ?: null;
 }

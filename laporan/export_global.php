@@ -15,8 +15,10 @@ $format=(string)($_GET['format']??'preview');if(!in_array($format,['preview','pr
 if($globalScope&&($format==='print'||($_GET['preview_action']??'')==='print')){$format='pdf';$_GET['download']='0';}
 $excelDownload=$format==='excel'&&($_GET['download']??'')==='1';
 if($format==='pdf'){require_once __DIR__.'/../includes/pdf.php';require_pdf_library();}
-$filters=report_filters($koneksi,$_GET);if($template==='riwayat-tagihan'&&!isset($_GET['siswa_status']))$filters['siswa_status']='all';if(!isset($_GET['kategori'])&&$template==='penerimaan')$filters['kategori']='semua';if($template==='tunggakan-siswa'){$filters['q']='';if(($_GET['mode']??'')==='all'){$filters['kelas']='';unset($filters['_multi']['kelas']);}}
-$report=report_build($koneksi,$template,$filters);require_once __DIR__.'/../includes/global_report_matrix.php';$matrix=$globalScope?global_report_matrix($report,$template,$reportUnitId):null;$generated=spp_date_label(new DateTimeImmutable('now'),true);$operator=(string)($_SESSION['admin_nama']??$_SESSION['admin_username']??'Pengguna');
+require_once __DIR__.'/../includes/report_artifact.php';report_perf_mark('validate');
+if($globalScope)$koneksi->begin_transaction(MYSQLI_TRANS_START_READ_ONLY|MYSQLI_TRANS_START_WITH_CONSISTENT_SNAPSHOT);
+$filters=report_filters($koneksi,$_GET);report_perf_mark('filter');if($template==='riwayat-tagihan'&&!isset($_GET['siswa_status']))$filters['siswa_status']='all';if(!isset($_GET['kategori'])&&$template==='penerimaan')$filters['kategori']='semua';if($template==='tunggakan-siswa'){$filters['q']='';if(($_GET['mode']??'')==='all'){$filters['kelas']='';unset($filters['_multi']['kelas']);}}
+$report=report_build($koneksi,$template,$filters);if($globalScope)$koneksi->commit();report_perf_mark('query_model');require_once __DIR__.'/../includes/global_report_matrix.php';$matrix=$globalScope?global_report_matrix($report,$template,$reportUnitId):null;$generated=spp_date_label(new DateTimeImmutable('now'),true);$operator=(string)($_SESSION['admin_nama']??$_SESSION['admin_username']??'Pengguna');
 if($template==='tunggakan-siswa'&&$format==='excel'&&($_GET['view']??'')==='detail'){
     $classId=report_class_filter_rombel_id($filters);
     $selectedClass=null;
@@ -87,6 +89,10 @@ if($isCashRecap)$printOrientation='portrait';
 require_once __DIR__.'/../includes/excel.php';
 $appliedFilterText=global_report_filter_text($koneksi,$filters,$template);
 $documentSubtitle=$appliedFilterText?:$report['subtitle'];
+$artifactIdentity=['route'=>'global','unit'=>$reportUnitId,'template'=>$template,'filters'=>$filters,'orientation'=>$printOrientation];
+$artifactModel=['report'=>$report,'subtitle'=>$documentSubtitle,'school'=>unit_school_name($reportUnitId),'operator'=>$operator];
+report_perf_mark('layout');
+
 
 $moneyTotals=report_money_totals($report,$template);if($template==='riwayat-tagihan')$moneyTotals=array_values(array_filter($moneyTotals,static fn($total)=>($total['key']??'')==='tagihan'));
 function export_safe_text($value):string{
@@ -142,7 +148,7 @@ h3{font-size:12px;color:#<?= $documentPalette[0] ?>}.data tfoot th,.data tfoot t
  .billing-export-overview strong{font-size:10pt}.billing-export-overview span{font-size:8pt}.billing-export-note{font-size:8pt}.kop h1{font-size:13pt}.kop p,.meta td,.title div{font-size:8pt}.title h2{font-size:15pt}.title p{margin:3px 0}
  h3,.report-section-heading h3{font-size:10pt}.data th,.data td{font-size:9pt;padding:5pt 4pt;line-height:1.3}
  .report-matrix-print th,.report-matrix-print td,.report-matrix-print .money{font-size:9pt;padding:5pt 4pt}
- .report-matrix-print .report-secondary-id,.report-matrix-print .matrix-group-period{font-size:8pt}.report-matrix-print .matrix-detail{font-size:9pt}
+ .report-matrix-print .report-secondary-id,.report-matrix-print .matrix-group-period{font-size:9pt}.report-matrix-print .matrix-detail{font-size:9pt}
  .report-matrix-print .matrix-identity{position:static!important;left:auto!important}
  .report-matrix-print th{background:#e5eee9!important;color:#17231d!important;font-weight:bold;border-color:#7a9186}
  .report-matrix-print tfoot th,.report-matrix-print tfoot td{font-size:9pt}.report-matrix-print .badge-nis,.report-matrix-print .kelas-badge,.report-matrix-print .report-status{padding:1pt 2pt;color:#17231d!important;background:transparent!important;border:0}
@@ -227,5 +233,9 @@ if(in_array($format,['preview','print'],true)){
         'auto_print'=>$format==='print'||($_GET['preview_action']??'')==='print',
     ]);
 }
-if($format==='pdf'){$options=new \Dompdf\Options();$options->set('isRemoteEnabled',false);$options->set('isHtml5ParserEnabled',true);$options->setDefaultMediaType('print');$options->setChroot(realpath(__DIR__.'/..'));$dompdf=new \Dompdf\Dompdf($options);$dompdf->loadHtml($html,'UTF-8');$dompdf->setPaper('A4',$printOrientation);$dompdf->render();$dompdf->stream($safeName.'.pdf',['Attachment'=>($_GET['download']??'1')!=='0']);exit;}
+if($format==='pdf'){
+    $renderPdf=static function()use($html,$printOrientation){$options=new \Dompdf\Options();$options->set('isRemoteEnabled',false);$options->set('isHtml5ParserEnabled',true);$options->setDefaultMediaType('print');$options->setChroot(realpath(__DIR__.'/..'));$dompdf=new \Dompdf\Dompdf($options);$dompdf->loadHtml($html,'UTF-8');$dompdf->setPaper('A4',$printOrientation);$dompdf->render();$bytes=$dompdf->output();report_perf_mark('pdf');return $bytes;};
+    $artifact=report_artifact_get($artifactIdentity,$artifactModel,'pdf',$renderPdf);
+    report_artifact_stream($artifact,$safeName.'.pdf','pdf',($_GET['download']??'1')!=='0');
+}
 echo $html;

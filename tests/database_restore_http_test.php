@@ -48,12 +48,14 @@ function restore_test_upload(array $session,string $file): array {
 }
 $originalConfig=file_get_contents($config['_config_file']);$originalDbName=null;
 try{
-    $account=$koneksi->query("SELECT id,role,nama FROM admin WHERE role='super_admin' AND is_active=1 ORDER BY id LIMIT 1")->fetch_assoc();$session=restore_test_session($account);
+    $testRole=getenv('SPP_TEST_RESTORE_ROLE')?:'super_admin';
+    if(!in_array($testRole,['super_admin','admin','kasir'],true))throw new RuntimeException('Invalid restore test role.');
+    $account=$koneksi->query("SELECT id,role,nama FROM admin WHERE role='$testRole' AND is_active=1 ORDER BY id LIMIT 1")->fetch_assoc();$session=restore_test_session($account);
     $before=restore_test_fingerprint($koneksi);
     $backup=db_backup_enqueue((int)$account['id'],bin2hex(random_bytes(16)));db_backup_dispatch($backup['id']);
     $until=time()+180;do{$backup=db_backup_find($queue,$backup['id']);if(in_array($backup['state'],['verified','failed'],true))break;usleep(300000);}while(time()<$until);
     restore_assert($backup['state']==='verified','Fixture backup must be verified');$sql=db_backup_archive($queue,$backup['id'])['file'];
-    foreach(['admin','kasir','bendahara'] as $role){$other=$koneksi->query("SELECT id,role FROM admin WHERE role='$role' AND is_active=1 LIMIT 1")->fetch_assoc();[$status]=restore_test_request(restore_test_session($other,1),'upload',[],$sql);restore_assert($status===403,'Non-super role can restore');}
+    foreach(['bendahara'] as $role){$other=$koneksi->query("SELECT id,role FROM admin WHERE role='$role' AND is_active=1 LIMIT 1")->fetch_assoc();[$status]=restore_test_request(restore_test_session($other,1),'upload',[],$sql);restore_assert($status===403,'Read-only role can restore');}
     [$status]=restore_test_request(['id'=>$session['id'],'csrf'=>'wrong'],'upload',[],$sql);restore_assert($status===403,'Invalid CSRF accepted');
     $bad=$config['storage_root'].'/invalid-restore.sql';file_put_contents($bad,"DROP DATABASE mysql;\n");[$status]=restore_test_request($session,'upload',[],$bad);restore_assert($status===400,'Untrusted SQL accepted');
     $cap=restore_test_upload($session,$sql);restore_assert(restore_test_fingerprint($koneksi)===$before,'Validation changed target database');
@@ -79,6 +81,7 @@ try{
     $safetyReport=json_decode(file_get_contents(db_backup_job_dir($job['safety_id']).'/verification.json'),true);restore_assert($safetyReport['fingerprints']!==json_decode(file_get_contents(db_backup_job_dir($backup['id']).'/verification.json'),true)['fingerprints'],'Safety snapshot did not include newer rows');
     $old=file_get_contents($base.'/backup_restore.php',false,stream_context_create(['http'=>['header'=>'Cookie: PHPSESSID='.$session['id'],'ignore_errors'=>true,'follow_location'=>0]]));restore_assert(str_contains($http_response_header[0],' 302 '),'Pre-restore session remained valid');
     echo "PASS: validated restore, request drain, maintenance, safety archive, exact rows and session invalidation\n";
+    if(getenv('SPP_TEST_RESTORE_SMOKE')==='1'){echo 'PASS: restore smoke for '.$testRole.'; '.$checks.' checks'.PHP_EOL;return;}
     foreach(['restore_safety','restore_import','restore_audit'] as $failure){
         $session=restore_test_session($account);$cap=restore_test_upload($session,$sql);
         $changed='RECOVERY QA '.$failure;$stmt=$koneksi->prepare('UPDATE admin SET nama=? WHERE id=?');$stmt->bind_param('si',$changed,$account['id']);$stmt->execute();$stmt->close();$expected=restore_test_fingerprint($koneksi);

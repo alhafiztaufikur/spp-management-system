@@ -3,11 +3,8 @@
 if (PHP_SAPI !== 'cli') { http_response_code(404); exit(1); }
 require_once __DIR__ . '/../koneksi.php';
 require_once __DIR__ . '/../includes/reports.php';
-
-if (getenv('SPP_TEST_ALLOW_MUTATION') !== '1'
-    || !preg_match('/^db_spp_audit_[a-z0-9_]+$/', DB_NAME)) {
-    throw new RuntimeException('Tes hanya berjalan pada clone audit dengan flag mutasi tes.');
-}
+require_once __DIR__.'/http_form_scope.php';
+spp_test_assert_database_target($koneksi);
 
 function du_item_assert(bool $condition, string $message): void {
     if (!$condition) throw new RuntimeException($message);

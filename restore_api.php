@@ -5,7 +5,7 @@ header('Cache-Control: private, no-store');header('X-Content-Type-Options: nosni
 function restore_response(int $status,array $data): never {
     http_response_code($status);header('Content-Type: application/json; charset=utf-8');echo json_encode($data,JSON_UNESCAPED_UNICODE|JSON_THROW_ON_ERROR);exit;
 }
-if(empty($_SESSION['admin_id'])||($_SESSION['admin_role']??'')!=='super_admin')restore_response(403,['error'=>'Hanya Super Admin aktif yang dapat memulihkan database.']);
+if(empty($_SESSION['admin_id'])||!operational_role())restore_response(403,['error'=>'Hanya Super Admin, Administrator, atau Kasir aktif yang dapat memulihkan database.']);
 $method=$_SERVER['REQUEST_METHOD']??'GET';$action=($method==='POST'?$_POST:$_GET)['action']??'';
 if($method==='POST'&&empty($_POST)&&(int)($_SERVER['CONTENT_LENGTH']??0)>0)restore_response(413,['error'=>'Unggahan melebihi batas PHP atau tidak lengkap. Periksa post_max_size dan upload_max_filesize pada server.']);
 foreach(['id','token','confirmation','understood'] as $field)if(isset(($method==='POST'?$_POST:$_GET)[$field])&&!is_string(($method==='POST'?$_POST:$_GET)[$field]))restore_response(400,['error'=>'Parameter pemulihan tidak valid.']);
@@ -28,7 +28,7 @@ try{
         db_restore_update($db,$row['id'],'rolling_back','Melanjutkan pemulihan backup pengaman.');
         session_write_close();db_restore_dispatch($row['id']);restore_response(202,['job'=>db_restore_public(db_restore_find($db,$row['id']))]);
     }
-    require_once __DIR__.'/koneksi.php';require_once __DIR__.'/includes/auth.php';requireRole(['super_admin']);db_backup_actor($actor);
+    require_once __DIR__.'/koneksi.php';require_once __DIR__.'/includes/auth.php';requireRole(['super_admin','admin','kasir']);db_backup_actor($actor);
     if($action==='upload'){
         if(!is_array($_FILES['sql']??null))throw new InvalidArgumentException('Pilih satu file SQL untuk diperiksa.');
         $result=db_restore_upload($actor,$_FILES['sql']);$_SESSION['database_restore_job']=['id'=>$result['job']['id'],'token'=>$result['token']];session_write_close();

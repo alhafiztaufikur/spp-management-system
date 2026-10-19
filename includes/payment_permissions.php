@@ -9,10 +9,10 @@ function payment_capabilities(mysqli $db, array $payment, ?array $events = null,
     $creator=payment_activity_summary($events)['creator'];
     $owner=(int)($creator['actor_id']??0);
     $role=$_SESSION['admin_role']??'';
-    $super=$role==='super_admin';
+    $operator=operational_role($role);
     $scope=unit_active_id(); $unit=(int)($payment['unit_id']??$scope);
-    $inScope=$unit>=1 && $unit<=3 && ($scope===$unit || ($scope===0 && $super));
-    $allowed=$inScope && ($super || ($owner>0 && $owner===(int)($_SESSION['admin_id']??0)));
+    $inScope=$unit>=1 && $unit<=3 && ($scope===$unit || ($scope===0 && $operator));
+    $allowed=$inScope && ($operator || ($owner>0 && $owner===(int)($_SESSION['admin_id']??0)));
     $pending ??= function_exists('transaction_authorization_schema_ready') && transaction_authorization_schema_ready($db) ? (transaction_authorization_pending_for_payments($db,[$id])[$id]??[]) : [];
     $mutable=$allowed && !$deleted && $scope!==0 && in_array($role,['super_admin','admin','kasir'],true)
         && (int)($payment['payment_link_version']??0)===1 && !$pending;
@@ -33,13 +33,12 @@ function payment_assert_owner(mysqli $db, int $id, int $actorId): void
     if ($actorId<=0 || $actorId!==(int)($_SESSION['admin_id']??0)) throw new RuntimeException('Identitas operator tidak valid.');
     $s=$db->prepare('SELECT role,is_active,unit_id FROM admin WHERE id=?');$s->bind_param('i',$actorId);$s->execute();$actor=$s->get_result()->fetch_assoc();$s->close();
     if(!$actor || !(int)$actor['is_active'] || $actor['role']!==($_SESSION['admin_role']??'')) throw new RuntimeException('Akun operator tidak aktif atau perannya tidak sesuai.');
-    if($actor['role']!=='super_admin' && (int)$actor['unit_id']!==unit_active_id()) throw new RuntimeException('Unit operator tidak sesuai.');
+    if(!operational_role($actor['role']) || !in_array(unit_active_id(),[1,2,3],true)) throw new RuntimeException('Pilih satu unit operasional yang diizinkan.');
     $s=$db->prepare('SELECT id,unit_id FROM bayar WHERE id=?');$s->bind_param('i',$id);$s->execute();$row=$s->get_result()->fetch_assoc();$s->close();
     if(!$row) throw new RuntimeException('Transaksi tidak ditemukan pada unit ini.');
     if(unit_active_id()!==0 && (int)$row['unit_id']!==unit_active_id()) throw new RuntimeException('Transaksi tidak ditemukan pada unit ini.');
-    $creator=payment_activity_summary(payment_activity_for_payments($db,[$id])[$id]??[])['creator'];
-    if(($_SESSION['admin_role']??'')!=='super_admin' && (!(int)($creator['actor_id']??0) || (int)$creator['actor_id']!==$actorId))
-        throw new RuntimeException('Transaksi terkunci: hanya pembuat awal yang dapat melakukan tindakan ini.');
+    // The immutable creator stays in the journal. Admin/Kasir request a correction;
+    // only the separately checked Super Admin decision can apply that request.
 }
 
 function payment_can_print_batch(mysqli $db, string $token): bool

@@ -26,13 +26,17 @@ date_default_timezone_set('Asia/Jakarta');
 require_once __DIR__.'/includes/date_format.php';
 
 try {
-    $koneksi = new mysqli(DB_HOST, DB_USER, DB_PASS, DB_NAME, $dbPort);
+    $reportMeasured=PHP_SAPI!=='cli'&&in_array(str_replace('\\','/',realpath($_SERVER['SCRIPT_FILENAME']??'')?:''),array_map(static fn($path)=>str_replace('\\','/',__DIR__.'/'.$path),['laporan/export_global.php','laporan/export_pdf.php','laporan/export_excel.php','otorisasi_export_pdf.php']),true);
+    if($reportMeasured)require_once __DIR__.'/includes/report_metrics.php';
+    $koneksi = $reportMeasured?new ReportMeasuredConnection(DB_HOST, DB_USER, DB_PASS, DB_NAME, $dbPort):new mysqli(DB_HOST, DB_USER, DB_PASS, DB_NAME, $dbPort);
     if ($koneksi->connect_error) {
         throw new RuntimeException($koneksi->connect_error);
     }
     $koneksi->set_charset('utf8mb4');
     $koneksi->query("SET NAMES utf8mb4 COLLATE utf8mb4_general_ci");
     $koneksi->query("SET time_zone = '+07:00'");
+    require_once __DIR__.'/includes/workflow_readiness.php';
+    workflow_require_ready($koneksi);
     require_once __DIR__ . '/includes/units.php';
     unit_bootstrap_context($koneksi);
 } catch (Throwable $error) {

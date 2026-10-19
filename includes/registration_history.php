@@ -159,7 +159,18 @@ function registration_page(mysqli $db,array $f): array
         $summary=registration_query($db,"SELECT COUNT(*) students,COALESCE(SUM(total),0) bill,COALESCE(SUM(paid),0) paid,COALESCE(SUM(remaining),0) remaining $operatorSummary FROM ($sql) x",$params,$types)[0];
         $pages=total_pages((int)$summary['students'],$f['per_page']);$page=min($f['page'],$pages);$offset=($page-1)*$f['per_page'];
         $rows=registration_query($db,"SELECT * FROM ($sql) x ORDER BY th_ajaran DESC,CAST(kelas AS UNSIGNED),nama,tagihan_id LIMIT ? OFFSET ?",array_merge($params,[$f['per_page'],$offset]),$types.'ii');
-    }return compact('summary','pages','page','offset','rows');
+    }
+    if($f['view']!=='deleted' && $rows) {
+        $ids=array_map('intval',array_column($rows,'tagihan_id'));
+        $owner=history_operator_where($db,$f['values']['operator']??['*'],'b.id','b.unit_id');
+        $payments=$db->query('SELECT b.*,d.tagihan_daftar_ulang_id,d.jumlah du_amount FROM bayar_du d JOIN bayar b ON b.id=d.bayar_id AND b.unit_id=d.unit_id WHERE d.tagihan_daftar_ulang_id IN ('.implode(',',$ids).')'.$owner.' ORDER BY b.TGL_BYR DESC,b.id DESC')->fetch_all(MYSQLI_ASSOC);
+        $events=payment_activity_for_payments($db,array_column($payments,'id'));
+        $receipts=[];
+        foreach($payments as $payment)if(payment_capabilities($db,$payment,$events[(int)$payment['id']]??[],false,[])['can_print'])$receipts[(int)$payment['tagihan_daftar_ulang_id']][]=$payment;
+        foreach($rows as &$row)$row['receipts']=$receipts[(int)$row['tagihan_id']]??[];
+        unset($row);
+    }
+    return compact('summary','pages','page','offset','rows');
 }
 
 function registration_detail(mysqli $db,int $bill,int $unit,string $view,array $operators=['*']): array
@@ -205,7 +216,7 @@ function registration_render_detail(array $g,array $query): void
     <div class="ph-detail-actions">
     <?php if($caps['can_edit']): ?><a class="btn-tbl btn-tbl-edit" href="<?= $e(payment_return_edit_url($token,$id)) ?>"><?= authorization_icon('edit') ?> <?= transaction_authorization_requires_request()?'Ajukan Edit':'Edit' ?></a><?php endif; ?>
     <?php if($caps['can_delete']): ?><button type="button" class="btn-tbl btn-tbl-del open-du-delete" data-id="<?= $id ?>" data-context="<?= $e($token) ?>" data-student="<?= $e($g['nama']) ?>"><?= authorization_icon('delete') ?> <?= transaction_authorization_requires_request()?'Ajukan Hapus':'Hapus' ?></button><?php endif; ?>
-    <?php if($caps['can_print']): ?><a class="btn-tbl btn-tbl-print" href="../laporan/cetak_struk.php?id=<?= $id ?>" target="_blank" rel="noopener"><?= authorization_icon('pdf') ?> Cetak</a><?php endif; ?>
+    <?php if($caps['can_print']): ?><a class="btn-tbl btn-tbl-print history-receipt-button" href="../laporan/cetak_struk.php?id=<?= $id ?>" target="_blank" rel="noopener"><?= authorization_icon('print') ?> Cetak Bukti Transaksi</a><?php endif; ?>
     <button type="button" class="btn-tbl open-payment-activity" data-id="<?= $id ?>" data-unit="<?= (int)$g['unit_id'] ?>"><?= authorization_icon('history') ?> Riwayat Aktivitas</button></div>
     <noscript><details><summary>Riwayat Aktivitas</summary><?php foreach($t['events'] as $event): ?><p class="du-transaction-meta"><?= $e(payment_activity_labels()[$event['action']]??$event['action']) ?> · <?= $e($event['actor_name']?:'Tidak tercatat') ?> · <?= $e(spp_date_label($event['occurred_at'],true)) ?><br><?= $e($event['note']??'') ?></p><?php endforeach; ?></details>
     <?php if($caps['can_delete']): ?><details><summary><?= transaction_authorization_requires_request()?'Ajukan Hapus':'Hapus Transaksi' ?></summary><p>Seluruh komponen transaksi ini akan dihapus<?= transaction_authorization_requires_request()?' setelah disetujui Super Admin':'' ?>. Jurnal tetap tersimpan.</p><form method="post" action="proses.php"><input type="hidden" name="aksi" value="hapus"><input type="hidden" name="id" value="<?= $id ?>"><input type="hidden" name="return_context" value="<?= $e($token) ?>"><input type="hidden" name="csrf_token" value="<?= $e($_SESSION['csrf_payment']) ?>"><?php if(transaction_authorization_requires_request()): ?><label>Alasan <textarea class="field-input" name="authorization_reason" minlength="5" maxlength="500" required></textarea></label><?php endif; ?><button class="btn btn-danger" type="submit">Konfirmasi penghapusan</button></form></details><?php endif; ?></noscript>

@@ -8,16 +8,16 @@
     const count=exportForm.querySelector('[data-export-count]'),clear=exportForm.querySelector('[data-export-clear]'),print=exportForm.querySelector('[data-export-selected]');
     const filter=JSON.parse(root.dataset.exportFilter);filter.kind.sort();filter.status.sort();
     const context=JSON.stringify([root.dataset.exportAccount,root.dataset.exportScope,filter]);
-    const storageKey='spp.authorization.pdf.selection';let choices=new Set();
-    function restore(){choices=new Set();try{const saved=JSON.parse(sessionStorage.getItem(storageKey)||'null');if(saved?.context===context&&Array.isArray(saved.choices))choices=new Set(saved.choices.filter(key=>/^[1-3]\|[1-9]\d*$/.test(key)));}catch{}}
+    const storageKey='spp.authorization.pdf.selection.v2';let choices=new Set();
+    function restore(){choices=new Set();try{const saved=JSON.parse(sessionStorage.getItem(storageKey)||'null');if(saved?.context===context&&Array.isArray(saved.choices))choices=new Set(saved.choices.filter(key=>/^(pembayaran|tabungan_masuk|tabungan_keluar)\|[1-3]\|[1-9]\d*$/.test(key)));}catch{}}
     restore();
-    const key=box=>box.dataset.unit+'|'+box.dataset.id;
+    const key=box=>box.dataset.source+'|'+box.dataset.unit+'|'+box.dataset.id;
     function sync(){
       boxes.forEach(box=>{box.checked=choices.has(key(box));box.closest('.auth-record-row').classList.toggle('is-print-selected',box.checked);});
       const selectedOnPage=boxes.filter(box=>box.checked).length;
       all.checked=boxes.length>0&&selectedOnPage===boxes.length;all.indeterminate=selectedOnPage>0&&!all.checked;
       count.textContent=choices.size+' transaksi dipilih';clear.disabled=print.disabled=choices.size===0;
-      exportForm.elements.transactions.value=JSON.stringify([...choices].map(value=>{const [unit,payment]=value.split('|');return {unit_id:Number(unit),payment_id:Number(payment)};}));
+      exportForm.elements.transactions.value=JSON.stringify([...choices].map(value=>{const [source,unit,payment]=value.split('|');return {source,unit_id:Number(unit),payment_id:Number(payment)};}));
       try{sessionStorage.setItem(storageKey,JSON.stringify({context,choices:[...choices]}));}catch{}
     }
     boxes.forEach(box=>box.addEventListener('change',()=>{box.checked?choices.add(key(box)):choices.delete(key(box));sync();}));
@@ -35,7 +35,7 @@
     if(push)history.pushState(null,'',card.href);
     detail.setAttribute('aria-busy','true');detail.replaceChildren(Object.assign(document.createElement('p'),{textContent:'Memuat detail transaksi…',className:'auth-muted'}));
     try{
-      const params=new URLSearchParams({id:card.dataset.id,unit_id:card.dataset.unit,view:root.dataset.view});
+      const params=new URLSearchParams({source:card.dataset.source,id:card.dataset.id,unit_id:card.dataset.unit,view:root.dataset.view});
       const response=await fetch('otorisasi_detail.php?'+params,{signal:controller.signal,headers:{Accept:'application/json'}});
       const data=await response.json();if(!response.ok||!data.ok)throw new Error(data.message||'Detail belum dapat dimuat.');
       if(version===generation)detail.innerHTML=data.html;
@@ -44,7 +44,7 @@
   }
   cards.forEach((card,i)=>card.addEventListener('click',e=>{if(e.ctrlKey||e.metaKey||e.shiftKey||e.altKey)return;e.preventDefault();select(i);}));
   prev.addEventListener('click',()=>select(selected-1));next.addEventListener('click',()=>select(selected+1));
-  addEventListener('popstate',()=>{const q=new URL(location.href).searchParams;const i=cards.findIndex(c=>c.dataset.id===q.get('selected')&&c.dataset.unit===q.get('selected_unit'));if(i>=0)select(i,false);else if(cards.length)select(0,false);});
+  addEventListener('popstate',()=>{const q=new URL(location.href).searchParams;const i=cards.findIndex(c=>c.dataset.id===q.get('selected')&&c.dataset.unit===q.get('selected_unit')&&c.dataset.source===(q.get('selected_source')||'pembayaran'));if(i>=0)select(i,false);else if(cards.length)select(0,false);});
   const dialog=document.createElement('dialog');dialog.className='auth-confirm-dialog';
   dialog.setAttribute('aria-labelledby','auth-confirm-title');dialog.setAttribute('aria-describedby','auth-confirm-copy');
   dialog.innerHTML='<div class="auth-confirm-heading"><span data-confirm-icon aria-hidden="true"></span><h3 id="auth-confirm-title"></h3></div><div class="auth-confirm-body"><strong data-confirm-reference></strong><p id="auth-confirm-copy"></p><div class="auth-confirm-actions"><button type="button" class="btn btn-ghost" data-confirm-cancel>Batal</button><button type="button" class="btn btn-primary" data-confirm-accept></button></div></div>';

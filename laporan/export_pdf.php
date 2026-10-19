@@ -7,17 +7,26 @@ require_once '../koneksi.php';
 require_once '../includes/auth.php';
 require_once '../includes/spp_billing.php';
 require_once '../includes/payment_permissions.php';
-requireRole(['admin', 'bendahara']);
+requireRole(['admin', 'bendahara', 'kasir']);
 $reportUnitId=unit_report_scope($koneksi,(string)($_GET['unit']??''));
 
 // Multi-filter recaps use the same three-sheet document as the XLSX export.
 if(($_GET['mode']??'')!=='selected' && (is_array($_GET['jenis_laporan']??null)||($_GET['jenis_laporan']??'semua')!=='semua')){
     $sppGeneralPdf=true;require __DIR__.'/export_excel.php';$html=general_document_html($doc);
-    if(($_GET['output']??'preview')!=='pdf'){
-        require_once '../includes/report_preview.php';$downloadQuery=$_GET;$downloadQuery['output']='pdf';
-        render_report_pdf_preview($html,['title'=>$doc['title'],'subtitle'=>$doc['subtitle'],'orientation'=>'landscape','row_count'=>array_sum(array_map(static fn($section)=>count($section['rows']),$sheets[1]['sections'])),'download_url'=>'export_pdf.php?'.filter_build_query($downloadQuery),'back_url'=>'index.php?'.filter_build_query($_GET)]);
+    $detailCount=0;foreach(array_slice($sheets,1) as $sheet)foreach($sheet['sections'] as $section)$detailCount+=count($section['rows']);
+    if(!in_array($_GET['output']??'preview',['pdf','inline'],true)){
+        require_once '../includes/report_preview.php';$downloadQuery=$_GET;$downloadQuery['output']='pdf';$inlineQuery=$_GET;$inlineQuery['output']='inline';
+        render_report_pdf_preview($html,['title'=>$doc['title'],'subtitle'=>$doc['subtitle'],'orientation'=>'landscape','unit'=>$reportUnitId,'generated'=>$doc['generated'],'pdf_url'=>'export_pdf.php?'.filter_build_query($inlineQuery),'row_count'=>$detailCount,'download_url'=>'export_pdf.php?'.filter_build_query($downloadQuery),'back_url'=>'index.php?'.filter_build_query($_GET)]);
     }
-    require_once '../includes/pdf.php';require_pdf_library();$options=new \Dompdf\Options();$options->setIsRemoteEnabled(false);$options->setChroot(realpath(__DIR__.'/..'));$pdf=new \Dompdf\Dompdf($options);$pdf->loadHtml($html,'UTF-8');$pdf->setPaper('A4','landscape');$pdf->render();$pdf->stream('laporan-keuangan-'.date('Ymd-His').'.pdf',['Attachment'=>true]);exit;
+    require_once '../includes/pdf.php';require_pdf_library();require_once '../includes/report_artifact.php';
+    $stable=$doc;unset($stable['generated']);$query=$_GET;unset($query['output']);
+    $artifact=report_artifact_get(['route'=>'recap','unit'=>$reportUnitId,'query'=>$query],$stable,'pdf',static function()use($html){
+        $options=new \Dompdf\Options();$options->setIsRemoteEnabled(false);$options->setChroot(realpath(__DIR__.'/..'));
+        $pdf=new \Dompdf\Dompdf($options);$pdf->loadHtml($html,'UTF-8');$pdf->setPaper('A4','landscape');$pdf->render();
+        $pdf->getCanvas()->page_text(705,571,'Halaman {PAGE_NUM} / {PAGE_COUNT}',$pdf->getFontMetrics()->getFont('DejaVu Sans'),8,[.3,.4,.35]);
+        $bytes=$pdf->output();report_perf_mark('pdf');return $bytes;
+    });
+    report_artifact_stream($artifact,'rekap-laporan-transaksi.pdf','pdf',($_GET['output']??'pdf')!=='inline');
 }
 
 $output_mode = (string)($_GET['output'] ?? 'preview');
@@ -255,8 +264,8 @@ if (!$selected_mode) {
     $generated = spp_date_label(new DateTimeImmutable('now'),true);
     $operator = (string)($_SESSION['admin_nama'] ?? $_SESSION['admin_username'] ?? 'Pengguna');
     $html = '<!DOCTYPE html><html lang="id"><head><meta charset="UTF-8"><style>'
-        . '@page{margin:14mm;size:A4 landscape}*{box-sizing:border-box}body{font-family:DejaVu Sans,Arial,sans-serif;color:#18281f;font-size:9px;margin:0}.kop{width:100%;border-bottom:3px double #15543c;margin-bottom:10px}.kop td{border:0;padding:0 0 8px}.kop img{width:54px;height:54px;object-fit:contain}.kop h1{font-size:15px;margin:0;text-align:center}.kop p{text-align:center;margin:3px 0;color:#52645b}.title{text-align:center;margin:10px 0}.title h2{font-size:15px;margin:0 0 4px}.title p{margin:0;color:#66766d}.meta{width:100%;margin-bottom:8px}.meta td{border:0;padding:2px}.summary{display:table;width:100%;margin:10px 0 12px;border:1px solid #cfe9dc}.summary div{display:table-cell;padding:9px;border-right:1px solid #e1f1e8}.summary div:last-child{border-right:0}.summary span{display:block;color:#708078;font-size:8px;text-transform:uppercase;font-weight:700}.summary strong{display:block;margin-top:3px;font-size:12px}table{width:100%;border-collapse:collapse}thead{display:table-header-group}tr{page-break-inside:avoid}th{background:#15543c;color:#fff;text-align:left;font-size:8px;text-transform:uppercase;padding:7px;border:1px solid #8fb3a2}td{padding:6px;border:1px solid #d9e9e1;vertical-align:top}tbody tr:nth-child(even){background:#f5faf7}.num{text-align:right;font-weight:700;color:#0b8d4b;white-space:nowrap}.empty{text-align:center;color:#718078;padding:24px}small{color:#708078}.footer{position:fixed;bottom:-8mm;left:0;right:0;border-top:1px solid #b9cec3;padding-top:3px;color:#697970;font-size:7px}.footer:after{content:"SistemSPP - Halaman " counter(page)}'
-        . 'body{font-size:9.5px;line-height:1.38;background:#fff}.kop{margin-bottom:12px}.kop img{width:60px;height:60px}.kop h1{font-size:16px;letter-spacing:.15px}.title{margin:12px 0 9px;padding:9px 12px;border:1px solid #d3e7dc;background:#f3faf6}.title h2{font-size:16px;color:#123f2f}.meta{color:#61736a;margin-bottom:10px}.summary{border-radius:4px;background:#fbfdfc}.summary div{padding:10px 12px}.summary strong{color:#143d2f;font-size:13px}body>table:last-of-type{table-layout:fixed}body>table:last-of-type th:nth-child(1){width:4%}body>table:last-of-type th:nth-child(2){width:14%}body>table:last-of-type th:nth-child(3){width:19%}body>table:last-of-type th:nth-child(4){width:8%}body>table:last-of-type th:nth-child(5){width:13%}body>table:last-of-type th:nth-child(6){width:10%}body>table:last-of-type th:nth-child(7){width:17%}body>table:last-of-type th:nth-child(8){width:15%}th{padding:7px 8px}td{padding:6px 8px;word-break:break-word}@media screen{body{padding:28px 30px;font-size:10.5px}.kop h1{font-size:18px}.kop p{font-size:10px}.title h2{font-size:17px}.title p{font-size:10px}.meta{font-size:10px}.summary span{font-size:8.5px}.summary strong{font-size:14px}th{font-size:9px;padding:8px}td{padding:7px 8px}.footer{position:static;margin-top:18px}}'
+        . '@page{margin:14mm;size:A4 landscape}*{box-sizing:border-box}body{font-family:DejaVu Sans,Arial,sans-serif;color:#18281f;font-size:9pt;margin:0}.kop{width:100%;border-bottom:3px double #15543c;margin-bottom:10px}.kop td{border:0;padding:0 0 8px}.kop img{width:54px;height:54px;object-fit:contain}.kop h1{font-size:15px;margin:0;text-align:center}.kop p{text-align:center;margin:3px 0;color:#52645b}.title{text-align:center;margin:10px 0}.title h2{font-size:15px;margin:0 0 4px}.title p{margin:0;color:#66766d}.meta{width:100%;margin-bottom:8px}.meta td{border:0;padding:2px}.summary{display:table;width:100%;margin:10px 0 12px;border:1px solid #cfe9dc}.summary div{display:table-cell;padding:9px;border-right:1px solid #e1f1e8}.summary div:last-child{border-right:0}.summary span{display:block;color:#708078;font-size:9pt;text-transform:uppercase;font-weight:700}.summary strong{display:block;margin-top:3px;font-size:12px}table{width:100%;border-collapse:collapse}thead{display:table-header-group}tr{page-break-inside:avoid}th{background:#15543c;color:#fff;text-align:left;font-size:9pt;text-transform:uppercase;padding:7px;border:1px solid #8fb3a2}td{padding:6px;border:1px solid #d9e9e1;vertical-align:top}tbody tr:nth-child(even){background:#f5faf7}.num{text-align:right;font-weight:700;color:#0b8d4b;white-space:nowrap}.empty{text-align:center;color:#718078;padding:24px}small{color:#708078}.footer{position:fixed;bottom:-8mm;left:0;right:0;border-top:1px solid #b9cec3;padding-top:3px;color:#697970;font-size:9pt}.footer:after{content:"SistemSPP - Halaman " counter(page)}'
+        . 'body{font-size:9pt;line-height:1.38;background:#fff}.kop{margin-bottom:12px}.kop img{width:60px;height:60px}.kop h1{font-size:16px;letter-spacing:.15px}.title{margin:12px 0 9px;padding:9px 12px;border:1px solid #d3e7dc;background:#f3faf6}.title h2{font-size:16px;color:#123f2f}.meta{color:#61736a;margin-bottom:10px}.summary{border-radius:4px;background:#fbfdfc}.summary div{padding:10px 12px}.summary strong{color:#143d2f;font-size:13px}body>table:last-of-type{table-layout:fixed}body>table:last-of-type th:nth-child(1){width:4%}body>table:last-of-type th:nth-child(2){width:14%}body>table:last-of-type th:nth-child(3){width:19%}body>table:last-of-type th:nth-child(4){width:8%}body>table:last-of-type th:nth-child(5){width:13%}body>table:last-of-type th:nth-child(6){width:10%}body>table:last-of-type th:nth-child(7){width:17%}body>table:last-of-type th:nth-child(8){width:15%}th{padding:7px 8px}td{padding:6px 8px;word-break:break-word}@media screen{body{padding:28px 30px;font-size:9pt}.kop h1{font-size:18px}.kop p{font-size:9pt}.title h2{font-size:17px}.title p{font-size:9pt}.meta{font-size:9pt}.summary span{font-size:9pt}.summary strong{font-size:14px}th{font-size:9pt;padding:8px}td{padding:7px 8px}.footer{position:static;margin-top:18px}}'
         . '</style></head><body><table class="kop"><tr><td style="width:72px">' . ($logoData !== '' ? '<img src="' . $logoData . '" alt="Logo sekolah">' : '') . '</td><td><h1>' . e(unit_school_name($reportUnitId)) . '</h1><p>Perum Bekasi Griya Asri II, Tambun Selatan - Telp. 021-88363466</p></td><td style="width:72px"></td></tr></table><div class="title"><h2>REKAP LAPORAN TRANSAKSI</h2><p>Periode ' . e($periode) . '</p></div><table class="meta"><tr><td>Dibuat: ' . e($generated) . '</td><td style="text-align:right">Petugas: ' . e($operator) . '</td></tr></table><div class="summary"><div><span>Total Transaksi</span><strong>' . number_format($totalRows) . '</strong></div><div><span>Total Pembayaran</span><strong>Rp ' . money_total($grandTotal) . '</strong></div></div><table><thead><tr><th>No</th><th>NIS</th><th>Nama</th><th>Kelas</th><th>Periode Bayar</th><th>Sistem</th><th>Tanggal</th><th>Total</th></tr></thead><tbody>'
         . $htmlRows
         . '</tbody></table><div class="footer"></div></body></html>';
@@ -284,6 +293,7 @@ if (!$selected_mode) {
     $options->set('isRemoteEnabled', false);
     $options->set('isHtml5ParserEnabled', true);
     $options->setDefaultMediaType('print');
+$options->setFontHeightRatio(1.0);
     $dompdf = new \Dompdf\Dompdf($options);
     $dompdf->loadHtml($html);
     $dompdf->setPaper('A4', 'landscape');
@@ -352,338 +362,24 @@ function total_psb_bill(array $row): float {
     return max(0, (float)($row['PSB'] ?? 0));
 }
 
+require_once __DIR__.'/../includes/receipt_print.php';
+$documents=[];
+foreach($rows as $row){
+    $allocation=$spp_allocations_by_payment[(int)$row['id']]??null;
+    $sisaDu=(float)$row['uang_du']>.001 && (int)($row['du_bill_id']??0)>0
+        ? max(0,(float)$row['du_nominal_tagihan']-(float)$row['du_paid_this_bill']) : null;
+    $documents[]=[
+        'payment'=>$row,'school'=>unit_school_name((int)$row['unit_id']),
+        'primary'=>array_map(static fn($line)=>[$line['label'],$line['amount']],primary_lines($row,$allocation)),
+        'remaining'=>[['Sisa PSB',max(0,total_psb_bill($row)-(float)$row['total_psb_bayar'])],['Sisa DU',$sisaDu]],
+        'other'=>array_map(static fn($line)=>[$line['label'],$line['amount']],other_lines($row,$details_by_payment[(int)$row['id']]??[],$allocation)),
+        'period'=>month_name_from_value($row['BULAN'],$bln_names).' '.$row['TAHUN'],
+        'words'=>terbilang_rupiah($row['total_jumlah']),'date'=>spp_date_label($row['TGL_BYR'],true),
+        'signer'=>$row['operator_name'] ?: ($_SESSION['admin_nama']??'Bagian Keuangan'),
+    ];
+}
 ob_start();
-?>
-<!DOCTYPE html>
-<html lang="id">
-<head>
-  <meta charset="UTF-8" />
-  <title>Slip Pembayaran</title>
-  <link rel="icon" type="image/png" href="../assets/img/favicon.png?v=2" />
-  <style>
-    @page { size: 210mm 148mm; margin: 0; }
-    * { box-sizing: border-box; }
-    body {
-      margin: 0;
-      background: #fff;
-      color: #000;
-      font-family: "Times New Roman", Times, serif;
-      font-size: 11.5px;
-      line-height: 1.22;
-    }
-    .slip {
-      width: 190mm;
-      height: 133mm;
-      padding: 8mm 10mm 7mm;
-      background: #fff;
-      page-break-after: always;
-      page-break-inside: avoid;
-      overflow: hidden;
-    }
-    .slip:last-child { page-break-after: auto; }
-    .school-title {
-      margin: 0;
-      text-align: center;
-      font-family: Arial, Helvetica, sans-serif;
-      font-size: 15px;
-      line-height: 1.15;
-      font-weight: 800;
-    }
-    .school-address {
-      margin: 7px 0 5px;
-      text-align: center;
-      font-size: 10.5px;
-    }
-    .line { border-top: 1px solid #000; }
-    .doc-title {
-      margin: 5px 0 9px;
-      text-align: center;
-      font-weight: 800;
-      letter-spacing: 1.1px;
-      font-size: 11px;
-    }
-    table {
-      border-collapse: collapse;
-      width: 100%;
-    }
-    .info-table,
-    .detail-table,
-    .total-table,
-    .footer-table {
-      width: 174mm;
-      margin-left: 8mm;
-      margin-right: 8mm;
-    }
-    .info-table {
-      margin-bottom: 5px;
-    }
-    .info-table td,
-    .mini-table td,
-    .pay-table td,
-    .footer-table td {
-      vertical-align: top;
-    }
-    .info-left,
-    .info-right,
-    .detail-left,
-    .detail-right {
-      width: 50%;
-    }
-    .info-left,
-    .detail-left {
-      padding-right: 8mm;
-    }
-    .info-right,
-    .detail-right {
-      padding-left: 8mm;
-    }
-    .mini-table td {
-      padding: 1.3px 0;
-    }
-    .label {
-      width: 33mm;
-    }
-    .sep {
-      width: 4mm;
-      text-align: center;
-    }
-    .year-inline {
-      display: inline-block;
-      width: 27mm;
-      text-align: right;
-    }
-    .split-line {
-      margin: 3px 0 8px;
-    }
-    .detail-table {
-      margin-bottom: 8px;
-    }
-    .section-label {
-      margin-bottom: 4px;
-      text-decoration: underline;
-    }
-    .pay-table td {
-      padding: 2px 0;
-    }
-    .no-col {
-      width: 6mm;
-    }
-    .pay-label {
-      width: 48mm;
-    }
-    .pay-sep {
-      width: 4mm;
-      text-align: center;
-    }
-    .pay-amount {
-      width: 25mm;
-      text-align: right;
-      white-space: nowrap;
-    }
-    .amount {
-      text-align: right;
-      white-space: nowrap;
-    }
-    .compact-label {
-      font-style: italic;
-      font-weight: 700;
-    }
-    .other-spacer {
-      height: 9px;
-    }
-    .total-table {
-      border-top: 1px solid #000;
-      border-bottom: 1px solid #000;
-      font-family: Arial, Helvetica, sans-serif;
-      font-size: 11px;
-      font-weight: 800;
-      letter-spacing: .6px;
-    }
-    .total-table td {
-      padding: 5px 0;
-    }
-    .total-label {
-      padding-left: 0;
-    }
-    .total-amount {
-      width: 32mm;
-      text-align: right;
-    }
-    .footer-table {
-      margin-top: 8px;
-    }
-    .footer-left {
-      width: 68%;
-    }
-    .footer-right {
-      width: 32%;
-      text-align: center;
-    }
-    .terbilang-table td {
-      padding: 0 0 13px;
-    }
-    .terbilang-label {
-      width: 24mm;
-      font-weight: 700;
-    }
-    .terbilang-value {
-      font-size: 12.5px;
-      font-style: italic;
-    }
-    .method-label {
-      width: 34mm;
-    }
-    .signature-space { height: 20px; }
-    .signature-name { font-weight: 700; }
-  </style>
-</head>
-<body>
-  <?php foreach ($rows as $row):
-    $details = $details_by_payment[(int)$row['id']] ?? [];
-    $sppAllocation=$spp_allocations_by_payment[(int)$row['id']]??null;
-    $primary = primary_lines($row,$sppAllocation);
-    $others = other_lines($row, $details,$sppAllocation);
-    $sisa_psb = max(0, total_psb_bill($row) - (float)$row['total_psb_bayar']);
-    $sisa_du = (float)$row['uang_du'] > 0.001 && (int)($row['du_bill_id'] ?? 0) > 0
-        ? max(0, (float)$row['du_nominal_tagihan'] - (float)$row['du_paid_this_bill'])
-        : null;
-    $month_name = month_name_from_value($row['BULAN'], $bln_names);
-    $signer = $row['operator_name'] ?: ($_SESSION['admin_nama'] ?? 'Bagian Keuangan');
-  ?>
-  <section class="slip">
-    <h1 class="school-title"><?= e(unit_school_name((int)$row['unit_id'])) ?></h1>
-    <p class="school-address">Perum Bekasi Griya Asri II, Blok E Jl.H.Nabrih Ds. Sumber Jaya Kp.Buwek Tambun Selatan Telp. 021.88363466</p>
-    <div class="line"></div>
-    <div class="doc-title">SLIP PEMBAYARAN SEKOLAH</div>
-
-    <table class="info-table">
-      <tr>
-        <td class="info-left">
-          <table class="mini-table">
-            <tr>
-              <td class="label">No.Induk</td>
-              <td class="sep">:</td>
-              <td><?= e($row['NO_INDUK']) ?></td>
-            </tr>
-            <?php if (!empty($row['NO_induk_diknas'])): ?>
-            <tr>
-              <td class="label">NIS Diknas</td>
-              <td class="sep">:</td>
-              <td><?= e($row['NO_induk_diknas']) ?></td>
-            </tr>
-            <?php endif; ?>
-            <tr>
-              <td class="label">Nama Siswa</td>
-              <td class="sep">:</td>
-              <td><?= e($row['NAMA']) ?></td>
-            </tr>
-          </table>
-        </td>
-        <td class="info-right">
-          <table class="mini-table">
-            <tr>
-              <td class="label">Kelas</td>
-              <td class="sep">:</td>
-              <td><?= e($row['kelas_rombel_snapshot'] ?: ($row['KELAS'] ?: $row['KELAS_SISWA'])) ?></td>
-            </tr>
-            <tr>
-              <td class="label">Untuk Pembayaran Bulan</td>
-              <td class="sep">:</td>
-              <td><?= e($month_name) ?><span class="year-inline"><?= e($row['TAHUN']) ?></span></td>
-            </tr>
-          </table>
-        </td>
-      </tr>
-    </table>
-
-    <div class="line split-line"></div>
-
-    <table class="detail-table">
-      <tr>
-        <td class="detail-left">
-          <div class="section-label">Data Pembayaran :</div>
-          <table class="pay-table">
-            <?php foreach ($primary as $index => $line): ?>
-            <tr>
-              <td class="no-col"><?= $index + 1 ?>.</td>
-              <td class="pay-label"><?= e($line['label']) ?></td>
-              <td class="pay-sep">:</td>
-              <td class="pay-amount"><?= e(money_plain($line['amount'])) ?></td>
-            </tr>
-            <?php endforeach; ?>
-          </table>
-        </td>
-        <td class="detail-right">
-          <div class="section-label">Sisa Pembayaran :</div>
-          <table class="pay-table">
-            <tr>
-              <td class="compact-label">Sisa PSB</td>
-              <td class="pay-sep">:</td>
-              <td class="pay-amount"><?= e(money_plain($sisa_psb)) ?></td>
-            </tr>
-            <tr>
-              <td class="compact-label">Sisa DU</td>
-              <td class="pay-sep">:</td>
-              <td class="pay-amount"><?= e(money_plain($sisa_du)) ?></td>
-            </tr>
-            <tr><td class="other-spacer" colspan="3"></td></tr>
-          </table>
-          <div class="section-label">Pembayaran Lain - lain</div>
-          <table class="pay-table">
-            <?php if ($others): ?>
-              <?php foreach ($others as $line): ?>
-              <tr>
-                <td><?= e($line['label']) ?></td>
-                <td class="pay-sep">:</td>
-                <td class="pay-amount"><?= e($line['amount'] < 0 ? '-' . money_plain(abs($line['amount'])) : money_plain($line['amount'])) ?></td>
-              </tr>
-              <?php endforeach; ?>
-            <?php else: ?>
-              <tr><td>&nbsp;</td><td class="pay-sep">:</td><td></td></tr>
-              <tr><td>&nbsp;</td><td class="pay-sep">:</td><td></td></tr>
-            <?php endif; ?>
-          </table>
-        </td>
-      </tr>
-    </table>
-
-    <table class="total-table">
-      <tr>
-        <td class="total-label">JUMLAH TOTAL</td>
-        <td class="total-amount"><?= e(money_total($row['total_jumlah'])) ?></td>
-      </tr>
-    </table>
-
-    <table class="footer-table">
-      <tr>
-        <td class="footer-left">
-          <table class="terbilang-table">
-            <tr>
-              <td class="terbilang-label">Terbilang:</td>
-              <td class="terbilang-value"><?= e(terbilang_rupiah($row['total_jumlah'])) ?></td>
-            </tr>
-          </table>
-          <table>
-            <tr>
-              <td class="method-label">Sistem Pembayaran</td>
-              <td class="sep">:</td>
-              <td><strong><?= e($row['sistem_pembayaran'] ?? 'VA') ?></strong></td>
-            </tr>
-          </table>
-        </td>
-        <td class="footer-right">
-          <div>Bekasi, <?= e(spp_date_label($row['TGL_BYR'],true)) ?></div>
-          <div>Bagian Keuangan</div>
-          <div class="signature-space"></div>
-          <div class="signature-name"><?= e($signer) ?></div>
-        </td>
-      </tr>
-    </table>
-  </section>
-  <?php endforeach; ?>
-</body>
-</html>
-<?php
+receipt_print_document($documents,'Slip Pembayaran','Struk siap dicetak',true);
 $html = ob_get_clean();
 
 if ($output_mode === 'preview') {
@@ -694,6 +390,8 @@ if ($output_mode === 'preview') {
     unset($backQuery['output'], $backQuery['mode'], $backQuery['ids'], $backQuery['contoh']);
     render_report_pdf_preview($html, [
         'title' => 'Slip Pembayaran',
+        'document_label' => 'Letter separo · 215,9 × 139,7 mm',
+        'stage_width' => '980px',
         'subtitle' => 'Periode ' . $periode . ' - ' . number_format(count($rows)) . ' transaksi dipilih',
         'generated' => spp_date_label(new DateTimeImmutable('now'),true),
         'row_count' => count($rows),
@@ -708,13 +406,14 @@ require_pdf_library();
 
 $options = new \Dompdf\Options();
 $options->setDefaultMediaType('print');
+$options->setFontHeightRatio(1.0);
 $options->setIsHtml5ParserEnabled(true);
 $options->setIsRemoteEnabled(false);
 $options->setChroot(realpath(__DIR__ . '/..'));
 
 $dompdf = new \Dompdf\Dompdf($options);
 $dompdf->loadHtml($html, 'UTF-8');
-$dompdf->setPaper([0, 0, 595.276, 419.528]);
+$dompdf->setPaper([0, 0, 612, 396]);
 $dompdf->render();
 $dompdf->stream(sprintf('slip-pembayaran-%04d-%02d.pdf', $filter_tahun, $filter_bulan), ['Attachment' => true]);
 exit;

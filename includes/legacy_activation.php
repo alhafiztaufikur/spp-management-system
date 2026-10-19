@@ -8,7 +8,7 @@ function legacy_activate(mysqli $db,int $id,int $classId,int $yearId,array $fees
     $db->begin_transaction();
     try {
         $access=$db->prepare("SELECT id,role,unit_id FROM admin WHERE id=? AND is_active=1 FOR UPDATE");$access->bind_param('i',$actor);$access->execute();$account=$access->get_result()->fetch_assoc();$access->close();
-        if(!$account||!in_array($account['role'],['super_admin','admin','kasir'],true)||($account['role']!=='super_admin'&&(int)$account['unit_id']!==unit_active_id()))throw new RuntimeException('Hak aktivasi atau unit akun sudah berubah.');
+        if(!$account||!operational_role($account['role'])||!in_array(unit_active_id(),[1,2,3],true))throw new RuntimeException('Hak aktivasi atau unit akun sudah berubah.');
         $s=$db->prepare('SELECT * FROM siswa WHERE id=? FOR UPDATE');$s->bind_param('i',$id);$s->execute();$student=$s->get_result()->fetch_assoc();$s->close();
         if(!$student||!(int)$student['legacy_pending']||(int)$student['is_active']||$student['master_kelas_id']!==null)throw new RuntimeException('Siswa bukan Legacy yang menunggu aktivasi; kiriman ulang ditolak.');
         $class=class_find($db,$classId,true,true);if(!$class)throw new RuntimeException('Pilih rombel aktif pada unit siswa.');

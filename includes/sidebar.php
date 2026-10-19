@@ -16,7 +16,7 @@ $role = $_SESSION['admin_role'] ?? '';
 $allNavItems = [
   ['dashboard.php', 'Dashboard',
    '<rect x="3" y="3" width="7" height="7"/><rect x="14" y="3" width="7" height="7"/><rect x="14" y="14" width="7" height="7"/><rect x="3" y="14" width="7" height="7"/>',
-   ['admin', 'bendahara'], 'Menu Utama'],
+   ['admin', 'bendahara', 'kasir'], 'Menu Utama'],
 
   ['pembayaran/form.php', 'Input Pembayaran',
    '<rect x="2" y="5" width="20" height="14" rx="2"/><line x1="2" y1="10" x2="22" y2="10"/>',
@@ -33,7 +33,7 @@ $allNavItems = [
 
   ['otorisasi_transaksi.php', $role === 'kasir' ? 'Pengajuan Saya' : ($role === 'bendahara' ? 'Riwayat Otorisasi' : 'Otorisasi Transaksi'),
    '<path d="M12 22s8-4 8-10V5l-8-3-8 3v7c0 6 8 10 8 10z"/><path d="M9 12l2 2 4-4"/>',
-   ['admin', 'bendahara', 'kasir'], 'Pembayaran'],
+   ['super_admin'], 'Pembayaran'],
 
   ['siswa/daftar.php', 'Data Siswa',
    '<path d="M17 21v-2a4 4 0 0 0-4-4H5a4 4 0 0 0-4 4v2"/><circle cx="9" cy="7" r="4"/><path d="M23 21v-2a4 4 0 0 0-3-3.87"/><path d="M16 3.13a4 4 0 0 1 0 7.75"/>',
@@ -73,7 +73,7 @@ $allNavItems = [
 
   ['laporan/index.php', 'Laporan Transaksi',
    '<path d="M9 11l3 3L22 4"/><path d="M21 12v7a2 2 0 0 1-2 2H5a2 2 0 0 1-2-2V5a2 2 0 0 1 2-2h11"/>',
-   ['admin', 'bendahara'], 'Laporan'],
+   ['admin', 'bendahara', 'kasir'], 'Laporan'],
 
   ['laporan/global.php', 'Laporan Global',
    '<path d="M3 3v18h18"/><path d="M7 15l3-3 3 2 5-6"/><path d="M7 19h12"/>',
@@ -88,7 +88,7 @@ $allNavItems = [
    ['super_admin'], 'Pengaturan'],
   ['backup_restore.php', 'Backup & Restore',
    '<ellipse cx="12" cy="5" rx="8" ry="3"/><path d="M4 5v14c0 4 16 4 16 0V5M4 12c0 4 16 4 16 0"/>',
-   ['super_admin'], 'Pengaturan'],
+   ['super_admin', 'admin', 'kasir'], 'Pengaturan'],
 ];
 
 // Filter nav items berdasarkan role
@@ -121,7 +121,7 @@ $shortLabels = [
 ];
 
 // Role label
-$roleLabels = ['super_admin' => 'Super Admin', 'admin' => 'Administrator', 'bendahara' => 'Bendahara TU', 'kasir' => 'Kasir'];
+$roleLabels = ['super_admin' => 'Super Admin', 'admin' => 'Administrator'];
 $roleLabel  = $roleLabels[$role] ?? 'Pengguna';
 $roleAvatars = [
   'super_admin' => 'SA',
@@ -153,6 +153,8 @@ function unitSwitchReportScope(select) {
 document.addEventListener('DOMContentLoaded', function () {
   document.querySelectorAll('form[method="post" i]').forEach(function(form){
     var action=form.getAttribute('action')||'';
+    // This POST exports a read selection; it does not change school transactions.
+    if(form.classList.contains('auth-export-tools') && new URL(action,location.href).pathname.endsWith('/otorisasi_export_pdf.php'))return;
     if(form.classList.contains('sidebar-unit-form') || form.classList.contains('dashboard-unit-switch-form') || action.includes('logout.php') || (['database-backup-form','database-backup-settings-form'].includes(form.id) && new URL(action,location.href).pathname.endsWith('/backup_api.php')))return;
     form.querySelectorAll('input,select,textarea,button').forEach(function(control){control.disabled=true});
     form.hidden=true;form.style.setProperty('display','none','important');
@@ -183,12 +185,12 @@ document.addEventListener('DOMContentLoaded', function () {
     </div>
   </div>
 
-  <?php if (unit_is_super()): ?>
+  <?php if (operational_role()): ?>
   <div class="sidebar-unit-panel">
     <form action="<?= $root ?>unit_switch.php" method="post" class="sidebar-unit-form" data-operational-unit="<?= $activeUnit ?>">
       <input type="hidden" name="csrf_token" value="<?= htmlspecialchars($_SESSION['csrf_unit_switch'],ENT_QUOTES,'UTF-8') ?>">
       <input type="hidden" name="next" value="<?= htmlspecialchars($_SERVER['REQUEST_URI'] ?? '/dashboard.php',ENT_QUOTES,'UTF-8') ?>">
-      <span class="sidebar-unit-kicker"><span aria-hidden="true"></span> SUPER ADMIN</span>
+      <span class="sidebar-unit-kicker"><span aria-hidden="true"></span> <?= htmlspecialchars(strtoupper($roleLabel),ENT_QUOTES,'UTF-8') ?></span>
       <label for="sidebar-unit-select" class="sidebar-unit-heading"><span class="sidebar-unit-heading-icon" aria-hidden="true"><svg width="22" height="22" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.8" stroke-linecap="round" stroke-linejoin="round"><path d="m3 10 9-7 9 7M5 9v12h14V9M9 21v-7h6v7M10 8h4"/></svg></span>Unit operasional</label>
       <span class="sidebar-unit-select-wrap">
         <select id="sidebar-unit-select" name="unit_id" data-native-select onchange="clearAuthorizationPrintSelection();this.form.submit()">
@@ -212,7 +214,7 @@ document.addEventListener('DOMContentLoaded', function () {
     </form>
   </div>
   <?php endif; ?>
-  <?php if (unit_is_super()): ?>
+  <?php if (operational_role()): ?>
   <script>
   document.addEventListener('DOMContentLoaded', function () {
     var unitForm = document.querySelector('.sidebar-unit-form');

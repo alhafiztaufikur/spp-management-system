@@ -33,7 +33,7 @@
 .account-workspace .account-filter-reset:focus-visible,.account-workspace .savings-row-actions .btn-tbl:focus-visible,.account-workspace .account-more button:focus-visible{outline:2px solid var(--accent);outline-offset:3px}
 @media(max-width:650px){.account-workspace .account-filter-reset{width:100%}.account-workspace .savings-row-actions .btn-tbl{padding:9px 8px;min-height:38px;font-size:11px}.account-workspace .account-activate-form{display:flex;flex:1}}
 .account-workspace .savings-row-actions .btn-tbl{scroll-margin-block:110px}
-.account-workspace .account-create-card .action-bar{justify-content:flex-end;}
+.account-workspace .account-create-card .action-bar{justify-content:space-between;}
 .account-workspace .account-history{margin-top:4px;font-size:11px;line-height:1.5;color:var(--text-secondary);}
 .account-workspace .account-history.no-history{color:var(--accent);}
 .account-workspace .savings-row-actions{flex-wrap:wrap;gap:8px;}
@@ -42,3 +42,6 @@
 .account-workspace .account-delete-reason{padding:6px 10px;max-width:230px;white-space:normal;}
 .account-workspace #form-purge-account{margin-top:16px;}
 .account-workspace #form-purge-account .btn-error{background:var(--red);color:#fff;border-color:var(--red);}
+
+.account-workspace .savings-row-actions .account-self-badge{border:1px solid var(--border);background:var(--accent-soft);color:var(--accent);cursor:default}.account-create-card .account-reload{margin-left:0}
+.account-workspace .savings-row-actions .account-self-badge:hover{box-shadow:none;transform:none}

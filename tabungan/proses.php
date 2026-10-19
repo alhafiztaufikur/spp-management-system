@@ -8,6 +8,7 @@ require_once '../koneksi.php';
 require_once '../includes/auth.php';
 require_once '../includes/financial_request.php';
 require_once '../includes/savings_notes.php';
+require_once '../includes/savings_authorization.php';
 requireRole(['admin', 'kasir']);
 
 if ($_SERVER['REQUEST_METHOD'] !== 'POST') {
@@ -55,24 +56,10 @@ $koneksi->begin_transaction();
 
 try {
     financial_request_reserve($koneksi, $requestKey, 'tabungan_' . $aksi, (int)$_SESSION['admin_id']);
-    $stmtStudent = $koneksi->prepare('SELECT id FROM siswa WHERE NO_INDUK = ? AND is_active = 1 FOR UPDATE');
-    $stmtStudent->bind_param('s', $no_induk);
-    $stmtStudent->execute();
-    $activeStudent = $stmtStudent->get_result()->fetch_assoc();
-    $stmtStudent->close();
-    if (!$activeStudent) {
-        throw new RuntimeException('Siswa tidak ditemukan atau sudah diarsipkan.');
-    }
-
-    // 1) Ambil atau buat record saldo tabungan siswa
     require_once __DIR__.'/../includes/legacy_operational_read.php';lop_bank_assert_ready($koneksi,$no_induk);
-    $stmt = $koneksi->prepare("SELECT SALDO FROM tabungan WHERE NO_INDUK = ? FOR UPDATE");
-    $stmt->bind_param('s', $no_induk);
-    $stmt->execute();
-    $res   = $stmt->get_result()->fetch_assoc();
-    $saldo = (float)($res['SALDO'] ?? 0);
-    $stmt->close();
-
+    $ledger=savings_locked_ledger($koneksi,$no_induk);
+    if(!(int)$koneksi->query("SELECT is_active FROM siswa WHERE id=".(int)$ledger['student']['id'])->fetch_row()[0])throw new RuntimeException('Siswa sudah diarsipkan.');
+    $saldo=$ledger['balance']/100;
     if ($aksi === 'keluar' && $saldo <= 0) {
         throw new Exception('Saldo tabungan kosong. Penarikan tidak bisa diproses.');
     }
@@ -115,6 +102,9 @@ try {
     $journalId = (int)$koneksi->insert_id;
     $stmt3->close();
 
+    $newRow=['id'=>$journalId,'unit_id'=>unit_active_id(),'NO_INDUK'=>$no_induk,'TANGGAL'=>$tanggal_dt,'MASUK'=>$aksi==='masuk'?$nominal:0,'KELUAR'=>$aksi==='keluar'?$nominal:0,'user_id'=>$user_id,'keterangan'=>$keterangan,'jenis'=>$aksi];
+    savings_ledger_balance(array_merge($ledger['rows'],[$newRow]),true,$ledger['opening']);
+    if(savings_authorization_ready($koneksi))savings_event($koneksi,$newRow,'created',(int)$user_id,null,savings_snapshot($newRow,$ledger['student'])['data'],'created:'.$aksi.':'.$journalId);
     financial_request_complete($koneksi, $requestKey, $journalId);
     $koneksi->commit();
 

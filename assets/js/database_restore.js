@@ -19,7 +19,7 @@
     const [step,label]=stages[state] || [0,'Menyiapkan pemulihan'];
     const terminal=['completed','rolled_back'].includes(state) && finalized;
     byId('restore-progress-panel').hidden=false;
-    setText('restore-stage-label',finalized ? label : 'Menyelesaikan pemulihan');
+    setText('restore-stage-label',byId('restore-connection') ? 'Tahapan Pemulihan' : finalized ? label : 'Menyelesaikan pemulihan');
     setText('restore-stage-count',terminal ? '4 tahap selesai' : `Tahap ${step+1} dari 4`);
     const bar=byId('restore-progress-bar');
     if(['uploading','validating'].includes(state))bar.removeAttribute('value');
@@ -92,8 +92,14 @@
     clearTimeout(timer);
     try {
       const result = await request('status');job = result.job;render();
+      if(byId('restore-connection'))byId('restore-connection').hidden=true;
       if (active()) timer = setTimeout(poll,2000);
-    } catch (_) {feedback('Progres belum dapat dihubungi. Akan dicoba kembali; jangan mengunggah ulang.');timer = setTimeout(poll,5000);}
+    } catch (_) {
+      const message='Sambungan terputus. Progres akan diperiksa kembali; pekerjaan tidak diulang.';
+      if(byId('restore-connection')){setText('restore-connection',message);byId('restore-connection').hidden=false;}
+      else feedback(message);
+      timer = setTimeout(poll,5000);
+    }
   };
   document.addEventListener('restore-file-selected', event => {
     if (active() || (job && job.state === 'recovery_required')) {feedback('Selesaikan pemulihan yang berjalan sebelum memilih file lain.');return;}

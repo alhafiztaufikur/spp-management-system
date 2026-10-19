@@ -193,6 +193,7 @@ function pilihSiswaDatalist(input) {
     document.getElementById('disp-kelas').value = '';
     clearPaymentDetails();
     refreshPaymentHistory('');
+    closeSppWarning();
     resetSppStatusState();
     return;
   }
@@ -214,7 +215,8 @@ function pilihSiswaDatalist(input) {
       refreshBiayaLainBillsFromServer(nis || '');
       applyStudentPaymentDetails(opt);
       refreshPaymentHistory(nis || '');
-      scheduleSppStatusCheck(false);
+      if(previousNis!==nis)closeSppWarning();
+      scheduleSppStatusCheck(sppStatusUiReady&&!window.sppEditPaymentId&&previousNis!==nis,null,previousNis!==nis);
       found = true;
       break;
     }
@@ -227,43 +229,61 @@ function pilihSiswaDatalist(input) {
     document.getElementById('disp-kelas').value = '';
     clearPaymentDetails();
     refreshPaymentHistory('');
+    closeSppWarning();
     resetSppStatusState();
   }
 }
 
-function refreshPaymentHistory(noInduk) {
-  const body = document.getElementById('payment-history-body');
-  const period = document.getElementById('payment-history-period');
-  const url = window.sppPaymentHistoryUrl || '';
-  if (!body || !url) return;
-  if (!noInduk) {
-    body.innerHTML = '<tr><td colspan="6">Belum ada siswa dipilih.</td></tr>';
-    if (period) period.textContent = 'Pilih siswa untuk melihat transaksi.';
-    return;
-  }
-  body.innerHTML = '<tr><td colspan="6">Memuat history transaksi.</td></tr>';
-  fetch(url + '?no_induk=' + encodeURIComponent(noInduk), { headers: { 'Accept': 'application/json' } })
-    .then(response => response.json())
-    .then(payload => {
-      if (!payload.ok) throw new Error(payload.message || 'Gagal memuat history.');
-      if (period) period.textContent = payload.period || '';
-      const rows = Array.isArray(payload.rows) ? payload.rows : [];
-      if (!rows.length) {
-        body.innerHTML = '<tr><td colspan="6">Belum ada transaksi pembayaran untuk siswa ini.</td></tr>';
-        return;
-      }
-      body.innerHTML = rows.map(row => '<tr>' +
-        '<td>' + escapeHtml(row.tanggal || '') + '</td>' +
-        '<td>' + escapeHtml(row.periode || '') + '</td>' +
-        '<td>' + escapeHtml(row.komponen || '') + '</td>' +
-        '<td>' + escapeHtml(row.metode || '') + '</td>' +
-        '<td>' + escapeHtml(row.operator || '') + '</td>' +
-        '<td><strong>' + escapeHtml(row.total || 'Rp 0') + '</strong></td>' +
-      '</tr>').join('');
-    })
-    .catch(error => {
-      body.innerHTML = '<tr><td colspan="6">' + escapeHtml(error.message || 'Gagal memuat history.') + '</td></tr>';
-    });
+let paymentHistoryController=null,paymentHistoryGeneration=0,paymentHistoryStudent='';
+document.addEventListener('change',event=>{if(event.target.id==='payment-history-scope')refreshPaymentHistory(document.getElementById('disp-nis')?.value||'');});
+async function refreshPaymentHistory(noInduk) {
+  const body=document.getElementById('payment-history-body'),period=document.getElementById('payment-history-period');
+  const url=window.sppPaymentHistoryUrl||'';if(!body||!url)return;
+  const generation=++paymentHistoryGeneration;paymentHistoryController?.abort();
+  paymentHistoryController=null;
+  const current=()=>generation===paymentHistoryGeneration&&(document.getElementById('disp-nis')?.value||'')===noInduk;
+  const state=(code,message,retry=false)=>{
+    window.studentPaymentHistory?.setState(code);body.dataset.historyState=code;body.replaceChildren();
+    const tr=document.createElement('tr'),td=document.createElement('td'),text=document.createElement('span');
+    td.colSpan=7;text.textContent=message;td.append(text);tr.append(td);body.append(tr);
+    if(retry){const button=document.createElement('button');button.type='button';button.className='btn btn-ghost btn-sm';button.style.marginLeft='12px';button.textContent='Coba Lagi';button.dataset.historyRetry='1';button.addEventListener('click',()=>{if(current())refreshPaymentHistory(noInduk);});td.append(button);}
+  };
+  if(!noInduk){paymentHistoryStudent='';window.studentPaymentHistory?.reset();state('unselected','Belum ada siswa dipilih.');body.removeAttribute('aria-busy');if(period)period.textContent='Pilih siswa untuk melihat transaksi.';return;}
+  state('loading','Memuat riwayat transaksi...');body.setAttribute('aria-busy','true');
+  if(period)period.textContent='Memeriksa riwayat siswa terpilih.';
+  const controller=new AbortController();paymentHistoryController=controller;
+  const picker=document.getElementById('payment-history-scope');
+  if(paymentHistoryStudent!==noInduk){if(picker)picker.value='active';window.studentPaymentHistory?.reset();}
+  paymentHistoryStudent=noInduk;
+  const params=new URLSearchParams({no_induk:noInduk,scope:picker?.value||'active'});
+  if(Number.isInteger(window.sppPaymentHistoryUnit))params.set('unit_id',String(window.sppPaymentHistoryUnit));
+  const studentId=selectedStudentOption()?.dataset.studentId;if(studentId)params.set('student_id',studentId);
+  try {
+    const response=await fetch(url+'?'+params,{signal:controller.signal,cache:'no-store',headers:{Accept:'application/json'}});
+    if(!current())return;
+    const expired=response.status===401||(response.redirected&&/\/login\.php(?:$|[?#])/.test(response.url));
+    if(expired){state('session_expired','Sesi habis. Silakan masuk kembali.');return;}
+    if(response.status===403){state('access_denied','Akun Anda tidak dapat membuka riwayat pada formulir pembayaran.');return;}
+    let payload;
+    try{payload=await response.json();}catch{if(current())state('invalid_response','Respons riwayat tidak dapat dibaca. Silakan coba lagi.',true);return;}
+    if(!current())return;
+    if(!payload||typeof payload!=='object'||Array.isArray(payload)){state('invalid_response','Respons riwayat tidak dapat dibaca. Silakan coba lagi.',true);return;}
+    if(!response.ok||payload.ok!==true){
+      const code=payload.code;
+      const messages={unit_changed:'Unit formulir sudah berubah. Muat ulang Input Pembayaran sebelum memilih siswa.',student_scope_mismatch:'Siswa tidak tersedia atau identitasnya tidak sesuai unit. Pilih ulang siswa.',invalid_request:'Parameter siswa tidak valid. Pilih ulang siswa.'};
+      if(messages[code])state(code,messages[code]);
+      else if(code==='session_expired')state(code,'Sesi habis. Silakan masuk kembali.');
+      else state('history_unavailable','Riwayat pembayaran belum dapat dimuat. Silakan coba lagi.',true);
+      return;
+    }
+    if(!Array.isArray(payload.rows)){state('invalid_response','Respons riwayat tidak dapat dibaca. Silakan coba lagi.',true);return;}
+    if(picker&&Array.isArray(payload.scopes)){picker.replaceChildren(...payload.scopes.map(item=>{const option=document.createElement('option');option.value=item.value;option.textContent=item.label;return option;}));picker.value=payload.scope||'active';}
+    if(period)period.textContent=payload.period||'';
+    if(!payload.rows.length){state('empty','Belum ada transaksi pembayaran untuk siswa ini.');window.studentPaymentHistory?.setRows(payload);return;}
+    body.dataset.historyState='ready';
+    window.studentPaymentHistory?.setRows(payload);
+  }catch(error){if(current()&&error.name!=='AbortError')state('network_error','Koneksi terputus saat memuat riwayat. Silakan coba lagi.',true);}
+  finally{if(current()){body.removeAttribute('aria-busy');if(body.dataset.historyState!=='ready'&&body.dataset.historyState!=='empty'&&period)period.textContent='Riwayat siswa terpilih';}}
 }
 
 document.addEventListener('DOMContentLoaded', function () {
@@ -866,7 +886,8 @@ function selectedStudentOption() {
   const list = document.getElementById('siswa-list');
   const nis = document.getElementById('disp-nis')?.value || '';
   if (!input || !list || !nis) return null;
-  return Array.from(list.options).find(opt => opt.dataset.nis === nis || opt.value === input.value) || null;
+  const options=Array.from(list.options);
+  return options.find(opt=>opt.dataset.nis===nis) || options.find(opt=>opt.value===input.value) || null;
 }
 
 function paidForPeriod(opt, key) {
@@ -1208,7 +1229,7 @@ function selectedBiayaLainSummary() {
   document.querySelectorAll('.biaya-lain-select').forEach(select => {
     const option = select.options[select.selectedIndex];
     const billId = option?.value || '';
-    if (!billId || selected.has(billId)) return;
+    if (!billId || billId.startsWith('master:') || selected.has(billId)) return;
     selected.add(billId);
     total += parseNumber(option.dataset.nominal || 0);
     paid += paidBiayaLainForSelectedStudent(billId);
@@ -1470,6 +1491,18 @@ function showSppWarning(status, sourceElement = null, force = false, onPrimary =
   message.textContent = status.message || 'Pembayaran SPP belum dapat diproses.';
   amount.textContent = status.amount_label || '';
   amount.hidden = !status.amount_label;
+  if (Array.isArray(status.obligations)) {
+    amount.hidden=false;amount.replaceChildren();amount.classList.add('obligation-summary');
+    const groups={};
+    status.obligations.forEach(row=>{const kind=row.kind||'other';(groups[kind]??=[]).push(row);});
+    const labels={psb:'Pendaftaran',du:'Daftar Ulang',other:'Biaya Lain',komite:'Tunggakan Komite',spp:'Tunggakan SPP'};
+    Object.entries(groups).forEach(([kind,rows])=>{
+      const section=document.createElement('section'),heading=document.createElement('h4');heading.textContent=labels[kind]||'Kewajiban';section.append(heading);
+      rows.forEach(row=>{const line=document.createElement('div'),name=document.createElement('span'),value=document.createElement('strong');name.textContent=row.label;value.textContent='Rp '+Number(row.remaining).toLocaleString('id-ID');line.className='obligation-line';line.append(name,value);section.append(line);});amount.append(section);
+    });
+    const total=document.createElement('div');total.className='obligation-line obligation-total';
+    const label=document.createElement('span'),value=document.createElement('strong');label.textContent='Total Kewajiban';value.textContent='Rp '+status.obligations.reduce((sum,row)=>sum+Number(row.remaining),0).toLocaleString('id-ID');total.append(label,value);amount.append(total);
+  } else amount.classList.remove('obligation-summary');
   const code = status.code || 'blocked';
   const severity = status.severity || (['not_published','already_paid','not_payable'].includes(code) ? 'info' : 'error');
   overlay.dataset.severity = severity;
@@ -1479,7 +1512,7 @@ function showSppWarning(status, sourceElement = null, force = false, onPrimary =
   close.textContent = status.action_label || 'Mengerti';
   sppWarningPrimaryAction = onPrimary;
   sppWarningSecondaryAction = null;
-  if (code === 'prior_unpaid' && status.blocking_period) {
+  if ((code === 'prior_unpaid'||code==='obligations_summary') && status.blocking_period) {
     close.textContent = 'Pilih ' + status.blocking_period.label;
     secondary.hidden = false;
     sppWarningPrimaryAction = () => {
@@ -1514,7 +1547,7 @@ function showSppWarning(status, sourceElement = null, force = false, onPrimary =
     sppWarningPrimaryAction = code === 'billing_changed'
       ? () => { try { sessionStorage.setItem('paymentDraftReload',JSON.stringify(capturePaymentDraftInBrowser())); } catch (_) { /* storage unavailable */ } window.location.reload(); }
       : () => requestSppStatus({ interactive: false, force: true, sourceElement: retryTarget });
-  } else if (['not_published','already_paid','not_payable'].includes(code)) {
+  } else if (['not_published','already_paid','not_payable','covered_psb','waived','cancelled'].includes(code)) {
     close.textContent = 'Pilih bulan lain';
     sppWarningPrimaryAction = () => document.getElementById('bulan-bayar')?.focus();
   } else if (code === 'du_reselect') {
@@ -1558,8 +1591,14 @@ function applySppStatusPayload(payload) {
     setPaymentComponent('spp', Number(selected.tariff), Number(selected.paid));
   }
   updateTotal();
+  refreshSppInstallmentAvailability();
+  const label=document.getElementById('spp-context-label');if(label&&payload.message)label.textContent=payload.message;
 }
 
+function showPaymentObligations(payload,source) {
+  const data=payload?.obligations;if(!data?.rows?.length)return;
+  showSppWarning({code:'obligations_summary',severity:'warning',title:'Ringkasan Kewajiban Siswa',message:'Berikut kewajiban yang masih tersisa. Pilih komponen yang ingin dibayar pada formulir.',obligations:data.rows,blocking_period:data.oldest_period},source,true);
+}
 async function requestSppStatus(options = {}) {
   const context = currentSppStatusContext();
   const interactive = options.interactive === true;
@@ -1579,6 +1618,7 @@ async function requestSppStatus(options = {}) {
     } else if (interactive && ['prior_unpaid','arrears'].includes(cached.status)) {
       showSppWarning(cached, sourceElement);
     }
+    if(interactive&&options.summary)showPaymentObligations(cached,sourceElement);
     return cached;
   }
 
@@ -1594,6 +1634,8 @@ async function requestSppStatus(options = {}) {
   try {
     const url = new URL(urlValue, window.location.href);
     url.searchParams.set('no_induk', context.noInduk);
+    if(Number.isInteger(window.sppPaymentHistoryUnit))url.searchParams.set('unit_id',String(window.sppPaymentHistoryUnit));
+    if(selectedStudentOption()?.dataset.studentId)url.searchParams.set('student_id',selectedStudentOption().dataset.studentId);
     url.searchParams.set('bulan', context.bulan);
     url.searchParams.set('tahun', context.tahun);
     if (context.editId > 0) url.searchParams.set('edit_id', String(context.editId));
@@ -1603,7 +1645,7 @@ async function requestSppStatus(options = {}) {
       signal: sppStatusAbortController.signal
     });
     const payload = await response.json().catch(() => null);
-    if (requestId !== sppStatusRequestId) return null;
+    if (requestId !== sppStatusRequestId || currentSppStatusContext()?.key!==context.key) return null;
     if (!response.ok || !payload?.ok) throw new Error(payload?.message || 'Status SPP belum dapat diperiksa.');
 
     sppStatusState.pending = false;
@@ -1614,9 +1656,10 @@ async function requestSppStatus(options = {}) {
     } else if (interactive && ['prior_unpaid','arrears'].includes(payload.status)) {
       showSppWarning(payload, sourceElement, force);
     }
+    if(interactive&&options.summary)showPaymentObligations(payload,sourceElement);
     return payload;
   } catch (error) {
-    if (error?.name === 'AbortError' || requestId !== sppStatusRequestId) return null;
+    if (error?.name === 'AbortError' || requestId !== sppStatusRequestId || currentSppStatusContext()?.key!==context.key) return null;
     const payload = unavailableSppStatus();
     sppStatusState.pending = false;
     sppStatusState.payload = payload;
@@ -1626,7 +1669,7 @@ async function requestSppStatus(options = {}) {
   }
 }
 
-function scheduleSppStatusCheck(interactive = true, sourceElement = null) {
+function scheduleSppStatusCheck(interactive = true, sourceElement = null, summary = false) {
   if (sppStatusTimer) window.clearTimeout(sppStatusTimer);
   const context = currentSppStatusContext();
   if (!context) {
@@ -1636,7 +1679,7 @@ function scheduleSppStatusCheck(interactive = true, sourceElement = null) {
   }
   sppStatusTimer = window.setTimeout(() => {
     sppStatusTimer = null;
-    requestSppStatus({ interactive, sourceElement });
+    requestSppStatus({ interactive, sourceElement, summary });
   }, 220);
 }
 
@@ -1914,13 +1957,13 @@ function initPromotionBatchSelector() {
       year.required = !year.disabled;
       if (level.value === 'psb') { context.requestSubmit(); return; }
       const match=/^(\d{4})\/(\d{4})$/.exec(year.selectedOptions[0]?.textContent.trim()||'');
-      const graduation=Number(level.value)===Number(context.dataset.lastLevel);
+      const graduation=context.dataset.custom!=='1'&&Number(level.value)===Number(context.dataset.lastLevel);
       document.getElementById('promotion-target-label').textContent=graduation?'Tahun Kelulusan':'Tahun Ajaran Tujuan';
       document.getElementById('promotion-target-year').textContent=match?(graduation?match[0]:(Number(match[1])+1)+'/'+(Number(match[2])+1)):'Pilih tahun asal';
       const old=document.getElementById('promotion-submit-button');if(old)old.disabled=true;
       if(year.value&&level.value)context.requestSubmit();
     };
-    year.addEventListener('change',changed);level.addEventListener('change',changed);
+    year.addEventListener('change',changed);level.addEventListener('change',changed);document.getElementById('promotion-mode')?.addEventListener('change',()=>context.requestSubmit());
   }
   const form = document.getElementById('promotion-batch-form');
   if (!form || form.dataset.promotionReady === '1') return;
@@ -2005,25 +2048,16 @@ function initPromotionBatchSelector() {
     updateSelection();
   });
 
-  form.addEventListener('submit', function (event) {
-    const selected = selectedRows();
-    if (selected.length === 0) {
-      event.preventDefault();
-      return;
-    }
-    const missingTargets = selected.filter(row => {
-      const target = row.querySelector('select[name^="target_master_kelas_id"]');
-      return target && !target.value;
-    }).length;
-    let message = form.dataset.graduation==='1' ? 'Luluskan '+selected.length+' siswa pada TA '+form.dataset.sourceYear+'? Tidak membuat penempatan tahun tujuan.' : actionLabel + ' ' + selected.length + ' siswa dari TA ' + form.dataset.sourceYear + ' ke TA ' + form.dataset.targetYear + '?';
-    if (missingTargets > 0) {
-      message += '\n\n' + missingTargets + ' siswa belum memiliki rombel tujuan dan akan dilewati.';
-    }
-    if (!window.confirm(message)) {
-      event.preventDefault();
-      return;
-    }
-    if (submitButton) submitButton.disabled = true;
+  form.addEventListener('submit', async function (event) {
+    event.preventDefault();const selected=selectedRows();
+    if(!selected.length||form.dataset.submitting==='1')return;
+    const missing=selected.filter(row=>{const target=row.querySelector('select[name^="target_master_kelas_id"]');return target&&!target.value;});
+    if(missing.length){missing[0].querySelector('select').focus();return;}
+    form.dataset.submitting='1';
+    const details=selected.map(row=>row.querySelector('.promotion-student-identity strong').textContent+' · '+(row.querySelector('.kelas-badge')?.textContent||'')+' → '+(row.querySelector('select')?.selectedOptions[0]?.textContent||'Lulus'));
+    const accepted=await window.workflowConfirm({title:form.dataset.graduation==='1'?'Konfirmasi Kelulusan':'Konfirmasi Kenaikan Kelas',message:'TA '+form.dataset.sourceYear+' → '+form.dataset.targetYear+'. Riwayat pembayaran lama tetap tersimpan; histori Input Pembayaran mengikuti penempatan baru.',rows:details,action:'Proses '+selected.length+' Siswa'},event.submitter);
+    if(!accepted){delete form.dataset.submitting;return;}
+    if(submitButton)submitButton.disabled=true;HTMLFormElement.prototype.submit.call(form);
   });
 
   filterRows();
@@ -2038,6 +2072,7 @@ document.addEventListener('DOMContentLoaded', function () {
   const sel = document.getElementById('siswa-select');
   if (sel && sel.value) pilihSiswa(sel);
   const siswaSearch = document.getElementById('siswa-search');
+  if(siswaSearch && window.sppEditOriginal?.no_induk)siswaSearch.value=String(window.sppEditOriginal.no_induk);
   if (siswaSearch && siswaSearch.value.trim() !== '') {
     pilihSiswaDatalist(siswaSearch);
   }
@@ -2446,7 +2481,8 @@ function biayaLainBillsForSelectedStudent() {
   if (!opt) return [];
   try {
     const bills = JSON.parse(opt.dataset.biayaLainBills || '[]');
-    return Array.isArray(bills) ? bills : [];
+    const choices=opt.dataset.otherFeeChoicesLoaded==='1'?(Array.isArray(bills)?bills:[]):[...(window.sppOtherFeeMasters||[]),...(Array.isArray(bills)?bills:[])];
+    return choices.filter((choice,index,all)=>all.findIndex(other=>String(other.id)===String(choice.id))===index);
   } catch (_) {
     return [];
   }
@@ -2467,27 +2503,31 @@ function refreshBiayaLainOptions() {
     const current = select.value;
     const currentOption = select.options[select.selectedIndex];
     const legacyPlaceholder = Array.from(select.options).find(option => option.dataset.legacy === '1');
-    const legacy = current && !bills.some(bill => String(bill.id) === String(current))
+    const catalogChoice=bills.find(bill=>String(bill.id)===String(current));
+    const historicalChoice=current.startsWith('master:')&&!!select.closest('.biaya-lain-row')?.querySelector('[name="biaya_lain_detail_id[]"]')?.value;
+    const legacy = current && (historicalChoice||(!current.startsWith('master:')&&!catalogChoice))
       ? {
           id: current,
-          master_id: currentOption?.dataset.masterId || '',
+          master_id: currentOption?.dataset.masterId || (current.startsWith('master:')?current.slice(7):''),
           nama: currentOption?.dataset.baseLabel || currentOption?.textContent || 'Biaya Lain (histori)',
-          nominal: currentOption?.dataset.nominal || 0,
+          nominal: catalogChoice?.nominal ?? currentOption?.dataset.nominal ?? 0,
           paid: currentOption?.dataset.paid || 0
         }
       : null;
-    const available = legacy ? [...bills, legacy] : bills;
+    const available = legacy ? [...bills.filter(bill=>String(bill.id)!==String(current)), legacy] : bills;
     select.innerHTML = '';
     const placeholder = document.createElement('option');
     placeholder.value = '';
     placeholder.textContent = legacyPlaceholder?.textContent || (selectedStudentOption()
-      ? (bills.length ? 'Pilih tagihan' : 'Belum ada tagihan')
+      ? (bills.length ? 'Pilih Biaya / Tagihan Lama' : 'Belum ada biaya aktif atau tagihan lama')
       : 'Pilih siswa dulu');
     if (legacyPlaceholder) {
       placeholder.dataset.legacy = '1';
       placeholder.dataset.nominal = legacyPlaceholder.dataset.nominal || '0';
     }
     select.appendChild(placeholder);
+    const optionalGroup=document.createElement('optgroup');optionalGroup.label='Biaya Berulang';
+    const billGroup=document.createElement('optgroup');billGroup.label='Tagihan Tidak Berulang / Tagihan Lama';select.append(optionalGroup,billGroup);
     available.forEach(bill => {
       const option = document.createElement('option');
       option.value = String(bill.id);
@@ -2495,10 +2535,14 @@ function refreshBiayaLainOptions() {
       option.dataset.nominal = String(bill.nominal || bill.nominal_tagihan || 0);
       option.dataset.paid = String(bill.paid || bill.terbayar || 0);
       option.dataset.baseLabel = String(bill.nama || bill.nama_snapshot || 'Biaya Lain');
-      option.textContent = option.dataset.baseLabel;
-      select.appendChild(option);
+      option.textContent = (option.value.startsWith("master:") ? "Berulang: " : "Tagihan: ") + option.dataset.baseLabel;
+      (option.value.startsWith('master:')?optionalGroup:billGroup).appendChild(option);
     });
     if (current && Array.from(select.options).some(option => option.value === current)) select.value = current;
+    else if(current.startsWith('master:')){
+      const amount=select.closest('.biaya-lain-row')?.querySelector('.biaya-lain-nominal');
+      if(amount)amount.value='0';
+    }
   });
   refreshBiayaLainAvailability();
 }
@@ -2508,7 +2552,7 @@ function refreshBiayaLainBillsFromServer(noInduk) {
   const url = window.sppOtherFeeBillsUrl || '';
   if (!url || !noInduk) return;
   const requestId = ++biayaLainBillsRequestId;
-  fetch(url + '?no_induk=' + encodeURIComponent(noInduk), {
+  fetch(url + '?'+new URLSearchParams({no_induk:noInduk,unit_id:String(window.sppPaymentHistoryUnit),student_id:selectedStudentOption()?.dataset.studentId||'0'}), {
     headers: { 'Accept': 'application/json' },
     cache: 'no-store'
   })
@@ -2519,10 +2563,12 @@ function refreshBiayaLainBillsFromServer(noInduk) {
       const opt = selectedStudentOption();
       if (!opt || String(opt.dataset.nis || '') !== String(noInduk)) return;
       opt.dataset.biayaLainBills = JSON.stringify(Array.isArray(payload.rows) ? payload.rows : []);
+      opt.dataset.otherFeeChoicesLoaded='1';
       refreshBiayaLainOptions();
       document.querySelectorAll('.biaya-lain-row').forEach(row => refreshBiayaLainRow(row, true));
       applyGraduatePaymentLock(opt);
       restorePaymentDraftOtherFees();
+      updateTotal();
     })
     .catch(error => {
       if (requestId !== biayaLainBillsRequestId) return;
@@ -2580,6 +2626,7 @@ function refreshBiayaLainAvailability() {
   const rows = Array.from(document.querySelectorAll('#biaya-lain-list .biaya-lain-row'));
   const addButton = document.getElementById('btn-add-biaya-lain');
 
+  const key=option=>option?.value?(option.dataset.masterId?'master:'+option.dataset.masterId:option.value):'';
   rows.forEach(row => {
     const select = row.querySelector('.biaya-lain-select');
     if (!select) return;
@@ -2589,20 +2636,20 @@ function refreshBiayaLainAvailability() {
       if (!option.value) return;
       const baseLabel = option.dataset.baseLabel || option.textContent.replace(/\s+\((Lunas|Sudah dipilih)\)$/u, '');
       option.dataset.baseLabel = baseLabel;
-      const fullyPaid = paidBiayaLainForSelectedStudent(option.value) >= parseNumber(option.dataset.nominal || 0) - 0.001;
+      const fullyPaid = !option.value.startsWith("master:") && paidBiayaLainForSelectedStudent(option.value) >= parseNumber(option.dataset.nominal || 0) - 0.001;
       const usedByOtherRow = rows.some(otherRow => otherRow !== row
-        && otherRow.querySelector('.biaya-lain-select')?.value === option.value);
+        && key(otherRow.querySelector('.biaya-lain-select')?.selectedOptions[0]) === key(option));
       option.disabled = option.value !== selectedId && (fullyPaid || usedByOtherRow);
-      option.textContent = baseLabel + (fullyPaid ? ' (Lunas)' : (usedByOtherRow ? ' (Sudah dipilih)' : ''));
+      option.textContent = (option.value.startsWith('master:')?'Berulang: ':'Tagihan: ') + baseLabel + (fullyPaid ? ' (Lunas)' : (usedByOtherRow ? ' (Sudah dipilih)' : ''));
     });
 
     const selectedOption = select.options[select.selectedIndex];
     const total = parseNumber(selectedOption?.dataset.nominal || 0);
     const paid = selectedId ? paidBiayaLainForSelectedStudent(selectedId) : 0;
     const duplicated = !!selectedId && rows.some(otherRow => otherRow !== row
-      && otherRow.querySelector('.biaya-lain-select')?.value === selectedId);
+      && key(otherRow.querySelector('.biaya-lain-select')?.selectedOptions[0]) === key(selectedOption));
     let message = '';
-    if (selectedId && paid >= total - 0.001) {
+    if (selectedId && !selectedId.startsWith("master:") && paid >= total - 0.001) {
       message = (selectedOption?.dataset.baseLabel || 'Biaya ini') + ' sudah lunas dan tidak dapat ditambahkan lagi.';
     } else if (duplicated) {
       message = (selectedOption?.dataset.baseLabel || 'Biaya ini') + ' hanya boleh dipilih satu kali dalam satu transaksi.';
@@ -2619,7 +2666,7 @@ function refreshBiayaLainAvailability() {
   const referenceSelect = rows[0]?.querySelector('.biaya-lain-select');
   const hasAvailableMaster = referenceSelect && Array.from(referenceSelect.options).some(option => {
     if (!option.value) return false;
-    const fullyPaid = paidBiayaLainForSelectedStudent(option.value) >= parseNumber(option.dataset.nominal || 0) - 0.001;
+    const fullyPaid = !option.value.startsWith("master:") && paidBiayaLainForSelectedStudent(option.value) >= parseNumber(option.dataset.nominal || 0) - 0.001;
     const alreadyUsed = rows.some(row => row.querySelector('.biaya-lain-select')?.value === option.value);
     return !fullyPaid && !alreadyUsed;
   });
@@ -2637,6 +2684,26 @@ function refreshBiayaLainRow(row, preserveInput) {
 
   const option = select.options[select.selectedIndex];
   const billId = option?.value || '';
+  const optional = billId.startsWith('master:');
+  row.classList.toggle('is-optional-fee',optional);
+  totalEl?.closest('label')?.classList.add('ll-field-reference');
+  nominal.closest('label')?.classList.add('ll-field-amount');
+  const nominalLabel=nominal.closest('label')?.querySelector('.ll-field-label');if(nominalLabel)nominalLabel.textContent=optional?'Nominal Dibayar':'Bayar';
+  [paidEl,sisaEl].forEach(el=>{if(el?.closest('label'))el.closest('label').hidden=optional;});
+  const totalLabel=totalEl?.closest('label')?.querySelector('.ll-field-label');if(totalLabel)totalLabel.textContent=optional?'Tarif Referensi':'Total Tagihan';
+  if(optional){
+    const tariff=Number(option.dataset.nominal||0);
+    if(totalEl)totalEl.value=formatRupiahString(tariff);
+    if(!preserveInput)nominal.value=formatRupiahString(tariff);
+    let quote=row.querySelector('[data-recurring-quote]');
+    if(!quote){quote=document.createElement('input');quote.type='hidden';quote.dataset.recurringQuote='1';row.append(quote);}
+    if(quote.dataset.choice!==billId){quote.dataset.choice=billId;quote.value=String(tariff);}
+    quote.name='_other_fee_tariffs['+billId+']';quote.disabled=false;
+    const unchanged=row.dataset.originalChoice===billId&&Math.abs(parseNumber(nominal.value)-Number(row.dataset.originalAmount))<.001;
+    const mismatch=!unchanged&&Math.abs(parseNumber(nominal.value)-tariff)>.001;
+    nominal.setCustomValidity('');nominal.toggleAttribute('aria-invalid',mismatch);row.classList.toggle('row-overpaid',mismatch);return;
+  }
+  const quote=row.querySelector('[data-recurring-quote]');if(quote)quote.disabled=true;
   const masterTotal = parseNumber(option?.dataset.nominal || 0);
   const alreadyPaid = billId ? paidBiayaLainForSelectedStudent(billId) : 0;
   const remainingBeforeInput = Math.max(0, masterTotal - alreadyPaid);
@@ -2693,7 +2760,7 @@ function refreshBiayaLainWarnings() {
       warnings.push(select.validationMessage);
       return;
     }
-    const isTooMuch = select?.value && inputValue > remaining + 0.001;
+    const isTooMuch = select?.value && !select.value.startsWith('master:') && inputValue > remaining + 0.001;
     if (!isTooMuch) return;
 
     const selectedText = select.options[select.selectedIndex]?.textContent?.trim() || 'Biaya lain';
@@ -3246,4 +3313,20 @@ function konfirmasiHapus() {
 document.addEventListener('click', function (e) {
   const overlay = document.getElementById('modal-overlay');
   if (e.target === overlay) closeModal();
+});
+
+document.addEventListener('DOMContentLoaded',()=>{
+  const form=document.getElementById('form-bayar');if(!form)return;
+  form.addEventListener('submit',event=>{
+    for(const row of form.querySelectorAll('.biaya-lain-row')){
+      const select=row.querySelector('.biaya-lain-select'),input=row.querySelector('.biaya-lain-nominal');
+      if(!select?.value.startsWith('master:')||!input)continue;
+      const option=select.selectedOptions[0],tariff=Number(option?.dataset.nominal||0),amount=parseNumber(input.value);
+      if(row.dataset.originalChoice===select.value&&Math.abs(amount-Number(row.dataset.originalAmount))<.001)continue;
+      if(Math.abs(amount-tariff)>.001){event.preventDefault();event.stopImmediatePropagation();
+        const name=option.dataset.baseLabel||option.textContent;
+        showSppWarning({code:'recurring_amount',severity:'error',title:'Biaya Berulang harus lunas',message:name+' harus dibayar tepat Rp '+formatRupiah(tariff)+', tetapi diisi Rp '+formatRupiah(amount)+'. Perbaiki nominal sebelum menyimpan.'},input,true);return;
+      }
+    }
+  },true);
 });

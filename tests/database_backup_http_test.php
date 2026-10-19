@@ -116,7 +116,7 @@ try {
             [$status] = backup_http_request('backup_api.php?action=' . ($method === 'GET' ? 'status' : 'create'), $session, $method,
                 $method === 'POST' ? ['csrf_token' => 'invalid'] : null);
             $requests++;
-            backup_http_assert(in_array($status, [302, 401, 403], true), 'Stale Super Admin claim accepted for ' . $role);
+            backup_http_assert($method==='GET' && $role!=='bendahara' ? $status===200 : in_array($status, [302, 401, 403], true), 'Fresh role permissions incorrect for ' . $role);
         }
         [$status] = backup_http_request('backup_api.php?action=settings', $session, 'POST', ['csrf_token'=>'invalid','daily_time'=>'20:00','retention_days'=>'90','version'=>'0']);$requests++;
         backup_http_assert(in_array($status,[302,401,403],true),'Non-Super Admin changed backup settings');

@@ -9,12 +9,12 @@ if (!isset($_SESSION['admin_id'])) {
 }
 require_once 'koneksi.php';
 require_once 'includes/auth.php';
-requireRole(['admin', 'bendahara']);
+requireRole(['admin', 'bendahara', 'kasir']);
 // Rekap gabungan hanya tersedia bagi Super Admin; unit operasional tetap tersimpan.
 $reportUnitId=unit_report_scope($koneksi,(string)($_GET['unit']??''));
 require_once 'includes/reports.php';
 $dashboardBackupAlerts = [];
-if (unit_is_super()) {
+if (operational_role()) {
     require_once __DIR__ . '/includes/database_backup.php';
     try {
         $dashboardBackupSummary = db_backup_summary();
@@ -50,7 +50,8 @@ $jumlahTransaksi = count(array_unique(array_column($paymentComponents, 'id')));
 
 $startToday = $todayDate . ' 00:00:00';
 $endToday = date('Y-m-d H:i:s', strtotime($todayDate . ' +1 day'));
-$savingTransactions = report_savings_transactions($koneksi, $startToday, $endToday, $setoranFilters);
+$schoolSavingsFilters=$setoranFilters;$schoolSavingsFilters['_school_savings_cash']=true;
+$savingTransactions = report_savings_transactions($koneksi, $startToday, $endToday, $schoolSavingsFilters);
 $tabunganMasuk = array_sum(array_map(static fn($row) => (float)($row['masuk'] ?? 0), $savingTransactions));
 $tabunganKeluar = array_sum(array_map(static fn($row) => (float)($row['keluar'] ?? 0), $savingTransactions));
 $totalPenerimaan = $totalPembayaran + $tabunganMasuk - $tabunganKeluar;
@@ -128,7 +129,7 @@ $exportSetoranExcelUrl = 'laporan/export_global.php?template=setoran&format=exce
           <span><strong>Backup database:</strong> <?= htmlspecialchars((string)$dashboardBackupAlerts[0], ENT_QUOTES | ENT_SUBSTITUTE, 'UTF-8') ?> <a href="backup_restore.php">Periksa backup</a></span>
         </div>
         <?php endif; ?>
-        <?php if (unit_is_super()): ?>
+        <?php if (operational_role()): ?>
         <div class="dashboard-scope-card" aria-label="Cakupan rekap dashboard">
           <div class="dashboard-scope-copy">
             <span class="dashboard-scope-kicker">Cakupan rekap</span>

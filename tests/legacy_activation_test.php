@@ -2,16 +2,17 @@
 if(PHP_SAPI!=='cli'||getenv('SPP_TEST_ALLOW_MUTATION')!=='1'||!preg_match('/^db_spp_audit_[a-z0-9_]+$/D',(string)getenv('SPP_DB_NAME')))exit(1);
 require_once __DIR__.'/../koneksi.php';require_once __DIR__.'/../includes/legacy_activation.php';require_once __DIR__.'/../includes/reports.php';
 function la_assert($condition,$message){if(!$condition)throw new RuntimeException($message);}
-$nis='0000000099';$ids=[];$actor=(int)$koneksi->query("SELECT id FROM admin WHERE role='super_admin' AND is_active=1 LIMIT 1")->fetch_row()[0];
+$testRole=getenv('SPP_TEST_LEGACY_ROLE')?:'super_admin';if(!in_array($testRole,['super_admin','admin','kasir'],true))throw new RuntimeException('Invalid test role.');
+$nis='00'.random_int(81000000,81999999);$ids=[];$actor=(int)$koneksi->query("SELECT id FROM admin WHERE role='$testRole' AND is_active=1 LIMIT 1")->fetch_row()[0];
 foreach([1=>1,2=>7,3=>10] as $unit=>$level){
     $_SESSION['active_unit_id']=$unit;unit_set_context($koneksi,$unit);
     $exists=$koneksi->query("SELECT id FROM siswa WHERE NO_INDUK='$nis'")->fetch_row();
     if(!$exists){$name='Audit Legacy '.$unit;$s=$koneksi->prepare("INSERT INTO siswa(NO_INDUK,NAMA,KELAS,is_active,legacy_pending) VALUES(?,?,'LEGACY',0,1)");$s->bind_param('ss',$nis,$name);$s->execute();$id=(int)$koneksi->insert_id;
-        $raw=json_encode(['NO_INDUK'=>$nis,'NAMA'=>$name,'KELAS'=>'Tidak diketahui']);$hash=str_repeat((string)$unit,64);$s=$koneksi->prepare("INSERT INTO legacy_student_import(student_id,unit_id,source_hash,source_row,source_name,source_class,raw_data,imported_by) VALUES(?,?,?,1,'TEST.dat','Tidak diketahui',?,1)");$s->bind_param('iiss',$id,$unit,$hash,$raw);$s->execute();
+        $raw=json_encode(['NO_INDUK'=>$nis,'NAMA'=>$name,'KELAS'=>'Tidak diketahui']);$hash=hash('sha256',$nis.':'.$unit);$s=$koneksi->prepare("INSERT INTO legacy_student_import(student_id,unit_id,source_hash,source_row,source_name,source_class,raw_data,imported_by) VALUES(?,?,?,1,'TEST.dat','Tidak diketahui',?,?)");$s->bind_param('iissi',$id,$unit,$hash,$raw,$actor);$s->execute();
     }else $id=(int)$exists[0];$ids[$unit]=$id;
     $student=$koneksi->query('SELECT * FROM siswa WHERE id='.$id)->fetch_assoc();
     if($student['legacy_pending']){
-        foreach(["INSERT INTO tabungan(NO_INDUK,SALDO) VALUES('$nis',0)","INSERT INTO siswa_tahun_ajaran(tahun_ajaran_id,no_induk,kelas) SELECT id,'$nis','$level' FROM tahun_ajaran LIMIT 1"] as $sql){$blocked=false;try{$koneksi->query($sql);}catch(mysqli_sql_exception $e){$blocked=true;}la_assert($blocked,'Pending identity accepted an operational child');}
+        foreach(["INSERT INTO tabungan(unit_id,NO_INDUK,SALDO) VALUES($unit,'$nis',0)","INSERT INTO siswa_tahun_ajaran(unit_id,tahun_ajaran_id,no_induk,kelas) SELECT $unit,id,'$nis','$level' FROM tahun_ajaran LIMIT 1"] as $sql){$blocked=false;try{$koneksi->query($sql);}catch(mysqli_sql_exception $e){$blocked=true;}la_assert($blocked,'Pending identity accepted an operational child');}
         $class=(int)$koneksi->query("SELECT id FROM master_kelas WHERE tingkat=$level AND kode_rombel='A' AND is_active=1 LIMIT 1")->fetch_row()[0];
         $year=$koneksi->query("SELECT id,label FROM tahun_ajaran WHERE label='2026/2027' LIMIT 1")->fetch_assoc();
         $rate=spp_current_effective_rate($koneksi,(string)$level,0,$year['label']);

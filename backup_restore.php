@@ -3,7 +3,7 @@ session_start();
 if (!isset($_SESSION['admin_id'])) { header('Location: login.php'); exit; }
 require_once __DIR__ . '/koneksi.php';
 require_once __DIR__ . '/includes/auth.php';
-requireRole(['super_admin']);
+requireRole(['super_admin','admin','kasir']);
 if (($_SERVER['REQUEST_METHOD'] ?? '') !== 'GET') {
     http_response_code(405);
     header('Allow: GET');

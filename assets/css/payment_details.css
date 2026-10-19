@@ -1,4 +1,8 @@
 /* Payment detail cards and operator history; palette tokens cover all units/themes. */
+
+.ph-record-print{display:flex;justify-content:flex-end;padding:0 14px 12px;border:1px solid var(--border);border-top:0;border-radius:0 0 12px 12px;background:var(--bg-card);}
+.ph-record-card:has(.ph-record-print)>.ph-record{border-bottom:0;border-radius:12px 12px 0 0;}
+.ph-record-card:has(.is-selected) .ph-record-print{border-color:var(--accent);background:var(--accent-glow);}
 .biaya-lain-row {
   grid-template-columns: 28px repeat(4,minmax(0,1fr)) 38px;
   align-items: start; gap: 14px 12px; padding: 18px; position: relative;
@@ -12,6 +16,9 @@
 .biaya-lain-row .ll-field:has(.biaya-lain-sisa) { grid-column:4; grid-row:2; }
 .biaya-lain-row .ll-field:has(.biaya-lain-nominal) { grid-column:5; grid-row:2; }
 .biaya-lain-row .ll-field-label { font-size:11px; line-height:1.4; }
+.biaya-lain-row .ll-field[hidden] { display:none!important; }
+.biaya-lain-row.is-optional-fee .ll-field-reference { grid-column:2 / 4; grid-row:2; }
+.biaya-lain-row.is-optional-fee .ll-field-amount { grid-column:4 / 6; grid-row:2; }
 .other-fee-picker { position:relative; min-width:0; }
 .other-fee-native { position:absolute!important; width:1px!important; height:1px!important; opacity:0; pointer-events:none; }
 .other-fee-trigger { display:flex; align-items:center; justify-content:space-between; gap:14px; height:auto; min-height:48px; text-align:left; cursor:pointer; }
@@ -61,6 +68,8 @@
   .biaya-lain-row .ll-field:has(.biaya-lain-paid) { grid-column:3; grid-row:3; }
   .biaya-lain-row .ll-field:has(.biaya-lain-sisa) { grid-column:2; grid-row:4; }
   .biaya-lain-row .ll-field:has(.biaya-lain-nominal) { grid-column:3; grid-row:4; }
+  .biaya-lain-row.is-optional-fee .ll-field-reference { grid-column:2; grid-row:3; }
+  .biaya-lain-row.is-optional-fee .ll-field-amount { grid-column:3; grid-row:3; }
   .payment-history-shell .payment-operator-cell { min-width:0; max-width:none; }
 }
 @media(max-width:560px) {
@@ -72,3 +81,8 @@
   .payment-activity-change { grid-template-columns:1fr; }
   .payment-history-tabs { padding:14px; }
 }
+
+/* The receipt footer belongs to the same card; spacing sits outside the card. */
+.ph-record-card{margin-bottom:10px}.ph-record-card>.ph-record{margin-bottom:0!important}.ph-record-card .ph-record-print{margin-top:0;border-top:0}.du-installment .ph-detail-actions{border-top:0}
+
+.payment-history-scope{display:flex;align-items:center;gap:12px;margin-top:12px;font-size:12px}.payment-history-scope select{max-width:440px}@media(max-width:600px){.payment-history-scope{align-items:stretch;flex-direction:column}}

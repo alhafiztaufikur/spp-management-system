@@ -7,7 +7,7 @@ require_once __DIR__.'/legacy_full_read.php';
 function history_operator_options(mysqli $db): array
 {
     $scope = unit_active_id();
-    $where = $scope === 0 ? "role IN ('super_admin','admin','kasir','bendahara')" : "(unit_id=".(int)$scope." OR role='super_admin')";
+    $where = $scope === 0 ? "role IN ('super_admin','admin','kasir','bendahara')" : "(unit_id=".(int)$scope." OR role IN ('super_admin','admin','kasir'))";
     $actors = [];
     foreach ($db->query('SELECT id,nama,username FROM admin WHERE '.$where)->fetch_all(MYSQLI_ASSOC) as $actor) {
         $actors[(string)$actor['id']] = $actor['nama'].(!empty($actor['username']) ? ' (@'.$actor['username'].')' : '');
@@ -68,6 +68,7 @@ function history_operator_where(mysqli $db, array $operators, string $payment, s
     if (!$ids&&!$legacy) throw new InvalidArgumentException('Pilih minimal satu operator.');
     $clauses=[];if($ids)$clauses[]='('.$payment.'>0 AND '.history_operator_owner_sql($db,$payment,$unit).' IN ('.implode(',',$ids).'))';
     if($legacy&&lful_read_ready($db)){$quoted=array_map(static fn($v)=>"'".$db->real_escape_string($v)."'",$legacy);$clauses[]="($payment<0 AND EXISTS(SELECT 1 FROM legacy_full_payments lp WHERE lp.id=-$payment AND lp.unit_id=$unit AND CONCAT('legacy:',lp.unit_id,':',LOWER(HEX(COALESCE(lp.source_operator,'')))) IN (".implode(',',$quoted).")))";}
+    if($legacy&&lop_ready($db))$clauses[]="($payment<-1000000000 AND EXISTS(SELECT 1 FROM legacy_op_payments lp WHERE lp.id=-$payment-1000000000 AND lp.unit_id=$unit AND CONCAT('legacy:',lp.unit_id,':',LOWER(HEX(COALESCE(lp.source_operator,'')))) IN (".implode(',',$quoted).")))";
     return ' AND ('.implode(' OR ',$clauses).')';
 }
 

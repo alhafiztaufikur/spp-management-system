@@ -1,10 +1,9 @@
 <?php
 /** A placement without a published SPP bill is not a paid obligation. */
-if (PHP_SAPI !== 'cli' || getenv('SPP_TEST_ALLOW_MUTATION') !== '1'
-    || !preg_match('/^db_spp_audit_[a-z0-9_]+$/i', (string)getenv('SPP_DB_NAME'))) {
-    throw new RuntimeException('Use a disposable db_spp_audit_* clone with SPP_TEST_ALLOW_MUTATION=1.');
-}
+require_once __DIR__.'/http_form_scope.php';
+spp_test_assert_database_target();
 require_once __DIR__ . '/../koneksi.php';
+spp_test_assert_database_target($koneksi);
 require_once __DIR__ . '/../includes/reports.php';
 
 function unbilled_assert(bool $condition, string $message): void {

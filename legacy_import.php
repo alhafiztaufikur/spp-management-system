@@ -1,13 +1,14 @@
 <?php
 session_start();require_once __DIR__.'/koneksi.php';require_once __DIR__.'/includes/legacy_import_http.php';require_once __DIR__.'/includes/legacy_finance_http.php';
 $error='';$job=null;$rows=['rows'=>[],'total'=>0,'page'=>1];$preview=null;$health=[];
-try{lf_http_bootstrap($koneksi);}catch(DomainException $e){http_response_code(403);exit(legacy_ui_e($e->getMessage()));}
+try{legacy_http_actor($koneksi,'students');}catch(DomainException $e){http_response_code(403);exit(legacy_ui_e($e->getMessage()));}
 if(!in_array($_SERVER['REQUEST_METHOD'],['GET','POST'],true)){http_response_code(405);exit;}
 if(empty($_SESSION['csrf_legacy_import']))$_SESSION['csrf_legacy_import']=bin2hex(random_bytes(32));
 $category=$_GET['mode']??$_POST['category']??'students';$id=$_GET['id']??$_POST['id']??'';$step=$_GET['step']??'upload';
 try{
     if(!is_string($category)||!in_array($category,['students','finance'],true)||!is_string($id)||!is_string($step)||!in_array($step,['upload','review','confirm','result'],true))throw new DomainException('Pilihan halaman tidak valid.',400);
     if($id!==''){$job=legacy_job($id);if(($job['category']??'students')==='full'){header('Location: legacy_full.php?id='.$id);exit;}if(unit_active_id()!==0&&(int)$job['unit']!==unit_active_id())throw new DomainException('Pilih unit pekerjaan di sidebar.',403);$category=$job['category']??'students';}
+    legacy_http_actor($koneksi,$category);
     if($_SERVER['REQUEST_METHOD']==='POST'){
         $action=$_POST['action']??'';
         if($action==='upload'){$job=legacy_http_upload($koneksi,$_POST,$_FILES);header('Location: legacy_import.php?id='.$job['id'].'&step=review');exit;}

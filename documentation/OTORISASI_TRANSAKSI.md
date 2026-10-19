@@ -1,15 +1,31 @@
 # Otorisasi Transaksi — pembaruan 7 Oktober 2026
 
-## Hak akses
+## Detail aktivitas Tabungan — 18 Oktober 2026
 
-| Peran | Pemantauan | Edit/hapus pembayaran | Keputusan |
+Identitas transaksi diikuti kartu kronologi dengan jenis aktivitas, operator, waktu WIB, alasan dan perbandingan Sebelum/Sesudah atau Usulan. Kosong ditampilkan Tidak tercatat dan nol tetap nol. Gaya khusus Tabungan juga berlaku setelah AJAX; urutan, snapshot, hak/tindakan dan tampilan aktivitas Pembayaran dipertahankan. [Panduan](FILTER_ROMBEL_TABUNGAN_CUSTOM_20261018.md).
+
+## Tata letak filter - 17 Oktober 2026
+
+Jenis Transaksi, Jenis Perubahan, dan Status disusun sejajar. Pencarian serta tombol Tampilkan/Reset berada pada baris berikutnya dengan gap 16 piksel dan tinggi kontrol 46 piksel. Tablet memakai dua kolom, ponsel satu kolom. Pilihan kategori, filter, pagination dan ekspor tetap berlaku.
+
+
+## Pemisah menu - 16 Oktober 2026
+
+Otorisasi menyediakan tiga kartu menu: **Riwayat Pembayaran**, **Riwayat Daftar Ulang**, dan **Riwayat Tabungan**. Setiap menu memiliki Antrean/Riwayat sendiri. Tautan **Lihat semua menu** menggabungkan hasil dengan penanda kategori di setiap transaksi.
+
+Transaksi yang memiliki alokasi Daftar Ulang atau usulan nominal Daftar Ulang berada dalam menu Daftar Ulang, termasuk transaksi gabungan dan transaksi yang telah dihapus. Kronologinya tetap lengkap; tidak membuat transaksi baru. Tabungan dapat disaring lagi menjadi masuk/keluar. Kategori dipertahankan pada filter, pagination, pilihan cetak lintas halaman, pratinjau, dan PDF.
+
+
+## Hak akses — kebijakan terbaru 17 Oktober 2026
+
+| Peran | Pembayaran/Daftar Ulang | Tabungan | Keputusan/akun |
 |---|---|---|---|
-| Super Admin | Unit aktif, atau Semua Unit | Langsung pada satu unit | Setujui/tolak pada satu unit |
-| Admin | Semua petugas dalam unitnya | Pengajuan transaksi sendiri dengan alasan | Tidak diperbolehkan |
-| Kasir | Transaksi yang pernah dia ajukan | Pengajuan transaksi sendiri dengan alasan | Tidak diperbolehkan |
-| Bendahara | Semua petugas dalam unitnya | Tidak diperbolehkan | Tidak diperbolehkan |
+| Super Admin | Edit/hapus langsung | Edit/hapus langsung | Bisa |
+| Administrator | Ajukan edit/hapus semua petugas pada unit aktif | Edit/hapus langsung | Tidak |
 
-Pemohon dapat membatalkan pengajuan sendiri yang masih menunggu. Semua Unit merupakan tampilan baca; pilih SD, SMP, atau SMA sebelum melakukan perubahan. Aturan baru tidak mengubah identitas pelaku pada riwayat lama.
+Kedua peran dapat beroperasi di SD/SMP/SMA. Semua Unit tetap baca saja. Pemohon dapat membatalkan pengajuan sendiri yang pending. Pengajuan Tabungan lama tetap terkunci sampai Super Admin memutuskan; tidak dibuat pengajuan Tabungan baru. Identitas dan snapshot peran historis tetap disimpan.
+
+Lihat [panduan pembaruan dan status penerapan](WORKFLOW_UPDATE_20261017.md). Bagian riwayat implementasi lama di bawah tidak menggantikan kebijakan terbaru ini.
 
 ## Cara penggunaan
 

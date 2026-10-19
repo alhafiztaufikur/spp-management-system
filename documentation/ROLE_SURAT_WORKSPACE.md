@@ -1,14 +1,12 @@
 # Role Management dan Surat Orang Tua
 
-## Role Management
+## Role Management — kebijakan terbaru 17 Oktober 2026
 
-Hanya Super Admin dapat membuka halaman dan membuat, mengatur status, atau mengganti password akun. Formulir dipisahkan menjadi Informasi Akun serta Akses & Keamanan. Unit pembuatan mengikuti formulir dan pembatasan sidebar; filter daftar tidak mengganti unit pembuatan.
+Hanya Super Admin dapat membuat Administrator, mengatur status akun, dan mengganti password. Seluruh pengelolaan akun bersifat global dan tidak mengikuti unit sidebar. Akun Administrator langsung memperoleh akses SD/SMP/SMA tanpa pemilihan unit. Semua Unit tetap baca saja untuk operasi keuangan.
 
-Pencarian daftar memakai nama, username, dan role. Parameter GET `account_role[]`, `account_status[]`, serta `account_unit[]` menerima beberapa pilihan. Nilai tunggal tetap diterima, `*` berarti semua, dan `global` pada filter unit berarti akun Super Admin. Filter Unit hanya tersedia dalam cakupan Semua Unit. Nilai tidak sah ditolak dengan HTTP 400. Dalam satu filter berlaku OR, antarfilter berlaku AND.
+Hanya tersedia Super Admin dan Administrator. Satu Super Admin aktif dipertahankan; administrator1–4 merupakan akun awal, bukan batas jumlah akun. Akun lama dinonaktifkan dengan ID/nama dan hubungan operator historis tetap ada. Password Super Admin tidak diubah. Kredensial awal baru disimpan di berkas privat di luar webroot melalui migrasi CLI, bukan ditampilkan pada halaman atau Git.
 
-Jumlah tab peran dihitung setelah pencarian, unit, dan status, sebelum pembatasan peran. Judul daftar menampilkan jumlah akun yang benar-benar tampil. Tab peran memilih satu peran; Semua menghapus pembatasan peran. Filter tetap terbawa setelah tindakan akun dan Muat Ulang.
-
-Ketika unit operasional pada sidebar diganti, filter Unit daftar akun dibersihkan agar pilihan dari cakupan sebelumnya tidak terbawa ke unit baru.
+Lihat [panduan migrasi, akses, dan status penerapan](WORKFLOW_UPDATE_20261017.md). Filter nama/role/status tetap tersedia; bawaan daftar adalah akun aktif.
 
 ## Pesan surat
 

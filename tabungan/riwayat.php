@@ -10,6 +10,13 @@ require_once '../includes/savings_workspace.php';
 require_once '../includes/legacy_finance.php';
 require_once '../includes/legacy_full_read.php';
 requireRole(['admin', 'kasir', 'bendahara']);
+require_once '../includes/savings_authorization.php';
+require_once '../includes/savings_operator.php';
+$operatorOptions=savings_operator_options($koneksi);
+try{$operators=history_operator_choices($_GET['operator']??null,$operatorOptions);}
+catch(InvalidArgumentException $e){http_response_code(400);exit(savings_e($e->getMessage()));}
+require_once '../includes/history_class_filter.php';
+$rombelFilter=history_class_filter($koneksi,$_GET);
 
 $flash = $_SESSION['flash'] ?? null;
 unset($_SESSION['flash']);
@@ -40,24 +47,28 @@ if ($filter_nis !== '') {
 // input URL tidak pernah menjadi bagian dari SQL.
 $where_nis_masuk = $filter_nis !== '' ? ' AND (tm.NO_INDUK = ? OR s.NO_induk_diknas = ? OR s.NAMA LIKE ?)' : '';
 $where_nis_keluar = $filter_nis !== '' ? ' AND (tk.NO_INDUK = ? OR s.NO_induk_diknas = ? OR s.NAMA LIKE ?)' : '';
-$where_nis_masuk .= unit_student_selection_where();
-$where_nis_keluar .= unit_student_selection_where();
+$where_nis_masuk .= unit_student_selection_where().history_class_where($rombelFilter);
+$where_nis_keluar .= unit_student_selection_where().history_class_where($rombelFilter);
+$where_nis_masuk .= savings_operator_where($operators,savings_operator_owner_sql('tm.unit_id',"'masuk'",'tm.id','tm.user_id'));
+$where_nis_keluar .= savings_operator_where($operators,savings_operator_owner_sql('tk.unit_id',"'keluar'",'tk.id','tk.user_id'));
 $periodStart = $filter_tanggal_awal . ' 00:00:00';
 $periodEnd = date('Y-m-d H:i:s', strtotime($filter_tanggal_akhir . ' +1 day'));
 
 $legacyInSource=lful_savings_source($koneksi,'transaksi_m');$legacyOutSource=lful_savings_source($koneksi,'transaksi_k');
 $sql_masuk = "
-    SELECT tm.id,tm.unit_id, tm.NO_INDUK, s.NAMA, s.KELAS, s.NO_induk_diknas, tm.TANGGAL,
+    SELECT tm.id,tm.unit_id, tm.NO_INDUK, s.NAMA, mk.jenis AS rombel_jenis,mk.nama_custom AS rombel_nama,mk.tingkat,mk.kode_rombel,mk.is_placeholder,s.KELAS, s.NO_induk_diknas, tm.TANGGAL,
            tm.MASUK as nominal, 0 as keluar, 'masuk' as jenis, tm.user_id, tm.keterangan
     FROM $legacyInSource tm
     JOIN siswa s ON s.NO_INDUK = tm.NO_INDUK AND s.unit_id=tm.unit_id
+    LEFT JOIN master_kelas mk ON mk.id=s.master_kelas_id AND mk.unit_id=s.unit_id
     WHERE tm.TANGGAL >= ? AND tm.TANGGAL < ?$where_nis_masuk
 ";
 $sql_keluar = "
-    SELECT tk.id,tk.unit_id, tk.NO_INDUK, s.NAMA, s.KELAS, s.NO_induk_diknas, tk.TANGGAL,
+    SELECT tk.id,tk.unit_id, tk.NO_INDUK, s.NAMA, mk.jenis AS rombel_jenis,mk.nama_custom AS rombel_nama,mk.tingkat,mk.kode_rombel,mk.is_placeholder,s.KELAS, s.NO_induk_diknas, tk.TANGGAL,
            0 as nominal, tk.KELUAR as keluar, 'keluar' as jenis, tk.user_id, tk.keterangan
     FROM $legacyOutSource tk
     JOIN siswa s ON s.NO_INDUK = tk.NO_INDUK AND s.unit_id=tk.unit_id
+    LEFT JOIN master_kelas mk ON mk.id=s.master_kelas_id AND mk.unit_id=s.unit_id
     WHERE tk.TANGGAL >= ? AND tk.TANGGAL < ?$where_nis_keluar
 ";
 
@@ -89,6 +100,8 @@ $stmt->bind_param($pageTypes, ...$pageParams);
 $stmt->execute();
 $rows = $stmt->get_result()->fetch_all(MYSQLI_ASSOC);
 $stmt->close();
+require_once '../includes/kelas.php';
+foreach($rows as &$savingRow)$savingRow['kelas_label']=class_label($savingRow);unset($savingRow);
 
 // Rekap saldo semua siswa aktif. Siswa yang belum punya tabungan tetap tampil
 // agar admin bisa langsung menemukan nama dan mulai setoran pertama.
@@ -143,19 +156,37 @@ if ($selectedFilterNis !== '') {
     }
 }
 
-$total_masuk  = (float)$historySummary['total_masuk'];
-$total_keluar = (float)$historySummary['total_keluar'];
+
 $historyPaginationQuery = pagination_query([
     'tanggal_awal' => $filter_tanggal_awal,
     'tanggal_akhir' => $filter_tanggal_akhir,
     'nis' => $filter_nis,
     'per_page' => $perPage,
+    'operator' => $operators,
+    'rombel' => $rombelFilter['values'],
 ]);
 
+require_once '../includes/savings_authorization.php';
+$archiveView=($_GET['view']??'active')==='archive';
+if($archiveView&&savings_authorization_ready($koneksi)){
+    $archiveOwner=savings_operator_owner_sql('a.unit_id','a.jenis','a.transaction_id',"JSON_UNQUOTE(JSON_EXTRACT(a.before_snapshot,'$.transaction.user_id'))");
+    $archiveOperatorWhere=savings_operator_where($operators,$archiveOwner).history_class_archive_where($rombelFilter,'a.unit_id',"JSON_UNQUOTE(JSON_EXTRACT(a.before_snapshot,'$.transaction.NO_INDUK'))");
+    $s=$koneksi->prepare("SELECT a.jenis,a.transaction_id id,a.before_snapshot,a.unit_id FROM tabungan_aktivitas a WHERE a.action='deleted'
+        AND JSON_UNQUOTE(JSON_EXTRACT(a.before_snapshot,'$.transaction.TANGGAL'))>=? AND JSON_UNQUOTE(JSON_EXTRACT(a.before_snapshot,'$.transaction.TANGGAL'))<?
+        AND (?='' OR JSON_UNQUOTE(JSON_EXTRACT(a.before_snapshot,'$.transaction.NO_INDUK'))=? OR JSON_UNQUOTE(JSON_EXTRACT(a.before_snapshot,'$.transaction.NAMA')) LIKE ?)
+        $archiveOperatorWhere ORDER BY a.occurred_at DESC,a.id DESC");
+    $like='%'.$filter_nis.'%';$s->bind_param('sssss',$periodStart,$periodEnd,$filter_nis,$filter_nis,$like);$s->execute();$archived=$s->get_result()->fetch_all(MYSQLI_ASSOC);$s->close();
+    $historySummary=['total_masuk'=>0,'total_keluar'=>0];foreach($archived as $a){$tx=json_decode($a['before_snapshot'],true)['transaction'];$historySummary['total_masuk']+=(float)$tx['MASUK'];$historySummary['total_keluar']+=(float)$tx['KELUAR'];}
+    $totalHistoryRows=count($archived);$totalPages=total_pages($totalHistoryRows,$perPage);$page=min($page,$totalPages);$offset=($page-1)*$perPage;$rows=[];
+    foreach(array_slice($archived,$offset,$perPage) as $a){$row=json_decode($a['before_snapshot'],true)['transaction'];$row['nominal']=$row['MASUK'];$row['keluar']=$row['KELUAR'];$row['deleted']=true;$rows[]=$row;}
+    $historyPaginationQuery['view']='archive';
+}
+$total_masuk=(float)$historySummary['total_masuk'];$total_keluar=(float)$historySummary['total_keluar'];
 $rows=savings_enrich_rows($koneksi,$rows);
 $requestedSelection=isset($_GET['id'])||isset($_GET['jenis']);
 $selectedTransaction=null;
 if($requestedSelection){try{[$selectionKind,$selectionId]=savings_http_identity();$selectedTransaction=savings_transaction($koneksi,$selectionKind,$selectionId);}catch(InvalidArgumentException $e){http_response_code(400);}}else{$selectedTransaction=$rows[0]??null;}
+if($selectedTransaction&&!array_filter($rows,static fn($r)=>(int)$r['id']===(int)$selectedTransaction['id']&&$r['jenis']===$selectedTransaction['jenis']))$selectedTransaction=$rows[0]??null;
 $printTransaction=null;$prompt=$_SESSION['savings_print_prompt']??null;unset($_SESSION['savings_print_prompt']);
 if(is_array($prompt) && (unit_all_readonly() || (int)$prompt['unit_id']===unit_active_id())){$candidate=savings_transaction($koneksi,(string)$prompt['jenis'],(int)$prompt['id']);if($candidate && $candidate['can_print'])$printTransaction=$candidate;}
 unset($historyPaginationQuery['id'],$historyPaginationQuery['jenis']);
@@ -180,6 +211,7 @@ $periodLabel = $filter_tanggal_awal === $filter_tanggal_akhir
   <link rel="stylesheet" href="../assets/css/style.css?v=unitpalette4&amp;mtime=<?= filemtime(__DIR__ . '/../assets/css/style.css') ?>" />
   <link rel="stylesheet" href="../assets/css/date_controls.css?v=unitpalette4&amp;mtime=<?= filemtime(__DIR__ . '/../assets/css/date_controls.css') ?>" />
 <link rel="stylesheet" href="../assets/css/savings_workspace.css?v=<?= filemtime(__DIR__.'/../assets/css/savings_workspace.css') ?>">
+<link rel="stylesheet" href="../assets/css/history_rombel_refinement.css?v=<?= filemtime(__DIR__.'/../assets/css/history_rombel_refinement.css') ?>">
 </head>
 <body>
 <div class="bg-orbs"><div class="orb orb-1"></div><div class="orb orb-2"></div><div class="orb orb-3"></div></div>
@@ -206,10 +238,10 @@ $periodLabel = $filter_tanggal_awal === $filter_tanggal_akhir
 
     <div class="page-content sw-page">
 
-<div class="sw-stats"><?php foreach([['up',$total_masuk,'Total Masuk (Filter Aktif)','is-in'],['down',$total_keluar,'Total Keluar (Filter Aktif)','is-out'],['document',$totalHistoryRows,'Total Transaksi','is-count']] as $stat): ?><div class="sw-card sw-stat <?= $stat[3] ?>"><span class="sw-head-icon"><?= savings_icon($stat[0]) ?></span><div><strong><?= $stat[0]==='document'?number_format($stat[1]):savings_money($stat[1]) ?></strong><small><?= $stat[2] ?></small></div></div><?php endforeach; ?></div>
-<section class="sw-card sw-filter-card">        <form method="GET" class="sw-filter-form">
+<div class="sw-stats"><?php foreach([['up',$total_masuk,$archiveView?'Total Masuk (Arsip)':'Total Masuk (Filter Aktif)','is-in'],['down',$total_keluar,$archiveView?'Total Keluar (Arsip)':'Total Keluar (Filter Aktif)','is-out'],['document',$totalHistoryRows,'Total Transaksi','is-count']] as $stat): ?><div class="sw-card sw-stat <?= $stat[3] ?>"><span class="sw-head-icon"><?= savings_icon($stat[0]) ?></span><div><strong><?= $stat[0]==='document'?number_format($stat[1]):savings_money($stat[1]) ?></strong><small><?= $stat[2] ?></small></div></div><?php endforeach; ?></div>
+<section class="sw-card sw-filter-card">        <form method="GET" class="sw-filter-form"><input type="hidden" name="view" value="<?= $archiveView?'archive':'active' ?>">
 
-          <div class="field-row report-date-range-field"><label class="field-label">Tanggal Transaksi</label><div class="report-date-range-control report-date-range-picker" data-range-picker data-empty-label="<?= htmlspecialchars($periodLabel) ?>"><input type="hidden" name="tanggal_awal" value="<?= htmlspecialchars($filter_tanggal_awal) ?>"><input type="hidden" name="tanggal_akhir" value="<?= htmlspecialchars($filter_tanggal_akhir) ?>"><button type="button" class="report-date-range-button" aria-expanded="false"><span class="report-date-range-icon" aria-hidden="true"><svg width="15" height="15" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.4" stroke-linecap="round" stroke-linejoin="round"><rect x="3" y="4" width="18" height="18" rx="2"/><path d="M16 2v4M8 2v4M3 10h18"/></svg></span><span class="report-date-range-value"><?= htmlspecialchars($periodLabel) ?></span></button><div class="report-date-range-popover" hidden><label><span>Mulai</span><input type="date" value="<?= htmlspecialchars($filter_tanggal_awal) ?>" data-range-start></label><label><span>Sampai</span><input type="date" value="<?= htmlspecialchars($filter_tanggal_akhir) ?>" data-range-end></label><div class="report-date-range-popover-actions"><button type="button" class="btn btn-primary btn-sm" data-range-apply>Terapkan</button></div></div></div></div><div class="field-row sw-filter-student"><label class="field-label" for="savings-history-student">Cari Siswa (Nama / NIS / NIS Diknas)</label><div class="search-box"><svg width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.5" stroke-linecap="round" stroke-linejoin="round"><circle cx="11" cy="11" r="8"/><line x1="21" y1="21" x2="16.65" y2="16.65"/></svg><input type="text" id="savings-history-student" data-student-fit-viewport="1" data-student-search data-student-list="savings-history-student-list" data-student-select-callback="selectReportStudentSearchOption" data-student-query-target="savings-history-nis" placeholder="Ketik nama, NIS, atau NIS Diknas..." value="<?= htmlspecialchars($selected_saldo['NAMA'] ?? $filter_nis) ?>" autocomplete="off"><input type="hidden" name="student_id" data-student-identity="1" value="<?= (int)($_GET['student_id']??0) ?>"><input type="hidden" id="savings-history-nis" name="nis" value="<?= htmlspecialchars($filter_nis) ?>"></div><datalist id="savings-history-student-list"><?php foreach ($saldo_list as $studentOption): ?><option value="<?= htmlspecialchars($studentOption['NAMA']) ?>" data-student-id="<?= (int)($studentOption['student_id']??0) ?>" data-unit-id="<?= (int)($studentOption['unit_id']??0) ?>" data-nis="<?= htmlspecialchars($studentOption['NO_INDUK']) ?>" data-diknas="<?= htmlspecialchars((string)($studentOption['NO_induk_diknas'] ?? '')) ?>" data-nama="<?= htmlspecialchars($studentOption['NAMA']) ?>" data-kelas="<?= htmlspecialchars((unit_all_readonly()?unit_label((int)$studentOption['unit_id']).' · ':'').$studentOption['KELAS']) ?>"></option><?php endforeach; ?></datalist></div><div class="field-row tabungan-filter-page">
+          <div class="field-row report-date-range-field"><label class="field-label">Tanggal Transaksi</label><div class="report-date-range-control report-date-range-picker" data-range-picker data-empty-label="<?= htmlspecialchars($periodLabel) ?>"><input type="hidden" name="tanggal_awal" value="<?= htmlspecialchars($filter_tanggal_awal) ?>"><input type="hidden" name="tanggal_akhir" value="<?= htmlspecialchars($filter_tanggal_akhir) ?>"><button type="button" class="report-date-range-button" aria-expanded="false"><span class="report-date-range-icon" aria-hidden="true"><svg width="15" height="15" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.4" stroke-linecap="round" stroke-linejoin="round"><rect x="3" y="4" width="18" height="18" rx="2"/><path d="M16 2v4M8 2v4M3 10h18"/></svg></span><span class="report-date-range-value"><?= htmlspecialchars($periodLabel) ?></span></button><div class="report-date-range-popover" hidden><label><span>Mulai</span><input type="date" value="<?= htmlspecialchars($filter_tanggal_awal) ?>" data-range-start></label><label><span>Sampai</span><input type="date" value="<?= htmlspecialchars($filter_tanggal_akhir) ?>" data-range-end></label><div class="report-date-range-popover-actions"><button type="button" class="btn btn-primary btn-sm" data-range-apply>Terapkan</button></div></div></div></div><div class="field-row sw-filter-student"><label class="field-label" for="savings-history-student">Cari Siswa (Nama / NIS / NIS Diknas)</label><div class="search-box"><svg width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.5" stroke-linecap="round" stroke-linejoin="round"><circle cx="11" cy="11" r="8"/><line x1="21" y1="21" x2="16.65" y2="16.65"/></svg><input type="text" id="savings-history-student" data-student-fit-viewport="1" data-student-search data-student-list="savings-history-student-list" data-student-select-callback="selectReportStudentSearchOption" data-student-query-target="savings-history-nis" placeholder="Ketik nama, NIS, atau NIS Diknas..." value="<?= htmlspecialchars($selected_saldo['NAMA'] ?? $filter_nis) ?>" autocomplete="off"><input type="hidden" name="student_id" data-student-identity="1" value="<?= (int)($_GET['student_id']??0) ?>"><input type="hidden" id="savings-history-nis" name="nis" value="<?= htmlspecialchars($filter_nis) ?>"></div><datalist id="savings-history-student-list"><?php foreach ($saldo_list as $studentOption): ?><option value="<?= htmlspecialchars($studentOption['NAMA']) ?>" data-student-id="<?= (int)($studentOption['student_id']??0) ?>" data-unit-id="<?= (int)($studentOption['unit_id']??0) ?>" data-nis="<?= htmlspecialchars($studentOption['NO_INDUK']) ?>" data-diknas="<?= htmlspecialchars((string)($studentOption['NO_induk_diknas'] ?? '')) ?>" data-nama="<?= htmlspecialchars($studentOption['NAMA']) ?>" data-kelas="<?= htmlspecialchars((unit_all_readonly()?unit_label((int)$studentOption['unit_id']).' · ':'').$studentOption['KELAS']) ?>"></option><?php endforeach; ?></datalist></div><?php history_operator_field($operatorOptions,'savings-history-operator'); history_class_field($rombelFilter,'savings-history-rombel'); ?><div class="field-row tabungan-filter-page">
             <label class="field-label">Per Halaman</label>
             <select class="field-input field-select" name="per_page" aria-label="Jumlah transaksi tabungan per halaman">
               <?php foreach ($allowedPageSizes as $pageSize): ?>
@@ -223,7 +255,7 @@ $periodLabel = $filter_tanggal_awal === $filter_tanggal_akhir
             <?php if (hasRole(['admin','kasir'])): ?>
             <a href="masuk.php" class="btn btn-primary"><?= savings_icon('up') ?>Tabungan Masuk</a>
             <a href="keluar.php" class="btn btn-warning"><?= savings_icon('down') ?>Tabungan Keluar</a>
-            <a href="../laporan/template.php?template=tabungan-siswa&tanggal_awal=<?= urlencode($filter_tanggal_awal) ?>&tanggal_akhir=<?= urlencode($filter_tanggal_akhir) ?>&q=<?= urlencode($filter_nis) ?>&amp;student_id=<?= max(0,(int)($_GET['student_id']??0)) ?>" class="btn btn-ghost"><?= savings_icon('print') ?>Cetak Laporan</a>
+<?php if(!$archiveView): ?>            <a href="<?= savings_e('../laporan/template.php?'.http_build_query(['template'=>'tabungan-siswa','tanggal_awal'=>$filter_tanggal_awal,'tanggal_akhir'=>$filter_tanggal_akhir,'q'=>$filter_nis,'student_id'=>max(0,(int)($_GET['student_id']??0)),'operator'=>$operators,'siswa_status'=>'all'])) ?>" class="btn btn-ghost"><?= savings_icon('print') ?>Cetak Laporan</a><?php endif; ?>
             <?php endif; ?>
           </div>
         </form></section>
@@ -496,5 +528,6 @@ document.addEventListener('DOMContentLoaded', function(){
 });
 </script>
 <script src="../assets/js/savings_history.js?v=<?= filemtime(__DIR__.'/../assets/js/savings_history.js') ?>"></script>
+<script src="../assets/js/savings_correction.js?v=<?= filemtime(__DIR__.'/../assets/js/savings_correction.js') ?>"></script>
 </body>
 </html>

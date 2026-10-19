@@ -11,16 +11,16 @@ if (!isset($_SESSION['admin_id'])) {
 require_once 'koneksi.php';
 require_once 'includes/auth.php';
 requireRole(['super_admin']);
-$accountScopeUnit = unit_active_id();
+$accountScopeUnit = 0; // Accounts have global scope, independent of the operational sidebar.
 require_once 'includes/filter_choices.php';
 require_once 'includes/account_letter_ui.php';
 require_once 'includes/account_lifecycle.php';
-$accountRoleLabels=['super_admin'=>'Super Admin','admin'=>'Administrator','bendahara'=>'Bendahara TU','kasir'=>'Kasir'];
+$accountRoleLabels=['super_admin'=>'Super Admin','admin'=>'Administrator'];
 $accountRoles=filter_choices($_GET['account_role']??'*',$accountRoleLabels);
-$accountStatus=filter_choices($_GET['account_status']??'*',['active'=>'Aktif','inactive'=>'Nonaktif']);
-$accountUnits=filter_choices($_GET['account_unit']??'*',$accountScopeUnit?[(string)$accountScopeUnit=>unit_label($accountScopeUnit)]:['global'=>'Semua Unit (Super Admin)','1'=>'SD','2'=>'SMP','3'=>'SMA']);
+$accountStatus=filter_choices($_GET['account_status']??'active',['active'=>'Aktif','inactive'=>'Nonaktif']);
+$accountUnits=filter_choices($_GET['account_unit']??'*',$accountScopeUnit?[(string)$accountScopeUnit=>unit_label($accountScopeUnit)]:['global'=>'SD / SMP / SMA']);
 foreach(['account_role'=>$accountRoles,'account_status'=>$accountStatus,'account_unit'=>$accountUnits] as $name=>$values){
-    $options=$name==='account_role'?$accountRoleLabels:($name==='account_status'?['active'=>'Aktif','inactive'=>'Nonaktif']:($accountScopeUnit?[(string)$accountScopeUnit=>unit_label($accountScopeUnit)]:['global'=>'Semua Unit (Super Admin)','1'=>'SD','2'=>'SMP','3'=>'SMA']));
+    $options=$name==='account_role'?$accountRoleLabels:($name==='account_status'?['active'=>'Aktif','inactive'=>'Nonaktif']:($accountScopeUnit?[(string)$accountScopeUnit=>unit_label($accountScopeUnit)]:['global'=>'SD / SMP / SMA']));
     if(!filter_is_all($values)&&array_diff($values,array_map('strval',array_keys($options))))filter_choice_error($name);
 }
 if(isset($_GET['q'])&&!is_string($_GET['q']))filter_choice_error('pencarian akun');
@@ -34,7 +34,7 @@ if (empty($_SESSION['csrf_token'])) {
     $_SESSION['csrf_token'] = bin2hex(random_bytes(32));
 }
 $csrfToken   = $_SESSION['csrf_token'];
-$allowedRole = ['super_admin', 'admin', 'bendahara', 'kasir'];
+$allowedRole = ['admin'];
 
 $flash = $_SESSION['flash'] ?? null;
 unset($_SESSION['flash']);
@@ -75,7 +75,7 @@ if ($_SERVER['REQUEST_METHOD'] === 'POST') {
         $nama                 = trim($_POST['nama'] ?? '');
         $username             = trim($_POST['username'] ?? '');
         $role                 = $_POST['role'] ?? '';
-        $unitId               = filter_input(INPUT_POST, 'unit_id', FILTER_VALIDATE_INT);
+        $unitId               = null;
         $password             = $_POST['password'] ?? '';
         $passwordConfirmation = $_POST['password_confirmation'] ?? '';
 
@@ -85,10 +85,6 @@ if ($_SERVER['REQUEST_METHOD'] === 'POST') {
             setAccountFlash('error', 'Username harus 3–50 karakter dan hanya boleh berisi huruf, angka, titik, garis bawah, atau tanda hubung.');
         } elseif (!in_array($role, $allowedRole, true)) {
             setAccountFlash('error', 'Role akun tidak valid.');
-        } elseif ($accountScopeUnit !== 0 && ($role === 'super_admin' || $unitId !== $accountScopeUnit)) {
-            setAccountFlash('error', 'Pilih unit yang sesuai di sidebar. Untuk akun Super Admin, pilih Semua Unit.');
-        } elseif ($role === 'super_admin' ? $unitId !== 0 : !in_array($unitId, [1,2,3], true)) {
-            setAccountFlash('error', $role === 'super_admin' ? 'Super Admin harus memakai cakupan Semua Unit.' : 'Pilih unit SD, SMP, atau SMA.');
         } elseif (!validPassword($password)) {
             setAccountFlash('error', 'Password harus berisi 8 sampai 72 karakter.');
         } elseif ($password !== $passwordConfirmation) {
@@ -223,7 +219,7 @@ if ($_SERVER['REQUEST_METHOD'] === 'POST') {
 $accountResult = $koneksi->query(
     "SELECT id, username, nama, role, unit_id, is_active, created_at FROM admin WHERE 1=1 "
     . ($accountScopeUnit ? 'AND unit_id='.(int)$accountScopeUnit.' ' : '')
-    . "ORDER BY unit_id,FIELD(role,'super_admin','admin','bendahara','kasir'),nama ASC"
+    . "ORDER BY FIELD(role,'super_admin','admin'),nama ASC"
 );
 $accountRows=[];$roleCounts=array_fill_keys(array_keys($accountRoleLabels),0);
 while($row=$accountResult->fetch_assoc()){
@@ -294,7 +290,7 @@ try {
         <div class="card-title-row">
           <div class="card-title">
             <?= account_letter_icon('add') ?>
-            <span>Buat Akun Petugas<small>Tambah akun untuk admin, bendahara, atau kasir sesuai unit yang dipilih.</small></span>
+            <span>Buat Akun Petugas<small>Tambah Administrator dengan akses SD, SMP, dan SMA.</small></span>
           </div>
         </div>
         <div class="account-create-notice"><?= account_letter_icon('document') ?><span><strong>Hanya Super Admin yang dapat membuat akun.</strong></span></div>
@@ -310,29 +306,15 @@ try {
             </div>
             <div class="field-row">
               <label class="field-label" for="username"><span aria-hidden="true">@</span>Username</label>
-              <input class="field-input" type="text" id="username" name="username" minlength="3" maxlength="50" pattern="[A-Za-z0-9._-]+" placeholder="Contoh: kasir.andi" required autocomplete="username" />
+              <input class="field-input" type="text" id="username" name="username" minlength="3" maxlength="50" pattern="[A-Za-z0-9._-]+" placeholder="Contoh: admin.andi" required autocomplete="username" />
               <span class="field-hint">Huruf, angka, titik, garis bawah, atau tanda hubung.</span>
             </div>
           </div></section><section class="account-step"><h3><span>2</span><div>Akses &amp; Keamanan</div></h3><div class="fields-grid">
             <div class="field-row">
               <label class="field-label" for="role"><?= account_letter_icon('shield') ?>Role</label>
-              <select class="field-input field-select" id="role" name="role" required>
-                <option value="">-- Pilih Role --</option>
-                <option value="admin">Admin</option>
-                <option value="kasir">Kasir</option>
-                <option value="bendahara">Bendahara</option>
-                <?php if ($accountScopeUnit === 0): ?><option value="super_admin">Super Admin</option><?php endif; ?>
-              </select>
-            </div>
-            <div class="field-row">
-              <label class="field-label" for="account-unit"><?= account_letter_icon('unit') ?>Unit</label>
-              <select class="field-input field-select" id="account-unit" name="unit_id" required>
-                <?php if ($accountScopeUnit === 0): ?><option value="">-- Pilih Unit --</option><option value="0">Semua Unit (Super Admin)</option><?php endif; ?>
-                <?php foreach (($accountScopeUnit === 0 ? [1=>'SD',2=>'SMP',3=>'SMA'] : [$accountScopeUnit=>unit_label($accountScopeUnit)]) as $id=>$label): ?>
-                <option value="<?= $id ?>" <?= $accountScopeUnit===$id?'selected':'' ?>><?= $label ?></option>
-                <?php endforeach; ?>
-              </select>
-            </div>
+              <select class="field-input field-select" id="role" name="role" required><option value="admin">Administrator</option></select>
+              <span class="field-hint">Super Admin aktif sudah tersedia. Administrator tidak dapat mengelola akun atau memutuskan otorisasi.</span>
+            </div><div class="field-row"><span class="field-label">Cakupan akses</span><div class="field-input" id="account-unit">SD · SMP · SMA</div><span class="field-hint">Semua akun mencakup ketiga unit.</span></div>
             <div class="field-row">
               <label class="field-label" for="password-baru"><?= account_letter_icon('lock') ?>Password</label>
               <div class="password-field-wrap">
@@ -352,7 +334,7 @@ try {
               </div>
             </div>
           </div></section></div>
-          <div class="action-bar">
+          <div class="action-bar"><a class="btn btn-ghost account-reload" href="<?= htmlspecialchars($accountReturn) ?>"><?= account_letter_icon('reload') ?>Muat Ulang</a>
 
             <button type="submit" class="btn btn-primary" id="btn-tambah-akun">
               <svg width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.5" stroke-linecap="round" stroke-linejoin="round"><path d="M16 21v-2a4 4 0 0 0-4-4H6a4 4 0 0 0-4 4v2"/><circle cx="9" cy="7" r="4"/><line x1="19" y1="8" x2="19" y2="14"/><line x1="22" y1="11" x2="16" y2="11"/></svg>
@@ -368,11 +350,11 @@ try {
             <?= account_letter_icon('users') ?>
             <span>Daftar Akun (<?= count($accountRows) ?> akun)</span>
           </div>
-          <a class="btn btn-ghost account-reload" href="<?= htmlspecialchars($accountReturn) ?>"><?= account_letter_icon('reload') ?>Muat Ulang</a>
+
         </div>
         <form method="get" class="account-filter-form" id="account-filter-form">
           <label class="account-search"><?= account_letter_icon('search') ?><input class="field-input" name="q" value="<?= htmlspecialchars($accountSearch) ?>" maxlength="100" placeholder="Cari nama, username, atau role..." aria-label="Cari akun"></label>
-          <?php if(!$accountScopeUnit): ?><select name="account_unit[]" multiple data-filter-multiple data-dropdown-label="Unit" data-all-label="Semua unit" class="field-input"><option value="*" <?= filter_is_all($accountUnits)?'selected':'' ?>>Semua unit</option><?php foreach(['global'=>'Semua Unit (Super Admin)','1'=>'SD','2'=>'SMP','3'=>'SMA'] as $key=>$label): ?><option value="<?= $key ?>" <?= in_array((string)$key,$accountUnits,true)?'selected':'' ?>><?= $label ?></option><?php endforeach; ?></select><?php else: ?><span class="account-scope"><?= account_letter_icon('unit') ?>Unit <?= unit_label($accountScopeUnit) ?></span><?php endif; ?>
+          <?php if(!$accountScopeUnit): ?><select name="account_unit[]" multiple data-filter-multiple data-dropdown-label="Unit" data-all-label="Semua unit" class="field-input"><option value="*" <?= filter_is_all($accountUnits)?'selected':'' ?>>Semua unit</option><?php foreach(['global'=>'SD / SMP / SMA'] as $key=>$label): ?><option value="<?= $key ?>" <?= in_array((string)$key,$accountUnits,true)?'selected':'' ?>><?= $label ?></option><?php endforeach; ?></select><?php else: ?><span class="account-scope"><?= account_letter_icon('unit') ?>Unit <?= unit_label($accountScopeUnit) ?></span><?php endif; ?>
           <select name="account_role[]" multiple data-filter-multiple data-dropdown-label="Role" data-all-label="Semua role" class="field-input"><option value="*" <?= filter_is_all($accountRoles)?'selected':'' ?>>Semua role</option><?php foreach($accountRoleLabels as $key=>$label): ?><option value="<?= $key ?>" <?= in_array($key,$accountRoles,true)?'selected':'' ?>><?= $label ?></option><?php endforeach; ?></select>
           <select name="account_status[]" multiple data-filter-multiple data-dropdown-label="Status" data-all-label="Semua status" class="field-input"><option value="*" <?= filter_is_all($accountStatus)?'selected':'' ?>>Semua status</option><?php foreach(['active'=>'Aktif','inactive'=>'Nonaktif'] as $key=>$label): ?><option value="<?= $key ?>" <?= in_array($key,$accountStatus,true)?'selected':'' ?>><?= $label ?></option><?php endforeach; ?></select>
           <button type="submit" class="btn btn-primary account-filter-submit">Tampilkan</button>
@@ -407,7 +389,7 @@ try {
                     </span>
                   </div>
                 </td>
-                <td data-label="Unit"><span class="unit-pill"><?= unit_label((int)($account['unit_id'] ?? 0)) ?></span></td>
+                <td data-label="Unit"><span class="unit-pill">SD / SMP / SMA</span></td>
                 <td data-label="Role"><span class="badge-role badge-role-<?= htmlspecialchars($account['role']) ?>"><?= htmlspecialchars($accountRoleLabels[$account['role']] ?? $account['role']) ?></span></td>
                 <td data-label="Status"><span class="account-status <?= (int)$account['is_active']===1?'is-active':'is-inactive' ?>"><?= (int)$account['is_active']===1?'Aktif':'Nonaktif' ?></span></td>
                 <td data-label="Dibuat"><?= spp_date_label($account['created_at']) ?></td>
@@ -438,7 +420,7 @@ try {
                       <button class="btn-tbl btn-tbl-edit" type="submit"><?= account_letter_icon('user_check') ?>Aktifkan</button>
                     </form>
                     <?php else: ?>
-                    <span class="account-self-badge"><?= account_letter_icon('user') ?> Akun Anda</span>
+                    <span class="btn-tbl account-self-badge"><?= account_letter_icon('user') ?> Akun Anda</span>
                     <?php endif; ?>
                     <button type="button" class="btn-tbl btn-tbl-del btn-purge-account"
                       data-account-id="<?= (int)$account['id'] ?>" data-account-name="<?= htmlspecialchars($account['nama']) ?>" data-account-username="<?= htmlspecialchars($account['username']) ?>"
@@ -600,12 +582,6 @@ try {
 
       document.getElementById('new-password-confirmation').addEventListener('input', function () {
         this.setCustomValidity('');
-      });
-
-      document.getElementById('role').addEventListener('change', function () {
-        const unit = document.getElementById('account-unit');
-        if (this.value === 'super_admin') unit.value = '0';
-        else if (unit.value === '0') unit.value = '';
       });
 
       document.getElementById('form-tambah-akun').addEventListener('submit', function (event) {

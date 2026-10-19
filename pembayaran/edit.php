@@ -238,7 +238,7 @@ if (isset($restoreDraft['biaya_lain_tagihan_id']) && is_array($restoreDraft['bia
         $detailId = (int)($restoreDraft['biaya_lain_detail_id'][$index] ?? 0);
         $original = $originalDetails[$detailId] ?? [];
         $nominal = $restoreDraft['biaya_lain_nominal'][$index] ?? 0;
-        $biaya_lain_details[] = ['id'=>$original['id'] ?? '', 'tagihan_biaya_lain_id'=>is_scalar($billId)?(int)$billId:0,
+        $biaya_lain_details[] = ['id'=>$original['id'] ?? '', 'choice'=>is_scalar($billId)?(string)$billId:'','master_biaya_lain_id'=>$original['master_biaya_lain_id']??null,'tagihan_biaya_lain_id'=>is_scalar($billId)?(int)$billId:0,
             'nama_biaya_snapshot'=>$original['nama_biaya_snapshot'] ?? '',
             'nominal_snapshot'=>is_scalar($nominal)?(float)str_replace(['.',','],['','.'],(string)$nominal):0,
             'keterangan'=>is_scalar($restoreDraft['biaya_lain_keterangan'][$index] ?? null)?(string)$restoreDraft['biaya_lain_keterangan'][$index]:''];
@@ -287,6 +287,7 @@ $selectedPaymentMethod = $d['sistem_pembayaran'] ?? 'VA';
   <link rel="stylesheet" href="../assets/css/payment_details.css?v=<?= filemtime(__DIR__ . "/../assets/css/payment_details.css") ?>">
   <!-- Prevent theme flash -->
   <script>(function(){var t=localStorage.getItem('spp_theme')||'light';document.documentElement.setAttribute('data-theme',t);})();</script>
+<link rel="stylesheet" href="../assets/css/rombel_payment_refinement.css?v=<?= filemtime(__DIR__.'/../assets/css/rombel_payment_refinement.css') ?>">
 </head>
 <body>
 
@@ -355,7 +356,7 @@ $selectedPaymentMethod = $d['sistem_pembayaran'] ?? 'VA';
                     $selectedMonth = month_code($d['BULAN']);
                     foreach ($month_labels as $code => $label):
                     ?>
-                    <option value="<?= $code ?>" data-label="<?= $label ?>" <?= $selectedMonth === $code ? 'selected' : '' ?>><?= $label ?></option>
+                    <option value="<?= $code ?>" data-label="<?= $label ?>" <?= $selectedMonth === (string)$code ? 'selected' : '' ?>><?= $label ?></option>
                     <?php endforeach; ?>
                   </select>
                   <?php
@@ -405,13 +406,13 @@ $selectedPaymentMethod = $d['sistem_pembayaran'] ?? 'VA';
               <datalist id="siswa-list">
                 <?php while ($s = $siswa_list->fetch_assoc()): ?>
                 <option value="<?= htmlspecialchars($s['NAMA']) ?>"
-                  data-nis="<?= htmlspecialchars($s['NO_INDUK']) ?>"
+                  data-nis="<?= htmlspecialchars($s['NO_INDUK']) ?>" data-student-id="<?= (int)$s['id'] ?>"
                   data-diknas="<?= htmlspecialchars((string)($s['NO_induk_diknas'] ?? '')) ?>"
                   data-nama="<?= htmlspecialchars($s['NAMA']) ?>"
                   data-kelas="<?= htmlspecialchars($s['graduation_year'] ? ('LULUS · TA '.$s['graduation_year']) : class_label(['tingkat'=>$s['master_tingkat']?:$s['KELAS'],'kode_rombel'=>$s['kode_rombel']??'BELUM','is_placeholder'=>$s['is_placeholder']??1])) ?>"
                   data-is-graduate="<?= $s['graduation_year'] ? '1' : '0' ?>"
                   data-graduation-year="<?= htmlspecialchars((string)$s['graduation_year']) ?>"
-                  data-total-psb="<?= money_attr($s['PSB']) ?>"
+                  data-total-psb="<?= money_attr(max(0,(float)$s['PSB']-(float)$s['potongan_psb_nominal'])) ?>"
                   data-total-spp="<?= money_attr($s['SPP_PERBULAN']) ?>"
                   data-total-komite="<?= money_attr($s['POMG']) ?>"
                   data-paid-psb="<?= money_attr($s['paid_psb']) ?>"
@@ -495,6 +496,7 @@ $selectedPaymentMethod = $d['sistem_pembayaran'] ?? 'VA';
           <div class="lainlain-grid" id="biaya-lain-list">
             <?php foreach ($biaya_lain_details as $index => $detail):
               $selectedBillId = (int)($detail['tagihan_biaya_lain_id'] ?? 0);
+              $optionalChoice=$detail['choice']??(!$selectedBillId&&!empty($detail['master_biaya_lain_id'])?'master:'.$detail['master_biaya_lain_id']:'');
               $currentNominal = (float)($detail['nominal_snapshot'] ?? 0);
               $selectedBill = null;
               foreach($biaya_lain_bills[$d['NO_INDUK']] ?? [] as $candidate) if((int)$candidate['id']===$selectedBillId){$selectedBill=$candidate;break;}
@@ -502,13 +504,14 @@ $selectedPaymentMethod = $d['sistem_pembayaran'] ?? 'VA';
               $paidOther = $selectedBill ? (float)$selectedBill['paid'] : 0.0;
               $remainingAfterCurrent = max(0, $masterTotal - $paidOther);
             ?>
-            <div class="lainlain-row biaya-lain-row">
+            <div class="lainlain-row biaya-lain-row" data-original-choice="<?= htmlspecialchars($optionalChoice,ENT_QUOTES,'UTF-8') ?>" data-original-amount="<?= $currentNominal ?>">
               <span class="ll-num"><?= $index + 1 ?></span>
               <input type="hidden" name="biaya_lain_detail_id[]" value="<?= (int)($detail['id'] ?? 0) ?: '' ?>" />
               <label class="ll-field ll-field-kind">
                 <span class="ll-field-label">Jenis</span>
                 <select class="field-input field-select biaya-lain-select" name="biaya_lain_tagihan_id[]">
-                  <option value="" <?= $selectedBillId === 0 ? 'selected' : '' ?> <?= $selectedBillId === 0 && !empty($detail['id']) ? 'data-legacy="1" data-nominal="'.money_attr($currentNominal).'"' : '' ?>><?= $selectedBillId === 0 && !empty($detail['id']) ? htmlspecialchars($detail['nama_biaya_snapshot']) . ' (Data lama)' : '-- Pilih Tagihan --' ?></option>
+                  <?php if($optionalChoice): ?><option value="<?= htmlspecialchars($optionalChoice,ENT_QUOTES,'UTF-8') ?>" data-nominal="<?= money_attr($currentNominal) ?>" data-base-label="<?= htmlspecialchars($detail['nama_biaya_snapshot'],ENT_QUOTES,'UTF-8') ?>" selected><?= htmlspecialchars($detail['nama_biaya_snapshot']) ?> (Opsional)</option><?php endif; ?>
+                  <option value="" <?= !$optionalChoice && $selectedBillId === 0 ? 'selected' : '' ?> <?= $selectedBillId === 0 && !empty($detail['id']) ? 'data-legacy="1" data-nominal="'.money_attr($currentNominal).'"' : '' ?>><?= $selectedBillId === 0 && !empty($detail['id']) ? htmlspecialchars($detail['nama_biaya_snapshot']) . ' (Data lama)' : '-- Pilih Biaya / Tagihan Lama --' ?></option>
                   <?php foreach ($biaya_lain_bills[$d['NO_INDUK']] ?? [] as $bill): $isSelected=(int)$bill['id']===$selectedBillId; ?>
                   <option value="<?= (int)$bill['id'] ?>" data-master-id="<?= (int)$bill['master_id'] ?>" data-nominal="<?= money_attr($bill['nominal']) ?>" data-paid="<?= money_attr($bill['paid']) ?>" data-base-label="<?= htmlspecialchars($bill['nama']) ?>" <?= $isSelected ? 'selected' : '' ?>>
                     <?= htmlspecialchars($bill['nama']) ?>
@@ -543,7 +546,7 @@ $selectedPaymentMethod = $d['sistem_pembayaran'] ?? 'VA';
               <label class="ll-field ll-field-kind">
                 <span class="ll-field-label">Jenis</span>
                 <select class="field-input field-select biaya-lain-select" name="biaya_lain_tagihan_id[]">
-                  <option value="">-- Pilih Tagihan --</option>
+                  <option value="">-- Pilih Biaya / Tagihan Lama --</option>
                   <?php foreach ($biaya_lain_bills[$d['NO_INDUK']] ?? [] as $bill): ?>
                   <option value="<?= (int)$bill['id'] ?>" data-master-id="<?= (int)$bill['master_id'] ?>" data-nominal="<?= money_attr($bill['nominal']) ?>" data-paid="<?= money_attr($bill['paid']) ?>" data-base-label="<?= htmlspecialchars($bill['nama']) ?>"><?= htmlspecialchars($bill['nama']) ?></option>
                   <?php endforeach; ?>
@@ -568,7 +571,7 @@ $selectedPaymentMethod = $d['sistem_pembayaran'] ?? 'VA';
             <div class="payment-history-head">
               <div>
                 <strong>Riwayat pembayaran siswa</strong>
-                <span id="payment-history-period">Memuat history transaksi siswa.</span>
+                <span id="payment-history-period">Memuat history transaksi siswa.</span><label class="payment-history-scope">Tahun Histori <select id="payment-history-scope" class="field-input field-select"><option value="active">Penempatan Aktif</option><option value="all">Semua Tahun</option></select></label>
               </div>
             </div>
             <div class="table-container payment-history-table-wrap">
@@ -625,6 +628,9 @@ $selectedPaymentMethod = $d['sistem_pembayaran'] ?? 'VA';
     window.sppDaftarUlangMasters = {};
     window.sppDaftarUlangHasMasters = true;
     window.sppPaymentHistoryUrl = 'history_siswa.php';
+    window.sppOtherFeeBillsUrl = 'biaya_lain_siswa.php';
+    window.sppOtherFeeMasters = <?= json_encode(other_fee_optional_choices($koneksi),JSON_HEX_TAG|JSON_HEX_AMP|JSON_HEX_APOS|JSON_HEX_QUOT) ?>;
+    window.sppPaymentHistoryUnit = <?= unit_active_id() ?>;
     window.sppPaymentStatusUrl = 'status_spp.php';
     window.sppPublishedBilling = true;
     window.sppEditPaymentId = <?= (int)$d['id'] ?>;

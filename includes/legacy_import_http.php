@@ -1,12 +1,18 @@
 <?php
 require_once __DIR__.'/legacy_full_http.php';
 require_once __DIR__.'/legacy_ui.php';
+function legacy_http_actor(mysqli $db,string $category,bool $write=false): void {
+    if($category!=='students'){lf_actor($db,(int)($_SESSION['admin_id']??0),unit_active_id(),$write);return;}
+    if(!operational_role()||!lf_one($db,"SELECT id FROM admin WHERE id=? AND is_active=1 AND role IN ('super_admin','admin')",[(int)($_SESSION['admin_id']??0)]))throw new DomainException('Akun pengelola operasional aktif diperlukan.',403);
+    if($write&&!in_array(unit_active_id(),[1,2,3],true))throw new DomainException('Pilih satu unit operasional.',409);
+}
 /** Shared by the native form and the compatible JSON endpoint. */
 function legacy_http_upload(mysqli $db,array $input,array $files): array {
     $actor=(int)($_SESSION['admin_id']??0);$unit=unit_active_id();legacy_actor($db,$actor,$unit);
     if(!is_string($input['csrf_token']??null)||!hash_equals($_SESSION['csrf_legacy_import']??'',$input['csrf_token']))throw new DomainException('Token CSRF tidak valid.',403);
     $category=$input['category']??'students';
     if(!is_string($category)||!in_array($category,['students','finance','full'],true)||!is_string($input['unit']??null)||!preg_match('/^[123]$/D',$input['unit'])||(int)$input['unit']!==$unit)throw new DomainException('Pilih unit yang sama dengan unit operasional.',409);
+    legacy_http_actor($db,$category,true);
     $file=$files['backup']??null;
     if(count($files)!==1||!is_array($file)||!is_string($file['name']??null)||($file['error']??-1)!==UPLOAD_ERR_OK||!is_uploaded_file($file['tmp_name']))throw new DomainException('Pilih tepat satu file backup SQL Server.',400);
     if($invalid=legacy_upload_error($file['name'],(int)$file['size']))throw new DomainException($invalid[1],$invalid[0]);
@@ -28,9 +34,10 @@ function legacy_http_upload(mysqli $db,array $input,array $files): array {
     return $job;
 }
 function legacy_http_decide(mysqli $db,string $action,array $input): array {
-    lf_actor($db,(int)($_SESSION['admin_id']??0),unit_active_id(),true);
+
     if(!is_string($input['csrf_token']??null)||!hash_equals($_SESSION['csrf_legacy_import']??'',$input['csrf_token']))throw new DomainException('Token CSRF tidak valid.',403);
     if(!is_string($input['id']??null))throw new DomainException('Pekerjaan tidak valid.',400);$job=legacy_job($input['id']);
+    legacy_http_actor($db,$job['category']??'students',true);
     if((int)$job['unit']!==unit_active_id())throw new DomainException('Pilih unit pekerjaan di sidebar.',403);
     if($action==='confirm'){
         if(($job['category']??'students')==='full')throw new DomainException('Buka alur Migrasi Penuh untuk konfirmasi.',409);

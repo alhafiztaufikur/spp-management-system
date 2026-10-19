@@ -22,6 +22,7 @@ function legacy_ui_amounts(string $json): void {
     foreach(json_decode($json,true)??[] as $column=>$amount){$label=$labels[$column]??str_replace('_',' ',$column);echo '<div><small>'.legacy_ui_e($label).'</small><br>'.legacy_ui_e(legacy_ui_money($amount)).'</div>';}
 }
 function legacy_ui_jobs(int $unit,?string $category=null): array {
+    if(($_SESSION['admin_role']??'')!=='super_admin')$category='students';
     $sql='SELECT * FROM jobs WHERE (?=0 OR unit=?)';$args=[$unit,$unit];if($category!==null){$sql.=' AND category=?';$args[]=$category;}
     $stmt=legacy_queue()->prepare($sql.' ORDER BY created DESC LIMIT 20');$stmt->execute($args);return $stmt->fetchAll(PDO::FETCH_ASSOC);
 }

@@ -1,6 +1,7 @@
 <?php
 require_once __DIR__.'/authorization_history.php';
 require_once __DIR__.'/transaction_authorization.php';
+require_once __DIR__.'/authorization_sources.php';
 
 function authorization_escape($value): string { return htmlspecialchars((string)$value, ENT_QUOTES, 'UTF-8'); }
 function authorization_role_label(string $role): string {
@@ -23,6 +24,7 @@ function authorization_icon(string $name): string {
         'right'=>'<path d="m10 6 6 6-6 6M3 12h13"/>',
         'check'=>'<path d="m5 12 4 4L19 6"/>',
         'alert'=>'<circle cx="12" cy="12" r="9"/><path d="M12 7v6M12 17h.01"/>',
+        'print'=>'<path d="M6 9V3h12v6M6 18H3V9h18v9h-3M6 14h12v7H6zM17 12h1"/>',
         'pdf'=>'<path d="M14 2H6a2 2 0 0 0-2 2v16a2 2 0 0 0 2 2h12a2 2 0 0 0 2-2V8L14 2ZM14 2v6h6M8 12h8M8 16h8"/>',
         'search'=>'<circle cx="10" cy="10" r="7"/><path d="m15 15 6 6"/>',
     ];
@@ -44,7 +46,7 @@ function authorization_read_unit(mysqli $db, $raw): int {
     if (!is_scalar($raw) || !preg_match('/^[1-3]$/D',(string)$raw)) throw new InvalidArgumentException('Unit tidak valid.');
     $unit=(int)$raw;
     if ($scope!==0 && $unit!==$scope) throw new RuntimeException('Riwayat tidak ditemukan pada cakupan akses Anda.');
-    if ($scope===0 && !unit_is_super()) throw new RuntimeException('Akses tidak diizinkan.');
+    if ($scope===0 && !operational_role()) throw new RuntimeException('Akses tidak diizinkan.');
     unit_set_context($db,$unit); return $unit;
 }
 function authorization_event_model(array $e): array {
@@ -61,7 +63,8 @@ function authorization_event_model(array $e): array {
         'note'=>$e['note']??'','reconstructed'=>(bool)($e['reconstructed']??false),'changes'=>$changes,
         'proposed'=>str_starts_with($e['action'],'request_')];
 }
-function authorization_detail_model(mysqli $db, int $id, bool $queue): array {
+function authorization_detail_model(mysqli $db, int $id, bool $queue, string $source="pembayaran"): array {
+    authorization_source($source);if($source!=="pembayaran")return authorization_savings_model($db,$id,$queue,$source);
     $request=null;
     if($queue) {
         $request=transaction_authorization_find($db,$id);
@@ -89,16 +92,17 @@ function authorization_detail_model(mysqli $db, int $id, bool $queue): array {
         'nis'=>$identity['NO_INDUK']??'Tidak tercatat','latest'=>$latest,'events'=>$rows,'request'=>$request];
 }
 function authorization_render_detail(array $model): void {
+    if(($model["source"]??"pembayaran")!=="pembayaran"){authorization_render_savings($model);return;}
     $e=$model['latest']; [$status,$tone,$icon]=authorization_badge($e['action']); $request=$model['request'];
     ?>
     <div class="auth-detail-summary"><span class="auth-action-icon auth-tone-<?= $tone ?>"><?= authorization_icon($icon) ?></span><div><strong><?= authorization_escape($model['reference']) ?></strong> <span class="auth-status auth-tone-<?= $tone ?>"><?= authorization_escape($status) ?></span><p><?= authorization_escape($model['student']) ?></p><small>NIS <?= authorization_escape($model['nis']) ?> · <?= authorization_escape($model['unit']) ?></small></div></div>
-    <div class="auth-detail-grid"><div><small>Jenis perubahan</small><strong><?= authorization_escape($e['label']) ?></strong><span><?= $e['authorization_id']?'Pengajuan #'.(int)$e['authorization_id']:'Perubahan langsung' ?></span></div><div><small><?= $request?'Pemohon':'Operator' ?></small><strong><?= authorization_escape($e['name']) ?></strong><span><?= authorization_escape($e['username']?'@'.$e['username']:'Tidak tercatat') ?></span><span><?= authorization_escape(authorization_role_label($e['role'])) ?></span></div><div><small><?= $request?'Waktu pengajuan':'Waktu perubahan' ?></small><span><?= authorization_escape($e['time']) ?></span></div><div><small><?= $request?'Status pengajuan':'Aktivitas terakhir' ?></small><span class="auth-status auth-tone-<?= $tone ?>"><?= authorization_escape($status) ?></span></div></div>
+    <div class="auth-detail-grid"><div><small>Jenis perubahan</small><strong><?= authorization_escape($e['label']) ?></strong><span><?= $e['authorization_id']?'Pengajuan #'.(int)$e['authorization_id']:'Perubahan langsung' ?></span></div><div><small><?= $request?'Pemohon':'Operator' ?></small><strong><?= authorization_escape($e['name']) ?></strong><span><?= authorization_escape(authorization_role_label($e['role'])) ?></span></div><div><small><?= $request?'Waktu pengajuan':'Waktu perubahan' ?></small><span><?= authorization_escape($e['time']) ?></span></div><div><small><?= $request?'Status pengajuan':'Aktivitas terakhir' ?></small><span class="auth-status auth-tone-<?= $tone ?>"><?= authorization_escape($status) ?></span></div></div>
     <?php if($request): $before=json_decode($request['before_snapshot'],true); $payload=transaction_authorization_decode_payload($request);
         $changes=$request['action']==='hapus'?[['label'=>'Status transaksi','before'=>'Aktif','after'=>'Diusulkan dihapus']]:payment_activity_changes($before,authorization_proposed_snapshot($before,$payload)); ?>
     <h4>Usulan perubahan</h4><p class="auth-muted">Usulan belum berarti perubahan telah diterapkan.</p>
     <?php authorization_render_changes($changes,true); ?>
     <div class="auth-reason"><small>Alasan pemohon</small><p><?= nl2br(authorization_escape($request['request_reason'])) ?></p></div>
-    <?php if($request['status']==='pending' && !unit_all_readonly()):
+    <?php if($request['status']==='pending' && empty($model['readonly']) && !unit_all_readonly()):
         $token=authorization_escape($_SESSION['csrf_transaction_authorization']??''); ?>
         <?php if((int)$request['requested_by']===(int)$_SESSION['admin_id']): ?>
         <form data-auth-kind="<?= authorization_escape($request['action']) ?>" data-auth-reference="<?= authorization_escape($model['reference']) ?>" data-auth-student="<?= authorization_escape($model['student']) ?>" method="post" action="otorisasi_transaksi.php" data-auth-confirm="Batalkan permintaan ini?"><input type="hidden" name="csrf_token" value="<?= $token ?>"><input type="hidden" name="request_id" value="<?= (int)$request['id'] ?>"><input type="hidden" name="action" value="cancel"><button class="btn btn-ghost" type="submit">Batalkan Permintaan</button></form>
