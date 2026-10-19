@@ -27,7 +27,7 @@ function lop_effective_bank_rows(array $rows,array $cfg): array {
         $row['raw']['TANGGAL']=lop_date($fix['date']??null);$row['raw']['MASUK']=lf_money(lf_cents($fix['incoming']??null));$row['raw']['KELUAR']=lf_money(lf_cents($fix['outgoing']??null));
     }unset($row);return $rows;
 }
-/** A FIX only resolves a numeric mismatch. Invalid/ambiguous journals stay held. */
+/** A FIX resolves a mismatch or an explicitly acknowledged source precision issue. */
 function lop_fixed_bank(array $rows,?string $snapshot,array $fix): array {
     $bank=lf_reconcile($rows,$snapshot);$bank['source_balance']=$bank['balance'];$bank['adjustment']='0.00';
     // A unique, empty zero account has no historical movement to reconcile.
@@ -39,6 +39,16 @@ function lop_fixed_bank(array $rows,?string $snapshot,array $fix): array {
     if(($fix['confirmed']??false)!==true||!is_string($fix['evidence']??null)||mb_strlen(trim($fix['evidence']))<10||mb_strlen($fix['evidence'])>1000)throw new DomainException('Sahkan saldo FIX dan isi bukti minimal 10 karakter.');
     $amount=lf_cents($fix['amount']??null);
     $issues=array_values(array_filter($bank['issues'],fn($s)=>$s!=='Saldo sumber berbeda dengan jumlah jurnal.'));
+    if($bank['account_issues']){
+        $headers=array_values(array_filter($rows,fn($r)=>$r['table']==='tabungan'));
+        $ack=$fix['source_balance_override']??[];$header=$headers[0]??[];$raw=$header['raw']['SALDO']??null;
+        if(count($headers)===1&&is_string($raw)&&preg_match('/^[0-9]{1,13}\.[0-9]{3,}$/D',$raw)
+            &&($ack['row_key']??null)===($header['row_key']??null)&&($ack['raw']??null)===$raw){
+            $issues=array_values(array_unique(array_merge(array_diff($issues,$bank['account_issues']),$bank['journal_issues'])));
+            $bank['source_precision_acknowledged']=true;
+        }
+    }
     $bank['balance']=lf_money($amount);$bank['adjustment']=lf_money($amount-lf_cents($bank['incoming'])+lf_cents($bank['outgoing']));
     $bank['issues']=$issues;$bank['ready']=!$issues;return $bank;
 }
+require_once __DIR__.'/legacy_operational_savings_fix.php';

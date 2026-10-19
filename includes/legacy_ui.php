@@ -2,6 +2,9 @@
 /** Presentation only. These labels and links never authorize an import. */
 function legacy_ui_e(mixed $value): string { return htmlspecialchars((string)($value??''),ENT_QUOTES|ENT_SUBSTITUTE,'UTF-8'); }
 function legacy_ui_sidebar(): void { include __DIR__.'/sidebar.php'; }
+function legacy_ui_topbar(string $title,string $breadcrumb='Pengaturan / Import Legacy'): void {
+    echo '<div class="topbar"><button type="button" class="sidebar-toggle" id="btn-sidebar-toggle" onclick="toggleSidebar()" aria-label="Buka navigasi"><svg width="20" height="20" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" aria-hidden="true"><path d="M3 6h18M3 12h18M3 18h18"/></svg></button><div class="topbar-title"><h2>'.legacy_ui_e($title).'</h2><span class="breadcrumb">'.legacy_ui_e($breadcrumb).'</span></div><div class="clock-badge" id="liveClock">--:--:--</div></div>';
+}
 function legacy_ui_state(string $state): string {
     return ['queued'=>'Menunggu pemeriksaan','processing'=>'Sedang diperiksa','ready'=>'Siap ditinjau','simulate_queued'=>'Menunggu pemeriksaan','simulating'=>'Sedang diperiksa','apply_queued'=>'Menunggu penerapan','applying'=>'Sedang diterapkan','imported'=>'Selesai','failed'=>'Perlu diperbaiki','cancelled'=>'Dibatalkan','accepted'=>'Siap diimpor','held'=>'Perlu diperbaiki','non_student'=>'Bukan siswa','already_imported'=>'Sudah diimpor','archived'=>'Arsip tersimpan','archive'=>'Siap diarsipkan','reference'=>'Referensi sumber'][$state]??'Belum diperiksa';
 }

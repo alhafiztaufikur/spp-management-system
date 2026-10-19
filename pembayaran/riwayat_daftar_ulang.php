@@ -6,6 +6,7 @@ require_once __DIR__.'/../includes/auth.php';
 require_once __DIR__.'/../includes/transaction_authorization.php';
 require_once __DIR__.'/../includes/registration_history.php';
 requireRole(['admin','kasir','bendahara']);
+if(($_GET['view']??'')==='legacy'){require_once __DIR__.'/../includes/legacy_registration_history.php';try{mh_registration_render($koneksi);}catch(InvalidArgumentException $e){http_response_code(400);echo htmlspecialchars($e->getMessage(),ENT_QUOTES,'UTF-8');}exit;}
 if(empty($_SESSION['csrf_payment']))$_SESSION['csrf_payment']=bin2hex(random_bytes(32));
 try {
     if(isset($_GET['q_plain'])) {

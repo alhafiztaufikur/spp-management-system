@@ -107,3 +107,12 @@
 .ph-request-status h4{margin:0 0 8px;font-size:14px}
 .ph-request-status p{margin:6px 0;font-size:13px;overflow-wrap:anywhere}
 .ph-request-status form{margin-top:12px}
+
+/* Historical-source filters stay within the established workspace. */
+.ph-period-summary{margin:14px 0 0;padding:12px 14px;border-radius:10px;background:var(--accent-glow);font-size:13px;line-height:1.6;color:var(--text-secondary)}
+.ph-tabs{flex-wrap:wrap}.ph-record-identity{min-width:0;overflow-wrap:anywhere}
+@media(max-width:600px){.ph-page-content{padding:16px 12px}.ph-tabs{max-width:100%}.ph-tabs a{white-space:normal}.ph-filter-actions{flex-wrap:wrap}}
+
+.mh-recap-filter{display:grid;grid-template-columns:2fr 1fr 1fr auto;gap:14px;align-items:end;margin:20px 0}.mh-recap-filter label{display:grid;gap:8px;font-size:13px;color:var(--text-secondary)}.mh-block{display:block;color:var(--text-muted);margin-top:4px}.savings-recap-card{margin-top:20px}.mh-recap-filter .field-input{width:100%;min-width:0}@media(max-width:800px){.mh-recap-filter{grid-template-columns:1fr 1fr}}@media(max-width:500px){.mh-recap-filter{grid-template-columns:1fr}}
+
+.ph-export-actions{display:flex;flex-wrap:wrap;gap:10px;margin:0 0 16px}

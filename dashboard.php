@@ -44,7 +44,7 @@ $setoranFilters = [
 ];
 
 $paymentComponents = report_payment_components($koneksi, $setoranFilters);
-$paymentComponents = array_values(array_filter($paymentComponents, static fn($row) => ($row['kategori_key'] ?? '') !== 'potongan'));
+$paymentComponents = array_values(array_filter($paymentComponents, static fn($row) => ($row['kategori_key'] ?? '') !== 'potongan' && empty($row['legacy'])));
 $totalPembayaran = array_sum(array_map(static fn($row) => (float)($row['nominal'] ?? 0), $paymentComponents));
 $jumlahTransaksi = count(array_unique(array_column($paymentComponents, 'id')));
 
@@ -52,6 +52,7 @@ $startToday = $todayDate . ' 00:00:00';
 $endToday = date('Y-m-d H:i:s', strtotime($todayDate . ' +1 day'));
 $schoolSavingsFilters=$setoranFilters;$schoolSavingsFilters['_school_savings_cash']=true;
 $savingTransactions = report_savings_transactions($koneksi, $startToday, $endToday, $schoolSavingsFilters);
+$savingTransactions=array_values(array_filter($savingTransactions,static fn($r)=>(int)$r['id']>0||($r['legacy_origin']??'')==='new'));
 $tabunganMasuk = array_sum(array_map(static fn($row) => (float)($row['masuk'] ?? 0), $savingTransactions));
 $tabunganKeluar = array_sum(array_map(static fn($row) => (float)($row['keluar'] ?? 0), $savingTransactions));
 $totalPenerimaan = $totalPembayaran + $tabunganMasuk - $tabunganKeluar;

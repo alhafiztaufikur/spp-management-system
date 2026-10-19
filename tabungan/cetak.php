@@ -3,6 +3,7 @@ session_start();
 require_once __DIR__ . '/../koneksi.php';
 require_once __DIR__ . '/../includes/auth.php';
 requireRole(['admin', 'kasir', 'bendahara']);
+require_once __DIR__.'/../includes/migrated_history.php';
 
 $students = $koneksi->query("
     SELECT s.id, s.NO_INDUK, s.unit_id, s.NO_induk_diknas, s.NAMA, s.KELAS,
@@ -12,9 +13,12 @@ $students = $koneksi->query("
     LEFT JOIN tabungan t ON t.NO_INDUK = s.NO_INDUK AND t.unit_id=s.unit_id
     LEFT JOIN (SELECT unit_id,NO_INDUK, COUNT(*) AS jumlah FROM transaksi_m GROUP BY unit_id,NO_INDUK) m ON m.NO_INDUK = s.NO_INDUK AND m.unit_id=s.unit_id
     LEFT JOIN (SELECT unit_id,NO_INDUK, COUNT(*) AS jumlah FROM transaksi_k GROUP BY unit_id,NO_INDUK) k ON k.NO_INDUK = s.NO_INDUK AND k.unit_id=s.unit_id
-    WHERE s.is_active = 1
+    WHERE s.legacy_pending=0
     ORDER BY s.NAMA, s.NO_INDUK
 ")->fetch_all(MYSQLI_ASSOC);
+$bookCounts=[];$bookSource=mh_savings_source($koneksi);foreach(lf_rows($koneksi,"SELECT student_id,COUNT(*) n FROM $bookSource t WHERE student_id IS NOT NULL AND origin<>'adjustment' GROUP BY student_id") as $count)$bookCounts[(int)$count['student_id']]=(int)$count['n'];
+foreach($students as &$bookStudent)$bookStudent['transaksi']=$bookCounts[(int)$bookStudent['id']]??0;unset($bookStudent);
+if(lop_ready($koneksi))$students=array_merge($students,lf_rows($koneksi,"SELECT 0 id,o.id owner_id,o.source_identity NO_INDUK,o.unit_id,'' NO_induk_diknas,o.name NAMA,o.source_class KELAS,a.balance saldo,(SELECT COUNT(*) FROM legacy_op_journals j WHERE j.owner_id=o.id AND j.unit_id=o.unit_id AND j.cancelled=0) transaksi FROM legacy_op_owners o JOIN legacy_op_accounts a ON a.owner_id=o.id AND a.unit_id=o.unit_id JOIN legacy_full_batches b ON b.id=o.batch_id AND b.unit_id=o.unit_id WHERE o.student_id IS NULL AND b.state='completed'"));
 $classes = array_values(array_unique(array_map(static fn(array $student): string => (string)$student['KELAS'], $students)));
 sort($classes, SORT_NATURAL);
 
@@ -99,7 +103,7 @@ function print_book_escape($value): string
               </div>
               <datalist id="savings-print-list">
                 <?php foreach ($students as $student): ?>
-                <option value="<?= print_book_escape($student['NAMA']) ?>" data-student-id="<?= (int)$student['id'] ?>" data-unit-id="<?= (int)$student['unit_id'] ?>" data-nis="<?= print_book_escape($student['NO_INDUK']) ?>" data-diknas="<?= print_book_escape($student['NO_induk_diknas'] ?? '') ?>" data-nama="<?= print_book_escape($student['NAMA']) ?>" data-kelas="<?= print_book_escape((unit_all_readonly()?unit_label((int)$student['unit_id']).' · ':'').$student['KELAS']) ?>" data-kelas-id="<?= print_book_escape($student['KELAS']) ?>" data-saldo="<?= print_book_escape($student['saldo']) ?>" data-transaksi="<?= (int)$student['transaksi'] ?>"></option>
+                <option value="<?= print_book_escape($student['NAMA']) ?>" data-owner-id="<?= (int)($student['owner_id']??0) ?>" data-student-id="<?= (int)$student['id'] ?>" data-unit-id="<?= (int)$student['unit_id'] ?>" data-nis="<?= print_book_escape($student['NO_INDUK']) ?>" data-diknas="<?= print_book_escape($student['NO_induk_diknas'] ?? '') ?>" data-nama="<?= print_book_escape($student['NAMA']) ?>" data-kelas="<?= print_book_escape((unit_all_readonly()?unit_label((int)$student['unit_id']).' · ':'').$student['KELAS']) ?>" data-kelas-id="<?= print_book_escape($student['KELAS']) ?>" data-saldo="<?= print_book_escape($student['saldo']) ?>" data-transaksi="<?= (int)$student['transaksi'] ?>"></option>
                 <?php endforeach; ?>
               </datalist>
             </div>
@@ -139,11 +143,11 @@ function print_book_escape($value): string
   const classFilter = document.getElementById('savings-print-class');
   const action = document.getElementById('savings-print-action');
   const summary = document.getElementById('savings-print-summary');
-  let selectedNis = ''; let selectedId = '';
+  let selectedNis = ''; let selectedId = '';let selectedOwner='';
   const rupiah = new Intl.NumberFormat('id-ID', {style: 'currency', currency: 'IDR', maximumFractionDigits: 0});
 
   function resetSelection() {
-    selectedNis = '';
+    selectedNis = '';selectedOwner='';
     action.disabled = true;
     summary.classList.remove('is-selected');
     document.getElementById('savings-print-name').textContent = 'Pilih siswa terlebih dahulu';
@@ -156,7 +160,7 @@ function print_book_escape($value): string
   window.selectSavingsBookStudent = function (input, option) {
     const nis = option.dataset.nis || '';
     if (!nis) { resetSelection(); return; }
-    selectedNis = nis; selectedId=option.dataset.studentId || '';
+    selectedNis = nis; selectedId=option.dataset.studentId || '';selectedOwner=option.dataset.ownerId||'';
     document.getElementById('savings-print-name').textContent = option.dataset.nama || option.value;
     document.getElementById('savings-print-nis').textContent = 'NIS ' + nis + (option.dataset.diknas ? ' · NIS Diknas ' + option.dataset.diknas : '');
     document.getElementById('savings-print-student-class').textContent = 'Kelas ' + (option.dataset.kelas || '-');
@@ -169,6 +173,7 @@ function print_book_escape($value): string
   search.addEventListener('input', resetSelection);
   classFilter.addEventListener('change', function () { search.value = ''; resetSelection(); });
   action.addEventListener('click', function () {
+    if(selectedOwner&&selectedOwner!=='0'){window.location.href='cetak_buku.php?owner_id='+encodeURIComponent(selectedOwner);return;}
     if (selectedNis) window.location.href = 'cetak_buku.php?nis=' + encodeURIComponent(selectedNis) + '&student_id=' + encodeURIComponent(selectedId);
   });
 })();

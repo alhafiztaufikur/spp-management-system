@@ -47,6 +47,26 @@ function workflow_accounts_finalize(mysqli $db): void {
     if(!workflow_column_exists($db,'admin','active_super_guard'))$db->query("ALTER TABLE admin ADD COLUMN active_super_guard TINYINT GENERATED ALWAYS AS (CASE WHEN role='super_admin' AND is_active=1 THEN 1 ELSE NULL END) STORED, ADD UNIQUE KEY uk_one_active_super(active_super_guard)");
 }
 
+/** Explicit alternative: preserve every account ID, username, password and active status. */
+function workflow_accounts_preserve_existing(mysqli $db): void {
+    if(PHP_SAPI!=='cli')throw new RuntimeException('CLI only');
+    if($db->query("SELECT 1 FROM workflow_migration_log WHERE migration_key='two_roles_20261017'")->num_rows){workflow_accounts_finalize($db);return;}
+    $db->begin_transaction();
+    try{
+        $before=$db->query('SELECT id,username,nama,role,unit_id,is_active FROM admin ORDER BY id FOR UPDATE')->fetch_all(MYSQLI_ASSOC);
+        $super=array_values(array_filter($before,static fn($a)=>$a['username']==='superadmin'&&(int)$a['is_active']===1));
+        if(count($super)!==1)throw new RuntimeException('Tepat satu akun superadmin aktif wajib tersedia; akun tidak dibuat ulang.');
+        $id=(int)$super[0]['id'];
+        $preserveTime=workflow_column_exists($db,'admin','updated_at')?',updated_at=updated_at':'';
+        $db->query("UPDATE admin SET role='admin',unit_id=NULL$preserveTime WHERE id<>$id");
+        $db->query("UPDATE admin SET role='super_admin',unit_id=NULL$preserveTime WHERE id=$id");
+        $json=json_encode($before,JSON_THROW_ON_ERROR);$s=$db->prepare("INSERT INTO workflow_migration_log VALUES('two_roles_20261017',NOW(),?)");$s->bind_param('s',$json);$s->execute();$s->close();
+        $db->query("INSERT INTO workflow_migration_log VALUES('accounts_preserved_20261019',NOW(),JSON_OBJECT('policy','preserve_existing','super_id',$id))");
+        $db->commit();
+    }catch(Throwable $e){$db->rollback();throw $e;}
+    workflow_accounts_finalize($db);
+}
+
 /** Initial accounts only: reruns preserve IDs/passwords and never delete historical owners. */
 function workflow_accounts_apply(mysqli $db, string $credentialsFile): void {
     if(PHP_SAPI!=='cli')throw new RuntimeException('CLI only');

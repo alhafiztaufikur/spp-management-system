@@ -5,6 +5,7 @@ function lop_ready(mysqli $db,bool $refresh=false): bool {
     static $cache=[];$key=spl_object_id($db).':'.$db->thread_id;if(!$refresh&&array_key_exists($key,$cache))return $cache[$key];
     return $cache[$key]=(int)$db->query("SELECT COUNT(*) FROM information_schema.VIEWS WHERE TABLE_SCHEMA=DATABASE() AND TABLE_NAME IN ('legacy_op_groups','legacy_op_owners','legacy_op_payments','legacy_op_journals','legacy_op_accounts','legacy_op_tariffs','legacy_op_pending','legacy_op_obligations','legacy_op_audit')")->fetch_row()[0]===9
         && lop_review_schema_ready($db)
+        && (int)$db->query("SELECT COUNT(*) FROM information_schema.COLUMNS WHERE TABLE_SCHEMA=DATABASE() AND TABLE_NAME='master_kelas' AND COLUMN_NAME IN ('jenis','nama_custom')")->fetch_row()[0]===2
         && (int)$db->query("SELECT COUNT(*) FROM information_schema.TRIGGERS WHERE TRIGGER_SCHEMA=DATABASE() AND TRIGGER_NAME IN ('lop_audit_update','lop_audit_delete','lop_id_payments','lop_id_journals')")->fetch_row()[0]===4;
 }
 function lop_schema_apply(mysqli $db): void {
@@ -26,5 +27,6 @@ function lop_schema_apply(mysqli $db): void {
     foreach(['UPDATE','DELETE'] as $event){$trigger='lop_audit_'.strtolower($event);if(!(int)$db->query("SELECT COUNT(*) FROM information_schema.TRIGGERS WHERE TRIGGER_SCHEMA=DATABASE() AND TRIGGER_NAME='$trigger'")->fetch_row()[0])$db->query("CREATE TRIGGER $trigger BEFORE $event ON legacy_op_audit_data FOR EACH ROW SIGNAL SQLSTATE '45000' SET MESSAGE_TEXT='Audit migrasi tidak dapat diubah'");}
     foreach(['payments','journals'] as $kind){$name='lop_id_'.$kind;if(!(int)$db->query("SELECT COUNT(*) FROM information_schema.TRIGGERS WHERE TRIGGER_SCHEMA=DATABASE() AND TRIGGER_NAME='$name'")->fetch_row()[0])$db->query("CREATE TRIGGER $name AFTER INSERT ON legacy_op_{$kind}_data FOR EACH ROW BEGIN IF NEW.id>=1000000000 THEN SIGNAL SQLSTATE '45000' SET MESSAGE_TEXT='Batas identitas transaksi migrasi tercapai'; END IF; END");}
     lop_review_schema_apply($db);
+    require_once __DIR__.'/special_classes_schema.php';special_classes_schema_apply($db);
     if(!lop_ready($db,true))throw new RuntimeException('Pemasangan skema operasional belum lengkap.');
 }

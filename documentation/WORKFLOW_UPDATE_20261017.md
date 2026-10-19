@@ -1,5 +1,8 @@
 # Pembaruan akses, tagihan, histori, dan cetak — 17 Oktober 2026
 
+> Pembaruan lokal 19 Oktober 2026: akses source utama dipulihkan setelah skema workflow dipasang. Atas pilihan pengguna, semua 10 username/password dipertahankan: satu Super Admin dan sembilan Administrator. Kebijakan empat akun awal pada catatan 17 Oktober di bawah tidak diterapkan pada pemulihan ini. Lihat [hasil pemulihan terbaru](MAIN_WORKFLOW_RECOVERY_20261019.md).
+
+
 ## Status penerapan
 
 **Sudah aktif pada database operasional, 17 Oktober 2026 sekitar 15.52 WIB.** Migrasi skema dan penataan akun berhasil dijalankan setelah permintaan perbaikan akses. Halaman pemeliharaan sebelumnya muncul karena kode baru sudah aktif tetapi database masih memakai skema lama; kondisi tersebut sudah diselesaikan.

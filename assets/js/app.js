@@ -277,9 +277,9 @@ async function refreshPaymentHistory(noInduk) {
       return;
     }
     if(!Array.isArray(payload.rows)){state('invalid_response','Respons riwayat tidak dapat dibaca. Silakan coba lagi.',true);return;}
-    if(picker&&Array.isArray(payload.scopes)){picker.replaceChildren(...payload.scopes.map(item=>{const option=document.createElement('option');option.value=item.value;option.textContent=item.label;return option;}));picker.value=payload.scope||'active';}
+    if(picker&&Array.isArray(payload.scopes)){picker.replaceChildren(...payload.scopes.map(item=>{const option=document.createElement('option');option.value=item.value;option.textContent=item.label;return option;}));picker.value=payload.scope||'active';if((payload.legacy_count||0)>0&&payload.scope==='active')picker.title=payload.legacy_count+' transaksi Legacy tersedia pada Semua Tahun / Riwayat Lama';}
     if(period)period.textContent=payload.period||'';
-    if(!payload.rows.length){state('empty','Belum ada transaksi pembayaran untuk siswa ini.');window.studentPaymentHistory?.setRows(payload);return;}
+    if(!payload.rows.length){state('empty',(payload.legacy_count||0)>0?'Ada '+payload.legacy_count+' transaksi Legacy. Pilih Semua Tahun atau Riwayat Lama untuk melihatnya.':'Belum ada transaksi pembayaran untuk siswa ini.');window.studentPaymentHistory?.setRows(payload);return;}
     body.dataset.historyState='ready';
     window.studentPaymentHistory?.setRows(payload);
   }catch(error){if(current()&&error.name!=='AbortError')state('network_error','Koneksi terputus saat memuat riwayat. Silakan coba lagi.',true);}

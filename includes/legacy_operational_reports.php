@@ -1,8 +1,10 @@
 <?php
 require_once __DIR__.'/legacy_operational_read.php';
 function lop_savings_report_rows(mysqli $db,string $start,string $end,array $f): array {
-    if(!lop_ready($db))return [];$rows=[];
-    foreach(lf_rows($db,"SELECT j.*,(SELECT MIN(a.actor_id) FROM legacy_op_audit a WHERE a.unit_id=j.unit_id AND a.entity_type='bank_new' AND a.entity_id=j.id) native_actor,o.name,o.student_id,o.source_identity,o.source_class,s.NO_INDUK,s.NO_induk_diknas,s.master_kelas_id FROM legacy_op_journals j JOIN legacy_op_owners o ON o.id=j.owner_id AND o.unit_id=j.unit_id LEFT JOIN siswa s ON s.id=o.student_id AND s.unit_id=o.unit_id JOIN legacy_full_batches b ON b.id=j.batch_id AND b.unit_id=j.unit_id WHERE b.state='completed' AND j.cancelled=0 AND j.source_date>=? AND j.source_date<? ORDER BY j.source_date,j.id",[$start,$end]) as $j){
+    if(!lop_ready($db))return [];$rows=[];$selection='';if(($f['owner_id']??0)>0)$selection.=' AND j.owner_id='.(int)$f['owner_id'];if(($f['student_id']??0)>0)$selection.=' AND o.student_id='.(int)$f['student_id'];
+    foreach(lf_rows($db,"SELECT j.*,(SELECT MIN(a.actor_id) FROM legacy_op_audit a WHERE a.unit_id=j.unit_id AND a.entity_type='bank_new' AND a.entity_id=j.id) native_actor,o.name,o.student_id,o.source_identity,o.source_class,s.NO_INDUK,s.NO_induk_diknas,COALESCE(s.master_kelas_id,g.master_kelas_id) master_kelas_id FROM legacy_op_journals j JOIN legacy_op_owners o ON o.id=j.owner_id AND o.unit_id=j.unit_id LEFT JOIN siswa s ON s.id=o.student_id AND s.unit_id=o.unit_id LEFT JOIN legacy_op_groups g ON g.id=o.group_id AND g.unit_id=o.unit_id JOIN legacy_full_batches b ON b.id=j.batch_id AND b.unit_id=j.unit_id WHERE b.state='completed' AND j.cancelled=0 $selection AND j.source_date>=? AND j.source_date<? ORDER BY j.source_date,j.id",[$start,$end]) as $j){
+        if(($f['owner_id']??0)>0&&(int)$j['owner_id']!==(int)$f['owner_id'])continue;
+        if(($f['student_id']??0)>0&&(int)$j['student_id']!==(int)$f['student_id'])continue;
         if(($f['_school_savings_cash']??false)&&$j['student_id']===null)continue;
         $operator=$j['origin']==='adjustment'?'':($j['origin']==='legacy'?lful_operator_key((int)$j['unit_id'],$j['source_operator']):(string)$j['source_operator']);
         $operatorKey=$j['origin']==='legacy'?$operator:(string)($j['native_actor']??$operator);if(($f['operator']??'')!==''&&$f['operator']!==$operatorKey)continue;if(isset($f['_multi']['operator'])&&!filter_is_all($f['_multi']['operator'])&&!in_array($operatorKey,$f['_multi']['operator'],true))continue;

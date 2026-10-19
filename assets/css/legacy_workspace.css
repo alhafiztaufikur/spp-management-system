@@ -1,0 +1,112 @@
+/* Legacy additions use the application's surfaces, typography and unit palette.
+   Keep these rules scoped: ordinary master/payment workspaces are unaffected. */
+.legacy-ui{max-width:1600px;line-height:1.6}
+.legacy-ui,.legacy-groups{--legacy-control-height:44px;min-width:0}
+.legacy-ui :is(h1,h2,h3),.legacy-groups :is(h2,h3){color:var(--text-primary);line-height:1.4}
+.legacy-ui h1{font-size:clamp(23px,2vw,30px);letter-spacing:-.5px;margin:0 0 6px}
+.legacy-ui h2{font-size:18px;margin:0 0 6px}.legacy-ui h3{font-size:16px;margin:0 0 6px}
+.legacy-ui .dbt-card{padding:24px;border-radius:14px;background:var(--bg-card);box-shadow:0 5px 20px rgba(0,0,0,.03);margin-block:0 20px}
+.legacy-ui .dbt-heading{gap:14px;align-items:flex-start;margin-bottom:24px}
+.legacy-ui .dbt-heading>div{min-width:0;flex:1}.legacy-ui .dbt-heading>.dbt-button{flex-shrink:0}
+.legacy-ui .dbt-card>p{margin:8px 0 18px;font-size:13px;color:var(--text-secondary);line-height:1.7}
+.legacy-section-heading{display:flex;justify-content:space-between;gap:16px;align-items:flex-start;margin-bottom:20px;flex-wrap:wrap}
+.legacy-section-heading>div{min-width:0}.legacy-section-heading p{margin:4px 0 0;color:var(--text-muted);font-size:13px}
+.legacy-subsection{padding-top:24px;margin-top:24px;border-top:1px solid var(--border)}
+.legacy-ui .dbt-button,.legacy-groups .btn{min-height:44px;border-radius:10px;font-size:13px;gap:8px;padding:10px 16px;text-decoration:none;line-height:1.5}
+.legacy-ui .dbt-button:not(.dbt-button-primary){background:var(--bg-card);color:var(--accent)}
+.legacy-ui .dbt-button:hover,.legacy-groups .btn:hover{filter:brightness(.97)}
+.legacy-ui :is(button,a,input,select,textarea,summary):focus-visible,.legacy-groups :is(button,a,input,select,summary):focus-visible{outline:3px solid var(--accent);outline-offset:3px}
+.legacy-ui .lf-form{display:flex;flex-direction:column;gap:18px;margin-top:18px}
+.legacy-ui .lf-form label,.legacy-directory-search label,.legacy-ui .lf-search label{display:flex;flex-direction:column;gap:8px;color:var(--text-primary);font-weight:600;font-size:13px;min-width:0}
+.legacy-ui :is(.lf-form,.lf-search,.legacy-directory-search,.dbt-import-grid) :is(input:not([type=hidden]):not([type=checkbox]):not([type=radio]),select,textarea),.legacy-groups :is(input,select){box-sizing:border-box;display:block;width:100%;min-width:0;max-width:100%;min-height:44px;padding:11px 13px;border:1px solid var(--border);border-radius:10px;background:var(--bg-input,var(--bg-surface));color:var(--text-primary);font:inherit;font-size:13px;line-height:1.5}
+.legacy-ui :is(.lf-form,.lf-search) textarea{min-height:100px;resize:vertical}
+.legacy-ui input:read-only:not([type=checkbox]){background:var(--bg-surface);color:var(--text-secondary)}
+.legacy-ui input[type=checkbox],.legacy-groups input[type=checkbox]{accent-color:var(--accent);width:18px;min-width:18px;height:18px;min-height:18px;margin:2px 0 0;flex:none}
+.legacy-ui label.legacy-check-row,.legacy-ui .lf-form label:has(>input[type=checkbox]){display:flex;flex-direction:row;align-items:flex-start;gap:12px;line-height:1.65;font-weight:500;padding:14px;border:1px solid var(--border);border-radius:10px;background:var(--bg-surface)}
+.legacy-ui .lful-grid{gap:20px}.legacy-ui .lful-grid>label{align-self:start}
+.legacy-ui .lf-form>.dbt-button{align-self:flex-start}.legacy-ui .legacy-actions{margin-top:8px;padding-top:20px}
+.legacy-ui .dbt-table{width:100%;border-collapse:collapse;font-size:13px}
+.legacy-ui .dbt-table :is(th,td){padding:14px 16px;vertical-align:top;text-align:left;line-height:1.6;border-bottom:1px solid var(--border)}
+.legacy-ui .dbt-table th{background:var(--accent-glow);color:var(--accent);font-weight:700;font-size:12px}
+.legacy-ui .dbt-table td small{display:block;color:var(--text-muted);margin-top:4px}
+.legacy-ui .dbt-table-scroll{border:1px solid var(--border);border-radius:12px;overflow:auto;margin-top:16px;overscroll-behavior-x:contain}
+.legacy-ui .dbt-table-scroll .dbt-table{margin:0}.legacy-ui .dbt-table tr:last-child td{border-bottom:0}
+.legacy-ledger-scroll{max-height:560px}.legacy-ledger-scroll th{position:sticky;top:0;z-index:1;background:var(--bg-surface)!important}
+.legacy-money{font-variant-numeric:tabular-nums;white-space:nowrap;font-weight:600}
+.legacy-inline-actions{display:flex;flex-wrap:wrap;gap:10px;align-items:center}
+.legacy-ui .dbt-table .legacy-inline-actions{flex-wrap:nowrap}
+.legacy-directory-search{display:grid;grid-template-columns:minmax(200px,1fr) minmax(160px,.55fr) auto;gap:16px;align-items:end;margin:0 0 20px;padding:18px;background:var(--bg-surface);border:1px solid var(--border);border-radius:12px}
+.legacy-account-workspace .legacy-directory-search{grid-template-columns:minmax(0,1fr) auto}
+.legacy-directory-search input[type=hidden]{display:none}.legacy-directory-search .legacy-inline-actions{align-self:end}
+.legacy-directory-table-wrap{max-width:100%;border:1px solid var(--border);border-radius:12px;overflow:hidden}
+.legacy-directory-table{width:100%;border-collapse:collapse;font-size:13px;text-align:left}
+.legacy-directory-table :is(th,td){text-align:left;padding:15px 18px;vertical-align:middle;line-height:1.6;border-bottom:1px solid var(--border)}
+.legacy-directory-table th{font-size:12px;color:var(--accent);background:var(--accent-glow);font-weight:700}
+.legacy-directory-table tr:last-child td{border-bottom:0}.legacy-directory-table tbody tr:hover{background:var(--accent-glow)}
+.legacy-directory-table td:first-child{width:30%}.legacy-directory-table td:last-child{width:1%;white-space:nowrap}
+.legacy-directory-table td strong{display:block;font-size:14px}.legacy-directory-table td small{display:block;font-size:12px;color:var(--text-muted);margin-top:4px}
+.legacy-directory-number{font-size:15px;font-weight:700;font-variant-numeric:tabular-nums}.legacy-muted{color:var(--text-muted);font-size:12px}
+.legacy-kind-badge,.legacy-directory-count{display:inline-flex;align-items:center;gap:6px;padding:5px 10px;border:1px solid var(--border);border-radius:8px;background:var(--bg-surface);font-size:12px;font-weight:600;color:var(--text-secondary);white-space:normal}
+.legacy-kind-badge[data-kind=academic],.legacy-kind-badge[data-kind=active],.legacy-kind-badge[data-kind=ready]{background:var(--accent-glow);color:var(--accent)}
+.legacy-kind-badge[data-kind=held],.legacy-kind-badge[data-kind=legacy]{color:var(--warning-text,#a95c0d);background:var(--warning-bg,rgba(217,119,6,.1))}
+.legacy-directory-count{margin-left:auto;flex:none;color:var(--accent);background:var(--accent-glow)}
+.legacy-directory-aliases summary{font-size:12px;color:var(--text-muted);cursor:pointer;padding:6px 0;min-height:32px}
+.legacy-directory-pagination{display:flex;flex-wrap:wrap;justify-content:space-between;align-items:center;gap:16px;padding-top:18px;font-size:12px;color:var(--text-muted)}
+.legacy-directory-pagination>div{display:flex;gap:8px;flex-wrap:wrap}.legacy-directory-empty{display:flex;flex-direction:column;align-items:center;gap:8px;padding:36px 20px;text-align:center;color:var(--text-muted);font-size:13px}.legacy-directory-empty p{margin:0}.legacy-directory-empty h3{margin:4px 0;font-size:16px}
+.legacy-ui .legacy-balance{margin:22px 0 12px;gap:16px}.legacy-ui .legacy-balance>div{background:var(--bg-surface);padding:20px;border-radius:12px}.legacy-ui .legacy-balance dd{font-variant-numeric:tabular-nums;overflow-wrap:anywhere;font-size:22px;line-height:1.4}.legacy-ui .legacy-balance>div:last-child{background:var(--accent-glow)}
+.legacy-ui .legacy-fold{margin-top:24px;border:1px solid var(--border);border-radius:12px;padding:0 18px}.legacy-ui .legacy-fold>summary{display:flex;align-items:center;gap:10px;color:var(--accent);font-weight:600}.legacy-fold[open]{padding-bottom:18px}
+.legacy-edit-workspace{max-width:1300px}.legacy-edit-workspace>.dbt-button{margin:0 0 20px}
+.legacy-ui .dbt-import-grid{gap:20px;margin-block:18px}.legacy-ui .dbt-import-grid label{display:block;margin-bottom:8px;font-size:13px;font-weight:600}
+.legacy-ui .lop-manual-settings{margin-block:20px}.legacy-ui .lop-manual-settings>summary{padding:16px 0}.legacy-ui .lop-manual-settings .dbt-card{margin-top:18px}
+.legacy-ui .lop-group-card{margin-block:12px}.legacy-ui .lop-group-card>summary{padding:18px}
+.legacy-ui .legacy-approval-checkboxes{display:grid;grid-template-columns:1fr;gap:12px}
+.legacy-ui .lf-search{gap:16px;align-items:end}.legacy-ui .legacy-changes{gap:14px}.legacy-ui .legacy-changes>div{padding:12px 0}
+.legacy-ui .lop-panel-nav{gap:10px;margin:20px 0}.legacy-ui .lop-panel-nav a{min-height:48px}
+@media(max-width:1100px){.legacy-directory-search{grid-template-columns:minmax(0,1fr) minmax(150px,.7fr)}.legacy-directory-search>.legacy-inline-actions{grid-column:1/-1}.legacy-directory-table :is(th,td){padding:14px 12px}.legacy-directory-table td:first-child{width:auto}.legacy-groups .class-panel-heading{flex-wrap:wrap}}
+@media(max-width:760px){
+ .legacy-ui.db-tools-page{padding:20px 16px 100px}.legacy-ui .dbt-card{padding:18px}.legacy-ui .dbt-heading>.dbt-icon{display:none}.legacy-ui .dbt-heading>.dbt-button{width:100%}
+ .legacy-directory-search,.legacy-account-workspace .legacy-directory-search{grid-template-columns:1fr;padding:14px;gap:14px}.legacy-directory-search>.legacy-inline-actions{grid-column:auto}.legacy-directory-search .legacy-inline-actions>*{flex:1}
+ .legacy-directory-table-wrap{border:0;border-radius:0;overflow:visible}.legacy-directory-table,.legacy-directory-table tbody{display:block;width:100%}.legacy-directory-table thead{position:absolute;width:1px;height:1px;padding:0;margin:-1px;overflow:hidden;clip:rect(0,0,0,0);white-space:nowrap}
+ .legacy-directory-table tbody{display:grid;gap:14px}.legacy-directory-table tr{display:block;border:1px solid var(--border);border-radius:12px;padding:14px;background:var(--bg-card)}
+ .legacy-directory-table td{display:flex;justify-content:space-between;align-items:flex-start;gap:14px;border:0;padding:7px 0!important;width:auto!important;white-space:normal!important;text-align:right}
+ .legacy-directory-table td::before{content:attr(data-label);font-size:12px;font-weight:500;color:var(--text-muted);text-align:left;flex-shrink:0;max-width:40%}
+ .legacy-directory-table td:first-child{display:block;text-align:left;padding-bottom:12px!important;border-bottom:1px solid var(--border);margin-bottom:8px}.legacy-directory-table td:first-child::before{display:none}
+ .legacy-directory-table td:last-child{padding-top:12px!important}.legacy-directory-table td:last-child::before{display:none}.legacy-directory-table td:last-child .btn,.legacy-directory-table td:last-child .dbt-button{width:100%}
+ .legacy-directory-table td small{margin:3px 0 0}.legacy-directory-count{margin:0}.legacy-groups .class-panel-heading>div{flex:1}.legacy-groups .class-panel-heading .legacy-directory-count{margin-left:50px}
+ .legacy-directory-pagination{align-items:stretch;flex-direction:column}.legacy-directory-pagination>div>*{flex:1}.legacy-ui .lful-grid{grid-template-columns:1fr;gap:18px}
+ .legacy-ui .dbt-table{min-width:620px}.legacy-ui .dbt-table :is(th,td){padding:12px}.legacy-ui .legacy-balance dd{font-size:20px}.legacy-ui .legacy-actions .dbt-button{flex:1;min-width:130px}
+ .legacy-ui .dbt-import-grid{grid-template-columns:1fr}.legacy-section-heading>.dbt-button{width:100%}.legacy-ui .lf-form>.dbt-button{width:100%}
+}
+@media(prefers-reduced-motion:reduce){.legacy-ui *,.legacy-groups *{scroll-behavior:auto!important}}
+
+/* Keep directory actions readable rather than shrinking them to a word per line. */
+.legacy-groups{scroll-margin-top:100px}.legacy-groups .legacy-directory-table td:last-child{width:260px}
+.legacy-groups .legacy-directory-table td:last-child .btn{white-space:nowrap;min-width:240px}
+@media(max-width:760px){
+ .legacy-groups .class-panel-heading{display:grid;grid-template-columns:38px minmax(0,1fr);gap:12px}
+ .legacy-groups .class-panel-heading>div{grid-column:2}.legacy-groups .class-panel-heading .legacy-directory-count{grid-column:2;margin:0;justify-self:start}
+ .legacy-groups .legacy-directory-table td:last-child .btn{min-width:0;white-space:normal}
+ .legacy-ui .lop-replacement-table{min-width:0}
+}
+
+.legacy-groups{animation:none}.legacy-ui .lful-modal .lful-confirm{padding:0}
+
+.legacy-ui .lf-search{padding:16px;margin-block:18px;background:var(--bg-surface);border:1px solid var(--border);border-radius:12px}
+.legacy-ui .lful-status-grid>div{padding:18px;border:1px solid var(--border);border-radius:12px;background:var(--bg-surface);min-width:0}
+.legacy-ui .lful-status-grid strong{display:block;font-size:clamp(22px,3vw,30px);font-variant-numeric:tabular-nums;color:var(--accent)}
+.legacy-ui .lful-status-grid p{font-size:13px;margin:6px 0 0;color:var(--text-secondary)}
+.legacy-ui form[enctype="multipart/form-data"]{display:grid;gap:18px;margin-top:20px;min-width:0}
+.legacy-ui form[enctype="multipart/form-data"] label{display:grid;gap:10px;font-size:13px;font-weight:600;min-width:0}
+.legacy-ui form[enctype="multipart/form-data"] input[type=file]{display:block;max-width:100%;width:100%;box-sizing:border-box;padding:14px;border:1px solid var(--border);border-radius:10px;background:var(--bg-surface);color:var(--text-primary);font:inherit}
+.legacy-ui input[type=file]::file-selector-button{border:1px solid var(--border);border-radius:8px;background:var(--bg-card);color:var(--accent);padding:9px 12px;margin-right:12px;font:inherit;font-weight:600;cursor:pointer}
+.legacy-ui form[enctype="multipart/form-data"]>.dbt-button{justify-self:end}
+.legacy-activation-workspace{max-width:1300px}.legacy-activation-workspace .legacy-balance dd{font-size:18px}
+@media(max-width:760px){.legacy-ui .lop-target-table{min-width:0}.legacy-ui .lf-search{flex-direction:column;align-items:stretch}.legacy-ui .lf-search label{flex:auto}.legacy-ui form[enctype="multipart/form-data"]>.dbt-button{width:100%}}
+
+.legacy-ui .dbt-table-scroll:has(tbody:empty){display:none}
+@media(max-width:760px){
+ .legacy-ui .lop-precision-table{min-width:0}
+ .legacy-ui .lop-precision-table td:first-child{display:flex;text-align:right;padding-bottom:7px!important;border-bottom:0;margin-bottom:0}
+ .legacy-ui .lop-precision-table td:first-child::before,.legacy-ui .lop-precision-table td:last-child::before{display:block}
+ .legacy-ui .lop-precision-table td:last-child{padding-top:7px!important}
+}

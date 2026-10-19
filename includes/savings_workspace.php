@@ -1,6 +1,7 @@
 <?php
 require_once __DIR__.'/account_letter_ui.php';
 require_once __DIR__.'/legacy_full_read.php';
+require_once __DIR__.'/migrated_history.php';
 
 function savings_e($value): string { return htmlspecialchars((string)$value, ENT_QUOTES, 'UTF-8'); }
 function savings_money($value): string { $v=round((float)$value,2);return 'Rp '.number_format($v,$v===floor($v)?0:2,',','.'); }
@@ -42,7 +43,7 @@ function savings_enrich_rows(mysqli $db, array $rows): array {
         $proof=$evidence[(int)$row['unit_id'].'|'.$row['jenis'].'|'.$row['id']]??null;
         $owner=$proof ? ((int)$proof['n']===1?(int)$proof['actor']:0) : (preg_match('/^[1-9][0-9]*$/D',(string)$row['user_id'])?(int)$row['user_id']:0);
         $account=$accounts[$owner]??$historical[$owner]??null;
-        if((int)$row['id']<0){$row['owner_id']=0;$row['operator_name']=$row['user_id'];$row['operator_username']='';$row['operator_role']='Legacy';$row['can_print']=true;$row['reference']='Legacy ? '.abs((int)$row['id']);$row['receipt_url']='cetak_buku.php?'.http_build_query(['nis'=>$row['NO_INDUK'],'unit_id'=>$row['unit_id']]);continue;}
+        if((int)$row['id']<0){$row['owner_id']=0;$row['operator_name']=$row['user_id'];$row['operator_username']='';$row['operator_role']=($row['origin']??'')==='new'?'SistemSPP':'Legacy';$row['can_print']=true;$row['reference']='Legacy / '.abs((int)$row['id']);$row['receipt_url']='cetak_buku.php?'.http_build_query(!empty($row['legacy_owner_id'])&&empty($row['student_id'])?['owner_id'=>$row['legacy_owner_id'],'unit_id'=>$row['unit_id']]:['nis'=>$row['NO_INDUK'],'student_id'=>$row['student_id']??0,'unit_id'=>$row['unit_id']]);continue;}
         $row['owner_id']=$owner;
         $row['operator_name']=$account['nama']??($owner>0?'Operator #'.$owner:'Tidak tercatat');
         $row['operator_username']=$account['username']??'';
@@ -56,9 +57,9 @@ function savings_enrich_rows(mysqli $db, array $rows): array {
 
 function savings_transaction(mysqli $db, string $kind, int $id): ?array {
     if (!in_array($kind,['masuk','keluar'],true) || $id===0) throw new InvalidArgumentException('Identitas transaksi tabungan tidak valid.');
-    $table=lful_savings_source($db,$kind==='masuk'?'transaksi_m':'transaksi_k');
-    $s=$db->prepare("SELECT t.id,t.unit_id,t.NO_INDUK,t.TANGGAL,t.MASUK nominal,t.KELUAR keluar,t.user_id,t.keterangan,s.id student_id,s.NAMA,s.KELAS,s.NO_induk_diknas,mk.jenis AS rombel_jenis,mk.nama_custom AS rombel_nama,mk.tingkat,mk.kode_rombel,mk.is_placeholder FROM $table t LEFT JOIN siswa s ON s.NO_INDUK=t.NO_INDUK AND s.unit_id=t.unit_id LEFT JOIN master_kelas mk ON mk.id=s.master_kelas_id AND mk.unit_id=s.unit_id WHERE t.id=?");
-    $s->bind_param('i',$id);$s->execute();$row=$s->get_result()->fetch_assoc();$s->close();
+    $table=mh_savings_source($db);
+    $s=$db->prepare("SELECT * FROM $table t WHERE t.id=? AND t.jenis=?");
+    $s->bind_param('is',$id,$kind);$s->execute();$row=$s->get_result()->fetch_assoc();$s->close();
     if (!$row) {
         require_once __DIR__.'/savings_authorization.php';
         if(!savings_authorization_ready($db))return null;
@@ -74,17 +75,17 @@ function savings_transaction(mysqli $db, string $kind, int $id): ?array {
 }
 
 function savings_detail_html(array $row): string {
-    if(empty($row['student_id'])&&isset($GLOBALS['koneksi'])){$s=$GLOBALS['koneksi']->prepare('SELECT id FROM siswa WHERE NO_INDUK=? AND unit_id=?');$s->bind_param('si',$row['NO_INDUK'],$row['unit_id']);$s->execute();$row['student_id']=$s->get_result()->fetch_row()[0]??0;$s->close();}
+    if(empty($row['legacy_owner_id'])&&empty($row['student_id'])&&isset($GLOBALS['koneksi'])){$s=$GLOBALS['koneksi']->prepare('SELECT id FROM siswa WHERE NO_INDUK=? AND unit_id=?');$s->bind_param('si',$row['NO_INDUK'],$row['unit_id']);$s->execute();$row['student_id']=$s->get_result()->fetch_row()[0]??0;$s->close();}
     $incoming=$row['jenis']==='masuk';
     ob_start(); ?>
-    <header class="sw-card-head"><div><?= savings_icon('document') ?><div><h3>Detail Transaksi</h3><small>Informasi lengkap transaksi tabungan.</small></div></div><span class="sw-status <?= $incoming?'is-in':'is-out' ?>"><?= savings_icon($incoming?'up':'down') ?> Tabungan <?= $incoming?'Masuk':'Keluar' ?></span></header>
+    <header class="sw-card-head"><div><?= savings_icon('document') ?><div><h3>Detail Transaksi</h3><small>Informasi lengkap transaksi tabungan.</small></div></div><span class="sw-status <?= $incoming?'is-in':'is-out' ?>"><?= savings_icon($incoming?'up':'down') ?> <?= ($row['origin']??'')==='adjustment'?'Penyesuaian Saldo Migrasi':'Tabungan '.($incoming?'Masuk':'Keluar') ?></span></header>
     <div class="sw-detail-body">
-      <div class="sw-identity"><div><small>Nomor Induk</small><strong class="sw-accent"><?= savings_e($row['NO_INDUK']) ?></strong></div><div><small>Nama Siswa</small><strong><?= savings_e($row['NAMA']??'Tidak tercatat') ?></strong></div><div><small>NIS Diknas</small><span><?= savings_e($row['NO_induk_diknas']??'—') ?></span></div><div><small>Kelas / Unit</small><span class="sw-class"><?= savings_e($row['kelas_label']??$row['KELAS']??'—') ?> · <?= savings_e(unit_label((int)$row['unit_id'])) ?></span></div></div>
+      <div class="sw-identity"><div><small>Nomor Induk</small><strong class="sw-accent"><?= savings_e($row['NO_INDUK']) ?></strong></div><div><small><?= empty($row['student_id'])?'Pemilik rekening':'Nama Siswa' ?></small><strong><?= savings_e($row['NAMA']??'Tidak tercatat') ?></strong></div><div><small>NIS Diknas</small><span><?= savings_e($row['NO_induk_diknas']??'—') ?></span></div><div><small>Kelas / Unit</small><span class="sw-class"><?= savings_e($row['kelas_label']??$row['KELAS']??'—') ?> · <?= savings_e(unit_label((int)$row['unit_id'])) ?></span></div></div>
       <dl class="sw-detail-grid"><div><dt><?= savings_icon('calendar') ?>Tanggal Transaksi</dt><dd><?= savings_e(spp_date_label($row['TANGGAL'],true)) ?></dd></div><div><dt><?= savings_icon('user') ?>Operator</dt><dd><?= savings_e($row['operator_name']) ?><?php if($row['operator_username']): ?><small>@<?= savings_e($row['operator_username']) ?> · <?= savings_e($row['operator_role']) ?></small><?php endif; ?></dd></div><div><dt><?= savings_icon('up') ?>Jumlah Masuk</dt><dd class="sw-accent"><?= savings_money($row['nominal']) ?></dd></div><div><dt><?= savings_icon('down') ?>Jumlah Keluar</dt><dd class="sw-out"><?= savings_money($row['keluar']) ?></dd></div><div><dt><?= savings_icon('document') ?>Referensi Transaksi</dt><dd><?= savings_e($row['reference']) ?></dd></div><div><dt><?= savings_icon('check') ?>Status</dt><dd><?= !empty($row['deleted'])?'Arsip (dihapus)':'Tersimpan' ?></dd></div></dl>
-      <div class="sw-note"><strong>Keterangan</strong><p><?= nl2br(savings_e($row['keterangan']?:'—')) ?></p></div>
+      <?php if(($row['origin']??'')==='adjustment'): ?><p class="sw-note">Penyesuaian Saldo Migrasi: <?= savings_money($row['adjustment_delta']) ?>. Bukan setoran atau penarikan kas.</p><?php endif; ?><div class="sw-note"><strong>Keterangan</strong><p><?= nl2br(savings_e($row['keterangan']?:'—')) ?></p></div>
       <div class="sw-detail-print-actions"><?php if ($row['can_print']): ?><a class="btn btn-primary" href="<?= savings_e($row['receipt_url']) ?>" target="_blank" rel="noopener"><?= savings_icon('print') ?>Cetak Buku Tabungan</a><?php elseif(!empty($row['deleted'])): ?><p class="sw-lock">Transaksi diarsipkan. Bukti transaksi aktif tidak tersedia.</p><?php else: ?><p class="sw-lock"><?= savings_icon('lock') ?>Cetak terkunci. <?= savings_e($row['owner_id']?'Transaksi milik '.$row['operator_name'].'.':'Pemilik tidak tercatat.') ?> Anda tetap dapat melihat detailnya.</p><?php endif; ?>
-      <a class="btn btn-ghost" href="cetak_buku.php?<?= savings_e(http_build_query(['nis'=>$row['NO_INDUK'],'student_id'=>$row['student_id']??0])) ?>" target="_blank" rel="noopener"><?= savings_icon('document') ?>Cetak Buku Tabungan</a></div>
-      <?php require_once __DIR__.'/savings_correction_ui.php';savings_correction_controls($GLOBALS['koneksi'],$row); ?>
+      <a class="btn btn-ghost" href="cetak_buku.php?<?= savings_e(http_build_query((!empty($row['legacy_owner_id'])&&empty($row['student_id'])?['owner_id'=>$row['legacy_owner_id']]:['nis'=>$row['NO_INDUK'],'student_id'=>$row['student_id']??0]))) ?>" target="_blank" rel="noopener"><?= savings_icon('document') ?>Cetak Buku Tabungan</a></div>
+      <?php if((int)$row['id']<-1000000000){if(unit_is_super()&&!unit_all_readonly()){$jid=-1000000000-(int)$row['id'];$return=mh_return_create('tabungan/riwayat.php',array_replace($_GET,['id'=>$row['id'],'jenis'=>$row['jenis']]),(int)$row['unit_id'],'journal',$jid);echo '<a class="btn btn-ghost" href="../legacy_correction.php?kind=journal&amp;id='.$jid.'&amp;hr='.$return.'">Koreksi Jurnal Legacy</a>';};}elseif((int)$row['id']>0&&is_file(__DIR__.'/savings_correction_ui.php')){require_once __DIR__.'/savings_correction_ui.php';savings_correction_controls($GLOBALS['koneksi'],$row);} ?>
     </div>
     <?php return (string)ob_get_clean();
 }

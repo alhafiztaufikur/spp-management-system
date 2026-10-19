@@ -1,6 +1,6 @@
 <?php
 $fields=['x_top'=>'Kiri halaman atas','y_top'=>'Awal tabel atas','x_bottom'=>'Kiri halaman bawah','y_bottom'=>'Awal baris bawah','header'=>'Tinggi kepala tabel','row_height'=>'Tinggi baris','rows_top'=>'Baris halaman atas','rows_bottom'=>'Baris halaman bawah','text_offset'=>'Posisi teks dari atas baris','w_no'=>'Lebar No','w_date'=>'Lebar Tanggal','w_in'=>'Lebar Masuk','w_out'=>'Lebar Keluar','w_balance'=>'Lebar Jumlah','w_sign'=>'Lebar Paraf'];
-$guideUrl='cetak_buku.php?'.http_build_query(['nis'=>$nis,'student_id'=>(int)$student['id'],'output'=>'guide']+$settings);
+$guideUrl='cetak_buku.php?'.http_build_query((!empty($student['owner_id'])?['owner_id'=>$student['owner_id'],'output'=>'guide']:['nis'=>$nis,'student_id'=>(int)$student['id'],'output'=>'guide'])+$settings);
 header('Content-Type: text/html; charset=UTF-8');
 ?>
 <!doctype html><html lang="id" data-palette="<?= book_escape(unit_palette_for_view((int)$student['unit_id'])) ?>"><head>
@@ -8,10 +8,10 @@ header('Content-Type: text/html; charset=UTF-8');
 <link rel="stylesheet" href="../assets/css/style.css"><link rel="stylesheet" href="../assets/css/savings_book_print.css?v=<?= filemtime(__DIR__.'/../assets/css/savings_book_print.css') ?>">
 <script>try{document.documentElement.dataset.theme=localStorage.getItem('spp_theme')||'light'}catch(e){}</script></head><body>
 <main class="book-workspace" data-book-print data-storage-key="spp_plq20_layout_<?= (int)$student['unit_id'] ?>">
-<header class="book-heading"><div><span class="book-eyebrow">EPSON PLQ-20 ESC/P2</span><h1>Cetak Buku Tabungan</h1><p><?= book_escape($student['NAMA']) ?> · NIS <?= book_escape($nis) ?> · <?= book_escape($student['kelas_label']??$student['KELAS']) ?> · <?= count($book['entries']) ?> transaksi</p><p>Saldo akhir <strong>Rp <?= book_escape(savings_book_money($book['balance'])) ?></strong></p></div><a class="book-button secondary" href="<?= book_escape($backUrl) ?>"><?= book_escape($backLabel) ?></a></header>
+<header class="book-heading"><div><span class="book-eyebrow">EPSON PLQ-20 ESC/P2</span><h1>Cetak Buku Tabungan</h1><p><?= book_escape($student['NAMA']) ?> · <?= !empty($student['owner_id'])?'Identitas sumber':'NIS' ?> <?= book_escape($nis) ?> · <?= book_escape($student['kelas_label']??$student['KELAS']) ?> · <?= count($book['entries']) ?> transaksi</p><p>Saldo akhir <strong>Rp <?= book_escape(savings_book_money($book['balance'])) ?></strong></p></div><a class="book-button secondary" href="<?= book_escape($backUrl) ?>"><?= book_escape($backLabel) ?></a></header>
 <section class="book-instructions"><strong>Cetak isi ke buku yang sudah bergaris</strong><p>Passbook <b>On</b> · Binding <b>Horizontal</b> · A5 potret <b>148 × 210 mm</b> · Skala <b>100% / Actual size</b>. Garis panduan pada preview tidak ikut tercetak. Cocokkan posisi dengan Cetak Uji Kalibrasi sebelum memakai buku.</p></section>
 <form method="get" action="cetak_buku.php" data-book-form>
-<input type="hidden" name="nis" value="<?= book_escape($nis) ?>"><input type="hidden" name="student_id" value="<?= (int)$student['id'] ?>">
+<?php if(!empty($student['owner_id'])): ?><input type="hidden" name="owner_id" value="<?= (int)$student['owner_id'] ?>"><?php else: ?><input type="hidden" name="nis" value="<?= book_escape($nis) ?>"><input type="hidden" name="student_id" value="<?= (int)$student['id'] ?>"><?php endif; ?>
 <section class="book-card"><h2>Transaksi dan posisi awal</h2><div class="book-fields">
 <label>Transaksi pertama<input type="number" name="entry_from" min="<?= $book['entries']?1:0 ?>" max="<?= count($book['entries']) ?>" value="<?= $settings['entry_from'] ?>" required></label>
 <label>Transaksi terakhir<input type="number" name="entry_to" min="<?= $book['entries']?1:0 ?>" max="<?= count($book['entries']) ?>" value="<?= $settings['entry_to'] ?>" required></label>

@@ -20,7 +20,7 @@ function database_access_release($handle): void {
 }
 function database_access_http(string $database,int $port): void {
     $paths=database_access_paths($database,$port);
-    $blocked=static function(): never {http_response_code(503);header('Retry-After: 10');exit('SistemSPP sedang memulihkan database. Silakan coba kembali setelah selesai.');};
+    $blocked=static function()use($paths): never {require_once __DIR__.'/database_access_wait.php';database_access_wait_response(is_file($paths['maintenance']));};
     if(is_file($paths['maintenance']))$blocked();
     try{$lock=database_access_lock($paths,LOCK_SH|LOCK_NB);}catch(Throwable $e){$blocked();}
     if(!$lock)$blocked();

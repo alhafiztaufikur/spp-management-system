@@ -25,16 +25,17 @@ function rombel_schema_apply(mysqli $db): void {
         $db->query("DROP TRIGGER `$name`");$db->query($sql);
     }
     // Labels are snapshots, not codes. Long custom names must survive every output.
-    $columns=$db->query("SELECT TABLE_NAME,COLUMN_NAME,IS_NULLABLE FROM information_schema.COLUMNS WHERE TABLE_SCHEMA=DATABASE() AND TABLE_NAME LIKE '%\\_data' AND COLUMN_NAME IN ('kelas_rombel_snapshot','riwayat_kelas_snapshot')")->fetch_all(MYSQLI_ASSOC);
+    $columns=$db->query("SELECT TABLE_NAME,COLUMN_NAME,IS_NULLABLE,COLUMN_DEFAULT FROM information_schema.COLUMNS WHERE TABLE_SCHEMA=DATABASE() AND TABLE_NAME LIKE '%\\_data' AND COLUMN_NAME IN ('kelas_rombel_snapshot','riwayat_kelas_snapshot')")->fetch_all(MYSQLI_ASSOC);
     $views=['master_kelas','bayar_biaya_lain'];
     foreach ($columns as $column) {
         $table=$column['TABLE_NAME'];$name=$column['COLUMN_NAME'];$nullable=$column['IS_NULLABLE']==='YES'?'NULL':'NOT NULL';
-        $db->query("ALTER TABLE `$table` MODIFY `$name` VARCHAR(100) $nullable");$views[]=substr($table,0,-5);
+        $default=$column['COLUMN_DEFAULT']!==null?" DEFAULT '".$db->real_escape_string($column['COLUMN_DEFAULT'])."'":($column['IS_NULLABLE']==='YES'?' DEFAULT NULL':'');
+        $db->query("ALTER TABLE `$table` MODIFY `$name` VARCHAR(100) $nullable$default");$views[]=substr($table,0,-5);
     }
     foreach (array_unique($views) as $view) $db->query("CREATE OR REPLACE VIEW `$view` AS SELECT * FROM `{$view}_data` WHERE current_unit_id()=0 OR unit_id=current_unit_id() WITH CASCADED CHECK OPTION");
     for ($unit=1;$unit<=3;$unit++) {
         $db->query('SET @app_unit_id='.$unit);
-        $db->query("UPDATE master_kelas SET jenis='psb' WHERE tingkat=0 AND kode_rombel='PSB' AND jenis='reguler'");
+        $db->query("UPDATE master_kelas SET jenis='psb',updated_at=updated_at WHERE tingkat=0 AND kode_rombel='PSB' AND jenis='reguler'");
         $db->query("INSERT INTO master_kelas(tingkat,kode_rombel,jenis,nama_custom,is_active) SELECT NULL,'OUT','out','Out',1 WHERE NOT EXISTS(SELECT 1 FROM master_kelas WHERE jenis='out')");
     }
     if (!$db->query("SELECT 1 FROM information_schema.STATISTICS WHERE TABLE_SCHEMA=DATABASE() AND TABLE_NAME='master_kelas_data' AND INDEX_NAME='uk_rombel_custom_name'")->num_rows) {

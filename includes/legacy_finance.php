@@ -48,11 +48,14 @@ function lf_require_schema(mysqli $db): void { if(!legacy_finance_ready($db)) th
 
 /** Exact reconciliation of one original NIS, independent from target account/cache. */
 function lf_reconcile(array $records, ?string $snapshotDate=null): array {
-    $accounts=[];$in=0;$out=0;$journals=0;$issues=[];$dates=[];
+    $accounts=[];$accountRaw=[];$accountIssues=[];$journalIssues=[];$in=0;$out=0;$journals=0;$issues=[];$dates=[];
     foreach($records as $record){
         $raw=$record['raw']??json_decode($record['raw_data'],true,512,JSON_THROW_ON_ERROR);$table=$record['table']??$record['source_table'];
         try {
-            if($table==='tabungan') $accounts[]=lf_cents($raw['SALDO']??null);
+            if($table==='tabungan') {
+                $accountRaw[]=$raw['SALDO']??null;$accounts[]=null;
+                try{$accounts[array_key_last($accounts)]=lf_cents($raw['SALDO']??null);}catch(DomainException $e){$accountIssues[]=$e->getMessage();}
+            }
             if(in_array($table,['transaksi_m','transaksi_k'],true)){
                 // Audited journals leave the opposite-direction column NULL; the primary amount may never be NULL.
                 $m=lf_cents($raw['MASUK']??($table==='transaksi_k'?'0':null));$k=lf_cents($raw['KELUAR']??($table==='transaksi_m'?'0':null));
@@ -67,12 +70,13 @@ function lf_reconcile(array $records, ?string $snapshotDate=null): array {
             }
         }catch(DomainException $e){$issues[]=$e->getMessage();}
     }
+    $journalIssues=$issues;$issues=array_merge($accountIssues,$journalIssues);
     if(count($accounts)!==1)$issues[]='Rekening sumber tidak unik atau tidak tersedia.';
     if(!$journals)$issues[]='Jurnal sumber tidak lengkap.';
     $balance=count($accounts)===1?$accounts[0]:null;
     if($balance!==null && $balance!==$in-$out)$issues[]='Saldo sumber berbeda dengan jumlah jurnal.';
     sort($dates,SORT_STRING);
-    return ['ready'=>!$issues,'balance'=>$balance===null?null:lf_money($balance),'incoming'=>lf_money($in),'outgoing'=>lf_money($out),'accounts'=>count($accounts),'journals'=>$journals,'last_source_date'=>$dates?end($dates):null,'issues'=>array_values(array_unique($issues))];
+    return ['ready'=>!$issues,'balance'=>$balance===null?null:lf_money($balance),'source_balance_raw'=>count($accountRaw)===1?$accountRaw[0]:null,'account_issues'=>array_values(array_unique($accountIssues)),'journal_issues'=>array_values(array_unique($journalIssues)),'incoming'=>lf_money($in),'outgoing'=>lf_money($out),'accounts'=>count($accounts),'journals'=>$journals,'last_source_date'=>$dates?end($dates):null,'issues'=>array_values(array_unique($issues))];
 }
 function lf_extract_manifest(array $job): array {
     $dir=legacy_root().'/'.$job['id'];

@@ -6,6 +6,7 @@ require_once 'includes/kelas.php';
 require_once 'includes/pagination.php';
 require_once __DIR__.'/includes/filter_choices.php';
 require_once __DIR__.'/includes/psb_placement.php';
+require_once __DIR__.'/includes/special_classes_http.php';
 require_once __DIR__.'/includes/promotion_participants_ui.php';
 requireRole(['admin', 'kasir']);
 [$unitMinLevel,$unitMaxLevel]=unit_level_bounds();
@@ -14,6 +15,8 @@ $promotionMode=is_string($modeInput)?$modeInput:'invalid';
 $customPromotion=$promotionMode==='custom';
 
 if (empty($_SESSION['csrf_master_kelas'])) $_SESSION['csrf_master_kelas'] = bin2hex(random_bytes(32));
+
+special_classes_handle($koneksi);
 
 function class_master_redirect(): void {
     $query=[];
@@ -68,20 +71,6 @@ if ($_SERVER['REQUEST_METHOD'] === 'POST') {
         } elseif ($action === 'aktifkan_semua_rombel') {
             $affected = class_enable_all_rombel($koneksi);
             $message = $affected > 0 ? $affected . ' rombel berhasil diaktifkan kembali.' : 'Seluruh rombel sudah aktif.';
-        } elseif (in_array($action,['tambah_custom','update_custom'],true)) {
-            $name=trim((string)($_POST['nama_custom']??''));
-            if($name===''||mb_strlen($name)>100)throw new RuntimeException('Nama rombel custom wajib diisi, maksimal 100 karakter.');
-            if(in_array(mb_strtolower($name),['psb','out'],true))throw new RuntimeException('Nama tersebut dikelola sistem.');
-            $check=$koneksi->prepare('SELECT id FROM master_kelas WHERE nama_custom=? AND id<>? LIMIT 1');$check->bind_param('si',$name,$id);$check->execute();$duplicate=$check->get_result()->num_rows;$check->close();
-            if($duplicate)throw new RuntimeException('Nama rombel custom sudah tersedia pada unit ini.');
-            if($action==='update_custom'){
-                $class=class_find($koneksi,$id);if(!$class||class_kind($class)!=='custom')throw new RuntimeException('Rombel custom tidak ditemukan.');
-                $stmt=$koneksi->prepare('UPDATE master_kelas SET nama_custom=? WHERE id=?');$stmt->bind_param('si',$name,$id);
-            }else{
-                $code='C'.strtoupper(bin2hex(random_bytes(4)));
-                $stmt=$koneksi->prepare("INSERT INTO master_kelas(tingkat,kode_rombel,jenis,nama_custom,is_placeholder,is_active) VALUES(NULL,?,'custom',?,0,1)");$stmt->bind_param('ss',$code,$name);
-            }
-            $stmt->execute();$stmt->close();$message='Rombel custom berhasil disimpan.';
         } elseif (in_array($action, ['tambah', 'update'], true)) {
             $level = (int)($_POST['tingkat'] ?? 0);
             $code = strtoupper(trim((string)($_POST['kode_rombel'] ?? '')));
@@ -200,9 +189,9 @@ foreach ($promotionTargets as $target) {
 $classes = $koneksi->query("SELECT mk.*,
     (SELECT COUNT(*) FROM siswa s WHERE s.master_kelas_id = mk.id AND s.is_active=1) AS siswa_count,
     (SELECT COUNT(*) FROM siswa_tahun_ajaran sta WHERE sta.master_kelas_id = mk.id) AS history_count
-    FROM master_kelas mk ORDER BY CASE WHEN mk.jenis='out' THEN 0 WHEN mk.jenis='psb' THEN 1 WHEN mk.jenis='custom' THEN 3 ELSE 2 END, mk.tingkat, mk.is_placeholder, mk.kode_rombel")->fetch_all(MYSQLI_ASSOC);
+    FROM master_kelas mk WHERE mk.jenis NOT IN ('custom','out') AND NOT(mk.tingkat=0 AND UPPER(mk.kode_rombel) REGEXP '^ALUMNI20[0-9]{2}$') ORDER BY CASE WHEN mk.jenis='out' THEN 0 WHEN mk.jenis='psb' THEN 1 WHEN mk.jenis='custom' THEN 3 ELSE 2 END, mk.tingkat, mk.is_placeholder, mk.kode_rombel")->fetch_all(MYSQLI_ASSOC);
 $classSearch = trim((string)($_GET['q_kelas'] ?? ''));
-$levelOptions=['out'=>'Out','psb'=>'PSB','custom'=>'Custom','alumni'=>'Alumni'];foreach(range($unitMinLevel,$unitMaxLevel) as $level)$levelOptions[(string)$level]='Kelas '.$level;
+$levelOptions=['psb'=>'PSB'];foreach(range($unitMinLevel,$unitMaxLevel) as $level)$levelOptions[(string)$level]='Kelas '.$level;
 $classLevels=filter_register('tingkat_kelas',$_GET['tingkat_kelas']??null,$levelOptions);
 $classStatuses=filter_register('status_kelas',$_GET['status_kelas']??null,['aktif'=>'Aktif','nonaktif'=>'Nonaktif','placeholder'=>'Placeholder']);
 $classLevelFilter=filter_scalar($classLevels);$classStatusFilter=filter_scalar($classStatuses);
@@ -264,6 +253,8 @@ require_once __DIR__.'/includes/master_workspace_ui.php';
   <script>(function(){var t=localStorage.getItem('spp_theme')||'light';document.documentElement.setAttribute('data-theme',t);})();</script>
 <link rel="stylesheet" href="assets/css/promotion_participants.css?v=<?= filemtime(__DIR__.'/assets/css/promotion_participants.css') ?>">
 <link rel="stylesheet" href="assets/css/rombel_payment_refinement.css?v=<?= filemtime(__DIR__.'/assets/css/rombel_payment_refinement.css') ?>">
+<link rel="stylesheet" href="assets/css/legacy_workspace.css?v=<?= filemtime(__DIR__.'/assets/css/legacy_workspace.css') ?>">
+<link rel="stylesheet" href="assets/css/special_classes.css?v=<?= filemtime(__DIR__.'/assets/css/special_classes.css') ?>">
 </head>
 <body data-readable-workspace="master-classes">
 <div class="bg-orbs"><div class="orb orb-1"></div><div class="orb orb-2"></div><div class="orb orb-3"></div></div>
@@ -290,8 +281,9 @@ require_once __DIR__.'/includes/master_workspace_ui.php';
       <div class="class-stat"><span class="class-workspace-icon"><?= master_workspace_icon('students') ?></span><div><span>Siswa Aktif</span><strong><?= number_format(array_sum(array_map(fn($row)=>in_array(class_kind($row),['reguler','psb'],true)?(int)$row['siswa_count']:0, $classes))) ?></strong><small>Total siswa aktif dalam rombel.</small></div></div>
       <div class="class-stat"><span class="class-workspace-icon"><?= master_workspace_icon('calendar') ?></span><div><span>Histori</span><strong><?= number_format(array_sum(array_map(fn($row)=>(int)$row['history_count'], $classes))) ?></strong><small>Seluruh catatan penempatan siswa.</small></div></div>
       <div class="class-stat"><span class="class-workspace-icon"><?= master_workspace_icon('document') ?></span><div><span>Rombel Aktif / Nonaktif</span><strong><span><?= number_format(count(array_filter($classes, static fn($row)=>(int)$row['is_active']===1))) ?></span><span class="class-stat-divider"> / </span><span><?= number_format(count(array_filter($classes, static fn($row)=>(int)$row['is_active']===0))) ?></span></strong><small>Termasuk placeholder yang dikelola sistem.</small></div></div>
-      <?php if (!unit_all_readonly()): ?><a class="class-add-shortcut" href="#class-rombel-form" data-open-class-form><span class="class-shortcut-icon" aria-hidden="true"><?= master_workspace_icon('plus') ?></span><div><strong>Tambah Rombel</strong><small>Buat rombel baru untuk kelas pada unit ini.</small></div><span aria-hidden="true">&#8594;</span></a><?php endif; ?>
+      <?php if (!unit_all_readonly()): ?><div class="class-create-actions"><a class="class-add-shortcut" href="#class-rombel-form" data-open-class-form><span class="class-shortcut-icon" aria-hidden="true"><?= master_workspace_icon('plus') ?></span><div><strong>Tambah Rombel</strong><small>Buat rombel baru untuk kelas pada unit ini.</small></div><span aria-hidden="true">&#8594;</span></a><a class="btn btn-primary" href="master_kelas.php?special_new=1#special-classes"><?= master_workspace_icon('plus') ?> Tambah Kelas Khusus</a></div><?php endif; ?>
     </section>
+
     <section id="kelola-rombel" data-class-panel="manage" aria-label="Kelola rombel">
     <?php if (!unit_all_readonly()): ?>
     <details class="main-card master-modern-card master-modern-form class-add-panel" id="class-rombel-form" open><summary class="class-form-summary"><?= $editClass ? 'Edit Rombel' : 'Tambah Rombel' ?></summary><div class="class-form-content"><?php if ($classEditError): ?><div class="alert alert-warning"><?= htmlspecialchars($classEditError) ?></div><?php endif; ?>
@@ -306,15 +298,6 @@ require_once __DIR__.'/includes/master_workspace_ui.php';
     </div></details>
     <?php endif; ?>
       <div class="class-manage-grid">
-    <?php if(!unit_all_readonly()): ?>
-    <section class="main-card master-modern-card class-custom-panel">
-      <div class="card-title-row"><span class="class-workspace-icon"><?= master_workspace_icon('plus') ?></span><div><h2><?= $customEdit?'Edit':'Tambah' ?> Rombel Custom</h2><p>Nama bebas tanpa tingkat, untuk tabungan dan kebutuhan nonakademik.</p></div></div>
-      <form method="post" class="class-custom-form">
-        <input type="hidden" name="csrf_token" value="<?= htmlspecialchars($_SESSION['csrf_master_kelas']) ?>"><input type="hidden" name="aksi" value="<?= $customEdit?'update_custom':'tambah_custom' ?>"><input type="hidden" name="id" value="<?= (int)($customEdit['id']??0) ?>">
-        <label class="field-row"><span class="field-label">Nama Rombel Custom</span><input class="field-input" name="nama_custom" maxlength="100" required placeholder="Contoh: Tabungan Guru" value="<?= htmlspecialchars($customEdit['nama_custom']??'') ?>"></label><button type="submit" class="btn btn-primary"><?= master_workspace_icon('plus') ?> Simpan Rombel Custom</button>
-      </form>
-    </section>
-    <?php endif; ?>
     <section class="main-card master-modern-card master-modern-list class-list-panel" data-rombel-view="groups">
       <div class="card-title-row class-list-heading"><span class="class-workspace-icon"><?= master_workspace_icon('layers') ?></span><div><div class="card-title">Daftar Rombel per Kelas</div></div><span class="class-group-total"><?= number_format($classTotalRows) ?> rombel hasil filter</span></div>
       <div class="class-view-switch" hidden role="group" aria-label="Tampilan daftar rombel"><button type="button" data-class-view="groups" aria-pressed="true">Per Kelas</button><button type="button" data-class-view="cards" aria-pressed="false">Kartu</button><button type="button" data-class-view="table" aria-pressed="false">Tabel</button></div>
@@ -518,8 +501,9 @@ require_once __DIR__.'/includes/master_workspace_ui.php';
       <?php participants_held($promotionHeld,$participantsModel); ?>
     </div>
     </section>
-    </div>
+    <?php require __DIR__.'/includes/special_classes_view.php'; ?>
     <?php require __DIR__.'/includes/legacy_operational_groups_view.php'; ?>
+    </div>
   </main>
 </div>
 <script src="assets/js/date_format.js?v=<?= filemtime(__DIR__ . '/assets/js/date_format.js') ?>"></script>
@@ -527,4 +511,5 @@ require_once __DIR__.'/includes/master_workspace_ui.php';
   <script src="assets/js/app.js?v=<?= filemtime(__DIR__ . '/assets/js/app.js') ?>"></script><script>document.addEventListener('DOMContentLoaded',function(){autoHideFlash();});</script>
 <script src="assets/js/master_kelas.js?v=<?= filemtime(__DIR__ . '/assets/js/master_kelas.js') ?>"></script>
 <script src="assets/js/promotion_participants.js?v=<?= filemtime(__DIR__.'/assets/js/promotion_participants.js') ?>"></script>
+<script src="assets/js/special_classes.js?v=<?= filemtime(__DIR__.'/assets/js/special_classes.js') ?>"></script>
 </body></html>

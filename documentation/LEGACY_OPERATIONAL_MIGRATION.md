@@ -1,5 +1,11 @@
 # Migrasi Legacy menjadi data kerja
 
+## Membaca hasil migrasi yang sudah selesai
+
+Buka Riwayat Pembayaran dan pilih **Semua Periode** untuk seluruh histori, atau **Histori Legacy tanpa tanggal** untuk catatan tanpa tanggal saja. Bulan berjalan tetap menjadi tampilan awal. Gunakan filter sumber/pemilik dan tautan Rincian untuk transaksi Legacy; Data Siswa menyediakan tautan pembayaran serta jurnal tabungan secara terpisah. Rekening non-siswa dibuka melalui ID pemilik, bukan NIS buatan.
+
+**Excel - Semua Hasil** mengekspor seluruh cakupan filter; **Cetak Halaman Ini** menghasilkan PDF halaman aktif. Saldo peralihan dan penyesuaian tidak menjadi kas masuk baru. [Rincian perubahan, bukti pemasangan lab, pengujian dan batasnya](LEGACY_READBACK_20261020.md).
+
 **Finalisasi:** setelah simulasi siap, gunakan **Finalisasi Migrasi → Mulai Migrasi Sekarang** pada kartu dekat ringkasan. Data baru menjadi operasional setelah penerapan dan verifikasi selesai. [Urutan layar dan perbaikan memori](LEGACY_FINALIZATION_20261019.md).
 
 **Pembaruan penyelesaian otomatis:** [Aturan saldo sumber, presisi, rekening tambahan, jurnal nol dan referensi terpisah](LEGACY_SYSTEM_RESOLUTION_20261019.md). Catatan tanpa pemilik yang lebih baru tetap berada di daftar terpisah dan tidak menjadi histori sebelum 2020.
@@ -103,3 +109,17 @@ Contoh: jurnal bersih Rp800, saldo sumber Rp1.000, saldo FIX Rp900. Buku menampi
 Pengesahan FIX hanya menyelesaikan selisih nominal. Rekening ganda/identitas ambigu, tanggal atau nominal jurnal yang tidak valid tidak otomatis digabung atau dihapus. Bagian valid tetap dapat diterapkan; data tertahan dilanjutkan pada batch yang sama. Perubahan draf membatalkan simulasi dan konfirmasi terdahulu.
 
 Hasil pengujian pembaruan ini dicatat pada [QA peninjauan 19 Oktober](LEGACY_REVIEW_QA_20261019.md).
+
+
+## Saldo FIX untuk presisi sumber lebih dari dua desimal — 19 Oktober 2026
+
+Jika rekening sumber tunggal tetapi SALDO atau jurnal memakai lebih dari dua desimal, **Periksa Saldo FIX** dapat menawarkan koreksi presisi jurnal ke dua desimal. Konfirmasi menampilkan nominal mentah, nominal operasional yang diusulkan, saldo FIX dan penyesuaian. Koreksi tidak terjadi pada tahap pratinjau: pilih **Sahkan Saldo FIX** untuk menyimpan jurnal dan FIX bersama; simulasi otomatis menyusul. Kembali Mengubah maupun validasi gagal mempertahankan isian dan checkbox.
+
+Pengesahan hanya berlaku pada sumber dan versi draf yang diperiksa. Rekening ganda, identitas ambigu, tanggal/arah/nominal jurnal lain yang tidak valid tetap diperiksa. Parser uang umum tidak berubah. Arsip mentah dan operator/tanggal sumber tetap disimpan; penyesuaian bukan kas baru.
+
+Contoh sumber SMP Rohis Mhi: SALDO `0.13100000005215406`, satu jurnal masuk `0.131`. Setelah koreksi yang disahkan menjadi `0.13`, tujuh jurnal bersih menghasilkan Rp0,13; FIX Rp0 menghasilkan satu penyesuaian −Rp0,13 sebelum peralihan. [Rincian pemasangan dan pengujian](LEGACY_SMP_SALDO_FIX.md).
+
+
+## Saat finalisasi sedang berjalan
+
+Selama penerapan data dan verifikasi backup, aplikasi menampilkan **Finalisasi migrasi sedang berjalan**. Halaman memeriksa ulang setiap 10 detik dan akses terbuka kembali setelah worker selesai; jangan menekan Finalisasi Migrasi berulang. Halaman boleh ditutup, kemudian dibuka kembali. Permintaan POST yang tertahan tidak dikirim ulang otomatis. Setelah status **Migrasi Selesai**, siswa, pembayaran dan tabungan hasil migrasi dapat dibuka di sistem. [Penjelasan dan hasil pemeriksaan SMP](LEGACY_FINALIZATION_WAIT.md).

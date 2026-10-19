@@ -39,6 +39,11 @@ try {
           'komponen'=>$components?implode(', ',$components):'Koreksi','metode'=>$p['sistem_pembayaran'],'operator'=>($creator['actor_name']??'')?:($p['operator_nama']?:'Tidak tercatat'),
           'total'=>'Rp '.number_format((float)$p['total_jumlah'],0,',','.'),'context_year'=>$p['riwayat_tahun_ajaran'],'context_class'=>$p['riwayat_kelas_snapshot']];
     }
+    require_once '../includes/migrated_history.php';
+    $legacy=mh_student_legacy_history($koneksi,$student);
+    if($scope==='all'||$scope==='unknown')$rows=array_merge($rows,$legacy);
+    usort($rows,static fn($a,$b)=>strcmp((string)$b['tanggal_raw'],(string)$a['tanggal_raw'])?:($b['id']<=>$a['id']));
+    foreach($scopes as &$historyScope)if($historyScope['value']==='unknown')$historyScope['label']='Riwayat Lama / Legacy: '.count($legacy).' transaksi Legacy';unset($historyScope);
     echo json_encode(['ok'=>true,'period'=>'History pembayaran '.$student['NAMA'].': '.count($rows).' transaksi · '.($scope==='all'?'Semua Tahun':($scope==='unknown'?'Konteks belum tercatat':'TA '.$year)),
-      'rows'=>$rows,'scopes'=>$scopes,'scope'=>$scope,'active_context'=>$context,'student_id'=>(int)$student['id'],'unit_id'=>(int)$student['unit_id']],JSON_UNESCAPED_UNICODE|JSON_INVALID_UTF8_SUBSTITUTE|JSON_THROW_ON_ERROR);
+      'rows'=>$rows,'scopes'=>$scopes,'scope'=>$scope,'legacy_count'=>count($legacy),'active_context'=>$context,'student_id'=>(int)$student['id'],'unit_id'=>(int)$student['unit_id']],JSON_UNESCAPED_UNICODE|JSON_INVALID_UTF8_SUBSTITUTE|JSON_THROW_ON_ERROR);
 }catch(Throwable $e){error_log('History siswa gagal: '.get_class($e).' code='.(int)$e->getCode().' unit='.unit_active_id());history_fail(503,'history_unavailable','Riwayat pembayaran belum dapat dimuat. Silakan coba lagi.');}

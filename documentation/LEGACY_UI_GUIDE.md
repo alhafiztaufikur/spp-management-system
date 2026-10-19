@@ -1,5 +1,11 @@
 # Menggunakan Import Legacy
 
+## Membaca hasil migrasi yang sudah selesai
+
+Buka Riwayat Pembayaran dan pilih **Semua Periode** untuk seluruh histori, atau **Histori Legacy tanpa tanggal** untuk catatan tanpa tanggal saja. Bulan berjalan tetap menjadi tampilan awal. Gunakan filter sumber/pemilik dan tautan Rincian untuk transaksi Legacy; Data Siswa menyediakan tautan pembayaran serta jurnal tabungan secara terpisah. Rekening non-siswa dibuka melalui ID pemilik, bukan NIS buatan.
+
+**Excel - Semua Hasil** mengekspor seluruh cakupan filter; **Cetak Halaman Ini** menghasilkan PDF halaman aktif. Saldo peralihan dan penyesuaian tidak menjadi kas masuk baru. [Rincian perubahan, bukti pemasangan lab, pengujian dan batasnya](LEGACY_READBACK_20261020.md).
+
 Untuk membawa siswa, transaksi dan rekening menjadi data kerja yang dapat dikoreksi Super Admin, gunakan [panduan Migrasi Operasional](LEGACY_OPERATIONAL_MIGRATION.md). Kartu Migrasi Penuh mengarah ke peninjauan operasional; mode impor siswa dan arsip tetap tersedia.
 
 Buka **Pengaturan → Backup & Restore → Import Legacy**, lalu pilih unit di sidebar. Hanya Super Admin aktif yang dapat mengimpor. **Semua Unit** digunakan untuk membaca hasil.
@@ -87,3 +93,16 @@ Setelah **Periksa Ulang / Simulasi**, lihat **Pembayaran siap ? diperiksa sistem
 Gunakan **Periksa Ulang / Simulasi** dengan worker terbaru. Ringkasan **penyelesaian rekening oleh sistem** menampilkan normalisasi presisi, saldo yang mengikuti backup, dan rekening utama yang disiapkan dari rekening tambahan. Buka dasar pemeriksaan untuk melihat nominal sebelum/sesudah dan alasannya. Saldo FIX yang sebelumnya sudah disimpan tetap dipertahankan.
 
 **Catatan Belum Teridentifikasi**, **Referensi Anomali DU**, dan **Referensi Jurnal Nol** tersedia melalui tautan ringkasan migrasi/halaman catatan. Daftar ini menyimpan sumber apa adanya dan tidak lagi masuk daftar masalah yang menghambat data siap. Catatan tanpa pemilik tetap belum teridentifikasi; penerimaan atau saldo tidak dialihkan kepada seseorang berdasarkan perkiraan.
+
+
+## Kelompok dan rekening setelah migrasi — pembaruan 19 Oktober 2026
+
+Buka **Master Kelas/Rombel → Kelompok dari Legacy**. Bagian ini mengikuti lebar konten Master Kelas. Cari nama/kode kelompok atau pilih jenis kelompok; daftar berisi maksimal **25 kelompok per halaman**. Pada ponsel, setiap kelompok ditampilkan sebagai kartu. Nama tidak diulang; ejaan sumber yang berbeda dapat dibuka melalui **Ejaan sumber**.
+
+Pilih **Lihat Rekening & Transaksi** untuk melihat identitas pada kelompok tersebut. Pencarian rekening dan pagination mempertahankan kelompok yang dipilih. **Kembali ke Kelompok** memulihkan pencarian kelompok sebelumnya. **Lihat Rincian** membuka saldo sumber, saldo peralihan, saldo berjalan, pembayaran, dan jurnal pemilik yang dipilih. Nominal yang tidak tercatat tetap dibedakan dari nol.
+
+Halaman rekening, tarif, koreksi, histori, aktivasi, dan peninjauan migrasi memakai header/navigasi aplikasi, gaya kontrol, jarak, serta warna unit yang sama. Tabel transaksi lebar dapat digeser di dalam area tabel pada ponsel. Saat pratinjau koreksi terbuka, gunakan **Kembali Mengubah** atau Escape untuk mengembalikan isian. Tanpa JavaScript, konfirmasi tetap tersedia sebagai formulir biasa.
+
+Perubahan ini hanya menata tampilan dan navigasi baca. Tarif, penghitungan saldo, koreksi, pengesahan saldo FIX, dan finalisasi migrasi tetap mengikuti mekanisme existing. Pada lab copy, konfigurasi database, antrean, draf, saldo FIX, dan basis source sebelum sinkronisasi remote dipertahankan. Bila tampilan lama masih tersimpan pada browser, gunakan **Ctrl+F5**.
+
+Hasil pemeriksaan dan batas pengujian: [Pemeriksaan UI Legacy 19 Oktober 2026](LEGACY_UI_REVIEW_20261019.md).

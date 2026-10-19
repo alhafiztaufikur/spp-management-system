@@ -20,7 +20,14 @@ function class_student_code(array $class): string {
 function class_label(array $class): string {
     $kind=class_kind($class);
     if ($kind==='out') return 'Out';
-    if ($kind==='custom') return (string)($class['nama_custom']??$class['rombel_nama']??'Custom');
+    if ($kind==='custom') {
+        if(isset($class['nama_custom'])||isset($class['rombel_nama']))return (string)($class['nama_custom']??$class['rombel_nama']);
+        static $names=[];$unit=function_exists('unit_active_id')?unit_active_id():0;
+        if(!isset($names[$unit])&&isset($GLOBALS['koneksi'])){$names[$unit]=[];$rows=$GLOBALS['koneksi']->query("SELECT id,nama_custom FROM master_kelas WHERE jenis='custom'")->fetch_all(MYSQLI_ASSOC);foreach($rows as $row)$names[$unit][(int)$row['id']]=$row['nama_custom'];}
+        $customId=(int)($class['master_kelas_id']??0);
+        if($customId&&!isset($names[$unit][$customId])&&isset($GLOBALS['koneksi'])){$stmt=$GLOBALS['koneksi']->prepare("SELECT nama_custom FROM master_kelas WHERE id=? AND jenis='custom'");$stmt->bind_param('i',$customId);$stmt->execute();$found=$stmt->get_result()->fetch_row();$stmt->close();if($found)$names[$unit][$customId]=$found[0];}
+        return (string)($names[$unit][(int)($class['master_kelas_id']??0)]??'Kelas Khusus');
+    }
     if (($class['tingkat']??$class['KELAS']??'')==='LEGACY') return 'Legacy';
     if(class_is_alumni($class))return 'Alumni'.($class['graduation_year']??substr($class['kode_rombel'],6));
     $level = (int)($class['tingkat'] ?? $class['KELAS'] ?? 0);
@@ -225,7 +232,7 @@ function class_disable_empty_rombel(mysqli $db): int {
 function class_enable_all_rombel(mysqli $db): int {
     $stmt = $db->prepare("UPDATE master_kelas
         SET is_active = 1
-        WHERE is_placeholder = 0 AND UPPER(kode_rombel) NOT LIKE 'ALUMNI%'
+        WHERE jenis='reguler' AND tingkat>0 AND is_placeholder = 0 AND UPPER(kode_rombel) NOT LIKE 'ALUMNI%'
           AND is_active = 0");
     $stmt->execute();
     $affected = $stmt->affected_rows;

@@ -7,6 +7,7 @@ require_once '../includes/daftar_ulang.php';
 require_once '../includes/kelas.php';
 require_once '../includes/master_workspace_ui.php';
 require_once '../includes/pagination.php';
+require_once '../includes/migrated_history.php';
 require_once '../includes/student_tariff_consistency.php';
 require_once '../includes/tagihan_sekali.php';
 require_once '../includes/spp_billing.php';
@@ -18,19 +19,7 @@ if (empty($_SESSION['csrf_student'])) {
 }
 
 function student_history_count(mysqli $db, string $noInduk): int {
-    $sql = "
-        SELECT
-          (SELECT COUNT(*) FROM bayar WHERE NO_INDUK = ?) +
-          (SELECT COUNT(*) FROM bayar_du WHERE no_induk = ?) +
-          (SELECT COUNT(*) FROM transaksi_m WHERE NO_INDUK = ?) +
-          (SELECT COUNT(*) FROM transaksi_k WHERE NO_INDUK = ?) AS jumlah
-    ";
-    $stmt = $db->prepare($sql);
-    $stmt->bind_param('ssss', $noInduk, $noInduk, $noInduk, $noInduk);
-    $stmt->execute();
-    $count = (int)$stmt->get_result()->fetch_assoc()['jumlah'];
-    $stmt->close();
-    return $count;
+    return mh_student_counts($db,unit_active_id(),$noInduk)['total'];
 }
 
 function find_student(mysqli $db, int $id, bool $forUpdate = false): ?array {
@@ -40,7 +29,7 @@ function find_student(mysqli $db, int $id, bool $forUpdate = false): ?array {
     $student = $stmt->get_result()->fetch_assoc() ?: null;
     $stmt->close();
     if ($student && !empty($student['legacy_pending']) && $forUpdate) throw new RuntimeException('Gunakan Aktivasi Legacy; Pulihkan/Edit biasa tidak diizinkan.');
-    if ($student) $student['history_count'] = student_history_count($db, $student['NO_INDUK']);
+    if ($student) $student['history_count'] = mh_student_counts($db,(int)$student['unit_id'],$student['NO_INDUK'],(int)$student['id'])['total'];
     return $student;
 }
 
@@ -90,6 +79,10 @@ function validate_student_identity(mysqli $db, array $source): array {
         throw new RuntimeException('Nama siswa wajib diisi dan maksimal 100 karakter.');
     }
     $class = class_find($db, $classId, true, true);
+    if(!$class&&(int)($source['id']??0)>0){
+        $current=find_student($db,(int)$source['id']);
+        if($current&&(int)$current['master_kelas_id']===$classId){$candidate=class_find($db,$classId,false,true);if($candidate&&class_kind($candidate)==='custom')$class=$candidate;}
+    }
     if (!$class) throw new RuntimeException('Pilih kelas/rombel aktif dari Master Kelas.');
     return [$noInduk, $name, class_student_code($class), $classId];
 }
@@ -143,7 +136,7 @@ if ($_SERVER['REQUEST_METHOD'] === 'POST') {
             $stmtDuplicate->close();
             if ($duplicate) throw new RuntimeException('Nomor induk sudah digunakan siswa lain.');
 
-            $targetClass=class_find($koneksi,$classId,true,true);
+            $targetClass=class_find($koneksi,$classId,false,true);
             $targetKind=class_kind($targetClass);
             $komiteStartMonth = (string)($_POST['komite_mulai_bulan'] ?? '07');
             if (!in_array($komiteStartMonth,['01','02','03','04','05','06','07','08','09','10','11','12'],true)) {
@@ -404,14 +397,17 @@ if ($editId > 0 && !$editStudent) {
 $query = trim((string)($_GET['q'] ?? ''));
 require_once '../includes/student_filters.php';
 [$filterClass,$filterStatus,$classOptions,$studentFilterSql]=student_list_filters($koneksi,$_GET);
+if($editStudent&&!empty($editStudent['master_kelas_id'])){$currentClass=class_find($koneksi,(int)$editStudent['master_kelas_id']);if($currentClass&&class_kind($currentClass)==='custom'&&!(int)$currentClass['is_active'])$classOptions[]=$currentClass;}
+
 $filterClassOptions=student_filter_class_choices($koneksi);
 filter_output_start();
 $allowedPageSizes = [10, 25, 50];
 $perPage = page_size_param('per_page', $allowedPageSizes, 10);
 $page = page_int_param('page');
 
+$studentReadSource=mh_students_source($koneksi);
 $listWhereSql = "
-    FROM siswa s
+    FROM $studentReadSource s
     WHERE (? = '' OR s.NO_INDUK LIKE CONCAT('%', ?, '%') OR s.NAMA LIKE CONCAT('%', ?, '%') OR s.NO_induk_diknas LIKE CONCAT('%', ?, '%'))
       AND (? = 0 OR s.master_kelas_id = ?)
       AND (? = 'all' OR CASE ? WHEN 'legacy' THEN s.legacy_pending=1 WHEN 'archived' THEN s.legacy_pending=0 AND s.is_active=0 ELSE s.legacy_pending=0 AND s.is_active=1 END) $studentFilterSql
@@ -436,7 +432,7 @@ $stmtList = $koneksi->prepare("
        (SELECT COUNT(*) FROM bayar_du du WHERE du.no_induk = s.NO_INDUK AND du.unit_id=s.unit_id) +
        (SELECT COUNT(*) FROM transaksi_m tm WHERE tm.NO_INDUK = s.NO_INDUK AND tm.unit_id=s.unit_id) +
        (SELECT COUNT(*) FROM transaksi_k tk WHERE tk.NO_INDUK = s.NO_INDUK AND tk.unit_id=s.unit_id)) AS history_count
-    FROM siswa s
+    FROM $studentReadSource s
     LEFT JOIN master_kelas mk ON mk.id = s.master_kelas_id
     WHERE (? = '' OR s.NO_INDUK LIKE CONCAT('%', ?, '%') OR s.NAMA LIKE CONCAT('%', ?, '%') OR s.NO_induk_diknas LIKE CONCAT('%', ?, '%'))
       AND (? = 0 OR s.master_kelas_id = ?)
@@ -451,6 +447,8 @@ $pageParams = array_merge($listParams, [$perPage, $offset]);
 $stmtList->bind_param($pageTypes, ...$pageParams);
 $stmtList->execute();
 $studentRows = $stmtList->get_result()->fetch_all(MYSQLI_ASSOC);
+$historyCounts=mh_student_counts_many($koneksi,$studentRows);
+foreach($studentRows as &$historyStudent){$counts=$historyCounts[(int)$historyStudent['id']]??['total'=>0,'payments'=>0];$historyStudent['history_count']=$counts['total'];$historyStudent['jml_bayar']=$counts['payments'];}unset($historyStudent);
 $stmtList->close();
 $classHistories = [];
 $graduationYears = [];
@@ -757,7 +755,7 @@ if(in_array($previewLevel,['CUSTOM','OUT'],true))$sppRatePreview=['base'=>0,'net
                 ])) ?></span><?php if($historyRows): ?><button type="button" class="student-class-history-toggle" aria-expanded="false" aria-controls="<?= $historyId ?>" aria-label="Buka Riwayat Kelas <?= htmlspecialchars($student['NAMA'], ENT_QUOTES, 'UTF-8') ?>" data-student-name="<?= htmlspecialchars($student['NAMA'], ENT_QUOTES, 'UTF-8') ?>"><svg aria-hidden="true" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><path d="M3 12a9 9 0 1 0 3-6.7L3 8"/><path d="M3 3v5h5M12 7v5l3 2"/></svg><span>Riwayat</span><span class="student-class-history-chevron" aria-hidden="true">⌄</span></button><?php endif; ?></div></td>
                 <td data-label="SPP/Bulan" class="nominal">Rp <?= number_format((float)$student['SPP_PERBULAN'], 0, ',', '.') ?></td>
                 <td data-label="Status"><span class="master-status <?= $student['is_active'] ? 'is-active' : 'is-inactive' ?>"><?= !empty($student['legacy_pending']) ? 'Legacy — belum aktif' : ($isGraduate ? 'Lulus · TA ' . htmlspecialchars($graduateYear) : ($student['KELAS']==='OUT'?'Out':($student['is_active'] ? 'Aktif' : 'Diarsipkan'))) ?></span></td>
-                <td data-label="Riwayat Transaksi" class="student-history-col"><span class="badge-count"><?= (int)$student['history_count'] ?>x</span></td>
+                <td data-label="Riwayat Transaksi" class="student-history-col"><span class="badge-count"><?= (int)$student['history_count'] ?> catatan</span><small><a href="../pembayaran/lihat.php?student_id=<?= (int)$student['id'] ?>&amp;all_periods=1&amp;back_context=<?= mh_return_create('siswa/daftar.php',$_GET,(int)$student['unit_id'],'student',(int)$student['id']) ?>"><?= (int)$student['jml_bayar'] ?> pembayaran</a> · <a href="../tabungan/riwayat.php?student_id=<?= (int)$student['id'] ?>&amp;all_periods=1&amp;back_context=<?= mh_return_create('siswa/daftar.php',$_GET,(int)$student['unit_id'],'student',(int)$student['id']) ?>"><?= max(0,(int)$student['history_count']-(int)$student['jml_bayar']) ?> jurnal tabungan</a></small></td>
                 <td data-label="Aksi" class="aksi-col">
                   <a class="btn-tbl btn-tbl-edit" href="<?= htmlspecialchars($editUrl) ?>"><?= !empty($student['legacy_pending']) ? 'Aktifkan & Tempatkan' : 'Edit' ?></a>
                   <?php if(!$isGraduate && empty($student['legacy_pending'])): ?><form method="POST" action="daftar.php" style="display:inline" onsubmit="return confirm('<?= $student['is_active'] ? 'Arsipkan' : 'Pulihkan' ?> siswa <?= htmlspecialchars(addslashes($student['NAMA'])) ?>?')">

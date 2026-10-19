@@ -65,3 +65,13 @@ Langkah di atas khusus konfigurasi utama `db_spp`. Untuk server atau database uj
 Skrip dan petunjuk tersedia pada source utama. Bantuan, validasi opsi, serta pemeriksaan target diuji. Persiapan ini belum menjalankan `--apply` pada database utama atau Copy; data pengguna dan paket deployment dipertahankan. Uji pemasangan berulang pada instance terisolasi sebelumnya dicatat dalam [hasil QA](LEGACY_REVIEW_QA_20261019.md).
 
 Status lanjutan: skema terbaru sudah dipasang khusus **lab copy / db_spp_test2** pada pembaruan lab; database utama tetap belum dipasangi skema operasional. Lihat [panduan lab](LAB_COPY.md) dan [persetujuan massal](LEGACY_BULK_REVIEW_20261019.md). Persetujuan massal versi 5 tidak memerlukan perubahan skema tambahan.
+
+
+## Kelas Khusus (pemasangan terpisah)
+
+Fitur Tambah Kelas Khusus memakai CLI `scripts/migrate_special_classes.php`, tanpa migrasi akun/workflow. Pemeriksaan default hanya membaca kesiapan. Lab copy telah menerima subset skema yang diperlukan setelah backup; database utama tidak diubah. Lihat [panduan Kelas Khusus](KELAS_KHUSUS.md) untuk langkah penggunaan, perintah pemasangan, dan hasil pengujian.
+
+
+## Penyatuan hubungan kelas existing
+
+`php scripts/repair_legacy_classes.php --unit=1` memeriksa hubungan kelas tanpa mutasi. Penerapan data lab memakai backup dan audit per unit, bukan pemasangan skema baru. Lihat [panduan penyatuan kelas](LEGACY_CLASS_UNIFICATION.md).

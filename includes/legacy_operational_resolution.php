@@ -51,8 +51,25 @@ function lop_promote_accounts(array $records,?string $snapshot,array &$resolutio
 function lop_resolved_source_rows(array $records,array $cfg,?string $snapshot): array {
     $history=[];$references=[];$resolutions=[];$effective=[];
     foreach($records as $r){$old=lop_unowned_history($r);$separate=$old?null:lop_separate_record($r,$cfg);if($old)$history[$r['row_key']]=$old;elseif($separate)$references[$r['row_key']]=$separate;else $effective[]=$r;}
-    return [lop_promote_accounts($effective,$snapshot,$resolutions),$history,$references,$resolutions];
+    $effective=lop_resolve_zero_header($effective,$snapshot,$resolutions);return [lop_promote_accounts($effective,$snapshot,$resolutions),$history,$references,$resolutions];
 }
 function lop_source_union(array ...$sets): array {
     $rows=[];foreach($sets as $set)foreach($set as $row)$rows[$row['row_key']]=$row;return array_values($rows);
+}
+/** A redundant zero header carries no extra funds when one unique owner's valid ledger proves the other header. */
+function lop_resolve_zero_header(array $records,?string $snapshot,array &$resolutions): array {
+    $owners=[];$banks=[];$remove=[];
+    foreach($records as $r){$identity=lful_identity(legacy_source_identity($r['raw']));if($identity==='')continue;if($r['table']==='siswa')$owners[$identity][]=$r;if(in_array($r['table'],['tabungan','transaksi_m','transaksi_k'],true))$banks[$identity][]=$r;}
+    foreach($banks as $identity=>$rows){
+        if(count($owners[$identity]??[])!==1||legacy_source_identity_issues($owners[$identity][0]['raw']))continue;
+        $headers=array_values(array_filter($rows,fn($r)=>$r['table']==='tabungan'));if(count($headers)!==2)continue;
+        try{$a=lf_cents($headers[0]['raw']['SALDO']??null);$b=lf_cents($headers[1]['raw']['SALDO']??null);}catch(DomainException $e){continue;}
+        if(!(($a===0&&$b>0)||($b===0&&$a>0)))continue;
+        $zero=$headers[$a===0?0:1];$keep=$headers[$a===0?1:0];
+        $candidate=array_values(array_filter($rows,fn($r)=>$r['row_key']!==$zero['row_key']));$bank=lf_reconcile($candidate,$snapshot);
+        if(!$bank['ready'])continue;
+        $identity=(string)$identity;$remove[$zero['row_key']]=true;
+        $resolutions['zero-header:'.$identity]=['kind'=>'duplicate_zero_account','identity'=>$identity,'amount'=>$bank['balance'],'selected_row_key'=>$keep['row_key'],'archived_row_key'=>$zero['row_key'],'selected_source'=>$keep['raw'],'archived_source'=>$zero['raw'],'reason'=>'Satu pemilik sumber unik; dua catatan saldo berisi nol dan saldo positif. Seluruh jurnal valid tepat cocok dengan saldo positif. Catatan nol tetap diarsipkan dan tidak menambah rekening atau saldo.'];
+    }
+    return $remove?array_values(array_filter($records,fn($r)=>!isset($remove[$r['row_key']]))):$records;
 }

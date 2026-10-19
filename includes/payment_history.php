@@ -14,7 +14,7 @@ function payment_history_period(array $p): string
 }
 function payment_history_model(mysqli $db,int $id,bool $deleted): array
 {
-    if($id<0&&!$deleted)return lful_history_model($db,-$id)+['capabilities'=>['can_edit'=>false,'can_delete'=>false,'can_print'=>false]];
+    if($id<0&&!$deleted)return lful_history_model($db,-$id)+['capabilities'=>['can_edit'=>false,'can_delete'=>false,'can_print'=>true]];
     if($id<=0) throw new OutOfBoundsException('Transaksi tidak ditemukan pada unit ini.');
     $details=[];
     if($deleted) {

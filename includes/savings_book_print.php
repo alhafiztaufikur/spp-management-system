@@ -2,15 +2,33 @@
 require_once __DIR__.'/savings_book.php';
 require_once __DIR__.'/legacy_finance.php';
 require_once __DIR__.'/legacy_full_read.php';
+require_once __DIR__.'/migrated_history.php';
 
 final class SavingsBookRequestError extends RuntimeException {}
+
+function savings_book_owner_load(mysqli $db,int $ownerId): array {
+    if(!lop_ready($db))throw new SavingsBookRequestError('Rekening tidak ditemukan.',404);
+    $db->begin_transaction();
+    try {
+        $o=lf_one($db,"SELECT o.*,a.opening,a.balance,a.effective_date,g.master_kelas_id group_class_id FROM legacy_op_owners o LEFT JOIN legacy_op_groups g ON g.id=o.group_id AND g.unit_id=o.unit_id JOIN legacy_op_accounts a ON a.owner_id=o.id AND a.unit_id=o.unit_id JOIN legacy_full_batches b ON b.id=o.batch_id AND b.unit_id=o.unit_id WHERE o.id=? AND o.state='ready' AND b.state='completed'",[$ownerId]);
+        if(!$o)throw new SavingsBookRequestError('Rekening tidak ditemukan dalam cakupan unit Anda.',404);
+        if($o['student_id'])throw new SavingsBookRequestError('Gunakan identitas siswa untuk rekening siswa.',400);
+        $legacy=[];$new=[];
+        foreach(lf_rows($db,"SELECT id,source_date tanggal,incoming masuk,outgoing keluar,IF(incoming>0,0,1) urutan_mutasi,origin FROM legacy_op_journals WHERE owner_id=? AND cancelled=0 ORDER BY source_date,(origin='adjustment'),id",[$ownerId]) as $j){if($j['origin']==='new')$new[]=$j;else $legacy[]=$j;}
+        $student=['id'=>0,'owner_id'=>$ownerId,'unit_id'=>$o['unit_id'],'NO_INDUK'=>$o['source_identity'],'NAMA'=>$o['name'],'KELAS'=>$o['source_class'],'kelas_label'=>$o['source_class'],'SALDO'=>$o['balance']];
+        require_once __DIR__.'/kelas.php';if($o['group_class_id']&&($c=class_find($db,(int)$o['group_class_id'])))$student['kelas_label']=class_label($c);
+        $book=savings_book_make($new,(float)$o['balance'],['amount'=>$o['opening'],'effective_date'=>$o['effective_date']],$legacy);
+        $db->commit();return [$student,$book];
+    }catch(Throwable $e){$db->rollback();throw $e;}
+}
 
 /** Read one student's complete ledger and balance in the same database snapshot. */
 function savings_book_load(mysqli $db, string $nis, int $studentId = 0, int $unitId = 0): array
 {
     $db->begin_transaction();
     try {
-        $stmt = $db->prepare('SELECT s.id, s.NO_INDUK, s.unit_id, s.NO_induk_diknas, s.NAMA, s.KELAS, COALESCE(t.SALDO, 0) AS SALDO FROM siswa s LEFT JOIN tabungan t ON t.NO_INDUK=s.NO_INDUK AND t.unit_id=s.unit_id WHERE s.NO_INDUK=? AND (?=0 OR s.id=?) AND (?=0 OR s.unit_id=?)');
+        $students=mh_students_source($db);
+        $stmt = $db->prepare("SELECT s.id, s.NO_INDUK, s.unit_id, s.NO_induk_diknas, s.NAMA, s.KELAS, COALESCE(t.SALDO, 0) AS SALDO FROM $students s LEFT JOIN tabungan t ON t.NO_INDUK=s.NO_INDUK AND t.unit_id=s.unit_id WHERE s.NO_INDUK=? AND (?=0 OR s.id=?) AND (?=0 OR s.unit_id=?)");
         $stmt->bind_param('siiii', $nis, $studentId, $studentId, $unitId, $unitId);
         $stmt->execute();
         $matches = $stmt->get_result()->fetch_all(MYSQLI_ASSOC);
@@ -19,7 +37,7 @@ function savings_book_load(mysqli $db, string $nis, int $studentId = 0, int $uni
         if (!$matches) throw new SavingsBookRequestError('Siswa tidak ditemukan dalam cakupan unit Anda.', 404);
         $student = $matches[0];
         require_once __DIR__.'/kelas.php';
-        $c=$db->prepare('SELECT mk.* FROM siswa s JOIN master_kelas mk ON mk.id=s.master_kelas_id AND mk.unit_id=s.unit_id WHERE s.id=?');$c->bind_param('i',$student['id']);$c->execute();$class=$c->get_result()->fetch_assoc();$c->close();$student['kelas_label']=$class?class_label($class):$student['KELAS'];
+        $c=$db->prepare("SELECT mk.* FROM $students s JOIN master_kelas mk ON mk.id=s.master_kelas_id AND mk.unit_id=s.unit_id WHERE s.id=?");$c->bind_param('i',$student['id']);$c->execute();$class=$c->get_result()->fetch_assoc();$c->close();$student['kelas_label']=$class?class_label($class):$student['KELAS'];
         $unitId = (int)$student['unit_id'];
         try{lop_bank_assert_ready($db,(string)$student['NO_INDUK'],$unitId);}catch(DomainException $e){throw new SavingsBookRequestError($e->getMessage(),409);}
         $stmt = $db->prepare("SELECT x.id, x.tanggal, x.masuk, x.keluar, x.urutan_mutasi FROM (

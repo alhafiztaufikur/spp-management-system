@@ -1,5 +1,59 @@
 # Riwayat Perubahan AI SistemSPP
 
+## 2026-10-20 - Menuntaskan pembacaan hasil migrasi
+
+- Satukan jumlah, daftar, detail, operator dan pagination SQL pembayaran native/Legacy untuk siswa maupun pemilik non-siswa; sediakan Semua Periode, filter tanpa tanggal, sumber dan jenis pemilik, serta ekspor bertahap.
+- Selaraskan histori DU, jumlah/ekspor Data Siswa, rekap rekening 25 per halaman, buku `owner_id`, penyesuaian terpisah, laporan dan pemisahan kas. Pertahankan konteks kembali melalui token server dan label kelas operasional.
+- Pasang patch yang sesuai basis lab lama setelah backup file; pertahankan API, tata cetak buku dan pembacaan kolom opsional. Tidak mengganti konfigurasi maupun skema.
+- Verifikasi 118.244 pembayaran (9.288 tanpa tanggal), 2.418 rekening, 54 pemeriksaan backend per basis, browser Chromium 109/Chrome dan hasil ekspor. Fingerprint 51 tabel utama dan 59 tabel lab tidak berubah. [Hasil audit dan batas pemeriksaan](LEGACY_READBACK_20261020.md).
+
+## 2026-10-20 - Migrasi penuh SMA di lab copy
+
+- Selesaikan backup `sma17102026` melalui worker dan alur pengesahan/simulasi/finalisasi existing, sesuai instruksi pengguna tanpa konfirmasi tambahan. Hasil: 252 siswa (67 aktif), 11.211 pembayaran, 8.938 jurnal, 380 rekening dan nol pengecualian; backup sebelum/sesudah terverifikasi.
+- Sahkan identitas testing sebagai rekening non-siswa dan cocokkan fingerprint kode kelompok numerik pada draf. Tambahkan resolusi terbatas untuk header saldo nol ganda yang terbukti oleh satu pemilik dan jurnal valid; kedua baris asli tetap diarsipkan. Aturan 10 dan uji regresi mempertahankan jumlah/nominal.
+- Database utama (51 tabel) dan baris SD/SMP pada 57 tabel lab berunit identik. Uji baca hasil/koreksi/kelas/siswa/riwayat HTTP 200; tanpa perubahan fitur lain, skema, commit/push atau deployment. [Hasil dan bukti](LEGACY_SMA_MIGRATION_20261020.md).
+
+## 2026-10-20 - Halaman tunggu finalisasi Legacy
+
+- Bedakan pesan finalisasi migrasi dari pemulihan database. Ganti respons polos dengan halaman SistemSPP yang memeriksa ulang GET otomatis setiap 10 detik; POST tidak dikirim ulang otomatis, dan API mendapat JSON 503 yang dapat dicoba kembali. Penguncian/verifikasi tidak dilewati.
+- Pasang tampilan pada source utama dan lab tanpa menghentikan worker yang aktif. Finalisasi SMP yang telah dimulai pengguna selesai pada 00:00:16 WIB: 60.181 pembayaran, 27.546 jurnal, saldo Rohis Mhi Rp0 dan backup sebelum/sesudah terverifikasi. Kedua login kembali HTTP 200.
+- Uji penguncian nyata, respons migrasi/pemulihan/API/POST, pemulihan akses, serta 16 kasus HTML lokal Chrome/Chromium 109, terang/gelap, desktop/ponsel dan zoom hingga 200%. [Rincian dan batas](LEGACY_FINALIZATION_WAIT.md).
+
+## 2026-10-19 - Saldo FIX presisi Legacy SMP
+
+- Pisahkan keberadaan rekening dari validitas nominal. Saldo sumber dengan presisi berlebih tidak lagi membuat rekening tunggal dianggap tidak tersedia; hasil jurnal yang belum lengkap ditandai dengan jelas.
+- Konfirmasi Saldo FIX menawarkan koreksi presisi jurnal secara eksplisit, menyimpan koreksi dan FIX bersama, mempertahankan sumber/operator/tanggal, lalu mengantrekan simulasi otomatis. Aturan 9 membatalkan cache/konfirmasi lama tanpa menghapus draf.
+- Selesaikan draf SMP Rohis Mhi (`220817`) di lab: jurnal Rp0,131 menjadi Rp0,13, penyesuaian −Rp0,13, saldo akhir Rp0; simulasi 60.181 pembayaran dan nol pengecualian. Tidak menjalankan finalisasi. Seluruh 51 tabel utama dan 59 tabel lab identik sebelum/sesudah pekerjaan.
+- Uji sumber SMP lengkap, controller CLI, pembatalan/input/CSRF/token/versi/sumber, publikasi terisolasi dengan backup terverifikasi, rollback/retry, saldo/buku dan pemisahan kas. Pemeriksaan visual menggunakan HTML hasil render pada Chrome dan Chromium 109; server HTTP QA ditolak peninjauan otomatis sehingga pengujian submit lewat jaringan belum dilakukan. [Panduan dan bukti](LEGACY_SMP_SALDO_FIX.md).
+
+## 2026-10-19 - Pemulihan akses project utama
+
+- Pasang skema workflow/rombel yang belum tersedia pada `db_spp` setelah backup dipulihkan dan rehearsal terisolasi; pertahankan pemeriksaan kesiapan. Login localhost kembali HTTP 200.
+- Tambahkan opsi CLI `--preserve-existing-accounts`: semua 10 ID/username/password/status/timestamp dipertahankan, `superadmin` tetap Super Admin dan sembilan akun lain menjadi Administrator sesuai persetujuan pengguna. Jalur bootstrap akun existing tetap kompatibel.
+- Migrasi rombel mempertahankan default snapshot dan timestamp master. Data keuangan/siswa existing serta 59 tabel lab tetap identik; backup sesudah pembaruan dipulihkan dengan 51 tabel identik. Uji akun, pengulangan, 240 GET clone, audit FK/keuangan dan browser localhost Chromium 109 lulus. [Bukti dan batas](MAIN_WORKFLOW_RECOVERY_20261019.md).
+
+## 2026-10-19 - Penyatuan kelas operasional dan sumber Legacy
+
+- Hapus tombol Tambah Rombel yang berulang; sejajarkan Tambah Kelas Khusus dalam kolom aksi atas. Direktori nonakademik memuat Alumni, OUT, custom dan kelompok rekening, dengan filter jenis/status, anggota siswa/non-siswa, nama kanonis, asal sumber, dan pagination.
+- Kelompok Legacy dimuat hanya setelah dibuka lewat GET; trace SQL membuktikan nol kueri daftar pada keadaan tertutup. Tautan kelas ke rekening mendukung `class_id` opsional dan mempertahankan konteks kembali.
+- Aturan operasional 8 menyiapkan hubungan kelas dalam penerapan; CLI perbaikan existing memakai transaksi/audit per unit. Master existing yang diganti nama tetap digunakan, tanpa mengubah sumber atau transaksi.
+- Terapkan patch di lab setelah backup/pemulihan terverifikasi: 10 master, 10 hubungan kelompok, 10 audit; 267 alumni yang sudah benar tidak dipindahkan ulang. Database utama, siswa, keuangan, draf dan saldo FIX tetap utuh. [Panduan dan bukti pengujian](LEGACY_CLASS_UNIFICATION.md).
+
+## 2026-10-19 - Kelas Khusus pada Master Kelas
+
+- Tambahkan tindakan Tambah Kelas Khusus dengan nama bebas maksimal 100 karakter, status, pencarian/pagination, anggota, edit, aktivasi/nonaktif, serta konfirmasi hapus kelas kosong. Nama sama dalam unit diperiksa tanpa membedakan huruf besar/kecil.
+- Pertahankan representasi custom tanpa tingkat, anggota existing pada kelas nonaktif, snapshot histori, dan pemisahan dari SPP/kenaikan kelas serta aksi massal akademik. Nama kelas dikenali pada tabungan/laporan/ekspor; PSB, OUT, Alumni dan kelompok Legacy tetap mengikuti mekanisme existing.
+- Siapkan CLI aditif yang dapat dijalankan ulang tanpa migrasi akun/workflow. Pasang hanya fitur/dependensi yang diperlukan di lab copy setelah backup dan uji pemulihan. Database utama tidak diubah; data existing 50 tabel utama/59 tabel lab, konfigurasi, draf dan saldo FIX dipertahankan. Tidak membuat data contoh pada lab, commit/push, atau memperbarui deployment.
+- Uji CRUD, unit/peran/CSRF, retry, versi, hapus terpakai, input gagal, tanpa efek keuangan, Excel/PDF, dua basis SQL/HTTP dan 48 kasus Chrome/Chromium 109; pemeriksaan baca tambahan pada lab. [Panduan, pemasangan, bukti, dan batas pengujian](KELAS_KHUSUS.md).
+
+## 2026-10-19 - Penyelarasan tampilan Legacy
+
+- Letakkan kelompok hasil migrasi di dalam konten Master Kelas; gunakan header berikon, filter nama/jenis, badge, pagination 25 kelompok, dan kartu ponsel tanpa pengulangan nama.
+- Tombol kelompok membuka daftar rekening yang sesuai. Pencarian, halaman, serta konteks kembali dibawa sampai rincian/koreksi/tarif; kontrak tautan lama tetap tersedia.
+- Seragamkan header, navigasi ponsel, kontrol, tabel, ringkasan saldo, kondisi kosong, dan konfirmasi pada halaman Legacy. Nominal dan mekanisme keuangan tidak diubah.
+- Terapkan perubahan UI ke lab copy sebagai patch, dengan konfigurasi/runtime serta basis source lab tetap dipertahankan. Tidak menjalankan skema atau migrasi final, commit/push, maupun pembaruan deployment.
+- [Hasil pemeriksaan desktop/ponsel, Chromium 109, regresi, dan fingerprint](LEGACY_UI_REVIEW_20261019.md).
+
 ## 2026-10-19 - Penggabungan pembaruan operasional dan migrasi Legacy
 
 - Gabungkan dua commit remote sampai `1ccaad3` dengan implementasi Legacy lokal. Kelas Alumni dipertahankan bersama Custom/Out, laporan/operator, tarif, Biaya Lain, pencetakan, akses operasional dan koreksi tabungan terbaru.
