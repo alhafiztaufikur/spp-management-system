@@ -1,0 +1,62 @@
+{
+    "SD": [],
+    "SMP": [
+        {
+            "schema": "dbo",
+            "name": "fn_diagramobjects",
+            "type": "FN",
+            "execute_as_principal_id": 1,
+            "definition_sha256": "53168122a30196179567551ab7dac95ec3a5cbfb3a79f472f94058d68d6d98e1"
+        },
+        {
+            "schema": "dbo",
+            "name": "sp_alterdiagram",
+            "type": "P ",
+            "execute_as_principal_id": 1,
+            "definition_sha256": "06b84dee49bdbf0d1037e07d3b9190f311ac9b6f516c35ac7dc2d3222eb875c7"
+        },
+        {
+            "schema": "dbo",
+            "name": "sp_creatediagram",
+            "type": "P ",
+            "execute_as_principal_id": 1,
+            "definition_sha256": "805be2550a89985581ea5533254fa304aff75c98f55990676d37a07b0acc9821"
+        },
+        {
+            "schema": "dbo",
+            "name": "sp_dropdiagram",
+            "type": "P ",
+            "execute_as_principal_id": 1,
+            "definition_sha256": "f19e38590dde90fbb5816adab799950a99ee399aaf4a179ed365e14b02eaa308"
+        },
+        {
+            "schema": "dbo",
+            "name": "sp_helpdiagramdefinition",
+            "type": "P ",
+            "execute_as_principal_id": 1,
+            "definition_sha256": "8075ca61c23352376fad45a79d7154179fe3435e1feb96236ff3e278107f73b1"
+        },
+        {
+            "schema": "dbo",
+            "name": "sp_helpdiagrams",
+            "type": "P ",
+            "execute_as_principal_id": 1,
+            "definition_sha256": "2c8dbc91b1f18a3907152cfbcb892fcbbf8c19e9c8b609fbd25b895a81f72a1f"
+        },
+        {
+            "schema": "dbo",
+            "name": "sp_renamediagram",
+            "type": "P ",
+            "execute_as_principal_id": 1,
+            "definition_sha256": "521a1f56c151e405e355235a83d5a50d1b5cbdf31563529ef4e9f18a92921bbf"
+        },
+        {
+            "schema": "dbo",
+            "name": "sp_upgraddiagrams",
+            "type": "P ",
+            "execute_as_principal_id": null,
+            "definition_sha256": "9d9c0d519e6624690c9fa10992e2587ae6e2f221da4bc709a1c482ce49862ae5"
+        }
+    ],
+    "SMA": []
+}

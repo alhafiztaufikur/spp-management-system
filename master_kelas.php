@@ -101,6 +101,7 @@ if ($_SERVER['REQUEST_METHOD'] === 'POST') {
             $koneksi->begin_transaction();
             $class = class_find($koneksi, $id, false, true);
             if (!$class || (int)$class['is_placeholder'] === 1) throw new RuntimeException('Rombel placeholder harus selalu aktif.');
+            if(($class['legacy_kind']??'')==='alumni')throw new RuntimeException('Kelas Alumni merupakan kelompok nonakademik dan tetap nonaktif.');
             $newStatus = (int)$targetStatus;
             if ((int)$class['tingkat'] === 0 && $newStatus === 0) throw new RuntimeException('Rombel PSB harus tetap aktif untuk pendaftaran calon siswa.');
             if ((int)$class['is_active'] === $newStatus) {
@@ -180,7 +181,7 @@ $classes = $koneksi->query("SELECT mk.*,
     (SELECT COUNT(*) FROM siswa_tahun_ajaran sta WHERE sta.master_kelas_id = mk.id) AS history_count
     FROM master_kelas mk ORDER BY CASE WHEN mk.tingkat=0 THEN 0 ELSE 1 END, mk.tingkat, mk.is_placeholder, mk.kode_rombel")->fetch_all(MYSQLI_ASSOC);
 $classSearch = trim((string)($_GET['q_kelas'] ?? ''));
-$levelOptions=['psb'=>'PSB'];foreach(range($unitMinLevel,$unitMaxLevel) as $level)$levelOptions[(string)$level]='Kelas '.$level;
+$levelOptions=['psb'=>'PSB','alumni'=>'Alumni'];foreach(range($unitMinLevel,$unitMaxLevel) as $level)$levelOptions[(string)$level]='Kelas '.$level;
 $classLevels=filter_register('tingkat_kelas',$_GET['tingkat_kelas']??null,$levelOptions);
 $classStatuses=filter_register('status_kelas',$_GET['status_kelas']??null,['aktif'=>'Aktif','nonaktif'=>'Nonaktif','placeholder'=>'Placeholder']);
 $classLevelFilter=filter_scalar($classLevels);$classStatusFilter=filter_scalar($classStatuses);
@@ -188,8 +189,8 @@ filter_register('source_rombel_filter',$_GET['source_rombel_filter']??null,array
 filter_output_start();
 $classRows = array_values(array_filter($classes, static function (array $class) use ($classSearch, $classLevels, $classStatuses): bool {
     $label = class_label($class);
-    $isPsb = (int)$class['tingkat'] === 0;
-    if(!filter_is_all($classLevels)&&!in_array($isPsb?'psb':(string)(int)$class['tingkat'],$classLevels,true))return false;
+    $isAlumni=class_is_alumni($class);$isPsb = (int)$class['tingkat'] === 0&&!$isAlumni;
+    if(!filter_is_all($classLevels)&&!in_array($isAlumni?'alumni':($isPsb?'psb':(string)(int)$class['tingkat']),$classLevels,true))return false;
     $matchesStatus=filter_is_all($classStatuses)||array_filter($classStatuses,static fn($v)=>
         ($v==='aktif'&&(int)$class['is_active']===1&&(int)$class['is_placeholder']!==1)||
         ($v==='nonaktif'&&(int)$class['is_active']===0)||($v==='placeholder'&&(int)$class['is_placeholder']===1));
@@ -206,12 +207,12 @@ $classInactiveCount = count(array_filter($classRows, static fn(array $class): bo
 // Every filtered rombel is rendered once, in the established source order.
 $classGroups = [];
 foreach ($classRows as $class) {
-    $grade = (int)$class['tingkat'];
+    $grade = class_is_alumni($class)?-1:(int)$class['tingkat'];
     if (!isset($classGroups[$grade])) $classGroups[$grade] = ['count'=>0,'students'=>0,'rows'=>[]];
     $classGroups[$grade]['count']++;
     $classGroups[$grade]['students'] += (int)$class['siswa_count'];
 }
-foreach ($classRows as $index=>$class) $classGroups[(int)$class['tingkat']]['rows'][$index] = $class;
+foreach ($classRows as $index=>$class) $classGroups[class_is_alumni($class)?-1:(int)$class['tingkat']]['rows'][$index] = $class;
 $firstVisibleGroup = null;
 foreach ($classGroups as $grade=>$group) if ($group['rows']) { $firstVisibleGroup=$grade; if ($grade>0) break; }
 $classQuickUrl = static function (?array $levels=null, ?array $statuses=null) use ($classSearch,$classLevels,$classStatuses): string {
@@ -283,12 +284,12 @@ require_once __DIR__.'/includes/master_workspace_ui.php';
       <?php if (!$classGroups): ?><div class="empty-state"><p>Rombel tidak ditemukan</p><span>Ubah pencarian atau filter yang dipilih.</span></div><?php endif; ?>
       <?php foreach ($classGroups as $grade=>$group): ?>
         <details class="class-level-group" data-level-group <?= $grade===$firstVisibleGroup?'open':'' ?>>
-          <summary><span class="class-rombel-icon" aria-hidden="true"><?= master_workspace_icon('layers') ?></span><strong><?= $grade===0?'PSB':'Kelas '.$grade ?></strong><span class="class-group-count"><?= number_format($group['count']) ?> rombel</span><span class="class-group-students"><?= number_format($group['students']) ?> siswa aktif</span><svg class="class-group-chevron" aria-hidden="true" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><path d="m6 9 6 6 6-6"/></svg></summary>
+          <summary><span class="class-rombel-icon" aria-hidden="true"><?= master_workspace_icon('layers') ?></span><strong><?= $grade===-1?'Alumni':($grade===0?'PSB':'Kelas '.$grade) ?></strong><span class="class-group-count"><?= number_format($group['count']) ?> rombel</span><span class="class-group-students"><?= number_format($group['students']) ?> siswa aktif</span><svg class="class-group-chevron" aria-hidden="true" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><path d="m6 9 6 6 6-6"/></svg></summary>
           <?php if ($group['rows']): ?>
-          <div class="table-container" tabindex="0" aria-label="Rombel <?= $grade===0?'PSB':'Kelas '.$grade ?>"><table class="payment-table responsive-table rombel-data-table"><thead><tr><th>No</th><th>Label</th><th>Tingkat</th><th>Status</th><th>Siswa Aktif</th><th>Histori</th><th>Aksi</th></tr></thead><tbody>
+          <div class="table-container" tabindex="0" aria-label="Rombel <?= $grade===-1?'Alumni':($grade===0?'PSB':'Kelas '.$grade) ?>"><table class="payment-table responsive-table rombel-data-table"><thead><tr><th>No</th><th>Label</th><th>Tingkat</th><th>Status</th><th>Siswa Aktif</th><th>Histori</th><th>Aksi</th></tr></thead><tbody>
           <?php foreach ($group['rows'] as $i=>$class): $label=class_label($class); ?>
-        <tr data-class-id="<?= (int)$class['id'] ?>"><td data-label="No"><?= $i+1 ?></td><td data-label="Label"><span class="class-rombel-icon" aria-hidden="true"><?= master_workspace_icon('students') ?></span><strong><?= unit_record_badge($class) ?><?= htmlspecialchars($label) ?></strong></td><td data-label="Tingkat"><span class="kelas-badge"><?= (int)$class['tingkat']===0?'PSB':'Kelas '.(int)$class['tingkat'] ?></span></td><td data-label="Status"><span class="master-status <?= (int)$class['is_active']===1?'is-active':'is-inactive' ?>"><?= (int)$class['is_placeholder']===1?'Placeholder':((int)$class['is_active']===1?'Aktif':'Nonaktif') ?></span></td><td data-label="Siswa Aktif" class="text-center"><span class="class-card-caption">Siswa Aktif</span><?= number_format((int)$class['siswa_count']) ?></td><td data-label="Histori" class="text-center"><span class="class-card-caption">Histori</span><?= number_format((int)$class['history_count']) ?></td><td data-label="Aksi" class="aksi-col">
-        <?php if(!unit_all_readonly() && (int)$class['is_placeholder']!==1 && (int)$class['tingkat']>0): ?><a class="btn-tbl btn-tbl-edit" href="master_kelas.php?edit=<?= (int)$class['id'] ?>">Edit</a><form method="post" style="display:inline"><input type="hidden" name="csrf_token" value="<?= htmlspecialchars($_SESSION['csrf_master_kelas']) ?>"><input type="hidden" name="aksi" value="toggle"><input type="hidden" name="id" value="<?= (int)$class['id'] ?>"><input type="hidden" name="target_active" value="<?= (int)$class['is_active']===1?'0':'1' ?>"><button class="btn-tbl btn-tbl-toggle <?= (int)$class['is_active']===1?'is-deactivate':'is-activate' ?>" type="submit"><?= (int)$class['is_active']===1?'Nonaktifkan':'Aktifkan' ?></button></form><?php elseif (!unit_all_readonly() && (int)$class['tingkat']===0 && !(int)$class['is_active']): ?><form method="post"><input type="hidden" name="csrf_token" value="<?= htmlspecialchars($_SESSION['csrf_master_kelas']) ?>"><input type="hidden" name="aksi" value="toggle"><input type="hidden" name="id" value="<?= (int)$class['id'] ?>"><input type="hidden" name="target_active" value="1"><button class="btn-tbl btn-tbl-toggle is-activate" type="submit">Aktifkan PSB</button></form><?php else: ?><span class="payment-auto-note"><?= !unit_all_readonly()?'Dikelola sistem':'Pilih satu unit untuk mengubah rombel' ?></span><?php endif; ?>
+        <tr data-class-id="<?= (int)$class['id'] ?>"><td data-label="No"><?= $i+1 ?></td><td data-label="Label"><span class="class-rombel-icon" aria-hidden="true"><?= master_workspace_icon('students') ?></span><strong><?= unit_record_badge($class) ?><?= htmlspecialchars($label) ?></strong></td><td data-label="Tingkat"><span class="kelas-badge"><?= class_is_alumni($class)?'Alumni':((int)$class['tingkat']===0?'PSB':'Kelas '.(int)$class['tingkat']) ?></span></td><td data-label="Status"><span class="master-status <?= (int)$class['is_active']===1?'is-active':'is-inactive' ?>"><?= (int)$class['is_placeholder']===1?'Placeholder':((int)$class['is_active']===1?'Aktif':'Nonaktif') ?></span></td><td data-label="Siswa Aktif" class="text-center"><span class="class-card-caption">Siswa Aktif</span><?= number_format((int)$class['siswa_count']) ?></td><td data-label="Histori" class="text-center"><span class="class-card-caption">Histori</span><?= number_format((int)$class['history_count']) ?></td><td data-label="Aksi" class="aksi-col">
+        <?php if(!unit_all_readonly() && (int)$class['is_placeholder']!==1 && (int)$class['tingkat']>0): ?><a class="btn-tbl btn-tbl-edit" href="master_kelas.php?edit=<?= (int)$class['id'] ?>">Edit</a><form method="post" style="display:inline"><input type="hidden" name="csrf_token" value="<?= htmlspecialchars($_SESSION['csrf_master_kelas']) ?>"><input type="hidden" name="aksi" value="toggle"><input type="hidden" name="id" value="<?= (int)$class['id'] ?>"><input type="hidden" name="target_active" value="<?= (int)$class['is_active']===1?'0':'1' ?>"><button class="btn-tbl btn-tbl-toggle <?= (int)$class['is_active']===1?'is-deactivate':'is-activate' ?>" type="submit"><?= (int)$class['is_active']===1?'Nonaktifkan':'Aktifkan' ?></button></form><?php elseif (!unit_all_readonly() && !class_is_alumni($class) && (int)$class['tingkat']===0 && !(int)$class['is_active']): ?><form method="post"><input type="hidden" name="csrf_token" value="<?= htmlspecialchars($_SESSION['csrf_master_kelas']) ?>"><input type="hidden" name="aksi" value="toggle"><input type="hidden" name="id" value="<?= (int)$class['id'] ?>"><input type="hidden" name="target_active" value="1"><button class="btn-tbl btn-tbl-toggle is-activate" type="submit">Aktifkan PSB</button></form><?php else: ?><span class="payment-auto-note"><?= !unit_all_readonly()?'Dikelola sistem':'Pilih satu unit untuk mengubah rombel' ?></span><?php endif; ?>
         </td></tr>
           <?php endforeach; ?>
           </tbody></table></div>
@@ -478,6 +479,7 @@ require_once __DIR__.'/includes/master_workspace_ui.php';
     </div>
     </section>
     </div>
+    <?php require __DIR__.'/includes/legacy_operational_groups_view.php'; ?>
   </main>
 </div>
 <script src="assets/js/date_format.js?v=<?= filemtime(__DIR__ . '/assets/js/date_format.js') ?>"></script>

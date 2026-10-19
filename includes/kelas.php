@@ -5,8 +5,12 @@ require_once __DIR__ . '/tagihan_tahunan.php';
 require_once __DIR__ . '/komite_billing.php';
 require_once __DIR__.'/promotion.php';
 
+function class_is_alumni(array $class): bool {
+    return ($class['legacy_kind']??'')==='alumni'||preg_match('/^Alumni20[0-9]{2}$/Di',(string)($class['kode_rombel']??''))===1;
+}
 function class_label(array $class): string {
     if (($class['tingkat']??$class['KELAS']??'')==='LEGACY') return 'Legacy';
+    if(class_is_alumni($class))return 'Alumni'.($class['graduation_year']??substr($class['kode_rombel'],6));
     $level = (int)($class['tingkat'] ?? 0);
     $code = strtoupper(trim((string)($class['kode_rombel'] ?? '')));
     if ($level === 0 || $code === 'PSB') {
@@ -19,8 +23,8 @@ function class_label(array $class): string {
 }
 
 function class_find(mysqli $db, int $classId, bool $activeOnly = false, bool $forUpdate = false): ?array {
-    $sql = 'SELECT id, unit_id, tingkat, kode_rombel, is_placeholder, is_active FROM master_kelas WHERE id = ?';
-    if ($activeOnly) $sql .= ' AND is_active = 1';
+    $sql = 'SELECT * FROM master_kelas WHERE id = ?';
+    if ($activeOnly) $sql .= " AND is_active = 1 AND NOT (tingkat=0 AND UPPER(kode_rombel) LIKE 'ALUMNI%')";
     $sql .= ' LIMIT 1';
     if ($forUpdate) $sql .= ' FOR UPDATE';
     $stmt = $db->prepare($sql);
@@ -34,9 +38,9 @@ function class_find(mysqli $db, int $classId, bool $activeOnly = false, bool $fo
 
 function class_all(mysqli $db, bool $activeOnly = true, bool $includePlaceholder = true): array {
     $where = [];
-    if ($activeOnly) $where[] = 'is_active = 1';
+    if ($activeOnly) $where[] = "is_active = 1 AND NOT (tingkat=0 AND UPPER(kode_rombel) LIKE 'ALUMNI%')";
     if (!$includePlaceholder) $where[] = 'is_placeholder = 0';
-    $sql = 'SELECT id, unit_id, tingkat, kode_rombel, is_placeholder, is_active FROM master_kelas';
+    $sql = 'SELECT * FROM master_kelas';
     if ($where) $sql .= ' WHERE ' . implode(' AND ', $where);
     $sql .= " ORDER BY CASE WHEN tingkat=0 THEN 0 ELSE 1 END, tingkat, is_placeholder, kode_rombel";
     $rows = $db->query($sql)->fetch_all(MYSQLI_ASSOC);
@@ -209,7 +213,7 @@ function class_disable_empty_rombel(mysqli $db): int {
 function class_enable_all_rombel(mysqli $db): int {
     $stmt = $db->prepare("UPDATE master_kelas
         SET is_active = 1
-        WHERE is_placeholder = 0
+        WHERE is_placeholder = 0 AND UPPER(kode_rombel) NOT LIKE 'ALUMNI%'
           AND is_active = 0");
     $stmt->execute();
     $affected = $stmt->affected_rows;

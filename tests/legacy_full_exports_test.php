@@ -1,0 +1,10 @@
+<?php
+if(PHP_SAPI!=='cli')exit(1);require_once __DIR__.'/../koneksi.php';require_once __DIR__.'/http_form_scope.php';spp_test_assert_database_target($koneksi);require_once __DIR__.'/legacy_finance_support.php';require_once __DIR__.'/../includes/legacy_full_read.php';
+$root=dirname((string)getenv('SPP_TEST_ISOLATED_INSTANCE'));$c=json_decode(file_get_contents($root.'/full-browser.json'),true);$base=$c['base'];spp_test_assert_http_clone($base,DB_NAME);$sid=$c['receipt_session'];
+$params=['template'=>'penerimaan','unit'=>'all','tanggal_awal'=>'2026-10-01','tanggal_akhir'=>max('2026-10-16',date('Y-m-d')),'kategori'=>'semua','siswa_status'=>'all'];
+foreach(['preview','pdf','excel'] as $format){$url=$base.'/laporan/export_global.php?'.http_build_query($params+['format'=>$format,'download'=>'1']);$body=file_get_contents($url,false,stream_context_create(['http'=>['header'=>'Cookie: PHPSESSID='.$sid,'ignore_errors'=>true,'follow_location'=>0,'timeout'=>180]]));lft_assert(str_contains($http_response_header[0]??'',' 200 '),'Global export HTTP '.$format);
+    if($format==='preview')lft_assert(str_contains($body,'Asal')&&str_contains($body,'Legacy')&&str_contains($body,'SistemSPP'),'Preview source identity lost');
+    if($format==='pdf'){lft_assert(str_starts_with($body,'%PDF-'),'Global historic PDF');file_put_contents($root.'/full-global.pdf',$body);}
+    if($format==='excel'){lft_assert(str_starts_with($body,'PK'),'Excel signature');$file=$root.'/full-global.xlsx';file_put_contents($file,$body);require_once __DIR__.'/../vendor/autoload.php';$book=\PhpOffice\PhpSpreadsheet\IOFactory::load($file);$cells=[];foreach($book->getAllSheets() as $sheet)foreach($sheet->toArray() as $row)foreach($row as $value)$cells[]=$value;lft_assert(in_array('Legacy',$cells,true)&&in_array('SistemSPP',$cells,true)&&in_array('Asal',$cells,true),'Excel lost actual origin cells');$book->disconnectWorksheets();}
+}
+echo "PASS: actual combined preview/PDF/Excel, historic/current origin cells preserved in downloaded workbook.\n";

@@ -30,6 +30,7 @@ function komite_sync_placement(mysqli $db, int $placementId): int {
         $nis = (string)$placement['no_induk'];
         $class = (string)$placement['kelas_rombel_snapshot'];
         $month = (string)$period['bulan']; $year = (string)$period['tahun'];
+        require_once __DIR__.'/legacy_full_read.php';if(lful_is_covered($db,$nis,'komite',$year.'-'.str_pad($month,2,'0',STR_PAD_LEFT)))continue;
         $insert->bind_param('iissssd', $yearId, $placementId, $nis, $class, $month, $year, $rate);
         $insert->execute(); $created += $insert->affected_rows;
     }

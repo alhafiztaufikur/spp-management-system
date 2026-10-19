@@ -1,5 +1,6 @@
 <?php
 
+require_once __DIR__ . '/../includes/units.php';
 require_once __DIR__ . '/../includes/reports.php';
 
 function billing_group_assert(bool $condition, string $message): void {
@@ -20,7 +21,7 @@ try {
     $rows = [
         billing_group_row('002','Hafiz','spp','SPP','Agustus 2026','2026-08',100000,0),
         billing_group_row('001','Lakchamana','spp','SPP','Agustus 2026','2026-08',100000,50000),
-        billing_group_row('001','Lakchamana','pangkal','Uang Pangkal','Sekali saat masuk','',500000,500000),
+        billing_group_row('001','Lakchamana','psb','Uang PSB','Sekali saat masuk','',500000,500000),
         billing_group_row('001','Lakchamana','spp','SPP','Juli 2026','2026-07',100000,100000),
         billing_group_row('001','Lakchamana','spp','SPP','Juli 2027','2027-07',100000,0,'2027/2028'),
         billing_group_row('001','Lakchamana','daftar_ulang','Daftar Ulang','2026/2027','',1000000,250000),
@@ -30,7 +31,7 @@ try {
     $groups = report_billing_history_group_students($rows);
     billing_group_assert(count($groups)===2,'Harus ada satu kelompok per siswa.');
     $columns=report_billing_history_component_columns($groups);
-    billing_group_assert(array_column($columns,'komponen_key')===['daftar_ulang','pangkal','biaya_lain:9','spp'],'Kolom matriks tidak mengikuti komponen dan urutan laporan.');
+    billing_group_assert(array_column($columns,'komponen_key')===['daftar_ulang','psb','biaya_lain:9','spp'],'Kolom matriks tidak mengikuti komponen dan urutan laporan.');
     $student=array_column($groups,null,'nis')['001'];
     $components=array_column($student['components'],null,'komponen_key');
     billing_group_assert(count($components)===4,'Jumlah komponen siswa tidak sesuai.');

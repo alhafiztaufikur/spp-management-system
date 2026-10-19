@@ -3,15 +3,15 @@
   const $ = id => document.getElementById(id);
   const config = JSON.parse($('legacy-config').textContent);
   const storageKey = 'spp-legacy-job:' + config.key;
-  let file = null, category = 'students', ready = false, id = localStorage.getItem(storageKey), timer, state = '', jobUnit=0, restoreInProgress=false;
+  let file = null, category = 'students', ready = false, financeReady = false, id = localStorage.getItem(storageKey), timer, state = '', jobUnit=0, restoreInProgress=false;
   const start = $('legacy-start'), dialog = $('legacy-dialog');
   const units = {SD: 1, SMP: 2, SMA: 3};
   const refresh = () => {
-    start.disabled = restoreInProgress || !(ready && file && category === 'students' && units[$('legacy-unit').value] === config.unit);
-    if (category !== 'students') $('legacy-readiness').textContent = 'Kategori ini belum tersedia; hanya identitas siswa yang dapat diimpor.';
+    start.disabled = restoreInProgress || !(ready && file && (category === 'students' || (category === 'finance' && financeReady)) && units[$('legacy-unit').value] === config.unit);
+    if (category === 'finance' && !financeReady) $('legacy-readiness').textContent = 'Keuangan Legacy belum siap. Administrator perlu memasang skema melalui CLI.';
     else if (!config.unit) $('legacy-readiness').textContent = 'Pilih SD, SMP, atau SMA di sidebar. Semua Unit hanya untuk baca.';
     else if (units[$('legacy-unit').value] !== config.unit) $('legacy-readiness').textContent = 'Unit sumber harus sama dengan pilihan sidebar.';
-    else if (ready) $('legacy-readiness').textContent = 'Worker siap. Pilih satu backup .dat untuk pemeriksaan sumber.';
+    else if (ready) $('legacy-readiness').textContent = 'Worker siap. Pilih satu backup SQL Server (.dat, .bak, atau tanpa ekstensi) untuk diperiksa.';
   };
   const api = async (action, fields = {}) => {
     const body = new URLSearchParams({action, csrf_token: config.csrf, ...fields});
@@ -22,6 +22,9 @@
   const progress = (done, total) => { if (total > 0) $('legacy-progress').value = Math.min(100, done / total * 100); else $('legacy-progress').removeAttribute('value'); };
   const render = result => {
     const job = result.job; state = job.state;jobUnit=Number(job.unit);
+    const finance = job.category === 'finance';
+    $('legacy-confirm-section').querySelector('p').textContent = finance ? 'Konfirmasi hanya menyimpan arsip histori. Saldo, tunggakan, dan penerimaan aktif belum berubah.' : 'Siswa diterima sebagai Legacy, tanpa penempatan, tagihan, atau rekening Tabungan.';
+    $('legacy-confirm').textContent = finance ? 'Simpan Arsip Keuangan' : 'Impor Identitas Legacy';
     $('legacy-job-name').textContent = `${job.name} · ${Object.keys(units).find(key => units[key] === Number(job.unit))}`;
     statusText(`${job.stage}: ${job.message || (job.total > 0 ? `${job.done}/${job.total} baris` : 'Sedang diproses')}`);
     progress(job.done, job.total);
@@ -34,7 +37,7 @@
     if (preview) {
       $('legacy-counts').textContent = Object.entries(preview.counts).map(([key, value]) => `${key}: ${value}`).join(' · ') + `. Pratinjau maksimal ${preview.limit} baris; laporan memuat seluruh baris.`;
       const table = document.createElement('table'); table.className = 'dbt-table';
-      const head = document.createElement('tr'); ['Baris', 'NIS', 'Nama', 'Kelas sumber', 'Hasil', 'Alasan'].forEach(label => { const cell = document.createElement('th'); cell.textContent = label; head.append(cell); });table.append(head);
+      const head = document.createElement('tr'); ['Baris', 'NIS', 'Nama', finance ? 'Tabel sumber' : 'Kelas sumber', 'Hasil', 'Alasan'].forEach(label => { const cell = document.createElement('th'); cell.textContent = label; head.append(cell); });table.append(head);
       preview.rows.forEach(row => { const tr = document.createElement('tr'); ['ordinal', 'nis', 'name', 'class', 'result', 'reason'].forEach(key => { const td = document.createElement('td');td.textContent = row[key];tr.append(td); });table.append(tr); });
       $('legacy-preview').replaceChildren(table);
     }
@@ -73,5 +76,5 @@
   dialog.addEventListener('close', () => $('legacy-reopen').focus());
   $('legacy-reopen').hidden = !id;
   $('legacy-reopen').addEventListener('click', () => { dialog.showModal();poll(); });
-  fetch('legacy_import_api.php?action=health', {cache: 'no-store'}).then(r => r.json()).then(result => { ready = result.ready === true;if (!ready) $('legacy-readiness').textContent = result.reasons?.join(' ') || 'Layanan belum tersedia.';refresh(); }).catch(() => { $('legacy-readiness').textContent = 'Kesiapan worker tidak dapat diperiksa.'; });
+  fetch('legacy_import_api.php?action=health', {cache: 'no-store'}).then(r => r.json()).then(result => { ready = result.ready === true;financeReady = result.finance_ready === true;if (!ready) $('legacy-readiness').textContent = result.reasons?.join(' ') || 'Layanan belum tersedia.';refresh(); }).catch(() => { $('legacy-readiness').textContent = 'Kesiapan worker tidak dapat diperiksa.'; });
 })();

@@ -7,6 +7,8 @@ require_once '../koneksi.php';
 require_once '../includes/auth.php';
 require_once '../includes/pagination.php';
 require_once '../includes/savings_workspace.php';
+require_once '../includes/legacy_finance.php';
+require_once '../includes/legacy_full_read.php';
 requireRole(['admin', 'kasir', 'bendahara']);
 
 $flash = $_SESSION['flash'] ?? null;
@@ -43,17 +45,18 @@ $where_nis_keluar .= unit_student_selection_where();
 $periodStart = $filter_tanggal_awal . ' 00:00:00';
 $periodEnd = date('Y-m-d H:i:s', strtotime($filter_tanggal_akhir . ' +1 day'));
 
+$legacyInSource=lful_savings_source($koneksi,'transaksi_m');$legacyOutSource=lful_savings_source($koneksi,'transaksi_k');
 $sql_masuk = "
     SELECT tm.id,tm.unit_id, tm.NO_INDUK, s.NAMA, s.KELAS, s.NO_induk_diknas, tm.TANGGAL,
            tm.MASUK as nominal, 0 as keluar, 'masuk' as jenis, tm.user_id, tm.keterangan
-    FROM transaksi_m tm
+    FROM $legacyInSource tm
     JOIN siswa s ON s.NO_INDUK = tm.NO_INDUK AND s.unit_id=tm.unit_id
     WHERE tm.TANGGAL >= ? AND tm.TANGGAL < ?$where_nis_masuk
 ";
 $sql_keluar = "
     SELECT tk.id,tk.unit_id, tk.NO_INDUK, s.NAMA, s.KELAS, s.NO_induk_diknas, tk.TANGGAL,
            0 as nominal, tk.KELUAR as keluar, 'keluar' as jenis, tk.user_id, tk.keterangan
-    FROM transaksi_k tk
+    FROM $legacyOutSource tk
     JOIN siswa s ON s.NO_INDUK = tk.NO_INDUK AND s.unit_id=tk.unit_id
     WHERE tk.TANGGAL >= ? AND tk.TANGGAL < ?$where_nis_keluar
 ";
@@ -116,6 +119,11 @@ $saldo_list = $koneksi->query("
 ")->fetch_all(MYSQLI_ASSOC);
 
 $total_saldo_semua = array_sum(array_map(static fn($row) => (float)$row['SALDO'], $saldo_list));
+// Opening balances are not cash deposits; show them beside each cached balance.
+$legacyOpenings=[];
+$legacyBankHeld=lop_held_student_accounts($koneksi);
+if(lop_ready($koneksi))foreach(lf_rows($koneksi,'SELECT o.student_id,a.opening amount,a.effective_date FROM legacy_op_accounts a JOIN legacy_op_owners o ON o.id=a.owner_id AND o.unit_id=a.unit_id WHERE o.student_id IS NOT NULL') as $opening)$legacyOpenings[(int)$opening['student_id']]=$opening;
+if(legacy_finance_ready($koneksi))foreach(lf_rows($koneksi,'SELECT student_id,amount,effective_date FROM legacy_savings_openings WHERE cancelled_at IS NULL') as $opening)$legacyOpenings[(int)$opening['student_id']]=$opening;
 $siswa_punya_saldo = count(array_filter($saldo_list, static fn($row) => (float)$row['SALDO'] > 0));
 $saldo_tertinggi = empty($saldo_list) ? 0 : max(array_map(static fn($row) => (float)$row['SALDO'], $saldo_list));
 $kelas_rekap = array_values(array_unique(array_map(static fn($row) => (string)$row['KELAS'], $saldo_list)));
@@ -230,7 +238,7 @@ $periodLabel = $filter_tanggal_awal === $filter_tanggal_akhir
           </div>
           <div class="savings-recap-total">
             <span>Total saldo seluruh siswa dalam cakupan unit</span>
-            <strong>Rp <?= number_format($total_saldo_semua, 0, ',', '.') ?></strong>
+            <strong><?= savings_money($total_saldo_semua) ?></strong>
           </div>
         </div>
 
@@ -238,7 +246,7 @@ $periodLabel = $filter_tanggal_awal === $filter_tanggal_akhir
         <div class="savings-recap-stats">
           <div><span>Siswa aktif</span><strong><?= number_format(count($saldo_list)) ?></strong></div>
           <div><span>Punya saldo</span><strong><?= number_format($siswa_punya_saldo) ?></strong></div>
-          <div><span>Saldo tertinggi</span><strong>Rp <?= number_format($saldo_tertinggi, 0, ',', '.') ?></strong></div>
+          <div><span>Saldo tertinggi</span><strong><?= savings_money($saldo_tertinggi) ?></strong></div>
         </div>
 
         <div class="savings-search-panel">
@@ -305,14 +313,14 @@ $periodLabel = $filter_tanggal_awal === $filter_tanggal_akhir
                   </div>
                 </td>
                 <td data-label="Kelas" class="savings-class-col"><span class="savings-class-badge">Kelas <?= htmlspecialchars($sl['KELAS']) ?></span></td>
-                <td data-label="Saldo" class="nominal savings-balance <?= $saldo > 0 ? 'is-positive' : 'is-empty' ?>">Rp <?= number_format($saldo,0,',','.') ?></td>
+                <td data-label="Saldo" class="nominal savings-balance <?= $saldo > 0 ? 'is-positive' : 'is-empty' ?>"><?= isset($legacyBankHeld[(int)$sl['student_id']])?'Perlu diperiksa':savings_money($saldo) ?><?php if(isset($legacyOpenings[(int)$sl['student_id']])): ?><small style="display:block">Saldo awal Legacy Rp <?= number_format((float)$legacyOpenings[(int)$sl['student_id']]['amount'],2,',','.') ?></small><?php endif; ?></td>
                 <td data-label="Terakhir"><?= htmlspecialchars($lastActivity) ?></td>
                 <td data-label="Aksi">
                   <div class="savings-row-actions">
                     <a href="riwayat.php?student_id=<?= (int)$sl['student_id'] ?>&amp;nis=<?= urlencode($sl['NO_INDUK']) ?>&tanggal_awal=<?= urlencode($filter_tanggal_awal) ?>&tanggal_akhir=<?= urlencode($filter_tanggal_akhir) ?>" class="btn-tbl btn-tbl-view" title="Lihat riwayat">
                       <svg width="13" height="13" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.4" stroke-linecap="round" stroke-linejoin="round"><path d="M1 12s4-8 11-8 11 8 11 8-4 8-11 8-11-8-11-8z"/><circle cx="12" cy="12" r="3"/></svg>
                     </a>
-                    <?php if (hasRole(['admin','kasir'])): ?>
+                    <?php if(isset($legacyBankHeld[(int)$sl['student_id']])): $held=$legacyBankHeld[(int)$sl['student_id']]; ?><a class="btn-tbl" href="../legacy_accounts.php?batch=<?= htmlspecialchars($held['batch_id']) ?>&amp;owner=<?= (int)$held['owner_id'] ?>">Tinjau</a><?php elseif (hasRole(['admin','kasir'])): ?>
                     <a href="masuk.php?nis=<?= urlencode($sl['NO_INDUK']) ?>" class="btn-tbl btn-tbl-edit" title="Tabungan masuk">
                       <svg width="13" height="13" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.4" stroke-linecap="round" stroke-linejoin="round"><path d="M12 5v14"/><path d="M5 12h14"/></svg>
                     </a>

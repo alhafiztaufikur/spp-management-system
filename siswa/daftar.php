@@ -194,7 +194,7 @@ if ($_SERVER['REQUEST_METHOD'] === 'POST') {
             $effectiveYear = $oldStudent
                 ? spp_student_effective_year($koneksi, (string)$oldStudent['NO_INDUK'])
                 : du_current_academic_year();
-            $effectiveSpp = spp_current_effective_rate($koneksi, $class, $values['potongan_spp_nominal'], $effectiveYear);
+            $effectiveSpp = spp_current_effective_rate($koneksi, $class, $values['potongan_spp_nominal'], $effectiveYear, $oldStudent ? (string)$oldStudent['NO_INDUK'] : null);
             $hasMasterSppRate = $effectiveSpp['year'] !== 'Belum disiapkan';
             if ((!$oldStudent || abs($values['potongan_spp_nominal']-(float)$oldStudent['potongan_spp_nominal'])>.001) && $values['potongan_spp_nominal'] > ($hasMasterSppRate ? (float)$effectiveSpp['base'] : 0) + .001) throw new RuntimeException('Potongan SPP tidak boleh melebihi tarif dasar; siapkan master terlebih dahulu.');
             $spp = $class === '0' ? 0.0 : ($hasMasterSppRate ? (float)$effectiveSpp['net'] : (float)($oldStudent['SPP_PERBULAN'] ?? 0));
@@ -390,6 +390,7 @@ if ($editId > 0 && !$editStudent) {
 $query = trim((string)($_GET['q'] ?? ''));
 require_once '../includes/student_filters.php';
 [$filterClass,$filterStatus,$classOptions,$studentFilterSql]=student_list_filters($koneksi,$_GET);
+$filterClassOptions=student_filter_class_choices($koneksi);
 filter_output_start();
 $allowedPageSizes = [10, 25, 50];
 $perPage = page_size_param('per_page', $allowedPageSizes, 10);
@@ -501,8 +502,8 @@ function rupiah_value($value): string {
 }
 $previewLevel = (string)($formStudent['KELAS'] ?? '');
 $previewDiscount = (float)form_student_value('potongan_spp_nominal', $oldInput, $formStudent, $fieldMap, 0);
-$sppRatePreview = spp_current_effective_rate($koneksi, $previewLevel, $previewDiscount, $editStudentYear);
-$sppRatesByGrade=[];[$firstGrade,$lastGrade]=unit_level_bounds();foreach(range($firstGrade,$lastGrade) as $grade)$sppRatesByGrade[$grade]=spp_current_effective_rate($koneksi,(string)$grade,0,$editStudentYear);
+$sppRatePreview = spp_current_effective_rate($koneksi, $previewLevel, $previewDiscount, $editStudentYear, $editStudent ? (string)$editStudent['NO_INDUK'] : null);
+$sppRatesByGrade=[];[$firstGrade,$lastGrade]=unit_level_bounds();foreach(range($firstGrade,$lastGrade) as $grade)$sppRatesByGrade[$grade]=spp_current_effective_rate($koneksi,(string)$grade,0,$editStudentYear,$editStudent ? (string)$editStudent['NO_INDUK'] : null);
 ?>
 <!DOCTYPE html>
 <html lang="id" data-palette="<?= unit_palette_for_view(isset($reportUnitId) ? (int)$reportUnitId : null) ?>">
@@ -697,7 +698,7 @@ $sppRatesByGrade=[];[$firstGrade,$lastGrade]=unit_level_bounds();foreach(range($
           </div>
           <select class="field-input field-select filter-sel" name="kelas" data-filter-multiple aria-label="Kelas/Rombel">
             <option value="">Semua Kelas</option>
-            <?php foreach ($classOptions as $classOption): ?><option value="<?= (int)$classOption['id'] ?>" <?= $filterClass === (int)$classOption['id'] ? 'selected' : '' ?>><?= htmlspecialchars($classOption['label']) ?></option><?php endforeach; ?>
+            <?php foreach ($filterClassOptions as $classOption): ?><option value="<?= (int)$classOption['id'] ?>" <?= $filterClass === (int)$classOption['id'] ? 'selected' : '' ?>><?= htmlspecialchars($classOption['label']) ?></option><?php endforeach; ?>
           </select>
           <select class="field-input field-select filter-sel" name="status" data-filter-multiple aria-label="Status">
             <option value="active" <?= $filterStatus === 'active' ? 'selected' : '' ?>>Aktif</option>

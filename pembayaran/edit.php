@@ -30,6 +30,7 @@ if (!empty($returnEntry['draft'])) {
     $restoreDraft = $returnEntry['draft'];
     ob_start(static fn($html) => payment_edit_restore_markup($html, $restoreDraft));
 }
+if ($id < -1000000000) { header('Location: ../legacy_correction.php?kind=payment&id='.(-$id-1000000000)); exit; }
 if ($id <= 0) { header('Location: ' . $returnUrl); exit; }
 
 $stmt = $koneksi->prepare("SELECT p.*, s.NO_INDUK, s.NAMA, s.KELAS, s.SPP_PERBULAN FROM bayar p JOIN siswa s ON s.NO_INDUK = p.NO_INDUK AND s.unit_id=p.unit_id WHERE p.id = ?");

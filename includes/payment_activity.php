@@ -35,6 +35,14 @@ function payment_activity_encode(?array $snapshot): ?string
     return $snapshot === null ? null : json_encode($snapshot, JSON_UNESCAPED_UNICODE | JSON_UNESCAPED_SLASHES | JSON_THROW_ON_ERROR);
 }
 
+function payment_activity_begin_transaction(mysqli $db): void
+{
+    require_once __DIR__.'/legacy_operational_schema.php';
+    // A receipt may wait for a Legacy correction: read its committed result after the lock.
+    if (lop_ready($db)) $db->query('SET TRANSACTION ISOLATION LEVEL READ COMMITTED');
+    $db->begin_transaction();
+}
+
 /** Call inside the financial transaction. Duplicate keys are read, never overwritten. */
 function payment_activity_record(mysqli $db, int $paymentId, string $action, $actorIdentity,
     ?array $before, ?array $after, string $key, ?int $authorizationId = null, string $note = '',
@@ -61,6 +69,10 @@ function payment_activity_record(mysqli $db, int $paymentId, string $action, $ac
         VALUES(?,?,?,?,?,?,?,?,?,?,?,?,?,?)');
     $s->bind_param('iississssisssi', $unit,$paymentId,$key,$action,$actorId,$actorName,$username,$role,$occurred,$authorizationId,$note,$beforeJson,$afterJson,$legacy);
     $s->execute(); $s->close();
+    if (!$reconstructed && in_array($action, ['created', 'edited', 'deleted'], true)) {
+        require_once __DIR__.'/legacy_operational_native.php';
+        lop_native_payment_changed($db, $before, $after);
+    }
 }
 
 function payment_activity_for_payments(mysqli $db, array $ids): array

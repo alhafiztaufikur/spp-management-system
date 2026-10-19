@@ -12,7 +12,7 @@
     });
   };
   tabs.forEach((tab, index) => {
-    tab.addEventListener('click', () => selectTab(tab));
+    tab.addEventListener('click', event => { event.preventDefault(); selectTab(tab); history.replaceState(null, '', '?tab=' + (tab.id === 'tab-legacy' ? 'legacy' : 'backup')); });
     tab.addEventListener('keydown', event => {
       let target;
       if (event.key === 'ArrowRight' || event.key === 'ArrowLeft') target = tabs[1 - index];
@@ -21,6 +21,7 @@
       if (target) { event.preventDefault(); selectTab(target); target.focus(); }
     });
   });
+  if (location.hash === '#panel-legacy') selectTab(byId('tab-legacy'));
   const selectedFiles = {restore: null, legacy: null};
   const legacyReadiness = () => document.dispatchEvent(new CustomEvent('legacy-selection-changed'));
   const updateSelection = (prefix, files) => {
@@ -33,7 +34,7 @@
     if (files.length > 1) error = 'Pilih satu file saja; pilihan ganda tidak diterima.';
     else if (files.length === 1) {
       const file = files[0];
-      if (!(prefix === 'legacy' ? /\.dat$/i : /\.sql$/i).test(file.name)) error = prefix === 'legacy' ? 'Pilih satu backup SQL Server (.dat).' : 'Pilih satu file SQL (.sql).';
+      if (!(prefix === 'legacy' ? (!file.name.includes('.') || /\.(dat|bak)$/i.test(file.name)) : /\.sql$/i.test(file.name))) error = prefix === 'legacy' ? 'Pilih backup SQL Server .dat, .bak, atau tanpa ekstensi.' : 'Pilih satu file SQL (.sql).';
       else if (file.size === 0) error = 'File kosong tidak dapat digunakan.';
       else if (file.size > 100 * 1024 * 1024) error = 'Ukuran file melebihi batas 100 MB.';
       else {
@@ -50,7 +51,7 @@
     legacyReadiness();
     if(prefix === 'legacy') document.dispatchEvent(new CustomEvent('legacy-file-selected', {detail: selectedFiles.legacy}));
   };
-  ['restore', 'legacy'].forEach(prefix => {
+  ['restore', 'legacy'].filter(prefix => byId(prefix + '-file')).forEach(prefix => {
     const input = byId(prefix + '-file'), zone = byId(prefix + '-dropzone');
     const choose = () => { input.value = ''; input.click(); };
     byId(prefix + '-choose').addEventListener('click', choose);
@@ -66,6 +67,7 @@
   });
   const conditions = {
     students: ['Identitas siswa sebagai Legacy', 'NIS dipertahankan per unit. Duplikasi dalam unit dan identitas yang bermasalah ditahan. Aktivasi dan penempatan dilakukan manual melalui Data Siswa.'],
+    finance: ['Arsip histori keuangan', 'Histori disimpan sebagai arsip. Saldo dan tunggakan harus ditinjau per siswa sebelum menjadi data aktif.'],
     classes: ['Histori kelas dan tarif perlu dilengkapi', 'Kelas, rombel, periode, dan tarif harus dipetakan dari bukti sumber. Kelas sebelum penempatan pertama tidak ditebak.'],
     payments: ['Relasi pembayaran perlu dibuktikan', 'Identitas transaksi, periode, siswa, tagihan, potongan, dan nominal perlu dicocokkan. Tidak ada penerimaan fiktif atau pemecahan transaksi otomatis.'],
     savings: ['Saldo dan jurnal perlu direkonsiliasi', 'Saldo Tabungan harus cocok dengan jurnal masuk/keluar. Saldo bukan penerimaan pembayaran sekolah.']
@@ -76,8 +78,9 @@
     document.dispatchEvent(new CustomEvent('legacy-category-selected', {detail: button.dataset.category}));
     byId('legacy-condition-title').textContent = title;
     byId('legacy-condition').textContent = description;
+    document.querySelector('.dbt-audit-condition .dbt-badge').textContent = button.dataset.category === 'finance' ? 'Arsip & peninjauan' : 'Identitas siswa saja';
   }));
-  byId('legacy-unit').addEventListener('change', legacyReadiness);
+  if (byId('legacy-unit')) byId('legacy-unit').addEventListener('change', legacyReadiness);
   const dialog = byId('restore-dialog');
   byId('restore-cancel').addEventListener('click', () => dialog.close());
   dialog.addEventListener('close', () => byId('restore-review').focus());

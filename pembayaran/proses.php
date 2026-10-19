@@ -199,6 +199,9 @@ function reject_removed_payment_components(array $source): void {
 }
 
 function validate_payment_context(string $tanggal, string $bulan, string $tahun): void {
+    require_once __DIR__.'/../includes/legacy_full_read.php';
+    $db=$GLOBALS['koneksi'];
+    if(lful_read_ready($db)){$cutover=lf_one($db,'SELECT cutoff FROM legacy_full_batches WHERE unit_id=?',[unit_active_id()]);if($cutover&&$tanggal<$cutover['cutoff'])throw new RuntimeException('Tanggal pembayaran mendahului waktu peralihan Legacy.');}
     if (!in_array($bulan, ['01','02','03','04','05','06','07','08','09','10','11','12'], true)) {
         throw new RuntimeException('Bulan pembayaran tidak valid.');
     }
@@ -626,7 +629,7 @@ if ($aksi === 'input') {
         exit;
     }
 
-    $koneksi->begin_transaction();
+    payment_activity_begin_transaction($koneksi);
 
     try {
         financial_request_reserve($koneksi, $requestKey, 'pembayaran', (int)$_SESSION['admin_id']);
@@ -846,7 +849,7 @@ if ($aksi === 'update') {
         authorization_abort_before_transaction($koneksi, $authorizationRequest, $authorizationRequestId, $authorizationApproverId, 'Pilih siswa terlebih dahulu.', 'edit.php?id=' . $id);
     }
 
-    $koneksi->begin_transaction();
+    payment_activity_begin_transaction($koneksi);
     try {
         if ($authorizationRequest) {
             $lockedRequest = transaction_authorization_find($koneksi, $authorizationRequestId, true);
@@ -1053,7 +1056,7 @@ if ($aksi === 'hapus') {
     $id = (int)($_POST['id'] ?? 0);
     if ($id <= 0) authorization_abort_before_transaction($koneksi, $authorizationRequest, $authorizationRequestId, $authorizationApproverId, 'ID transaksi tidak valid.', 'lihat.php');
 
-    $koneksi->begin_transaction();
+    payment_activity_begin_transaction($koneksi);
 
     try {
         if ($authorizationRequest) {

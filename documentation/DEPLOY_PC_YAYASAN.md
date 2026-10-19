@@ -57,7 +57,7 @@ Panduan ini untuk **pemasangan baru di PC Windows**, dengan akses dari jaringan 
 
 8. **Siapkan impor data lama jika diperlukan.**
 
-   Untuk impor berkas `.dat`, pasang SQL Server LocalDB 2019 dan jalankan worker sesuai [panduan Import Legacy](LEGACY_IMPORT_RUNBOOK_20261003.md). Worker ini perlu dijalankan kembali setelah restart atau logoff. Jika tidak memakai Import Legacy, langkah ini dapat dilewati.
+   Untuk impor berkas `.dat`, pasang SQL Server LocalDB 2019 dan jalankan worker sesuai [panduan Import Legacy](LEGACY_IMPORT_RUNBOOK_20261003.md). Untuk perpindahan penuh pada unit kosong, pasang skema CLI tambahan dan ikuti [panduan Migrasi Penuh](LEGACY_FULL_MIGRATION.md), termasuk pemeriksaan backup final, pemetaan komponen dan kewajiban, serta backup terverifikasi sebelum/sesudah. Worker ini perlu dijalankan kembali setelah restart atau logoff. Jika tidak memakai Import Legacy, langkah ini dapat dilewati.
 
 9. **Lakukan pemeriksaan sebelum mulai digunakan.**
 

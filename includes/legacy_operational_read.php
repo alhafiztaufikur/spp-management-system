@@ -1,0 +1,23 @@
+<?php
+require_once __DIR__.'/legacy_operational_schema.php';
+function lop_read_one(mysqli $db,string $sql,array $values): ?array {$s=$db->prepare($sql);$s->bind_param(str_repeat('s',count($values)),...$values);$s->execute();$row=$s->get_result()->fetch_assoc();$s->close();return $row;}
+function lop_tariff(mysqli $db,string $nis): ?float {
+    if(!lop_ready($db))return null;$r=lop_read_one($db,"SELECT t.amount FROM legacy_op_tariffs t JOIN siswa s ON s.id=t.student_id AND s.unit_id=t.unit_id WHERE s.NO_INDUK=? AND t.basis='legacy'",[$nis]);return $r?(float)$r['amount']:null;
+}
+function lop_opening(mysqli $db,int $student,int $unit): ?array {
+    if(!lop_ready($db))return null;return lop_read_one($db,'SELECT a.opening amount,a.effective_date FROM legacy_op_accounts a JOIN legacy_op_owners o ON o.id=a.owner_id AND o.unit_id=a.unit_id WHERE o.student_id=? AND o.unit_id=?',[$student,$unit]);
+}
+function lop_bank_assert_ready(mysqli $db,string $nis,int $unit=0): void {
+    if(!lop_ready($db))return;$r=lop_read_one($db,"SELECT o.id,a.id account_id FROM legacy_op_owners o JOIN siswa s ON s.id=o.student_id AND s.unit_id=o.unit_id LEFT JOIN legacy_op_accounts a ON a.owner_id=o.id AND a.unit_id=o.unit_id WHERE s.NO_INDUK=? AND (?=0 OR s.unit_id=?) AND EXISTS(SELECT 1 FROM legacy_op_pending p WHERE p.unit_id=o.unit_id AND p.batch_id=o.batch_id AND p.source_identity=o.source_identity AND p.section='savings' AND p.resolved=0)",[$nis,$unit,$unit]);if($r&&!$r['account_id'])throw new DomainException('Tabungan Legacy rekening ini masih perlu diperiksa. Rekening lain tetap dapat digunakan.');
+}
+function lop_held_student_accounts(mysqli $db): array {
+    if(!lop_ready($db))return [];$rows=$db->query("SELECT o.student_id,o.id owner_id,o.batch_id FROM legacy_op_owners o WHERE o.student_id IS NOT NULL AND NOT EXISTS(SELECT 1 FROM legacy_op_accounts a WHERE a.owner_id=o.id AND a.unit_id=o.unit_id) AND EXISTS(SELECT 1 FROM legacy_op_pending p WHERE p.batch_id=o.batch_id AND p.unit_id=o.unit_id AND p.source_identity=o.source_identity AND p.section='savings' AND p.resolved=0)")->fetch_all(MYSQLI_ASSOC);$result=[];foreach($rows as $r)$result[(int)$r['student_id']]=$r;return $result;
+}
+function lop_payment_select(mysqli $db,array $columns): string {
+    $mapping=['id'=>'-(1000000000+p.id)','unit_id'=>'p.unit_id','NO_INDUK'=>'s.NO_INDUK','KELAS'=>'p.class_snapshot','kelas_rombel_snapshot'=>'p.class_snapshot','TGL_BYR'=>'p.source_date','total_jumlah'=>'p.total','user_id'=>"CONCAT('legacy:',p.unit_id,':',LOWER(HEX(COALESCE(p.source_operator,''))))",'BULAN'=>"''",'TAHUN'=>"''",'KETERANGAN'=>"CONCAT('Migrasi Legacy · ',p.source_period,' · ',p.note)",'sistem_pembayaran'=>"'Legacy'",'created_at'=>'p.source_date','updated_at'=>'NULL'];
+    $select=[];foreach($columns as $c){$name=$c['COLUMN_NAME'];if(!preg_match('/^[a-zA-Z0-9_]+$/D',$name))throw new LogicException('Invalid column');$select[]=($mapping[$name]??'0').' AS `'.$name.'`';}
+    return 'SELECT '.implode(',',$select)." FROM legacy_op_payments p JOIN legacy_op_owners o ON o.id=p.owner_id AND o.unit_id=p.unit_id JOIN siswa s ON s.id=o.student_id AND s.unit_id=o.unit_id JOIN legacy_full_batches b ON b.id=p.batch_id AND b.unit_id=p.unit_id WHERE b.state='completed' AND p.cancelled=0";
+}
+function lop_payment_model(mysqli $db,int $id): array {
+    $p=lop_read_one($db,"SELECT p.*,o.student_id,o.name NAMA,o.source_identity NO_INDUK,s.NO_induk_diknas,b.cutoff,src.backup_hash FROM legacy_op_payments p JOIN legacy_op_owners o ON o.id=p.owner_id AND o.unit_id=p.unit_id LEFT JOIN siswa s ON s.id=o.student_id AND s.unit_id=o.unit_id JOIN legacy_full_batches b ON b.id=p.batch_id AND b.unit_id=p.unit_id JOIN legacy_finance_sources src ON src.id=b.source_id AND src.unit_id=b.unit_id WHERE p.id=? AND b.state='completed'",[$id]);if(!$p)throw new OutOfBoundsException('Transaksi migrasi tidak ditemukan pada unit ini.');$p['items']=json_decode($p['items'],true,64,JSON_THROW_ON_ERROR);$p['operational']=true;return ['legacy'=>$p];
+}

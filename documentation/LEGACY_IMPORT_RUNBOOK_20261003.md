@@ -1,5 +1,9 @@
 # Runbook importer identitas Legacy
 
+Panduan pengguna terbaru tersedia di [Menggunakan Import Legacy](LEGACY_UI_GUIDE.md): tiga pilihan tujuan, tahapan melalui GET, formulir tanpa JavaScript, pencarian siswa, serta arahan penyelesaian masalah. Prosedur pemasangan dan pengamanan di bawah tetap berlaku.
+
+> Penambahan keuangan 16 Oktober 2026 disiapkan terpisah dan belum dipasang pada operasional. Kategori Siswa dalam runbook ini tetap berlaku. Untuk arsip, saldo awal, tunggakan, pemasangan skema CLI dan hasil pengujian, baca [panduan Histori Keuangan Legacy](LEGACY_FINANCE_20261016.md).
+
 ## Prasyarat lokal
 
 PHP 8.3 dengan mysqli, PDO SQLite, mbstring dan proc_open; PowerShell Windows/.NET SqlClient; SQL Server LocalDB 2019 di bawah **pengguna Windows pemilik instance**; MySQL 8.4. Runtime LocalDB shared/default tidak diubah. Target `db_spp` trial; target tes harus bernama `db_spp_audit_*`/`db_spp_test_*` dan memakai `SPP_TEST_ALLOW_MUTATION=1`.
@@ -69,3 +73,11 @@ Untuk `db_spp` yang sudah dimigrasi, buka [script pemeriksaan DBeaver](../sql/db
 Hasil meliputi identitas server/database, tujuh pemeriksaan kontrak skema Legacy, siswa dan manifest per unit, angka pembayaran/Tabungan, serta 30 pemeriksaan integritas. Semua baris pemeriksaan harus `OK` dan `jumlah_masalah=0`. Angka operasional dibaca aktual; tidak dipaksa sama dengan baseline historis karena aplikasi dapat menerima transaksi berikutnya.
 
 Script diuji pada MySQL lokal dan seluruh 37 pemeriksaan lulus. Ini adalah pemeriksaan database yang sudah terpasang; migrasi DDL tetap menggunakan prosedur CLI/backup/maintenance di atas dan impor `.dat` memakai worker. Hasil baris ditahan/GK berada pada staging privat importer, tidak dibuat menjadi siswa dalam SQL ini. Pengujian tidak mencakup pengoperasian antarmuka DBeaver secara langsung.
+
+## Migrasi penuh untuk server bersih
+
+Untuk perpindahan operasional per unit, gunakan **Import Legacy ? Migrasi Penuh**, bukan kategori Siswa/Histori Keuangan secara terpisah. Mode penuh memerlukan skema CLI tambahan, peninjauan seluruh masalah, dan backup terverifikasi. Ikuti [panduan migrasi penuh](LEGACY_FULL_MIGRATION.md). Database unit yang sudah berisi siswa/transaksi ditolak tanpa dihapus.
+
+## Backup terbaru tanpa ekstensi ? 17 Oktober 2026
+
+Impor mendukung `.dat`, `.bak`, dan file tanpa ekstensi melalui pemeriksaan isi dan profil 2019/2026. Lihat [panduan backup terbaru](LEGACY_BACKUP_2026.md). Dukungan pembacaan tidak mengesahkan saldo, identitas, atau kewajiban yang masih bermasalah.

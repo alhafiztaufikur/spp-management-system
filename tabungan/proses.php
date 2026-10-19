@@ -65,6 +65,7 @@ try {
     }
 
     // 1) Ambil atau buat record saldo tabungan siswa
+    require_once __DIR__.'/../includes/legacy_operational_read.php';lop_bank_assert_ready($koneksi,$no_induk);
     $stmt = $koneksi->prepare("SELECT SALDO FROM tabungan WHERE NO_INDUK = ? FOR UPDATE");
     $stmt->bind_param('s', $no_induk);
     $stmt->execute();

@@ -1,6 +1,7 @@
 <?php
 /** Private job storage. SQL Server backups are never executed by an HTTP request. */
 require_once __DIR__.'/legacy_schema.php';
+require_once __DIR__.'/legacy_source.php';
 function legacy_root(): string {
     $base=getenv('SPP_LEGACY_STORAGE')?:'C:/laragon/data/spp-legacy-import';
     $root=rtrim(str_replace('\\','/',$base),'/').'/'.DB_NAME;
@@ -12,6 +13,11 @@ function legacy_root(): string {
 function legacy_queue(): PDO {
     $db=new PDO('sqlite:'.legacy_root().'/queue.sqlite',null,null,[PDO::ATTR_ERRMODE=>PDO::ERRMODE_EXCEPTION]);
     $db->exec('PRAGMA busy_timeout=10000; PRAGMA journal_mode=WAL; CREATE TABLE IF NOT EXISTS jobs(id TEXT PRIMARY KEY,unit INTEGER NOT NULL,actor INTEGER NOT NULL,name TEXT NOT NULL,hash TEXT NOT NULL,state TEXT NOT NULL,stage TEXT NOT NULL,done INTEGER NOT NULL DEFAULT 0,total INTEGER NOT NULL DEFAULT 0,message TEXT NOT NULL DEFAULT "",created INTEGER NOT NULL,updated INTEGER NOT NULL,cancel INTEGER NOT NULL DEFAULT 0); CREATE TABLE IF NOT EXISTS rows(job TEXT NOT NULL,ordinal INTEGER NOT NULL,nis TEXT,name TEXT,class TEXT,raw TEXT NOT NULL,result TEXT NOT NULL,reason TEXT NOT NULL,PRIMARY KEY(job,ordinal));');
+    if(!in_array('category',array_column($db->query('PRAGMA table_info(jobs)')->fetchAll(PDO::FETCH_ASSOC),'name'),true)){
+        $db->exec('BEGIN IMMEDIATE');
+        try{if(!in_array('category',array_column($db->query('PRAGMA table_info(jobs)')->fetchAll(PDO::FETCH_ASSOC),'name'),true))$db->exec("ALTER TABLE jobs ADD COLUMN category TEXT NOT NULL DEFAULT 'students'");$db->exec('COMMIT');}
+        catch(Throwable $e){$db->exec('ROLLBACK');throw $e;}
+    }
     return $db;
 }
 function legacy_job(string $id): array {
@@ -25,7 +31,11 @@ function legacy_update(string $id,array $fields):void {
     $args[]=$id;$s=legacy_queue()->prepare('UPDATE jobs SET '.implode(',',$sql).' WHERE id=?');$s->execute($args);
 }
 function legacy_public(array $job):array {
-    return array_intersect_key($job,array_flip(['id','unit','name','hash','state','stage','done','total','message','created','updated','cancel']));
+    $public=array_intersect_key($job,array_flip(['id','unit','name','hash','state','stage','done','total','message','created','updated','cancel','category']));
+    $dir=legacy_root().'/'.$job['id'];
+    foreach(['source_manifest.json','finance_manifest.json'] as $file)if(is_file($dir.'/'.$file)){$m=json_decode(ltrim(file_get_contents($dir.'/'.$file),"\xEF\xBB\xBF"),true);if(is_array($m))$public+=array_intersect_key($m,array_flip(['source_profile','source_profile_version','source_schema_signature','reader_version']));}
+    if($job['state']==='failed'&&is_file($dir.'/source-error.json')){$e=json_decode(ltrim(file_get_contents($dir.'/source-error.json'),"\xEF\xBB\xBF"),true);if(($e['code']??'')==='source_schema_unsupported'){$public['code']=$e['code'];$public['action']=legacy_ui_problem($e['code']);}}
+    return $public;
 }
 function legacy_actor(mysqli $db,int $actor,int $unit):void {
     $s=$db->prepare("SELECT id FROM admin WHERE id=? AND role='super_admin' AND is_active=1");$s->bind_param('i',$actor);$s->execute();$ok=$s->get_result()->fetch_assoc();$s->close();
@@ -36,39 +46,43 @@ function legacy_readiness(mysqli $db):array {
     if(!legacy_schema_ready($db))$reasons[]='Migrasi identitas Legacy belum terpasang.';
     $heart=is_file($root.'/heartbeat.json')?json_decode(file_get_contents($root.'/heartbeat.json'),true):[];
     if(!is_array($heart)||time()-($heart['time']??0)>15)$reasons[]='Worker importer belum aktif.';
+    if(($heart['source_reader_version']??0)!==LEGACY_SOURCE_READER_VERSION)$reasons[]='Mulai ulang worker importer untuk memakai pembaca backup terbaru.';
     if(empty($heart['sql_ready']))$reasons[]='SQL Server importer belum tersedia.';
     if(!is_writable($root))$reasons[]='Penyimpanan privat tidak dapat ditulis.';
     if(!is_file($root.'/instance.json'))$reasons[]='Instance importer belum disiapkan.';
     if((float)disk_free_space($root)<1073741824)$reasons[]='Ruang penyimpanan kurang dari 1 GiB.';
-    return ['ready'=>!$reasons,'reasons'=>$reasons];
+    return ['ready'=>!$reasons,'reasons'=>$reasons,'finance_worker'=>in_array('finance',$heart['categories']??[],true),'full_worker'=>in_array('full',$heart['categories']??[],true),'operational_worker'=>($heart['operational_version']??0)===(defined('LOP_VERSION')?LOP_VERSION:1)];
 }
 function legacy_upload_error(string $name,int $size):?array {
     if($size>104857600)return [413,'Ukuran backup maksimal 100 MiB.'];
-    if($size<1||strtolower(pathinfo($name,PATHINFO_EXTENSION))!=='dat')return [400,'Pilih backup .dat yang tidak kosong.'];
+    if($size<1||$name===''||!mb_check_encoding($name,'UTF-8')||mb_strlen($name)>255||str_starts_with($name,'.')||$name!==basename(str_replace('\\','/',$name))||preg_match('/[\x00-\x1f\x7f<>:"|?*]/u',$name)||preg_match('/[. ]$/D',$name)
+        ||!in_array(strtolower(pathinfo($name,PATHINFO_EXTENSION)),['','dat','bak'],true))return [400,'Pilih backup SQL Server .dat, .bak, atau tanpa ekstensi yang tidak kosong.'];
     return null;
 }
-function legacy_enqueue(string $file,string $name,int $unit,int $actor):array {
+function legacy_enqueue(string $file,string $name,int $unit,int $actor,string $category='students'):array {
+    if(!in_array($category,['students','finance','full'],true))throw new InvalidArgumentException('Kategori tidak tersedia.');
     if(!is_file($file))throw new RuntimeException('Backup tidak ditemukan.');
     if($invalid=legacy_upload_error($name,(int)filesize($file)))throw new RuntimeException($invalid[1]);
     $id=bin2hex(random_bytes(16));$dir=legacy_root().'/'.$id;mkdir($dir,0700);
     $hash=hash_file('sha256',$file);if(!copy($file,$dir.'/source.dat'))throw new RuntimeException('Penyimpanan unggahan gagal.');
     if(hash_file('sha256',$dir.'/source.dat')!==$hash)throw new RuntimeException('Hash unggahan tidak cocok.');
     $name=mb_substr(basename(str_replace('\\','/',$name)),0,255);
-    $s=legacy_queue()->prepare('INSERT INTO jobs(id,unit,actor,name,hash,state,stage,created,updated) VALUES(?,?,?,?,?,"queued","Periksa Backup",?,?)');$s->execute([$id,$unit,$actor,$name,$hash,time(),time()]);
+    $s=legacy_queue()->prepare('INSERT INTO jobs(id,unit,actor,name,hash,state,stage,created,updated,category) VALUES(?,?,?,?,?,"queued","Periksa Backup",?,?,?)');$s->execute([$id,$unit,$actor,$name,$hash,time(),time(),$category]);
     return legacy_job($id);
 }
 function legacy_stage(mysqli $db,array $job,array $rows):void {
     unit_set_context($db,(int)$job['unit']);$q=legacy_queue();$counts=[];
     $diknasCounts=[];
-    foreach($rows as $raw){$nis=(string)($raw['NO_INDUK']??'');$counts[$nis]=($counts[$nis]??0)+1;$d=(string)($raw['NO_induk_diknas']??'');$diknasCounts[$d]=($diknasCounts[$d]??0)+1;}
+    foreach($rows as $raw){$nis=legacy_source_identity($raw);$counts[$nis]=($counts[$nis]??0)+1;$d=(string)($raw['NO_induk_diknas']??'');$diknasCounts[$d]=($diknasCounts[$d]??0)+1;}
     $q->beginTransaction();
     try {
         $q->prepare('DELETE FROM rows WHERE job=?')->execute([$job['id']]);
         $write=$q->prepare('INSERT INTO rows(job,ordinal,nis,name,class,raw,result,reason) VALUES(?,?,?,?,?,?,?,?)');
         $find=$db->prepare('SELECT s.id,m.source_hash,m.source_row FROM siswa s LEFT JOIN legacy_student_import m ON m.student_id=s.id WHERE s.NO_INDUK=?');
         foreach($rows as $i=>$raw){
-            $nis=(string)($raw['NO_INDUK']??'');$name=(string)($raw['NAMA']??'');$class=(string)($raw['KELAS']??'');$result='accepted';$reason='Identitas layak; belum aktif dan belum ditempatkan.';
-            if(strtoupper(trim($class))==='GK'){$result='non_student';$reason='GK terbukti Guru & Karyawan pada master legacy, bukan siswa.';}
+            $nis=legacy_source_identity($raw);$name=(string)($raw['NAMA']??'');$class=(string)($raw['KELAS']??'');$result='accepted';$reason='Identitas layak; belum aktif dan belum ditempatkan.';
+            if($identityIssues=legacy_source_identity_issues($raw)){$result='held';$reason=implode(' ',$identityIssues);}
+            elseif(strtoupper(trim($class))==='GK'){$result='non_student';$reason='GK terbukti Guru & Karyawan pada master legacy, bukan siswa.';}
             elseif(in_array(strtoupper(trim($class)),['GURU','KARYAWAN','ADMIN','TAB'],true)){$result='held';$reason='Kode sumber diduga akun non-siswa; diperlukan pemeriksaan identitas manual.';}
             elseif(!preg_match('/^[0-9]{1,10}$/D',$nis)||$name===''||trim($name)===''||mb_strlen($name)>100||preg_match('/[\x00-\x1f\x7f]/u',$name)){$result='held';$reason='NIS/nama tidak memenuhi struktur target; nilai asli dipertahankan.';}
             elseif($counts[$nis]>1){$result='held';$reason='NIS ganda dalam unit sumber.';}
@@ -84,9 +98,10 @@ function legacy_stage(mysqli $db,array $job,array $rows):void {
     }catch(Throwable $e){$q->rollBack();throw $e;}
     legacy_update($job['id'],['state'=>legacy_job($job['id'])['cancel']?'cancelled':'ready','stage'=>'Siap Ditinjau','done'=>count($rows),'total'=>count($rows),'message'=>'Tinjau identitas dan baris yang ditahan sebelum konfirmasi.']);
 }
+require_once __DIR__.'/legacy_ui.php';
 function legacy_preview(string $id):array {
     $q=legacy_queue();$s=$q->prepare('SELECT result,COUNT(*) AS count FROM rows WHERE job=? GROUP BY result');$s->execute([$id]);$counts=$s->fetchAll(PDO::FETCH_KEY_PAIR);
-    $s=$q->prepare('SELECT ordinal,nis,name,class,result,reason FROM rows WHERE job=? ORDER BY ordinal LIMIT 100');$s->execute([$id]);return ['counts'=>$counts,'rows'=>$s->fetchAll(PDO::FETCH_ASSOC),'limit'=>100];
+    $s=$q->prepare('SELECT ordinal,nis,name,class,result,reason FROM rows WHERE job=? ORDER BY ordinal LIMIT 100');$s->execute([$id]);$rows=$s->fetchAll(PDO::FETCH_ASSOC);foreach($rows as &$row){$row['status_label']=legacy_ui_state($row['result']);if($row['result']==='held'){$row['code']='source_identity';$row['action']=legacy_ui_problem('source_identity');}}unset($row);return ['counts'=>$counts,'rows'=>$rows,'limit'=>100];
 }
 function legacy_apply(mysqli $db,array $job):void {
     legacy_actor($db,(int)$job['actor'],(int)$job['unit']);unit_set_context($db,(int)$job['unit']);

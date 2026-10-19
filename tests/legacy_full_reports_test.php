@@ -1,0 +1,13 @@
+<?php
+if(PHP_SAPI!=='cli')exit(1);require_once __DIR__.'/../koneksi.php';require_once __DIR__.'/http_form_scope.php';spp_test_assert_database_target($koneksi);require_once __DIR__.'/../includes/reports.php';require_once __DIR__.'/legacy_finance_support.php';
+$db=$koneksi;$source=['tanggal_awal'=>'2000-01-01','tanggal_akhir'=>'2035-12-31','tahun_ajaran'=>'2026/2027','bulan_awal'=>'07','bulan_akhir'=>'06','tahun'=>'2026','kategori'=>'semua','siswa_status'=>'all'];
+foreach(['super_admin','admin','kasir','bendahara'] as $role){$_SESSION=['admin_id'=>41,'admin_role'=>$role,'admin_unit_id'=>1,'active_unit_id'=>1];
+    foreach(global_report_templates() as $template){$count=0;$parts=[];
+        foreach([1,2,3] as $unit){$query=$source+['template'=>$template,'unit'=>(string)$unit];$query['kategori']=$template==='penerimaan'?'semua':'spp';global_report_scope($db,$query);$f=report_filters($db,$query);$r=report_build($db,$template,$f);$count+=count($r['rows']);$parts[$unit]=$r;lft_assert(unit_active_id()===1,'Report changed operational unit');
+            if($template==='penerimaan'){$native=(float)lf_one($db,'SELECT COALESCE(SUM(total_jumlah),0) n FROM bayar')['n'];$historic=(float)lf_one($db,"SELECT COALESCE(SUM(p.total),0) n FROM legacy_full_payments p JOIN legacy_full_batches b ON b.id=p.batch_id AND b.unit_id=p.unit_id WHERE b.state='completed' AND p.source_date IS NOT NULL")['n'];lft_assert(abs(array_sum(array_column($r['rows'],'total_penerimaan'))-$native-$historic)<.001,'Independent unit receipt totals');}
+        }
+        $query=$source+['template'=>$template,'unit'=>'all'];$query['kategori']=$template==='penerimaan'?'semua':'spp';global_report_scope($db,$query);$r=report_build($db,$template,report_filters($db,$query));lft_assert(count($r['rows'])===$count,'Combined rows differ: '.$template);foreach($r['rows'] as $row)lft_assert(in_array((int)$row['unit_id'],[1,2,3],true),'Row unit identity absent');lft_assert(unit_active_id()===1,'Combined report changed operational unit');
+    }echo 'PASS: '.$role." all report templates x four scopes; combined ownership and independent historical/current receipt totals.\n";
+}
+unit_set_context($db,2);$op=lful_operator_key(2,'operator_lama');$cashier=(string)$db->query("SELECT id FROM admin WHERE role='kasir' AND unit_id=2 AND is_active=1 LIMIT 1")->fetch_row()[0];$f=report_filters($db,['tanggal_awal'=>'2000-01-01','tanggal_akhir'=>'2035-12-31','operator'=>[$op,$cashier]]);$transactions=report_savings_transactions($db,'2000-01-01','2036-01-01',$f);lft_assert(count($transactions)>=3,'Mixed historic/current operator filter lost rows');
+echo "PASS: legacy/current mixed operator selection and undated receipt exclusion.\n";

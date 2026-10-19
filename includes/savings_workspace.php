@@ -1,8 +1,9 @@
 <?php
 require_once __DIR__.'/account_letter_ui.php';
+require_once __DIR__.'/legacy_full_read.php';
 
 function savings_e($value): string { return htmlspecialchars((string)$value, ENT_QUOTES, 'UTF-8'); }
-function savings_money($value): string { return 'Rp '.number_format((float)$value, 0, ',', '.'); }
+function savings_money($value): string { $v=round((float)$value,2);return 'Rp '.number_format($v,$v===floor($v)?0:2,',','.'); }
 function savings_icon(string $name): string {
     $paths=['up'=>'M12 20V4m-6 6 6-6 6 6','down'=>'M12 4v16m-6-6 6 6 6-6','wallet'=>'M3 6h17v15H3V6Zm0 0V3h14v3M16 11h5v5h-5v-5','calendar'=>'M4 5h16v16H4V5ZM8 3v4M16 3v4M4 10h16','check'=>'m5 12 4 4 10-10'];
     if (!isset($paths[$name])) return account_letter_icon($name);
@@ -34,6 +35,7 @@ function savings_enrich_rows(mysqli $db, array $rows): array {
         $proof=$evidence[(int)$row['unit_id'].'|'.$row['jenis'].'|'.$row['id']]??null;
         $owner=$proof ? ((int)$proof['n']===1?(int)$proof['actor']:0) : (preg_match('/^[1-9][0-9]*$/D',(string)$row['user_id'])?(int)$row['user_id']:0);
         $account=$accounts[$owner]??null;
+        if((int)$row['id']<0){$row['owner_id']=0;$row['operator_name']=$row['user_id'];$row['operator_username']='';$row['operator_role']='Legacy';$row['can_print']=true;$row['reference']='Legacy ? '.abs((int)$row['id']);$row['receipt_url']='cetak_buku.php?'.http_build_query(['nis'=>$row['NO_INDUK'],'unit_id'=>$row['unit_id']]);continue;}
         $row['owner_id']=$owner;
         $row['operator_name']=$account['nama']??'Tidak tercatat';
         $row['operator_username']=$account['username']??'';
@@ -46,8 +48,8 @@ function savings_enrich_rows(mysqli $db, array $rows): array {
 }
 
 function savings_transaction(mysqli $db, string $kind, int $id): ?array {
-    if (!in_array($kind,['masuk','keluar'],true) || $id<1) throw new InvalidArgumentException('Identitas transaksi tabungan tidak valid.');
-    $table=$kind==='masuk'?'transaksi_m':'transaksi_k';
+    if (!in_array($kind,['masuk','keluar'],true) || $id===0) throw new InvalidArgumentException('Identitas transaksi tabungan tidak valid.');
+    $table=lful_savings_source($db,$kind==='masuk'?'transaksi_m':'transaksi_k');
     $s=$db->prepare("SELECT t.id,t.unit_id,t.NO_INDUK,t.TANGGAL,t.MASUK nominal,t.KELUAR keluar,t.user_id,t.keterangan,s.NAMA,s.KELAS,s.NO_induk_diknas FROM $table t LEFT JOIN siswa s ON s.NO_INDUK=t.NO_INDUK AND s.unit_id=t.unit_id WHERE t.id=?");
     $s->bind_param('i',$id);$s->execute();$row=$s->get_result()->fetch_assoc();$s->close();
     if (!$row) return null;
@@ -70,6 +72,6 @@ function savings_detail_html(array $row): string {
 
 function savings_http_identity(): array {
     $kind=$_GET['jenis']??'';$id=$_GET['id']??'';
-    if (!is_string($kind) || !in_array($kind,['masuk','keluar'],true) || !is_string($id) || !preg_match('/^[1-9][0-9]{0,17}$/D',$id)) throw new InvalidArgumentException('Identitas transaksi tabungan tidak valid.');
+    if (!is_string($kind) || !in_array($kind,['masuk','keluar'],true) || !is_string($id) || !preg_match('/^-?[1-9][0-9]{0,17}$/D',$id)) throw new InvalidArgumentException('Identitas transaksi tabungan tidak valid.');
     return [$kind,(int)$id];
 }

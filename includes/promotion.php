@@ -97,7 +97,7 @@ function promotion_apply_student(mysqli $db,string $nis,int $targetClassId,array
         return ['student'=>$student['NAMA'],'action'=>'lulus','source_year'=>$ctx['source_year'],'graduation_year'=>$ctx['source_year'],'target_year'=>$ctx['target_year'],'source_placement_id'=>$sourceId];
     }
     $yearId=class_ensure_academic_year($db,$ctx['target_year']);$newLevel=(string)$target['tingkat'];$label=class_label($target);
-    $rate=spp_current_effective_rate($db,$newLevel,(float)$student['potongan_spp_nominal'],$ctx['target_year']);$rateReady=$rate['year']!=='Belum disiapkan'&&(float)$rate['base']>0;$spp=$rateReady?(float)$rate['net']:0.0;$komite=(float)$student['POMG'];
+    $rate=spp_current_effective_rate($db,$newLevel,(float)$student['potongan_spp_nominal'],$ctx['target_year'],$nis);$rateReady=$rate['year']!=='Belum disiapkan'&&(float)$rate['base']>0;$spp=$rateReady?(float)$rate['net']:0.0;$komite=(float)$student['POMG'];
     $s=$db->prepare('UPDATE siswa SET KELAS=?,master_kelas_id=?,SPP_PERBULAN=? WHERE id=? AND unit_id=?');$s->bind_param('sidii',$newLevel,$targetClassId,$spp,$student['id'],$ctx['unit_id']);$s->execute();$s->close();
     $s=$db->prepare("INSERT INTO siswa_tahun_ajaran(tahun_ajaran_id,no_induk,kelas,master_kelas_id,kelas_rombel_snapshot,spp_perbulan_snapshot,komite_snapshot,status) VALUES(?,?,?,?,?,?,?,'aktif')");
     $s->bind_param('issisdd',$yearId,$nis,$newLevel,$targetClassId,$label,$spp,$komite);$s->execute();$destination=(int)$db->insert_id;$s->close();

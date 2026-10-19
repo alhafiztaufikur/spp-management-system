@@ -8,7 +8,7 @@ final class SavingsBookBalanceMismatch extends RuntimeException
  * Susun buku tabungan dari seluruh mutasi seorang siswa.
  * Nominal dihitung dalam sen agar pembandingan saldo tidak bergantung pada float.
  */
-function savings_book_make(array $transactions, float $recordedBalance): array
+function savings_book_make(array $transactions, float $recordedBalance, ?array $opening = null, array $legacy = []): array
 {
     usort($transactions, static function (array $a, array $b): int {
         $byDate = strcmp((string)$a['tanggal'], (string)$b['tanggal']);
@@ -19,6 +19,15 @@ function savings_book_make(array $transactions, float $recordedBalance): array
 
     $balance = 0;
     $entries = [];
+    if($legacy){
+        foreach($legacy as $transaction){$incoming=(int)round((float)$transaction['masuk']*100);$outgoing=(int)round((float)$transaction['keluar']*100);$balance+=$incoming-$outgoing;
+            $entries[]=['number'=>count($entries)+1,'tanggal'=>$transaction['tanggal'],'masuk'=>$incoming,'keluar'=>$outgoing,'saldo'=>$balance,'label'=>($transaction['origin']??'')==='adjustment'?'Penyesuaian Saldo Migrasi':'Legacy'];}
+        if(!$opening||$balance!==(int)round((float)$opening['amount']*100))throw new SavingsBookBalanceMismatch('Histori Legacy berbeda dari saldo peralihan.');
+    }
+    if($opening){
+        $balance=(int)round((float)$opening['amount']*100);
+        $entries[]=['number'=>count($entries)+1,'tanggal'=>$opening['effective_date'],'masuk'=>0,'keluar'=>0,'saldo'=>$balance,'label'=>$legacy?'Saldo peralihan Legacy':'Saldo awal Legacy'];
+    }
     foreach ($transactions as $transaction) {
         $incoming = (int)round((float)$transaction['masuk'] * 100);
         $outgoing = (int)round((float)$transaction['keluar'] * 100);

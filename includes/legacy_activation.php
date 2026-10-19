@@ -1,5 +1,5 @@
 <?php
-require_once __DIR__.'/kelas.php';require_once __DIR__.'/spp_billing.php';
+require_once __DIR__.'/kelas.php';require_once __DIR__.'/spp_billing.php';require_once __DIR__.'/legacy_source.php';
 /** Explicit first placement; deliberately does not call the automatic student billing sync. */
 function legacy_activate(mysqli $db,int $id,int $classId,int $yearId,array $fees,int $actor,string $actorName):void {
     if(array_key_exists('pangkal',$fees))throw new RuntimeException('Formulir aktivasi kedaluwarsa.');

@@ -24,7 +24,7 @@ function psb_placement_apply(mysqli $db, string $nis, int $targetId, string $yea
 
     class_ensure_academic_year($db, $year);
     $level = (string)$first;
-    $rate = spp_current_effective_rate($db, $level, (float)$student['potongan_spp_nominal'], $year);
+    $rate = spp_current_effective_rate($db, $level, (float)$student['potongan_spp_nominal'], $year, $nis);
     $spp = $rate['year'] !== 'Belum disiapkan' ? (float)$rate['net'] : (float)$student['SPP_PERBULAN'];
     $update = $db->prepare('UPDATE siswa SET KELAS=?,master_kelas_id=?,SPP_PERBULAN=? WHERE id=? AND unit_id=?');
     $id = (int)$student['id'];

@@ -1,5 +1,7 @@
 <?php
 require_once __DIR__.'/savings_book.php';
+require_once __DIR__.'/legacy_finance.php';
+require_once __DIR__.'/legacy_full_read.php';
 
 final class SavingsBookRequestError extends RuntimeException {}
 
@@ -17,6 +19,7 @@ function savings_book_load(mysqli $db, string $nis, int $studentId = 0, int $uni
         if (!$matches) throw new SavingsBookRequestError('Siswa tidak ditemukan dalam cakupan unit Anda.', 404);
         $student = $matches[0];
         $unitId = (int)$student['unit_id'];
+        try{lop_bank_assert_ready($db,(string)$student['NO_INDUK'],$unitId);}catch(DomainException $e){throw new SavingsBookRequestError($e->getMessage(),409);}
         $stmt = $db->prepare("SELECT x.id, x.tanggal, x.masuk, x.keluar, x.urutan_mutasi FROM (
             SELECT id, TANGGAL AS tanggal, MASUK AS masuk, 0 AS keluar, 0 AS urutan_mutasi FROM transaksi_m WHERE NO_INDUK=? AND unit_id=?
             UNION ALL
@@ -26,7 +29,7 @@ function savings_book_load(mysqli $db, string $nis, int $studentId = 0, int $uni
         $stmt->execute();
         $transactions = $stmt->get_result()->fetch_all(MYSQLI_ASSOC);
         $stmt->close();
-        $book = savings_book_make($transactions, (float)$student['SALDO']);
+        $book = savings_book_make($transactions, (float)$student['SALDO'], lf_opening_for_student($db,$unitId,(int)$student['id']),lful_journals($db,(int)$student['id'],$unitId));
         $db->commit();
         return [$student, $book];
     } catch (Throwable $error) {

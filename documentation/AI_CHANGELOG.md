@@ -1,6 +1,136 @@
 # Riwayat Perubahan AI SistemSPP
 
+## 2026-10-19 - Finalisasi migrasi dan penggunaan memori
+
+- Perebutan kunci akses dengan respons HTTP finalisasi sekarang ditunggu dan diantrekan ulang otomatis, bukan menjadi kegagalan migrasi. Uji memakai proses pemegang kunci baca terpisah membuktikan worker bisa melanjutkan setelah akses dilepas.
+
+- Hilangkan simulasi lengkap dari konfirmasi HTTP operasional; validasi memakai snapshot worker yang terikat versi, hash sumber, master, dan kondisi tujuan. Worker tetap memeriksa seluruh hasil sebelum penerapan atomik.
+- Fingerprint JSON dihitung bertahap dengan hasil identik; fingerprint tabel membaca baris secara bertahap. Tidak ada batas jumlah transaksi baru dan tidak menghapus batas memori PHP global.
+- Tombol Finalisasi Migrasi tampil dekat ringkasan di setiap bagian, diikuti konfirmasi Mulai Migrasi Sekarang serta status antrean, penerapan, verifikasi, dan hasil. Formulir tanpa JavaScript tetap didukung.
+- [Panduan finalisasi dan pengujian](LEGACY_FINALIZATION_20261019.md). Source utama/lab copy diperbarui tanpa penerapan final pengguna, perubahan database utama, commit/push, atau pembaruan deployment.
+
+## 2026-10-19 - Penyelesaian otomatis rekening dan catatan Legacy
+
+- Aturan operasional 7/workflow 8 menyelesaikan jurnal nol sebagai referensi, residu presisi saldo maksimal Rp0,000001 bila tepat cocok jurnal, serta saldo akhir dari header sumber unik melalui penyesuaian beraudit. Saldo FIX pengguna tetap didahulukan.
+- Rekening tambahan yang unik, cocok jurnal, dan belum memiliki rekening utama disiapkan sebagai rekening utama sekali. Source row key, arsip asli dan manifest keputusan dipertahankan.
+- DU negatif menjadi Referensi Anomali DU; catatan tanpa identitas 2020+/tanpa tanggal masuk Catatan Belum Teridentifikasi. Keduanya tidak menjadi kas/tagihan/saldo aktif atau dianggap lunas. Histori anonim sebelum 2020 tetap memakai aturan tanggal sumber sebelumnya.
+- Direktori rekening menampilkan status siap hasil sistem. Daftar referensi terpisah mendukung rincian, pencarian, tanggal, pagination dan CSV sebelum/sesudah publikasi. Koreksi jurnal yang sudah disimpan tidak dimasukkan ulang sebagai referensi jurnal nol.
+- Pengujian meliputi enam sumber 2019/2026, presisi dan batas toleransi, prioritas FIX, rekening tambahan, publikasi/rollback/retry pada MySQL terisolasi, audit/nonkas, pemulihan backup, peran/unit/CSRF dan Chrome/Chromium 109. [Aturan dan hasil](LEGACY_SYSTEM_RESOLUTION_20261019.md).
+
+## 2026-10-19 - Modal migrasi dan pemeriksaan otomatis berbasis sumber
+
+- Modal maksimal 880 px, judul sesuai bagian, ringkasan tanpa angka nol yang tidak relevan, tabel perubahan saldo/kartu ponsel, serta judul/tombol tetap terlihat dengan satu area gulir. Tutup/Escape/Kembali mempertahankan isian; formulir server tetap berfungsi tanpa JavaScript.
+- Aturan operasional versi 6 menggunakan rincian valid sekali ketika U_LAIN kosong/nol, tanpa mengubah pemetaan, potongan/DU, kelas atau saldo FIX. Bukti per baris dan versi aturan disimpan dalam manifest; ringkasan/API menampilkan jumlah otomatis.
+- Catatan tanpa identitas bertanggal sebelum 2020 menjadi Histori Legacy Tanpa Pemilik/referensi kosong pada arsip existing. Tanggal/nilai asli dipertahankan, tanpa pemilik palsu atau dampak kas/saldo aktif. Halaman histori mendukung pencarian, tanggal, rincian, pagination dan CSV, sebelum/sesudah publikasi. Catatan 2020+, tanpa tanggal dan tanggal invalid tetap perlu penyelesaian.
+- Uji tiga sumber 2026 dan tiga regresi 2019, nominal/duplikasi, rollback/publikasi/backup pemulihan pada instance terisolasi, HTTP tanpa JavaScript, batas unit/peran/CSRF dan browser Chrome/Chromium 109. Rincian hasil serta batas pengujian ada pada [panduan pemeriksaan otomatis](LEGACY_AUTOMATIC_REVIEW_20261019.md).
+
+## 2026-10-19 - Persetujuan massal dan saldo utama Legacy
+
+- Tambahkan Setujui Semua Data dan persetujuan per bagian dengan pratinjau terikat sumber/master/versi, satu pengesahan untuk kelompok siswa serta pembayaran terkait, nama komponen Legacy, dan master nonaktif tanpa tarif. Alumni serta pemilik transaksi tanpa master siswa ditampung dengan jenis yang jelas.
+- Perbaiki pembacaan rincian biaya saat U_LAIN nol; total/rincian tetap dihitung satu kali. Masalah ditampilkan per kelompok penyebab, dengan jumlah baris sumber tetap tersedia melalui API.
+- Tabungan menyediakan direktori rekening utama dan Jumlah Sebenarnya pada rekening tambahan. Sesuai keputusan pengguna, saldo menggantikan saldo akhir rekening utama yang dipilih, dengan konfirmasi dan penyesuaian beraudit tanpa kas baru atau rekening ganda. Tabungan cocok tidak meminta isian ulang.
+- Uji enam ekstraksi 2019/2026, simulasi worker SD terisolasi (46.852 pembayaran, 40 usulan master), publikasi fixture/rollback/retry/backup pemulihan, API/server tanpa JavaScript dan 72 kasus browser Chrome/Chromium 109. DU negatif serta identitas/saldo bermasalah tetap menjadi pengecualian ringkas. [Panduan dan batas](LEGACY_BULK_REVIEW_20261019.md).
+- Aturan operasional versi 5, tanpa skema baru. Source utama dan lab copy diperbarui; data operasional utama serta data/pekerjaan uji pengguna dipertahankan. Tidak melakukan impor nyata, commit/push atau memperbarui deployment.
+
+## 2026-10-19 - Pembaruan lab copy
+
+- Atas permintaan pengguna, source terbaru disalin ke `spp-management-system-Copy`, selanjutnya disebut **lab copy**, dengan koneksi tetap `db_spp_test2`. Konfigurasi privat, antrean, pekerjaan siap ditinjau, dan seluruh isi tabel existing dipertahankan.
+- Skema operasional terbaru dipasang pada database lab saja; worker dijalankan ulang, kesiapan SQL Server/aturan terbaru lulus. Backup sebelum/sesudah lulus uji pemulihan terisolasi; audit integritas dan FK, login, halaman impor, backup, serta health lulus.
+- Fingerprint 50 tabel utama identik; isi 59 tabel lab identik setelah mengecualikan hanya tiga kolom baru bernilai default. Akun aplikasi lab tetap tidak memiliki akses ke database utama. Tidak menjalankan impor nyata, commit/push, atau pembaruan deployment. [Panduan lab copy](LAB_COPY.md).
+
+## 2026-10-19 - Persiapan perintah skema CLI Legacy
+
+- Lengkapi installer operasional dengan bantuan tanpa koneksi database, mode pemeriksaan eksplisit, tampilan target, dan opsi pencocokan nama database. Opsi salah ditolak sebelum koneksi; pemanggilan lama tetap didukung.
+- Tambahkan [petunjuk PowerShell](LEGACY_SCHEMA_CLI.md) untuk backup, pemeliharaan, pemasangan, pemeriksaan ulang, serta kegagalan DDL. Pemeriksaan baca saja dan regresi argumen diuji; tidak memasang skema pada database utama/Copy, tidak mengimpor, commit/push, atau memperbarui deployment.
+
+## 2026-10-19 ? Peninjauan Migrasi Operasional Legacy
+
+- Formulir/checkbox ditata ulang; sasaran memakai tabel/kartu, pencarian, pagination dan ringkasan rekening.
+- Saran Alumni per tahun, kelas nonakademik yang tidak ditagih/naik kelas, serta pengesahan identitas testing sebagai Rekening Uji Legacy.
+- Nama biaya berasal dari master lain; slot dengan kode sama dikelompokkan, benturan nama wajib dipilih, master belum digunakan ditampilkan terpisah. Lain Test dan usulan master nonaktif tanpa tarif tersedia; aktivasi nol ditolak.
+- Saldo FIX memakai pratinjau/konfirmasi server dan penyesuaian migrasi beraudit, tanpa kas baru atau penggandaan saldo. Koreksi rekening tetap memeriksa transaksi lanjutan.
+- Pembaruan skema melalui CLI saja; aturan operasional 4 dan Migrasi Penuh 6 memerlukan pemeriksaan ulang serta restart worker. Source utama saja; tidak memasang skema/impor pada database utama atau Copy, tanpa commit/push/deployment.
+- [Panduan](LEGACY_OPERATIONAL_MIGRATION.md) ? [Hasil QA](LEGACY_REVIEW_QA_20261019.md).
+
+
 File ini mencatat perubahan proyek secara reverse chronological. Baca [PROJECT_CONTEXT.md](./PROJECT_CONTEXT.md) terlebih dahulu untuk memahami arsitektur, aturan bisnis, dan kewajiban dokumentasi.
+
+## 2026-10-18 - Persiapan migrasi langsung dari backup
+
+- Mode operasional menyiapkan kelas yang jelas, tarif sumber, pasangan komponen dan tabungan yang cocok sekaligus. Usulan tersimpan saat worker selesai membaca sumber; pekerjaan lama memperoleh tombol Siapkan & Periksa Hasil. Pengesahan utang tidak diwajibkan untuk memindahkan siswa/pembayaran yang valid, dan tidak dipalsukan sebagai lunas.
+- Aturan manual menjadi bagian opsional yang dapat dibuka; konfirmasi akhir cukup satu tombol. Saldo berselisih, identitas ambigu, status tidak dikenal dan kelas di luar jenjang tetap ditahan per bagian. CSRF, versi, unit kosong, transaksi atomik, backup dan verifikasi tetap berlaku. Worker versi operasional 2 memerlukan restart; tanpa skema tambahan.
+- Uji pembacaan enam sumber, alur server tanpa JavaScript sampai publikasi pada salinan dengan backup sebelum/sesudah terverifikasi, regresi tarif/penghitungan dan 32 kasus UI Chrome/Chromium 109. [Panduan](LEGACY_OPERATIONAL_MIGRATION.md).
+
+## 2026-10-18 - Migrasi operasional Legacy
+
+- Tambahkan skema CLI opsional sembilan tabel/view: kelompok, pemilik rekening non-siswa, dasar tarif per siswa, pembayaran/jurnal kerja, saldo, kewajiban, data tertahan dan audit. Arsip sumber tetap immutable; mode lama kompatibel.
+- Publikasikan relasi data siap secara atomik, dengan penahanan per bagian, kelanjutan batch, versi, konfirmasi dan backup terverifikasi sebelum/sesudah. GK/TABGJ tidak menjadi siswa akademik; variasi ejaan kelompok digabung dengan asal tersimpan. SPP memakai sumber per siswa, POMG sebagai Komite; koreksi pembayaran tidak mengubah dasar tarif.
+- Koreksi khusus Super Admin memeriksa dampak tagihan, pembayaran baru, kedua rekening, saldo berjalan, alasan, versi dan konfirmasi. Pembayaran/jurnal operasional dibaca riwayat/laporan/cetak, dengan pemisahan kas historis dan saldo peralihan sekali. Perubahan dasar tarif merupakan tindakan terpisah.
+- Pembayaran kasir serta edit/hapus existing menyelaraskan sisa kewajiban dan fingerprint kerja dalam transaksi yang sama, termasuk pemeriksaan konflik setelah konfirmasi.
+- Uji enam backup melalui worker terisolasi, fixture publikasi/koreksi/rollback/resume/master nonaktif, transaksi kasir, buku tabungan, PDF/Excel, serta 216 kasus browser Chrome/Chromium 109 dengan/tanpa JavaScript. [Panduan dan batas](LEGACY_OPERATIONAL_MIGRATION.md).
+- Tidak memasang skema atau mengimpor pada database utama, tidak menyentuh Copy, commit/push maupun paket deployment. Runtime importer bersama dipertahankan.
+
+## 2026-10-17 - Perbaikan aktivasi siswa Legacy dan pengesahan POMG
+
+- Perbaiki ID siswa pada formulir Aktivasi Legacy yang tertimpa variabel pilihan unit dari sidebar. Gunakan identitas halaman khusus dan render sidebar dalam scope terpisah. Tolak ketidakcocokan ID URL/formulir lama tanpa mengaktifkan siswa lain. Kelas, tahun dan nominal dipertahankan saat validasi gagal; pratinjau tarif server mendukung formulir tanpa JavaScript.
+- Sesuai keputusan yayasan, POMG sumber adalah Komite bulanan. Aktivasi/usulan individual dan kelompok mengambil nominal sumber yang valid; pengguna tetap mengonfirmasi. Kelompok dapat mempertahankan POMG per siswa atau memakai nominal kelompok secara eksplisit. Rincian POMG dipetakan ke Komite tanpa mengubah arsip asli atau menggandakan U_LAIN; U_SORGA tetap terpisah. Aturan migrasi versi 5 membatalkan simulasi/konfirmasi lama.
+- Pengujian mutasi hanya pada instance salinan: aktivasi Super Admin/Admin/Kasir × SD/SMP/SMA, ID formulir setelah sidebar, validasi/input, CSRF, formulir lama, replay, batas unit/peran dan pratinjau tanpa JavaScript. POMG sumber nyata diuji untuk usulan individual/kelompok, override dan fingerprint pratinjau; proyeksi pembayaran/nominal sumber tetap konsisten. Tidak menerapkan aktivasi atau migrasi ke operasional; tanpa commit/push/pembaruan deployment.
+- Enam belas skenario browser lulus pada Chrome dan Chromium 109 nyata: ponsel/desktop, tema terang/gelap, JavaScript aktif/nonaktif, pilihan kelas/tahun, ID siswa, usulan Komite dan pemulihan nominal pada pratinjau server. Fingerprint seluruh tabel operasional sebelum/sesudah identik. Worker utama dimulai ulang saat antrean kosong dengan penguncian klaim pekerjaan, dan kesiapan SQL Server/pembaca/aturan versi 5 terverifikasi. Worker Copy dan runtime importer dipertahankan; Windows 7 fisik tidak diuji.
+
+## 2026-10-17 - Pratinjau tabungan tambahan Legacy
+
+- Ganti deretan accordion nomor induk dengan daftar rekening berpaginasi, pencarian nama/NIS, filter status dan rincian rekening terpilih. Nama hanya ditampilkan bila identitas sumber tunggal. Kartu saldo sumber/jurnal/selisih, arahan pemeriksaan dan bukti sumber terlipat memperjelas tindakan tanpa mengulang peringatan panjang.
+- Navigasi GET dan tautan langsung bekerja tanpa JavaScript; pilihan/filter/halaman dipertahankan setelah penyimpanan. Input pemeriksaan dipulihkan saat validasi gagal. Status Tersimpan tetap diperiksa terhadap bukti dan fingerprint sumber oleh aturan backend existing.
+- Tampilan mengikuti tema unit, mendukung tema gelap, fokus keyboard dan ukuran tombol sentuh. Tidak mengubah rekonsiliasi, nominal, hak akses, skema atau aturan penerapan migrasi. Source utama saja; tanpa commit/push atau perubahan deployment/Copy.
+- Verifikasi pada instance salinan: 40 skenario Chrome/Chromium 109 nyata, tema terang/gelap, JavaScript aktif/nonaktif, lebar 360/390/768/1366/1920 px; pencarian, status kosong, pagination, pilihan rekening, reload, rincian sumber, fokus dan parameter berbentuk array. Regresi model mencakup status bukti kedaluwarsa, identitas ambigu, nominal selisih, pemulihan input dan escaping. Kontrak sumber Legacy tetap lulus; fingerprint operasional sebelum/sesudah identik. Tampilan ponsel dan desktop diperiksa dari screenshot privat. Windows 7 fisik tidak diuji; runtime browser existing dipakai kembali.
+
+## 2026-10-17 - Backup Legacy 2026 dan file tanpa ekstensi
+
+- Ketiga mode menerima `.dat`, `.bak`, dan nama tanpa ekstensi; validasi isi/unit/integritas tetap dilakukan worker terisolasi. Profil 2019 dipertahankan, profil 2026 dipilih dari struktur lengkap. Definisi delapan objek diagram SMP diverifikasi tanpa dieksekusi.
+- Identitas SD `no_induk` dibaca bersama pemeriksaan `NO_INDUK1`; raw sumber dan fingerprint tidak diubah. ID numerik dipisahkan dari nominal; `tabungan_wajib` teks/numerik diperiksa eksplisit. Tabungan tambahan tampil terpisah dan tidak menjadi saldo tambahan otomatis.
+- Pembacaan arsip bertahap, pratinjau sumber dibatasi, cache/profil privat dipisahkan menurut struktur, dan konfirmasi lama diperiksa ulang. Worker lama ditandai perlu dimulai ulang. Tidak ada skema MySQL tambahan.
+- Verifikasi: 18 pemeriksaan backup nyata (2019/2026 ? tiga mode ? tiga unit), kecocokan fingerprint independen, 22 kasus profil/objek, unggahan HTTP dan proteksi akses, 192 skenario browser serta 16 pemeriksaan ulang tampilan tabungan tambahan di Chrome/Chromium 109. Regresi migrasi atomik, backup/restore terverifikasi, tabungan, cicilan, seluruh laporan, PDF/Excel lulus pada instance salinan. Windows 7 fisik tidak diuji.
+- Source utama saja; tanpa commit/push, perubahan Copy, impor operasional, migrasi MySQL operasional, atau pembaruan deployment. Lihat [panduan dan bukti pengujian](LEGACY_BACKUP_2026.md).
+
+## 2026-10-17 - Perbaikan UI/UX seluruh Import Legacy
+
+- Ganti halaman awal dengan tiga kartu tujuan dan riwayat pekerjaan berwaktu WIB. Tambahkan formulir server siswa/keuangan dari unggah sampai hasil, dengan retry unggah beridentitas, tanpa mengganti kontrak API lama.
+- Pisahkan lima tahap GET Migrasi Penuh dan empat bagian pengecualian. Pratinjau kelompok memakai sebelum/sesudah berlabel, kembali mengubah mempertahankan input, dan perubahan kelompok membersihkan pilihan sementara. Sidebar tidak lagi menimpa variabel halaman.
+- Pisahkan arsip dari peninjauan keuangan; pencarian siswa berdasarkan nama/NIS/kelas dibatasi unit dan Super Admin. Tambahkan pagination/filter, saldo sumber/jurnal/selisih, kode masalah/tindakan opsional, serta status simpan/dirty. Pertahankan konfirmasi, versi, CSRF dan seluruh aturan keuangan.
+- Pengujian pada salinan meliputi sumber asli ketiga unit, sumber 63.000 baris, formulir tanpa JavaScript, keamanan, rollback/recovery worker, backup terverifikasi, transaksi baru, histori/PDF/Excel, serta 300 kasus browser utama dan 36 kasus katalog panjang pada Chrome/Edge/Chromium 109 nyata. Fingerprint 50 tabel operasional identik; Windows 7 fisik belum diuji.
+- [Panduan pengguna](LEGACY_UI_GUIDE.md) dan [hasil QA](LEGACY_UI_QA_20261017.md) diperbarui. Tanpa impor/migrasi operasional, commit/push, atau perubahan deployment; penolakan cleanup sebelumnya dan runtime importer dipertahankan.
+
+## 2026-10-16 - Penyiapan komponen Legacy dalam Migrasi Penuh
+
+- Tambahkan katalog komponen dengan jumlah transaksi, total/rentang nominal sumber dan contoh bukti. SPP/DU hanya usulan pasangan; arti Pangkal/U_SORGA/POMG tetap perlu pengesahan. Kolom tabungan pada pembayaran hanya menjadi referensi jurnal yang disahkan, bukan kas biaya tambahan. Perlakuan referensi U_LAIN/DU dicatat sebagai catatan histori.
+- Gunakan master Biaya Lain existing atau usulan master dalam JSON draf. Nama/tarif/bukti/persetujuan diperiksa, termasuk benturan collation dengan master nonaktif. Simulasi tidak menulis master. Final membuat master nonaktif, meresolusikan ID dalam histori/cakupan dan menyimpan manifest; fingerprint menormalisasi ID otomatis. Rollback/retry meliputi master dan data unit. Tidak ada skema/menu master baru.
+- Form komponen/usulan individual menjaga pemetaan lain dan bekerja tanpa JavaScript pada katalog panjang; aksi bulk lama dan draf tanpa usulan tetap didukung. Ringkasan/modal mencantumkan master nonaktif dan nominalnya. Perbaiki konteks unit CLI pada simulasi/worker agar tingkat/tarif SMP/SMA tidak mengikuti sesi/default SD.
+- Ketiga .dat asli lulus restore/CHECKDB/profil/jumlah/total pada instance QA, dengan 77/104/30 pasangan kolom-rincian berisi nilai. Worker sebenarnya tanpa sesi browser lulus migrasi SMA, kegagalan setelah commit dan recovery. Uji model/HTTP/CSRF/peran/unit/versi, benturan, tarif tidak valid, sumber berubah, rollback, cicilan/pelunasan/idempotensi, histori/laporan/PDF/Excel serta regresi tabungan dan matriks laporan lulus. Chrome/Edge/Chromium 109 asli: 120 kasus tampilan/palette, kedua tema dan formulir tanpa JavaScript; Windows 7 fisik belum diuji.
+- Seluruh mutasi pengujian pada instance salinan privat. Database operasional, paket deployment, commit/push tetap di luar pekerjaan ini; dump/akun/log/screenshot tidak masuk Git. Rincian penggunaan dan verifikasi ada pada [panduan Migrasi Penuh](LEGACY_FULL_MIGRATION.md).
+- Backup akhir salinan sesudah pembayaran lulus pemulihan; fingerprint 50 tabel operasional identik. HTTP/MySQL QA dihentikan, LocalDB QA dihapus, browser ditutup; runtime importer operasional dipertahankan. Penghapusan folder browser-temp milik QA ditolak otomatis (**blocked by policy**) sehingga artifak privat tersebut masih tersisa; tidak ada browser baru dipasang ke AppData.
+
+## 2026-10-16 - Memasang skema Legacy pada database lokal melalui CLI
+
+- Pengguna meminta pemasangan untuk mengatasi pesan "Migrasi penuh belum siap. Pasang skema melalui CLI." Prasyarat identitas sudah siap; skema arsip keuangan dan Migrasi Penuh belum tersedia.
+- Akses aplikasi/importer dikunci eksklusif dan dispatcher backup dikunci selama pekerjaan. Jalankan `scripts/migrate_legacy_full.php --apply --confirm-maintenance` dengan penanda pemeliharaan; skema keuangan dipasang sebagai dependensi. Setelah pemeriksaan selesai, pemeliharaan dibuka kembali.
+- Backup pengaman `9e8883bd8572caa52e99fc9eb2addd86` dan backup hasil `16c11e3521812c58e93d919d6618c4a9` sama-sama Terverifikasi melalui pemulihan MySQL terisolasi. Fingerprint isi 36 tabel lama identik, 14 tabel baru kosong, kedua pemeriksaan kesiapan CLI lulus dan health `ok`. Manifest/fingerprint/log tersimpan privat di luar Git.
+- Tidak mengimpor `.dat`, mengubah siswa/saldo/tagihan, commit/push, atau memperbarui deployment. SD lokal memiliki 458 siswa: pemasangan skema tidak menghilangkan persyaratan unit kosong pada Migrasi Penuh; impor identitas tambahan tetap melalui kategori Siswa.
+
+## 2026-10-16 - Migrasi penuh Legacy untuk server bersih
+
+- Tambahkan mode peralihan per unit, peninjauan individual/kelompok, pemetaan master, klasifikasi masalah/catatan, simulasi dan konfirmasi berversi. Unit dengan siswa/transaksi existing ditolak; akun/master konfigurasi boleh tersedia. Profil penuh tabel/kolom SQL Server diperiksa selain restore/CHECKDB. Antrean kategori Siswa/Keuangan tetap kompatibel.
+- Enam tabel/view tambahan dipasang melalui CLI setelah skema arsip. Satu transaksi menyimpan siswa/penempatan, sumber immutable, histori terstruktur, saldo peralihan dan cakupan/tunggakan; konfigurasi serta alasan pemetaan ikut manifest. SPP/Komite berikutnya disiapkan setelah cakupan selesai. Pengaman mencegah penerbitan periode lama/dibayar di muka dan mutasi saat verifikasi tertahan.
+- Riwayat pembayaran, salinan histori/PDF, laporan/ekspor, filter operator, riwayat/buku tabungan mengenali sumber Legacy tanpa kas atau saldo ganda. Tanggal kosong tetap kosong; saldo berselisih/presisi berlebih ditahan. Rekening bukan siswa memerlukan bukti penyelesaian, bukan sekadar dikeluarkan dari migrasi.
+- Backup pengaman dan backup hasil memakai layanan backup existing dan uji pemulihan nyata. Retry setelah commit memverifikasi hasil tanpa mengimpor ulang; CLI pemulihan dapat membangun ulang antrean dari manifest database. Uji sumber asli, model, HTTP/CSRF/versi, transaksi kasir, matriks laporan, kegagalan/rollback/recovery dan browser dicatat pada [panduan](LEGACY_FULL_MIGRATION.md).
+- Operasional tidak dimigrasikan, seluruh pengujian mutasi pada instance terisolasi. Source sesuai origin/main saat pemeriksaan; tanpa commit/push atau pembaruan deployment.
+
+## 2026-10-16 - Menyiapkan arsip keuangan, saldo awal, dan Tunggakan Legacy
+
+- Source disinkronkan fast-forward ke `ff08db4`; perubahan manual pengguna dari teman dipertahankan. Import Siswa tetap kompatibel; kategori Histori Keuangan memakai restore/CHECKDB/read-only LocalDB khusus, profil 20 tabel per unit, jumlah/checksum/fingerprint, serta identitas deterministik yang mempertahankan kemunculan baris identik. Antrean lama default Siswa; dukungan heartbeat worker mencegah penggunaan worker lama untuk keuangan.
+- Tambahkan delapan tabel/view melalui CLI, arsip/rincian/CSV khusus Super Admin, pencocokan manual beralasan dan diaudit, review berversi, konfirmasi server lima menit, serta penerapan atomik per siswa. Saldo awal terpisah dari setoran/kas; rekening lama dan data tidak tepat ditahan. Tunggakan yang disahkan menggunakan tagihan Biaya Lain dengan master dilindungi, tanpa mengubah SPP/DU existing. Pembatalan mempertahankan histori dan memeriksa penggunaan/pembayaran kembali.
+- Buku tabungan, saldo berjalan, laporan, tampilan saldo dan audit backup mengenali saldo awal. Nominal sen yang valid ditampilkan tanpa hilang; presisi sumber berlebih tetap ditahan. Histori sumber tidak menjadi transaksi aktif atau akun/operator baru.
+- Ketiga backup Februari 2019 benar-benar dipulihkan pada salinan: 89.408 baris termasuk referensi; 422/521/251 identitas memiliki rekonsiliasi tabungan matematis tepat, bukan persetujuan penerapan. Uji model/HTTP, konkurensi dua proses, cicilan/pelunasan/struk/otorisasi edit-hapus, idempotensi, CSRF/akun dicabut, rollback, CSV, pembatalan, backup-pemulihan penuh dan kegagalannya lulus. UI diuji 60 kasus pada Chrome/Edge dan Chromium 109 asli, dua tema/empat palette/enam lebar, keyboard/Escape dan tanpa JavaScript. Windows 7 fisik belum diuji.
+- Seluruh mutasi pada instance salinan privat; fingerprint 36 tabel operasional identik. **Tidak memasang skema/mengimpor keuangan pada operasional, tidak commit/push, dan tidak memperbarui deployment.** Panduan pemasangan/pemulihan serta batas rekonsiliasi ada di [LEGACY_FINANCE_20261016.md](LEGACY_FINANCE_20261016.md).
 
 ## 2026-10-14 - Menyusun ulang manual pengguna lengkap dengan screenshot
 
@@ -2118,3 +2248,14 @@ Salin template ini ke bagian paling atas setelah `Aturan Pencatatan`:
 
 - Risiko tersisa, technical debt, atau `Tidak ada`.
 ```
+
+
+## 2026-10-17 — Alur Migrasi Penuh yang lebih sederhana
+
+- Lima tahap pengguna, kesiapan server, katalog sumber yang disiapkan worker, ringkasan peninjauan/pengecualian, pengesahan kelompok dengan daftar/fingerprint tepat, pilihan individual yang dipertahankan, serta profil aturan privat per unit/struktur.
+- Histori Saja untuk komponen lama, U_SORGA sebagai usulan pensiun, tanpa tarif atau master; kategori ikut riwayat/laporan/PDF/Excel dan tidak dapat menerbitkan tagihan. Master baru existing tetap nonaktif.
+- Alumni tanpa kelas/penempatan aktif; SPP dibandingkan per kelas dan selisih ditinjau tanpa menebak potongan; saldo cocok serta kewajiban disahkan terpisah.
+- Simulasi antrean dengan pemulihan worker, status/reload, formulir native tanpa JavaScript, serta API lama tetap kompatibel. Perbaiki ID pekerjaan yang tertimpa variabel sidebar dan parsing checkbox bernilai `0`.
+- Seluruh pengujian mutasi menggunakan instance MySQL privat terisolasi. Tidak memasang skema, mengimpor data pada db_spp operasional, commit/push, atau memperbarui deployment.
+- Verifikasi: tiga `.dat` asli dipulihkan kembali; 3.000 siswa/63.000 baris simulasi besar; penerapan salinan SD/SMA dengan backup terverifikasi; regresi kas/tabungan/tunggakan/laporan/PDF/Excel; 36 kasus browser interaktif dan 48 kasus tampilan/palet, termasuk Chromium 109. Fingerprint 50 tabel operasional tetap identik.
+- Semua proses QA ditutup. Penghapusan berkas browser sementara dan instance QA ditolak pemeriksaan otomatis (**blocked by policy**); keduanya dipertahankan tanpa penghapusan alternatif. Tidak ada browser baru dipasang atau runtime importer utama dihapus.

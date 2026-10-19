@@ -4,6 +4,7 @@ if (!isset($_SESSION['admin_id'])) { header('Location: login.php'); exit; }
 require_once 'koneksi.php';
 require_once 'includes/auth.php';
 require_once 'includes/biaya_lain.php';
+require_once 'includes/legacy_finance.php';
 requireRole(['admin', 'kasir']);
 
 if (empty($_SESSION['csrf_master_biaya_lain'])) $_SESSION['csrf_master_biaya_lain'] = bin2hex(random_bytes(32));
@@ -27,6 +28,11 @@ if ($_SERVER['REQUEST_METHOD'] === 'POST') {
         master_redirect();
     }
     $aksi = $_POST['aksi'] ?? '';
+    $legacyMasterId=(int)($_POST['master_id']??$_POST['id']??0);
+    if(lf_reserved_master($koneksi,$legacyMasterId)){
+        $_SESSION['flash']=['type'=>'error','msg'=>'Tunggakan Legacy dikelola melalui peninjauan per siswa.'];
+        master_redirect();
+    }
 
     if ($aksi === 'terbitkan_tagihan') {
         try {
@@ -93,6 +99,7 @@ if ($_SERVER['REQUEST_METHOD'] === 'POST') {
                 WHERE id=?");
             foreach ($students as $student) {
                 $noInduk = (string)$student['NO_INDUK'];
+                require_once __DIR__.'/includes/legacy_full_read.php';if(lful_is_covered($koneksi,$noInduk,'biaya_lain:'.$masterId,(string)($_POST['periode']??date('Y-m')))){$skipped++;continue;}
                 $classId = (int)($student['master_kelas_id'] ?? 0);
                 $classSnapshot = class_label([
                     'tingkat' => $student['tingkat'] ?? $student['KELAS'],
@@ -177,12 +184,16 @@ if ($_SERVER['REQUEST_METHOD'] === 'POST') {
         $nama = trim($_POST['nama'] ?? '');
         $nominal = master_amount($_POST['nominal'] ?? 0);
         $isActive = isset($_POST['is_active']) ? 1 : 0;
+        if(legacy_finance_ready($koneksi)&&preg_match('/^Tunggakan Legacy(?:\s|[·:]|$)/iu',$nama)){
+            $_SESSION['flash']=['type'=>'error','msg'=>'Nama Tunggakan Legacy khusus untuk pengesahan melalui Import Legacy.'];master_redirect();
+        }
 
         if ($nama === '' || mb_strlen($nama) > 100) {
             $_SESSION['flash'] = ['type' => 'error', 'msg' => 'Nama biaya wajib diisi dan maksimal 100 karakter.'];
             master_redirect();
         }
-        if ($nominal <= 0) {
+        $tariffPending=$nominal===0.0&&$isActive===0&&$id>0&&(int)$koneksi->query("SELECT COUNT(*) FROM information_schema.COLUMNS WHERE TABLE_SCHEMA=DATABASE() AND TABLE_NAME='master_biaya_lain' AND COLUMN_NAME='legacy_tariff_pending'")->fetch_row()[0]===1&&lf_one($koneksi,'SELECT id FROM master_biaya_lain WHERE id=? AND legacy_tariff_pending=1',[$id]);
+        if ($nominal <= 0 && !$tariffPending) {
             $_SESSION['flash'] = ['type' => 'error', 'msg' => 'Nominal biaya harus lebih dari Rp 0.'];
             master_redirect();
         }
@@ -208,7 +219,8 @@ if ($_SERVER['REQUEST_METHOD'] === 'POST') {
                 : ['type' => 'error', 'msg' => 'Master biaya gagal ditambahkan.'];
         } else {
             if ($id <= 0) master_redirect();
-            $stmt = $koneksi->prepare('UPDATE master_biaya_lain SET nama = ?, nominal = ?, is_active = ? WHERE id = ?');
+            $clearPending=$nominal>0&&(int)$koneksi->query("SELECT COUNT(*) FROM information_schema.COLUMNS WHERE TABLE_SCHEMA=DATABASE() AND TABLE_NAME='master_biaya_lain' AND COLUMN_NAME='legacy_tariff_pending'")->fetch_row()[0]===1;
+            $stmt = $koneksi->prepare('UPDATE master_biaya_lain SET nama = ?, nominal = ?, is_active = ?'.($clearPending?',legacy_tariff_pending=0':'').' WHERE id = ?');
             $stmt->bind_param('sdii', $nama, $nominal, $isActive, $id);
             $berhasil = $stmt->execute();
             $stmt->close();
@@ -228,10 +240,11 @@ if ($_SERVER['REQUEST_METHOD'] === 'POST') {
         }
         try {
             $koneksi->begin_transaction();
-            $stmt = $koneksi->prepare('SELECT is_active FROM master_biaya_lain WHERE id=? FOR UPDATE');
+            $stmt = $koneksi->prepare('SELECT * FROM master_biaya_lain WHERE id=? FOR UPDATE');
             $stmt->bind_param('i', $id); $stmt->execute();
             $current = $stmt->get_result()->fetch_assoc(); $stmt->close();
             if (!$current) throw new RuntimeException('Master biaya tidak ditemukan.');
+            if($targetStatus&&((float)$current['nominal']<=0))throw new DomainException('Isi tarif positif sebelum mengaktifkan master ini.');
             if ((int)$current['is_active'] === (int)$targetStatus) {
                 $koneksi->commit();
                 $_SESSION['flash'] = ['type' => 'warning', 'msg' => 'Status master biaya sudah sesuai. Tidak ada perubahan.'];
@@ -288,6 +301,7 @@ if ($_SERVER['REQUEST_METHOD'] === 'POST') {
 $editData = null;
 $editId = (int)($_GET['edit'] ?? 0);
 if ($editId > 0) {
+    if(lf_reserved_master($koneksi,$editId))master_redirect();
     $stmt = $koneksi->prepare('SELECT * FROM master_biaya_lain WHERE id = ?');
     $stmt->bind_param('i', $editId);
     $stmt->execute();
@@ -312,6 +326,7 @@ $masterList = $koneksi->query("
     ORDER BY m.is_active DESC, m.nama ASC
 ");
 $activeMasters = $koneksi->query("SELECT id,nama,nominal FROM master_biaya_lain WHERE is_active=1 ORDER BY nama")->fetch_all(MYSQLI_ASSOC);
+$activeMasters=array_values(array_filter($activeMasters,static fn($master)=>!lf_reserved_master($koneksi,(int)$master['id'])));
 $activeClasses = class_all($koneksi, true);
 $activeStudents = $koneksi->query("SELECT s.NO_INDUK,s.NO_induk_diknas,s.NAMA,s.KELAS,s.master_kelas_id,mk.tingkat,mk.kode_rombel,mk.is_placeholder FROM siswa s LEFT JOIN master_kelas mk ON mk.id=s.master_kelas_id WHERE s.is_active=1 ORDER BY s.NAMA")->fetch_all(MYSQLI_ASSOC);
 $publishRequestKey = bin2hex(random_bytes(16));
@@ -495,11 +510,12 @@ require_once __DIR__ . '/includes/master_workspace_ui.php';
               <tr>
                 <td data-label="No"><?= $no++ ?></td>
                 <td data-label="Nama Biaya"><strong><?= unit_record_badge($item) ?><?= htmlspecialchars($item['nama']) ?></strong></td>
-                <td data-label="Nominal" class="nominal">Rp <?= number_format((float)$item['nominal'], 0, ',', '.') ?></td>
+                <td data-label="Nominal" class="nominal"><?= lf_reserved_master($koneksi,(int)$item['id'])?'Per pengesahan':(!empty($item['legacy_tariff_pending'])&&(float)$item['nominal']===0.0?'Tarif belum ditetapkan':'Rp '.number_format((float)$item['nominal'],0,',','.')) ?></td>
                 <td data-label="Status"><span class="master-status <?= $item['is_active'] ? 'is-active' : 'is-inactive' ?>"><?= $item['is_active'] ? 'Aktif' : 'Nonaktif' ?></span></td>
                 <td data-label="Tagihan"><span class="badge-count"><?= (int)$item['jumlah_tagihan'] ?></span></td>
                 <td data-label="Transaksi"><span class="badge-count"><?= (int)$item['jumlah_pemakaian'] ?>x</span></td>
                 <td data-label="Aksi" class="aksi-col">
+                  <?php if(lf_reserved_master($koneksi,(int)$item['id'])): ?><span class="master-status">Pengesahan Legacy</span><?php else: ?>
                   <a class="btn-tbl btn-tbl-edit" href="master_biaya_lain.php?edit=<?= (int)$item['id'] ?>">Edit</a>
                   <form method="POST" action="master_biaya_lain.php" style="display:inline">
                     <input type="hidden" name="csrf_token" value="<?= htmlspecialchars($_SESSION['csrf_master_biaya_lain']) ?>" />
@@ -511,6 +527,7 @@ require_once __DIR__ . '/includes/master_workspace_ui.php';
                     <input type="hidden" name="aksi" value="hapus" /><input type="hidden" name="id" value="<?= (int)$item['id'] ?>" />
                     <button class="btn-tbl btn-tbl-del" type="submit" <?= ((int)$item['jumlah_pemakaian'] > 0 || (int)$item['jumlah_tagihan'] > 0) ? 'disabled title="Sudah memiliki tagihan atau transaksi"' : '' ?>>Hapus</button>
                   </form>
+                  <?php endif; ?>
                 </td>
               </tr>
               <?php endwhile; endif; ?>

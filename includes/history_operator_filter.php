@@ -1,6 +1,7 @@
 <?php
 require_once __DIR__.'/payment_activity.php';
 require_once __DIR__.'/filter_choices.php';
+require_once __DIR__.'/legacy_full_read.php';
 
 /** Include current accounts and immutable historical identities within the visible units. */
 function history_operator_options(mysqli $db): array
@@ -23,6 +24,7 @@ function history_operator_options(mysqli $db): array
                 .(!empty($actor['actor_username']) ? ' (@'.$actor['actor_username'].')' : '');
         }
     }
+    $actors+=lful_operator_options($db);
     natcasesort($actors);
     $actors['unknown'] = 'Tidak tercatat';
     return $actors;
@@ -57,13 +59,16 @@ function history_operator_owner_sql(mysqli $db, string $payment, string $unit): 
 function history_operator_where(mysqli $db, array $operators, string $payment, string $unit): string
 {
     if (filter_is_all($operators)) return '';
-    $ids = [];
+    $ids = [];$legacy=[];
     foreach ($operators as $operator) {
+        if(str_starts_with((string)$operator,'legacy:')){$legacy[]=$operator;continue;}
         if ($operator !== 'unknown' && !preg_match('/^[1-9][0-9]*$/D', (string)$operator)) throw new InvalidArgumentException('Pilihan operator tidak valid.');
         $ids[] = $operator === 'unknown' ? 0 : (int)$operator;
     }
-    if (!$ids) throw new InvalidArgumentException('Pilih minimal satu operator.');
-    return ' AND '.history_operator_owner_sql($db, $payment, $unit).' IN ('.implode(',', $ids).')';
+    if (!$ids&&!$legacy) throw new InvalidArgumentException('Pilih minimal satu operator.');
+    $clauses=[];if($ids)$clauses[]='('.$payment.'>0 AND '.history_operator_owner_sql($db,$payment,$unit).' IN ('.implode(',',$ids).'))';
+    if($legacy&&lful_read_ready($db)){$quoted=array_map(static fn($v)=>"'".$db->real_escape_string($v)."'",$legacy);$clauses[]="($payment<0 AND EXISTS(SELECT 1 FROM legacy_full_payments lp WHERE lp.id=-$payment AND lp.unit_id=$unit AND CONCAT('legacy:',lp.unit_id,':',LOWER(HEX(COALESCE(lp.source_operator,'')))) IN (".implode(',',$quoted).")))";}
+    return ' AND ('.implode(' OR ',$clauses).')';
 }
 
 function history_operator_field(array $options, string $id): void

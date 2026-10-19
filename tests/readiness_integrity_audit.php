@@ -5,6 +5,8 @@ if (PHP_SAPI !== 'cli') {
     exit(1);
 }
 require_once __DIR__ . '/../koneksi.php';
+require_once __DIR__ . '/../includes/legacy_finance.php';
+require_once __DIR__ . '/../includes/legacy_full.php';
 unit_set_context($koneksi, 0);
 
 function readiness_scalar(mysqli $db, string $sql): float {
@@ -99,6 +101,16 @@ $checks = [
            OR COALESCE(t.SALDO,0)<-0.01",
 ];
 
+if(legacy_finance_ready($koneksi)){
+    $metrics['saldo_awal_legacy']="SELECT COALESCE(SUM(amount),0) FROM legacy_savings_openings WHERE cancelled_at IS NULL";
+    $checks['tunggakan_legacy_tidak_cocok']="SELECT COUNT(*) FROM legacy_debts d JOIN tagihan_biaya_lain t ON t.id=d.bill_id JOIN siswa s ON s.id=d.student_id WHERE d.unit_id<>t.unit_id OR d.unit_id<>s.unit_id OR t.no_induk<>s.NO_INDUK OR d.amount<>t.nominal_tagihan OR d.master_id<>t.master_biaya_lain_id";
+    $checks['saldo_tabungan_tidak_cocok_jurnal']="SELECT COUNT(*) FROM tabungan t JOIN siswa s ON s.unit_id=t.unit_id AND s.NO_INDUK=t.NO_INDUK
+      LEFT JOIN legacy_savings_openings o ON o.student_id=s.id AND o.unit_id=s.unit_id AND o.cancelled_at IS NULL
+      LEFT JOIN (SELECT unit_id,NO_INDUK,SUM(MASUK) total FROM transaksi_m GROUP BY unit_id,NO_INDUK) m ON m.unit_id=t.unit_id AND m.NO_INDUK=t.NO_INDUK
+      LEFT JOIN (SELECT unit_id,NO_INDUK,SUM(KELUAR) total FROM transaksi_k GROUP BY unit_id,NO_INDUK) k ON k.unit_id=t.unit_id AND k.NO_INDUK=t.NO_INDUK
+      WHERE ABS(COALESCE(t.SALDO,0)-COALESCE(o.amount,0)-COALESCE(m.total,0)+COALESCE(k.total,0))>0.001 OR t.SALDO<0";
+}
+
 if((int)$koneksi->query("SELECT COUNT(*) FROM information_schema.COLUMNS WHERE TABLE_SCHEMA=DATABASE() AND TABLE_NAME='siswa_data' AND COLUMN_NAME='legacy_pending'")->fetch_row()[0]){
     $checks['duplikat_nis_per_unit']="SELECT COUNT(*) FROM (SELECT unit_id,NO_INDUK FROM siswa GROUP BY unit_id,NO_INDUK HAVING COUNT(*)>1) x";
     $checks['legacy_status_tidak_valid']="SELECT COUNT(*) FROM siswa WHERE legacy_pending=1 AND (is_active<>0 OR KELAS<>'LEGACY' OR master_kelas_id IS NOT NULL)";
@@ -114,11 +126,28 @@ if((int)$koneksi->query("SELECT COUNT(*) FROM information_schema.COLUMNS WHERE T
     $checks['migrasi_komponen_belum_selesai']="SELECT COUNT(*) FROM financial_component_migration WHERE stage<>'complete'";
 }
 
+if(lop_ready($koneksi)){
+    $checks['saldo_tabungan_tidak_cocok_jurnal']="SELECT COUNT(*) FROM tabungan t JOIN siswa s ON s.unit_id=t.unit_id AND s.NO_INDUK=t.NO_INDUK
+      LEFT JOIN legacy_savings_openings o ON o.student_id=s.id AND o.unit_id=s.unit_id AND o.cancelled_at IS NULL
+      LEFT JOIN legacy_op_owners own ON own.student_id=s.id AND own.unit_id=s.unit_id LEFT JOIN legacy_op_accounts a ON a.owner_id=own.id AND a.unit_id=own.unit_id
+      LEFT JOIN (SELECT unit_id,NO_INDUK,SUM(MASUK) total FROM transaksi_m GROUP BY unit_id,NO_INDUK) m ON m.unit_id=t.unit_id AND m.NO_INDUK=t.NO_INDUK
+      LEFT JOIN (SELECT unit_id,NO_INDUK,SUM(KELUAR) total FROM transaksi_k GROUP BY unit_id,NO_INDUK) k ON k.unit_id=t.unit_id AND k.NO_INDUK=t.NO_INDUK
+      WHERE ABS(t.SALDO-COALESCE(a.opening,o.amount,0)-COALESCE(m.total,0)+COALESCE(k.total,0))>0.001 OR t.SALDO<0";
+    $checks['tunggakan_legacy_tidak_cocok']=str_replace('d.amount<>t.nominal_tagihan',"(d.amount<>t.nominal_tagihan AND NOT EXISTS(SELECT 1 FROM legacy_op_obligations ob WHERE ob.bill_id=t.id AND ob.unit_id=t.unit_id))",$checks['tunggakan_legacy_tidak_cocok']);
+}
 echo 'database=' . DB_NAME . PHP_EOL;
 foreach ($metrics as $name => $sql) {
     echo 'metric.' . $name . '=' . number_format(readiness_scalar($koneksi, $sql), 2, '.', '') . PHP_EOL;
 }
 $failed = false;
+if(legacy_full_ready($koneksi)){
+    $broken=0;foreach(lf_rows($koneksi,'SELECT id FROM legacy_full_batches') as $batch){try{lful_check_result($koneksi,$batch['id']);}catch(Throwable $e){$broken++;}}
+    echo ($broken?'FAIL':'OK').'.migrasi_penuh_tidak_cocok='.$broken.PHP_EOL;$failed=$broken>0;
+}
+if(legacy_finance_ready($koneksi)){
+    $broken=0;foreach(lf_rows($koneksi,'SELECT id,unit_id,row_count,fingerprint FROM legacy_finance_sources WHERE published=1') as $source){$actual=lf_source_fingerprint($koneksi,(int)$source['unit_id'],(int)$source['id']);if($actual['count']!==(int)$source['row_count']||$actual['fingerprint']!==$source['fingerprint'])$broken++;}
+    echo ($broken?'FAIL':'OK').'.arsip_legacy_tidak_cocok='.$broken.PHP_EOL;$failed=$failed||$broken>0;
+}
 foreach ($checks as $name => $sql) {
     $count = (int)readiness_scalar($koneksi, $sql);
     echo ($count === 0 ? 'OK' : 'FAIL') . '.' . $name . '=' . $count . PHP_EOL;

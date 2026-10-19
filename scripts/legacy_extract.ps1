@@ -1,4 +1,4 @@
-param([Parameter(Mandatory=$true)][string]$JobDirectory,[Parameter(Mandatory=$true)][ValidateSet(1,2,3)][int]$Unit,[switch]$Setup,[switch]$Health,[switch]$Recover)
+param([Parameter(Mandatory=$true)][string]$JobDirectory,[Parameter(Mandatory=$true)][ValidateSet(1,2,3)][int]$Unit,[switch]$Setup,[switch]$Health,[switch]$Recover,[ValidateSet('students','finance','full')][string]$Category='students')
 $ErrorActionPreference='Stop'
 $exe='C:\Program Files\Microsoft SQL Server\150\Tools\Binn\SqlLocalDB.exe'
 $root=[IO.Path]::GetFullPath($JobDirectory)
@@ -76,8 +76,16 @@ try {
     Sql "ALTER DATABASE [$dbName] SET TRUSTWORTHY OFF; ALTER DATABASE [$dbName] SET DB_CHAINING OFF"|Out-Null
     if(@(Sql "DBCC CHECKDB ([$dbName]) WITH NO_INFOMSGS,ALL_ERRORMSGS,TABLERESULTS").Count){throw 'Source integrity check failed'}
     Sql "ALTER DATABASE [$dbName] SET READ_ONLY WITH ROLLBACK IMMEDIATE"|Out-Null
+    . (Join-Path $PSScriptRoot 'legacy_source_profiles.ps1')
+    $sourceProfile=Select-LegacySourceProfile
+    if($Category -in @('finance','full')){
+        . (Join-Path $PSScriptRoot 'legacy_finance_extract.ps1')
+        Export-LegacyFinance
+        return
+    }
     $columns=@(Sql "SELECT c.name,t.name AS data_type,c.is_computed FROM sys.columns c JOIN sys.types t ON t.user_type_id=c.user_type_id WHERE c.object_id=OBJECT_ID('dbo.siswa','U') ORDER BY c.column_id" $dbName)
     $required=@('NO_INDUK','NAMA','KELAS','SPP_PERBULAN','PANGKAL','BANGUNAN','SERAGAM','KEGIATAN','PANGKAL_BAYAR','BANGUNAN_BAYAR','SERAGAM_BAYAR','KEGIATAN_BAYAR','POMG','DAFTAR_ULANG','NO_induk_diknas','potong_pangkal','tot_pangkal','tot_du','potong_du','id')
+    if($sourceProfile.version -eq '2026' -and $Unit -eq 1){$required[0]='no_induk';$required+='NO_INDUK1'}
     if($columns.Count -ne $required.Count -or @($columns|Where-Object is_computed).Count){throw 'Unexpected or computed source columns'}
     foreach($column in $required){if($columns.name -notcontains $column){throw 'Audited student profile does not match'}}
     if(@($columns|Where-Object{$_.data_type -notin @('nvarchar','varchar','int','smallint','bigint','money','decimal','numeric','float','real','bit','datetime','nchar','char','tinyint')}).Count){throw 'Unexpected source column type'}
@@ -88,7 +96,7 @@ try {
     $output=New-Object IO.StreamWriter((Join-Path $root 'rows.jsonl'),$false,(New-Object Text.UTF8Encoding($false)))
     try{for($i=0;$i -lt $rows.Count;$i++){$output.WriteLine((ConvertTo-Json -InputObject $rows[$i] -Depth 8 -Compress));if(($i%25)-eq 0){Progress 'Ekstraksi' ($i+1) $total}}}finally{$output.Dispose()}
     Progress 'Ekstraksi' $rows.Count $total
-    @{database=$h.DatabaseName;date=[string]$h.BackupFinishDate;version=$h.SoftwareVersionMajor;rows=$total;columns=$columns}|ConvertTo-Json -Depth 8|Set-Content -LiteralPath (Join-Path $root 'source_manifest.json') -Encoding UTF8
+    @{database=$h.DatabaseName;date=[string]$h.BackupFinishDate;version=$h.SoftwareVersionMajor;rows=$total;columns=$columns;source_profile=$sourceProfile.id;source_profile_version=$sourceProfile.version;source_schema_signature=$sourceProfile.signature;reader_version=1}|ConvertTo-Json -Depth 8|Set-Content -LiteralPath (Join-Path $root 'source_manifest.json') -Encoding UTF8
 }finally{
     if($created){Sql "ALTER DATABASE [$dbName] SET SINGLE_USER WITH ROLLBACK IMMEDIATE; DROP DATABASE [$dbName]"|Out-Null}
 }

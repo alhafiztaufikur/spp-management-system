@@ -1,0 +1,5593 @@
+{
+    "SD": {
+        "bayar_du": [
+            {
+                "name": "no_induk",
+                "type": "nvarchar",
+                "length": 100,
+                "precision": 0,
+                "scale": 0
+            },
+            {
+                "name": "kelas",
+                "type": "char",
+                "length": 5,
+                "precision": 0,
+                "scale": 0
+            },
+            {
+                "name": "th_ajaran",
+                "type": "char",
+                "length": 9,
+                "precision": 0,
+                "scale": 0
+            },
+            {
+                "name": "jumlah",
+                "type": "numeric",
+                "length": 9,
+                "precision": 18,
+                "scale": 0
+            },
+            {
+                "name": "id",
+                "type": "numeric",
+                "length": 9,
+                "precision": 18,
+                "scale": 0
+            }
+        ],
+        "bayar": [
+            {
+                "name": "NO_INDUK",
+                "type": "nvarchar",
+                "length": 20,
+                "precision": 0,
+                "scale": 0
+            },
+            {
+                "name": "KELAS",
+                "type": "nvarchar",
+                "length": 10,
+                "precision": 0,
+                "scale": 0
+            },
+            {
+                "name": "U_PANGKAL",
+                "type": "float",
+                "length": 8,
+                "precision": 53,
+                "scale": 0
+            },
+            {
+                "name": "U_BANGUNAN",
+                "type": "float",
+                "length": 8,
+                "precision": 53,
+                "scale": 0
+            },
+            {
+                "name": "U_SERAGAM",
+                "type": "float",
+                "length": 8,
+                "precision": 53,
+                "scale": 0
+            },
+            {
+                "name": "U_KEGIATAN",
+                "type": "float",
+                "length": 8,
+                "precision": 53,
+                "scale": 0
+            },
+            {
+                "name": "U_SPP",
+                "type": "float",
+                "length": 8,
+                "precision": 53,
+                "scale": 0
+            },
+            {
+                "name": "U_MAKAN",
+                "type": "float",
+                "length": 8,
+                "precision": 53,
+                "scale": 0
+            },
+            {
+                "name": "U_SORGA",
+                "type": "float",
+                "length": 8,
+                "precision": 53,
+                "scale": 0
+            },
+            {
+                "name": "U_INFAQ",
+                "type": "float",
+                "length": 8,
+                "precision": 53,
+                "scale": 0
+            },
+            {
+                "name": "U_LAIN",
+                "type": "float",
+                "length": 8,
+                "precision": 53,
+                "scale": 0
+            },
+            {
+                "name": "KETERANGAN",
+                "type": "nvarchar",
+                "length": 40,
+                "precision": 0,
+                "scale": 0
+            },
+            {
+                "name": "TGL_BYR",
+                "type": "datetime",
+                "length": 8,
+                "precision": 23,
+                "scale": 3
+            },
+            {
+                "name": "BULAN",
+                "type": "nvarchar",
+                "length": 4,
+                "precision": 0,
+                "scale": 0
+            },
+            {
+                "name": "user_id",
+                "type": "nvarchar",
+                "length": 20,
+                "precision": 0,
+                "scale": 0
+            },
+            {
+                "name": "TAHUN",
+                "type": "char",
+                "length": 4,
+                "precision": 0,
+                "scale": 0
+            },
+            {
+                "name": "LAIN_LAIN1",
+                "type": "nvarchar",
+                "length": 10,
+                "precision": 0,
+                "scale": 0
+            },
+            {
+                "name": "LAIN_LAIN2",
+                "type": "nvarchar",
+                "length": 10,
+                "precision": 0,
+                "scale": 0
+            },
+            {
+                "name": "LAIN_LAIN3",
+                "type": "nvarchar",
+                "length": 10,
+                "precision": 0,
+                "scale": 0
+            },
+            {
+                "name": "LAIN_LAIN4",
+                "type": "nvarchar",
+                "length": 10,
+                "precision": 0,
+                "scale": 0
+            },
+            {
+                "name": "JUMLAH1",
+                "type": "float",
+                "length": 8,
+                "precision": 53,
+                "scale": 0
+            },
+            {
+                "name": "JUMLAH2",
+                "type": "float",
+                "length": 8,
+                "precision": 53,
+                "scale": 0
+            },
+            {
+                "name": "JUMLAH3",
+                "type": "float",
+                "length": 8,
+                "precision": 53,
+                "scale": 0
+            },
+            {
+                "name": "JUMLAH4",
+                "type": "float",
+                "length": 8,
+                "precision": 53,
+                "scale": 0
+            },
+            {
+                "name": "th_ajaran",
+                "type": "char",
+                "length": 9,
+                "precision": 0,
+                "scale": 0
+            },
+            {
+                "name": "kelas_du",
+                "type": "char",
+                "length": 5,
+                "precision": 0,
+                "scale": 0
+            },
+            {
+                "name": "id",
+                "type": "numeric",
+                "length": 9,
+                "precision": 18,
+                "scale": 0
+            },
+            {
+                "name": "potong_spp",
+                "type": "float",
+                "length": 8,
+                "precision": 53,
+                "scale": 0
+            },
+            {
+                "name": "tabungan_wajib",
+                "type": "float",
+                "length": 8,
+                "precision": 53,
+                "scale": 0
+            },
+            {
+                "name": "rstatus",
+                "type": "nchar",
+                "length": 20,
+                "precision": 0,
+                "scale": 0
+            },
+            {
+                "name": "cara_bayar",
+                "type": "char",
+                "length": 10,
+                "precision": 0,
+                "scale": 0
+            },
+            {
+                "name": "jam",
+                "type": "char",
+                "length": 15,
+                "precision": 0,
+                "scale": 0
+            }
+        ],
+        "Daftar_ulang": [
+            {
+                "name": "th_ajaran",
+                "type": "char",
+                "length": 9,
+                "precision": 0,
+                "scale": 0
+            },
+            {
+                "name": "kelas",
+                "type": "char",
+                "length": 1,
+                "precision": 0,
+                "scale": 0
+            },
+            {
+                "name": "Jumlah",
+                "type": "numeric",
+                "length": 9,
+                "precision": 18,
+                "scale": 0
+            },
+            {
+                "name": "id",
+                "type": "numeric",
+                "length": 9,
+                "precision": 18,
+                "scale": 0
+            }
+        ],
+        "jemputan": [
+            {
+                "name": "NO_INDUK",
+                "type": "nvarchar",
+                "length": 20,
+                "precision": 0,
+                "scale": 0
+            },
+            {
+                "name": "BULAN",
+                "type": "char",
+                "length": 10,
+                "precision": 0,
+                "scale": 0
+            },
+            {
+                "name": "TAHUN",
+                "type": "char",
+                "length": 10,
+                "precision": 0,
+                "scale": 0
+            },
+            {
+                "name": "JUMLAH",
+                "type": "float",
+                "length": 8,
+                "precision": 53,
+                "scale": 0
+            },
+            {
+                "name": "KELAS",
+                "type": "nvarchar",
+                "length": 10,
+                "precision": 0,
+                "scale": 0
+            },
+            {
+                "name": "BAYAR",
+                "type": "float",
+                "length": 8,
+                "precision": 53,
+                "scale": 0
+            }
+        ],
+        "kelas": [
+            {
+                "name": "kode",
+                "type": "char",
+                "length": 5,
+                "precision": 0,
+                "scale": 0
+            },
+            {
+                "name": "nama",
+                "type": "char",
+                "length": 30,
+                "precision": 0,
+                "scale": 0
+            }
+        ],
+        "kls": [
+            {
+                "name": "no_induk",
+                "type": "nvarchar",
+                "length": 20,
+                "precision": 0,
+                "scale": 0
+            },
+            {
+                "name": "nama",
+                "type": "nvarchar",
+                "length": 60,
+                "precision": 0,
+                "scale": 0
+            },
+            {
+                "name": "kelas",
+                "type": "nvarchar",
+                "length": 10,
+                "precision": 0,
+                "scale": 0
+            }
+        ],
+        "komitment_manual": [
+            {
+                "name": "no_induk",
+                "type": "char",
+                "length": 10,
+                "precision": 0,
+                "scale": 0
+            },
+            {
+                "name": "tgl_komitment",
+                "type": "datetime",
+                "length": 8,
+                "precision": 23,
+                "scale": 3
+            },
+            {
+                "name": "psb",
+                "type": "numeric",
+                "length": 9,
+                "precision": 18,
+                "scale": 0
+            },
+            {
+                "name": "du",
+                "type": "numeric",
+                "length": 9,
+                "precision": 18,
+                "scale": 0
+            },
+            {
+                "name": "spp",
+                "type": "numeric",
+                "length": 9,
+                "precision": 18,
+                "scale": 0
+            },
+            {
+                "name": "komite",
+                "type": "numeric",
+                "length": 9,
+                "precision": 18,
+                "scale": 0
+            },
+            {
+                "name": "lain_lain",
+                "type": "numeric",
+                "length": 9,
+                "precision": 18,
+                "scale": 0
+            },
+            {
+                "name": "id",
+                "type": "int",
+                "length": 4,
+                "precision": 10,
+                "scale": 0
+            }
+        ],
+        "komitment": [
+            {
+                "name": "no_induk",
+                "type": "char",
+                "length": 10,
+                "precision": 0,
+                "scale": 0
+            },
+            {
+                "name": "tgl_komitment",
+                "type": "datetime",
+                "length": 8,
+                "precision": 23,
+                "scale": 3
+            },
+            {
+                "name": "tgl_langsung",
+                "type": "char",
+                "length": 20,
+                "precision": 0,
+                "scale": 0
+            },
+            {
+                "name": "tgl_angsur",
+                "type": "datetime",
+                "length": 8,
+                "precision": 23,
+                "scale": 3
+            },
+            {
+                "name": "uraian",
+                "type": "char",
+                "length": 30,
+                "precision": 0,
+                "scale": 0
+            },
+            {
+                "name": "bulan_tahun",
+                "type": "char",
+                "length": 15,
+                "precision": 0,
+                "scale": 0
+            },
+            {
+                "name": "jumlah",
+                "type": "int",
+                "length": 4,
+                "precision": 10,
+                "scale": 0
+            },
+            {
+                "name": "ket",
+                "type": "char",
+                "length": 10,
+                "precision": 0,
+                "scale": 0
+            },
+            {
+                "name": "lain_lain",
+                "type": "int",
+                "length": 4,
+                "precision": 10,
+                "scale": 0
+            },
+            {
+                "name": "id",
+                "type": "int",
+                "length": 4,
+                "precision": 10,
+                "scale": 0
+            }
+        ],
+        "lain": [
+            {
+                "name": "KODE",
+                "type": "nvarchar",
+                "length": 10,
+                "precision": 0,
+                "scale": 0
+            },
+            {
+                "name": "NAMA",
+                "type": "nvarchar",
+                "length": 40,
+                "precision": 0,
+                "scale": 0
+            }
+        ],
+        "makan": [
+            {
+                "name": "NO_INDUK",
+                "type": "nvarchar",
+                "length": 20,
+                "precision": 0,
+                "scale": 0
+            },
+            {
+                "name": "BULAN",
+                "type": "nvarchar",
+                "length": 4,
+                "precision": 0,
+                "scale": 0
+            },
+            {
+                "name": "TAHUN",
+                "type": "nvarchar",
+                "length": 8,
+                "precision": 0,
+                "scale": 0
+            },
+            {
+                "name": "JUMLAH",
+                "type": "float",
+                "length": 8,
+                "precision": 53,
+                "scale": 0
+            },
+            {
+                "name": "KELAS",
+                "type": "nvarchar",
+                "length": 10,
+                "precision": 0,
+                "scale": 0
+            },
+            {
+                "name": "BAYAR",
+                "type": "float",
+                "length": 8,
+                "precision": 53,
+                "scale": 0
+            }
+        ],
+        "rekap_belum_spp": [
+            {
+                "name": "no_induk",
+                "type": "char",
+                "length": 10,
+                "precision": 0,
+                "scale": 0
+            },
+            {
+                "name": "kelas",
+                "type": "char",
+                "length": 5,
+                "precision": 0,
+                "scale": 0
+            },
+            {
+                "name": "tahun",
+                "type": "char",
+                "length": 4,
+                "precision": 0,
+                "scale": 0
+            },
+            {
+                "name": "juli",
+                "type": "numeric",
+                "length": 9,
+                "precision": 18,
+                "scale": 0
+            },
+            {
+                "name": "agustus",
+                "type": "numeric",
+                "length": 9,
+                "precision": 18,
+                "scale": 0
+            },
+            {
+                "name": "september",
+                "type": "numeric",
+                "length": 9,
+                "precision": 18,
+                "scale": 0
+            },
+            {
+                "name": "oktober",
+                "type": "numeric",
+                "length": 9,
+                "precision": 18,
+                "scale": 0
+            },
+            {
+                "name": "nopember",
+                "type": "numeric",
+                "length": 9,
+                "precision": 18,
+                "scale": 0
+            },
+            {
+                "name": "desember",
+                "type": "numeric",
+                "length": 9,
+                "precision": 18,
+                "scale": 0
+            },
+            {
+                "name": "januari",
+                "type": "numeric",
+                "length": 9,
+                "precision": 18,
+                "scale": 0
+            },
+            {
+                "name": "pebruari",
+                "type": "numeric",
+                "length": 9,
+                "precision": 18,
+                "scale": 0
+            },
+            {
+                "name": "maret",
+                "type": "numeric",
+                "length": 9,
+                "precision": 18,
+                "scale": 0
+            },
+            {
+                "name": "april",
+                "type": "numeric",
+                "length": 9,
+                "precision": 18,
+                "scale": 0
+            },
+            {
+                "name": "mei",
+                "type": "numeric",
+                "length": 9,
+                "precision": 18,
+                "scale": 0
+            },
+            {
+                "name": "juni",
+                "type": "numeric",
+                "length": 9,
+                "precision": 18,
+                "scale": 0
+            },
+            {
+                "name": "tanda",
+                "type": "char",
+                "length": 1,
+                "precision": 0,
+                "scale": 0
+            },
+            {
+                "name": "spp_perbulan",
+                "type": "numeric",
+                "length": 9,
+                "precision": 18,
+                "scale": 0
+            },
+            {
+                "name": "tot_spp",
+                "type": "numeric",
+                "length": 9,
+                "precision": 18,
+                "scale": 0
+            },
+            {
+                "name": "spp_bayar",
+                "type": "numeric",
+                "length": 9,
+                "precision": 18,
+                "scale": 0
+            },
+            {
+                "name": "Ket_spp",
+                "type": "char",
+                "length": 200,
+                "precision": 0,
+                "scale": 0
+            },
+            {
+                "name": "psb_pertahun",
+                "type": "numeric",
+                "length": 9,
+                "precision": 18,
+                "scale": 0
+            },
+            {
+                "name": "psb_bayar",
+                "type": "numeric",
+                "length": 9,
+                "precision": 18,
+                "scale": 0
+            },
+            {
+                "name": "du_pertahun",
+                "type": "numeric",
+                "length": 9,
+                "precision": 18,
+                "scale": 0
+            },
+            {
+                "name": "du_bayar",
+                "type": "numeric",
+                "length": 9,
+                "precision": 18,
+                "scale": 0
+            },
+            {
+                "name": "jul",
+                "type": "numeric",
+                "length": 9,
+                "precision": 18,
+                "scale": 0
+            },
+            {
+                "name": "agu",
+                "type": "numeric",
+                "length": 9,
+                "precision": 18,
+                "scale": 0
+            },
+            {
+                "name": "sep",
+                "type": "numeric",
+                "length": 9,
+                "precision": 18,
+                "scale": 0
+            },
+            {
+                "name": "okt",
+                "type": "numeric",
+                "length": 9,
+                "precision": 18,
+                "scale": 0
+            },
+            {
+                "name": "nop",
+                "type": "numeric",
+                "length": 9,
+                "precision": 18,
+                "scale": 0
+            },
+            {
+                "name": "des",
+                "type": "numeric",
+                "length": 9,
+                "precision": 18,
+                "scale": 0
+            },
+            {
+                "name": "jan",
+                "type": "numeric",
+                "length": 9,
+                "precision": 18,
+                "scale": 0
+            },
+            {
+                "name": "peb",
+                "type": "numeric",
+                "length": 9,
+                "precision": 18,
+                "scale": 0
+            },
+            {
+                "name": "mar",
+                "type": "numeric",
+                "length": 9,
+                "precision": 18,
+                "scale": 0
+            },
+            {
+                "name": "apr",
+                "type": "numeric",
+                "length": 9,
+                "precision": 18,
+                "scale": 0
+            },
+            {
+                "name": "me",
+                "type": "numeric",
+                "length": 9,
+                "precision": 18,
+                "scale": 0
+            },
+            {
+                "name": "jun",
+                "type": "numeric",
+                "length": 9,
+                "precision": 18,
+                "scale": 0
+            },
+            {
+                "name": "tot_komite",
+                "type": "numeric",
+                "length": 9,
+                "precision": 18,
+                "scale": 0
+            },
+            {
+                "name": "bayar_komite",
+                "type": "numeric",
+                "length": 9,
+                "precision": 18,
+                "scale": 0
+            },
+            {
+                "name": "komite_perbulan",
+                "type": "numeric",
+                "length": 9,
+                "precision": 18,
+                "scale": 0
+            },
+            {
+                "name": "jml_komite",
+                "type": "numeric",
+                "length": 9,
+                "precision": 18,
+                "scale": 0
+            }
+        ],
+        "siswa": [
+            {
+                "name": "no_induk",
+                "type": "nvarchar",
+                "length": 20,
+                "precision": 0,
+                "scale": 0
+            },
+            {
+                "name": "NO_INDUK1",
+                "type": "nvarchar",
+                "length": 20,
+                "precision": 0,
+                "scale": 0
+            },
+            {
+                "name": "NAMA",
+                "type": "nvarchar",
+                "length": 60,
+                "precision": 0,
+                "scale": 0
+            },
+            {
+                "name": "KELAS",
+                "type": "nvarchar",
+                "length": 10,
+                "precision": 0,
+                "scale": 0
+            },
+            {
+                "name": "SPP_PERBULAN",
+                "type": "float",
+                "length": 8,
+                "precision": 53,
+                "scale": 0
+            },
+            {
+                "name": "PANGKAL",
+                "type": "float",
+                "length": 8,
+                "precision": 53,
+                "scale": 0
+            },
+            {
+                "name": "BANGUNAN",
+                "type": "float",
+                "length": 8,
+                "precision": 53,
+                "scale": 0
+            },
+            {
+                "name": "SERAGAM",
+                "type": "float",
+                "length": 8,
+                "precision": 53,
+                "scale": 0
+            },
+            {
+                "name": "KEGIATAN",
+                "type": "float",
+                "length": 8,
+                "precision": 53,
+                "scale": 0
+            },
+            {
+                "name": "PANGKAL_BAYAR",
+                "type": "float",
+                "length": 8,
+                "precision": 53,
+                "scale": 0
+            },
+            {
+                "name": "BANGUNAN_BAYAR",
+                "type": "float",
+                "length": 8,
+                "precision": 53,
+                "scale": 0
+            },
+            {
+                "name": "SERAGAM_BAYAR",
+                "type": "float",
+                "length": 8,
+                "precision": 53,
+                "scale": 0
+            },
+            {
+                "name": "KEGIATAN_BAYAR",
+                "type": "float",
+                "length": 8,
+                "precision": 53,
+                "scale": 0
+            },
+            {
+                "name": "POMG",
+                "type": "float",
+                "length": 8,
+                "precision": 53,
+                "scale": 0
+            },
+            {
+                "name": "DAFTAR_ULANG",
+                "type": "float",
+                "length": 8,
+                "precision": 53,
+                "scale": 0
+            },
+            {
+                "name": "NO_induk_diknas",
+                "type": "char",
+                "length": 10,
+                "precision": 0,
+                "scale": 0
+            },
+            {
+                "name": "potong_pangkal",
+                "type": "float",
+                "length": 8,
+                "precision": 53,
+                "scale": 0
+            },
+            {
+                "name": "tot_pangkal",
+                "type": "float",
+                "length": 8,
+                "precision": 53,
+                "scale": 0
+            },
+            {
+                "name": "tot_du",
+                "type": "float",
+                "length": 8,
+                "precision": 53,
+                "scale": 0
+            },
+            {
+                "name": "potong_du",
+                "type": "float",
+                "length": 8,
+                "precision": 53,
+                "scale": 0
+            },
+            {
+                "name": "id",
+                "type": "int",
+                "length": 4,
+                "precision": 10,
+                "scale": 0
+            }
+        ],
+        "SPP_BELUM": [
+            {
+                "name": "NO_INDUK",
+                "type": "nvarchar",
+                "length": 20,
+                "precision": 0,
+                "scale": 0
+            },
+            {
+                "name": "NAMA",
+                "type": "nvarchar",
+                "length": 60,
+                "precision": 0,
+                "scale": 0
+            },
+            {
+                "name": "KELAS",
+                "type": "nvarchar",
+                "length": 10,
+                "precision": 0,
+                "scale": 0
+            },
+            {
+                "name": "SPP_PERBULAN",
+                "type": "float",
+                "length": 8,
+                "precision": 53,
+                "scale": 0
+            },
+            {
+                "name": "PANGKAL",
+                "type": "float",
+                "length": 8,
+                "precision": 53,
+                "scale": 0
+            },
+            {
+                "name": "BANGUNAN",
+                "type": "float",
+                "length": 8,
+                "precision": 53,
+                "scale": 0
+            },
+            {
+                "name": "SERAGAM",
+                "type": "float",
+                "length": 8,
+                "precision": 53,
+                "scale": 0
+            },
+            {
+                "name": "KEGIATAN",
+                "type": "float",
+                "length": 8,
+                "precision": 53,
+                "scale": 0
+            },
+            {
+                "name": "potong_spp",
+                "type": "float",
+                "length": 8,
+                "precision": 53,
+                "scale": 0
+            }
+        ],
+        "tabungan": [
+            {
+                "name": "NO_INDUK",
+                "type": "nvarchar",
+                "length": 20,
+                "precision": 0,
+                "scale": 0
+            },
+            {
+                "name": "SALDO",
+                "type": "float",
+                "length": 8,
+                "precision": 53,
+                "scale": 0
+            },
+            {
+                "name": "id",
+                "type": "int",
+                "length": 4,
+                "precision": 10,
+                "scale": 0
+            }
+        ],
+        "temp_bayar_du": [
+            {
+                "name": "no_induk",
+                "type": "nvarchar",
+                "length": 20,
+                "precision": 0,
+                "scale": 0
+            },
+            {
+                "name": "kelas",
+                "type": "char",
+                "length": 5,
+                "precision": 0,
+                "scale": 0
+            },
+            {
+                "name": "th_ajaran",
+                "type": "char",
+                "length": 9,
+                "precision": 0,
+                "scale": 0
+            },
+            {
+                "name": "jumlah",
+                "type": "numeric",
+                "length": 9,
+                "precision": 18,
+                "scale": 0
+            },
+            {
+                "name": "id",
+                "type": "numeric",
+                "length": 9,
+                "precision": 18,
+                "scale": 0
+            },
+            {
+                "name": "du",
+                "type": "numeric",
+                "length": 9,
+                "precision": 18,
+                "scale": 0
+            }
+        ],
+        "temp_belum_spp": [
+            {
+                "name": "no_induk",
+                "type": "char",
+                "length": 10,
+                "precision": 0,
+                "scale": 0
+            },
+            {
+                "name": "kelas",
+                "type": "char",
+                "length": 5,
+                "precision": 0,
+                "scale": 0
+            },
+            {
+                "name": "tahun",
+                "type": "char",
+                "length": 4,
+                "precision": 0,
+                "scale": 0
+            },
+            {
+                "name": "u_spp",
+                "type": "numeric",
+                "length": 9,
+                "precision": 18,
+                "scale": 0
+            },
+            {
+                "name": "bulan",
+                "type": "char",
+                "length": 2,
+                "precision": 0,
+                "scale": 0
+            },
+            {
+                "name": "u_sorga",
+                "type": "numeric",
+                "length": 9,
+                "precision": 18,
+                "scale": 0
+            }
+        ],
+        "transaksi_k": [
+            {
+                "name": "NO_INDUK",
+                "type": "nvarchar",
+                "length": 20,
+                "precision": 0,
+                "scale": 0
+            },
+            {
+                "name": "TANGGAL",
+                "type": "smalldatetime",
+                "length": 4,
+                "precision": 16,
+                "scale": 0
+            },
+            {
+                "name": "MASUK",
+                "type": "float",
+                "length": 8,
+                "precision": 53,
+                "scale": 0
+            },
+            {
+                "name": "KELUAR",
+                "type": "float",
+                "length": 8,
+                "precision": 53,
+                "scale": 0
+            },
+            {
+                "name": "user_id",
+                "type": "char",
+                "length": 10,
+                "precision": 0,
+                "scale": 0
+            }
+        ],
+        "transaksi_m": [
+            {
+                "name": "NO_INDUK",
+                "type": "nvarchar",
+                "length": 20,
+                "precision": 0,
+                "scale": 0
+            },
+            {
+                "name": "TANGGAL",
+                "type": "smalldatetime",
+                "length": 4,
+                "precision": 16,
+                "scale": 0
+            },
+            {
+                "name": "MASUK",
+                "type": "float",
+                "length": 8,
+                "precision": 53,
+                "scale": 0
+            },
+            {
+                "name": "KELUAR",
+                "type": "float",
+                "length": 8,
+                "precision": 53,
+                "scale": 0
+            },
+            {
+                "name": "user_id",
+                "type": "char",
+                "length": 10,
+                "precision": 0,
+                "scale": 0
+            },
+            {
+                "name": "id",
+                "type": "int",
+                "length": 4,
+                "precision": 10,
+                "scale": 0
+            }
+        ],
+        "u_lain": [
+            {
+                "name": "NO_INDUK",
+                "type": "nvarchar",
+                "length": 20,
+                "precision": 0,
+                "scale": 0
+            },
+            {
+                "name": "KODE",
+                "type": "nvarchar",
+                "length": 10,
+                "precision": 0,
+                "scale": 0
+            },
+            {
+                "name": "JUMLAH",
+                "type": "float",
+                "length": 8,
+                "precision": 53,
+                "scale": 0
+            },
+            {
+                "name": "TGL_BAYAR",
+                "type": "smalldatetime",
+                "length": 4,
+                "precision": 16,
+                "scale": 0
+            },
+            {
+                "name": "kelas",
+                "type": "nvarchar",
+                "length": 10,
+                "precision": 0,
+                "scale": 0
+            }
+        ],
+        "U_TABUNGAN": [
+            {
+                "name": "NO_INDUK",
+                "type": "nvarchar",
+                "length": 20,
+                "precision": 0,
+                "scale": 0
+            },
+            {
+                "name": "TANGGAL",
+                "type": "smalldatetime",
+                "length": 4,
+                "precision": 16,
+                "scale": 0
+            },
+            {
+                "name": "MASUK",
+                "type": "float",
+                "length": 8,
+                "precision": 53,
+                "scale": 0
+            },
+            {
+                "name": "KELUAR",
+                "type": "float",
+                "length": 8,
+                "precision": 53,
+                "scale": 0
+            }
+        ],
+        "tb_masuk": [
+            {
+                "name": "NO_INDUK",
+                "type": "nvarchar",
+                "length": 20,
+                "precision": 0,
+                "scale": 0
+            },
+            {
+                "name": "TANGGAL",
+                "type": "smalldatetime",
+                "length": 4,
+                "precision": 16,
+                "scale": 0
+            },
+            {
+                "name": "MASUK",
+                "type": "float",
+                "length": 8,
+                "precision": 53,
+                "scale": 0
+            },
+            {
+                "name": "KELUAR",
+                "type": "float",
+                "length": 8,
+                "precision": 53,
+                "scale": 0
+            },
+            {
+                "name": "user_id",
+                "type": "char",
+                "length": 10,
+                "precision": 0,
+                "scale": 0
+            },
+            {
+                "name": "id",
+                "type": "int",
+                "length": 4,
+                "precision": 10,
+                "scale": 0
+            }
+        ],
+        "tb_keluar": [
+            {
+                "name": "NO_INDUK",
+                "type": "nvarchar",
+                "length": 20,
+                "precision": 0,
+                "scale": 0
+            },
+            {
+                "name": "TANGGAL",
+                "type": "smalldatetime",
+                "length": 4,
+                "precision": 16,
+                "scale": 0
+            },
+            {
+                "name": "MASUK",
+                "type": "float",
+                "length": 8,
+                "precision": 53,
+                "scale": 0
+            },
+            {
+                "name": "KELUAR",
+                "type": "float",
+                "length": 8,
+                "precision": 53,
+                "scale": 0
+            },
+            {
+                "name": "user_id",
+                "type": "char",
+                "length": 10,
+                "precision": 0,
+                "scale": 0
+            }
+        ],
+        "tb_total": [
+            {
+                "name": "NO_INDUK",
+                "type": "nvarchar",
+                "length": 20,
+                "precision": 0,
+                "scale": 0
+            },
+            {
+                "name": "SALDO",
+                "type": "float",
+                "length": 8,
+                "precision": 53,
+                "scale": 0
+            },
+            {
+                "name": "id",
+                "type": "int",
+                "length": 4,
+                "precision": 10,
+                "scale": 0
+            }
+        ],
+        "tbg": [
+            {
+                "name": "msuk",
+                "type": "numeric",
+                "length": 9,
+                "precision": 18,
+                "scale": 0
+            },
+            {
+                "name": "keluar",
+                "type": "numeric",
+                "length": 9,
+                "precision": 18,
+                "scale": 0
+            },
+            {
+                "name": "jumlh",
+                "type": "numeric",
+                "length": 9,
+                "precision": 18,
+                "scale": 0
+            },
+            {
+                "name": "id",
+                "type": "int",
+                "length": 4,
+                "precision": 10,
+                "scale": 0
+            },
+            {
+                "name": "tanda",
+                "type": "nchar",
+                "length": 20,
+                "precision": 0,
+                "scale": 0
+            },
+            {
+                "name": "tgl",
+                "type": "datetime",
+                "length": 8,
+                "precision": 23,
+                "scale": 3
+            },
+            {
+                "name": "nomer",
+                "type": "int",
+                "length": 4,
+                "precision": 10,
+                "scale": 0
+            },
+            {
+                "name": "user_id",
+                "type": "char",
+                "length": 10,
+                "precision": 0,
+                "scale": 0
+            }
+        ],
+        "siswa2025": [
+            {
+                "name": "NO_INDUK",
+                "type": "nvarchar",
+                "length": 20,
+                "precision": 0,
+                "scale": 0
+            },
+            {
+                "name": "NAMA",
+                "type": "nvarchar",
+                "length": 60,
+                "precision": 0,
+                "scale": 0
+            },
+            {
+                "name": "KELAS",
+                "type": "nvarchar",
+                "length": 10,
+                "precision": 0,
+                "scale": 0
+            },
+            {
+                "name": "SPP_PERBULAN",
+                "type": "float",
+                "length": 8,
+                "precision": 53,
+                "scale": 0
+            },
+            {
+                "name": "PANGKAL",
+                "type": "float",
+                "length": 8,
+                "precision": 53,
+                "scale": 0
+            },
+            {
+                "name": "BANGUNAN",
+                "type": "float",
+                "length": 8,
+                "precision": 53,
+                "scale": 0
+            },
+            {
+                "name": "SERAGAM",
+                "type": "float",
+                "length": 8,
+                "precision": 53,
+                "scale": 0
+            },
+            {
+                "name": "KEGIATAN",
+                "type": "float",
+                "length": 8,
+                "precision": 53,
+                "scale": 0
+            },
+            {
+                "name": "PANGKAL_BAYAR",
+                "type": "float",
+                "length": 8,
+                "precision": 53,
+                "scale": 0
+            },
+            {
+                "name": "BANGUNAN_BAYAR",
+                "type": "float",
+                "length": 8,
+                "precision": 53,
+                "scale": 0
+            },
+            {
+                "name": "SERAGAM_BAYAR",
+                "type": "float",
+                "length": 8,
+                "precision": 53,
+                "scale": 0
+            },
+            {
+                "name": "KEGIATAN_BAYAR",
+                "type": "float",
+                "length": 8,
+                "precision": 53,
+                "scale": 0
+            },
+            {
+                "name": "POMG",
+                "type": "float",
+                "length": 8,
+                "precision": 53,
+                "scale": 0
+            },
+            {
+                "name": "DAFTAR_ULANG",
+                "type": "float",
+                "length": 8,
+                "precision": 53,
+                "scale": 0
+            },
+            {
+                "name": "NO_induk_diknas",
+                "type": "char",
+                "length": 10,
+                "precision": 0,
+                "scale": 0
+            },
+            {
+                "name": "potong_pangkal",
+                "type": "float",
+                "length": 8,
+                "precision": 53,
+                "scale": 0
+            },
+            {
+                "name": "tot_pangkal",
+                "type": "float",
+                "length": 8,
+                "precision": 53,
+                "scale": 0
+            },
+            {
+                "name": "tot_du",
+                "type": "float",
+                "length": 8,
+                "precision": 53,
+                "scale": 0
+            },
+            {
+                "name": "potong_du",
+                "type": "float",
+                "length": 8,
+                "precision": 53,
+                "scale": 0
+            },
+            {
+                "name": "id",
+                "type": "int",
+                "length": 4,
+                "precision": 10,
+                "scale": 0
+            }
+        ],
+        "siswalama": [
+            {
+                "name": "NO_INDUK",
+                "type": "nvarchar",
+                "length": 20,
+                "precision": 0,
+                "scale": 0
+            },
+            {
+                "name": "NAMA",
+                "type": "nvarchar",
+                "length": 60,
+                "precision": 0,
+                "scale": 0
+            },
+            {
+                "name": "KELAS",
+                "type": "nvarchar",
+                "length": 10,
+                "precision": 0,
+                "scale": 0
+            },
+            {
+                "name": "SPP_PERBULAN",
+                "type": "float",
+                "length": 8,
+                "precision": 53,
+                "scale": 0
+            },
+            {
+                "name": "PANGKAL",
+                "type": "float",
+                "length": 8,
+                "precision": 53,
+                "scale": 0
+            },
+            {
+                "name": "BANGUNAN",
+                "type": "float",
+                "length": 8,
+                "precision": 53,
+                "scale": 0
+            },
+            {
+                "name": "SERAGAM",
+                "type": "float",
+                "length": 8,
+                "precision": 53,
+                "scale": 0
+            },
+            {
+                "name": "KEGIATAN",
+                "type": "float",
+                "length": 8,
+                "precision": 53,
+                "scale": 0
+            },
+            {
+                "name": "PANGKAL_BAYAR",
+                "type": "float",
+                "length": 8,
+                "precision": 53,
+                "scale": 0
+            },
+            {
+                "name": "BANGUNAN_BAYAR",
+                "type": "float",
+                "length": 8,
+                "precision": 53,
+                "scale": 0
+            },
+            {
+                "name": "SERAGAM_BAYAR",
+                "type": "float",
+                "length": 8,
+                "precision": 53,
+                "scale": 0
+            },
+            {
+                "name": "KEGIATAN_BAYAR",
+                "type": "float",
+                "length": 8,
+                "precision": 53,
+                "scale": 0
+            },
+            {
+                "name": "POMG",
+                "type": "float",
+                "length": 8,
+                "precision": 53,
+                "scale": 0
+            },
+            {
+                "name": "DAFTAR_ULANG",
+                "type": "float",
+                "length": 8,
+                "precision": 53,
+                "scale": 0
+            },
+            {
+                "name": "NO_induk_diknas",
+                "type": "char",
+                "length": 10,
+                "precision": 0,
+                "scale": 0
+            },
+            {
+                "name": "potong_pangkal",
+                "type": "float",
+                "length": 8,
+                "precision": 53,
+                "scale": 0
+            },
+            {
+                "name": "tot_pangkal",
+                "type": "float",
+                "length": 8,
+                "precision": 53,
+                "scale": 0
+            },
+            {
+                "name": "tot_du",
+                "type": "float",
+                "length": 8,
+                "precision": 53,
+                "scale": 0
+            },
+            {
+                "name": "potong_du",
+                "type": "float",
+                "length": 8,
+                "precision": 53,
+                "scale": 0
+            },
+            {
+                "name": "id",
+                "type": "int",
+                "length": 4,
+                "precision": 10,
+                "scale": 0
+            },
+            {
+                "name": "induk",
+                "type": "char",
+                "length": 10,
+                "precision": 0,
+                "scale": 0
+            }
+        ],
+        "siswaxx01": [
+            {
+                "name": "NO_INDUK",
+                "type": "nvarchar",
+                "length": 20,
+                "precision": 0,
+                "scale": 0
+            },
+            {
+                "name": "NAMA",
+                "type": "nvarchar",
+                "length": 60,
+                "precision": 0,
+                "scale": 0
+            },
+            {
+                "name": "KELAS",
+                "type": "nvarchar",
+                "length": 10,
+                "precision": 0,
+                "scale": 0
+            },
+            {
+                "name": "SPP_PERBULAN",
+                "type": "float",
+                "length": 8,
+                "precision": 53,
+                "scale": 0
+            },
+            {
+                "name": "PANGKAL",
+                "type": "float",
+                "length": 8,
+                "precision": 53,
+                "scale": 0
+            },
+            {
+                "name": "BANGUNAN",
+                "type": "float",
+                "length": 8,
+                "precision": 53,
+                "scale": 0
+            },
+            {
+                "name": "SERAGAM",
+                "type": "float",
+                "length": 8,
+                "precision": 53,
+                "scale": 0
+            },
+            {
+                "name": "KEGIATAN",
+                "type": "float",
+                "length": 8,
+                "precision": 53,
+                "scale": 0
+            },
+            {
+                "name": "PANGKAL_BAYAR",
+                "type": "float",
+                "length": 8,
+                "precision": 53,
+                "scale": 0
+            },
+            {
+                "name": "BANGUNAN_BAYAR",
+                "type": "float",
+                "length": 8,
+                "precision": 53,
+                "scale": 0
+            },
+            {
+                "name": "SERAGAM_BAYAR",
+                "type": "float",
+                "length": 8,
+                "precision": 53,
+                "scale": 0
+            },
+            {
+                "name": "KEGIATAN_BAYAR",
+                "type": "float",
+                "length": 8,
+                "precision": 53,
+                "scale": 0
+            },
+            {
+                "name": "POMG",
+                "type": "float",
+                "length": 8,
+                "precision": 53,
+                "scale": 0
+            },
+            {
+                "name": "DAFTAR_ULANG",
+                "type": "float",
+                "length": 8,
+                "precision": 53,
+                "scale": 0
+            },
+            {
+                "name": "NO_induk_diknas",
+                "type": "char",
+                "length": 10,
+                "precision": 0,
+                "scale": 0
+            },
+            {
+                "name": "potong_pangkal",
+                "type": "float",
+                "length": 8,
+                "precision": 53,
+                "scale": 0
+            },
+            {
+                "name": "tot_pangkal",
+                "type": "float",
+                "length": 8,
+                "precision": 53,
+                "scale": 0
+            },
+            {
+                "name": "tot_du",
+                "type": "float",
+                "length": 8,
+                "precision": 53,
+                "scale": 0
+            },
+            {
+                "name": "potong_du",
+                "type": "float",
+                "length": 8,
+                "precision": 53,
+                "scale": 0
+            },
+            {
+                "name": "id",
+                "type": "int",
+                "length": 4,
+                "precision": 10,
+                "scale": 0
+            }
+        ],
+        "siswaxx25": [
+            {
+                "name": "NO_INDUK",
+                "type": "nvarchar",
+                "length": 20,
+                "precision": 0,
+                "scale": 0
+            },
+            {
+                "name": "NAMA",
+                "type": "nvarchar",
+                "length": 60,
+                "precision": 0,
+                "scale": 0
+            },
+            {
+                "name": "KELAS",
+                "type": "nvarchar",
+                "length": 10,
+                "precision": 0,
+                "scale": 0
+            },
+            {
+                "name": "SPP_PERBULAN",
+                "type": "float",
+                "length": 8,
+                "precision": 53,
+                "scale": 0
+            },
+            {
+                "name": "PANGKAL",
+                "type": "float",
+                "length": 8,
+                "precision": 53,
+                "scale": 0
+            },
+            {
+                "name": "BANGUNAN",
+                "type": "float",
+                "length": 8,
+                "precision": 53,
+                "scale": 0
+            },
+            {
+                "name": "SERAGAM",
+                "type": "float",
+                "length": 8,
+                "precision": 53,
+                "scale": 0
+            },
+            {
+                "name": "KEGIATAN",
+                "type": "float",
+                "length": 8,
+                "precision": 53,
+                "scale": 0
+            },
+            {
+                "name": "PANGKAL_BAYAR",
+                "type": "float",
+                "length": 8,
+                "precision": 53,
+                "scale": 0
+            },
+            {
+                "name": "BANGUNAN_BAYAR",
+                "type": "float",
+                "length": 8,
+                "precision": 53,
+                "scale": 0
+            },
+            {
+                "name": "SERAGAM_BAYAR",
+                "type": "float",
+                "length": 8,
+                "precision": 53,
+                "scale": 0
+            },
+            {
+                "name": "KEGIATAN_BAYAR",
+                "type": "float",
+                "length": 8,
+                "precision": 53,
+                "scale": 0
+            },
+            {
+                "name": "POMG",
+                "type": "float",
+                "length": 8,
+                "precision": 53,
+                "scale": 0
+            },
+            {
+                "name": "DAFTAR_ULANG",
+                "type": "float",
+                "length": 8,
+                "precision": 53,
+                "scale": 0
+            }
+        ],
+        "bayar29052019": [
+            {
+                "name": "NO_INDUK",
+                "type": "nvarchar",
+                "length": 20,
+                "precision": 0,
+                "scale": 0
+            },
+            {
+                "name": "KELAS",
+                "type": "nvarchar",
+                "length": 10,
+                "precision": 0,
+                "scale": 0
+            },
+            {
+                "name": "U_PANGKAL",
+                "type": "float",
+                "length": 8,
+                "precision": 53,
+                "scale": 0
+            },
+            {
+                "name": "U_BANGUNAN",
+                "type": "float",
+                "length": 8,
+                "precision": 53,
+                "scale": 0
+            },
+            {
+                "name": "U_SERAGAM",
+                "type": "float",
+                "length": 8,
+                "precision": 53,
+                "scale": 0
+            },
+            {
+                "name": "U_KEGIATAN",
+                "type": "float",
+                "length": 8,
+                "precision": 53,
+                "scale": 0
+            },
+            {
+                "name": "U_SPP",
+                "type": "float",
+                "length": 8,
+                "precision": 53,
+                "scale": 0
+            },
+            {
+                "name": "U_MAKAN",
+                "type": "float",
+                "length": 8,
+                "precision": 53,
+                "scale": 0
+            },
+            {
+                "name": "U_SORGA",
+                "type": "float",
+                "length": 8,
+                "precision": 53,
+                "scale": 0
+            },
+            {
+                "name": "U_INFAQ",
+                "type": "float",
+                "length": 8,
+                "precision": 53,
+                "scale": 0
+            },
+            {
+                "name": "U_LAIN",
+                "type": "float",
+                "length": 8,
+                "precision": 53,
+                "scale": 0
+            },
+            {
+                "name": "KETERANGAN",
+                "type": "nvarchar",
+                "length": 40,
+                "precision": 0,
+                "scale": 0
+            },
+            {
+                "name": "TGL_BYR",
+                "type": "datetime",
+                "length": 8,
+                "precision": 23,
+                "scale": 3
+            },
+            {
+                "name": "BULAN",
+                "type": "nvarchar",
+                "length": 40,
+                "precision": 0,
+                "scale": 0
+            },
+            {
+                "name": "user_id",
+                "type": "nvarchar",
+                "length": 20,
+                "precision": 0,
+                "scale": 0
+            },
+            {
+                "name": "TAHUN",
+                "type": "char",
+                "length": 4,
+                "precision": 0,
+                "scale": 0
+            },
+            {
+                "name": "LAIN_LAIN1",
+                "type": "nvarchar",
+                "length": 10,
+                "precision": 0,
+                "scale": 0
+            },
+            {
+                "name": "LAIN_LAIN2",
+                "type": "nvarchar",
+                "length": 10,
+                "precision": 0,
+                "scale": 0
+            },
+            {
+                "name": "LAIN_LAIN3",
+                "type": "nvarchar",
+                "length": 10,
+                "precision": 0,
+                "scale": 0
+            },
+            {
+                "name": "LAIN_LAIN4",
+                "type": "nvarchar",
+                "length": 10,
+                "precision": 0,
+                "scale": 0
+            },
+            {
+                "name": "JUMLAH1",
+                "type": "float",
+                "length": 8,
+                "precision": 53,
+                "scale": 0
+            },
+            {
+                "name": "JUMLAH2",
+                "type": "float",
+                "length": 8,
+                "precision": 53,
+                "scale": 0
+            },
+            {
+                "name": "JUMLAH3",
+                "type": "float",
+                "length": 8,
+                "precision": 53,
+                "scale": 0
+            },
+            {
+                "name": "JUMLAH4",
+                "type": "float",
+                "length": 8,
+                "precision": 53,
+                "scale": 0
+            },
+            {
+                "name": "th_ajaran",
+                "type": "char",
+                "length": 9,
+                "precision": 0,
+                "scale": 0
+            },
+            {
+                "name": "kelas_du",
+                "type": "char",
+                "length": 5,
+                "precision": 0,
+                "scale": 0
+            },
+            {
+                "name": "id",
+                "type": "numeric",
+                "length": 9,
+                "precision": 18,
+                "scale": 0
+            },
+            {
+                "name": "potong_spp",
+                "type": "float",
+                "length": 8,
+                "precision": 53,
+                "scale": 0
+            },
+            {
+                "name": "tabungan_wajib",
+                "type": "float",
+                "length": 8,
+                "precision": 53,
+                "scale": 0
+            }
+        ]
+    },
+    "SMP": {
+        "bayar_du": [
+            {
+                "name": "no_induk",
+                "type": "nvarchar",
+                "length": 100,
+                "precision": 0,
+                "scale": 0
+            },
+            {
+                "name": "kelas",
+                "type": "char",
+                "length": 5,
+                "precision": 0,
+                "scale": 0
+            },
+            {
+                "name": "th_ajaran",
+                "type": "char",
+                "length": 9,
+                "precision": 0,
+                "scale": 0
+            },
+            {
+                "name": "jumlah",
+                "type": "numeric",
+                "length": 9,
+                "precision": 18,
+                "scale": 0
+            }
+        ],
+        "bayar": [
+            {
+                "name": "NO_INDUK",
+                "type": "nvarchar",
+                "length": 20,
+                "precision": 0,
+                "scale": 0
+            },
+            {
+                "name": "KELAS",
+                "type": "nvarchar",
+                "length": 10,
+                "precision": 0,
+                "scale": 0
+            },
+            {
+                "name": "U_PANGKAL",
+                "type": "float",
+                "length": 8,
+                "precision": 53,
+                "scale": 0
+            },
+            {
+                "name": "U_BANGUNAN",
+                "type": "float",
+                "length": 8,
+                "precision": 53,
+                "scale": 0
+            },
+            {
+                "name": "U_SERAGAM",
+                "type": "float",
+                "length": 8,
+                "precision": 53,
+                "scale": 0
+            },
+            {
+                "name": "U_KEGIATAN",
+                "type": "float",
+                "length": 8,
+                "precision": 53,
+                "scale": 0
+            },
+            {
+                "name": "U_SPP",
+                "type": "float",
+                "length": 8,
+                "precision": 53,
+                "scale": 0
+            },
+            {
+                "name": "U_MAKAN",
+                "type": "float",
+                "length": 8,
+                "precision": 53,
+                "scale": 0
+            },
+            {
+                "name": "U_SORGA",
+                "type": "float",
+                "length": 8,
+                "precision": 53,
+                "scale": 0
+            },
+            {
+                "name": "U_INFAQ",
+                "type": "float",
+                "length": 8,
+                "precision": 53,
+                "scale": 0
+            },
+            {
+                "name": "U_LAIN",
+                "type": "float",
+                "length": 8,
+                "precision": 53,
+                "scale": 0
+            },
+            {
+                "name": "KETERANGAN",
+                "type": "nvarchar",
+                "length": 40,
+                "precision": 0,
+                "scale": 0
+            },
+            {
+                "name": "TGL_BYR",
+                "type": "datetime",
+                "length": 8,
+                "precision": 23,
+                "scale": 3
+            },
+            {
+                "name": "BULAN",
+                "type": "nvarchar",
+                "length": 4,
+                "precision": 0,
+                "scale": 0
+            },
+            {
+                "name": "user_id",
+                "type": "nvarchar",
+                "length": 20,
+                "precision": 0,
+                "scale": 0
+            },
+            {
+                "name": "TAHUN",
+                "type": "char",
+                "length": 4,
+                "precision": 0,
+                "scale": 0
+            },
+            {
+                "name": "LAIN_LAIN1",
+                "type": "nvarchar",
+                "length": 10,
+                "precision": 0,
+                "scale": 0
+            },
+            {
+                "name": "LAIN_LAIN2",
+                "type": "nvarchar",
+                "length": 10,
+                "precision": 0,
+                "scale": 0
+            },
+            {
+                "name": "LAIN_LAIN3",
+                "type": "nvarchar",
+                "length": 10,
+                "precision": 0,
+                "scale": 0
+            },
+            {
+                "name": "LAIN_LAIN4",
+                "type": "nvarchar",
+                "length": 10,
+                "precision": 0,
+                "scale": 0
+            },
+            {
+                "name": "JUMLAH1",
+                "type": "float",
+                "length": 8,
+                "precision": 53,
+                "scale": 0
+            },
+            {
+                "name": "JUMLAH2",
+                "type": "float",
+                "length": 8,
+                "precision": 53,
+                "scale": 0
+            },
+            {
+                "name": "JUMLAH3",
+                "type": "float",
+                "length": 8,
+                "precision": 53,
+                "scale": 0
+            },
+            {
+                "name": "JUMLAH4",
+                "type": "float",
+                "length": 8,
+                "precision": 53,
+                "scale": 0
+            },
+            {
+                "name": "th_ajaran",
+                "type": "char",
+                "length": 9,
+                "precision": 0,
+                "scale": 0
+            },
+            {
+                "name": "kelas_du",
+                "type": "char",
+                "length": 5,
+                "precision": 0,
+                "scale": 0
+            },
+            {
+                "name": "potong_spp",
+                "type": "float",
+                "length": 8,
+                "precision": 53,
+                "scale": 0
+            },
+            {
+                "name": "id",
+                "type": "int",
+                "length": 4,
+                "precision": 10,
+                "scale": 0
+            },
+            {
+                "name": "cara_bayar",
+                "type": "char",
+                "length": 10,
+                "precision": 0,
+                "scale": 0
+            },
+            {
+                "name": "jam",
+                "type": "char",
+                "length": 15,
+                "precision": 0,
+                "scale": 0
+            },
+            {
+                "name": "tabungan_wajib",
+                "type": "float",
+                "length": 8,
+                "precision": 53,
+                "scale": 0
+            }
+        ],
+        "Daftar_ulang": [
+            {
+                "name": "th_ajaran",
+                "type": "char",
+                "length": 9,
+                "precision": 0,
+                "scale": 0
+            },
+            {
+                "name": "kelas",
+                "type": "char",
+                "length": 1,
+                "precision": 0,
+                "scale": 0
+            },
+            {
+                "name": "Jumlah",
+                "type": "numeric",
+                "length": 9,
+                "precision": 18,
+                "scale": 0
+            },
+            {
+                "name": "id",
+                "type": "int",
+                "length": 4,
+                "precision": 10,
+                "scale": 0
+            }
+        ],
+        "jemputan": [
+            {
+                "name": "NO_INDUK",
+                "type": "nvarchar",
+                "length": 20,
+                "precision": 0,
+                "scale": 0
+            },
+            {
+                "name": "BULAN",
+                "type": "char",
+                "length": 10,
+                "precision": 0,
+                "scale": 0
+            },
+            {
+                "name": "TAHUN",
+                "type": "char",
+                "length": 10,
+                "precision": 0,
+                "scale": 0
+            },
+            {
+                "name": "JUMLAH",
+                "type": "float",
+                "length": 8,
+                "precision": 53,
+                "scale": 0
+            },
+            {
+                "name": "KELAS",
+                "type": "nvarchar",
+                "length": 10,
+                "precision": 0,
+                "scale": 0
+            },
+            {
+                "name": "BAYAR",
+                "type": "float",
+                "length": 8,
+                "precision": 53,
+                "scale": 0
+            }
+        ],
+        "kelas": [
+            {
+                "name": "kode",
+                "type": "char",
+                "length": 5,
+                "precision": 0,
+                "scale": 0
+            },
+            {
+                "name": "nama",
+                "type": "char",
+                "length": 30,
+                "precision": 0,
+                "scale": 0
+            }
+        ],
+        "kls": [
+            {
+                "name": "no_induk",
+                "type": "nvarchar",
+                "length": 20,
+                "precision": 0,
+                "scale": 0
+            },
+            {
+                "name": "nama",
+                "type": "nvarchar",
+                "length": 60,
+                "precision": 0,
+                "scale": 0
+            },
+            {
+                "name": "kelas",
+                "type": "nvarchar",
+                "length": 10,
+                "precision": 0,
+                "scale": 0
+            }
+        ],
+        "komitment_manual": [
+            {
+                "name": "no_induk",
+                "type": "char",
+                "length": 10,
+                "precision": 0,
+                "scale": 0
+            },
+            {
+                "name": "tgl_komitment",
+                "type": "datetime",
+                "length": 8,
+                "precision": 23,
+                "scale": 3
+            },
+            {
+                "name": "psb",
+                "type": "numeric",
+                "length": 9,
+                "precision": 18,
+                "scale": 0
+            },
+            {
+                "name": "du",
+                "type": "numeric",
+                "length": 9,
+                "precision": 18,
+                "scale": 0
+            },
+            {
+                "name": "spp",
+                "type": "numeric",
+                "length": 9,
+                "precision": 18,
+                "scale": 0
+            },
+            {
+                "name": "komite",
+                "type": "numeric",
+                "length": 9,
+                "precision": 18,
+                "scale": 0
+            },
+            {
+                "name": "lain_lain",
+                "type": "numeric",
+                "length": 9,
+                "precision": 18,
+                "scale": 0
+            },
+            {
+                "name": "id",
+                "type": "int",
+                "length": 4,
+                "precision": 10,
+                "scale": 0
+            }
+        ],
+        "komitment": [
+            {
+                "name": "no_induk",
+                "type": "char",
+                "length": 10,
+                "precision": 0,
+                "scale": 0
+            },
+            {
+                "name": "tgl_komitment",
+                "type": "datetime",
+                "length": 8,
+                "precision": 23,
+                "scale": 3
+            },
+            {
+                "name": "tgl_langsung",
+                "type": "char",
+                "length": 20,
+                "precision": 0,
+                "scale": 0
+            },
+            {
+                "name": "tgl_angsur",
+                "type": "datetime",
+                "length": 8,
+                "precision": 23,
+                "scale": 3
+            },
+            {
+                "name": "uraian",
+                "type": "char",
+                "length": 30,
+                "precision": 0,
+                "scale": 0
+            },
+            {
+                "name": "bulan_tahun",
+                "type": "char",
+                "length": 15,
+                "precision": 0,
+                "scale": 0
+            },
+            {
+                "name": "jumlah",
+                "type": "int",
+                "length": 4,
+                "precision": 10,
+                "scale": 0
+            },
+            {
+                "name": "ket",
+                "type": "char",
+                "length": 10,
+                "precision": 0,
+                "scale": 0
+            },
+            {
+                "name": "lain_lain",
+                "type": "int",
+                "length": 4,
+                "precision": 10,
+                "scale": 0
+            },
+            {
+                "name": "id",
+                "type": "int",
+                "length": 4,
+                "precision": 10,
+                "scale": 0
+            }
+        ],
+        "lain": [
+            {
+                "name": "KODE",
+                "type": "nvarchar",
+                "length": 10,
+                "precision": 0,
+                "scale": 0
+            },
+            {
+                "name": "NAMA",
+                "type": "nvarchar",
+                "length": 40,
+                "precision": 0,
+                "scale": 0
+            }
+        ],
+        "makan": [
+            {
+                "name": "NO_INDUK",
+                "type": "nvarchar",
+                "length": 20,
+                "precision": 0,
+                "scale": 0
+            },
+            {
+                "name": "BULAN",
+                "type": "nvarchar",
+                "length": 4,
+                "precision": 0,
+                "scale": 0
+            },
+            {
+                "name": "TAHUN",
+                "type": "nvarchar",
+                "length": 8,
+                "precision": 0,
+                "scale": 0
+            },
+            {
+                "name": "JUMLAH",
+                "type": "float",
+                "length": 8,
+                "precision": 53,
+                "scale": 0
+            },
+            {
+                "name": "KELAS",
+                "type": "nvarchar",
+                "length": 10,
+                "precision": 0,
+                "scale": 0
+            },
+            {
+                "name": "BAYAR",
+                "type": "float",
+                "length": 8,
+                "precision": 53,
+                "scale": 0
+            }
+        ],
+        "rekap_belum_spp": [
+            {
+                "name": "no_induk",
+                "type": "char",
+                "length": 10,
+                "precision": 0,
+                "scale": 0
+            },
+            {
+                "name": "kelas",
+                "type": "char",
+                "length": 5,
+                "precision": 0,
+                "scale": 0
+            },
+            {
+                "name": "tahun",
+                "type": "char",
+                "length": 4,
+                "precision": 0,
+                "scale": 0
+            },
+            {
+                "name": "juli",
+                "type": "numeric",
+                "length": 9,
+                "precision": 18,
+                "scale": 0
+            },
+            {
+                "name": "agustus",
+                "type": "numeric",
+                "length": 9,
+                "precision": 18,
+                "scale": 0
+            },
+            {
+                "name": "september",
+                "type": "numeric",
+                "length": 9,
+                "precision": 18,
+                "scale": 0
+            },
+            {
+                "name": "oktober",
+                "type": "numeric",
+                "length": 9,
+                "precision": 18,
+                "scale": 0
+            },
+            {
+                "name": "nopember",
+                "type": "numeric",
+                "length": 9,
+                "precision": 18,
+                "scale": 0
+            },
+            {
+                "name": "desember",
+                "type": "numeric",
+                "length": 9,
+                "precision": 18,
+                "scale": 0
+            },
+            {
+                "name": "januari",
+                "type": "numeric",
+                "length": 9,
+                "precision": 18,
+                "scale": 0
+            },
+            {
+                "name": "pebruari",
+                "type": "numeric",
+                "length": 9,
+                "precision": 18,
+                "scale": 0
+            },
+            {
+                "name": "maret",
+                "type": "numeric",
+                "length": 9,
+                "precision": 18,
+                "scale": 0
+            },
+            {
+                "name": "april",
+                "type": "numeric",
+                "length": 9,
+                "precision": 18,
+                "scale": 0
+            },
+            {
+                "name": "mei",
+                "type": "numeric",
+                "length": 9,
+                "precision": 18,
+                "scale": 0
+            },
+            {
+                "name": "juni",
+                "type": "numeric",
+                "length": 9,
+                "precision": 18,
+                "scale": 0
+            },
+            {
+                "name": "tanda",
+                "type": "char",
+                "length": 1,
+                "precision": 0,
+                "scale": 0
+            },
+            {
+                "name": "spp_perbulan",
+                "type": "numeric",
+                "length": 9,
+                "precision": 18,
+                "scale": 0
+            },
+            {
+                "name": "tot_spp",
+                "type": "numeric",
+                "length": 9,
+                "precision": 18,
+                "scale": 0
+            },
+            {
+                "name": "spp_bayar",
+                "type": "numeric",
+                "length": 9,
+                "precision": 18,
+                "scale": 0
+            },
+            {
+                "name": "Ket_spp",
+                "type": "char",
+                "length": 200,
+                "precision": 0,
+                "scale": 0
+            },
+            {
+                "name": "psb_pertahun",
+                "type": "numeric",
+                "length": 9,
+                "precision": 18,
+                "scale": 0
+            },
+            {
+                "name": "psb_bayar",
+                "type": "numeric",
+                "length": 9,
+                "precision": 18,
+                "scale": 0
+            },
+            {
+                "name": "du_pertahun",
+                "type": "numeric",
+                "length": 9,
+                "precision": 18,
+                "scale": 0
+            },
+            {
+                "name": "du_bayar",
+                "type": "numeric",
+                "length": 9,
+                "precision": 18,
+                "scale": 0
+            },
+            {
+                "name": "jul",
+                "type": "numeric",
+                "length": 9,
+                "precision": 18,
+                "scale": 0
+            },
+            {
+                "name": "agu",
+                "type": "numeric",
+                "length": 9,
+                "precision": 18,
+                "scale": 0
+            },
+            {
+                "name": "sep",
+                "type": "numeric",
+                "length": 9,
+                "precision": 18,
+                "scale": 0
+            },
+            {
+                "name": "okt",
+                "type": "numeric",
+                "length": 9,
+                "precision": 18,
+                "scale": 0
+            },
+            {
+                "name": "nop",
+                "type": "numeric",
+                "length": 9,
+                "precision": 18,
+                "scale": 0
+            },
+            {
+                "name": "des",
+                "type": "numeric",
+                "length": 9,
+                "precision": 18,
+                "scale": 0
+            },
+            {
+                "name": "jan",
+                "type": "numeric",
+                "length": 9,
+                "precision": 18,
+                "scale": 0
+            },
+            {
+                "name": "peb",
+                "type": "numeric",
+                "length": 9,
+                "precision": 18,
+                "scale": 0
+            },
+            {
+                "name": "mar",
+                "type": "numeric",
+                "length": 9,
+                "precision": 18,
+                "scale": 0
+            },
+            {
+                "name": "apr",
+                "type": "numeric",
+                "length": 9,
+                "precision": 18,
+                "scale": 0
+            },
+            {
+                "name": "me",
+                "type": "numeric",
+                "length": 9,
+                "precision": 18,
+                "scale": 0
+            },
+            {
+                "name": "jun",
+                "type": "numeric",
+                "length": 9,
+                "precision": 18,
+                "scale": 0
+            },
+            {
+                "name": "tot_komite",
+                "type": "numeric",
+                "length": 9,
+                "precision": 18,
+                "scale": 0
+            },
+            {
+                "name": "bayar_komite",
+                "type": "numeric",
+                "length": 9,
+                "precision": 18,
+                "scale": 0
+            },
+            {
+                "name": "komite_perbulan",
+                "type": "numeric",
+                "length": 9,
+                "precision": 18,
+                "scale": 0
+            },
+            {
+                "name": "jml_komite",
+                "type": "numeric",
+                "length": 9,
+                "precision": 18,
+                "scale": 0
+            },
+            {
+                "name": "tgl_cetak",
+                "type": "datetime",
+                "length": 8,
+                "precision": 23,
+                "scale": 3
+            },
+            {
+                "name": "sampai_bulan",
+                "type": "char",
+                "length": 20,
+                "precision": 0,
+                "scale": 0
+            }
+        ],
+        "siswa": [
+            {
+                "name": "NO_INDUK",
+                "type": "nvarchar",
+                "length": 20,
+                "precision": 0,
+                "scale": 0
+            },
+            {
+                "name": "NAMA",
+                "type": "nvarchar",
+                "length": 60,
+                "precision": 0,
+                "scale": 0
+            },
+            {
+                "name": "KELAS",
+                "type": "nvarchar",
+                "length": 10,
+                "precision": 0,
+                "scale": 0
+            },
+            {
+                "name": "SPP_PERBULAN",
+                "type": "float",
+                "length": 8,
+                "precision": 53,
+                "scale": 0
+            },
+            {
+                "name": "PANGKAL",
+                "type": "float",
+                "length": 8,
+                "precision": 53,
+                "scale": 0
+            },
+            {
+                "name": "BANGUNAN",
+                "type": "float",
+                "length": 8,
+                "precision": 53,
+                "scale": 0
+            },
+            {
+                "name": "SERAGAM",
+                "type": "float",
+                "length": 8,
+                "precision": 53,
+                "scale": 0
+            },
+            {
+                "name": "KEGIATAN",
+                "type": "float",
+                "length": 8,
+                "precision": 53,
+                "scale": 0
+            },
+            {
+                "name": "PANGKAL_BAYAR",
+                "type": "float",
+                "length": 8,
+                "precision": 53,
+                "scale": 0
+            },
+            {
+                "name": "BANGUNAN_BAYAR",
+                "type": "float",
+                "length": 8,
+                "precision": 53,
+                "scale": 0
+            },
+            {
+                "name": "SERAGAM_BAYAR",
+                "type": "float",
+                "length": 8,
+                "precision": 53,
+                "scale": 0
+            },
+            {
+                "name": "KEGIATAN_BAYAR",
+                "type": "float",
+                "length": 8,
+                "precision": 53,
+                "scale": 0
+            },
+            {
+                "name": "POMG",
+                "type": "float",
+                "length": 8,
+                "precision": 53,
+                "scale": 0
+            },
+            {
+                "name": "DAFTAR_ULANG",
+                "type": "float",
+                "length": 8,
+                "precision": 53,
+                "scale": 0
+            },
+            {
+                "name": "NO_induk_diknas",
+                "type": "char",
+                "length": 10,
+                "precision": 0,
+                "scale": 0
+            },
+            {
+                "name": "potong_pangkal",
+                "type": "float",
+                "length": 8,
+                "precision": 53,
+                "scale": 0
+            },
+            {
+                "name": "tot_pangkal",
+                "type": "float",
+                "length": 8,
+                "precision": 53,
+                "scale": 0
+            },
+            {
+                "name": "tot_du",
+                "type": "float",
+                "length": 8,
+                "precision": 53,
+                "scale": 0
+            },
+            {
+                "name": "potong_du",
+                "type": "float",
+                "length": 8,
+                "precision": 53,
+                "scale": 0
+            },
+            {
+                "name": "id",
+                "type": "int",
+                "length": 4,
+                "precision": 10,
+                "scale": 0
+            }
+        ],
+        "SPP_BELUM": [
+            {
+                "name": "NO_INDUK",
+                "type": "nvarchar",
+                "length": 20,
+                "precision": 0,
+                "scale": 0
+            },
+            {
+                "name": "NAMA",
+                "type": "nvarchar",
+                "length": 60,
+                "precision": 0,
+                "scale": 0
+            },
+            {
+                "name": "KELAS",
+                "type": "nvarchar",
+                "length": 10,
+                "precision": 0,
+                "scale": 0
+            },
+            {
+                "name": "SPP_PERBULAN",
+                "type": "float",
+                "length": 8,
+                "precision": 53,
+                "scale": 0
+            },
+            {
+                "name": "PANGKAL",
+                "type": "float",
+                "length": 8,
+                "precision": 53,
+                "scale": 0
+            },
+            {
+                "name": "BANGUNAN",
+                "type": "float",
+                "length": 8,
+                "precision": 53,
+                "scale": 0
+            },
+            {
+                "name": "SERAGAM",
+                "type": "float",
+                "length": 8,
+                "precision": 53,
+                "scale": 0
+            },
+            {
+                "name": "KEGIATAN",
+                "type": "float",
+                "length": 8,
+                "precision": 53,
+                "scale": 0
+            },
+            {
+                "name": "potong_spp",
+                "type": "float",
+                "length": 8,
+                "precision": 53,
+                "scale": 0
+            }
+        ],
+        "tabungan": [
+            {
+                "name": "NO_INDUK",
+                "type": "nvarchar",
+                "length": 20,
+                "precision": 0,
+                "scale": 0
+            },
+            {
+                "name": "SALDO",
+                "type": "float",
+                "length": 8,
+                "precision": 53,
+                "scale": 0
+            },
+            {
+                "name": "id",
+                "type": "int",
+                "length": 4,
+                "precision": 10,
+                "scale": 0
+            }
+        ],
+        "temp_bayar_du": [
+            {
+                "name": "no_induk",
+                "type": "nvarchar",
+                "length": 20,
+                "precision": 0,
+                "scale": 0
+            },
+            {
+                "name": "kelas",
+                "type": "char",
+                "length": 5,
+                "precision": 0,
+                "scale": 0
+            },
+            {
+                "name": "th_ajaran",
+                "type": "char",
+                "length": 9,
+                "precision": 0,
+                "scale": 0
+            },
+            {
+                "name": "jumlah",
+                "type": "numeric",
+                "length": 9,
+                "precision": 18,
+                "scale": 0
+            },
+            {
+                "name": "id",
+                "type": "numeric",
+                "length": 9,
+                "precision": 18,
+                "scale": 0
+            },
+            {
+                "name": "du",
+                "type": "numeric",
+                "length": 9,
+                "precision": 18,
+                "scale": 0
+            }
+        ],
+        "temp_belum_spp": [
+            {
+                "name": "no_induk",
+                "type": "char",
+                "length": 15,
+                "precision": 0,
+                "scale": 0
+            },
+            {
+                "name": "kelas",
+                "type": "char",
+                "length": 15,
+                "precision": 0,
+                "scale": 0
+            },
+            {
+                "name": "tahun",
+                "type": "char",
+                "length": 15,
+                "precision": 0,
+                "scale": 0
+            },
+            {
+                "name": "u_spp",
+                "type": "numeric",
+                "length": 9,
+                "precision": 18,
+                "scale": 0
+            },
+            {
+                "name": "bulan",
+                "type": "char",
+                "length": 14,
+                "precision": 0,
+                "scale": 0
+            },
+            {
+                "name": "u_sorga",
+                "type": "numeric",
+                "length": 9,
+                "precision": 18,
+                "scale": 0
+            }
+        ],
+        "transaksi_k": [
+            {
+                "name": "NO_INDUK",
+                "type": "nvarchar",
+                "length": 20,
+                "precision": 0,
+                "scale": 0
+            },
+            {
+                "name": "TANGGAL",
+                "type": "smalldatetime",
+                "length": 4,
+                "precision": 16,
+                "scale": 0
+            },
+            {
+                "name": "MASUK",
+                "type": "float",
+                "length": 8,
+                "precision": 53,
+                "scale": 0
+            },
+            {
+                "name": "KELUAR",
+                "type": "float",
+                "length": 8,
+                "precision": 53,
+                "scale": 0
+            },
+            {
+                "name": "user_id",
+                "type": "char",
+                "length": 10,
+                "precision": 0,
+                "scale": 0
+            }
+        ],
+        "transaksi_m": [
+            {
+                "name": "NO_INDUK",
+                "type": "nvarchar",
+                "length": 20,
+                "precision": 0,
+                "scale": 0
+            },
+            {
+                "name": "TANGGAL",
+                "type": "smalldatetime",
+                "length": 4,
+                "precision": 16,
+                "scale": 0
+            },
+            {
+                "name": "MASUK",
+                "type": "float",
+                "length": 8,
+                "precision": 53,
+                "scale": 0
+            },
+            {
+                "name": "KELUAR",
+                "type": "float",
+                "length": 8,
+                "precision": 53,
+                "scale": 0
+            },
+            {
+                "name": "user_id",
+                "type": "char",
+                "length": 10,
+                "precision": 0,
+                "scale": 0
+            },
+            {
+                "name": "id",
+                "type": "int",
+                "length": 4,
+                "precision": 10,
+                "scale": 0
+            }
+        ],
+        "u_lain": [
+            {
+                "name": "NO_INDUK",
+                "type": "nvarchar",
+                "length": 20,
+                "precision": 0,
+                "scale": 0
+            },
+            {
+                "name": "KODE",
+                "type": "nvarchar",
+                "length": 10,
+                "precision": 0,
+                "scale": 0
+            },
+            {
+                "name": "JUMLAH",
+                "type": "float",
+                "length": 8,
+                "precision": 53,
+                "scale": 0
+            },
+            {
+                "name": "TGL_BAYAR",
+                "type": "smalldatetime",
+                "length": 4,
+                "precision": 16,
+                "scale": 0
+            },
+            {
+                "name": "kelas",
+                "type": "nvarchar",
+                "length": 10,
+                "precision": 0,
+                "scale": 0
+            }
+        ],
+        "U_TABUNGAN": [
+            {
+                "name": "NO_INDUK",
+                "type": "nvarchar",
+                "length": 20,
+                "precision": 0,
+                "scale": 0
+            },
+            {
+                "name": "TANGGAL",
+                "type": "smalldatetime",
+                "length": 4,
+                "precision": 16,
+                "scale": 0
+            },
+            {
+                "name": "MASUK",
+                "type": "float",
+                "length": 8,
+                "precision": 53,
+                "scale": 0
+            },
+            {
+                "name": "KELUAR",
+                "type": "float",
+                "length": 8,
+                "precision": 53,
+                "scale": 0
+            }
+        ],
+        "siswa05082023": [
+            {
+                "name": "NO_INDUK",
+                "type": "nvarchar",
+                "length": 20,
+                "precision": 0,
+                "scale": 0
+            },
+            {
+                "name": "NAMA",
+                "type": "nvarchar",
+                "length": 60,
+                "precision": 0,
+                "scale": 0
+            },
+            {
+                "name": "KELAS",
+                "type": "nvarchar",
+                "length": 10,
+                "precision": 0,
+                "scale": 0
+            },
+            {
+                "name": "SPP_PERBULAN",
+                "type": "float",
+                "length": 8,
+                "precision": 53,
+                "scale": 0
+            },
+            {
+                "name": "PANGKAL",
+                "type": "float",
+                "length": 8,
+                "precision": 53,
+                "scale": 0
+            },
+            {
+                "name": "BANGUNAN",
+                "type": "float",
+                "length": 8,
+                "precision": 53,
+                "scale": 0
+            },
+            {
+                "name": "SERAGAM",
+                "type": "float",
+                "length": 8,
+                "precision": 53,
+                "scale": 0
+            },
+            {
+                "name": "KEGIATAN",
+                "type": "float",
+                "length": 8,
+                "precision": 53,
+                "scale": 0
+            },
+            {
+                "name": "PANGKAL_BAYAR",
+                "type": "float",
+                "length": 8,
+                "precision": 53,
+                "scale": 0
+            },
+            {
+                "name": "BANGUNAN_BAYAR",
+                "type": "float",
+                "length": 8,
+                "precision": 53,
+                "scale": 0
+            },
+            {
+                "name": "SERAGAM_BAYAR",
+                "type": "float",
+                "length": 8,
+                "precision": 53,
+                "scale": 0
+            },
+            {
+                "name": "KEGIATAN_BAYAR",
+                "type": "float",
+                "length": 8,
+                "precision": 53,
+                "scale": 0
+            },
+            {
+                "name": "POMG",
+                "type": "float",
+                "length": 8,
+                "precision": 53,
+                "scale": 0
+            },
+            {
+                "name": "DAFTAR_ULANG",
+                "type": "float",
+                "length": 8,
+                "precision": 53,
+                "scale": 0
+            },
+            {
+                "name": "NO_induk_diknas",
+                "type": "char",
+                "length": 10,
+                "precision": 0,
+                "scale": 0
+            },
+            {
+                "name": "potong_pangkal",
+                "type": "float",
+                "length": 8,
+                "precision": 53,
+                "scale": 0
+            },
+            {
+                "name": "tot_pangkal",
+                "type": "float",
+                "length": 8,
+                "precision": 53,
+                "scale": 0
+            },
+            {
+                "name": "tot_du",
+                "type": "float",
+                "length": 8,
+                "precision": 53,
+                "scale": 0
+            },
+            {
+                "name": "potong_du",
+                "type": "float",
+                "length": 8,
+                "precision": 53,
+                "scale": 0
+            },
+            {
+                "name": "idno",
+                "type": "int",
+                "length": 4,
+                "precision": 10,
+                "scale": 0
+            }
+        ],
+        "bayar05082023": [
+            {
+                "name": "NO_INDUK",
+                "type": "nvarchar",
+                "length": 20,
+                "precision": 0,
+                "scale": 0
+            },
+            {
+                "name": "KELAS",
+                "type": "nvarchar",
+                "length": 10,
+                "precision": 0,
+                "scale": 0
+            },
+            {
+                "name": "U_PANGKAL",
+                "type": "float",
+                "length": 8,
+                "precision": 53,
+                "scale": 0
+            },
+            {
+                "name": "U_BANGUNAN",
+                "type": "float",
+                "length": 8,
+                "precision": 53,
+                "scale": 0
+            },
+            {
+                "name": "U_SERAGAM",
+                "type": "float",
+                "length": 8,
+                "precision": 53,
+                "scale": 0
+            },
+            {
+                "name": "U_KEGIATAN",
+                "type": "float",
+                "length": 8,
+                "precision": 53,
+                "scale": 0
+            },
+            {
+                "name": "U_SPP",
+                "type": "float",
+                "length": 8,
+                "precision": 53,
+                "scale": 0
+            },
+            {
+                "name": "U_MAKAN",
+                "type": "float",
+                "length": 8,
+                "precision": 53,
+                "scale": 0
+            },
+            {
+                "name": "U_SORGA",
+                "type": "float",
+                "length": 8,
+                "precision": 53,
+                "scale": 0
+            },
+            {
+                "name": "U_INFAQ",
+                "type": "float",
+                "length": 8,
+                "precision": 53,
+                "scale": 0
+            },
+            {
+                "name": "U_LAIN",
+                "type": "float",
+                "length": 8,
+                "precision": 53,
+                "scale": 0
+            },
+            {
+                "name": "KETERANGAN",
+                "type": "nvarchar",
+                "length": 40,
+                "precision": 0,
+                "scale": 0
+            },
+            {
+                "name": "TGL_BYR",
+                "type": "datetime",
+                "length": 8,
+                "precision": 23,
+                "scale": 3
+            },
+            {
+                "name": "BULAN",
+                "type": "nvarchar",
+                "length": 4,
+                "precision": 0,
+                "scale": 0
+            },
+            {
+                "name": "user_id",
+                "type": "nvarchar",
+                "length": 20,
+                "precision": 0,
+                "scale": 0
+            },
+            {
+                "name": "TAHUN",
+                "type": "char",
+                "length": 4,
+                "precision": 0,
+                "scale": 0
+            },
+            {
+                "name": "LAIN_LAIN1",
+                "type": "nvarchar",
+                "length": 10,
+                "precision": 0,
+                "scale": 0
+            },
+            {
+                "name": "LAIN_LAIN2",
+                "type": "nvarchar",
+                "length": 10,
+                "precision": 0,
+                "scale": 0
+            },
+            {
+                "name": "LAIN_LAIN3",
+                "type": "nvarchar",
+                "length": 10,
+                "precision": 0,
+                "scale": 0
+            },
+            {
+                "name": "LAIN_LAIN4",
+                "type": "nvarchar",
+                "length": 10,
+                "precision": 0,
+                "scale": 0
+            },
+            {
+                "name": "JUMLAH1",
+                "type": "float",
+                "length": 8,
+                "precision": 53,
+                "scale": 0
+            },
+            {
+                "name": "JUMLAH2",
+                "type": "float",
+                "length": 8,
+                "precision": 53,
+                "scale": 0
+            },
+            {
+                "name": "JUMLAH3",
+                "type": "float",
+                "length": 8,
+                "precision": 53,
+                "scale": 0
+            },
+            {
+                "name": "JUMLAH4",
+                "type": "float",
+                "length": 8,
+                "precision": 53,
+                "scale": 0
+            },
+            {
+                "name": "th_ajaran",
+                "type": "char",
+                "length": 9,
+                "precision": 0,
+                "scale": 0
+            },
+            {
+                "name": "kelas_du",
+                "type": "char",
+                "length": 5,
+                "precision": 0,
+                "scale": 0
+            },
+            {
+                "name": "potong_spp",
+                "type": "float",
+                "length": 8,
+                "precision": 53,
+                "scale": 0
+            },
+            {
+                "name": "id",
+                "type": "int",
+                "length": 4,
+                "precision": 10,
+                "scale": 0
+            }
+        ],
+        "bayar29052019": [
+            {
+                "name": "NO_INDUK",
+                "type": "nvarchar",
+                "length": 20,
+                "precision": 0,
+                "scale": 0
+            },
+            {
+                "name": "KELAS",
+                "type": "nvarchar",
+                "length": 10,
+                "precision": 0,
+                "scale": 0
+            },
+            {
+                "name": "U_PANGKAL",
+                "type": "float",
+                "length": 8,
+                "precision": 53,
+                "scale": 0
+            },
+            {
+                "name": "U_BANGUNAN",
+                "type": "float",
+                "length": 8,
+                "precision": 53,
+                "scale": 0
+            },
+            {
+                "name": "U_SERAGAM",
+                "type": "float",
+                "length": 8,
+                "precision": 53,
+                "scale": 0
+            },
+            {
+                "name": "U_KEGIATAN",
+                "type": "float",
+                "length": 8,
+                "precision": 53,
+                "scale": 0
+            },
+            {
+                "name": "U_SPP",
+                "type": "float",
+                "length": 8,
+                "precision": 53,
+                "scale": 0
+            },
+            {
+                "name": "U_MAKAN",
+                "type": "float",
+                "length": 8,
+                "precision": 53,
+                "scale": 0
+            },
+            {
+                "name": "U_SORGA",
+                "type": "float",
+                "length": 8,
+                "precision": 53,
+                "scale": 0
+            },
+            {
+                "name": "U_INFAQ",
+                "type": "float",
+                "length": 8,
+                "precision": 53,
+                "scale": 0
+            },
+            {
+                "name": "U_LAIN",
+                "type": "float",
+                "length": 8,
+                "precision": 53,
+                "scale": 0
+            },
+            {
+                "name": "KETERANGAN",
+                "type": "nvarchar",
+                "length": 40,
+                "precision": 0,
+                "scale": 0
+            },
+            {
+                "name": "TGL_BYR",
+                "type": "datetime",
+                "length": 8,
+                "precision": 23,
+                "scale": 3
+            },
+            {
+                "name": "BULAN",
+                "type": "nvarchar",
+                "length": 40,
+                "precision": 0,
+                "scale": 0
+            },
+            {
+                "name": "user_id",
+                "type": "nvarchar",
+                "length": 20,
+                "precision": 0,
+                "scale": 0
+            },
+            {
+                "name": "TAHUN",
+                "type": "char",
+                "length": 4,
+                "precision": 0,
+                "scale": 0
+            },
+            {
+                "name": "LAIN_LAIN1",
+                "type": "nvarchar",
+                "length": 10,
+                "precision": 0,
+                "scale": 0
+            },
+            {
+                "name": "LAIN_LAIN2",
+                "type": "nvarchar",
+                "length": 10,
+                "precision": 0,
+                "scale": 0
+            },
+            {
+                "name": "LAIN_LAIN3",
+                "type": "nvarchar",
+                "length": 10,
+                "precision": 0,
+                "scale": 0
+            },
+            {
+                "name": "LAIN_LAIN4",
+                "type": "nvarchar",
+                "length": 10,
+                "precision": 0,
+                "scale": 0
+            },
+            {
+                "name": "JUMLAH1",
+                "type": "float",
+                "length": 8,
+                "precision": 53,
+                "scale": 0
+            },
+            {
+                "name": "JUMLAH2",
+                "type": "float",
+                "length": 8,
+                "precision": 53,
+                "scale": 0
+            },
+            {
+                "name": "JUMLAH3",
+                "type": "float",
+                "length": 8,
+                "precision": 53,
+                "scale": 0
+            },
+            {
+                "name": "JUMLAH4",
+                "type": "float",
+                "length": 8,
+                "precision": 53,
+                "scale": 0
+            },
+            {
+                "name": "th_ajaran",
+                "type": "char",
+                "length": 9,
+                "precision": 0,
+                "scale": 0
+            },
+            {
+                "name": "kelas_du",
+                "type": "char",
+                "length": 5,
+                "precision": 0,
+                "scale": 0
+            },
+            {
+                "name": "potong_spp",
+                "type": "float",
+                "length": 8,
+                "precision": 53,
+                "scale": 0
+            }
+        ],
+        "bayarxx05": [
+            {
+                "name": "NO_INDUK",
+                "type": "nvarchar",
+                "length": 20,
+                "precision": 0,
+                "scale": 0
+            },
+            {
+                "name": "KELAS",
+                "type": "nvarchar",
+                "length": 10,
+                "precision": 0,
+                "scale": 0
+            },
+            {
+                "name": "U_PANGKAL",
+                "type": "float",
+                "length": 8,
+                "precision": 53,
+                "scale": 0
+            },
+            {
+                "name": "U_BANGUNAN",
+                "type": "float",
+                "length": 8,
+                "precision": 53,
+                "scale": 0
+            },
+            {
+                "name": "U_SERAGAM",
+                "type": "float",
+                "length": 8,
+                "precision": 53,
+                "scale": 0
+            },
+            {
+                "name": "U_KEGIATAN",
+                "type": "float",
+                "length": 8,
+                "precision": 53,
+                "scale": 0
+            },
+            {
+                "name": "U_SPP",
+                "type": "float",
+                "length": 8,
+                "precision": 53,
+                "scale": 0
+            },
+            {
+                "name": "U_MAKAN",
+                "type": "float",
+                "length": 8,
+                "precision": 53,
+                "scale": 0
+            },
+            {
+                "name": "U_SORGA",
+                "type": "float",
+                "length": 8,
+                "precision": 53,
+                "scale": 0
+            },
+            {
+                "name": "U_INFAQ",
+                "type": "float",
+                "length": 8,
+                "precision": 53,
+                "scale": 0
+            },
+            {
+                "name": "U_LAIN",
+                "type": "float",
+                "length": 8,
+                "precision": 53,
+                "scale": 0
+            },
+            {
+                "name": "KETERANGAN",
+                "type": "nvarchar",
+                "length": 40,
+                "precision": 0,
+                "scale": 0
+            },
+            {
+                "name": "TGL_BYR",
+                "type": "datetime",
+                "length": 8,
+                "precision": 23,
+                "scale": 3
+            },
+            {
+                "name": "BULAN",
+                "type": "nvarchar",
+                "length": 4,
+                "precision": 0,
+                "scale": 0
+            },
+            {
+                "name": "user_id",
+                "type": "nvarchar",
+                "length": 20,
+                "precision": 0,
+                "scale": 0
+            },
+            {
+                "name": "TAHUN",
+                "type": "char",
+                "length": 4,
+                "precision": 0,
+                "scale": 0
+            },
+            {
+                "name": "LAIN_LAIN1",
+                "type": "nvarchar",
+                "length": 10,
+                "precision": 0,
+                "scale": 0
+            },
+            {
+                "name": "LAIN_LAIN2",
+                "type": "nvarchar",
+                "length": 10,
+                "precision": 0,
+                "scale": 0
+            },
+            {
+                "name": "LAIN_LAIN3",
+                "type": "nvarchar",
+                "length": 10,
+                "precision": 0,
+                "scale": 0
+            },
+            {
+                "name": "LAIN_LAIN4",
+                "type": "nvarchar",
+                "length": 10,
+                "precision": 0,
+                "scale": 0
+            },
+            {
+                "name": "JUMLAH1",
+                "type": "float",
+                "length": 8,
+                "precision": 53,
+                "scale": 0
+            },
+            {
+                "name": "JUMLAH2",
+                "type": "float",
+                "length": 8,
+                "precision": 53,
+                "scale": 0
+            },
+            {
+                "name": "JUMLAH3",
+                "type": "float",
+                "length": 8,
+                "precision": 53,
+                "scale": 0
+            },
+            {
+                "name": "JUMLAH4",
+                "type": "float",
+                "length": 8,
+                "precision": 53,
+                "scale": 0
+            },
+            {
+                "name": "th_ajaran",
+                "type": "char",
+                "length": 9,
+                "precision": 0,
+                "scale": 0
+            },
+            {
+                "name": "kelas_du",
+                "type": "char",
+                "length": 5,
+                "precision": 0,
+                "scale": 0
+            },
+            {
+                "name": "potong_spp",
+                "type": "float",
+                "length": 8,
+                "precision": 53,
+                "scale": 0
+            }
+        ]
+    },
+    "SMA": {
+        "bayar_du": [
+            {
+                "name": "no_induk",
+                "type": "nvarchar",
+                "length": 100,
+                "precision": 0,
+                "scale": 0
+            },
+            {
+                "name": "kelas",
+                "type": "char",
+                "length": 5,
+                "precision": 0,
+                "scale": 0
+            },
+            {
+                "name": "th_ajaran",
+                "type": "char",
+                "length": 9,
+                "precision": 0,
+                "scale": 0
+            },
+            {
+                "name": "jumlah",
+                "type": "numeric",
+                "length": 9,
+                "precision": 18,
+                "scale": 0
+            },
+            {
+                "name": "id",
+                "type": "numeric",
+                "length": 9,
+                "precision": 18,
+                "scale": 0
+            }
+        ],
+        "bayar": [
+            {
+                "name": "NO_INDUK",
+                "type": "nvarchar",
+                "length": 20,
+                "precision": 0,
+                "scale": 0
+            },
+            {
+                "name": "KELAS",
+                "type": "nvarchar",
+                "length": 10,
+                "precision": 0,
+                "scale": 0
+            },
+            {
+                "name": "U_PANGKAL",
+                "type": "float",
+                "length": 8,
+                "precision": 53,
+                "scale": 0
+            },
+            {
+                "name": "U_BANGUNAN",
+                "type": "float",
+                "length": 8,
+                "precision": 53,
+                "scale": 0
+            },
+            {
+                "name": "U_SERAGAM",
+                "type": "float",
+                "length": 8,
+                "precision": 53,
+                "scale": 0
+            },
+            {
+                "name": "U_KEGIATAN",
+                "type": "float",
+                "length": 8,
+                "precision": 53,
+                "scale": 0
+            },
+            {
+                "name": "U_SPP",
+                "type": "float",
+                "length": 8,
+                "precision": 53,
+                "scale": 0
+            },
+            {
+                "name": "U_MAKAN",
+                "type": "float",
+                "length": 8,
+                "precision": 53,
+                "scale": 0
+            },
+            {
+                "name": "U_SORGA",
+                "type": "float",
+                "length": 8,
+                "precision": 53,
+                "scale": 0
+            },
+            {
+                "name": "U_INFAQ",
+                "type": "float",
+                "length": 8,
+                "precision": 53,
+                "scale": 0
+            },
+            {
+                "name": "U_LAIN",
+                "type": "float",
+                "length": 8,
+                "precision": 53,
+                "scale": 0
+            },
+            {
+                "name": "KETERANGAN",
+                "type": "nvarchar",
+                "length": 40,
+                "precision": 0,
+                "scale": 0
+            },
+            {
+                "name": "TGL_BYR",
+                "type": "datetime",
+                "length": 8,
+                "precision": 23,
+                "scale": 3
+            },
+            {
+                "name": "BULAN",
+                "type": "nvarchar",
+                "length": 4,
+                "precision": 0,
+                "scale": 0
+            },
+            {
+                "name": "user_id",
+                "type": "nvarchar",
+                "length": 20,
+                "precision": 0,
+                "scale": 0
+            },
+            {
+                "name": "TAHUN",
+                "type": "char",
+                "length": 4,
+                "precision": 0,
+                "scale": 0
+            },
+            {
+                "name": "LAIN_LAIN1",
+                "type": "nvarchar",
+                "length": 10,
+                "precision": 0,
+                "scale": 0
+            },
+            {
+                "name": "LAIN_LAIN2",
+                "type": "nvarchar",
+                "length": 10,
+                "precision": 0,
+                "scale": 0
+            },
+            {
+                "name": "LAIN_LAIN3",
+                "type": "nvarchar",
+                "length": 10,
+                "precision": 0,
+                "scale": 0
+            },
+            {
+                "name": "LAIN_LAIN4",
+                "type": "nvarchar",
+                "length": 10,
+                "precision": 0,
+                "scale": 0
+            },
+            {
+                "name": "JUMLAH1",
+                "type": "float",
+                "length": 8,
+                "precision": 53,
+                "scale": 0
+            },
+            {
+                "name": "JUMLAH2",
+                "type": "float",
+                "length": 8,
+                "precision": 53,
+                "scale": 0
+            },
+            {
+                "name": "JUMLAH3",
+                "type": "float",
+                "length": 8,
+                "precision": 53,
+                "scale": 0
+            },
+            {
+                "name": "JUMLAH4",
+                "type": "float",
+                "length": 8,
+                "precision": 53,
+                "scale": 0
+            },
+            {
+                "name": "th_ajaran",
+                "type": "char",
+                "length": 9,
+                "precision": 0,
+                "scale": 0
+            },
+            {
+                "name": "kelas_du",
+                "type": "char",
+                "length": 5,
+                "precision": 0,
+                "scale": 0
+            },
+            {
+                "name": "id",
+                "type": "numeric",
+                "length": 9,
+                "precision": 18,
+                "scale": 0
+            },
+            {
+                "name": "potong_spp",
+                "type": "float",
+                "length": 8,
+                "precision": 53,
+                "scale": 0
+            },
+            {
+                "name": "cara_bayar",
+                "type": "char",
+                "length": 10,
+                "precision": 0,
+                "scale": 0
+            },
+            {
+                "name": "jam",
+                "type": "char",
+                "length": 15,
+                "precision": 0,
+                "scale": 0
+            },
+            {
+                "name": "tabungan_wajib",
+                "type": "nchar",
+                "length": 20,
+                "precision": 0,
+                "scale": 0
+            }
+        ],
+        "Daftar_ulang": [
+            {
+                "name": "th_ajaran",
+                "type": "char",
+                "length": 9,
+                "precision": 0,
+                "scale": 0
+            },
+            {
+                "name": "kelas",
+                "type": "char",
+                "length": 5,
+                "precision": 0,
+                "scale": 0
+            },
+            {
+                "name": "Jumlah",
+                "type": "numeric",
+                "length": 9,
+                "precision": 18,
+                "scale": 0
+            },
+            {
+                "name": "id",
+                "type": "numeric",
+                "length": 9,
+                "precision": 18,
+                "scale": 0
+            }
+        ],
+        "jemputan": [
+            {
+                "name": "NO_INDUK",
+                "type": "nvarchar",
+                "length": 20,
+                "precision": 0,
+                "scale": 0
+            },
+            {
+                "name": "BULAN",
+                "type": "char",
+                "length": 10,
+                "precision": 0,
+                "scale": 0
+            },
+            {
+                "name": "TAHUN",
+                "type": "char",
+                "length": 10,
+                "precision": 0,
+                "scale": 0
+            },
+            {
+                "name": "JUMLAH",
+                "type": "float",
+                "length": 8,
+                "precision": 53,
+                "scale": 0
+            },
+            {
+                "name": "KELAS",
+                "type": "nvarchar",
+                "length": 10,
+                "precision": 0,
+                "scale": 0
+            },
+            {
+                "name": "BAYAR",
+                "type": "float",
+                "length": 8,
+                "precision": 53,
+                "scale": 0
+            }
+        ],
+        "kelas": [
+            {
+                "name": "kode",
+                "type": "char",
+                "length": 5,
+                "precision": 0,
+                "scale": 0
+            },
+            {
+                "name": "nama",
+                "type": "char",
+                "length": 30,
+                "precision": 0,
+                "scale": 0
+            }
+        ],
+        "kls": [
+            {
+                "name": "no_induk",
+                "type": "nvarchar",
+                "length": 20,
+                "precision": 0,
+                "scale": 0
+            },
+            {
+                "name": "nama",
+                "type": "nvarchar",
+                "length": 60,
+                "precision": 0,
+                "scale": 0
+            },
+            {
+                "name": "kelas",
+                "type": "nvarchar",
+                "length": 10,
+                "precision": 0,
+                "scale": 0
+            }
+        ],
+        "komitment_manual": [
+            {
+                "name": "no_induk",
+                "type": "char",
+                "length": 10,
+                "precision": 0,
+                "scale": 0
+            },
+            {
+                "name": "tgl_komitment",
+                "type": "datetime",
+                "length": 8,
+                "precision": 23,
+                "scale": 3
+            },
+            {
+                "name": "psb",
+                "type": "numeric",
+                "length": 9,
+                "precision": 18,
+                "scale": 0
+            },
+            {
+                "name": "du",
+                "type": "numeric",
+                "length": 9,
+                "precision": 18,
+                "scale": 0
+            },
+            {
+                "name": "spp",
+                "type": "numeric",
+                "length": 9,
+                "precision": 18,
+                "scale": 0
+            },
+            {
+                "name": "komite",
+                "type": "numeric",
+                "length": 9,
+                "precision": 18,
+                "scale": 0
+            },
+            {
+                "name": "lain_lain",
+                "type": "numeric",
+                "length": 9,
+                "precision": 18,
+                "scale": 0
+            },
+            {
+                "name": "id",
+                "type": "int",
+                "length": 4,
+                "precision": 10,
+                "scale": 0
+            }
+        ],
+        "komitment": [
+            {
+                "name": "no_induk",
+                "type": "char",
+                "length": 10,
+                "precision": 0,
+                "scale": 0
+            },
+            {
+                "name": "tgl_komitment",
+                "type": "datetime",
+                "length": 8,
+                "precision": 23,
+                "scale": 3
+            },
+            {
+                "name": "tgl_langsung",
+                "type": "char",
+                "length": 20,
+                "precision": 0,
+                "scale": 0
+            },
+            {
+                "name": "tgl_angsur",
+                "type": "datetime",
+                "length": 8,
+                "precision": 23,
+                "scale": 3
+            },
+            {
+                "name": "uraian",
+                "type": "char",
+                "length": 30,
+                "precision": 0,
+                "scale": 0
+            },
+            {
+                "name": "bulan_tahun",
+                "type": "char",
+                "length": 15,
+                "precision": 0,
+                "scale": 0
+            },
+            {
+                "name": "jumlah",
+                "type": "int",
+                "length": 4,
+                "precision": 10,
+                "scale": 0
+            },
+            {
+                "name": "ket",
+                "type": "char",
+                "length": 10,
+                "precision": 0,
+                "scale": 0
+            },
+            {
+                "name": "lain_lain",
+                "type": "int",
+                "length": 4,
+                "precision": 10,
+                "scale": 0
+            },
+            {
+                "name": "id",
+                "type": "int",
+                "length": 4,
+                "precision": 10,
+                "scale": 0
+            }
+        ],
+        "lain": [
+            {
+                "name": "KODE",
+                "type": "nvarchar",
+                "length": 10,
+                "precision": 0,
+                "scale": 0
+            },
+            {
+                "name": "NAMA",
+                "type": "nvarchar",
+                "length": 80,
+                "precision": 0,
+                "scale": 0
+            }
+        ],
+        "makan": [
+            {
+                "name": "NO_INDUK",
+                "type": "nvarchar",
+                "length": 20,
+                "precision": 0,
+                "scale": 0
+            },
+            {
+                "name": "BULAN",
+                "type": "nvarchar",
+                "length": 4,
+                "precision": 0,
+                "scale": 0
+            },
+            {
+                "name": "TAHUN",
+                "type": "nvarchar",
+                "length": 8,
+                "precision": 0,
+                "scale": 0
+            },
+            {
+                "name": "JUMLAH",
+                "type": "float",
+                "length": 8,
+                "precision": 53,
+                "scale": 0
+            },
+            {
+                "name": "KELAS",
+                "type": "nvarchar",
+                "length": 10,
+                "precision": 0,
+                "scale": 0
+            },
+            {
+                "name": "BAYAR",
+                "type": "float",
+                "length": 8,
+                "precision": 53,
+                "scale": 0
+            }
+        ],
+        "rekap_belum_spp": [
+            {
+                "name": "no_induk",
+                "type": "char",
+                "length": 10,
+                "precision": 0,
+                "scale": 0
+            },
+            {
+                "name": "kelas",
+                "type": "char",
+                "length": 5,
+                "precision": 0,
+                "scale": 0
+            },
+            {
+                "name": "tahun",
+                "type": "char",
+                "length": 4,
+                "precision": 0,
+                "scale": 0
+            },
+            {
+                "name": "juli",
+                "type": "numeric",
+                "length": 9,
+                "precision": 18,
+                "scale": 0
+            },
+            {
+                "name": "agustus",
+                "type": "numeric",
+                "length": 9,
+                "precision": 18,
+                "scale": 0
+            },
+            {
+                "name": "september",
+                "type": "numeric",
+                "length": 9,
+                "precision": 18,
+                "scale": 0
+            },
+            {
+                "name": "oktober",
+                "type": "numeric",
+                "length": 9,
+                "precision": 18,
+                "scale": 0
+            },
+            {
+                "name": "nopember",
+                "type": "numeric",
+                "length": 9,
+                "precision": 18,
+                "scale": 0
+            },
+            {
+                "name": "desember",
+                "type": "numeric",
+                "length": 9,
+                "precision": 18,
+                "scale": 0
+            },
+            {
+                "name": "januari",
+                "type": "numeric",
+                "length": 9,
+                "precision": 18,
+                "scale": 0
+            },
+            {
+                "name": "pebruari",
+                "type": "numeric",
+                "length": 9,
+                "precision": 18,
+                "scale": 0
+            },
+            {
+                "name": "maret",
+                "type": "numeric",
+                "length": 9,
+                "precision": 18,
+                "scale": 0
+            },
+            {
+                "name": "april",
+                "type": "numeric",
+                "length": 9,
+                "precision": 18,
+                "scale": 0
+            },
+            {
+                "name": "mei",
+                "type": "numeric",
+                "length": 9,
+                "precision": 18,
+                "scale": 0
+            },
+            {
+                "name": "juni",
+                "type": "numeric",
+                "length": 9,
+                "precision": 18,
+                "scale": 0
+            },
+            {
+                "name": "tanda",
+                "type": "char",
+                "length": 1,
+                "precision": 0,
+                "scale": 0
+            },
+            {
+                "name": "spp_perbulan",
+                "type": "numeric",
+                "length": 9,
+                "precision": 18,
+                "scale": 0
+            },
+            {
+                "name": "tot_spp",
+                "type": "numeric",
+                "length": 9,
+                "precision": 18,
+                "scale": 0
+            },
+            {
+                "name": "spp_bayar",
+                "type": "numeric",
+                "length": 9,
+                "precision": 18,
+                "scale": 0
+            },
+            {
+                "name": "Ket_spp",
+                "type": "char",
+                "length": 200,
+                "precision": 0,
+                "scale": 0
+            },
+            {
+                "name": "psb_pertahun",
+                "type": "numeric",
+                "length": 9,
+                "precision": 18,
+                "scale": 0
+            },
+            {
+                "name": "psb_bayar",
+                "type": "numeric",
+                "length": 9,
+                "precision": 18,
+                "scale": 0
+            },
+            {
+                "name": "du_pertahun",
+                "type": "numeric",
+                "length": 9,
+                "precision": 18,
+                "scale": 0
+            },
+            {
+                "name": "du_bayar",
+                "type": "numeric",
+                "length": 9,
+                "precision": 18,
+                "scale": 0
+            },
+            {
+                "name": "jul",
+                "type": "numeric",
+                "length": 9,
+                "precision": 18,
+                "scale": 0
+            },
+            {
+                "name": "agu",
+                "type": "numeric",
+                "length": 9,
+                "precision": 18,
+                "scale": 0
+            },
+            {
+                "name": "sep",
+                "type": "numeric",
+                "length": 9,
+                "precision": 18,
+                "scale": 0
+            },
+            {
+                "name": "okt",
+                "type": "numeric",
+                "length": 9,
+                "precision": 18,
+                "scale": 0
+            },
+            {
+                "name": "nop",
+                "type": "numeric",
+                "length": 9,
+                "precision": 18,
+                "scale": 0
+            },
+            {
+                "name": "des",
+                "type": "numeric",
+                "length": 9,
+                "precision": 18,
+                "scale": 0
+            },
+            {
+                "name": "jan",
+                "type": "numeric",
+                "length": 9,
+                "precision": 18,
+                "scale": 0
+            },
+            {
+                "name": "peb",
+                "type": "numeric",
+                "length": 9,
+                "precision": 18,
+                "scale": 0
+            },
+            {
+                "name": "mar",
+                "type": "numeric",
+                "length": 9,
+                "precision": 18,
+                "scale": 0
+            },
+            {
+                "name": "apr",
+                "type": "numeric",
+                "length": 9,
+                "precision": 18,
+                "scale": 0
+            },
+            {
+                "name": "me",
+                "type": "numeric",
+                "length": 9,
+                "precision": 18,
+                "scale": 0
+            },
+            {
+                "name": "jun",
+                "type": "numeric",
+                "length": 9,
+                "precision": 18,
+                "scale": 0
+            },
+            {
+                "name": "tot_komite",
+                "type": "numeric",
+                "length": 9,
+                "precision": 18,
+                "scale": 0
+            },
+            {
+                "name": "bayar_komite",
+                "type": "numeric",
+                "length": 9,
+                "precision": 18,
+                "scale": 0
+            },
+            {
+                "name": "komite_perbulan",
+                "type": "numeric",
+                "length": 9,
+                "precision": 18,
+                "scale": 0
+            },
+            {
+                "name": "jml_komite",
+                "type": "numeric",
+                "length": 9,
+                "precision": 18,
+                "scale": 0
+            },
+            {
+                "name": "tgl_cetak",
+                "type": "datetime",
+                "length": 8,
+                "precision": 23,
+                "scale": 3
+            },
+            {
+                "name": "sampai_bulan",
+                "type": "char",
+                "length": 20,
+                "precision": 0,
+                "scale": 0
+            }
+        ],
+        "siswa": [
+            {
+                "name": "NO_INDUK",
+                "type": "nvarchar",
+                "length": 20,
+                "precision": 0,
+                "scale": 0
+            },
+            {
+                "name": "NAMA",
+                "type": "nvarchar",
+                "length": 60,
+                "precision": 0,
+                "scale": 0
+            },
+            {
+                "name": "KELAS",
+                "type": "nvarchar",
+                "length": 10,
+                "precision": 0,
+                "scale": 0
+            },
+            {
+                "name": "SPP_PERBULAN",
+                "type": "float",
+                "length": 8,
+                "precision": 53,
+                "scale": 0
+            },
+            {
+                "name": "PANGKAL",
+                "type": "float",
+                "length": 8,
+                "precision": 53,
+                "scale": 0
+            },
+            {
+                "name": "BANGUNAN",
+                "type": "float",
+                "length": 8,
+                "precision": 53,
+                "scale": 0
+            },
+            {
+                "name": "SERAGAM",
+                "type": "float",
+                "length": 8,
+                "precision": 53,
+                "scale": 0
+            },
+            {
+                "name": "KEGIATAN",
+                "type": "float",
+                "length": 8,
+                "precision": 53,
+                "scale": 0
+            },
+            {
+                "name": "PANGKAL_BAYAR",
+                "type": "float",
+                "length": 8,
+                "precision": 53,
+                "scale": 0
+            },
+            {
+                "name": "BANGUNAN_BAYAR",
+                "type": "float",
+                "length": 8,
+                "precision": 53,
+                "scale": 0
+            },
+            {
+                "name": "SERAGAM_BAYAR",
+                "type": "float",
+                "length": 8,
+                "precision": 53,
+                "scale": 0
+            },
+            {
+                "name": "KEGIATAN_BAYAR",
+                "type": "float",
+                "length": 8,
+                "precision": 53,
+                "scale": 0
+            },
+            {
+                "name": "POMG",
+                "type": "float",
+                "length": 8,
+                "precision": 53,
+                "scale": 0
+            },
+            {
+                "name": "DAFTAR_ULANG",
+                "type": "float",
+                "length": 8,
+                "precision": 53,
+                "scale": 0
+            },
+            {
+                "name": "NO_induk_diknas",
+                "type": "char",
+                "length": 10,
+                "precision": 0,
+                "scale": 0
+            },
+            {
+                "name": "potong_pangkal",
+                "type": "float",
+                "length": 8,
+                "precision": 53,
+                "scale": 0
+            },
+            {
+                "name": "tot_pangkal",
+                "type": "float",
+                "length": 8,
+                "precision": 53,
+                "scale": 0
+            },
+            {
+                "name": "tot_du",
+                "type": "float",
+                "length": 8,
+                "precision": 53,
+                "scale": 0
+            },
+            {
+                "name": "potong_du",
+                "type": "float",
+                "length": 8,
+                "precision": 53,
+                "scale": 0
+            },
+            {
+                "name": "id",
+                "type": "int",
+                "length": 4,
+                "precision": 10,
+                "scale": 0
+            }
+        ],
+        "SPP_BELUM": [
+            {
+                "name": "NO_INDUK",
+                "type": "nvarchar",
+                "length": 20,
+                "precision": 0,
+                "scale": 0
+            },
+            {
+                "name": "NAMA",
+                "type": "nvarchar",
+                "length": 60,
+                "precision": 0,
+                "scale": 0
+            },
+            {
+                "name": "KELAS",
+                "type": "nvarchar",
+                "length": 10,
+                "precision": 0,
+                "scale": 0
+            },
+            {
+                "name": "SPP_PERBULAN",
+                "type": "float",
+                "length": 8,
+                "precision": 53,
+                "scale": 0
+            },
+            {
+                "name": "PANGKAL",
+                "type": "float",
+                "length": 8,
+                "precision": 53,
+                "scale": 0
+            },
+            {
+                "name": "BANGUNAN",
+                "type": "float",
+                "length": 8,
+                "precision": 53,
+                "scale": 0
+            },
+            {
+                "name": "SERAGAM",
+                "type": "float",
+                "length": 8,
+                "precision": 53,
+                "scale": 0
+            },
+            {
+                "name": "KEGIATAN",
+                "type": "float",
+                "length": 8,
+                "precision": 53,
+                "scale": 0
+            },
+            {
+                "name": "potong_spp",
+                "type": "float",
+                "length": 8,
+                "precision": 53,
+                "scale": 0
+            }
+        ],
+        "tabungan": [
+            {
+                "name": "NO_INDUK",
+                "type": "nvarchar",
+                "length": 20,
+                "precision": 0,
+                "scale": 0
+            },
+            {
+                "name": "SALDO",
+                "type": "float",
+                "length": 8,
+                "precision": 53,
+                "scale": 0
+            },
+            {
+                "name": "id",
+                "type": "int",
+                "length": 4,
+                "precision": 10,
+                "scale": 0
+            }
+        ],
+        "temp_bayar_du": [
+            {
+                "name": "no_induk",
+                "type": "nvarchar",
+                "length": 20,
+                "precision": 0,
+                "scale": 0
+            },
+            {
+                "name": "kelas",
+                "type": "char",
+                "length": 5,
+                "precision": 0,
+                "scale": 0
+            },
+            {
+                "name": "th_ajaran",
+                "type": "char",
+                "length": 9,
+                "precision": 0,
+                "scale": 0
+            },
+            {
+                "name": "jumlah",
+                "type": "numeric",
+                "length": 9,
+                "precision": 18,
+                "scale": 0
+            },
+            {
+                "name": "id",
+                "type": "numeric",
+                "length": 9,
+                "precision": 18,
+                "scale": 0
+            },
+            {
+                "name": "du",
+                "type": "numeric",
+                "length": 9,
+                "precision": 18,
+                "scale": 0
+            }
+        ],
+        "temp_belum_spp": [
+            {
+                "name": "no_induk",
+                "type": "char",
+                "length": 10,
+                "precision": 0,
+                "scale": 0
+            },
+            {
+                "name": "kelas",
+                "type": "char",
+                "length": 5,
+                "precision": 0,
+                "scale": 0
+            },
+            {
+                "name": "tahun",
+                "type": "char",
+                "length": 4,
+                "precision": 0,
+                "scale": 0
+            },
+            {
+                "name": "u_spp",
+                "type": "numeric",
+                "length": 9,
+                "precision": 18,
+                "scale": 0
+            },
+            {
+                "name": "bulan",
+                "type": "char",
+                "length": 2,
+                "precision": 0,
+                "scale": 0
+            },
+            {
+                "name": "u_pomg",
+                "type": "numeric",
+                "length": 9,
+                "precision": 18,
+                "scale": 0
+            },
+            {
+                "name": "u_sorga",
+                "type": "numeric",
+                "length": 9,
+                "precision": 18,
+                "scale": 0
+            }
+        ],
+        "transaksi_k": [
+            {
+                "name": "NO_INDUK",
+                "type": "nvarchar",
+                "length": 20,
+                "precision": 0,
+                "scale": 0
+            },
+            {
+                "name": "TANGGAL",
+                "type": "smalldatetime",
+                "length": 4,
+                "precision": 16,
+                "scale": 0
+            },
+            {
+                "name": "MASUK",
+                "type": "float",
+                "length": 8,
+                "precision": 53,
+                "scale": 0
+            },
+            {
+                "name": "KELUAR",
+                "type": "float",
+                "length": 8,
+                "precision": 53,
+                "scale": 0
+            },
+            {
+                "name": "user_id",
+                "type": "char",
+                "length": 10,
+                "precision": 0,
+                "scale": 0
+            }
+        ],
+        "transaksi_m": [
+            {
+                "name": "NO_INDUK",
+                "type": "nvarchar",
+                "length": 20,
+                "precision": 0,
+                "scale": 0
+            },
+            {
+                "name": "TANGGAL",
+                "type": "smalldatetime",
+                "length": 4,
+                "precision": 16,
+                "scale": 0
+            },
+            {
+                "name": "MASUK",
+                "type": "float",
+                "length": 8,
+                "precision": 53,
+                "scale": 0
+            },
+            {
+                "name": "KELUAR",
+                "type": "float",
+                "length": 8,
+                "precision": 53,
+                "scale": 0
+            },
+            {
+                "name": "user_id",
+                "type": "char",
+                "length": 10,
+                "precision": 0,
+                "scale": 0
+            },
+            {
+                "name": "id",
+                "type": "int",
+                "length": 4,
+                "precision": 10,
+                "scale": 0
+            }
+        ],
+        "u_lain": [
+            {
+                "name": "NO_INDUK",
+                "type": "nvarchar",
+                "length": 20,
+                "precision": 0,
+                "scale": 0
+            },
+            {
+                "name": "KODE",
+                "type": "nvarchar",
+                "length": 10,
+                "precision": 0,
+                "scale": 0
+            },
+            {
+                "name": "JUMLAH",
+                "type": "float",
+                "length": 8,
+                "precision": 53,
+                "scale": 0
+            },
+            {
+                "name": "TGL_BAYAR",
+                "type": "smalldatetime",
+                "length": 4,
+                "precision": 16,
+                "scale": 0
+            },
+            {
+                "name": "kelas",
+                "type": "nvarchar",
+                "length": 10,
+                "precision": 0,
+                "scale": 0
+            }
+        ],
+        "U_TABUNGAN": [
+            {
+                "name": "NO_INDUK",
+                "type": "nvarchar",
+                "length": 20,
+                "precision": 0,
+                "scale": 0
+            },
+            {
+                "name": "TANGGAL",
+                "type": "smalldatetime",
+                "length": 4,
+                "precision": 16,
+                "scale": 0
+            },
+            {
+                "name": "MASUK",
+                "type": "float",
+                "length": 8,
+                "precision": 53,
+                "scale": 0
+            },
+            {
+                "name": "KELUAR",
+                "type": "float",
+                "length": 8,
+                "precision": 53,
+                "scale": 0
+            }
+        ]
+    }
+}

@@ -17,7 +17,7 @@ if(Test-Path -LiteralPath $manifest){
         throw 'Manifest proses berubah; periksa kepemilikan sebelum melanjutkan'
     }
 }
-$worker=Start-Process -FilePath $PhpExecutable -ArgumentList ('"'+(Join-Path $PSScriptRoot 'legacy_worker.php')+'"') -WorkingDirectory $app -WindowStyle Hidden -RedirectStandardOutput (Join-Path $root 'worker-output.log') -RedirectStandardError (Join-Path $root 'worker-error.log') -PassThru
+$worker=Start-Process -FilePath $PhpExecutable -ArgumentList ('-d memory_limit=768M "'+(Join-Path $PSScriptRoot 'legacy_worker.php')+'"') -WorkingDirectory $app -WindowStyle Hidden -RedirectStandardOutput (Join-Path $root 'worker-output.log') -RedirectStandardError (Join-Path $root 'worker-error.log') -PassThru
 $process=Get-CimInstance Win32_Process -Filter "ProcessId=$($worker.Id)"
 @{pid=$worker.Id;created=$process.CreationDate.ToUniversalTime().Ticks.ToString();app=$app;database=$db;user=[Security.Principal.WindowsIdentity]::GetCurrent().Name}|ConvertTo-Json|Set-Content -LiteralPath $manifest -Encoding UTF8
 Write-Output "Worker importer dimulai: $($worker.Id)"

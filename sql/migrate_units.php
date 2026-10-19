@@ -188,3 +188,8 @@ financial_components_apply($koneksi);
 
 require_once __DIR__ . "/payment_activity_schema.php";
 payment_activity_schema_apply($koneksi);
+
+require_once __DIR__."/../includes/legacy_full_schema.php";
+legacy_full_schema_apply($koneksi);
+require_once __DIR__.'/../includes/legacy_operational_schema.php';
+lop_schema_apply($koneksi);

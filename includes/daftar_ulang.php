@@ -460,6 +460,7 @@ function du_create_bill_for_placement(mysqli $db, int $placementId, bool $syncLe
     $row = $stmt->get_result()->fetch_assoc();
     $stmt->close();
     if (!$row || $row['placement_status'] !== 'aktif' || $row['year_status'] !== 'published') return null;
+    require_once __DIR__.'/legacy_full_read.php';if(lful_is_covered($db,(string)$row['no_induk'],'daftar_ulang',(string)$row['label']))return null;
     if (!$row['master_id'] || (float)$row['Jumlah'] <= 0) {
         throw new RuntimeException('Tarif Daftar Ulang untuk kelas penempatan siswa belum tersedia.');
     }
@@ -559,6 +560,11 @@ function du_publish_year_from_active_students(mysqli $db, int $yearId, string $l
     $stmtPlacement->close();
 
     $isCurrentYear = $label === du_current_academic_year() ? 1 : 0;
+    require_once __DIR__.'/legacy_full_read.php';$legacyExclude='';$expectedCount=$placementCount;
+    if(lful_read_ready($db)){
+        $coveredSql="EXISTS(SELECT 1 FROM legacy_full_coverage c JOIN siswa covered_student ON covered_student.id=c.student_id AND covered_student.unit_id=c.unit_id WHERE covered_student.NO_INDUK=sta.no_induk AND covered_student.unit_id=sta.unit_id AND c.category='daftar_ulang' AND c.period=(SELECT label FROM tahun_ajaran WHERE id=sta.tahun_ajaran_id))";
+        $stmt=$db->prepare("SELECT COUNT(*) n FROM siswa_tahun_ajaran sta WHERE sta.tahun_ajaran_id=? AND sta.kelas IN {$regularClasses} AND $coveredSql");$stmt->bind_param('i',$yearId);$stmt->execute();$expectedCount-=(int)$stmt->get_result()->fetch_assoc()['n'];$stmt->close();$legacyExclude=' AND NOT '.$coveredSql;
+    }
     $stmt = $db->prepare("INSERT IGNORE INTO tagihan_daftar_ulang
         (tahun_ajaran_id,penempatan_id,master_daftar_ulang_id,no_induk,kelas_snapshot,tahun_ajaran_snapshot,nominal_awal,nominal_tagihan)
         SELECT sta.tahun_ajaran_id,sta.id,du.id,sta.no_induk,sta.kelas,?,
@@ -567,10 +573,10 @@ function du_publish_year_from_active_students(mysqli $db, int $yearId, string $l
         FROM siswa_tahun_ajaran sta
         JOIN siswa s ON s.NO_INDUK=sta.no_induk AND s.unit_id=sta.unit_id
         JOIN Daftar_ulang du ON du.tahun_ajaran_id=sta.tahun_ajaran_id AND du.kelas=sta.kelas
-        WHERE sta.tahun_ajaran_id=? AND sta.kelas IN {$regularClasses}");
+        WHERE sta.tahun_ajaran_id=? AND sta.kelas IN {$regularClasses}{$legacyExclude}");
     $stmt->bind_param('siii', $label, $isCurrentYear, $isCurrentYear, $yearId); $stmt->execute();
     $created = $stmt->affected_rows; $stmt->close();
-    if ($created !== $placementCount) throw new RuntimeException('Jumlah tagihan tidak sesuai riwayat kelas tahun ajaran. Penerbitan dibatalkan.');
+    if ($created !== $expectedCount) throw new RuntimeException('Jumlah tagihan tidak sesuai riwayat kelas tahun ajaran. Penerbitan dibatalkan.');
 
     if ($isCurrentYear === 1) {
         $stmt = $db->prepare("UPDATE siswa s

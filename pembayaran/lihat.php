@@ -75,11 +75,12 @@ if ($isArchive) {
     $paymentRows = $archive['rows']; $totalPayments = $archive['total'];
     $totalPages = $archive['pages']; $page = $archive['page']; $offset = $archive['offset'];
 } else {
+$paymentSource=lful_payment_source($koneksi);
 $where = "WHERE 1=1".unit_student_selection_where();
 $params = [];
 $types  = '';
 $where .= history_operator_where($koneksi,$operators,'p.id','p.unit_id');
-$where .= " AND p.TGL_BYR >= ? AND p.TGL_BYR < ?";
+$where .= (($_GET['undated']??'')==='1')?" AND p.id<0 AND p.TGL_BYR IS NULL AND ? IS NOT NULL AND ? IS NOT NULL":" AND p.TGL_BYR >= ? AND p.TGL_BYR < ?";
 $params[] = $filter_tanggal_awal . ' 00:00:00';
 $params[] = date('Y-m-d H:i:s', strtotime($filter_tanggal_akhir . ' +1 day'));
 $types .= 'ss';
@@ -90,7 +91,7 @@ if ($search) {
     $types .= 'sss';
 }
 
-$countSql = "SELECT COUNT(*) AS total FROM bayar p
+$countSql = "SELECT COUNT(*) AS total FROM $paymentSource p
         JOIN siswa s ON s.NO_INDUK = p.NO_INDUK AND s.unit_id=p.unit_id
         $where";
 $stmtCount = $koneksi->prepare($countSql);
@@ -126,7 +127,7 @@ $tabQuery = $_GET; unset($tabQuery['page']);
 $activeTabUrl = 'lihat.php?' . http_build_query(array_merge($tabQuery,['view'=>'active']));
 $archiveTabUrl = 'lihat.php?' . http_build_query(array_merge($tabQuery,['view'=>'deleted']));
 
-$selectedId=max(0,(int)($_GET['selected']??0));
+$selectedId=(int)($_GET['selected']??0);
 $selectedRow=null;
 foreach($paymentRows as $candidate) if((int)$candidate['id']===$selectedId) $selectedRow=$candidate;
 $selectedRow ??= $paymentRows[0]??null;
@@ -271,7 +272,7 @@ filter_output_start();
             <option value="<?= $pageSize ?>" <?= $perPage === $pageSize ? 'selected' : '' ?>><?= $pageSize ?> / halaman</option>
             <?php endforeach; ?>
           </select></div>
-          <div class="ph-filter-actions">
+          <div class="ph-filter-actions"><label><input type="checkbox" name="undated" value="1" <?= ($_GET['undated']??'')==='1'?'checked':'' ?>> Histori Legacy tanpa tanggal</label>
             <button type="submit" class="btn btn-primary" id="btn-filter">Tampilkan Rekap</button>
             <a href="lihat.php?view=<?= $isArchive ? "deleted" : "active" ?>" class="btn btn-ghost" id="btn-reset-filter">Reset</a>
             <?php if(hasRole(['admin','kasir']) && !unit_all_readonly()): ?><a href="form.php" class="btn btn-primary" id="btn-tambah">+ Tambah Baru</a><?php endif; ?>
@@ -281,7 +282,7 @@ filter_output_start();
       <section class="ph-list-panel"><header class="ph-panel-heading"><div><h3><?= authorization_icon('history') ?> Daftar Transaksi</h3><p>Menampilkan <?= $firstShown ?>&ndash;<?= $lastShown ?> dari <?= number_format($totalPayments) ?> transaksi<?= $isArchive?' dihapus':'' ?>.</p></div><div class="ph-list-nav"><small><?= $firstShown ?>&ndash;<?= $lastShown ?> dari <?= number_format($totalPayments) ?></small><?php foreach(['Sebelumnya'=>$page-1,'Berikutnya'=>$page+1] as $label=>$target): ?><a class="btn btn-ghost btn-sm <?= $target<1||$target>$totalPages?'is-disabled':'' ?>" aria-label="Halaman <?= strtolower($label) ?>" <?= $target<1||$target>$totalPages?'aria-disabled="true" tabindex="-1"':'' ?> href="<?= $target>=1&&$target<=$totalPages?'lihat.php?'.htmlspecialchars(http_build_query(array_merge($_GET,['page'=>$target,'selected'=>null]))):'#' ?>"><?= authorization_icon($label==='Sebelumnya'?'left':'right') ?></a><?php endforeach; ?></div></header>
       <div class="ph-record-list">
       <?php foreach($paymentRows as $i=>$row): $id=(int)$row['id'];$href='lihat.php?'.http_build_query(array_merge($_GET,['selected'=>$id])); ?>
-      <a href="<?= authorization_escape($href) ?>" class="ph-record <?= $id===$selectedId?'is-selected':'' ?> <?= $isArchive?'is-deleted':'' ?>" data-payment-record data-id="<?= $id ?>" data-unit="<?= (int)$row['unit_id'] ?>" <?= $id===$selectedId?'aria-current="true"':'' ?>><span class="ph-record-number"><?= $offset+$i+1 ?></span><span class="ph-record-icon"><?= authorization_icon('student') ?></span><div class="ph-record-identity"><strong><?= authorization_escape($row['NO_INDUK']) ?></strong><span><?= authorization_escape($row['NAMA']) ?></span><small>Diknas <?= authorization_escape($row['NO_induk_diknas']??'Tidak tercatat') ?></small><?= unit_record_badge($row) ?></div><span class="kelas-badge">Kelas <?= authorization_escape($row['kelas_transaksi']) ?></span><div class="ph-record-period"><small>Periode</small><span><?= authorization_icon('calendar') ?> <?= authorization_escape(payment_history_period($row)) ?></span></div><div class="ph-record-total"><small>Total Bayar</small><strong><?= payment_history_money($row['total_jumlah']) ?></strong></div><span class="ph-status <?= $isArchive?'is-deleted':'' ?>"><?= $isArchive?'Dihapus':'Aktif' ?></span><?= authorization_icon('right') ?></a>
+      <a href="<?= authorization_escape($href) ?>" class="ph-record <?= $id===$selectedId?'is-selected':'' ?> <?= $isArchive?'is-deleted':'' ?>" data-payment-record data-id="<?= $id ?>" data-unit="<?= (int)$row['unit_id'] ?>" <?= $id===$selectedId?'aria-current="true"':'' ?>><span class="ph-record-number"><?= $offset+$i+1 ?></span><span class="ph-record-icon"><?= authorization_icon('student') ?></span><div class="ph-record-identity"><strong><?= authorization_escape($row['NO_INDUK']) ?></strong><span><?= authorization_escape($row['NAMA']) ?></span><small>Diknas <?= authorization_escape($row['NO_induk_diknas']??'Tidak tercatat') ?></small><?= unit_record_badge($row) ?></div><span class="kelas-badge">Kelas <?= authorization_escape($row['kelas_transaksi']) ?></span><div class="ph-record-period"><small>Periode</small><span><?= authorization_icon('calendar') ?> <?= authorization_escape(payment_history_period($row)) ?></span></div><div class="ph-record-total"><small>Total Bayar</small><strong><?= payment_history_money($row['total_jumlah']) ?></strong></div><span class="ph-status <?= $isArchive?'is-deleted':'' ?>"><?= $isArchive?'Dihapus':($id<0?'Legacy':'Aktif') ?></span><?= authorization_icon('right') ?></a>
       <?php endforeach; ?>
       <?php if(!$paymentRows): ?><div class="ph-empty"><?= authorization_icon('history') ?><h3>Tidak ada transaksi sesuai filter</h3><p><?= $isArchive?'Arsip menggunakan tanggal penghapusan.':'Ubah periode atau pencarian siswa untuk melihat transaksi lain.' ?></p></div><?php endif; ?>
       </div>

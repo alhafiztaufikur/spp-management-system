@@ -1,0 +1,32 @@
+<?php
+require_once __DIR__.'/../includes/legacy_full.php';
+require_once __DIR__.'/legacy_finance_support.php';
+$rows=[];$add=function(string $table,array $raw)use(&$rows){$n=count($rows)+1;$rows[]=['table'=>$table,'raw'=>$raw,'reference_only'=>$table==='lain','row_key'=>hash('sha256','bulk-'.$n),'student_ordinal'=>$n,'money_columns'=>array_values(array_intersect(array_keys($raw),['U_SPP','U_LAIN','JUMLAH1','JUMLAH2','JUMLAH3','JUMLAH4','SALDO','MASUK','KELUAR','SPP_PERBULAN','POMG']))];};
+$add('siswa',['NO_INDUK'=>'15160001','NAMA'=>'Alumni Uji','KELAS'=>'A2025','SPP_PERBULAN'=>'530000','POMG'=>'15000']);
+$add('siswa',['NO_INDUK'=>'21220001','NAMA'=>'Siswa Uji','KELAS'=>'1A','SPP_PERBULAN'=>'530000','POMG'=>'15000']);
+$add('siswa',['NO_INDUK'=>'test','NAMA'=>'test','KELAS'=>'BTQ']);
+$add('lain',['KODE'=>'057','NAMA'=>'Robotik']);$add('lain',['KODE'=>'0016','NAMA'=>'Basket']);$add('lain',['KODE'=>'0016','NAMA'=>'Pendalaman Materi']);
+$add('bayar',['NO_INDUK'=>'15160001','U_LAIN'=>'0','LAIN_LAIN1'=>'057','JUMLAH1'=>'500','LAIN_LAIN2'=>'0016','JUMLAH2'=>'100','TGL_BYR'=>'2026-10-01']);
+$add('bayar',['NO_INDUK'=>'ORPHAN','U_SPP'=>'100','TGL_BYR'=>null]);
+$add('tabungan',['NO_INDUK'=>'21220001','SALDO'=>'1000']);$add('transaksi_m',['NO_INDUK'=>'21220001','MASUK'=>'1000','TANGGAL'=>'2026-10-01']);
+$add('tb_total',['NO_INDUK'=>'21220001','SALDO'=>'900']);$add('tb_masuk',['NO_INDUK'=>'21220001','MASUK'=>'800','TANGGAL'=>'2026-10-01']);
+$m=['fingerprint'=>hash('sha256','bulk source'),'source_date'=>'2026-10-17','unit'=>1];
+$cfg=lop_source_setup($rows,$m,['cutoff'=>'2026-10-19 08:00:00'],1);
+$catalog=['manifest'=>$m,'components'=>array_values(lful_catalog($rows)),'additional_savings'=>lful_additional_savings($rows,$m['source_date'])];
+$proposal=lop_bulk_patch($rows,$catalog,$cfg,1,'all');$cfg=array_replace_recursive($cfg,$proposal['patch']);$plan=lop_prepare($rows,$cfg,1,$m['source_date']);
+lft_assert($plan['owners']['15160001']['ready']&&$plan['owners']['15160001']['graduation_year']===2025,'Alumni not approved as one group');
+lft_assert($plan['owners']['TEST']['ready']&&!$plan['owners']['TEST']['student'],'Testing account became academic student');
+lft_assert($plan['owners']['ORPHAN']['ready']&&!$plan['owners']['ORPHAN']['student'],'Orphan source was discarded or assigned fake NIS');
+lft_assert($plan['summary']['payments']===2&&$plan['summary']['payment_total']==='700.00','Source details absent from total or double-counted');
+lft_assert($plan['summary']['savings_total']==='1000.00','Unconfirmed additional balance counted');
+$extraKey=array_key_first($catalog['additional_savings']);$cfg['additional_savings'][$extraKey]=['fingerprint'=>$catalog['additional_savings'][$extraKey]['fingerprint'],'reason'=>'replace_main','target_identity'=>'21220001','main_fingerprint'=>lop_main_bank_fingerprint('21220001',lf_reconcile(array_values(array_filter($rows,fn($r)=>in_array($r['table'],['tabungan','transaksi_m','transaksi_k'],true))))),'amount'=>'850.00','confirmed'=>true,'evidence'=>'Saldo sebenarnya disahkan berdasarkan rekening.'];
+$plan=lop_prepare($rows,$cfg,1,$m['source_date']);$extra=$plan['owners']['21220001'];
+lft_assert($extra['savings']['balance']==='850.00'&&$extra['savings']['adjustment']==='-150.00'&&$extra['student'],'Separate FIX not exact or made duplicate student');
+lft_assert($plan['owners']['21220001']['savings']['balance']==='850.00'&&$plan['summary']['savings_total']==='850.00','FIX replaced main or counted twice');
+$groups=lop_pending_groups(['owners'=>['1'=>['group'=>'A2025'],'2'=>['group'=>'A2025']],'pending'=>[lop_pending('1','a','owner','owner_review','A'),lop_pending('2','b','payment','owner_review','B')]]);
+lft_assert(count($groups)===1&&$groups[0]['rows']===2,'Shared owner cause still requires individual transactions');
+$bad=$rows;$bad[6]['raw']['U_LAIN']='200';lft_assert((bool)array_filter(lop_prepare($bad,$cfg,1,$m['source_date'])['pending'],fn($p)=>$p['section']==='payment'),'Nonzero contradictory total silently changed');
+foreach(['0','700','1000'] as $amount){$cfg['additional_savings'][$extraKey]['amount']=$amount;$p=lop_prepare($rows,$cfg,1,$m['source_date']);lft_assert($p['owners']['21220001']['savings']['balance']===lf_money(lf_cents($amount)),'FIX zero/up/down rejected');}
+$cfg['additional_savings'][$extraKey]['amount']='-1';$p=lop_prepare($rows,$cfg,1,$m['source_date']);lft_assert($p['summary']['savings_total']==='1000.00'&&count($p['pending'])>0,'Negative FIX accepted');
+lft_assert(count(array_filter($proposal['patch']['new_masters'],fn($p)=>!empty($p['tariff_pending'])))===2,'Pending master proposals not grouped by source name');
+echo "PASS: mass approval, source fee names/conflicts, alumni/testing/unmatched owners, exact details totals, primary replacement FIX up/down/zero, grouped causes, negative/contradictory rejection.\n";

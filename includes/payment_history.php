@@ -1,17 +1,20 @@
 <?php
 require_once __DIR__.'/payment_permissions.php';
+require_once __DIR__.'/legacy_full_read.php';
 require_once __DIR__.'/payment_return.php';
 require_once __DIR__.'/authorization_presentation.php';
 
 function payment_history_money($value): string { return 'Rp '.number_format((float)$value,0,',','.'); }
 function payment_history_period(array $p): string
 {
+    if((int)($p['id']??0)<0)return 'Histori Legacy';
     $months=['Januari'=>'01','Februari'=>'02','Maret'=>'03','April'=>'04','Mei'=>'05','Juni'=>'06','Juli'=>'07','Agustus'=>'08','September'=>'09','Oktober'=>'10','November'=>'11','Desember'=>'12'];
     $raw=(string)($p['BULAN']??'');
     return ($months[$raw]??str_pad($raw,2,'0',STR_PAD_LEFT)).' '.($p['TAHUN']??'Tidak tercatat');
 }
 function payment_history_model(mysqli $db,int $id,bool $deleted): array
 {
+    if($id<0&&!$deleted)return lful_history_model($db,-$id)+['capabilities'=>['can_edit'=>false,'can_delete'=>false,'can_print'=>false]];
     if($id<=0) throw new OutOfBoundsException('Transaksi tidak ditemukan pada unit ini.');
     $details=[];
     if($deleted) {
@@ -46,6 +49,7 @@ function payment_history_actor(?array $event): void
 }
 function payment_history_render(array $model, ?array $query=null): void
 {
+    if(isset($model['legacy'])){lful_history_render($model);return;}
     $p=$model['payment'];$caps=$model['capabilities'];$deleted=$model['deleted'];$summary=$model['summary'];$id=(int)$p['id'];
     $token=$query!==null && !$deleted && ($caps['can_edit']||$caps['can_delete'])?payment_return_create($id,(int)$p['unit_id'],$query,'lihat.php'):'';
     ?>

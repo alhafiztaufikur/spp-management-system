@@ -1,0 +1,11 @@
+<?php
+if(PHP_SAPI!=='cli')exit(1);require_once __DIR__.'/../koneksi.php';require_once __DIR__.'/http_form_scope.php';spp_test_assert_database_target($koneksi);require_once __DIR__.'/../includes/legacy_full.php';require_once __DIR__.'/legacy_finance_support.php';
+$db=$koneksi;$actor=(int)$db->query("SELECT id FROM admin WHERE role='super_admin' AND is_active=1 LIMIT 1")->fetch_row()[0];unit_set_context($db,3);$b=lf_one($db,"SELECT * FROM legacy_full_batches WHERE state='completed'");$id=$b['id'];$d=lful_draft($id);$m=json_decode($b['manifest'],true);$m['mapping']=$d['settings'];
+// Simulate a restored post-migration safety backup and loss of the private queue.
+$before=[];foreach(['siswa_data','bayar_data','tabungan_data','legacy_full_payments_data','legacy_full_journals_data','tagihan_biaya_lain_data'] as $t)$before[$t]=$db->query("CHECKSUM TABLE $t EXTENDED")->fetch_assoc()['Checksum'];
+file_put_contents(dirname((string)getenv('SPP_TEST_ISOLATED_INSTANCE')).'/full-recovery-queue-before.json',lf_json($d));
+lf_query($db,"UPDATE legacy_full_batches SET state='verifying',manifest=? WHERE id=?",[lf_json($m),$id]);$q=lful_store();$q->prepare('DELETE FROM full_drafts WHERE job=?')->execute([$id]);$q->prepare('DELETE FROM rows WHERE job=?')->execute([$id]);$q->prepare('DELETE FROM jobs WHERE id=?')->execute([$id]);
+$root=dirname((string)getenv('SPP_TEST_ISOLATED_INSTANCE'));$p=proc_open([PHP_BINARY,'-d','memory_limit=768M',__DIR__.'/../scripts/verify_legacy_full.php','--batch='.$id,'--actor='.$actor,'--verify','--confirm-recovery'],[0=>['pipe','r'],1=>['file',$root.'/full-recovery.out.log','w'],2=>['file',$root.'/full-recovery.err.log','w']],$pipes);fclose($pipes[0]);lft_assert(proc_close($p)===0,'Administrative recovery failed; inspect private diagnostics.');
+lft_assert(lf_one($db,'SELECT state FROM legacy_full_batches WHERE id=?',[$id])['state']==='completed'&&legacy_job($id)['state']==='imported','Restored unit not recovered');
+foreach($before as $t=>$checksum)lft_assert($db->query("CHECKSUM TABLE $t EXTENDED")->fetch_assoc()['Checksum']===$checksum,'Recovery rewrote finances: '.$t);
+echo "PASS: restore-state reconciliation, queue recovery from database manifest, actual verified backup, no financial reimport.\n";
