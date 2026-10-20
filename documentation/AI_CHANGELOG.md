@@ -1,5 +1,14 @@
 # Riwayat Perubahan AI SistemSPP
 
+## 2026-10-21 - Audit Laporan Global setelah migrasi Legacy
+
+- Satukan bukti kewajiban/pembayaran Status, SPP Tahunan dan Per Item; tampilkan komponen histori serta kredit tanpa tagihan native dengan pokok tidak diketahui, tanpa tarif/tanggal buatan.
+- Gabungkan native/Legacy pada Penerimaan, Setoran dan Kas Tabungan; pertahankan saldo awal/penyesuaian di luar arus kas baru dan snapshot kelas transaksi.
+- Tambahkan `include_undated=1` dengan pencocokan periode terbukti, state pagination/unit/ekspor, Reset dan fallback tanpa JavaScript. Rapikan header/sel bulanan dan keterangan total parsial.
+- Hilangkan pembacaan Penerimaan berulang per kategori pada checkbox Semua; bukti bulanan/tunggakan dibaca berkelompok. Koreksi/pembatalan/replay diuji pada layanan existing.
+- Pertahankan pembatalan dan snapshot kelas Biaya Lain setelah perpindahan. PDF besar dirender bertahap dengan Dompdf existing agar tidak kehabisan memori; verifikasi ekspor lengkap 257 halaman terhadap Excel dan sumber independen.
+- Tanpa migrasi atau perubahan database pengguna; hash isi/skema 62 tabel tetap identik. [Hasil setiap template dan pengujian](GLOBAL_LEGACY_REPORT_AUDIT_20261021.md).
+
 ## 2026-10-21 - Data Master, kelulusan Alumni, dan PNG surat
 
 - Kelulusan tiga unit memakai Alumni tahun akhir TA asal; keanggotaan nonaktif, penempatan lulus, dan audit atomik. Timeline/hasil/peserta/ekspor mengikuti bukti; edit identitas Alumni tidak menerbitkan tagihan atau mengubah kelas.

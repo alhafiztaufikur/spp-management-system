@@ -128,3 +128,12 @@ html[data-theme="dark"][data-palette="super"] #global-report-workspace{--report-
 #global-report-workspace :is(th,td):is(.report-col-name,.matrix-nama,.billing-matrix-name){text-align:center!important;}
 #global-report-workspace .billing-matrix-name :is(strong,small){text-align:center;overflow-wrap:anywhere;}
 #global-report-workspace .excel-total span{background:var(--report-final-bg);color:var(--report-final-text);border-radius:8px;}
+
+.report-undated-field{grid-column:1/-1;min-width:0;padding:12px 14px;border:1px solid var(--border);border-radius:12px;background:var(--bg-elevated)}
+.report-undated-option{display:flex;align-items:center;gap:10px;min-height:28px;color:var(--text-primary);font-size:14px;font-weight:600;cursor:pointer}
+.report-undated-option input{width:18px;height:18px;flex:0 0 18px;margin:0;accent-color:var(--accent)}
+.report-undated-option input:focus-visible{outline:2px solid var(--accent);outline-offset:3px}
+.report-undated-field small{display:block;margin:3px 0 0 28px;color:var(--text-muted);font-size:12px;line-height:1.5}
+.report-evidence-note{margin:0;padding:10px 24px;color:var(--text-secondary);font-size:12px;line-height:1.6;border-top:1px solid var(--border)}
+.report-horizontal-matrix .matrix-main{display:block;background:transparent!important;border:0!important;border-radius:0!important;padding:0!important;font-weight:600;font-size:12px;line-height:1.5}
+.report-horizontal-matrix .matrix-detail{display:block;margin-top:4px;white-space:nowrap;color:var(--text-secondary);font-size:12px}

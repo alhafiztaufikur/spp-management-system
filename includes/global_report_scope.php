@@ -36,10 +36,10 @@ function global_report_scope(mysqli $db, array &$query): int {
 
 /** Unit-dependent identities/categories are omitted intentionally on scope navigation. */
 function global_report_preserved_query(mysqli $db, array $query): array {
-    $allowed=['template','tanggal_awal','tanggal_akhir','tahun_ajaran','bulan_awal','bulan_akhir','tahun','tahun_awal','tahun_akhir','mode','per_page'];
+    $allowed=['template','tanggal_awal','tanggal_akhir','tahun_ajaran','bulan_awal','bulan_akhir','tahun','tahun_awal','tahun_akhir','mode','per_page','include_undated','all_periods'];
     $keep=array_intersect_key($query,array_flip($allowed));
     if (isset($keep['tahun_ajaran'])) {
-        $years=array_column($db->query('SELECT DISTINCT label FROM tahun_ajaran')->fetch_all(MYSQLI_ASSOC),'label');
+        $years=array_column(report_years($db),'label');
         if (is_array($keep['tahun_ajaran'])) {
             $values=in_array('*',$keep['tahun_ajaran'],true)?['*']:array_values(array_filter($keep['tahun_ajaran'],static fn($v)=>is_string($v)&&in_array($v,$years,true)));
             if ($values) $keep['tahun_ajaran']=$values;else unset($keep['tahun_ajaran']);

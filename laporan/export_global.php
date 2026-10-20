@@ -18,7 +18,7 @@ if($format==='pdf'){require_once __DIR__.'/../includes/pdf.php';require_pdf_libr
 require_once __DIR__.'/../includes/report_artifact.php';report_perf_mark('validate');
 if($globalScope)$koneksi->begin_transaction(MYSQLI_TRANS_START_READ_ONLY|MYSQLI_TRANS_START_WITH_CONSISTENT_SNAPSHOT);
 $filters=report_filters($koneksi,$_GET);report_perf_mark('filter');if($template==='riwayat-tagihan'&&!isset($_GET['siswa_status']))$filters['siswa_status']='all';if(!isset($_GET['kategori'])&&$template==='penerimaan')$filters['kategori']='semua';if($template==='tunggakan-siswa'){$filters['q']='';if(($_GET['mode']??'')==='all'){$filters['kelas']='';unset($filters['_multi']['kelas']);}}
-$report=report_build($koneksi,$template,$filters);if($globalScope)$koneksi->commit();report_perf_mark('query_model');require_once __DIR__.'/../includes/global_report_matrix.php';$matrix=$globalScope?global_report_matrix($report,$template,$reportUnitId):null;$generated=spp_date_label(new DateTimeImmutable('now'),true);$operator=(string)($_SESSION['admin_nama']??$_SESSION['admin_username']??'Pengguna');
+$report=report_build($koneksi,$template,$filters);if(!empty($report['notes']))$report['subtitle'].=' · '.implode(' · ',$report['notes']);if($globalScope)$koneksi->commit();report_perf_mark('query_model');require_once __DIR__.'/../includes/global_report_matrix.php';$matrix=$globalScope?global_report_matrix($report,$template,$reportUnitId):null;$generated=spp_date_label(new DateTimeImmutable('now'),true);$operator=(string)($_SESSION['admin_nama']??$_SESSION['admin_username']??'Pengguna');
 if($template==='tunggakan-siswa'&&$format==='excel'&&($_GET['view']??'')==='detail'){
     $classId=report_class_filter_rombel_id($filters);
     $selectedClass=null;
@@ -36,7 +36,7 @@ if($template==='tunggakan-siswa'&&$format==='excel'&&($_GET['view']??'')==='deta
 if($format==='excel'){
     require_once __DIR__.'/../includes/excel.php';$doc=$matrix?global_report_matrix_excel($matrix,$report,$template,$reportUnitId):spp_excel_report_document($report,$template,$reportUnitId);
     if($globalScope)$doc['presentation']='global';
-    $filterText=$globalScope?global_report_filter_text($koneksi,$filters,$template):spp_excel_filter_text($koneksi,$filters,$template);if($filterText!=='')$doc['subtitle']=$globalScope?$filterText:$doc['subtitle'].' | '.$filterText;
+    $filterText=$globalScope?global_report_filter_text($koneksi,$filters,$template,$report['notes']??[]):spp_excel_filter_text($koneksi,$filters,$template);if($filterText!=='')$doc['subtitle']=$globalScope?$filterText:$doc['subtitle'].' | '.$filterText;
     $query=$_GET;$query['download']='1';$back=$_GET;unset($back['format'],$back['download']);
     spp_excel_respond($doc,$excelDownload,$template.'-'.date('Ymd-His'),'export_global.php?'.filter_build_query($query),'template.php?'.filter_build_query($back),$matrix?count($matrix['rows']):($template==='riwayat-tagihan'?count(report_billing_history_group_students($report['rows'])):count($report['rows'])));
 }
@@ -87,7 +87,7 @@ $printWidth=0;foreach($report['columns'] as $column)$printWidth+=global_report_c
 $printOrientation=$printMatrix?global_report_print_orientation($printMatrix):($printWidth+22>538?'landscape':'portrait');
 if($isCashRecap)$printOrientation='portrait';
 require_once __DIR__.'/../includes/excel.php';
-$appliedFilterText=global_report_filter_text($koneksi,$filters,$template);
+$appliedFilterText=global_report_filter_text($koneksi,$filters,$template,$report['notes']??[]);
 $documentSubtitle=$appliedFilterText?:$report['subtitle'];
 $artifactIdentity=['route'=>'global','unit'=>$reportUnitId,'template'=>$template,'filters'=>$filters,'orientation'=>$printOrientation];
 $artifactModel=['report'=>$report,'subtitle'=>$documentSubtitle,'school'=>unit_school_name($reportUnitId),'operator'=>$operator];
@@ -107,6 +107,7 @@ $logoPath=realpath(__DIR__.'/../assets/img/school-logo.png');
 // PDF requires GD to render the available bitmap logo.
 $canRenderLogo=$format!=='pdf'||extension_loaded('gd');
 $logoData=$logoPath&&$canRenderLogo?'data:image/png;base64,'.base64_encode((string)file_get_contents($logoPath)):'';
+$pdfMatrixChunks=null;
 ob_start(); ?>
 <!DOCTYPE html><html lang="id"><head><meta charset="UTF-8"><title><?= report_e($report['title']) ?></title><style>
 @page{margin:12mm;size:<?= $printOrientation==='landscape'?'A4 landscape':'A4 portrait' ?>}*{box-sizing:border-box}body{font-family:Arial,sans-serif;color:#17231d;font-size:9px;margin:0}.toolbar{padding:10px;background:#eef7f2;margin-bottom:12px}.toolbar button{padding:8px 14px;border:0;background:#108952;color:#fff;border-radius:6px;cursor:pointer}.kop{width:100%;border-bottom:3px double #15543c;padding-bottom:8px;margin-bottom:12px}.kop td{border:0}.kop img{width:58px;height:58px;object-fit:contain}.kop-logo-text{width:58px;height:58px;border:1px solid #15543c;color:#15543c;font-weight:bold;font-size:12px;text-align:center;line-height:58px}.kop h1{font-size:16px;margin:0;text-align:center}.kop p{text-align:center;margin:3px 0}.title{text-align:center;margin:10px 0 12px}.title h2{font-size:14px;margin:0 0 3px}.meta{width:100%;margin-bottom:8px}.meta td{border:0;padding:2px}table.data{border-collapse:collapse;width:100%}.data th,.data td{border:1px solid #9bb9aa;padding:4px;vertical-align:top}.data th{background:#12503a;color:white;text-transform:uppercase;font-size:8px}.data tr:nth-child(even){background:#f4f8f6}.money{text-align:right;white-space:nowrap}.total-table{margin-top:10px;max-width:420px;margin-left:auto}.total-table caption{text-align:left;font-weight:bold;margin-bottom:4px}.footer{position:fixed;bottom:-7mm;left:0;right:0;border-top:1px solid #aaa;padding-top:3px;color:#666;font-size:7px}.footer:after{content:" · Halaman " counter(page)}.signatures{width:100%;margin-top:24px}.signatures td{border:0;text-align:center;width:50%;height:70px;vertical-align:top}.negative{color:#b42318;font-weight:bold}.billing-group-row{page-break-inside:avoid}.billing-student strong{display:block;font-size:10px;margin-bottom:3px}.billing-student small,.billing-class{color:#52645b}.billing-summary div{margin-bottom:3px;white-space:nowrap}.billing-summary b{display:inline-block;min-width:54px}.billing-detail-item{padding:3px 0;border-bottom:1px solid #d8e5de;line-height:1.35}.billing-detail-item:last-child{border-bottom:0}.billing-detail-item b{display:inline-block;min-width:90px}.billing-detail-meta{color:#52645b}.billing-detail-money{white-space:nowrap}@media print{.toolbar{display:none}}
@@ -178,7 +179,15 @@ h3{font-size:12px;color:#<?= $documentPalette[0] ?>}.data tfoot th,.data tfoot t
 <?php if($printMatrix): ?>
 <?php if($template==='riwayat-tagihan'): ?><div class="billing-export-note">Tanggal Uang PSB mengikuti tanggal data siswa dibuat.</div><?php endif; ?>
 <?php if($format!=='pdf'): ?><div class="matrix-screen"><?= global_report_matrix_html($printMatrix) ?></div><?php else: ?>
-<?php foreach(global_report_matrix_bands($printMatrix,$printOrientation) as $bandIndex=>$band): ?><section class="matrix-print-band<?= $bandIndex===0?' matrix-print-band-first':'' ?>"><h3><?= report_e($report['title']) ?> · Kolom <?= $bandIndex+1 ?></h3><?= global_report_matrix_html($printMatrix,null,0,$band,true) ?></section><?php endforeach; endif; ?>
+<?php if(count($printMatrix['rows'])*count($printMatrix['columns'])>4000):
+    $pdfMatrixChunks=[];echo '<!--global-matrix-fragments-->';
+    foreach(global_report_matrix_bands($printMatrix,$printOrientation) as $bandIndex=>$band){
+        $blocks=array_chunk($printMatrix['rows'],80);foreach($blocks as $blockIndex=>$block){
+            $chunkMatrix=$printMatrix;if($blockIndex!==count($blocks)-1)$chunkMatrix['subtotals']=[];
+            $pdfMatrixChunks[]='<section class="matrix-print-band matrix-print-band-first"><h3>'.report_e($report['title']).' · Kolom '.($bandIndex+1).'</h3>'.global_report_matrix_html($chunkMatrix,$block,$blockIndex*80,$band,true).'</section>';
+        }
+    }
+else: foreach(global_report_matrix_bands($printMatrix,$printOrientation) as $bandIndex=>$band): ?><section class="matrix-print-band<?= $bandIndex===0?' matrix-print-band-first':'' ?>"><h3><?= report_e($report['title']) ?> · Kolom <?= $bandIndex+1 ?></h3><?= global_report_matrix_html($printMatrix,null,0,$band,true) ?></section><?php endforeach; endif; endif; ?>
 <?php elseif(isset($report['sections'])): $sectionStart=0;foreach($report['sections'] as $section){echo report_section_html($section,$sectionStart);$sectionStart+=count($section['rows']);} ?>
 <?php elseif($template==='riwayat-tagihan'): ?>
 <div class="billing-export-note">Tanggal yang dipilih adalah tanggal tagihan dibuat. Untuk Uang PSB, tanggal mengikuti tanggal data siswa dibuat.</div>
@@ -234,7 +243,17 @@ if(in_array($format,['preview','print'],true)){
     ]);
 }
 if($format==='pdf'){
-    $renderPdf=static function()use($html,$printOrientation){$options=new \Dompdf\Options();$options->set('isRemoteEnabled',false);$options->set('isHtml5ParserEnabled',true);$options->setDefaultMediaType('print');$options->setChroot(realpath(__DIR__.'/..'));$dompdf=new \Dompdf\Dompdf($options);$dompdf->loadHtml($html,'UTF-8');$dompdf->setPaper('A4',$printOrientation);$dompdf->render();$bytes=$dompdf->output();report_perf_mark('pdf');return $bytes;};
+    $renderPdf=static function()use($html,$printOrientation,$pdfMatrixChunks){
+        if($pdfMatrixChunks!==null){
+            [$prefix,$suffix]=explode('<!--global-matrix-fragments-->',$html,2);
+            $prefix=str_replace('</head>','<style>.footer:after{content:""}</style></head>',$prefix);
+            $continuationPrefix=substr($prefix,0,strpos($prefix,'>',strpos($prefix,'<body '))+1);
+            $footer=substr($suffix,strpos($suffix,'<div class="footer">'));
+            $documents=(static function()use($prefix,$continuationPrefix,$suffix,$footer,$pdfMatrixChunks){foreach($pdfMatrixChunks as $index=>$chunk)yield ($index===0?$prefix:$continuationPrefix).$chunk.($index===count($pdfMatrixChunks)-1?$suffix:$footer);})();
+            $bytes=global_report_render_pdf_fragments($documents,$printOrientation);
+        }else{$options=new \Dompdf\Options();$options->set('isRemoteEnabled',false);$options->set('isHtml5ParserEnabled',true);$options->setDefaultMediaType('print');$options->setChroot(realpath(__DIR__.'/..'));$dompdf=new \Dompdf\Dompdf($options);$dompdf->loadHtml($html,'UTF-8');$dompdf->setPaper('A4',$printOrientation);$dompdf->render();$bytes=$dompdf->output();}
+        report_perf_mark('pdf');return $bytes;
+    };
     $artifact=report_artifact_get($artifactIdentity,$artifactModel,'pdf',$renderPdf);
     report_artifact_stream($artifact,$safeName.'.pdf','pdf',($_GET['download']??'1')!=='0');
 }

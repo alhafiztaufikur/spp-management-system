@@ -31,6 +31,9 @@ function report_multi_operator_sql(array $filters,string $expression):string{
     return ' AND EXISTS (SELECT 1 FROM admin mop WHERE ('.report_sql_ci_eq('CAST(mop.id AS CHAR)','CAST('.$expression.' AS CHAR)').' OR '.report_sql_ci_eq('mop.username','CAST('.$expression.' AS CHAR)').' OR '.report_sql_ci_eq('mop.nama','CAST('.$expression.' AS CHAR)').')'.filter_sql_values($values,'mop.id').')';
 }
 function report_multiple_sections(mysqli $db,string $template,array $filters):?array{
+    // Receipts already have one column per selected component. Expanding an
+    // all-category checkbox into one full database read per component is redundant.
+    if($template==='penerimaan')return null;
     if(!empty($filters['_multiple_leaf'])||!array_intersect(['kategori','tahun_ajaran','bulan_awal'],array_keys($filters['_multi']??[])))return null;
     if(!in_array($template,['status','per-item','penerimaan','spp-tahunan'],true))return null;
     $categories=in_array($template,['status','per-item','penerimaan'],true)?report_multiple_values($filters,'kategori'):['spp'];
@@ -56,10 +59,10 @@ function report_multiple_sections(mysqli $db,string $template,array $filters):?a
     foreach($parts as $index=>$part){foreach($part['columns'] as $column)if(!isset($keys[$column[0]])){$keys[$column[0]]=true;$report['columns'][]=$column;}
         foreach($part['rows'] as $row){$row['_section']=$index;$report['rows'][]=$row;}}
     $identities=[];foreach($report['rows'] as $row)$identities[unit_student_key($row)]=true;$report['student_count']=count($identities);
-    return $report;
+    return report_evidence_notes($report,$template,$filters);
 }
 function report_multiple_query(array $filters):array{
-    $query=$filters;unset($query['_multi'],$query['_multiple_leaf']);foreach($filters['_multi']??[] as $key=>$values)$query[$key]=$values;return $query;
+    $query=$filters;unset($query['_multi'],$query['_multiple_leaf'],$query['_template']);foreach($filters['_multi']??[] as $key=>$values)$query[$key]=$values;return $query;
 }
 function report_section_html(array $section,int $start=0):string{
     require_once __DIR__.'/global_report_ui.php';

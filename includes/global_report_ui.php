@@ -3,7 +3,7 @@
 /** One semantic cell vocabulary for single/multiple categories and print output. */
 function global_report_cell($value,string $type,array $row,string $key): string
 {
-    if(in_array($type,['money','money_optional'],true))return $value===null||$value===''?($type==='money_optional'?'-':report_money(0)):report_e(report_money($value));
+    if(in_array($type,['money','money_optional'],true))return $value===null||$value===''?'—':report_e(report_money($value));
     if($type==='datetime'){
         $parts=spp_date_parts($value,$row['time_precision']??null);
         return '<span class="report-date">'.report_e($parts['date']).'</span>'.($parts['time']==='—'?'':'<span class="report-time">'.report_e($parts['time']).'</span>');

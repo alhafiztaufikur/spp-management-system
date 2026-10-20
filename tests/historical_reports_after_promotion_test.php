@@ -35,6 +35,9 @@ $target = '2091/2092';
 $third = '2092/2093';
 $fixtures = [];
 $failure = null;
+$actor=$koneksi->query("SELECT id FROM admin WHERE role='super_admin' AND is_active=1 LIMIT 1")->fetch_row();
+if(!$actor)throw new RuntimeException('Fixture requires an existing active Super Admin.');
+$_SESSION=['admin_id'=>(int)$actor[0],'admin_role'=>'super_admin','active_unit_id'=>1];
 $persist = getenv('SPP_TEST_PERSIST_FIXTURE') === '1';
 $koneksi->begin_transaction();
 try {

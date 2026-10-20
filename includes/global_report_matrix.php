@@ -21,7 +21,7 @@ function global_report_matrix(array $report,string $template,int $unit):?array {
     $columns=$identities;$groups=[];$rows=[];$slots=[];$subtotals=[];
     foreach($parts as $index=>$part){
         $label=$part['section_title']??$part['title'];
-        $subtitle=$part['subtitle']??'';$groupColumns=[];$moved=[];
+        $subtitle='';$groupColumns=[];$moved=[];
         // A constant period belongs in the group header. Variable periods remain cells.
         foreach(['periode','tahun_ajaran'] as $periodKey){
             if(!$part['rows']){$moved[$periodKey]=true;continue;}

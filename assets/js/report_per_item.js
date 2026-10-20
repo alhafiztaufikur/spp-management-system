@@ -7,6 +7,7 @@ document.addEventListener('DOMContentLoaded', () => {
   const exports = document.querySelectorAll('.report-export-btn');
   const monthly = new Set(['spp', 'komite']);
   const annual = new Set(window.sppAnnualReportCategories || []);
+  const oneTime = new Set(['psb']);
   let pending = false;
   function markPending() {
     pending = true;
@@ -19,7 +20,8 @@ document.addEventListener('DOMContentLoaded', () => {
     const show = {
       month: all || values.some(value => monthly.has(value)),
       'academic-year': all || values.some(value => annual.has(value)),
-      date: all || values.some(value => !monthly.has(value) && !annual.has(value)),
+      date: all || values.some(value => !monthly.has(value) && !annual.has(value) && !oneTime.has(value)),
+      'one-time': all || values.some(value => oneTime.has(value)),
     };
     form.classList.toggle('report-per-item-compact', !show.month);
     form.querySelectorAll('[data-per-item-period]').forEach(field => {
