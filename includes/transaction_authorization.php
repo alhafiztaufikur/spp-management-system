@@ -50,7 +50,7 @@ function transaction_authorization_table_exists(mysqli $db, string $table): bool
 function transaction_authorization_column_exists(mysqli $db, string $table, string $column): bool
 {
     static $cache = [];
-    $key = $table . '.' . $column;
+    $key = $db->thread_id . ':' . $table . '.' . $column;
     if (array_key_exists($key, $cache)) return $cache[$key];
     $stmt = $db->prepare('SELECT 1 FROM information_schema.COLUMNS WHERE TABLE_SCHEMA=DATABASE() AND TABLE_NAME=? AND COLUMN_NAME=? LIMIT 1');
     $stmt->bind_param('ss', $table, $column);
@@ -220,7 +220,7 @@ function transaction_authorization_mark_failed(mysqli $db, int $requestId, int $
         $stmt->bind_param('isi', $approverId, $note, $requestId);
         $stmt->execute(); $stmt->close();
         $snapshot = json_decode($request['before_snapshot'], true, 512, JSON_THROW_ON_ERROR);
-        payment_activity_record($db, (int)$snapshot['payment']['id'], 'failed', $approverId,
+        if(($request['transaction_source']??'system')==='legacy_op'){require_once __DIR__.'/legacy_transactions.php';lt_request_event($db,$request,$approverId,'failed',$note);}else payment_activity_record($db, (int)$snapshot['payment']['id'], 'failed', $approverId,
             $snapshot, null, 'decision:' . $requestId, $requestId, $note);
         $db->commit();
     } catch (Throwable $e) { $db->rollback(); throw $e; }
@@ -260,6 +260,7 @@ function transaction_authorization_decide(mysqli $db, int $requestId, string $st
     }
     $stmt->close();
     $snapshot = json_decode($request['before_snapshot'], true, 512, JSON_THROW_ON_ERROR);
+    if(($request['transaction_source']??'system')==='legacy_op'){require_once __DIR__.'/legacy_transactions.php';lt_request_event($db,$request,$deciderId,$status,$note);return;}
     payment_activity_record($db, (int)$snapshot['payment']['id'], $status, $deciderId,
         $snapshot, null, 'decision:' . $requestId, $requestId, $note);
 }
@@ -281,5 +282,5 @@ function transaction_authorization_money($value): string
 {
     $raw = trim((string)$value);
     $number = is_numeric($raw) ? (float)$raw : (float)str_replace(['.', ','], ['', '.'], $raw);
-    return 'Rp ' . number_format($number, 0, ',', '.');
+    return 'Rp ' . number_format($number, abs($number-round($number))>.00001?2:0, ',', '.');
 }

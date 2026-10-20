@@ -6,7 +6,7 @@ require_once __DIR__.'/../includes/auth.php';
 require_once __DIR__.'/../includes/transaction_authorization.php';
 require_once __DIR__.'/../includes/registration_history.php';
 requireRole(['admin','kasir','bendahara']);
-if(($_GET['view']??'')==='legacy'){require_once __DIR__.'/../includes/legacy_registration_history.php';try{mh_registration_render($koneksi);}catch(InvalidArgumentException $e){http_response_code(400);echo htmlspecialchars($e->getMessage(),ENT_QUOTES,'UTF-8');}exit;}
+if(($_GET['view']??'')!=='deleted'){try{require __DIR__.'/../includes/registration_combined_page.php';}catch(InvalidArgumentException $error){http_response_code(400);echo '<!doctype html><meta charset="utf-8"><main><h1>Periksa filter</h1><p>'.htmlspecialchars($error->getMessage(),ENT_QUOTES,'UTF-8').'</p><a href="riwayat_daftar_ulang.php">Kembali ke Riwayat Daftar Ulang</a></main>';}exit;}
 if(empty($_SESSION['csrf_payment']))$_SESSION['csrf_payment']=bin2hex(random_bytes(32));
 try {
     if(isset($_GET['q_plain'])) {

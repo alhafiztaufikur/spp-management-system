@@ -106,3 +106,12 @@ Halaman rekening, tarif, koreksi, histori, aktivasi, dan peninjauan migrasi mema
 Perubahan ini hanya menata tampilan dan navigasi baca. Tarif, penghitungan saldo, koreksi, pengesahan saldo FIX, dan finalisasi migrasi tetap mengikuti mekanisme existing. Pada lab copy, konfigurasi database, antrean, draf, saldo FIX, dan basis source sebelum sinkronisasi remote dipertahankan. Bila tampilan lama masih tersimpan pada browser, gunakan **Ctrl+F5**.
 
 Hasil pemeriksaan dan batas pengujian: [Pemeriksaan UI Legacy 19 Oktober 2026](LEGACY_UI_REVIEW_20261019.md).
+
+
+## Transaksi, DU, dan tabungan kelas khusus — 20 Oktober 2026
+
+Pembayaran hasil migrasi operasional memakai detail dan struk aplikasi, edit/hapus melalui pengajuan Administrator serta keputusan Super Admin, dan aktivitas yang dapat ditelusuri. Riwayat Daftar Ulang menggabungkan sumber secara default. Tabungan Masuk/Keluar mencari siswa maupun pemilik rekening non-siswa dengan pagination server. Lihat [panduan penggunaan dan hasil pemeriksaan](LEGACY_TRANSACTION_UNIFICATION.md).
+
+## Input dan struk siswa migrasi
+
+Input Pembayaran membawa unit eksplisit dan menyediakan pemulihan isian serta formulir server tanpa JavaScript. Riwayat Data Siswa memakai dua tombol berikon; struk selalu menampilkan Sisa PSB/Sisa DU dengan status diketahui, belum dapat ditentukan, atau tidak berlaku. [Rincian dan screenshot pemeriksaan](LEGACY_BILLING_REPAIR.md).

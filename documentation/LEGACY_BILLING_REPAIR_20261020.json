@@ -1,0 +1,130 @@
+{
+  "date": "2026-10-20",
+  "rule_version": 1,
+  "database": "db_spp_test2",
+  "installation": "spp-management-system -Copy",
+  "status": "complete",
+  "reconciliation": {
+    "1": {
+      "psb_ready": 958,
+      "du_ready": 331,
+      "du_created": 330,
+      "du_corrected": 1,
+      "unknown": 633,
+      "existing": 0,
+      "changes": 1716
+    },
+    "2": {
+      "psb_ready": 1072,
+      "du_ready": 198,
+      "du_created": 198,
+      "du_corrected": 0,
+      "unknown": 882,
+      "existing": 0,
+      "changes": 1519
+    },
+    "3": {
+      "psb_ready": 252,
+      "du_ready": 46,
+      "du_created": 46,
+      "du_corrected": 0,
+      "unknown": 206,
+      "existing": 0,
+      "changes": 348
+    }
+  },
+  "counts": {
+    "legacy_payments": 118244,
+    "undated_du_payments": 9288,
+    "savings_accounts": 2418,
+    "opening_obligations": 3008,
+    "du_bills_created": 574,
+    "du_snapshots_corrected": 1,
+    "future_spp_months_credited": 151
+  },
+  "unknown_current_du": {
+    "SD_class_1": 83,
+    "SMP_class_7": 103,
+    "SMA_class_10": 21
+  },
+  "tests": {
+    "billing": 59,
+    "du_tariffs": 18,
+    "spp_credit": 23,
+    "unknown_boundary": 3,
+    "native_compatibility": 6,
+    "migration_readback": 54,
+    "http_isolated": 7,
+    "http_installed": 13,
+    "chromium109": 51
+  },
+  "browser": "109.0.5412.0",
+  "fingerprint": {
+    "db_spp_unchanged": true,
+    "protected_financial_data_unchanged": true,
+    "configuration_unchanged": true,
+    "schema_unchanged": true,
+    "only_expected_tables_changed": true,
+    "changed_tables": [
+      {
+        "table": "legacy_full_batches_data",
+        "before_count": 3,
+        "after_count": 3,
+        "before_hash": "f46d639759089bc3f9c3599c8fba403c2481aa1e539ca7868fd212eebe4c1262",
+        "after_hash": "629efa5b1a0e53353503d30e65d1fa1b8adceab3597d48e3509b58a62c2b02c8"
+      },
+      {
+        "table": "legacy_op_audit_data",
+        "before_count": 43,
+        "after_count": 3626,
+        "before_hash": "1f1e11eeaab13ef3827c3a35c5444c05f3bdd686e7e36755c5208f9b97af0278",
+        "after_hash": "db8298ba8edc35517848375b066a787485e4bc03347b517f36149cae044d269d"
+      },
+      {
+        "table": "legacy_op_obligations_data",
+        "before_count": 0,
+        "after_count": 3008,
+        "before_hash": "e3b0c44298fc1c149afbf4c8996fb92427ae41e4649b934ca495991b7852b855",
+        "after_hash": "a1d84b04b4e4cf7a1d43da44907ff714663be74317aa056e3b45a3bc71a644ae"
+      },
+      {
+        "table": "tagihan_daftar_ulang_data",
+        "before_count": 1,
+        "after_count": 575,
+        "before_hash": "d79a19c9dfb6dc186e1a4b3c99f65ae48cafba2a0a1bae4e4de8d7110904762d",
+        "after_hash": "e948874b526757e1a8748a331840a98c4ef2cee90e86ee5754fc0a1dd51e3b35"
+      }
+    ]
+  },
+  "manifests": [
+    {
+      "unit": 2,
+      "only_working_digest_changed": true
+    },
+    {
+      "unit": 3,
+      "only_working_digest_changed": true
+    },
+    {
+      "unit": 1,
+      "only_working_digest_changed": true
+    }
+  ],
+  "retry_changes": 0,
+  "backup_sha256": "c8ecf893949e63fca5b70f3b0c86644781da95da16f571afd3eea81a3af34a54",
+  "limitations": [
+    "Headless Chromium regression harness; daily user browser session and physical printer not exercised",
+    "Zoom 200% tested using CSS reflow, not native browser UI zoom",
+    "Incomplete historical evidence stays unknown; no invented zero or settled status"
+  ],
+  "commit": false,
+  "push": false,
+  "deployment": false,
+  "migration_finalization": false,
+  "test_cleanup": {
+    "private_http_stopped": true,
+    "private_mysql_stopped": true,
+    "temporary_test_sessions_removed": true,
+    "user_apache_mysql_unchanged": true
+  }
+}

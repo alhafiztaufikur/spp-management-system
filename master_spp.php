@@ -88,7 +88,7 @@ if($_SERVER['REQUEST_METHOD']==='POST'){
             }
             $starts=is_array($_POST['start_month']??null)?$_POST['start_month']:[];
             $result=spp_publish_students($koneksi,$masterId,$students,$starts);
-            $message=$result['created'].' tagihan SPP baru berhasil diterbitkan.';
+            $message=$result['created'].' tagihan SPP baru diterbitkan; '.$result['existing'].' tagihan existing dipertahankan; '.($result['legacy_covered']??0).' periode tercakup Legacy; '.($result['before_transition']??0).' periode sebelum peralihan tidak ditagih.';
             if($result['existing'])$message.=' '.$result['existing'].' tagihan sudah tersedia.';
             if($result['ineligible'])$message.=' '.count($result['ineligible']).' siswa dilewati karena penempatannya belum valid.';
             $_SESSION['flash']=['type'=>'success','msg'=>$message];
@@ -130,7 +130,7 @@ if($_SERVER['REQUEST_METHOD']==='POST'){
                 $select->execute();
                 foreach($select->get_result()->fetch_all(MYSQLI_ASSOC) as $bill){
                     $order=$orders[$bill['bulan'].'-'.$bill['tahun']]??-1;
-                    if($order<$startOrder||(int)$bill['allocated']===1)continue;
+                    if($order<$startOrder||(int)$bill['allocated']===1||lb_spp_credit($koneksi,$nis,$bill['bulan'],$bill['tahun'])>.001)continue;
                     $billId=(int)$bill['id'];
                     $update->bind_param('si',$reason,$billId);
                     $update->execute();
@@ -172,6 +172,8 @@ filter_register('rombel_filter',$_GET['rombel_filter']??null,$rombelChoices);fil
 $cancelEligibleStudents=array_values(array_filter($students,static fn(array $student):bool=>(int)$student['is_active']===0));
 $stmt=$koneksi->prepare("SELECT COUNT(*) bills,SUM(CASE WHEN paid+0.001>=nominal_tagihan THEN 1 ELSE 0 END) paid_bills,SUM(CASE WHEN paid+0.001<nominal_tagihan AND status='open' THEN 1 ELSE 0 END) unpaid_bills FROM (SELECT ts.id,ts.nominal_tagihan,ts.status,COALESCE(SUM(CASE WHEN ab.status='active' THEN a.nominal_dari_bayar ELSE 0 END),0) paid FROM tagihan_spp ts LEFT JOIN spp_alokasi a ON a.tagihan_spp_id=ts.id LEFT JOIN spp_alokasi_batch ab ON ab.id=a.batch_id WHERE ts.master_spp_tahun_id=? GROUP BY ts.id) x");
 $stmt->bind_param('i',$masterId);$stmt->execute();$stats=$stmt->get_result()->fetch_assoc();$stmt->close();
+foreach(lf_rows($koneksi,"SELECT t.no_induk,t.bulan,t.tahun,t.nominal_tagihan,COALESCE(SUM(CASE WHEN b.status='active' THEN a.nominal_dari_bayar ELSE 0 END),0) paid FROM tagihan_spp t LEFT JOIN spp_alokasi a ON a.tagihan_spp_id=t.id LEFT JOIN spp_alokasi_batch b ON b.id=a.batch_id WHERE t.master_spp_tahun_id=? AND t.status='open' GROUP BY t.id",[$masterId]) as $b)if((float)$b['paid']+.001<(float)$b['nominal_tagihan']&&(float)$b['paid']+lb_spp_credit($koneksi,$b['no_induk'],$b['bulan'],$b['tahun'])+.001>=(float)$b['nominal_tagihan']){$stats['paid_bills']++;$stats['unpaid_bills']--;}
+
 
 require_once __DIR__ . '/includes/master_workspace_ui.php';
 $activeYearStudents = array_values(array_filter($students, static fn(array $student): bool => (int)$student['is_active'] === 1));
@@ -270,7 +272,7 @@ $yearStart = (int)substr($selectedYear, 0, 4);
             <div class="spp-students-table-wrap">
               <div class="promotion-student-list" id="spp-student-list" tabindex="0" aria-label="Daftar siswa untuk penerbitan SPP">
               <div class="spp-students-table-head" aria-hidden="true"><span></span><span>Nama Siswa</span><span>NIS</span><span>Rombel</span><span>Kelas</span><span>Tarif Efektif</span><span>Mulai Tagihan</span><span>Status</span></div>
-              <?php foreach ($students as $idx => $s): $level=(int)$s['kelas'];$net=spp_net_tariff((float)$rates[$level],(float)$s['potongan_spp_nominal']);$search=strtolower($s['NAMA'].' '.$s['no_induk'].' '.$s['kelas_rombel_snapshot']);$initials='';foreach(array_slice(preg_split('/\s+/u',trim((string)$s['NAMA'])),0,2) as $part)$initials.=mb_substr($part,0,1,'UTF-8'); ?>
+              <?php foreach ($students as $idx => $s): $level=(int)$s['kelas'];$net=spp_net_tariff(lop_tariff($koneksi,(string)$s['no_induk'],$selectedYear)??(float)$rates[$level],(float)$s['potongan_spp_nominal']);$search=strtolower($s['NAMA'].' '.$s['no_induk'].' '.$s['kelas_rombel_snapshot']);$initials='';foreach(array_slice(preg_split('/\s+/u',trim((string)$s['NAMA'])),0,2) as $part)$initials.=mb_substr($part,0,1,'UTF-8'); ?>
                 <article class="promotion-student-row spp-publish-row" data-search="<?= mspp_e($search) ?>" data-rombel="<?= mspp_e($s['kelas_rombel_snapshot']) ?>">
                   <label class="promotion-student-check"><input type="checkbox" name="selected_students[]" value="<?= mspp_e($s['no_induk']) ?>" <?= in_array((string)$s['no_induk'],$publishDraft['students'],true)?'checked':'' ?> aria-label="Pilih <?= mspp_e($s['NAMA']) ?>"><span></span></label>
                   <div class="promotion-student-identity"><span class="spp-student-avatar" aria-hidden="true"><?= mspp_e(mb_strtoupper($initials,'UTF-8')) ?></span><div><strong><?= mspp_e($s['NAMA']) ?></strong><small>Potongan Rp <?= mspp_money($s['potongan_spp_nominal']) ?></small><?php if (!(int)$s['is_active']): ?><small>Siswa diarsipkan</small><?php endif; ?></div></div>

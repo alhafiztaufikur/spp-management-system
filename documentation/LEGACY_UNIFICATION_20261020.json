@@ -1,0 +1,26 @@
+{
+  "payments": 118244,
+  "undated_du": 9288,
+  "accounts": 2418,
+  "backend": {
+    "readback": 54,
+    "transactions": 38,
+    "edges": 20,
+    "obligations": 5
+  },
+  "http_cases": 7,
+  "browser_cases": 56,
+  "final_ui_cases": 6,
+  "browser": "109.0.5412.0",
+  "export_responses": 9,
+  "additional_undated_receipt": true,
+  "lab_read_only_pages": 9,
+  "source_files_installed": 41,
+  "operational_data_changed": false,
+  "main_database_changed": false,
+  "lab_schema_columns": [
+    "transaction_source",
+    "legacy_payment_id"
+  ],
+  "cash_migration_counted_as_new": false
+}

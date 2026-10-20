@@ -1,0 +1,44 @@
+<?php
+if(PHP_SAPI!=='cli'||getenv('SPP_DB_PORT')!=='58246'||getenv('SPP_TEST_ALLOW_MUTATION')!=='1')throw new RuntimeException('Private restored fixture only.');
+$_SESSION=['admin_id'=>1,'admin_role'=>'super_admin','active_unit_id'=>1,'admin_nama'=>'Billing QA'];
+require __DIR__.'/../koneksi.php';require_once __DIR__.'/../includes/auth.php';require_once __DIR__.'/../includes/legacy_transactions.php';require_once __DIR__.'/../includes/receipt_balances.php';require_once __DIR__.'/../includes/spp_billing.php';require_once __DIR__.'/../includes/registration_combined.php';require_once __DIR__.'/../includes/reports.php';
+$db=$koneksi;if($db->query('SELECT @@server_uuid')->fetch_row()[0]!=='9d552e39-cbe6-11f1-9a5e-0a0027000012')throw new RuntimeException('Wrong server');
+$checks=[];$fixtures=[];function bcheck($ok,$label){global $checks;if(!$ok)throw new RuntimeException($label);$checks[]=$label;}
+function bscope($unit){global $db;$_SESSION['active_unit_id']=$unit;unit_set_context($db,$unit);lb_cache($db,true);}
+function breject($fn,$label){try{$fn();}catch(Throwable $e){bcheck(true,$label);return;}throw new RuntimeException('Expected rejection: '.$label);}
+foreach([1,2,3] as $unit){bscope($unit);$plan=lb_reconcile($db,1,false);bcheck($plan['changes']===0,"Unit $unit reconciliation idempotent");
+ $bill=lf_one($db,"SELECT t.*,s.id student_id FROM tagihan_daftar_ulang t JOIN siswa s ON s.NO_INDUK=t.no_induk AND s.unit_id=t.unit_id WHERE t.status='open' AND NOT EXISTS(SELECT 1 FROM bayar_du d WHERE d.tagihan_daftar_ulang_id=t.id) ORDER BY t.id LIMIT 1");bcheck((bool)$bill,"Unit $unit missing DU bills supplied");$nis=$bill['no_induk'];$proof=lb_du_source($db,$nis,$bill['tahun_ajaran_snapshot']);$status=du_find_bill_by_id($db,(int)$bill['id']);
+ bcheck($proof['known']&&abs($status['nominal_tagihan']-$proof['total'])<.001,"Unit $unit initial DU uses proven Legacy tariff");bcheck(abs($status['sisa']-max(0,$proof['total']-lb_du_credit($db,$nis,$bill['tahun_ajaran_snapshot'])))<.001,"Unit $unit source DU credit counted once");
+ $psb=lb_psb_source($db,$nis);$raw=lb_student($db,$nis)['raw'];bcheck(!$psb['known']||abs($psb['paid']-(float)$raw['PANGKAL_BAYAR'])<.001,"Unit $unit PSB cumulative header not added twice");
+ $receipt=payment_receipt_remaining($db,['NO_INDUK'=>$nis,'student_id'=>$bill['student_id'],'source_period'=>$bill['tahun_ajaran_snapshot']]);bcheck($receipt[0][0]==='Sisa PSB'&&$receipt[1][0]==='Sisa DU'&&abs($receipt[1][1]-$status['sisa'])<.001,"Unit $unit receipt agrees with input DU");
+ $old=payment_receipt_remaining($db,['NO_INDUK'=>$nis,'student_id'=>$bill['student_id'],'source_period'=>'2010/2011']);bcheck($old[1][1]===null&&$old[1][2]==='Belum dapat ditentukan',"Unit $unit unknown historical year never becomes zero");
+ $nativeCount=(int)lf_one($db,'SELECT COUNT(*) n FROM bayar')['n'];$db->begin_transaction();try{
+  lf_query($db,'DELETE FROM tagihan_daftar_ulang WHERE id=?',[$bill['id']]);$created=du_publish_year_from_active_students($db,(int)$bill['tahun_ajaran_id'],$bill['tahun_ajaran_snapshot']);bcheck($created===1,"Unit $unit published year fills missing bill");bcheck(du_publish_year_from_active_students($db,(int)$bill['tahun_ajaran_id'],$bill['tahun_ajaran_snapshot'])===0,"Unit $unit repeat publication no duplicate");
+  bcheck((int)lf_one($db,'SELECT COUNT(*) n FROM bayar')['n']===$nativeCount,"Unit $unit issuing DU creates no payment or cash");
+ }finally{$db->rollback();lb_cache($db,true);}
+ bcheck((bool)lf_one($db,'SELECT id FROM tagihan_daftar_ulang WHERE id=?',[$bill['id']]),"Unit $unit publication rollback restores bill");
+ $placement=lf_one($db,"SELECT p.*,m.id master_id,t.label FROM siswa_tahun_ajaran p JOIN tahun_ajaran t ON t.id=p.tahun_ajaran_id AND t.unit_id=p.unit_id JOIN master_spp_tahun m ON m.tahun_ajaran_id=t.id AND m.unit_id=t.unit_id WHERE p.no_induk=? AND p.status='aktif' LIMIT 1",[$nis]);
+ bcheck(lop_tariff($db,$nis,$placement['label'])!==null,"Unit $unit pre-existing master does not override Legacy");
+ $db->begin_transaction();try{$r=spp_publish_students($db,(int)$placement['master_id'],[$nis],[$nis=>'07']);bcheck($r['created']===0&&$r['existing']===8&&$r['before_transition']===4,"Unit $unit SPP retry distinguishes existing and pre-migration periods");}finally{$db->rollback();lb_cache($db,true);}
+ bcheck(spp_published_period_status($db,$nis,'10','2026')['code']==='legacy_covered',"Unit $unit old SPP period has precise status");
+ $db->begin_transaction();try{
+  $master=spp_master_state($db,(int)$placement['master_id']);$rates=spp_master_rates($db,(int)$master['id']);$version=spp_master_rate_version($master,$rates);$level=(int)$placement['kelas'];$rates[$level]+=10000;
+  $paidBill=lf_one($db,"SELECT * FROM tagihan_spp WHERE no_induk=? AND bulan='01' AND tahun='2027'",[$nis]);lf_query($db,"INSERT INTO spp_alokasi_batch(no_induk,tanggal,user_id,komite_required,uang_baru) VALUES(?,NOW(),'1',0,1)",[$nis]);$batch=$db->insert_id;lf_query($db,'INSERT INTO spp_alokasi(batch_id,tagihan_spp_id,nominal_dari_bayar) VALUES(?,?,1)',[$batch,$paidBill['id']]);
+  $result=spp_master_correct_published_rates($db,(int)$master['id'],$rates,$version,true);
+  $locked=lf_one($db,'SELECT * FROM tagihan_spp WHERE id=?',[$paidBill['id']]);$open=lf_one($db,"SELECT * FROM tagihan_spp WHERE no_induk=? AND bulan='02' AND tahun='2027'",[$nis]);
+  bcheck($locked['tarif_dasar_snapshot']===$paidBill['tarif_dasar_snapshot']&&$locked['nominal_tagihan']===$paidBill['nominal_tagihan'],"Unit $unit installment preserves SPP snapshot");bcheck(abs((float)$open['tarif_dasar_snapshot']-$rates[$level])<.001&&lop_tariff($db,$nis,$master['label'])===null,"Unit $unit explicit master edit reprices unpaid Legacy bills");
+  breject(fn()=>spp_master_correct_published_rates($db,(int)$master['id'],$rates,$version,true),"Unit $unit stale tariff version rejected");
+ }finally{$db->rollback();lb_cache($db,true);}
+ $sourcePayment=lf_one($db,"SELECT p.id FROM legacy_op_payments p JOIN legacy_op_owners o ON o.id=p.owner_id AND o.unit_id=p.unit_id WHERE o.student_id=? AND p.source_table='bayar_du' AND p.source_period=? AND p.cancelled=0 LIMIT 1",[$bill['student_id'],$bill['tahun_ajaran_snapshot']]);
+ $fixtures[$unit]=['student_id'=>$bill['student_id'],'nis'=>$nis,'bill_id'=>$bill['id'],'legacy_payment_id'=>$sourcePayment?(-1000000000-(int)$sourcePayment['id']):null];
+}
+bscope(1);$nis='242501009';$status=du_find_bill($db,$nis,10,2026);bcheck(abs(lb_du_credit($db,$nis,'2026/2027')-3720000)<.001&&abs($status['sisa']-(400000-lb_native_du_cents($db,$nis,'2026/2027')/100))<.001,'Source example DU 4120000 minus 3720000, then native installments');
+$non=payment_receipt_remaining($db,['student_id'=>null,'NO_INDUK'=>'no-student']);bcheck($non[0][2]==='Tidak berlaku'&&$non[1][2]==='Tidak berlaku','Non-student receipt obligations not applicable');
+$p=lf_one($db,"SELECT p.* FROM legacy_op_payments p JOIN legacy_op_owners o ON o.id=p.owner_id AND o.unit_id=p.unit_id WHERE o.student_id=? AND p.source_table='bayar_du' AND p.source_period='2026/2027' AND p.cancelled=0 LIMIT 1",[lb_student($db,$nis)['student_id']]);$record=lop_record($db,'payment',(int)$p['id']);$before=du_find_bill($db,$nis,10,2026)['sisa'];$db->begin_transaction();try{
+ $input=['date'=>$record['source_date'],'period'=>$record['source_period'],'items'=>$record['items'],'cancelled'=>true,'reason'=>'Isolated opening-credit cancellation','confirmation'=>'SIMPAN KOREKSI','preview_expires'=>time()+300];$preview=lop_correction_preview($db,1,1,'payment',(int)$p['id'],(int)$p['version'],$input);$key=bin2hex(random_bytes(32));lop_correction_apply($db,1,1,'payment',(int)$p['id'],(int)$p['version'],$input,$preview['digest'],$key,false);
+ bcheck(abs(du_find_bill($db,$nis,10,2026)['sisa']-($before+(float)$p['total']))<.001,'Legacy cancellation atomically restores DU balance');bcheck(lop_correction_apply($db,1,1,'payment',(int)$p['id'],(int)$p['version'],$input,$preview['digest'],$key,false)['replayed'],'Legacy cancellation retry exactly once');
+ $ob=lf_one($db,"SELECT remaining FROM legacy_op_obligations WHERE owner_id=? AND category='daftar_ulang' AND period='2026/2027'",[$p['owner_id']]);bcheck(abs((float)$ob['remaining']-du_find_bill($db,$nis,10,2026)['sisa'])<.001,'Persisted obligation agrees after correction');
+}finally{$db->rollback();lb_cache($db,true);}
+bcheck(abs(du_find_bill($db,$nis,10,2026)['sisa']-$before)<.001,'Rollback restores source credit and obligation');
+bscope(0);bcheck((int)lf_one($db,'SELECT COUNT(*) n FROM legacy_op_payments')['n']===118244,'All 118244 payment originals retained');bcheck((int)lf_one($db,'SELECT COUNT(*) n FROM legacy_op_accounts')['n']===2418,'All 2418 accounts retained');
+$result=['checks'=>count($checks),'passed'=>$checks,'fixtures'=>$fixtures];if(getenv('SPP_BILLING_RESULT'))file_put_contents(getenv('SPP_BILLING_RESULT'),json_encode($result,JSON_PRETTY_PRINT));echo json_encode($result,JSON_PRETTY_PRINT).PHP_EOL;

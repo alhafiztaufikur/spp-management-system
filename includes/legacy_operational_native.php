@@ -11,7 +11,11 @@ function lop_native_payment_changed(mysqli $db, ?array $before, ?array $after): 
             if ($id > 0) $billIds[$id] = $id;
         }
     }
-    if (!$billIds || !lop_ready($db)) return;
+    if (!lop_ready($db)) return;
+    require_once __DIR__.'/legacy_billing.php';
+    $owners=[];foreach([$before,$after] as $snapshot){$nis=(string)($snapshot['payment']['NO_INDUK']??$snapshot['NO_INDUK']??'');$student=lb_student($db,$nis);if($student)$owners[]=(int)$student['id'];}
+    $billingBatches=lb_sync_owners($db,$owners);lb_refresh_manifests($db,$billingBatches);
+    if(!$billIds)return;
     require_once __DIR__.'/legacy_operational_corrections.php';
     sort($billIds, SORT_NUMERIC);
     $batches = [];

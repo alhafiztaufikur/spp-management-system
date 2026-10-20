@@ -94,6 +94,7 @@ if ($_SERVER['REQUEST_METHOD'] === 'POST') {
 
                 $oldAmount = (float)$existing['Jumlah'];
                 if (abs($oldAmount - $amount) < .001) continue;
+                lb_mark_du_master($koneksi,$selectedYear,[(int)$class]);
                 $affected = 0;
                 if ($year['status'] === 'published') {
                     $existingId = (int)$existing['id'];
@@ -122,13 +123,13 @@ if ($_SERVER['REQUEST_METHOD'] === 'POST') {
                 du_write_audit($koneksi, $yearId, null, 'terbitkan_tagihan', ['status'=>'draft'], ['status'=>'published','sumber_kelas'=>'data_siswa'], $created);
                 $_SESSION['flash'] = ['type'=>'success','msg'=>'Tarif disimpan dan '.$created.' tagihan siswa berhasil diterbitkan.'];
             } else {
-                $_SESSION['flash'] = ['type'=>'success','msg'=>'Tarif dan tagihan yang belum lunas berhasil diperbarui.'];
+                $_SESSION['flash'] = ['type'=>'success','msg'=>'Tarif disimpan; hanya tagihan tanpa pembayaran yang diperbarui.'];
             }
         } elseif ($action === 'terbitkan') {
-            if ($year['status'] !== 'draft') throw new RuntimeException('Tahun ajaran ini sudah pernah diterbitkan.');
+            if ($year['status'] === 'closed') throw new RuntimeException('Buka kembali tahun ajaran sebelum melengkapi tagihan.');
             $created = du_publish_year_from_active_students($koneksi, $yearId, $selectedYear);
             du_write_audit($koneksi, $yearId, null, 'terbitkan_tagihan', ['status'=>'draft'], ['status'=>'published','sumber_kelas'=>'data_siswa'], $created);
-            $_SESSION['flash'] = ['type'=>'success','msg'=>$created.' tagihan berhasil diterbitkan berdasarkan kelas pada Data Siswa.'];
+            $_SESSION['flash'] = ['type'=>'success','msg'=>$created.' tagihan baru dilengkapi; '.($GLOBALS['du_publish_result']['existing']??0).' tagihan existing dipertahankan. '.($GLOBALS['du_publish_result']['unknown']??0).' data belum dapat ditentukan.'];
         } elseif ($action === 'tutup') {
             if ($year['status'] !== 'published') throw new RuntimeException('Hanya tahun ajaran terbit yang dapat ditutup.');
             $stmt = $koneksi->prepare("UPDATE tahun_ajaran SET status='closed',closed_at=NOW() WHERE id=?");
@@ -144,6 +145,7 @@ if ($_SERVER['REQUEST_METHOD'] === 'POST') {
         } else {
             throw new RuntimeException('Aksi Master Daftar Ulang tidak dikenal.');
         }
+        if(lop_ready($koneksi))lb_refresh_manifests($koneksi,lb_sync_owners($koneksi,array_column(lb_cache($koneksi)['students'],'id')));
         $koneksi->commit();
     } catch (Throwable $error) {
         $koneksi->rollback();
@@ -182,6 +184,8 @@ $stmt=$koneksi->prepare("SELECT COUNT(*) bills,COALESCE(SUM(tdu.nominal_tagihan)
     LEFT JOIN (SELECT tagihan_daftar_ulang_id,SUM(jumlah) paid FROM bayar_du GROUP BY tagihan_daftar_ulang_id) p ON p.tagihan_daftar_ulang_id=tdu.id
     WHERE tdu.tahun_ajaran_id=? AND tdu.status='open'");
 $stmt->bind_param('i',$yearId); $stmt->execute(); $billSummary=$stmt->get_result()->fetch_assoc(); $stmt->close();
+$issuedByClass=array_fill($firstLevel,$lastLevel-$firstLevel+1,0.0);
+foreach(lf_rows($koneksi,"SELECT no_induk,kelas_snapshot,nominal_tagihan FROM tagihan_daftar_ulang WHERE tahun_ajaran_id=? AND status='open'",[$yearId]) as $b){$billSummary['paid']+=lb_du_bill_credit($koneksi,$b['no_induk'],$selectedYear);$issuedByClass[(int)$b['kelas_snapshot']]+=(float)$b['nominal_tagihan'];}
 ?>
 <!DOCTYPE html>
 <html lang="id" data-palette="<?= unit_palette_for_view(isset($reportUnitId) ? (int)$reportUnitId : null) ?>">
@@ -218,17 +222,17 @@ $stmt->bind_param('i',$yearId); $stmt->execute(); $billSummary=$stmt->get_result
   </div>
 </section>
 <section class="main-card master-modern-card master-modern-form">
-  <div class="student-panel-heading"><span class="master-workspace-icon"><?= master_workspace_icon('coins') ?></span><div><h3>Tarif Kelas <?= $firstLevel ?>&ndash;<?= $lastLevel ?></h3><p>Jumlah siswa dibaca langsung dari Data Siswa aktif. Pastikan kelas siswa sudah benar sebelum menerbitkan tagihan.</p></div></div>
+  <div class="student-panel-heading"><span class="master-workspace-icon"><?= master_workspace_icon('coins') ?></span><div><h3>Tarif Kelas <?= $firstLevel ?>&ndash;<?= $lastLevel ?></h3><p>Tarif awal siswa migrasi mengikuti bukti Legacy. Perubahan tarif yang disimpan hanya memperbarui tagihan tanpa pembayaran; cicilan mempertahankan snapshot. Tahun Terbit tetap dapat melengkapi tagihan yang belum ada.</p></div></div>
   <form method="post" id="du-rate-form">
     <input type="hidden" name="csrf_token" value="<?= master_du_e($_SESSION['csrf_master_du']) ?>">
     <input type="hidden" name="aksi" value="<?= $year['status']==='draft'?'simpan_dan_terbitkan':'simpan_tarif' ?>">
     <input type="hidden" name="tahun_ajaran" value="<?= master_du_e($selectedYear) ?>">
     <div class="du-rate-grid">
-      <?php $rateEstimateTotal=0; for($c=$firstLevel;$c<=$lastLevel;$c++): $rateEstimateTotal += $activeByClass[$c]*$masters[$c]; ?>
+      <?php $rateEstimateTotal=0; for($c=$firstLevel;$c<=$lastLevel;$c++): $classEstimate=$year['status']==='draft'?$activeByClass[$c]*$masters[$c]:$issuedByClass[$c];$rateEstimateTotal += $classEstimate; ?>
       <article class="du-rate-card" data-du-rate-card data-students="<?= (int)$activeByClass[$c] ?>">
         <div class="du-rate-card-heading"><span class="du-class-roman" aria-hidden="true"><?= master_workspace_roman($c) ?></span><div><h3>Kelas <?= $c ?></h3><small><?= (int)$activeByClass[$c] ?> siswa aktif</small></div></div>
         <div class="du-rate-input-row"><label for="du-rate-<?= $c ?>">Tarif per siswa</label><div class="du-rate-input-wrap"><span aria-hidden="true">Rp</span><input id="du-rate-<?= $c ?>" class="field-input rupiah-input" name="jumlah[<?= $c ?>]" inputmode="numeric" value="<?= $masters[$c]>0?number_format($masters[$c],0,',','.') : '' ?>" placeholder="0" <?= $year['status']==='closed'?'disabled':'' ?>></div></div>
-        <div class="du-rate-estimate"><?= master_workspace_icon('calculator') ?><span>Estimasi total tagihan</span><strong data-du-estimate>Rp <?= number_format($activeByClass[$c]*$masters[$c],0,',','.') ?></strong></div>
+        <div class="du-rate-estimate"><?= master_workspace_icon('calculator') ?><span><?= $year['status']==='draft'?'Estimasi total tagihan':'Total tagihan tercatat' ?></span><strong <?= $year['status']==='draft'?'data-du-estimate':'' ?>>Rp <?= number_format($classEstimate,0,',','.') ?></strong></div>
       </article>
       <?php endfor; ?>
     </div>
@@ -242,7 +246,7 @@ $stmt->bind_param('i',$yearId); $stmt->execute(); $billSummary=$stmt->get_result
   <div class="card-title-row">
     <div class="student-panel-heading"><span class="master-workspace-icon"><?= master_workspace_icon('document') ?></span><div><h3>Penerbitan Tagihan</h3><p><?= $activeTotal ?> siswa aktif &middot; <?= (int)$billSummary['bills'] ?> tagihan terbit &middot; Total Rp <?= number_format((float)$billSummary['total'],0,',','.') ?> &middot; Terbayar Rp <?= number_format((float)$billSummary['paid'],0,',','.') ?></p><?php if($year['status']==='draft'): ?><p>Gunakan tombol Simpan & Terbitkan Tagihan di atas. Tarif, penempatan internal, dan tagihan siswa dibuat dalam satu proses.</p><?php endif; ?></div></div>
     <div class="action-bar">
-      <?php if($year['status']==='published'): ?><form method="post" onsubmit="return confirm('Tutup tahun ajaran? Tunggakan tetap dapat dibayar, tetapi tarif tidak dapat diubah lagi.')"><input type="hidden" name="csrf_token" value="<?= master_du_e($_SESSION['csrf_master_du']) ?>"><input type="hidden" name="aksi" value="tutup"><input type="hidden" name="tahun_ajaran" value="<?= master_du_e($selectedYear) ?>"><button class="btn btn-warning" type="submit"><?= master_workspace_icon('lock') ?>Tutup Tahun Ajaran</button></form>
+      <?php if($year['status']==='published'): ?><form method="post"><input type="hidden" name="csrf_token" value="<?= master_du_e($_SESSION['csrf_master_du']) ?>"><input type="hidden" name="aksi" value="terbitkan"><input type="hidden" name="tahun_ajaran" value="<?= master_du_e($selectedYear) ?>"><label><input type="checkbox" name="confirm_previous_debt" value="1"> Saya memahami tunggakan tahun sebelumnya tetap tercatat.</label><button class="btn btn-primary" type="submit"><?= master_workspace_icon('document') ?>Lengkapi Tagihan yang Belum Ada</button></form><form method="post" onsubmit="return confirm('Tutup tahun ajaran? Tunggakan tetap dapat dibayar, tetapi tarif tidak dapat diubah lagi.')"><input type="hidden" name="csrf_token" value="<?= master_du_e($_SESSION['csrf_master_du']) ?>"><input type="hidden" name="aksi" value="tutup"><input type="hidden" name="tahun_ajaran" value="<?= master_du_e($selectedYear) ?>"><button class="btn btn-warning" type="submit"><?= master_workspace_icon('lock') ?>Tutup Tahun Ajaran</button></form>
       <?php elseif($year['status']==='closed'): ?><form method="post" onsubmit="return confirm('Buka kembali tahun ajaran ini? Histori pembayaran tetap aman dan status kembali menjadi terbit.')"><input type="hidden" name="csrf_token" value="<?= master_du_e($_SESSION['csrf_master_du']) ?>"><input type="hidden" name="aksi" value="buka"><input type="hidden" name="tahun_ajaran" value="<?= master_du_e($selectedYear) ?>"><button class="btn btn-primary" type="submit"><?= master_workspace_icon('calendar') ?>Buka Kembali</button></form><?php endif; ?>
     </div>
   </div>

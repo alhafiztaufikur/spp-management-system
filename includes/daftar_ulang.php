@@ -1,4 +1,5 @@
 <?php
+require_once __DIR__.'/legacy_billing.php';
 
 function du_academic_year_label(int $month, int $year): string {
     if ($month < 1 || $month > 12 || $year < 2000 || $year > 2200) {
@@ -77,6 +78,7 @@ function du_find_bill_by_id(mysqli $db, int $billId, int $excludePaymentId = 0, 
         $bill['terbayar'] = (float)$stmt->get_result()->fetch_assoc()['terbayar'];
     }
     $stmt->close();
+    $bill['legacy_paid']=lb_du_bill_credit($db,(string)$bill['no_induk'],(string)$bill['tahun_ajaran']);$bill['terbayar']+=$bill['legacy_paid'];$bill['billing_rule_version']=LB_RULE_VERSION;$bill['tariff_basis']=$bill['legacy_paid']>0?'legacy_snapshot':(lb_du_override($db,(string)$bill['no_induk'],(string)$bill['tahun_ajaran'])?'system':(lb_student($db,(string)$bill['no_induk'])?'legacy':'system'));
     $bill['nominal_awal'] = (float)$bill['nominal_awal'];
     $bill['nominal_tagihan'] = (float)$bill['nominal_tagihan'];
     $bill['sisa'] = max(0, $bill['nominal_tagihan'] - $bill['terbayar']);
@@ -156,7 +158,7 @@ function du_selectable_bills_payload(mysqli $db, int $excludePaymentId = 0, int 
     $payload = [];
     while ($bill = $result->fetch_assoc()) {
         $total = (float)$bill['nominal_tagihan'];
-        $paid = (float)$bill['terbayar'];
+        $paid = (float)$bill['terbayar']+lb_du_bill_credit($db,(string)$bill['no_induk'],(string)$bill['tahun_ajaran_snapshot']);
         $remaining = max(0, $total - $paid);
         $isCurrent = (string)$bill['tahun_ajaran_snapshot'] === $current;
         if (!$isCurrent && $remaining <= .001 && (int)$bill['id'] !== $alwaysIncludeBillId) continue;
@@ -199,12 +201,7 @@ function du_find_bill(mysqli $db, string $noInduk, int $month, int $year, bool $
     $stmt->execute();
     $bill = $stmt->get_result()->fetch_assoc() ?: null;
     $stmt->close();
-    if ($bill) {
-        $bill['nominal_awal'] = (float)$bill['nominal_awal'];
-        $bill['nominal_tagihan'] = (float)$bill['nominal_tagihan'];
-        $bill['terbayar'] = (float)$bill['terbayar'];
-        $bill['sisa'] = max(0, $bill['nominal_tagihan'] - $bill['terbayar']);
-    }
+    if($bill)return du_find_bill_by_id($db,(int)$bill['id'],0,$forUpdate);
     return $bill;
 }
 
@@ -290,6 +287,7 @@ function du_apply_current_student_override(mysqli $db, string $noInduk): void {
         throw new RuntimeException('Tagihan Daftar Ulang siswa sudah dibatalkan dan tidak dapat diubah.');
     }
 
+    if((float)$bill['paid']>.001||lb_du_bill_credit($db,$noInduk,$label)>.001){du_sync_student_legacy_from_bill($db,(int)$bill['id']);return;}
     $amounts = du_student_legacy_amounts($bill, (float)$bill['class_amount']);
     if ($amounts['initial'] <= 0) {
         throw new RuntimeException('Tarif kelas Daftar Ulang belum tersedia untuk menghapus override siswa.');
@@ -325,6 +323,7 @@ function du_apply_current_student_override(mysqli $db, string $noInduk): void {
 function du_reconcile_current_student_override(mysqli $db, string $noInduk): array {
     $label = du_current_academic_year();
     $result = ['tahun_ajaran' => $label, 'status' => 'unchanged', 'label' => 'Daftar Ulang'];
+    if(lb_student($db,$noInduk)&&!lb_du_override($db,$noInduk,$label))return $result;
     $stmt = $db->prepare('SELECT MAX(ta.label) AS latest_year FROM siswa_tahun_ajaran sta JOIN tahun_ajaran ta ON ta.id=sta.tahun_ajaran_id WHERE sta.no_induk=?');
     $stmt->bind_param('s', $noInduk);
     $stmt->execute();
@@ -356,7 +355,7 @@ function du_reconcile_current_student_override(mysqli $db, string $noInduk): arr
     $different = abs((float)$bill['nominal_awal'] - $amounts['initial']) > .001
         || abs((float)$bill['nominal_tagihan'] - $amounts['total']) > .001;
     if (!$different) return $result;
-    if ((float)$bill['paid'] > .001 || $bill['status'] !== 'open' || $bill['year_status'] === 'closed') {
+    if ((float)$bill['paid'] > .001 || lb_du_bill_credit($db,$noInduk,$label)>.001 || $bill['status'] !== 'open' || $bill['year_status'] === 'closed') {
         $result['status'] = 'locked';
         return $result;
     }
@@ -415,7 +414,9 @@ function du_sync_open_bills_for_master_rate(
 
     $affected = 0;
     foreach ($bills as $bill) {
-        if ($isCurrentYear) {
+        if((float)$bill['paid']>0.001||lb_du_credit($db,(string)$bill['no_induk'],$yearLabel)>0.001)continue;
+        $source=lb_student($db,(string)$bill['no_induk']);
+        if (!$source && $isCurrentYear) {
             $legacyUnset = (float)$bill['DAFTAR_ULANG'] <= 0
                 && (float)$bill['potong_du'] <= 0
                 && (float)$bill['tot_du'] <= 0;
@@ -424,7 +425,7 @@ function du_sync_open_bills_for_master_rate(
                 && abs((float)$bill['potong_du']) < .001
                 && abs((float)$bill['tot_du'] - $oldAmount) < .001;
             if (!$legacyUnset && !$usesOldClassRate) continue;
-        } else {
+        } elseif(!$source) {
             $usesOldClassRate =
                 abs((float)$bill['nominal_awal'] - $oldAmount) < .001
                 && abs((float)$bill['nominal_tagihan'] - $oldAmount) < .001;
@@ -437,16 +438,17 @@ function du_sync_open_bills_for_master_rate(
         }
         $billId = (int)$bill['id'];
         $stmt = $db->prepare('UPDATE tagihan_daftar_ulang SET nominal_awal=?,nominal_tagihan=? WHERE id=?');
-        $stmt->bind_param('ddi', $newAmount, $newAmount, $billId);
+        $netAmount=max(0,$newAmount-max(0,(float)$bill['nominal_awal']-(float)$bill['nominal_tagihan']));
+        $stmt->bind_param('ddi', $newAmount, $netAmount, $billId);
         $stmt->execute();
         $stmt->close();
-        if ($isCurrentYear) du_sync_student_legacy_from_bill($db, $billId);
+        if ($isCurrentYear && !$source) du_sync_student_legacy_from_bill($db, $billId);
         $affected++;
     }
     return $affected;
 }
 
-function du_create_bill_for_placement(mysqli $db, int $placementId, bool $syncLegacy = true): ?int {
+function du_create_bill_for_placement(mysqli $db, int $placementId, bool $syncLegacy = true, bool $publishing = false): ?int {
     $stmt = $db->prepare("SELECT sta.id, sta.tahun_ajaran_id, sta.no_induk, sta.kelas, sta.status AS placement_status,
                                 ta.label, ta.status AS year_status, du.id AS master_id, du.Jumlah,
                                 s.DAFTAR_ULANG,s.potong_du,s.tot_du
@@ -459,7 +461,7 @@ function du_create_bill_for_placement(mysqli $db, int $placementId, bool $syncLe
     $stmt->execute();
     $row = $stmt->get_result()->fetch_assoc();
     $stmt->close();
-    if (!$row || $row['placement_status'] !== 'aktif' || $row['year_status'] !== 'published') return null;
+    if (!$row || $row['placement_status'] !== 'aktif' || ($row['year_status'] !== 'published' && !($publishing && $row['year_status']==='draft'))) return null;
     require_once __DIR__.'/legacy_full_read.php';if(lful_is_covered($db,(string)$row['no_induk'],'daftar_ulang',(string)$row['label']))return null;
     if (!$row['master_id'] || (float)$row['Jumlah'] <= 0) {
         throw new RuntimeException('Tarif Daftar Ulang untuk kelas penempatan siswa belum tersedia.');
@@ -473,6 +475,12 @@ function du_create_bill_for_placement(mysqli $db, int $placementId, bool $syncLe
     $amounts = $label === du_current_academic_year()
         ? du_student_legacy_amounts($row, (float)$row['Jumlah'])
         : ['initial'=>(float)$row['Jumlah'], 'discount'=>0.0, 'total'=>(float)$row['Jumlah'], 'custom'=>false];
+    $source=lb_student($db,$studentNumber);
+    if($source && $label===$source['migration_year']){
+        $proof=lb_du_source($db,$studentNumber,$label);
+        if(!$proof['known'])return null;
+        if(!lb_du_override($db,$studentNumber,$label))$amounts=['initial'=>$proof['gross'],'discount'=>$proof['discount'],'total'=>$proof['total']];
+    }
     $stmt = $db->prepare("INSERT INTO tagihan_daftar_ulang
         (tahun_ajaran_id, penempatan_id, master_daftar_ulang_id, no_induk, kelas_snapshot, tahun_ajaran_snapshot, nominal_awal, nominal_tagihan)
         VALUES (?, ?, ?, ?, ?, ?, ?, ?)
@@ -489,7 +497,7 @@ function du_create_bill_for_placement(mysqli $db, int $placementId, bool $syncLe
         $id = (int)($stmt->get_result()->fetch_assoc()['id'] ?? 0); $stmt->close();
     }
     if($id>0){$restore=$db->prepare("UPDATE tagihan_daftar_ulang SET status='open',cancel_reason=NULL,master_daftar_ulang_id=?,kelas_snapshot=?,nominal_awal=?,nominal_tagihan=? WHERE id=? AND status='cancelled' AND cancel_reason LIKE 'Koreksi pendaftaran awal PSB:%' AND NOT EXISTS(SELECT 1 FROM bayar_du WHERE tagihan_daftar_ulang_id=?)");$restore->bind_param('isddii',$masterId,$class,$initial,$total,$id,$id);$restore->execute();$restore->close();}
-    if ($syncLegacy && $id > 0 && $label === du_current_academic_year()) du_sync_student_legacy_from_bill($db, $id);
+    if ($syncLegacy && !$source && $id > 0 && $label === du_current_academic_year()) du_sync_student_legacy_from_bill($db, $id);
     return $id ?: null;
 }
 
@@ -500,13 +508,7 @@ function du_publish_year_from_active_students(mysqli $db, int $yearId, string $l
     $year = $stmt->get_result()->fetch_assoc(); $stmt->close();
     if (!$year || $year['label'] !== $label) throw new RuntimeException('Tahun ajaran penerbitan tidak valid.');
     if ($year['status'] === 'closed') throw new RuntimeException('Tahun ajaran yang sudah ditutup tidak dapat diterbitkan ulang.');
-    if ($year['status'] === 'published') {
-        $stmt = $db->prepare('SELECT COUNT(*) total FROM tagihan_daftar_ulang WHERE tahun_ajaran_id = ?');
-        $stmt->bind_param('i', $yearId); $stmt->execute();
-        $total = (int)$stmt->get_result()->fetch_assoc()['total']; $stmt->close();
-        return $total;
-    }
-
+    $alreadyPublished=$year['status']==='published';
     [$unitFirst,$unitLast]=unit_level_bounds();
     $regularClasses=unit_level_in_sql();
     $stmt = $db->prepare("SELECT COUNT(DISTINCT kelas) total FROM Daftar_ulang
@@ -535,7 +537,7 @@ function du_publish_year_from_active_students(mysqli $db, int $yearId, string $l
     $stmt = $db->prepare('SELECT COUNT(*) total FROM tagihan_daftar_ulang WHERE tahun_ajaran_id=?');
     $stmt->bind_param('i', $yearId); $stmt->execute();
     $existingBills = (int)$stmt->get_result()->fetch_assoc()['total']; $stmt->close();
-    if ($existingBills > 0) throw new RuntimeException('Tahun ajaran draf memiliki tagihan lama yang tidak konsisten. Periksa database sebelum menerbitkan ulang.');
+    if ($existingBills > 0 && !$alreadyPublished) throw new RuntimeException('Tahun ajaran draf memiliki tagihan lama yang tidak konsisten. Periksa database sebelum menerbitkan ulang.');
 
     if (strcmp($label, $currentYear) >= 0) {
         $stmt = $db->prepare("SELECT COUNT(*) AS missing FROM siswa s
@@ -557,40 +559,22 @@ function du_publish_year_from_active_students(mysqli $db, int $yearId, string $l
     require_once __DIR__ . '/komite_billing.php';
     $stmtPlacement=$db->prepare("SELECT id FROM siswa_tahun_ajaran WHERE tahun_ajaran_id=? AND kelas IN {$regularClasses}");
     $stmtPlacement->bind_param('i',$yearId);$stmtPlacement->execute();
-    foreach ($stmtPlacement->get_result()->fetch_all(MYSQLI_ASSOC) as $placement) komite_sync_placement($db,(int)$placement['id']);
+    foreach ($stmtPlacement->get_result()->fetch_all(MYSQLI_ASSOC) as $placement) if(!$alreadyPublished)komite_sync_placement($db,(int)$placement['id']);
     $stmtPlacement->close();
 
-    $isCurrentYear = $label === du_current_academic_year() ? 1 : 0;
-    require_once __DIR__.'/legacy_full_read.php';$legacyExclude='';$expectedCount=$placementCount;
-    if(lful_read_ready($db)){
-        $coveredSql="EXISTS(SELECT 1 FROM legacy_full_coverage c JOIN siswa covered_student ON covered_student.id=c.student_id AND covered_student.unit_id=c.unit_id WHERE covered_student.NO_INDUK=sta.no_induk AND covered_student.unit_id=sta.unit_id AND c.category='daftar_ulang' AND c.period=(SELECT label FROM tahun_ajaran WHERE id=sta.tahun_ajaran_id))";
-        $stmt=$db->prepare("SELECT COUNT(*) n FROM siswa_tahun_ajaran sta WHERE sta.tahun_ajaran_id=? AND sta.kelas IN {$regularClasses} AND $coveredSql");$stmt->bind_param('i',$yearId);$stmt->execute();$expectedCount-=(int)$stmt->get_result()->fetch_assoc()['n'];$stmt->close();$legacyExclude=' AND NOT '.$coveredSql;
+    // Publishing an academic year and filling its bills are separate operations.
+    // Reuse immutable placements; INSERT/unique constraints make retries harmless.
+    $created=0;$unknown=0;
+    $rows=lf_rows($db,"SELECT sta.id,sta.no_induk FROM siswa_tahun_ajaran sta JOIN siswa s ON s.NO_INDUK=sta.no_induk AND s.unit_id=sta.unit_id WHERE sta.tahun_ajaran_id=? AND sta.status='aktif' AND s.is_active=1 AND sta.kelas IN {$regularClasses}",[$yearId]);
+    foreach($rows as $placement){
+        if(lf_one($db,'SELECT id FROM tagihan_daftar_ulang WHERE tahun_ajaran_id=? AND no_induk=?',[$yearId,$placement['no_induk']]))continue;
+        if(du_create_bill_for_placement($db,(int)$placement['id'],true,true))$created++;else $unknown++;
     }
-    $stmt = $db->prepare("INSERT IGNORE INTO tagihan_daftar_ulang
-        (tahun_ajaran_id,penempatan_id,master_daftar_ulang_id,no_induk,kelas_snapshot,tahun_ajaran_snapshot,nominal_awal,nominal_tagihan)
-        SELECT sta.tahun_ajaran_id,sta.id,du.id,sta.no_induk,sta.kelas,?,
-               CASE WHEN ?=1 AND s.DAFTAR_ULANG>0 THEN s.DAFTAR_ULANG ELSE du.Jumlah END,
-               CASE WHEN ?=1 AND s.DAFTAR_ULANG>0 THEN GREATEST(s.DAFTAR_ULANG-s.potong_du,0) ELSE du.Jumlah END
-        FROM siswa_tahun_ajaran sta
-        JOIN siswa s ON s.NO_INDUK=sta.no_induk AND s.unit_id=sta.unit_id
-        JOIN Daftar_ulang du ON du.tahun_ajaran_id=sta.tahun_ajaran_id AND du.kelas=sta.kelas
-        WHERE sta.tahun_ajaran_id=? AND sta.kelas IN {$regularClasses}{$legacyExclude}");
-    $stmt->bind_param('siii', $label, $isCurrentYear, $isCurrentYear, $yearId); $stmt->execute();
-    $created = $stmt->affected_rows; $stmt->close();
-    if ($created !== $expectedCount) throw new RuntimeException('Jumlah tagihan tidak sesuai riwayat kelas tahun ajaran. Penerbitan dibatalkan.');
-
-    if ($isCurrentYear === 1) {
-        $stmt = $db->prepare("UPDATE siswa s
-            JOIN tagihan_daftar_ulang tdu ON tdu.no_induk=s.NO_INDUK AND tdu.unit_id=s.unit_id AND tdu.tahun_ajaran_id=?
-            SET s.DAFTAR_ULANG=tdu.nominal_awal,
-                s.potong_du=GREATEST(tdu.nominal_awal-tdu.nominal_tagihan,0),
-                s.tot_du=tdu.nominal_tagihan");
-        $stmt->bind_param('i', $yearId); $stmt->execute(); $stmt->close();
-    }
+    $GLOBALS['du_publish_result']=['created'=>$created,'unknown'=>$unknown,'existing'=>$existingBills];
 
     $stmt = $db->prepare("UPDATE tahun_ajaran SET status='published',published_at=NOW() WHERE id=? AND status='draft'");
     $stmt->bind_param('i', $yearId); $stmt->execute();
-    if ($stmt->affected_rows !== 1) { $stmt->close(); throw new RuntimeException('Status tahun ajaran gagal diterbitkan.'); }
+    if (!$alreadyPublished && $stmt->affected_rows !== 1) { $stmt->close(); throw new RuntimeException('Status tahun ajaran gagal diterbitkan.'); }
     $stmt->close();
     return $created;
 }

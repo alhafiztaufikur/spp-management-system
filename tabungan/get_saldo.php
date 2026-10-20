@@ -17,32 +17,7 @@ if (!hasRole(['admin', 'kasir'])) {
     exit;
 }
 
-$nisParam = $_GET['nis'] ?? '';
-if (!is_string($nisParam) || strlen($nisParam) > 10) {
-    http_response_code(400);
-    echo json_encode(['error' => 'NIS siswa tidak valid.']);
-    exit;
-}
-$nis  = trim($nisParam);
-$saldo = 0;
-$rawSaldo = 0;
-$saldoMinus = false;
-
-if ($nis) {
-    if(unit_active_id()===0 || (int)($_GET['student_id']??0)>0){try {unit_resolve_student($koneksi,$nis,(int)($_GET['student_id']??0));}catch(Throwable $e){http_response_code(409);echo json_encode(['error'=>$e->getMessage()]);exit;}}
-    $stmt = $koneksi->prepare("SELECT SALDO FROM tabungan WHERE NO_INDUK = ? LIMIT 1");
-    $stmt->bind_param('s', $nis);
-    $stmt->execute();
-    $row = $stmt->get_result()->fetch_assoc();
-    $rawSaldo = (float)($row['SALDO'] ?? 0);
-    $saldoMinus = $rawSaldo < 0;
-    $saldo = max(0, $rawSaldo);
-    $stmt->close();
-}
-
-echo json_encode([
-    'saldo' => $saldo,
-    'raw_saldo' => $rawSaldo,
-    'saldo_minus' => $saldoMinus,
-    'warning' => $saldoMinus ? 'Saldo tabungan terdeteksi minus dan perlu rekonsiliasi.' : ''
-]);
+require_once __DIR__.'/../includes/savings_owners.php';
+if(empty($_GET['owner_id'])&&empty($_GET['student_id'])&&($_GET['nis']??'')===''){echo json_encode(['saldo'=>0,'raw_saldo'=>0,'saldo_minus'=>false,'warning'=>'']);exit;}
+try{$r=so_resolve($koneksi,$_GET);$raw=(float)$r['balance'];echo json_encode(['saldo'=>max(0,$raw),'raw_saldo'=>$raw,'saldo_minus'=>$raw<0,'warning'=>$r['state']!=='ready'?'Rekening belum siap atau diblokir.':($raw<0?'Saldo perlu direkonsiliasi.':''),'owner_id'=>(int)$r['owner_id'],'student_id'=>(int)$r['student_id'],'owner_type'=>$r['owner_type'],'unit_id'=>(int)$r['unit_id'],'state'=>$r['state']]);}
+catch(Throwable $e){http_response_code(409);echo json_encode(['error'=>$e->getMessage()]);}

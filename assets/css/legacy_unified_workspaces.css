@@ -1,0 +1,40 @@
+/* Scoped to the unified Legacy workspaces; application palettes remain authoritative. */
+.legacy-unified .field-row{display:flex;flex-direction:column;gap:8px;margin-bottom:16px;color:var(--text-secondary);font-size:13px;font-weight:600}
+.legacy-unified .field-input{font:400 14px 'Inter',system-ui,sans-serif;min-width:0}
+.legacy-unified .btn{font-family:'Inter',system-ui,sans-serif}
+.legacy-unified .ph-detail-body>h3{margin:0 0 10px;font-size:18px}
+.legacy-unified .ph-detail-body>p{color:var(--text-muted);font-size:13px;line-height:1.6;margin:0 0 16px}
+.unified-registration .ph-record{grid-template-columns:38px minmax(0,1fr) auto 16px;gap:12px;padding:16px;align-items:center}
+.unified-registration .ph-record>.ph-record-icon{grid-column:1;grid-row:1;width:36px;height:36px}
+.unified-registration .ph-record>.ph-record-identity{grid-column:2;grid-row:1;overflow-wrap:break-word}
+.unified-registration .ph-record-identity strong{font-size:14px;line-height:1.5}
+.unified-registration .ph-record-identity small,.unified-registration .ph-record-identity span{display:block;line-height:1.6;color:var(--text-secondary);font-size:12px}
+.unified-registration .ph-record>div:last-of-type{grid-column:3;grid-row:1;text-align:right}
+.unified-registration .ph-record>div:last-of-type>*{display:block;font-size:12px;line-height:1.6}
+.unified-registration .ph-record>div:last-of-type>strong{color:var(--accent);font-size:14px;white-space:nowrap}
+.unified-registration .ph-record>svg{grid-column:4;grid-row:1}
+.unified-registration .ph-workspace{margin-top:18px}
+.unified-registration .ph-filter-form{grid-template-columns:repeat(3,minmax(0,1fr));align-items:end}
+.unified-registration .ph-filter-actions{grid-column:1/-1;flex-wrap:wrap;justify-content:flex-end}
+.unified-registration .ph-payment-box>p{line-height:1.7;margin:12px 0;color:var(--text-secondary);font-size:13px}
+.unified-savings .sw-student-option{text-decoration:none;color:var(--text-primary);align-items:center;min-width:0}
+.unified-savings .sw-student-option small{display:block;line-height:1.6}
+.unified-savings .sw-student-panel>p{margin:16px 0;color:var(--text-muted);font-size:13px}
+.unified-savings .sw-entry-panel>h2{font-size:20px;margin:20px 0 8px}
+.unified-savings .sw-entry-panel>p{line-height:1.7;color:var(--text-secondary);margin-bottom:18px}
+.unified-savings .sw-balance-box{margin-bottom:24px}
+.unified-payment-edit .main-card{max-width:880px;padding:24px;margin:0 auto}
+.unified-payment-edit .main-card>p{margin:14px 0;line-height:1.7;color:var(--text-secondary)}
+.unified-payment-edit form{margin:20px 0}
+.unified-payment-edit details{margin-top:20px}
+.legacy-unified :focus-visible{outline:3px solid var(--accent);outline-offset:3px}
+@media(max-width:700px){
+ .unified-registration .ph-filter-form{grid-template-columns:minmax(0,1fr)}
+ .unified-registration .ph-record{grid-template-columns:34px minmax(0,1fr);gap:10px}
+ .unified-registration .ph-record>div:last-of-type{grid-column:2;grid-row:2;text-align:left;display:flex;gap:6px;flex-wrap:wrap}
+ .unified-registration .ph-record>.ph-record-icon{align-self:start}
+ .unified-registration .ph-record>svg{display:none}
+ .unified-payment-edit .main-card{padding:18px}
+}
+
+.unified-payment-edit .ph-components dd{white-space:normal;max-width:70%;overflow-wrap:anywhere;text-align:right}

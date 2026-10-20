@@ -8,13 +8,13 @@ function authorization_history_source(): string
         a.occurred_at,a.authorization_id,a.note,a.before_snapshot,a.after_snapshot,a.reconstructed
         FROM pembayaran_aktivitas a WHERE a.action NOT IN ('created','baseline')
         UNION ALL
-        SELECT r.unit_id,COALESCE(r.bayar_id,CAST(JSON_UNQUOTE(JSON_EXTRACT(r.before_snapshot,'$.payment.id')) AS UNSIGNED)),
+        SELECT r.unit_id,COALESCE(r.bayar_id,CAST(JSON_UNQUOTE(JSON_EXTRACT(r.before_snapshot,'$.payment.id')) AS SIGNED)),
         -r.id*2,IF(r.action='edit','request_edit','request_delete'),r.requested_by,
         COALESCE(u.nama,''),COALESCE(u.username,''),COALESCE(u.role,''),r.requested_at,r.id,r.request_reason,r.before_snapshot,NULL,1
         FROM transaksi_otorisasi r LEFT JOIN admin u ON u.id=r.requested_by
         WHERE NOT EXISTS(SELECT 1 FROM pembayaran_aktivitas a WHERE a.authorization_id=r.id AND a.action IN ('request_edit','request_delete'))
         UNION ALL
-        SELECT r.unit_id,COALESCE(r.bayar_id,CAST(JSON_UNQUOTE(JSON_EXTRACT(r.before_snapshot,'$.payment.id')) AS UNSIGNED)),
+        SELECT r.unit_id,COALESCE(r.bayar_id,CAST(JSON_UNQUOTE(JSON_EXTRACT(r.before_snapshot,'$.payment.id')) AS SIGNED)),
         -r.id*2+1,r.status,r.decided_by,COALESCE(u.nama,''),COALESCE(u.username,''),COALESCE(u.role,''),
         r.decided_at,r.id,r.decision_note,r.before_snapshot,NULL,1
         FROM transaksi_otorisasi r LEFT JOIN admin u ON u.id=r.decided_by
@@ -27,16 +27,16 @@ function authorization_history_can_read(mysqli $db,int $id): bool
     if (!isRole('kasir')) return true;
     $actor=(int)$_SESSION['admin_id'];
     $s=$db->prepare("SELECT 1 FROM transaksi_otorisasi WHERE requested_by=? AND
-        COALESCE(bayar_id,CAST(JSON_UNQUOTE(JSON_EXTRACT(before_snapshot,'$.payment.id')) AS UNSIGNED))=? LIMIT 1");
+        COALESCE(bayar_id,CAST(JSON_UNQUOTE(JSON_EXTRACT(before_snapshot,'$.payment.id')) AS SIGNED))=? LIMIT 1");
     $s->bind_param('ii',$actor,$id);$s->execute();$allowed=(bool)$s->get_result()->fetch_row();$s->close();return $allowed;
 }
 
 function authorization_history_page(mysqli $db,string $status,string $kind,string $search,int $page,array $statuses=['*']): array
 {
-    $where='e.payment_id>0';$params=[];$types='';
+    $where='e.payment_id<>0';$params=[];$types='';
     if(isRole('kasir')) {
         $where.=" AND EXISTS(SELECT 1 FROM transaksi_otorisasi owned WHERE owned.requested_by=? AND owned.unit_id=e.unit_id
-            AND COALESCE(owned.bayar_id,CAST(JSON_UNQUOTE(JSON_EXTRACT(owned.before_snapshot,'$.payment.id')) AS UNSIGNED))=e.payment_id)";
+            AND COALESCE(owned.bayar_id,CAST(JSON_UNQUOTE(JSON_EXTRACT(owned.before_snapshot,'$.payment.id')) AS SIGNED))=e.payment_id)";
         $params[]=(int)$_SESSION['admin_id'];$types.='i';
     }
     if(!filter_is_all($statuses))$where.=filter_sql_values($statuses,'r.status');
@@ -67,7 +67,7 @@ function authorization_history_events(mysqli $db,int $id): array
     $events=payment_activity_for_payments($db,[$id])[$id]??[];
     $s=$db->prepare("SELECT r.*,u.nama,u.username,u.role,v.nama reviewer_name,v.username reviewer_username,v.role reviewer_role
         FROM transaksi_otorisasi r LEFT JOIN admin u ON u.id=r.requested_by LEFT JOIN admin v ON v.id=r.decided_by
-        WHERE COALESCE(r.bayar_id,CAST(JSON_UNQUOTE(JSON_EXTRACT(r.before_snapshot,'$.payment.id')) AS UNSIGNED))=?");
+        WHERE COALESCE(r.bayar_id,CAST(JSON_UNQUOTE(JSON_EXTRACT(r.before_snapshot,'$.payment.id')) AS SIGNED))=?");
     $s->bind_param('i',$id);$s->execute();$requests=$s->get_result()->fetch_all(MYSQLI_ASSOC);$s->close();
     foreach($requests as $r){
         $requestAction=$r['action']==='edit'?'request_edit':'request_delete';
@@ -92,6 +92,7 @@ function authorization_history_events(mysqli $db,int $id): array
 function authorization_proposed_snapshot(array $before,array $payload): array
 {
     $after=$before;
+    if(isset($payload['legacy_input'])){$v=$payload['legacy_input'];$after['payment']['TGL_BYR']=$v['date'];$after['payment']['BULAN']=$v['period'];$after['payment']['KETERANGAN']=$v['note'];$after['payment']['sistem_pembayaran']=$v['method']??$before['payment']['sistem_pembayaran']??'';$after['payment']['total_jumlah']=array_sum(array_column($v['items'],'amount'));$after['details']['legacy_items']=$v['items'];return $after;}
     $amount=static function($raw):float {
         $raw=trim((string)$raw);return is_numeric($raw)?(float)$raw:(float)str_replace(['.',','],['','.'],$raw);
     };

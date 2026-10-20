@@ -37,7 +37,7 @@ function savings_book_pdf(array $book,array $settings,bool $guide=false): \Dompd
         }
         foreach($pages[$number-1]??[] as $position){
             $entry=$position['entry'];$side=$position['side'];$x=$layout['x_'.$side];$y=($side==='top'?$layout['y_top']+$layout['header']:$layout['y_bottom'])+($position['row']-1)*$layout['row_height']+$layout['text_offset'];
-            $values=[(string)$entry['number'],spp_date_label($entry['tanggal']),$entry['masuk']?savings_book_money($entry['masuk']):'',$entry['keluar']?savings_book_money($entry['keluar']):'',savings_book_money($entry['saldo']),$entry['label']??''];
+            $values=[(string)$entry['number'],spp_date_label($entry['tanggal']),$entry['masuk']?savings_book_money($entry['masuk']):'',$entry['keluar']?savings_book_money($entry['keluar']):'',savings_book_money($entry['saldo']),(['Saldo awal Legacy'=>'Awal','Saldo peralihan Legacy'=>'Alih','Penyesuaian Saldo Migrasi'=>'FIX'][$entry['label']??'']??($entry['label']??''))];
             foreach($values as $i=>$value){if($value!=='')$text($x,$y,$widths[$i],$value,$i===1?7.5:8.5,$i>=2);$x+=$widths[$i];}
         }
     });

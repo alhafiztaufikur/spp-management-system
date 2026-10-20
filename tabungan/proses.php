@@ -17,11 +17,11 @@ if ($_SERVER['REQUEST_METHOD'] !== 'POST') {
 }
 
 $aksi      = $_POST['aksi'] ?? '';
-$no_induk  = trim($_POST['no_induk'] ?? '');
+$no_induk = is_string($_POST['no_induk']??'')?trim($_POST['no_induk']??''):'';
 $tanggal   = date('Y-m-d');
-$rawNominal = trim((string)($_POST['nominal'] ?? ''));
-$nominal   = ctype_digit($rawNominal) ? (float)$rawNominal : NAN;
-$keterangan = trim($_POST['keterangan'] ?? '');
+$rawNominal = is_string($_POST['nominal']??'')?trim($_POST['nominal']??''):'';
+$nominal = preg_match('/^[0-9]+(?:[.,][0-9]{1,2})?$/D',$rawNominal)?(float)str_replace(',','.',$rawNominal):NAN;
+$keterangan = is_string($_POST['keterangan']??'')?trim($_POST['keterangan']??''):'';
 $user_id   = (string)($_SESSION['admin_id'] ?? '');
 $requestKey = (string)($_POST['request_key'] ?? '');
 $fallback = $aksi === 'keluar' ? 'keluar.php' : 'masuk.php';
@@ -32,10 +32,26 @@ if (empty($_SESSION['csrf_savings']) || !hash_equals($_SESSION['csrf_savings'], 
     exit;
 }
 
+require_once __DIR__.'/../includes/savings_owners.php';
+$_SESSION['savings_entry_draft']=$_POST;
+try{
+    $canonicalAmount=so_amount($rawNominal);$nominal=(float)$canonicalAmount;if(mb_strlen($keterangan)>255)throw new DomainException('Keterangan maksimal 255 karakter.');
+    $target=so_resolve($koneksi,$_POST,true);$no_induk=$target['identity'];
+    if(!is_finite($nominal)||$nominal<=0||$nominal>9999999999999.99||!in_array($aksi,['masuk','keluar'],true))throw new DomainException('Isi nominal positif dengan maksimal dua desimal.');
+    if(!preg_match('/^[a-f0-9]{32}$/D',$requestKey))throw new DomainException('Kunci transaksi tidak valid.');
+    if($target['owner_type']==='account'){
+        require_once __DIR__.'/../includes/legacy_operational_bank.php';
+        $stamp=(string)($_POST['request_time']??date('Y-m-d H:i:s'));
+        $saved=lop_bank_new($koneksi,(int)$_SESSION['admin_id'],unit_active_id(),(int)$target['owner_id'],['amount'=>number_format($nominal,2,'.',''),'direction'=>$aksi==='masuk'?'in':'out','date'=>$stamp,'note'=>$keterangan],hash('sha256','entry:'.$requestKey));
+        unset($_SESSION['savings_entry_draft']);$jid=-1000000000-$saved['id'];$_SESSION['savings_print_prompt']=['jenis'=>$aksi,'id'=>$jid,'unit_id'=>unit_active_id()];$_SESSION['flash']=['type'=>'success','msg'=>'Transaksi tabungan berhasil disimpan.'];
+        header('Location: riwayat.php?'.http_build_query(['owner_id'=>$target['owner_id'],'all_periods'=>'1','jenis'=>$aksi,'id'=>$jid]));exit;
+    }
+}catch(Throwable $ex){$_SESSION['flash']=['type'=>'error','msg'=>$ex->getMessage()];header('Location: '.$fallback.'?'.http_build_query(array_intersect_key($_POST,array_flip(['student_id','owner_id']))));exit;}
+
 // Validasi dasar
 if (!$no_induk || !is_finite($nominal) || $nominal <= 0 || !in_array($aksi, ['masuk', 'keluar'], true)) {
     $_SESSION['flash'] = ['type' => 'error', 'msg' => 'Data tidak valid! Pastikan siswa dipilih dan nominal diisi.'];
-    header('Location: ' . ($aksi === 'keluar' ? 'keluar.php' : 'masuk.php'));
+    header('Location: ' . ($aksi === 'keluar' ? 'keluar.php' : 'masuk.php').'?'.http_build_query(array_intersect_key($_POST,array_flip(['student_id','owner_id']))));
     exit;
 }
 if (mb_strlen($keterangan, 'UTF-8') > 255) {
@@ -58,7 +74,7 @@ try {
     financial_request_reserve($koneksi, $requestKey, 'tabungan_' . $aksi, (int)$_SESSION['admin_id']);
     require_once __DIR__.'/../includes/legacy_operational_read.php';lop_bank_assert_ready($koneksi,$no_induk);
     $ledger=savings_locked_ledger($koneksi,$no_induk);
-    if(!(int)$koneksi->query("SELECT is_active FROM siswa WHERE id=".(int)$ledger['student']['id'])->fetch_row()[0])throw new RuntimeException('Siswa sudah diarsipkan.');
+    if(!(int)$ledger['student']['id']||(int)$ledger['student']['id']!==(int)$target['student_id'])throw new RuntimeException('Identitas rekening berubah.');
     $saldo=$ledger['balance']/100;
     if ($aksi === 'keluar' && $saldo <= 0) {
         throw new Exception('Saldo tabungan kosong. Penarikan tidak bisa diproses.');
@@ -108,6 +124,7 @@ try {
     financial_request_complete($koneksi, $requestKey, $journalId);
     $koneksi->commit();
 
+    unset($_SESSION['savings_entry_draft']);
     $_SESSION['savings_print_prompt'] = ['jenis'=>$aksi, 'id'=>$journalId, 'unit_id'=>unit_active_id()];
 
     $label = $aksi === 'masuk' ? 'masuk' : 'keluar';
@@ -126,6 +143,6 @@ try {
     $_SESSION['flash'] = ['type' => 'error', 'msg' => $e instanceof mysqli_sql_exception
         ? 'Tabungan gagal disimpan. Periksa data dan hubungi administrator jika masalah berulang.'
         : $e->getMessage()];
-    header('Location: ' . ($aksi === 'keluar' ? 'keluar.php' : 'masuk.php'));
+    header('Location: ' . ($aksi === 'keluar' ? 'keluar.php' : 'masuk.php').'?'.http_build_query(array_intersect_key($_POST,array_flip(['student_id','owner_id']))));
     exit;
 }

@@ -123,3 +123,12 @@ Contoh sumber SMP Rohis Mhi: SALDO `0.13100000005215406`, satu jurnal masuk `0.1
 ## Saat finalisasi sedang berjalan
 
 Selama penerapan data dan verifikasi backup, aplikasi menampilkan **Finalisasi migrasi sedang berjalan**. Halaman memeriksa ulang setiap 10 detik dan akses terbuka kembali setelah worker selesai; jangan menekan Finalisasi Migrasi berulang. Halaman boleh ditutup, kemudian dibuka kembali. Permintaan POST yang tertahan tidak dikirim ulang otomatis. Setelah status **Migrasi Selesai**, siswa, pembayaran dan tabungan hasil migrasi dapat dibuka di sistem. [Penjelasan dan hasil pemeriksaan SMP](LEGACY_FINALIZATION_WAIT.md).
+
+
+## Menggunakan hasil migrasi — 20 Oktober 2026
+
+Histori operasional dapat dicetak, diedit, dibatalkan, dan dilihat aktivitasnya melalui halaman transaksi aplikasi. Riwayat DU menampilkan pembayaran sumber secara default dan menghitung status hanya jika bukti kewajiban historis lengkap. Rekening non-siswa menggunakan formulir Tabungan Masuk/Keluar yang sama; setoran/penarikan baru masuk Kas Tabungan, sedangkan histori/peralihan/FIX tidak menjadi kas baru. [Panduan lengkap dan pemeriksaan pemasangan](LEGACY_TRANSACTION_UNIFICATION.md).
+
+## Kredit dan penerbitan sesudah migrasi
+
+Tahun Terbit dapat melengkapi tagihan DU yang belum terbentuk. Kredit komponen PSB/DU dan SPP per bulan dibaca tanpa menambah kas. [Aturan bukti, prioritas tarif, dan struk](LEGACY_BILLING_REPAIR.md).

@@ -14,7 +14,13 @@ if (!$row['can_print']) {http_response_code(403);exit('Anda hanya dapat mencetak
 requireRole(['admin','kasir','bendahara']);
 require_once __DIR__.'/../includes/savings_book_print.php';
 $output=$_GET['output']??'preview';if(!is_string($output)||!in_array($output,['preview','pdf'],true))book_error(400,'Format keluaran tidak valid.');
-// Legacy transaction URL resolves identity and permissions before opening the complete book.
-[$student,$book]=savings_book_http_load($koneksi,$row['NO_INDUK'],(int)$row['student_id'],(int)$row['unit_id']);
-$url='cetak_buku.php?'.http_build_query(['nis'=>$student['NO_INDUK'],'student_id'=>(int)$student['id'],'output'=>$output]);
-header('Location: '.$url,true,303);exit;
+require_once __DIR__.'/../includes/receipt_print.php';
+try {
+    $o=!empty($row['legacy_owner_id'])&&empty($row['student_id']);
+    [$identity,$book]=$o?savings_book_owner_load($koneksi,(int)$row['legacy_owner_id']):savings_book_load($koneksi,$row['NO_INDUK'],(int)$row['student_id'],(int)$row['unit_id']);
+    $journalId=$o?-$id-1000000000:($id<0&&$id>-1000000000?-$id:$id);$balance=null;
+    foreach($book['entries'] as $entry)if((int)($entry['id']??0)===$journalId&&($entry['jenis']??'')===$kind){$balance=$entry['saldo']/100;break;}
+    $amount=(float)($kind==='masuk'?$row['nominal']:$row['keluar']);
+    $p=['NO_INDUK'=>$row['NO_INDUK'],'NAMA'=>$row['NAMA'],'KELAS'=>$identity['kelas_label'],'owner_type'=>$o?'account':'student','total_jumlah'=>$amount,'TGL_BYR'=>$row['TANGGAL']];
+    receipt_http_output([['type'=>'savings','kind'=>$kind,'payment'=>$p,'school'=>unit_school_name((int)$row['unit_id']),'primary'=>[[$kind==='masuk'?'Setoran':'Penarikan',$amount]],'remaining'=>[['Saldo setelah transaksi',$balance]],'other'=>[],'reference'=>$row['reference'],'period'=>'','words'=>receipt_money_words($amount),'date'=>spp_date_label($row['TANGGAL']),'signer'=>$row['operator_name'],'note'=>$row['keterangan']]],'Bukti Transaksi Tabungan','Struk siap dicetak');
+}catch(Throwable $ex){http_response_code(409);echo savings_e($ex->getMessage());}

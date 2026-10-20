@@ -55,6 +55,7 @@ $siswa_sql = "
     ) ORDER BY s.NAMA ASC
 ";
 $siswa_list = $koneksi->query($siswa_sql);
+$psbOptions=one_time_fee_payload_for_options($koneksi);
 
 $period_payments = [];
 $spp_paid_result = $koneksi->query("
@@ -127,7 +128,8 @@ function total_after_discount($total, $discount, $fallbackTotal = 0) {
 // Flash message
 $flash = $_SESSION['flash'] ?? null;
 unset($_SESSION['flash']);
-$paymentDraft = $_SESSION['payment_draft'] ?? null;
+$paymentDraft = $_SESSION['payment_drafts_by_unit'][unit_active_id()] ?? $_SESSION['payment_draft'] ?? null;
+unset($_SESSION['payment_drafts_by_unit'][unit_active_id()]);
 unset($_SESSION['payment_draft']);
 ?>
 <!DOCTYPE html>
@@ -186,7 +188,8 @@ unset($_SESSION['payment_draft']);
       </div>
       <?php endif; ?>
 
-      <div class="main-card">
+      <?php require __DIR__.'/../includes/payment_nojs.php'; ?>
+      <div class="main-card" id="payment-interactive-card">
         <div class="card-title-row">
           <div class="card-title">
             <svg width="18" height="18" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><rect x="2" y="5" width="20" height="14" rx="2"/><line x1="2" y1="10" x2="22" y2="10"/></svg>
@@ -195,6 +198,7 @@ unset($_SESSION['payment_draft']);
         </div>
 
         <form method="POST" action="../pembayaran/proses.php" id="form-bayar">
+          <input type="hidden" name="_operational_unit" value="<?= unit_active_id() ?>" />
           <input type="hidden" name="aksi" value="input" />
           <input type="hidden" name="csrf_token" value="<?= htmlspecialchars($_SESSION['csrf_payment'], ENT_QUOTES, 'UTF-8') ?>" />
           <input type="hidden" name="request_key" value="<?= $paymentRequestKey ?>" />
@@ -286,7 +290,7 @@ unset($_SESSION['payment_draft']);
                 <input type="text" id="siswa-search" list="siswa-list" placeholder="Ketik nama, NIS, atau NIS Diknas..." oninput="pilihSiswaDatalist(this)" autocomplete="off" />
               </div>
               <datalist id="siswa-list">
-                <?php while ($s = $siswa_list->fetch_assoc()): ?>
+                <?php while ($s = $siswa_list->fetch_assoc()): $psbOption=$psbOptions[$s['NO_INDUK']]['psb']??['total'=>0,'paid'=>0,'known'=>false]; ?>
                 <option value="<?= htmlspecialchars($s['NAMA']) ?>"
                   data-nis="<?= htmlspecialchars($s['NO_INDUK']) ?>" data-student-id="<?= (int)$s['id'] ?>"
                   data-diknas="<?= htmlspecialchars((string)($s['NO_induk_diknas'] ?? '')) ?>"
@@ -294,10 +298,10 @@ unset($_SESSION['payment_draft']);
                   data-kelas="<?= htmlspecialchars($s['graduation_year'] ? ('LULUS · TA '.$s['graduation_year']) : class_label(['tingkat'=>$s['master_tingkat']?:$s['KELAS'],'kode_rombel'=>$s['kode_rombel']??'BELUM','is_placeholder'=>$s['is_placeholder']??1])) ?>"
                   data-is-graduate="<?= $s['graduation_year'] ? '1' : '0' ?>"
                   data-graduation-year="<?= htmlspecialchars((string)$s['graduation_year']) ?>"
-                  data-total-psb="<?= money_attr(max(0,(float)$s['PSB']-(float)$s['potongan_psb_nominal'])) ?>"
+                  data-psb-known="<?= !empty($psbOption['known'])?'1':'0' ?>" data-total-psb="<?= money_attr($psbOption['total']) ?>"
                   data-total-spp="<?= money_attr($s['SPP_PERBULAN']) ?>"
                   data-total-komite="<?= money_attr($s['POMG']) ?>"
-                  data-paid-psb="<?= money_attr($s['paid_psb']) ?>"
+                  data-paid-psb="<?= money_attr($psbOption['paid']) ?>"
                   data-paid-spp-periods="<?= htmlspecialchars(json_encode($period_payments[$s['NO_INDUK']]['spp'] ?? []), ENT_QUOTES, 'UTF-8') ?>"
                   data-spp-placements="<?= htmlspecialchars(json_encode($spp_placements[$s['NO_INDUK']] ?? [], JSON_UNESCAPED_UNICODE), ENT_QUOTES, 'UTF-8') ?>"
                   data-spp-billing="<?= htmlspecialchars(json_encode($published_spp_payload[$s['NO_INDUK']] ?? ['saldo'=>0,'tagihan'=>[]], JSON_UNESCAPED_UNICODE), ENT_QUOTES, 'UTF-8') ?>"

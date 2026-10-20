@@ -11,7 +11,7 @@ if($_SERVER['REQUEST_METHOD']!=='GET'){http_response_code(405);header('Allow: GE
 try {
     $originalScope=unit_active_id();authorization_read_unit($koneksi,$_GET['unit_id']??null);
     $source=authorization_source($_GET['source']??'pembayaran');
-    $id=filter_var($_GET['id']??null,FILTER_VALIDATE_INT,['options'=>['min_range'=>1]]);
+    $id=filter_var($_GET['id']??null,FILTER_VALIDATE_INT,[]);
     if(!$id)throw new InvalidArgumentException('ID tidak valid.');
     $view=$_GET['view']??'history';
     if(!in_array($view,['history','queue'],true))throw new InvalidArgumentException('Tampilan tidak valid.');

@@ -1,4 +1,5 @@
 <?php
+require_once __DIR__.'/legacy_billing.php';
 
 /**
  * Komponen yang hanya ditagihkan satu kali sepanjang riwayat siswa.
@@ -50,11 +51,13 @@ function one_time_fee_status(mysqli $db, string $noInduk, int $excludePaymentId 
     }
 
     $totals = one_time_fee_totals_from_student($student);
+    $opening=lb_psb_source($db,$noInduk);if($opening&&$opening['known']){if((float)$student['PSB']<=0)$totals['psb']=$opening['total'];$paid['psb']=(float)($paid['psb']??0)+$opening['paid'];}
     $result = [];
     foreach (one_time_fee_components() as $key => $cfg) {
         $total = (float)$totals[$key];
         $paidAmount = (float)($paid[$key] ?? 0);
         $result[$key] = [
+            'known'=>$opening===null||$opening['known'],'billing_state'=>$opening!==null&&!$opening['known']?'unknown':'known','basis'=>$opening['basis']??'system',
             'label' => $cfg['label'],
             'total' => $total,
             'paid' => $paidAmount,
@@ -75,8 +78,10 @@ function one_time_fee_payload_for_options(mysqli $db, int $excludePaymentId = 0)
     $payload = [];
     while ($row = $rows->fetch_assoc()) {
         $totals = one_time_fee_totals_from_student($row);
+        $opening=lb_psb_source($db,$row['NO_INDUK']);if($opening&&$opening['known']){if((float)$row['PSB']<=0)$totals['psb']=$opening['total'];$row['paid_psb']=(float)$row['paid_psb']+$opening['paid'];}
         foreach (one_time_fee_components() as $key => $cfg) {
             $payload[$row['NO_INDUK']][$key] = [
+                'known'=>$opening===null||$opening['known'],
                 'total' => (float)$totals[$key],
                 'paid' => (float)($row['paid_' . $key] ?? 0),
             ];
@@ -97,6 +102,7 @@ function validate_one_time_fee_payments(
         $input = (float)($amounts[$key] ?? 0);
         if ($input <= 0) continue;
         $fee = $status[$key];
+        if(empty($fee['known']))throw new RuntimeException('Sisa PSB belum dapat ditentukan dari bukti sumber. Lengkapi dasar PSB sebelum menerima pembayaran PSB.');
         if ($fee['total'] <= 0) {
             throw new RuntimeException($cfg['label'] . ' belum diatur pada Master Siswa.');
         }

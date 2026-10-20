@@ -48,6 +48,7 @@ if ($aksi === 'otorisasi_setujui') {
         transaction_authorization_assert_super($koneksi, $authorizationApproverId);
         if (!in_array($authorizationRequest['requested_by_role'], ['admin','kasir'], true)) throw new RuntimeException('Peran pemohon tidak dapat mengajukan perubahan.');
         if ((int)$authorizationRequest['requested_by'] === $authorizationApproverId) throw new RuntimeException('Pemohon tidak boleh menyetujui permintaannya sendiri.');
+        if(($authorizationRequest['transaction_source']??'system')==='legacy_op'){require_once __DIR__.'/../includes/legacy_transactions.php';lt_approve($koneksi,$authorizationRequestId,$authorizationApproverId,$authorizationDecisionNote);$_SESSION['flash']=['type'=>'success','msg'=>'Perubahan transaksi berhasil disetujui.'];header('Location: ../otorisasi_transaksi.php');exit;}
         $payload = transaction_authorization_decode_payload($authorizationRequest);
         $_POST = $payload;
         $aksi = $authorizationRequest['action'] === 'hapus' ? 'hapus' : 'update';
@@ -73,7 +74,7 @@ if ($aksi === 'batal_pengajuan') {
         if (!$requestId) throw new RuntimeException('Pengajuan tidak valid.');
         $request = transaction_authorization_find($koneksi, $requestId, true);
         if (!$request || $request['status'] !== 'pending' || (int)$request['requested_by'] !== (int)$_SESSION['admin_id']
-            || (int)$request['bayar_id'] !== $returnPaymentId)
+            || ((($request['transaction_source']??'system')==='legacy_op')?-1000000000-(int)$request['legacy_payment_id']:(int)$request['bayar_id']) !== $returnPaymentId)
             throw new RuntimeException('Hanya pemohon yang dapat membatalkan pengajuan yang masih menunggu.');
         transaction_authorization_decide($koneksi, $requestId, 'cancelled', (int)$_SESSION['admin_id']);
         $koneksi->commit();
@@ -618,6 +619,7 @@ function find_linked_payment(mysqli $db, int $bayarId): array {
 if ($aksi === 'input') {
     if ($_SERVER['REQUEST_METHOD'] !== 'POST' || empty($_SESSION['csrf_payment'])
         || !hash_equals($_SESSION['csrf_payment'], (string)($_POST['csrf_token'] ?? ''))) {
+        $_SESSION['payment_draft']=payment_capture_draft($_POST);
         $_SESSION['flash'] = ['type'=>'error', 'msg'=>'Permintaan pembayaran tidak valid atau sesi telah kedaluwarsa. Muat ulang formulir.'];
         header('Location: form.php');
         exit;

@@ -75,3 +75,12 @@ Fitur Tambah Kelas Khusus memakai CLI `scripts/migrate_special_classes.php`, tan
 ## Penyatuan hubungan kelas existing
 
 `php scripts/repair_legacy_classes.php --unit=1` memeriksa hubungan kelas tanpa mutasi. Penerapan data lab memakai backup dan audit per unit, bukan pemasangan skema baru. Lihat [panduan penyatuan kelas](LEGACY_CLASS_UNIFICATION.md).
+
+
+## Metadata tindakan transaksi Legacy — 20 Oktober 2026
+
+Gunakan `scripts/migrate_legacy_transactions.php --check --expect-db=db_spp_test2` untuk pemeriksaan. Pemasangan `--apply` membutuhkan `--backup=...` yang telah diverifikasi; tidak mengimpor data atau memasang skema melalui web. Metadata sumber otorisasi dan indeks telah dipasang pada lab saja, dengan fingerprint data awal identik. [Rincian installer, kompatibilitas, dan audit](LEGACY_TRANSACTION_UNIFICATION.md#pemasangan).
+
+## Rekonsiliasi tagihan hasil migrasi (20 Oktober 2026)
+
+Gunakan `scripts/reconcile_legacy_billing.php` untuk pratinjau/penerapan terbatas pada `db_spp_test2`; tidak mengulang migrasi atau mengubah skema. [Perintah, prioritas tarif, dan bukti pengujian](LEGACY_BILLING_REPAIR.md).

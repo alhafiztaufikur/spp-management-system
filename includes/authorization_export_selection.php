@@ -12,7 +12,7 @@ function authorization_export_selection(string $json): array
     foreach ($rows as $row) {
         if (!is_array($row) || !isset($row['unit_id'],$row['payment_id'])
             || !is_int($row['unit_id']) || !in_array($row['unit_id'],[1,2,3],true)
-            || !is_int($row['payment_id']) || $row['payment_id']<=0) {
+            || !is_int($row['payment_id']) || $row['payment_id']===0) {
             throw new InvalidArgumentException('Identitas transaksi terpilih tidak valid.');
         }
         $source=$row['source']??'pembayaran';if(!is_string($source)||!in_array($source,['pembayaran','tabungan_masuk','tabungan_keluar'],true))throw new InvalidArgumentException('Jenis pilihan tidak valid.');

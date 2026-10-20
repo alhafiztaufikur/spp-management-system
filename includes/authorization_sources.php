@@ -12,7 +12,7 @@ function authorization_menu_label(string $menu): string {
 }
 /** DU is evidenced by its saved allocation or the proposed DU amount, including deleted payments. */
 function authorization_du_evidence_sql(): string {
-    return "(COALESCE(JSON_LENGTH(JSON_EXTRACT(e.before_snapshot,'$.details.bayar_du')),0)>0
+    return "(JSON_UNQUOTE(JSON_EXTRACT(e.before_snapshot,'$.payment.source_table'))='bayar_du' OR JSON_SEARCH(e.before_snapshot,'one','daftar_ulang',NULL,'$.details.legacy_items[*].category') IS NOT NULL OR COALESCE(JSON_LENGTH(JSON_EXTRACT(e.before_snapshot,'$.details.bayar_du')),0)>0
         OR COALESCE(JSON_LENGTH(JSON_EXTRACT(e.after_snapshot,'$.details.bayar_du')),0)>0
         OR COALESCE(CAST(JSON_UNQUOTE(JSON_EXTRACT(r.proposed_payload,'$.uang_du')) AS DECIMAL(20,2)),0)>0)";
 }
@@ -47,8 +47,10 @@ function authorization_savings_model(mysqli $db,int $id,bool $queue,string $sour
 function authorization_combined_page(mysqli $db,bool $history,string $source,string $kind,string $q,int $page,array $statuses,string $menu='all'):array {
     authorization_menu($menu);
     $payment=$history?"SELECT p.*, 'pembayaran' source FROM (".authorization_history_source().") p":
-        "SELECT r.unit_id,COALESCE(r.bayar_id,0) payment_id,r.id,IF(r.action='hapus','request_delete','request_edit') action,r.requested_by actor_id,a.nama actor_name,a.username actor_username,a.role actor_role,r.requested_at occurred_at,r.id authorization_id,r.request_reason note,r.before_snapshot,NULL after_snapshot,0 reconstructed,'pembayaran' source FROM transaksi_otorisasi r JOIN admin a ON a.id=r.requested_by WHERE r.status='pending'";
+        "SELECT r.unit_id,COALESCE(r.bayar_id,CAST(JSON_UNQUOTE(JSON_EXTRACT(r.before_snapshot,'$.payment.id')) AS SIGNED),0) payment_id,r.id,IF(r.action='hapus','request_delete','request_edit') action,r.requested_by actor_id,a.nama actor_name,a.username actor_username,a.role actor_role,r.requested_at occurred_at,r.id authorization_id,r.request_reason note,r.before_snapshot,NULL after_snapshot,0 reconstructed,'pembayaran' source FROM transaksi_otorisasi r JOIN admin a ON a.id=r.requested_by WHERE r.status='pending'";
     $sql=$payment;
+    require_once __DIR__.'/legacy_operational_schema.php';
+    if($history&&lop_ready($db))$sql.=" UNION ALL SELECT a.unit_id,-1000000000-a.entity_id,-a.id,IF(JSON_EXTRACT(a.after_data,'$.cancelled')=1,'deleted','edited'),a.actor_id,u.nama,u.username,u.role,a.created_at,NULL,a.reason,JSON_OBJECT('payment',JSON_OBJECT('id',-1000000000-a.entity_id,'NAMA',o.name,'NO_INDUK',o.source_identity,'source_table',p.source_table)),NULL,0,'pembayaran' FROM legacy_op_audit a JOIN legacy_op_payments p ON p.id=a.entity_id AND p.unit_id=a.unit_id JOIN legacy_op_owners o ON o.id=p.owner_id AND o.unit_id=p.unit_id LEFT JOIN admin u ON u.id=a.actor_id WHERE a.entity_type='payment'";
     if(savings_authorization_ready($db))$sql.=$history?" UNION ALL SELECT unit_id,transaction_id,id,action,actor_id,actor_name,actor_username,actor_role,occurred_at,authorization_id,note,before_snapshot,after_snapshot,reconstructed,CONCAT('tabungan_',jenis) FROM tabungan_aktivitas WHERE action NOT IN ('created','baseline')":
         " UNION ALL SELECT r.unit_id,r.transaction_id,r.id,IF(r.action='hapus','request_delete','request_edit'),r.requested_by,a.nama,a.username,a.role,r.requested_at,r.id,r.request_reason,r.before_snapshot,NULL,0,CONCAT('tabungan_',r.jenis) FROM tabungan_otorisasi r JOIN admin a ON a.id=r.requested_by WHERE r.status='pending'";
     $where='1=1';$params=[];$types='';if($source!=='all'){$where.=' AND e.source=?';$params[]=$source;$types.='s';}

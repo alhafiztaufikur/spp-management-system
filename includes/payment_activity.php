@@ -107,10 +107,10 @@ function payment_activity_changes(?array $before, ?array $after): array
         $a = $before['payment'][$key] ?? ''; $b = $after['payment'][$key] ?? '';
         $equal = in_array($key,$money,true) ? abs((float)$a-(float)$b)<.001 : (string)$a===(string)$b;
         if ($equal) continue;
-        if (in_array($key,$money,true)) { $a='Rp '.number_format((float)$a,0,',','.'); $b='Rp '.number_format((float)$b,0,',','.'); }
+        if (in_array($key,$money,true)) { $a='Rp '.number_format((float)$a,abs((float)$a-round((float)$a))>.00001?2:0,',','.'); $b='Rp '.number_format((float)$b,abs((float)$b-round((float)$b))>.00001?2:0,',','.'); }
         $changes[]=['label'=>$label,'before'=>(string)$a,'after'=>(string)$b];
     }
-    foreach (['bayar_du'=>'Rincian Daftar Ulang','bayar_biaya_lain'=>'Rincian Biaya Lain'] as $table=>$label) {
+    foreach (['bayar_du'=>'Rincian Daftar Ulang','bayar_biaya_lain'=>'Rincian Biaya Lain','legacy_items'=>'Rincian Pembayaran'] as $table=>$label) {
         $normal = static function(array $rows): string {
             $result=[];
             foreach ($rows as $row) {
@@ -125,8 +125,8 @@ function payment_activity_changes(?array $before, ?array $after): array
         $display = static function(string $json): string {
             $items=[];
             foreach(json_decode($json,true) as $row) {
-                $name=$row['nama_biaya_snapshot']??($row['th_ajaran']??'Tagihan #'.($row['tagihan_biaya_lain_id']??$row['tagihan_daftar_ulang_id']??'—'));
-                $value='Rp '.number_format((float)($row['jumlah']??$row['nominal']??0),0,',','.');
+                $name=$row['label']??$row['nama_biaya_snapshot']??($row['th_ajaran']??'Tagihan #'.($row['tagihan_biaya_lain_id']??$row['tagihan_daftar_ulang_id']??'—'));
+                $n=(float)($row['amount']??$row['jumlah']??$row['nominal']??0);$value='Rp '.number_format($n,abs($n-round($n))>.00001?2:0,',','.');
                 $items[]=$name.': '.$value.(!empty($row['keterangan'])?' ('.$row['keterangan'].')':'');
             }
             return $items?implode('; ',$items):'Tidak ada rincian';

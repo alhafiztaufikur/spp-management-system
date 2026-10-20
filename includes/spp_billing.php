@@ -72,7 +72,7 @@ function spp_student_effective_year(mysqli $db, string $noInduk): string {
 
 /** Tarif informasi untuk Master Siswa sesuai tahun penempatan yang diedit. */
 function spp_current_effective_rate(mysqli $db, string $level, float $discountAmount, ?string $academicYear = null, ?string $studentNis = null): array {
-    $legacyBase=$studentNis!==null?lop_tariff($db,$studentNis):null;
+    $legacyBase=$studentNis!==null?lop_tariff($db,$studentNis,$academicYear):null;
     if($legacyBase!==null)return spp_net_tariff($legacyBase,$discountAmount)+['year'=>$academicYear??du_current_academic_year(),'basis'=>'legacy'];
     $empty = ['base'=>0.0, 'discount_amount'=>$discountAmount, 'discount'=>0.0, 'net'=>0.0, 'year'=>'Belum disiapkan'];
     [$firstLevel, $lastLevel] = unit_level_bounds();
@@ -84,7 +84,7 @@ function spp_current_effective_rate(mysqli $db, string $level, float $discountAm
     $stmt=$db->prepare('SELECT nominal_dasar FROM master_spp_tarif WHERE master_spp_tahun_id=? AND tingkat=? LIMIT 1');
     $masterId=(int)$master['id'];$levelInt=(int)$level;$stmt->bind_param('ii',$masterId,$levelInt);$stmt->execute();
     $base=(float)($stmt->get_result()->fetch_assoc()['nominal_dasar']??0);$stmt->close();
-    $result=spp_net_tariff($base,$discountAmount);$result['year']=(string)$master['label'];return $result;
+    $result=spp_net_tariff($base,$discountAmount);$result['year']=(string)$master['label'];$result['basis']='system';$result['rule_version']=LB_RULE_VERSION;return $result;
 }
 
 /** Menyelaraskan potongan hanya pada penempatan yang sedang diedit. */
@@ -94,14 +94,14 @@ function spp_sync_student_discount(mysqli $db, string $noInduk, float $discountA
     $stmt->bind_param('is',$placementId,$noInduk);$stmt->execute();$placement=$stmt->get_result()->fetch_assoc();$stmt->close();
     if(!$placement)throw new RuntimeException('Penempatan aktif siswa untuk perubahan potongan SPP tidak ditemukan.');
     $discountAmount=max(0,$discountAmount);$updated=0;$locked=0;
-    $stmt=$db->prepare("SELECT ts.id,ts.master_spp_tahun_id,ts.tarif_dasar_snapshot,ts.status,
+    $stmt=$db->prepare("SELECT ts.id,ts.master_spp_tahun_id,ts.tarif_dasar_snapshot,ts.status,ts.bulan,ts.tahun,
       EXISTS(SELECT 1 FROM spp_alokasi a JOIN spp_alokasi_batch ab ON ab.id=a.batch_id AND ab.status='active' WHERE a.tagihan_spp_id=ts.id) allocated
       FROM tagihan_spp ts JOIN master_spp_tahun mst ON mst.id=ts.master_spp_tahun_id
       WHERE ts.no_induk=? AND ts.penempatan_id=? AND mst.status<>'closed' AND ts.status IN ('open','waived') FOR UPDATE");
     $stmt->bind_param('si',$noInduk,$placementId);$stmt->execute();$bills=$stmt->get_result()->fetch_all(MYSQLI_ASSOC);$stmt->close();
     $update=$db->prepare('UPDATE tagihan_spp SET potongan_nominal_ditetapkan_snapshot=?,potongan_nominal_snapshot=?,nominal_tagihan=?,status=? WHERE id=?');
     foreach($bills as $bill){
-        if((int)$bill['allocated']===1){$locked++;continue;}
+        if((int)$bill['allocated']===1||lb_spp_credit($db,$noInduk,$bill['bulan'],$bill['tahun'])>.001){$locked++;continue;}
         $net=spp_net_tariff((float)$bill['tarif_dasar_snapshot'],$discountAmount);$status=$net['net']<=.001?'waived':'open';$id=(int)$bill['id'];
         $update->bind_param('dddsi',$discountAmount,$net['discount'],$net['net'],$status,$id);$update->execute();$updated++;
     }
@@ -163,7 +163,7 @@ function spp_sync_active_placement_rates(mysqli $db, int $yearId, array $rates, 
     $updateStudent = $db->prepare('UPDATE siswa SET SPP_PERBULAN=? WHERE NO_INDUK=? AND is_active=1');
     foreach ($placements as $placement) {
         $level = (int)$placement['kelas'];
-        $base = lop_tariff($db,(string)$placement['no_induk']) ?? (float)($rates[$level] ?? 0);
+        $base = lop_tariff($db,(string)$placement['no_induk'],$startYear.'/'.($startYear+1)) ?? (float)($rates[$level] ?? 0);
         if ($base <= .001) continue;
         $net = spp_net_tariff($base, (float)$placement['potongan_spp_nominal'])['net'];
         $snapshot = (int)$placement['spp_covered_by_psb'] === 1 ? 0.0 : $net;
@@ -237,21 +237,22 @@ function spp_master_correct_published_rates(mysqli $db, int $id, array $rates, s
     }
     if (!$changed) throw new RuntimeException('Belum ada perubahan tarif.');
     $yearId=(int)$master['tahun_ajaran_id'];
+    lb_mark_spp_master($db,(string)$master['label'],array_keys($changed));
     $s=$db->prepare('SELECT s.NO_INDUK FROM siswa s JOIN siswa_tahun_ajaran sta ON sta.no_induk=s.NO_INDUK AND sta.unit_id=s.unit_id WHERE sta.tahun_ajaran_id=? ORDER BY s.id');
     $s->bind_param('i',$yearId);$s->execute();$students=$s->get_result()->fetch_all(MYSQLI_ASSOC);$s->close();
     // Use the cashier's exact lookup shape. A join can lock a different NIS index
     // before the primary record, causing a cycle with payment foreign-key checks.
     $s=$db->prepare('SELECT id FROM siswa WHERE NO_INDUK=? FOR UPDATE');
     foreach($students as $student){$nis=(string)$student['NO_INDUK'];$s->bind_param('s',$nis);$s->execute();$s->get_result()->fetch_all();}$s->close();
-    $s=$db->prepare('SELECT id,no_induk,tingkat_snapshot,status,potongan_nominal_ditetapkan_snapshot FROM tagihan_spp WHERE master_spp_tahun_id=? ORDER BY id FOR UPDATE');
+    $s=$db->prepare('SELECT id,no_induk,tingkat_snapshot,status,potongan_nominal_ditetapkan_snapshot,bulan,tahun FROM tagihan_spp WHERE master_spp_tahun_id=? ORDER BY id FOR UPDATE');
     $s->bind_param('i',$id);$s->execute();$bills=$s->get_result()->fetch_all(MYSQLI_ASSOC);$s->close();
     $paid=$db->prepare("SELECT a.id FROM spp_alokasi a JOIN spp_alokasi_batch ab ON ab.id=a.batch_id WHERE a.tagihan_spp_id=? AND ab.status='active' LIMIT 1 FOR UPDATE");
     $update=$db->prepare('UPDATE tagihan_spp SET tarif_dasar_snapshot=?,potongan_nominal_snapshot=?,nominal_tagihan=?,status=? WHERE id=?');
     $updated=0;$locked=0;
     foreach ($bills as $bill) {
-        $level=(int)$bill['tingkat_snapshot'];if (!isset($changed[$level])) continue;if(lop_tariff($db,(string)$bill['no_induk'])!==null){$locked++;continue;}
+        $level=(int)$bill['tingkat_snapshot'];if (!isset($changed[$level])) continue;
         $billId=(int)$bill['id'];$paid->bind_param('i',$billId);$paid->execute();$allocated=$paid->get_result()->num_rows>0;
-        if ($allocated || !in_array($bill['status'],['open','waived'],true)) { $locked++;continue; }
+        if ($allocated || lb_spp_credit($db,(string)$bill['no_induk'],$bill['bulan'],$bill['tahun'])>.001 || !in_array($bill['status'],['open','waived'],true)) { $locked++;continue; }
         $base=$changed[$level];$net=spp_net_tariff($base,(float)$bill['potongan_nominal_ditetapkan_snapshot']);$status=$net['net']<=.001?'waived':'open';
         $update->bind_param('dddsi',$base,$net['discount'],$net['net'],$status,$billId);$update->execute();$updated++;
     }
@@ -292,6 +293,8 @@ function spp_master_save_rates(mysqli $db, int $masterYearId, array $rates): arr
         $changed++;
         spp_write_audit($db, $masterYearId, null, 'ubah_tarif', ['tingkat'=>$level,'nominal'=>(float)$old['nominal_dasar']], ['tingkat'=>$level,'nominal'=>$new,'tagihan_diubah'=>0,'tagihan_terkunci'=>0], 0);
     }
+    $yearLabel=lf_one($db,'SELECT label FROM tahun_ajaran WHERE id=?',[$master['tahun_ajaran_id']])['label'];
+    lb_mark_spp_master($db,$yearLabel,array_keys($rates));
     spp_sync_active_placement_rates($db, (int)$master['tahun_ajaran_id'], $rates);
     return ['rates_changed'=>$changed,'bills_updated'=>0,'bills_locked'=>0];
 }
@@ -319,12 +322,12 @@ function spp_publish_students(mysqli $db, int $masterYearId, array $students, ar
     $rates=spp_master_rates($db,$masterYearId);
     $selected=[]; foreach($students as $nis){$nis=trim((string)$nis);if($nis!=='')$selected[$nis]=true;}
     if(!$selected) throw new RuntimeException('Pilih minimal satu siswa untuk penerbitan SPP.');
-    $allLegacy=true;foreach(array_keys($selected) as $nis)if(lop_tariff($db,(string)$nis)===null){$allLegacy=false;break;}
+    $allLegacy=true;foreach(array_keys($selected) as $nis)if(lop_tariff($db,(string)$nis,(string)$master['label'])===null){$allLegacy=false;break;}
     foreach($rates as $level=>$rate)if($rate<=0&&!$allLegacy)throw new RuntimeException('Lengkapi tarif dasar kelas '.$level.' sebelum menerbitkan.');
-    if($useLegacyTariffs)foreach(array_keys($selected) as $nis)if(lop_tariff($db,(string)$nis)===null)throw new RuntimeException('Tarif Legacy siswa belum disahkan.');
+    if($useLegacyTariffs)foreach(array_keys($selected) as $nis)if(lop_tariff($db,(string)$nis,(string)$master['label'])===null)throw new RuntimeException('Tarif Legacy siswa belum disahkan.');
     spp_sync_active_placement_rates($db, (int)$master['tahun_ajaran_id'], $rates, array_keys($selected));
     $periods=spp_academic_periods((string)$master['label']);
-    $created=0;$skipped=0;$ineligible=[];
+    $created=0;$skipped=0;$legacyCovered=0;$beforeTransition=0;$ineligible=[];
     $find=$db->prepare("SELECT sta.id,sta.no_induk,sta.kelas,sta.master_kelas_id,sta.kelas_rombel_snapshot,sta.spp_covered_by_psb,sta.komite_mulai_bulan,s.potongan_spp_nominal,s.is_active
       FROM siswa_tahun_ajaran sta JOIN siswa s ON s.NO_INDUK=sta.no_induk AND s.unit_id=sta.unit_id
       WHERE sta.status<>'dibatalkan' AND sta.tahun_ajaran_id=? AND sta.no_induk=? AND CAST(sta.kelas AS UNSIGNED) " . unit_level_between_sql() . " LIMIT 1 FOR UPDATE");
@@ -337,13 +340,15 @@ function spp_publish_students(mysqli $db, int $masterYearId, array $students, ar
         // its Komite pair too; INSERT IGNORE preserves existing bills and paid snapshots.
         require_once __DIR__.'/komite_billing.php';
         komite_sync_placement($db,(int)$placement['id']);
-        $level=(int)$placement['kelas'];$base=lop_tariff($db,(string)$placement['no_induk'])??(float)$rates[$level];$discount=(float)$placement['potongan_spp_nominal'];
+        $level=(int)$placement['kelas'];$base=lop_tariff($db,(string)$placement['no_induk'],(string)$master['label'])??(float)$rates[$level];$discount=(float)$placement['potongan_spp_nominal'];
         $net=spp_net_tariff($base,$discount);$covered=(int)$placement['spp_covered_by_psb']===1;
         $start=(string)($startMonths[$nis]??$placement['komite_mulai_bulan']??'07');$startIndex=0;
         foreach($periods as $idx=>$period) if($period['bulan']===$start){$startIndex=$idx;break;}
         foreach($periods as $idx=>$period){
+            $opening=lb_student($db,$nis);$minimum=(string)($opening['settings']['start_period']??'');
+            if($minimum!==''&&($period['tahun'].'-'.$period['bulan'])<$minimum){$beforeTransition++;continue;}
             if($idx<$startIndex)continue;
-            require_once __DIR__.'/legacy_full_read.php';if(lful_is_covered($db,$nis,'spp',$period['tahun'].'-'.str_pad($period['bulan'],2,'0',STR_PAD_LEFT))){$skipped++;continue;}
+            require_once __DIR__.'/legacy_full_read.php';if(lful_is_covered($db,$nis,'spp',$period['tahun'].'-'.str_pad($period['bulan'],2,'0',STR_PAD_LEFT))){$legacyCovered++;continue;}
             $billBase=$covered?0:$base;$billDiscount=$covered?0:$net['discount'];$billNet=$covered?0:$net['net'];
             $status=$covered?'covered_psb':($billNet<=.001?'waived':'open');
             $placementId=(int)$placement['id'];$classId=(int)($placement['master_kelas_id']??0);$classIdParam=$classId?:null;
@@ -358,7 +363,7 @@ function spp_publish_students(mysqli $db, int $masterYearId, array $students, ar
     $find->close();$insert->close();
     if($created>0){$stmt=$db->prepare("UPDATE master_spp_tahun SET status='published',published_at=COALESCE(published_at,NOW()) WHERE id=? AND status='draft'");$stmt->bind_param('i',$masterYearId);$stmt->execute();$stmt->close();}
     spp_write_audit($db,$masterYearId,null,'terbitkan_tagihan',null,['siswa'=>count($selected),'tagihan_baru'=>$created,'tidak_memenuhi'=>$ineligible],$created);
-    return ['created'=>$created,'existing'=>$skipped,'ineligible'=>$ineligible];
+    return ['created'=>$created,'existing'=>$skipped,'legacy_covered'=>$legacyCovered,'before_transition'=>$beforeTransition,'ineligible'=>$ineligible];
 }
 
 
@@ -370,8 +375,8 @@ function spp_open_bills(mysqli $db, string $noInduk, bool $forUpdate=false): arr
       GROUP BY ts.id HAVING ts.nominal_tagihan-paid>.001 ORDER BY CAST(ts.tahun AS UNSIGNED),CAST(ts.bulan AS UNSIGNED),ts.id";
     if($forUpdate)$sql.=' FOR UPDATE';
     $stmt=$db->prepare($sql);$stmt->bind_param('s',$noInduk);$stmt->execute();$rows=$stmt->get_result()->fetch_all(MYSQLI_ASSOC);$stmt->close();
-    foreach($rows as &$row){$row['paid']=(float)$row['paid'];$row['remaining']=max(0,(float)$row['nominal_tagihan']-$row['paid']);}unset($row);
-    return $rows;
+    foreach($rows as &$row){$row['legacy_paid']=lb_spp_credit($db,$noInduk,$row['bulan'],$row['tahun']);$row['paid']=(float)$row['paid']+$row['legacy_paid'];$row['remaining']=max(0,(float)$row['nominal_tagihan']-$row['paid']);}unset($row);
+    return array_values(array_filter($rows,static fn($r)=>$r['remaining']>.001));
 }
 
 function spp_published_period_status(mysqli $db, string $noInduk, string $month, string $year, int $excludePaymentId=0): array {
@@ -380,6 +385,7 @@ function spp_published_period_status(mysqli $db, string $noInduk, string $month,
     $selected=null;$older=null;
     $target=(int)$year*100+(int)$month;
     foreach ($bills as $bill) {
+        $bill['paid']=(float)$bill['paid']+lb_spp_credit($db,$noInduk,$bill['bulan'],$bill['tahun']);
         $period=(int)$bill['tahun']*100+(int)$bill['bulan'];
         $remaining=max(0,(float)$bill['nominal_tagihan']-(float)$bill['paid']);
         if ($period===$target) $selected=$bill;
@@ -387,7 +393,9 @@ function spp_published_period_status(mysqli $db, string $noInduk, string $month,
     }
     $label=spp_month_label($month).' '.$year;
     $paid=(float)($selected['paid']??0);$total=(float)($selected['nominal_tagihan']??0);
-    $status=['ok'=>true,'status'=>'payable','code'=>'payable','lock_spp'=>false,'title'=>'','message'=>'','amount_label'=>'','selected'=>['bulan'=>$month,'tahun'=>$year,'label'=>$label,'tariff'=>$total,'paid'=>$paid,'remaining'=>max(0,$total-$paid)],'blocking_period'=>null];
+    $legacySelected=lb_spp_credit($db,$noInduk,$month,$year);
+    $status=['ok'=>true,'billing_rule_version'=>LB_RULE_VERSION,'legacy_paid'=>$legacySelected,'status'=>'payable','code'=>'payable','lock_spp'=>false,'title'=>'','message'=>'','amount_label'=>'','selected'=>['bulan'=>$month,'tahun'=>$year,'label'=>$label,'tariff'=>$total,'paid'=>$paid,'remaining'=>max(0,$total-$paid)],'blocking_period'=>null];
+    if(!$selected){require_once __DIR__.'/legacy_full_read.php';if(lful_is_covered($db,$noInduk,'spp',$year.'-'.str_pad($month,2,'0',STR_PAD_LEFT)))return array_merge($status,['status'=>'not_payable','code'=>'legacy_covered','lock_spp'=>true,'title'=>'Periode Legacy','message'=>'Periode '.$label.' berada pada histori/peralihan Legacy; tidak diterbitkan ulang sebagai tagihan baru.','amount_label'=>'Histori Legacy · kewajiban tidak tercatat']);}
     if (!$selected) return array_merge($status,['status'=>'not_published','code'=>'not_published','lock_spp'=>true,'title'=>'Tagihan SPP belum terbit','message'=>'SPP '.$label.' belum tersedia.','amount_label'=>'Pilih bulan lain atau hubungi admin.']);
     if(in_array($selected['status'],['covered_psb','waived','cancelled'],true)){
         $labels=['covered_psb'=>['Tercakup Uang PSB','SPP '.$label.' tercakup Uang PSB tahun pertama. Tidak perlu dibayar terpisah.'],'waived'=>['Potongan Penuh','SPP '.$label.' memiliki potongan penuh.'],'cancelled'=>['Tagihan Dibatalkan','SPP '.$label.' telah dibatalkan.']];
@@ -411,6 +419,7 @@ function spp_payment_payload(mysqli $db, int $excludePaymentId = 0): array {
       FROM tagihan_spp ts JOIN tahun_ajaran ta ON ta.id=ts.tahun_ajaran_id LEFT JOIN spp_alokasi a ON a.tagihan_spp_id=ts.id LEFT JOIN spp_alokasi_batch ab ON ab.id=a.batch_id
       WHERE ts.status='open' GROUP BY ts.id ORDER BY CAST(ts.tahun AS UNSIGNED),CAST(ts.bulan AS UNSIGNED)");
     while($row=$result->fetch_assoc()){
+        $row['paid']=(float)$row['paid']+lb_spp_credit($db,$row['no_induk'],$row['bulan'],$row['tahun']);
         $remaining=max(0,(float)$row['nominal_tagihan']-(float)$row['paid']);if($remaining<=.001)continue;
         $payload[$row['no_induk']]['tagihan'][]=['id'=>(int)$row['id'],'bulan'=>$row['bulan'],'tahun'=>$row['tahun'],'tahun_ajaran'=>$row['tahun_ajaran'],'kelas'=>$row['kelas_rombel_snapshot'],'total'=>(float)$row['nominal_tagihan'],'paid'=>(float)$row['paid'],'remaining'=>$remaining];
     }
@@ -448,6 +457,7 @@ function spp_assert_paid_order(mysqli $db, string $noInduk): void {
     $stmt=$db->prepare("SELECT ts.bulan,ts.tahun,ts.nominal_tagihan,COALESCE(SUM(CASE WHEN ab.status='active' THEN a.nominal_dari_bayar ELSE 0 END),0) paid,MAX(CASE WHEN ab.status='active' AND ab.komite_required=1 THEN 1 ELSE 0 END) protected_payment FROM tagihan_spp ts LEFT JOIN spp_alokasi a ON a.tagihan_spp_id=ts.id LEFT JOIN spp_alokasi_batch ab ON ab.id=a.batch_id WHERE ts.no_induk=? AND ts.status='open' GROUP BY ts.id ORDER BY CAST(ts.tahun AS UNSIGNED),CAST(ts.bulan AS UNSIGNED)");
     $stmt->bind_param('s',$noInduk);$stmt->execute();$firstUnpaid=null;
     foreach ($stmt->get_result()->fetch_all(MYSQLI_ASSOC) as $bill) {
+        $bill['paid']=(float)$bill['paid']+lb_spp_credit($db,$noInduk,$bill['bulan'],$bill['tahun']);
         if ((float)$bill['nominal_tagihan']-(float)$bill['paid']>.001 && !$firstUnpaid) $firstUnpaid=$bill;
         if ($firstUnpaid && (int)$bill['protected_payment']===1 && ((int)$bill['tahun']*100+(int)$bill['bulan']) > ((int)$firstUnpaid['tahun']*100+(int)$firstUnpaid['bulan'])) {
             $stmt->close();

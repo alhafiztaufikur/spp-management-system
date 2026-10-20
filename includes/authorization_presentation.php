@@ -5,7 +5,7 @@ require_once __DIR__.'/authorization_sources.php';
 
 function authorization_escape($value): string { return htmlspecialchars((string)$value, ENT_QUOTES, 'UTF-8'); }
 function authorization_role_label(string $role): string {
-    return ['super_admin'=>'Super Admin','admin'=>'Admin','kasir'=>'Kasir','bendahara'=>'Bendahara'][$role] ?? 'Tidak tercatat';
+    return ['super_admin'=>'Super Admin','admin'=>'Admin','kasir'=>'Kasir','bendahara'=>'Bendahara','legacy_source'=>'Operator sumber Legacy'][$role] ?? 'Tidak tercatat';
 }
 function authorization_icon(string $name): string {
     $paths = [
@@ -72,8 +72,9 @@ function authorization_detail_model(mysqli $db, int $id, bool $queue, string $so
         $snapshot=json_decode($request['before_snapshot'],true);
         $paymentId=(int)($request['bayar_id']??$snapshot['payment']['id']??0);
     } else $paymentId=$id;
-    if(!authorization_history_can_read($db,$paymentId)) throw new RuntimeException('Riwayat tidak ditemukan pada cakupan akses Anda.');
-    $events=authorization_history_events($db,$paymentId);
+    if($paymentId<-1000000000){require_once __DIR__.'/legacy_transactions.php';$lm=lt_model($db,-$paymentId-1000000000,(bool)lop_record($db,'payment',-$paymentId-1000000000)['cancelled']);$events=$lm['events'];}else $events=null;
+    if($events===null&&!authorization_history_can_read($db,$paymentId)) throw new RuntimeException('Riwayat tidak ditemukan pada cakupan akses Anda.');
+    $events??=authorization_history_events($db,$paymentId);
     if(!$events) throw new RuntimeException('Riwayat tidak ditemukan pada cakupan akses Anda.');
     $identity=[]; $rows=[];
     foreach($events as $e) {

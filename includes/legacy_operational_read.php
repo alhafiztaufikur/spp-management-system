@@ -1,7 +1,8 @@
 <?php
 require_once __DIR__.'/legacy_operational_schema.php';
 function lop_read_one(mysqli $db,string $sql,array $values): ?array {$s=$db->prepare($sql);$s->bind_param(str_repeat('s',count($values)),...$values);$s->execute();$row=$s->get_result()->fetch_assoc();$s->close();return $row;}
-function lop_tariff(mysqli $db,string $nis): ?float {
+function lop_tariff(mysqli $db,string $nis,?string $year=null): ?float {
+    require_once __DIR__.'/legacy_billing.php';if(lb_spp_override($db,$nis,$year??(function_exists('du_current_academic_year')?du_current_academic_year():((int)date('Y')-((int)date('n')<7?1:0)).'/'.((int)date('Y')+((int)date('n')<7?0:1)))))return null;
     if(!lop_ready($db))return null;$r=lop_read_one($db,"SELECT t.amount FROM legacy_op_tariffs t JOIN siswa s ON s.id=t.student_id AND s.unit_id=t.unit_id WHERE s.NO_INDUK=? AND t.basis='legacy'",[$nis]);return $r?(float)$r['amount']:null;
 }
 function lop_opening(mysqli $db,int $student,int $unit): ?array {

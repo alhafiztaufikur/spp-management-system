@@ -1,5 +1,21 @@
 # Riwayat Perubahan AI SistemSPP
 
+## 2026-10-20 - Perbaikan penerbitan dan sisa tagihan Legacy
+
+- Lengkapi DU pada tahun yang sudah terbit secara idempotent, pertahankan tarif awal Legacy dan snapshot cicilan. Aturan perubahan master berikutnya dicatat per tahun/tingkat dalam audit existing.
+- Rekonsiliasi kredit PSB/DU/SPP sesuai komponen dan periode tanpa pembayaran native atau kas baru. Selaraskan Input Pembayaran, laporan, dan struk Sisa PSB/Sisa DU; bukti kosong tetap belum dapat ditentukan.
+- Perbaiki penanda unit dan pemulihan isian, formulir tanpa JavaScript, serta tombol riwayat Data Siswa dan kartu ponsel.
+- [Panduan, hasil pemeriksaan, dan batas pengujian](LEGACY_BILLING_REPAIR.md). Pemasangan hanya file terkait ke lab, rekonsiliasi terbatas `db_spp_test2`; `db_spp` dan konfigurasi dipertahankan. Tanpa commit/push/deployment.
+
+
+## 2026-10-20 - Penyatuan transaksi Legacy, DU, dan tabungan kelas khusus
+
+- Gunakan model/detail/struk pembayaran aplikasi untuk hasil migrasi operasional; pertahankan pecahan, periode asli, ID negatif, operator sumber, dan arsip. Tambahkan edit, pembatalan, aktivitas, pengajuan Administrator, dan keputusan Super Admin atomik tanpa pembayaran native duplikat.
+- Gabungkan Riwayat Daftar Ulang secara default, sumber/filter/pagination SQL, 9.288 pembayaran tanpa tanggal, tarif `Daftar_ulang`/`du`, status berbasis bukti historis, serta Excel sesuai filter. Jangan melunasi tagihan operasional melalui kesamaan identitas/tahun saja.
+- Sediakan pencarian pemilik server 25 hasil, saldo `owner_id`, formulir tabungan siswa/non-siswa, struk dan buku rekening, retry, serta kas gabungan dengan rincian pemilik. Histori, peralihan, dan FIX tetap bukan kas baru.
+- Verifikasi 117 pemeriksaan backend, 7 kasus HTTP, 62 kasus Chromium 109, PDF/Excel dan 9 halaman lab tanpa mutasi. Pertahankan filter banyak pilihan; tanggal kosong ditampilkan sebagai Tidak tercatat.
+- Pasang metadata otorisasi dan indeks minimal di lab `db_spp_test2` setelah backup/pengujian terisolasi. Pertahankan konfigurasi dan seluruh data pengguna; fingerprint 51 tabel utama/60 tabel lab tidak berubah pada kolom awal. Tanpa commit/push/deployment. [Panduan dan bukti pemeriksaan](LEGACY_TRANSACTION_UNIFICATION.md).
+
 ## 2026-10-20 - Menuntaskan pembacaan hasil migrasi
 
 - Satukan jumlah, daftar, detail, operator dan pagination SQL pembayaran native/Legacy untuk siswa maupun pemilik non-siswa; sediakan Semua Periode, filter tanpa tanggal, sumber dan jenis pemilik, serta ekspor bertahap.

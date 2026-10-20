@@ -14,8 +14,8 @@ require_once __DIR__.'/../includes/payment_permissions.php';
 
 header('Cache-Control: no-store, no-cache, must-revalidate, max-age=0');
 
-$paymentId = max(0, (int)($_GET['id'] ?? 0));
-if ($paymentId <= 0) {
+$paymentId = (int)($_GET['id'] ?? 0);
+if ($paymentId === 0) {
     $_SESSION['flash'] = ['type' => 'error', 'msg' => 'Transaksi untuk struk tidak valid.'];
     header('Location: index.php');
     exit;
@@ -43,7 +43,7 @@ function receipt_month($value): string {
     return $months[$code] ?? (string)$value;
 }
 
-function receipt_date($value): string { return spp_date_label($value,true); }
+function receipt_date($value): string { return $value?spp_date_label($value,true):'Tidak tercatat'; }
 
 function receipt_words(int $number): string {
     $words = ['', 'satu', 'dua', 'tiga', 'empat', 'lima', 'enam', 'tujuh', 'delapan', 'sembilan', 'sepuluh', 'sebelas'];
@@ -99,6 +99,8 @@ function receipt_add_remaining_line(array &$lines, string $label, float $current
 }
 
 function receipt_remaining_lines(mysqli $db,array $payment,array $otherDetails): array {return payment_receipt_remaining($db,$payment);}
+
+if($paymentId<0){require_once __DIR__.'/../includes/payment_history.php';require_once __DIR__.'/../includes/receipt_print.php';try{$m=payment_history_model($koneksi,$paymentId,false);if(empty($m['payment']))throw new DomainException('Struk arsip belum tersedia.');$p=$m['payment'];if(unit_active_id()===0)unit_set_context($koneksi,(int)$p['unit_id']);$p['owner_type']=empty($p['student_id'])?'account':'student';$total=(float)$p['total_jumlah'];$fraction=(int)round(($total-floor($total))*100);receipt_http_output([['payment'=>$p,'school'=>unit_school_name((int)$p['unit_id']),'primary'=>$m['components'],'remaining'=>payment_receipt_remaining($koneksi,$p),'other'=>[],'period'=>payment_history_period($p),'words'=>receipt_money_words($total),'date'=>receipt_date($p['TGL_BYR']),'signer'=>$p['source_operator']?:'Tidak tercatat']], 'Struk Pembayaran', 'Struk siap dicetak');}catch(Throwable $ex){http_response_code(404);echo htmlspecialchars($ex->getMessage(),ENT_QUOTES,'UTF-8');}exit;}
 
 $stmt = $koneksi->prepare("
     SELECT
@@ -180,6 +182,6 @@ receipt_http_output([[
     'payment'=>$payment, 'school'=>unit_school_name((int)$payment['unit_id']),
     'primary'=>$primaryLines, 'remaining'=>$remainingLines, 'other'=>$otherLines,
     'period'=>receipt_month($payment['BULAN']).' '.$payment['TAHUN'],
-    'words'=>ucfirst(receipt_words((int)round($total))).' rupiah',
+    'words'=>receipt_money_words($total),
     'date'=>receipt_date($payment['TGL_BYR']), 'signer'=>$signer,
 ]], 'Struk #'.$paymentId.' - '.$payment['NAMA'], 'Struk siap dicetak');

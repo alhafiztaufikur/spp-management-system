@@ -4,7 +4,7 @@
     const body=dialog.querySelector('.payment-activity-content');const subtitle=dialog.querySelector('[data-activity-subtitle]');
     let source=null;let controller=null;
     const text=(tag,content,cls='')=>{const e=document.createElement(tag);e.textContent=content;if(cls)e.className=cls;return e;};
-    const roles={super_admin:'Super Admin',admin:'Admin',kasir:'Kasir',bendahara:'Bendahara'};
+    const roles={super_admin:'Super Admin',admin:'Admin',kasir:'Kasir',bendahara:'Bendahara',legacy_source:'Operator sumber Legacy'};
     dialog.querySelector('[data-close-activity]').addEventListener('click',()=>dialog.close());
     dialog.addEventListener('click',e=>{if(e.target===dialog){const r=dialog.getBoundingClientRect();if(e.clientX<r.left||e.clientX>r.right||e.clientY<r.top||e.clientY>r.bottom)dialog.close();}});
     dialog.addEventListener('close',()=>{controller?.abort();source?.focus();});

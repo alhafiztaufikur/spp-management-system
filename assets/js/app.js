@@ -1297,6 +1297,7 @@ function setPaymentComponent(key, total, paid) {
 
 function applyStudentPaymentDetails(opt) {
   if (!opt) return;
+  queueMicrotask(() => { if(opt.dataset.psbKnown==='0'){for(const key of ['total','bayar','sisa']){const el=document.getElementById('psb-'+key);if(el)el.value='Belum dapat ditentukan';}const input=document.getElementById('psb-input');if(input){input.value='0';input.readOnly=true;input.setAttribute('aria-readonly','true');}const label=document.getElementById('psb-context-label');if(label)label.textContent='Dasar PSB sumber belum lengkap.';} });
   ensureDefaultDaftarUlangSelection(opt);
   ['psb','spp','komite','du'].forEach(key => {
     if (window.sppPublishedBilling && (key === 'spp' || key === 'komite')) return;

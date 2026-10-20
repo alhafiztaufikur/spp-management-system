@@ -72,12 +72,6 @@ try { $operators = history_operator_choices($_GET['operator'] ?? null, $operator
 catch (InvalidArgumentException $error) { http_response_code(400); exit(htmlspecialchars($error->getMessage(),ENT_QUOTES,'UTF-8')); }
 
 $isArchive = ($_GET['view'] ?? '') === 'deleted';
-if ($isArchive) {
-    $archive = payment_archive_page($koneksi, $filter_tanggal_awal, $filter_tanggal_akhir, $search,
-        max(0,(int)($_GET['student_id']??0)), $page, $perPage, $operators, $rombelFilter);
-    $paymentRows = $archive['rows']; $totalPayments = $archive['total'];
-    $totalPages = $archive['pages']; $page = $archive['page']; $offset = $archive['offset'];
-} else {
 try {
     $history=mh_payment_page($koneksi,$_GET,$rombelFilter,$operators,
         $filter_tanggal_awal.' 00:00:00',date('Y-m-d H:i:s',strtotime($filter_tanggal_akhir.' +1 day')),$page,$perPage);
@@ -85,7 +79,6 @@ try {
 $_GET['page']=$history['page'];
 $paymentRows=$history['rows'];$totalPayments=$history['total'];$totalPages=$history['pages'];$page=$history['page'];$offset=$history['offset'];
 
-}
 $paymentPaginationQuery = pagination_query(['per_page' => $perPage, 'view'=>$isArchive?'deleted':'active','rombel'=>$rombelFilter['values']]);
 unset($paymentPaginationQuery['selected']);
 $activityGroups = payment_activity_for_payments($koneksi, array_column($paymentRows, 'id'));
@@ -262,8 +255,8 @@ filter_output_start();
       <section class="ph-list-panel"><header class="ph-panel-heading"><div><h3><?= authorization_icon('history') ?> Daftar Transaksi</h3><p>Menampilkan <?= $firstShown ?>&ndash;<?= $lastShown ?> dari <?= number_format($totalPayments) ?> transaksi<?= $isArchive?' dihapus':'' ?>.</p></div><div class="ph-list-nav"><small><?= $firstShown ?>&ndash;<?= $lastShown ?> dari <?= number_format($totalPayments) ?></small><?php foreach(['Sebelumnya'=>$page-1,'Berikutnya'=>$page+1] as $label=>$target): ?><a class="btn btn-ghost btn-sm <?= $target<1||$target>$totalPages?'is-disabled':'' ?>" aria-label="Halaman <?= strtolower($label) ?>" <?= $target<1||$target>$totalPages?'aria-disabled="true" tabindex="-1"':'' ?> href="<?= $target>=1&&$target<=$totalPages?'lihat.php?'.htmlspecialchars(http_build_query(array_merge($_GET,['page'=>$target,'selected'=>null]))):'#' ?>"><?= authorization_icon($label==='Sebelumnya'?'left':'right') ?></a><?php endforeach; ?></div></header>
       <div class="ph-record-list">
       <?php foreach($paymentRows as $i=>$row): $id=(int)$row['id'];$href='lihat.php?'.http_build_query(array_merge($_GET,['selected'=>$id]));$rowCaps=$id<0?['can_print'=>true]:payment_capabilities($koneksi,$row,$activityGroups[$id]??[],$isArchive,[]); ?><article class="ph-record-card">
-      <a href="<?= authorization_escape($href) ?>" class="ph-record <?= $id===$selectedId?'is-selected':'' ?> <?= $isArchive?'is-deleted':'' ?>" data-payment-record data-id="<?= $id ?>" data-unit="<?= (int)$row['unit_id'] ?>" <?= $id===$selectedId?'aria-current="true"':'' ?>><span class="ph-record-number"><?= $offset+$i+1 ?></span><span class="ph-record-icon"><?= authorization_icon('student') ?></span><div class="ph-record-identity"><strong><?= authorization_escape($row['NO_INDUK']) ?></strong><span><?= authorization_escape($row['NAMA']) ?></span><small><?= ($row['owner_type']??'student')==='account'?'Pemilik rekening non-siswa':'Siswa / Diknas '.authorization_escape($row['NO_induk_diknas']?:'Tidak tercatat') ?></small><?= unit_record_badge($row) ?></div><span class="kelas-badge">Kelas <?= authorization_escape($row['kelas_transaksi']) ?></span><div class="ph-record-period"><small>Periode</small><span><?= authorization_icon('calendar') ?> <?= authorization_escape(payment_history_period($row)) ?></span></div><div class="ph-record-total"><small>Total Bayar</small><strong><?= payment_history_money($row['total_jumlah']) ?></strong></div><span class="ph-status <?= $isArchive?'is-deleted':'' ?>"><?= $isArchive?'Dihapus':($id<0?'Legacy':'SistemSPP') ?></span><?= authorization_icon('right') ?></a>
-      <?php if($id>0&&$rowCaps['can_print']): ?><div class="ph-record-print"><a class="btn btn-ghost history-receipt-button" data-print-payment href="../laporan/cetak_struk.php?id=<?= $id ?>" target="_blank" rel="noopener"><?= authorization_icon('print') ?>Cetak Bukti Transaksi</a></div><?php endif; ?></article>
+      <a href="<?= authorization_escape($href) ?>" class="ph-record <?= $id===$selectedId?'is-selected':'' ?> <?= $isArchive?'is-deleted':'' ?>" data-payment-record data-id="<?= $id ?>" data-unit="<?= (int)$row['unit_id'] ?>" <?= $id===$selectedId?'aria-current="true"':'' ?>><span class="ph-record-number"><?= $offset+$i+1 ?></span><span class="ph-record-icon"><?= authorization_icon('student') ?></span><div class="ph-record-identity"><strong><?= authorization_escape($row['NO_INDUK']) ?></strong><span><?= authorization_escape($row['NAMA']) ?></span><small><?= ($row['owner_type']??'student')==='account'?'Pemilik rekening non-siswa':'Siswa / Diknas '.authorization_escape($row['NO_induk_diknas']?:'Tidak tercatat') ?></small><?= unit_record_badge($row) ?></div><span class="kelas-badge">Kelas <?= authorization_escape(payment_history_class($row['kelas_transaksi'])) ?></span><div class="ph-record-period"><small>Periode</small><span><?= authorization_icon('calendar') ?> <?= authorization_escape(payment_history_period($row)) ?></span></div><div class="ph-record-total"><small>Total Bayar</small><strong><?= payment_history_money($row['total_jumlah']) ?></strong></div><span class="ph-status <?= $isArchive?'is-deleted':'' ?>"><?= $isArchive?'Dihapus':($id<0?'Legacy':'SistemSPP') ?></span><?= authorization_icon('right') ?></a>
+      <?php if(!$isArchive&&$rowCaps['can_print']): ?><div class="ph-record-print"><a class="btn btn-ghost history-receipt-button" data-print-payment href="../laporan/cetak_struk.php?id=<?= $id ?>" target="_blank" rel="noopener"><?= authorization_icon('print') ?>Cetak Bukti Transaksi</a></div><?php endif; ?></article>
       <?php endforeach; ?>
       <?php if(!$paymentRows): ?><div class="ph-empty"><?= authorization_icon('history') ?><h3>Tidak ada transaksi sesuai filter</h3><p><?= $isArchive?'Arsip menggunakan tanggal penghapusan.':'Ubah periode atau pencarian siswa untuk melihat transaksi lain.' ?></p></div><?php endif; ?>
       </div>

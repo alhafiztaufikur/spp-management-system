@@ -21,7 +21,7 @@ function savings_book_make(array $transactions, float $recordedBalance, ?array $
     $entries = [];
     if($legacy){
         foreach($legacy as $transaction){$incoming=(int)round((float)$transaction['masuk']*100);$outgoing=(int)round((float)$transaction['keluar']*100);$balance+=$incoming-$outgoing;
-            $entries[]=['number'=>count($entries)+1,'tanggal'=>$transaction['tanggal'],'masuk'=>$incoming,'keluar'=>$outgoing,'saldo'=>$balance,'label'=>($transaction['origin']??'')==='adjustment'?'Penyesuaian Saldo Migrasi':'Legacy'];}
+            $entries[]=['number'=>count($entries)+1,'id'=>(int)$transaction['id'],'jenis'=>$incoming>0?'masuk':'keluar','tanggal'=>$transaction['tanggal'],'masuk'=>$incoming,'keluar'=>$outgoing,'saldo'=>$balance,'label'=>($transaction['origin']??'')==='adjustment'?'Penyesuaian Saldo Migrasi':'Legacy'];}
         if(!$opening||$balance!==(int)round((float)$opening['amount']*100))throw new SavingsBookBalanceMismatch('Histori Legacy berbeda dari saldo peralihan.');
     }
     if($opening){
