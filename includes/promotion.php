@@ -23,6 +23,30 @@ function promotion_context_from_target(mysqli $db,string $targetYear):array {
     $s=$db->prepare('SELECT id FROM tahun_ajaran WHERE label=? AND unit_id=?');$s->bind_param('si',$source,$unit);$s->execute();$id=(int)($s->get_result()->fetch_row()[0]??0);$s->close();
     return promotion_context($db,$id,$targetYear);
 }
+/** Graduation belongs to the end of the source academic year, not the date of processing. */
+function promotion_alumni_year(string $sourceYear): int {
+    return (int)substr(du_normalize_academic_year($sourceYear),5,4);
+}
+
+/** Caller owns the transaction. Reuse the canonical inactive class, including Legacy classes. */
+function promotion_alumni_class(mysqli $db,array $ctx): array {
+    $year=promotion_alumni_year($ctx['source_year']);$unit=(int)$ctx['unit_id'];$label='Alumni'.$year;
+    $find=static function()use($db,$unit,$label):?array {
+        $s=$db->prepare('SELECT * FROM master_kelas WHERE unit_id=? AND tingkat=0 AND kode_rombel=? FOR UPDATE');
+        $s->bind_param('is',$unit,$label);$s->execute();$row=$s->get_result()->fetch_assoc();$s->close();return $row?:null;
+    };
+    $row=$find();
+    if(!$row){
+        try{
+            $s=$db->prepare("INSERT INTO master_kelas(unit_id,tingkat,kode_rombel,is_placeholder,is_active,legacy_kind,graduation_year) VALUES(?,0,?,0,0,'alumni',?)");
+            $s->bind_param('isi',$unit,$label,$year);$s->execute();$s->close();
+        }catch(mysqli_sql_exception $e){if($e->getCode()!==1062)throw $e;}
+        $row=$find();
+    }
+    if(!$row||($row['legacy_kind']??'')!=='alumni'||(int)$row['graduation_year']!==$year||(int)$row['is_active']!==0||(int)$row['is_placeholder']!==0)
+        throw new RuntimeException('Master '.$label.' memiliki klasifikasi yang berbeda. Periksa Master Kelas.');
+    return $row;
+}
 function promotion_roster(mysqli $db,int $sourceYearId,int $level):array {
     $ctx=promotion_context($db,$sourceYearId,null,true);[$first,$last]=unit_level_bounds();if($level<$first||$level>$last)return [];
     $s=$db->prepare("SELECT s.id student_id,s.unit_id,s.NO_INDUK,s.NO_induk_diknas,s.NAMA,p.kelas KELAS,p.master_kelas_id,p.kelas_rombel_snapshot,p.id source_placement_id,p.status source_status,
@@ -100,8 +124,12 @@ function promotion_apply_student(mysqli $db,string $nis,int $targetClassId,array
     $s=$db->prepare("UPDATE siswa_tahun_ajaran SET status=? WHERE id=? AND unit_id=? AND status='aktif'");$s->bind_param('sii',$status,$sourceId,$ctx['unit_id']);$s->execute();$changed=$s->affected_rows;$s->close();
     if($changed!==1)throw new RuntimeException('Siswa sudah diproses; muat ulang halaman.');
     if($graduate){
-        $s=$db->prepare('UPDATE siswa SET is_active=0 WHERE id=? AND unit_id=?');$s->bind_param('ii',$student['id'],$ctx['unit_id']);$s->execute();$s->close();promotion_write_audit($db,$actor,$student,$source,$ctx,null);
-        return ['student'=>$student['NAMA'],'action'=>'lulus','source_year'=>$ctx['source_year'],'graduation_year'=>$ctx['source_year'],'target_year'=>$ctx['target_year'],'source_placement_id'=>$sourceId];
+        $alumni=promotion_alumni_class($db,$ctx);
+        $s=$db->prepare("UPDATE siswa SET KELAS='0',master_kelas_id=?,is_active=0 WHERE id=? AND unit_id=?");
+        $s->bind_param('iii',$alumni['id'],$student['id'],$ctx['unit_id']);$s->execute();$s->close();
+        $ctx['alumni_year']=(int)$alumni['graduation_year'];$ctx['alumni_class_id']=(int)$alumni['id'];$ctx['alumni_label']=class_label($alumni);
+        promotion_write_audit($db,$actor,$student,$source,$ctx,null);
+        return ['student'=>$student['NAMA'],'action'=>'lulus','source_year'=>$ctx['source_year'],'graduation_year'=>$ctx['source_year'],'alumni_year'=>$ctx['alumni_year'],'target'=>$ctx['alumni_label'],'alumni_class_id'=>$ctx['alumni_class_id'],'target_year'=>$ctx['target_year'],'source_placement_id'=>$sourceId];
     }
     $yearId=class_ensure_academic_year($db,$ctx['target_year']);$newLevel=(string)$target['tingkat'];$label=class_label($target);
     $rate=spp_current_effective_rate($db,$newLevel,(float)$student['potongan_spp_nominal'],$ctx['target_year'],$nis);$rateReady=$rate['year']!=='Belum disiapkan'&&(float)$rate['base']>0;$spp=$rateReady?(float)$rate['net']:0.0;$komite=(float)$student['POMG'];

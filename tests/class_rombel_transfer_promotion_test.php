@@ -8,6 +8,7 @@ if (PHP_SAPI !== 'cli' || getenv('SPP_TEST_ALLOW_MUTATION') !== '1'
 }
 require_once __DIR__ . '/../koneksi.php';
 require_once __DIR__ . '/../includes/kelas.php';
+require_once __DIR__ . '/../includes/student_class_transition.php';
 
 function rombel_assert(bool $condition, string $message): void {
     if (!$condition) throw new RuntimeException($message);
@@ -16,7 +17,7 @@ rombel_assert((string)$koneksi->query('SELECT DATABASE()')->fetch_row()[0] === $
     'Koneksi tidak menuju clone yang dinyatakan.');
 
 try {
-    $nis = 'AUDR000001';
+    $nis = 'AR'.random_int(10000000,99999999);
     $sourceYear = '2098/2099';
     $_SERVER['HTTP_X_SPP_TEST_CURRENT_YEAR']=$sourceYear;
     $targetYear = '2099/2100';
@@ -62,13 +63,20 @@ try {
     // A paid bill must retain the 5A source snapshot while the student's active rombel moves to 5B.
     $stmt = $koneksi->prepare('UPDATE siswa SET master_kelas_id=? WHERE NO_INDUK=?');
     $stmt->bind_param('is', $classes['5B'], $nis); $stmt->execute(); $stmt->close();
+    // A return from PSB/custom to the same grade must not overwrite a paid
+    // placement before the ordinary synchronization can protect its snapshot.
+    $beforeRestore=$koneksi->query("SELECT * FROM siswa WHERE NO_INDUK='$nis'")->fetch_assoc();$beforeRestore['KELAS']='0';
+    $koneksi->query("UPDATE siswa_tahun_ajaran SET status='pindah' WHERE id=$sourcePlacementId");
+    student_restore_regular_membership($koneksi,$beforeRestore,class_find($koneksi,$classes['5B']));
+    rombel_assert($koneksi->query("SELECT kelas_rombel_snapshot FROM siswa_tahun_ajaran WHERE id=$sourcePlacementId")->fetch_row()[0]==='5A','Pemulihan menimpa snapshot rombel yang sudah dibayar.');
     $sync = null;
     class_sync_student_current_year($koneksi, $nis, $classes['5B'], 250000, 100000, true, $sync);
     rombel_assert(($sync['kelas_dipertahankan'] ?? false) === true, 'Kelas tagihan sumber tidak dipertahankan.');
     $students = class_students_for_manual_step($koneksi, 5, $targetYear);
     $candidate = null;
     foreach ($students as $student) if ($student['NO_INDUK'] === $nis) $candidate = $student;
-    rombel_assert($candidate !== null && $candidate['kelas_label'] === '5A', 'Kelas historis siswa hilang.');
+    rombel_assert($candidate !== null && $candidate['kelas_rombel_snapshot'] === '5A', 'Kelas historis siswa hilang.');
+    rombel_assert($candidate['kelas_label'] === '5B', 'Daftar peserta tidak mengikuti rombel aktif.');
     $promotionCode = (string)($candidate['promotion_kode_rombel'] ?? $candidate['kode_rombel']);
     rombel_assert($promotionCode === 'B',
         "Tujuan otomatis harus mengikuti rombel aktif 5B, bukan snapshot 5A; kode terpilih: $promotionCode.");

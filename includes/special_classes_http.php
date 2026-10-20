@@ -25,7 +25,8 @@ function special_classes_handle(mysqli $db): void {
             else{special_class_save($db,$id,$name,(int)$active,$version);$message=$isToggle?'Status kelas khusus diperbarui. Anggota dan histori tetap tersimpan.':'Kelas khusus berhasil disimpan.';
                 if(is_string($request)&&preg_match('/^[a-f0-9]{32}$/D',$request)){$_SESSION['special_requests'][$request]=$digest;$_SESSION['special_requests']=array_slice($_SESSION['special_requests'],-20,null,true);}}
         }
-        unset($_SESSION['special_old']);$_SESSION['flash']=['type'=>'success','msg'=>$message];$return='special_status=all';
+        unset($_SESSION['special_old']);$_SESSION['flash']=['type'=>'success','msg'=>$message];$return='';
     }catch(Throwable $e){$_SESSION['special_old']=array_intersect_key($_POST,array_flip(['id','nama_custom','is_active']));$_SESSION['flash']=['type'=>'error','msg'=>$e instanceof DomainException?$e->getMessage():'Perubahan kelas dibatalkan. Muat ulang dan coba kembali.'];}
-    header('Location: master_kelas.php?'.$return.'#special-classes');exit;
+    $context=[];foreach(['special_q','special_kind','special_status','special_page','special_per_page','special_member_page'] as $key)if(isset($_POST[$key])&&is_string($_POST[$key]))$context[$key]=mb_substr($_POST[$key],0,100);
+    $query=http_build_query($context);header('Location: master_kelas.php?'.$query.($return!==''?($query!==''?'&':'').$return:'').'#special-classes');exit;
 }

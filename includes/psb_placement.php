@@ -18,6 +18,11 @@ function psb_placement_apply(mysqli $db, string $nis, int $targetId, string $yea
         throw new RuntimeException('Pilih rombel aktif pada kelas '.$first.' di unit ini.');
     }
     $unit = unit_active_id();
+    // Returning a regular student to PSB closes the placement first. An active
+    // or graduated academic placement must never be overwritten by admission.
+    $existing=$db->prepare("SELECT id FROM siswa_tahun_ajaran WHERE unit_id=? AND no_induk=? AND status IN ('aktif','lulus') LIMIT 1 FOR UPDATE");
+    $existing->bind_param('is',$unit,$nis);$existing->execute();$hasPlacement=$existing->get_result()->num_rows>0;$existing->close();
+    if($hasPlacement)throw new RuntimeException('Siswa sudah memiliki penempatan aktif atau riwayat kelulusan. Periksa riwayat kelas sebelum penempatan PSB.');
     student_restore_regular_membership($db,$student,$target);
 
     $restore=$db->prepare("SELECT p.id FROM siswa_tahun_ajaran p JOIN tahun_ajaran y ON y.id=p.tahun_ajaran_id AND y.unit_id=p.unit_id WHERE p.no_induk=? AND y.label=? AND p.status='dibatalkan' FOR UPDATE");$restore->bind_param('ss',$nis,$year);$restore->execute();$restoreId=(int)($restore->get_result()->fetch_row()[0]??0);$restore->close();

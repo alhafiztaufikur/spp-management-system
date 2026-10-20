@@ -1,5 +1,13 @@
 # Riwayat Perubahan AI SistemSPP
 
+## 2026-10-21 - Data Master, kelulusan Alumni, dan PNG surat
+
+- Kelulusan tiga unit memakai Alumni tahun akhir TA asal; keanggotaan nonaktif, penempatan lulus, dan audit atomik. Timeline/hasil/peserta/ekspor mengikuti bukti; edit identitas Alumni tidak menerbitkan tagihan atau mengubah kelas.
+- Perbaiki penempatan PSB yang menimpa penempatan aktif, pemulihan rombel yang menghapus snapshot berbayar, dan nilai DECIMAL yang salah dibaca pada edit identitas parsial.
+- Rapikan tindakan/pagination Kelas Khusus; arahkan tombol buku tabungan ke buku pemilik; hapus total gabungan dashboard dan susun tiga kartu.
+- Tambahkan PNG/ZIP surat dari PDF draf yang sama dengan PDF.js legacy 4.10.38 lokal, progres, penguncian klik, dan unduhan setelah seluruh halaman berhasil.
+- Tanpa perubahan database pengguna/migrasi/backfill. Verifikasi pada salinan terisolasi: kelulusan/concurrency/rollback, 744 pemeriksaan tarif Legacy, CRUD/HTTP, Chrome/Edge responsif, serta baca kembali PNG/PDF. [Audit dan batas pengujian](MASTER_ALUMNI_AUDIT_20261021.md).
+
 ## 2026-10-21 - Perapihan tampilan dan pembacaan jam transaksi
 
 - Pulihkan pembacaan 793 jam Legacy dari arsip berdasarkan unit/sumber/row key; bedakan jam diketahui, hanya tanggal, serta tanpa tanggal pada histori, detail, aktivitas, struk, dan laporan/PDF/Excel. Timestamp transaksi tidak ditulis ulang.
@@ -2510,3 +2518,7 @@ Salin template ini ke bagian paling atas setelah `Aturan Pencatatan`:
 ## 2026-10-20 - Optimasi riwayat dan tabungan
 
 Optimasi proyeksi pembayaran, agregasi DU sekali, rekap rekening terbatas halaman, lookup ID jurnal, streaming fingerprint, dan detail langsung setelah simpan. Endpoint baca/ekspor melepas sesi ketika aman; submit tabungan ganda dicegah. Tanpa perubahan skema atau data pengguna. Lihat [hasil pengujian dan batas kinerja](HISTORY_PERFORMANCE.md).
+
+## 2026-10-21 - Pemulihan impor phpMyAdmin yang terputus
+
+Sinkronisasi repo terbaru dan pemulihan `db_spp_test2` dari dump pengguna melalui CLI, setelah backup serta uji terisolasi. Lengkapi struktur aplikasi dan metadata integritas dengan alat existing; cocokkan seluruh tabel hasil pemulihan. `db_spp` dan konfigurasi lokal dipertahankan. Lihat [bukti dan panduan pemulihan](IMPORT_RECOVERY_20261021.md).

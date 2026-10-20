@@ -2055,8 +2055,9 @@ function initPromotionBatchSelector() {
     const missing=selected.filter(row=>{const target=row.querySelector('select[name^="target_master_kelas_id"]');return target&&!target.value;});
     if(missing.length){missing[0].querySelector('select').focus();return;}
     form.dataset.submitting='1';
-    const details=selected.map(row=>row.querySelector('.promotion-student-identity strong').textContent+' · '+(row.querySelector('.kelas-badge')?.textContent||'')+' → '+(row.querySelector('select')?.selectedOptions[0]?.textContent||'Lulus'));
-    const accepted=await window.workflowConfirm({title:form.dataset.graduation==='1'?'Konfirmasi Kelulusan':'Konfirmasi Kenaikan Kelas',message:'TA '+form.dataset.sourceYear+' → '+form.dataset.targetYear+'. Riwayat pembayaran lama tetap tersimpan; histori Input Pembayaran mengikuti penempatan baru.',rows:details,action:'Proses '+selected.length+' Siswa'},event.submitter);
+    const alumni='Alumni'+form.dataset.sourceYear.split('/')[1],graduating=form.dataset.graduation==='1';
+    const details=selected.map(row=>row.querySelector('.promotion-student-identity strong').textContent+' · '+(row.querySelector('.kelas-badge')?.textContent||'')+' → '+(row.querySelector('select')?.selectedOptions[0]?.textContent||alumni));
+    const accepted=await window.workflowConfirm({title:graduating?'Konfirmasi Kelulusan':'Konfirmasi Kenaikan Kelas',message:graduating?'TA '+form.dataset.sourceYear+' → '+alumni+'. Siswa menjadi nonaktif; seluruh riwayat kelas dan pembayaran tetap tersimpan.':'TA '+form.dataset.sourceYear+' → '+form.dataset.targetYear+'. Riwayat pembayaran lama tetap tersimpan; histori Input Pembayaran mengikuti penempatan baru.',rows:details,action:'Proses '+selected.length+' Siswa'},event.submitter);
     if(!accepted){delete form.dataset.submitting;return;}
     if(submitButton)submitButton.disabled=true;HTMLFormElement.prototype.submit.call(form);
   });

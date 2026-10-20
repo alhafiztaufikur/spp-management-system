@@ -24,7 +24,11 @@ function participants_model(mysqli $db,int $yearId,int $level,string $mode,?arra
         $status=['aktif'=>'Aktif','pindah'=>'Pindah','lulus'=>'Lulus','dibatalkan'=>'Dibatalkan'][$r['source_status']]??'Tidak tercatat';
         $target='Belum tersedia';$targetNote='';$destination=$destinations[$r['NO_INDUK']]??null;
         if($destination){$target=$destination['label'];$targetNote=$destination['year'].' · Tersimpan';}
-        elseif($r['source_status']==='lulus'||($mode==='regular'&&$level===$last)){$target='Kelulusan';$targetNote=$r['source_status']==='lulus'?'Tersimpan':'Rencana';}
+        elseif($r['source_status']==='lulus'||($mode==='regular'&&$level===$last)){
+            $alumni=$classes[(int)$r['active_class_id']]??null;
+            $target=$alumni&&class_is_alumni($alumni)?class_label($alumni):($r['source_status']==='lulus'?'Kelulusan':'Alumni'.promotion_alumni_year($ctx['source_year']));
+            $targetNote=$r['source_status']==='lulus'?'Tersimpan':'Rencana';
+        }
         elseif($r['eligible']){$target=$mode==='regular'?($byCode[strtoupper((string)$r['promotion_kode_rombel'])]??'Belum ditentukan'):'Belum ditentukan';$targetNote='Rencana · '.$ctx['target_year'];}
         $current=$classes[(int)$r['active_class_id']]['label']??participants_level_label($r['active_level']);
         $rows[]=['id'=>(int)$r['source_placement_id'],'student_id'=>(int)$r['student_id'],'unit'=>$ctx['unit_id'],'nama'=>$r['NAMA'],'nis'=>$r['NO_INDUK'],'diknas'=>trim((string)$r['NO_induk_diknas'])?:'Tidak tercatat',

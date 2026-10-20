@@ -12953,3 +12953,7 @@ html body .report-template-shell .report-template-table tbody td.report-col-cent
 .sidebar-unit-choice:disabled{opacity:.45;cursor:not-allowed}
 .sidebar-unit-form small{font-size:10px;line-height:1.5;color:var(--text-muted)}
 html[data-theme="dark"] .sidebar-unit-heading-icon,html[data-theme="dark"] .sidebar-unit-form .sidebar-unit-kicker{color:color-mix(in srgb,var(--op-color),white 35%)}
+
+/* Daily closing keeps school payments and savings in three separate cards. */
+.dashboard-breakdown-list{grid-template-columns:repeat(3,minmax(0,1fr))}
+@media(max-width:700px){.dashboard-breakdown-list{grid-template-columns:1fr}}

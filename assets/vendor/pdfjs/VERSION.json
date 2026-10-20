@@ -1,0 +1,26 @@
+{
+  "version": "4.10.38",
+  "source": "https://registry.npmjs.org/pdfjs-dist/-/pdfjs-dist-4.10.38.tgz",
+  "archive_sha256": "1011b38553532d7078c59f26b15a471f8dae00f101b60e2add9b8511737a1ce0",
+  "files": [
+    "LICENSE",
+    "standard_fonts/LICENSE_FOXIT",
+    "standard_fonts/LICENSE_LIBERATION",
+    "pdf.min.mjs",
+    "pdf.worker.min.mjs",
+    "standard_fonts/FoxitDingbats.pfb",
+    "standard_fonts/FoxitFixed.pfb",
+    "standard_fonts/FoxitFixedBold.pfb",
+    "standard_fonts/FoxitFixedBoldItalic.pfb",
+    "standard_fonts/FoxitFixedItalic.pfb",
+    "standard_fonts/FoxitSerif.pfb",
+    "standard_fonts/FoxitSerifBold.pfb",
+    "standard_fonts/FoxitSerifBoldItalic.pfb",
+    "standard_fonts/FoxitSerifItalic.pfb",
+    "standard_fonts/FoxitSymbol.pfb",
+    "standard_fonts/LiberationSans-Bold.ttf",
+    "standard_fonts/LiberationSans-BoldItalic.ttf",
+    "standard_fonts/LiberationSans-Italic.ttf",
+    "standard_fonts/LiberationSans-Regular.ttf"
+  ]
+}

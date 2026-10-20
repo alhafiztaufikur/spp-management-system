@@ -55,13 +55,11 @@ $savingTransactions = report_savings_transactions($koneksi, $startToday, $endTod
 $savingTransactions=array_values(array_filter($savingTransactions,static fn($r)=>(int)$r['id']>0||($r['legacy_origin']??'')==='new'));
 $tabunganMasuk = array_sum(array_map(static fn($row) => (float)($row['masuk'] ?? 0), $savingTransactions));
 $tabunganKeluar = array_sum(array_map(static fn($row) => (float)($row['keluar'] ?? 0), $savingTransactions));
-$totalPenerimaan = $totalPembayaran + $tabunganMasuk - $tabunganKeluar;
 
 $rekapHarianRows = [
     ['label' => 'Transaksi Pembayaran', 'desc' => 'Semua pembayaran siswa hari ini', 'nominal' => $totalPembayaran, 'kind' => 'payment', 'icon' => 'card'],
     ['label' => 'Tabungan Masuk', 'desc' => 'Setoran tabungan yang diterima', 'nominal' => $tabunganMasuk, 'kind' => 'saving-in', 'icon' => 'up'],
     ['label' => 'Tabungan Keluar', 'desc' => 'Penarikan tabungan siswa', 'nominal' => $tabunganKeluar, 'kind' => 'saving-out', 'icon' => 'down'],
-    ['label' => 'Total Penerimaan', 'desc' => 'Pembayaran + masuk - keluar', 'nominal' => $totalPenerimaan, 'kind' => 'total', 'icon' => 'total'],
 ];
 $bulanIndo = [
     '01' => 'Januari',
@@ -151,10 +149,9 @@ $exportSetoranExcelUrl = 'laporan/export_global.php?template=setoran&format=exce
             <span class="dashboard-eyebrow">Dashboard Closing</span>
             <h1>Ringkasan Hari Ini</h1>
             <p><?= $todayLabel ?></p>
-            <div class="dashboard-total-value"><?= report_money($totalPenerimaan) ?></div>
+            <div class="dashboard-total-value"><?= report_money($totalPembayaran) ?></div>
             <div class="dashboard-total-meta">
               <span><?= number_format($jumlahTransaksi) ?> transaksi</span>
-              <span>Total bersih</span>
             </div>
           </div>
 
@@ -217,7 +214,6 @@ $exportSetoranExcelUrl = 'laporan/export_global.php?template=setoran&format=exce
             <div>
               <span class="dashboard-eyebrow">Rekap Penerimaan</span>
               <h2>Rincian Hari Ini</h2>
-              <p>Pembayaran + tabungan masuk - tabungan keluar.</p>
             </div>
             <span class="dashboard-date-pill"><?= $todayLabel ?></span>
           </div>

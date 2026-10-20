@@ -15,11 +15,13 @@ function student_prepare_class_transition(mysqli $db,?array $before,array $targe
 /** Restore membership without modifying any existing bill/payment snapshots. */
 function student_restore_regular_membership(mysqli $db,?array $before,array $target): void {
     if (!$before || class_kind($target)!=='reguler' || !in_array((string)$before['KELAS'],['0','PSB','CUSTOM','OUT'],true)) return;
-    $s=$db->prepare("SELECT p.id,p.status FROM siswa_tahun_ajaran p JOIN tahun_ajaran y ON y.id=p.tahun_ajaran_id AND y.unit_id=p.unit_id WHERE p.no_induk=? AND y.label>=? AND p.status<>'dibatalkan' ORDER BY y.label DESC LIMIT 1 FOR UPDATE");
+    $s=$db->prepare("SELECT p.id,p.status,p.kelas FROM siswa_tahun_ajaran p JOIN tahun_ajaran y ON y.id=p.tahun_ajaran_id AND y.unit_id=p.unit_id WHERE p.no_induk=? AND y.label>=? AND p.status<>'dibatalkan' ORDER BY y.label DESC LIMIT 1 FOR UPDATE");
     $year=du_current_academic_year();$s->bind_param('ss',$before['NO_INDUK'],$year);$s->execute();$p=$s->get_result()->fetch_assoc();$s->close();
     if ($p && $p['status']!=='lulus') {
-        $level=(string)$target['tingkat'];$label=class_label($target);
-        $s=$db->prepare("UPDATE siswa_tahun_ajaran SET kelas=?,master_kelas_id=?,kelas_rombel_snapshot=?,status='aktif' WHERE id=?");
-        $s->bind_param('sisi',$level,$target['id'],$label,$p['id']);$s->execute();$s->close();
+        if((int)$p['kelas']!==(int)$target['tingkat'])throw new RuntimeException('Tingkat tujuan berbeda dari riwayat penempatan yang tersimpan. Periksa riwayat kelas sebelum memulihkan penempatan.');
+        // The normal synchronization below decides whether a paid rombel snapshot
+        // must be retained. Restoring membership must not erase it beforehand.
+        $s=$db->prepare("UPDATE siswa_tahun_ajaran SET status='aktif' WHERE id=?");
+        $s->bind_param('i',$p['id']);$s->execute();$s->close();
     }
 }

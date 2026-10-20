@@ -22,7 +22,7 @@ function rate_lock_reject(mysqli $db, int $id, array $rates): void {
     rate_lock_assert($before===rate_lock_snapshot($db),'Rejected save changed a rate, bill, student, placement or audit');
 }
 foreach ([1,2,3] as $unit) {
-    $_SESSION=['admin_role'=>'super_admin','active_unit_id'=>$unit];unit_set_context($koneksi,$unit);
+    $_SESSION=['admin_id'=>(int)$koneksi->query("SELECT id FROM admin WHERE role='super_admin' AND is_active=1 LIMIT 1")->fetch_row()[0],'admin_role'=>'super_admin','active_unit_id'=>$unit];unit_set_context($koneksi,$unit);
     $koneksi->begin_transaction();
     try {
         [$first,$last]=unit_level_bounds();$year='2171/2172';
