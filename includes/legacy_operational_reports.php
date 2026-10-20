@@ -1,8 +1,9 @@
 <?php
 require_once __DIR__.'/legacy_operational_read.php';
+require_once __DIR__.'/history_performance.php';
 function lop_savings_report_rows(mysqli $db,string $start,string $end,array $f): array {
     if(!lop_ready($db))return [];$rows=[];$selection='';if(($f['owner_id']??0)>0)$selection.=' AND j.owner_id='.(int)$f['owner_id'];if(($f['student_id']??0)>0)$selection.=' AND o.student_id='.(int)$f['student_id'];
-    foreach(lf_rows($db,"SELECT j.*,(SELECT MIN(a.actor_id) FROM legacy_op_audit a WHERE a.unit_id=j.unit_id AND a.entity_type='bank_new' AND a.entity_id=j.id) native_actor,o.name,o.student_id,o.source_identity,o.source_class,s.NO_INDUK,s.NO_induk_diknas,COALESCE(s.master_kelas_id,g.master_kelas_id) master_kelas_id FROM legacy_op_journals j JOIN legacy_op_owners o ON o.id=j.owner_id AND o.unit_id=j.unit_id LEFT JOIN siswa s ON s.id=o.student_id AND s.unit_id=o.unit_id LEFT JOIN legacy_op_groups g ON g.id=o.group_id AND g.unit_id=o.unit_id JOIN legacy_full_batches b ON b.id=j.batch_id AND b.unit_id=j.unit_id WHERE b.state='completed' AND j.cancelled=0 $selection AND j.source_date>=? AND j.source_date<? ORDER BY j.source_date,j.id",[$start,$end]) as $j){
+    foreach(hp_rows($db,"SELECT j.*,CASE WHEN j.origin='new' THEN (SELECT MIN(a.actor_id) FROM legacy_op_audit a WHERE a.unit_id=j.unit_id AND a.entity_type='bank_new' AND a.entity_id=j.id) ELSE NULL END native_actor,o.name,o.student_id,o.source_identity,o.source_class,s.NO_INDUK,s.NO_induk_diknas,COALESCE(s.master_kelas_id,g.master_kelas_id) master_kelas_id FROM legacy_op_journals j JOIN legacy_op_owners o ON o.id=j.owner_id AND o.unit_id=j.unit_id LEFT JOIN siswa s ON s.id=o.student_id AND s.unit_id=o.unit_id LEFT JOIN legacy_op_groups g ON g.id=o.group_id AND g.unit_id=o.unit_id JOIN legacy_full_batches b ON b.id=j.batch_id AND b.unit_id=j.unit_id WHERE b.state='completed' AND j.cancelled=0 $selection AND j.source_date>=? AND j.source_date<? ORDER BY j.source_date,j.id",[$start,$end]) as $j){
         if(($f['owner_id']??0)>0&&(int)$j['owner_id']!==(int)$f['owner_id'])continue;
         if(($f['student_id']??0)>0&&(int)$j['student_id']!==(int)$f['student_id'])continue;
 
@@ -12,6 +13,6 @@ function lop_savings_report_rows(mysqli $db,string $start,string $end,array $f):
     }return $rows;
 }
 function lop_savings_report_openings(mysqli $db,array $identities,string $before): array {
-    if(!lop_ready($db))return [];$out=[];
-    foreach(lf_rows($db,"SELECT COALESCE(s.NO_INDUK,CONCAT('rekening:',o.id)) identity_key,SUM(j.incoming-j.outgoing) amount FROM legacy_op_journals j JOIN legacy_op_owners o ON o.id=j.owner_id AND o.unit_id=j.unit_id LEFT JOIN siswa s ON s.id=o.student_id AND s.unit_id=o.unit_id JOIN legacy_full_batches b ON b.id=j.batch_id AND b.unit_id=j.unit_id WHERE b.state='completed' AND j.cancelled=0 AND j.source_date<? GROUP BY identity_key",[$before]) as $r)if(in_array($r['identity_key'],$identities,true))$out[$r['identity_key']]=(float)$r['amount'];return $out;
+    if(!lop_ready($db)||!$identities)return [];$out=[];$marks=implode(',',array_fill(0,count($identities),'?'));
+    foreach(hp_rows($db,"SELECT COALESCE(s.NO_INDUK,CONCAT('rekening:',o.id)) identity_key,SUM(j.incoming-j.outgoing) amount FROM legacy_op_journals j JOIN legacy_op_owners o ON o.id=j.owner_id AND o.unit_id=j.unit_id LEFT JOIN siswa s ON s.id=o.student_id AND s.unit_id=o.unit_id JOIN legacy_full_batches b ON b.id=j.batch_id AND b.unit_id=j.unit_id WHERE b.state='completed' AND j.cancelled=0 AND j.source_date<? AND COALESCE(s.NO_INDUK,CONCAT('rekening:',o.id)) IN ($marks) GROUP BY identity_key",array_merge([$before],$identities)) as $r)if(in_array($r['identity_key'],$identities,true))$out[$r['identity_key']]=(float)$r['amount'];return $out;
 }

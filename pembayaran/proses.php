@@ -854,9 +854,7 @@ if ($aksi === 'update') {
 
     $no_induk        = trim($_POST['no_induk'] ?? '');
     $tanggal_bayar   = $_POST['tanggal_bayar'] ?? date('Y-m-d H:i:s');
-    if (strlen($tanggal_bayar) === 10) {
-        $tanggal_bayar .= ' ' . date('H:i:s');
-    }
+
     $bulan_bayar     = normalize_month_code($_POST['bulan_bayar'] ?? '');
     $tahun_bayar     = $_POST['tahun_bayar'] ?? date('Y');
     $sistem_pembayaran = $_POST['sistem_pembayaran'] ?? 'VA';
@@ -897,6 +895,8 @@ if ($aksi === 'update') {
             $authorizationRequest = $lockedRequest;
         } else authorization_assert_no_pending($koneksi, $id);
         $old_bayar = find_linked_payment($koneksi, $id);
+        require_once __DIR__.'/../includes/payment_time.php';
+        $tanggal_bayar = payment_time_native_update((string)$tanggal_bayar,(string)$old_bayar['TGL_BYR']);
         $activityBefore = transaction_authorization_snapshot($koneksi, $id)["data"];
         $activityEditKey = trim((string)($_POST['activity_request_key'] ?? ''));
         if ($activityEditKey !== '' && !preg_match('/^[a-f0-9]{32}$/D', $activityEditKey)) throw new RuntimeException('Kunci perubahan tidak valid.');

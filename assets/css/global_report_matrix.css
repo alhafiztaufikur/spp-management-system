@@ -24,6 +24,9 @@ html[data-theme="dark"] .global-report-matrix-workspace{--matrix-stripe:var(--bg
 .report-horizontal-matrix .badge-nis{color:var(--accent);border:1px solid var(--border-hover);background:var(--accent-glow)}
 .report-horizontal-matrix .kelas-badge{background:#fff3e3;color:#b86a00;border:1px solid #ffd39b}
 .report-horizontal-matrix .report-status{background:var(--bg-elevated);color:var(--text-secondary)}
+.report-horizontal-matrix .report-col-status .report-status{max-width:100%;box-sizing:border-box;white-space:normal!important;overflow-wrap:anywhere;line-height:1.6;border-radius:9px;padding:6px 10px;text-align:center}
+.report-horizontal-matrix .matrix-main{display:inline-block;max-width:100%;box-sizing:border-box;white-space:normal!important;overflow-wrap:anywhere;line-height:1.6}
+#global-report-workspace .report-horizontal-matrix :is(td,th).report-col-status{white-space:normal!important;vertical-align:middle;height:auto;min-height:0}
 .report-horizontal-matrix .status-lunas{background:#d9fae7;color:#087943}
 .report-horizontal-matrix .status-cicilan,.report-horizontal-matrix .status-belum_bayar,.report-horizontal-matrix .status-rekonsiliasi{background:#fff0dd;color:#a75c00}
 .report-horizontal-matrix .report-negative{color:#d93939}

@@ -3,6 +3,7 @@
 require_once __DIR__.'/legacy_full_read.php';
 require_once __DIR__.'/filter_choices.php';
 require_once __DIR__.'/history_performance.php';
+require_once __DIR__.'/payment_time.php';
 
 function mh_has_column(mysqli $db,string $table,string $column): bool {
     static $cache=[];$key=$db->thread_id.'|'.$table.'|'.$column;
@@ -32,23 +33,41 @@ function mh_return_url(mixed $token,int $unit,string $kind,int $id): ?string {
     return $r['route'].'?'.http_build_query($r['query']);
 }
 
-function mh_payment_source(mysqli $db,bool $deleted=false,?int $targetId=null): string {
+function mh_payment_source(mysqli $db,bool $deleted=false,int|array|null $targetId=null,bool $withTime=true): string {
     // Keep the list projection small; financial details are loaded for one selected ID.
-    $parts=[];$nativeTarget=$targetId!==null?($targetId>0?' WHERE p.id='.$targetId:' WHERE FALSE'):'';$fullTarget=$targetId!==null?($targetId<0&&$targetId>=-1000000000?' AND p.id='.(-$targetId):' AND FALSE'):'';$opTarget=$targetId!==null?($targetId<-1000000000?' AND p.id='.(-1000000000-$targetId):' AND FALSE'):'';
+    $parts=[];$targets=$targetId===null?null:array_values(array_unique(array_map('intval',is_array($targetId)?$targetId:[$targetId])));
+    $target=static function(string $prefix,callable $accept,callable $decode)use($targets):string{
+        if($targets===null)return '';$ids=array_map($decode,array_values(array_filter($targets,$accept)));
+        return $prefix.($ids?'p.id IN ('.implode(',',$ids).')':'FALSE');
+    };
+    $nativeTarget=$target(' WHERE ',static fn($id)=>$id>0,static fn($id)=>$id);
+    $fullTarget=$target(' AND ',static fn($id)=>$id<0&&$id>=-1000000000,static fn($id)=>-$id);
+    $opTarget=$target(' AND ',static fn($id)=>$id<-1000000000,static fn($id)=>-$id-1000000000);
     $parts[]="SELECT p.id,p.unit_id,p.NO_INDUK,p.TGL_BYR,p.total_jumlah,p.user_id,p.KELAS,p.kelas_rombel_snapshot,p.created_at,p.updated_at,p.BULAN,p.TAHUN,p.payment_link_version,
         s.id student_id,NULL legacy_owner_id,COALESCE(s.NAMA,'Tidak tercatat') NAMA,s.NO_induk_diknas,s.master_kelas_id current_class_id,IF(s.id IS NULL,'account','student') owner_type,'system' source_kind,
-        COALESCE(NULLIF(p.kelas_rombel_snapshot,''),NULLIF(p.KELAS,''),s.KELAS,'Tidak tercatat') kelas_transaksi
+        COALESCE(NULLIF(p.kelas_rombel_snapshot,''),NULLIF(p.KELAS,''),s.KELAS,'Tidak tercatat') kelas_transaksi,
+        IF(p.TGL_BYR IS NULL,'none','datetime') time_precision,NULL imported_at,p.TGL_BYR stored_datetime
         FROM bayar p LEFT JOIN siswa s ON s.NO_INDUK=p.NO_INDUK AND s.unit_id=p.unit_id $nativeTarget";
-    if(!$deleted&&lful_read_ready($db))$parts[]="SELECT -p.id,p.unit_id,s.NO_INDUK,p.source_date,p.total,CONCAT('legacy:',p.unit_id,':',LOWER(HEX(COALESCE(p.source_operator,'')))),p.class_snapshot,p.class_snapshot,p.source_date,NULL,'','',0,s.id,NULL,s.NAMA,s.NO_induk_diknas,s.master_kelas_id,'student','legacy',p.class_snapshot
-        FROM legacy_full_payments p JOIN siswa s ON s.id=p.student_id AND s.unit_id=p.unit_id JOIN legacy_full_batches b ON b.id=p.batch_id AND b.unit_id=p.unit_id WHERE b.state='completed' $fullTarget";
-    if(lop_ready($db))$parts[]="SELECT -(1000000000+p.id),p.unit_id,COALESCE(s.NO_INDUK,o.source_identity),p.source_date,p.total,CONCAT('legacy:',p.unit_id,':',LOWER(HEX(COALESCE(p.source_operator,'')))),p.class_snapshot,p.class_snapshot,p.source_date,NULL,p.source_period,'',0,s.id,o.id,o.name,s.NO_induk_diknas,COALESCE(s.master_kelas_id,g.master_kelas_id),IF(s.id IS NULL,'account','student'),'legacy',p.class_snapshot
-        FROM legacy_op_payments p JOIN legacy_op_owners o ON o.id=p.owner_id AND o.unit_id=p.unit_id LEFT JOIN siswa s ON s.id=o.student_id AND s.unit_id=o.unit_id LEFT JOIN legacy_op_groups g ON g.id=o.group_id AND g.unit_id=o.unit_id JOIN legacy_full_batches b ON b.id=p.batch_id AND b.unit_id=p.unit_id WHERE b.state='completed' AND p.cancelled=".($deleted?'1':'0').$opTarget;
+    $time=$withTime&&(lful_read_ready($db)||lop_ready($db))?payment_time_projection($db):['value'=>'p.source_date','precision'=>"IF(p.source_date IS NULL,'none','date')",'updated'=>'NULL','join'=>''];
+    if(!$deleted&&lful_read_ready($db))$parts[]="SELECT -p.id,p.unit_id,s.NO_INDUK,".$time['value'].",p.total,CONCAT('legacy:',p.unit_id,':',LOWER(HEX(COALESCE(p.source_operator,'')))),p.class_snapshot,p.class_snapshot,NULL,".$time['updated'].",'','',0,s.id,NULL,s.NAMA,s.NO_induk_diknas,s.master_kelas_id,'student','legacy',p.class_snapshot,".$time['precision'].",b.completed_at,p.source_date
+        FROM legacy_full_payments p JOIN siswa s ON s.id=p.student_id AND s.unit_id=p.unit_id JOIN legacy_full_batches b ON b.id=p.batch_id AND b.unit_id=p.unit_id ".$time['join']." WHERE b.state='completed' $fullTarget";
+    if(lop_ready($db))$parts[]="SELECT -(1000000000+p.id),p.unit_id,COALESCE(s.NO_INDUK,o.source_identity),".$time['value'].",p.total,CONCAT('legacy:',p.unit_id,':',LOWER(HEX(COALESCE(p.source_operator,'')))),p.class_snapshot,p.class_snapshot,NULL,".$time['updated'].",p.source_period,'',0,s.id,o.id,o.name,s.NO_induk_diknas,COALESCE(s.master_kelas_id,g.master_kelas_id),IF(s.id IS NULL,'account','student'),'legacy',p.class_snapshot,".$time['precision'].",b.completed_at,p.source_date
+        FROM legacy_op_payments p JOIN legacy_op_owners o ON o.id=p.owner_id AND o.unit_id=p.unit_id LEFT JOIN siswa s ON s.id=o.student_id AND s.unit_id=o.unit_id LEFT JOIN legacy_op_groups g ON g.id=o.group_id AND g.unit_id=o.unit_id JOIN legacy_full_batches b ON b.id=p.batch_id AND b.unit_id=p.unit_id ".$time['join']." WHERE b.state='completed' AND p.cancelled=".($deleted?'1':'0').$opTarget;
     if($deleted){
         $fields=['id'=>'BIGINT','unit_id'=>'INT','NO_INDUK'=>'VARCHAR(255)','TGL_BYR'=>'DATETIME','total_jumlah'=>'DECIMAL(15,2)','user_id'=>'VARCHAR(255)','KELAS'=>'VARCHAR(100)','kelas_rombel_snapshot'=>'VARCHAR(100)','created_at'=>'DATETIME','updated_at'=>'DATETIME','BULAN'=>'VARCHAR(100)','TAHUN'=>'VARCHAR(20)','payment_link_version'=>'INT'];
         $cols=[];foreach($fields as $n=>$type)$cols[]="`$n` $type PATH '$.payment.$n' NULL ON EMPTY NULL ON ERROR";
         $archive="(SELECT j.* FROM pembayaran_aktivitas a JOIN JSON_TABLE(CAST(a.before_snapshot AS JSON),'$' COLUMNS (".implode(',',$cols).")) j WHERE a.action='deleted' AND NOT EXISTS(SELECT 1 FROM pembayaran_aktivitas n WHERE n.payment_id=a.payment_id AND n.unit_id=a.unit_id AND n.action='deleted' AND n.id>a.id))";
         $parts[0]=str_replace('FROM bayar p','FROM '.$archive.' p',$parts[0]);
     }
+    return hp_sql($db,'('.implode(' UNION ALL ',$parts).')');
+}
+
+/** Rank the unfiltered history using narrow rows, then hydrate the bounded page in one batch. */
+function mh_payment_order_source(mysqli $db): string {
+    $time=lful_read_ready($db)||lop_ready($db)?payment_time_projection($db):['value'=>'p.source_date','join'=>''];
+    $parts=["SELECT p.id,p.unit_id,p.TGL_BYR,p.TGL_BYR stored_datetime,'system' source_kind FROM bayar p"];
+    if(lful_read_ready($db))$parts[]="SELECT -p.id,p.unit_id,".$time['value'].",p.source_date,'legacy' FROM legacy_full_payments p JOIN siswa s ON s.id=p.student_id AND s.unit_id=p.unit_id JOIN legacy_full_batches b ON b.id=p.batch_id AND b.unit_id=p.unit_id ".$time['join']." WHERE b.state='completed'";
+    if(lop_ready($db))$parts[]="SELECT -(1000000000+p.id),p.unit_id,".$time['value'].",p.source_date,'legacy' FROM legacy_op_payments p JOIN legacy_op_owners o ON o.id=p.owner_id AND o.unit_id=p.unit_id JOIN legacy_full_batches b ON b.id=p.batch_id AND b.unit_id=p.unit_id ".$time['join']." WHERE b.state='completed' AND p.cancelled=0";
     return hp_sql($db,'('.implode(' UNION ALL ',$parts).')');
 }
 
@@ -103,8 +122,11 @@ function mh_payment_page(mysqli $db,array $input,array $classFilter,array $opera
         if(lop_ready($db))$du[]="(p.id<-1000000000 AND EXISTS(SELECT 1 FROM legacy_op_payments dp WHERE dp.id=-p.id-1000000000 AND dp.unit_id=p.unit_id AND (dp.source_table='bayar_du' OR JSON_SEARCH(dp.items,'one','daftar_ulang',NULL,'$[*].category') IS NOT NULL)))";
         $where.=$du?' AND ('.implode(' OR ',$du).')':' AND 0=1';
     }
-    $all=mh_payment_simple_count($db,$input,$classFilter,$operators)??(int)hp_one($db,"SELECT COUNT(*) n FROM $source p $where",$args)['n'];
-    $period='';$periodArgs=[];$dateColumn='p.TGL_BYR';
+    $simpleCount=mh_payment_simple_count($db,$input,$classFilter,$operators);
+    $all=$simpleCount??(int)hp_one($db,"SELECT COUNT(*) n FROM $source p $where",$args)['n'];
+    $compact=$simpleCount!==null&&$owner==='all'&&($input['view']??'')!=='deleted';
+    $pageSource=$compact?mh_payment_order_source($db):$source;
+    $period='';$periodArgs=[];$dateColumn='p.stored_datetime';
     if(($input['view']??'')==='deleted'){
         $legacyDate=lop_ready($db)?" WHEN p.id<-1000000000 THEN (SELECT MAX(a.created_at) FROM legacy_op_audit a WHERE a.entity_type='payment' AND a.entity_id=-p.id-1000000000 AND a.unit_id=p.unit_id AND JSON_EXTRACT(a.after_data,'$.cancelled')=1) ":'';
         $dateColumn="(CASE WHEN p.id>0 THEN (SELECT MAX(a.occurred_at) FROM pembayaran_aktivitas a WHERE a.payment_id=p.id AND a.unit_id=p.unit_id AND a.action='deleted') $legacyDate ELSE p.TGL_BYR END)";
@@ -118,12 +140,14 @@ function mh_payment_page(mysqli $db,array $input,array $classFilter,array $opera
     $targetSource=$selected?mh_payment_source($db,($input['view']??'')==='deleted',$selected):$source;
     if($selected&&($target=hp_one($db,"SELECT p.id,p.unit_id,p.TGL_BYR FROM $targetSource p $where $period AND p.id=?",array_merge($params,[$selected])))){
         $rankWhere=' AND (p.TGL_BYR>? OR (p.TGL_BYR<=>? AND (p.unit_id<? OR (p.unit_id=? AND p.id>?))) OR (? IS NULL AND p.TGL_BYR IS NOT NULL))';
-        $rank=(int)hp_one($db,"SELECT COUNT(*) n FROM $source p $where $period $rankWhere",array_merge($params,[$target['TGL_BYR'],$target['TGL_BYR'],$target['unit_id'],$target['unit_id'],$target['id'],$target['TGL_BYR']]))['n'];
+        $rank=(int)hp_one($db,"SELECT COUNT(*) n FROM $pageSource p $where $period $rankWhere",array_merge($params,[$target['TGL_BYR'],$target['TGL_BYR'],$target['unit_id'],$target['unit_id'],$target['id'],$target['TGL_BYR']]))['n'];
         $page=intdiv($rank,$size)+1;
     }
     $offset=($page-1)*$size;
-    $rows=hp_rows($db,"SELECT p.* FROM $source p $where $period ORDER BY p.TGL_BYR DESC,p.unit_id,p.id DESC LIMIT $size OFFSET $offset",$params);
-    return ['rows'=>$rows,'total'=>$total,'all'=>$all,'outside'=>$all-$total,'pages'=>$pages,'page'=>$page,'offset'=>$offset,
+    $rows=hp_rows($db,"SELECT p.* FROM $pageSource p $where $period ORDER BY p.TGL_BYR DESC,p.unit_id,p.id DESC LIMIT $size OFFSET $offset",$params);
+    if($compact&&$rows){$hydrate=mh_payment_source($db,false,array_column($rows,'id'));$rows=hp_rows($db,"SELECT p.* FROM $hydrate p ORDER BY p.TGL_BYR DESC,p.unit_id,p.id DESC");}
+    $undated=($input['view']??'')==='deleted'?0:(mh_payment_simple_count($db,array_replace($input,['undated'=>'1','all_periods'=>'0']),$classFilter,$operators,[$start,$end])??(int)hp_one($db,"SELECT COUNT(*) n FROM $source p $where AND p.id<0 AND p.TGL_BYR IS NULL",$args)['n']);
+    return ['rows'=>$rows,'total'=>$total,'all'=>$all,'undated'=>$undated,'outside'=>$all-$total,'pages'=>$pages,'page'=>$page,'offset'=>$offset,
         'read_sql'=>"SELECT p.* FROM $source p $where $period ORDER BY p.TGL_BYR DESC,p.unit_id,p.id DESC",'read_args'=>$params];
 }
 
@@ -177,7 +201,7 @@ function mh_student_legacy_history(mysqli $db,array $student): array {
         $rows[]=['id'=>(int)$p['id'],'unit_id'=>(int)$p['unit_id'],'tanggal_raw'=>$p['TGL_BYR'],'period_key'=>0,'total_raw'=>(float)$p['total_jumlah'],'components'=>$components,'can_detail'=>true,'can_print'=>true,
             'detail_url'=>'detail.php?'.http_build_query(['id'=>$p['id'],'unit_id'=>$p['unit_id'],'readonly'=>'1']),
             'print_url'=>'../laporan/cetak_legacy.php?'.http_build_query(['id'=>-(int)$p['id'],'unit_id'=>$p['unit_id']]),
-            'tanggal'=>$p['TGL_BYR']?spp_date_label($p['TGL_BYR'],true):'Tidak tercatat','periode'=>$receipt['source_period']?:'Tidak tercatat',
+            'time_precision'=>$p['time_precision'],'tanggal_date'=>payment_time_parts($p)['date'],'tanggal_time'=>payment_time_parts($p)['time'],'tanggal'=>payment_time_label($p),'periode'=>$receipt['source_period']?:'Tidak tercatat',
             'komponen'=>implode(', ',$components),'metode'=>'Legacy','operator'=>$receipt['source_operator']?:'Tidak tercatat',
             'total'=>'Rp '.number_format((float)$p['total_jumlah'],2,',','.'),'context_year'=>null,'context_class'=>$receipt['class_snapshot'],'source_kind'=>'legacy'];
     }return $rows;

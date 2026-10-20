@@ -64,94 +64,11 @@ if ($filter_tanggal_awal !== '' && $filter_tanggal_akhir !== '') {
     $period_label = $bulan_label . ' ' . $filter_tahun;
 }
 
-// Ambil data pembayaran
-$paymentOrder=match((string)($_GET['urut']??'terbaru')){
-    'nama'=>'s.NAMA ASC,b.TGL_BYR DESC',
-    'kelas'=>'CAST(b.KELAS AS UNSIGNED) ASC,b.kelas_rombel_snapshot ASC,s.NAMA ASC,b.TGL_BYR DESC',
-    'nominal_terbesar'=>'b.total_jumlah DESC,b.TGL_BYR DESC',
-    default=>'b.TGL_BYR DESC,b.id DESC',
-};
-$stmt = $koneksi->prepare("
-    SELECT b.unit_id,s.id AS student_id,s.NO_INDUK, s.NO_induk_diknas, s.NAMA,
-           COALESCE(NULLIF(b.kelas_rombel_snapshot,''),NULLIF(b.KELAS,''),s.KELAS) AS KELAS,
-           b.BULAN, b.TAHUN,
-           b.U_PSB, b.U_SPP, b.U_KOMITE,
-           b.sistem_pembayaran, b.total_jumlah, b.TGL_BYR
-    FROM bayar b JOIN siswa s ON s.NO_INDUK = b.NO_INDUK AND s.unit_id=b.unit_id
-    WHERE b.TGL_BYR >= ? AND b.TGL_BYR < ? $studentWhere
-    ORDER BY $paymentOrder
-");
-$bind($stmt, 'ss', [$period_start, $period_end]);
-$stmt->execute();
-$rows = $stmt->get_result()->fetch_all(MYSQLI_ASSOC);
-$stmt->close();
-
-$stmtKomponen = $koneksi->prepare("
-    SELECT SUM(U_PSB) AS psb,
-           SUM(U_SPP) AS spp,
-           SUM(U_KOMITE) AS komite, SUM(potong_spp) AS potongan_spp
-    FROM bayar b JOIN siswa s ON s.NO_INDUK = b.NO_INDUK AND s.unit_id=b.unit_id
-    WHERE b.TGL_BYR >= ? AND b.TGL_BYR < ? $studentWhere
-");
-$bind($stmtKomponen, 'ss', [$period_start, $period_end]);
-$stmtKomponen->execute();
-$komponenTetap = $stmtKomponen->get_result()->fetch_assoc();
-$stmtKomponen->close();
-
-$komponen_rows = [];
-$komponenMap = [
-    'Uang PSB' => 'psb',
-    'Uang SPP' => 'spp', 'Uang Komite' => 'komite'
-];
-foreach ($komponenMap as $nama => $key) {
-    if ((float)($komponenTetap[$key] ?? 0) > 0) {
-        $komponen_rows[] = ['nama' => $nama, 'total' => $komponenTetap[$key]];
-    }
-}
-
-$stmtBiayaLain = $koneksi->prepare("
-    SELECT d.nama_biaya_snapshot AS nama, SUM(d.nominal_snapshot) AS total
-    FROM bayar_biaya_lain d JOIN bayar b ON b.id = d.bayar_id
-    JOIN siswa s ON s.NO_INDUK = b.NO_INDUK AND s.unit_id=b.unit_id
-    WHERE b.TGL_BYR >= ? AND b.TGL_BYR < ? $studentWhere
-    GROUP BY d.nama_biaya_snapshot ORDER BY d.nama_biaya_snapshot ASC
-");
-$bind($stmtBiayaLain, 'ss', [$period_start, $period_end]);
-$stmtBiayaLain->execute();
-$komponen_rows = array_merge($komponen_rows, $stmtBiayaLain->get_result()->fetch_all(MYSQLI_ASSOC));
-$stmtBiayaLain->close();
-
-$stmtDu = $koneksi->prepare("
-    SELECT COALESCE(SUM(d.jumlah),0) AS total
-    FROM bayar_du d JOIN bayar b ON b.id=d.bayar_id
-    JOIN siswa s ON s.NO_INDUK=b.NO_INDUK AND s.unit_id=b.unit_id
-    WHERE b.TGL_BYR >= ? AND b.TGL_BYR < ? $studentWhere
-");
-$bind($stmtDu, 'ss', [$period_start, $period_end]);
-$stmtDu->execute();
-$totalDu = (float)($stmtDu->get_result()->fetch_assoc()['total'] ?? 0);
-$stmtDu->close();
-if ($totalDu > 0.001) $komponen_rows[] = ['nama'=>'Daftar Ulang','total'=>$totalDu];
-$totalDiscount = (float)($komponenTetap['potongan_spp'] ?? 0);
-if ($totalDiscount > 0.001) $komponen_rows[] = ['nama'=>'Potongan SPP','total'=>-$totalDiscount];
-
-// Ambil data tabungan periode ini
-$stmt2 = $koneksi->prepare("
-    SELECT tm.unit_id,tm.NO_INDUK, s.NO_induk_diknas, s.NAMA, s.KELAS, tm.TANGGAL, tm.MASUK as nominal, 'masuk' as jenis, tm.keterangan
-    FROM transaksi_m tm JOIN siswa s ON s.NO_INDUK = tm.NO_INDUK AND s.unit_id=tm.unit_id
-    WHERE tm.TANGGAL >= ? AND tm.TANGGAL < ? $studentWhere
-    UNION ALL
-    SELECT tk.unit_id,tk.NO_INDUK, s.NO_induk_diknas, s.NAMA, s.KELAS, tk.TANGGAL, tk.KELUAR as nominal, 'keluar' as jenis, tk.keterangan
-    FROM transaksi_k tk JOIN siswa s ON s.NO_INDUK = tk.NO_INDUK AND s.unit_id=tk.unit_id
-    WHERE tk.TANGGAL >= ? AND tk.TANGGAL < ? $studentWhere
-    ORDER BY TANGGAL DESC
-");
-$tabTypes = 'ssss' . str_repeat('s', count($studentParams) * 2);
-$tabParams = array_merge([$period_start, $period_end], $studentParams, [$period_start, $period_end], $studentParams);
-$stmt2->bind_param($tabTypes, ...$tabParams);
-$stmt2->execute();
-$tab_rows = $stmt2->get_result()->fetch_all(MYSQLI_ASSOC);
-$stmt2->close();
+// Keep the existing three-sheet layout; read all matching historical and current rows.
+$rows=general_payment_rows($koneksi,$period_start,$period_end,$filter_q,(string)($_GET['urut']??'terbaru'));
+$komponen_rows=general_payment_components($koneksi,$period_start,$period_end,$filter_q);
+$tab_rows=general_savings_read($koneksi,$period_start,$period_end,$filter_q,true);
+foreach($tab_rows as &$tab){$tab['nominal']=$tab['amount'];if($tab['origin']==='legacy')$tab['keterangan']='Legacy · '.$tab['keterangan'];}unset($tab);
 
 $preview_total_pembayaran = 0.0;
 foreach ($rows as $row) {

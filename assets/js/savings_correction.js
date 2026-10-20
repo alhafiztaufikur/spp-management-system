@@ -3,16 +3,17 @@
   'use strict';
   const detail=document.getElementById('sw-history-detail');if(!detail)return;
   const money=value=>'Rp '+Number(value||0).toLocaleString('id-ID');
-  const digitsOf=value=>value.replace(/\./g,'');
+  const digitsOf=value=>value.replace(/\./g,'').replace(',','.');
   function validateAmount(input){
     const raw=input.value;
-    const valid=/^(?:[0-9]{1,12}|[1-9][0-9]{0,2}(?:\.[0-9]{3}){1,3})$/.test(raw)&&Number(digitsOf(raw))>0;
-    input.setCustomValidity(valid?'':'Isi nominal rupiah positif, maksimal 12 digit, misalnya 90.000.');
+    const valid=/^(?:[0-9]{1,12}|[1-9][0-9]{0,2}(?:\.[0-9]{3}){1,3})(?:,[0-9]{1,2})?$/.test(raw)&&digitsOf(raw).split('.')[0].length<=12&&Number(digitsOf(raw))>0;
+    input.setCustomValidity(valid?'':'Isi nominal rupiah positif, maksimal 12 digit dan dua desimal, misalnya 90.000,50.');
     return valid;
   }
   detail.addEventListener('input',event=>{
     const input=event.target.closest('[data-savings-amount]');if(!input)return;
     const value=input.value,position=input.selectionStart??value.length;
+    if(value.includes(',')){validateAmount(input);return;}
     const count=value.slice(0,position).replace(/\D/g,'').length;
     // Do not silently reinterpret decimal, signed, or pasted malformed amounts.
     if(!/^[0-9.]*$/.test(value)){validateAmount(input);return;}
@@ -27,7 +28,7 @@
   detail.addEventListener('paste',event=>{
     const input=event.target.closest('[data-savings-amount]');if(!input)return;
     const text=event.clipboardData?.getData('text');if(text===undefined)return;
-    if(!/^(?:[0-9]+|[1-9][0-9]{0,2}(?:\.[0-9]{3})+)$/.test(text)){
+    if(!/^(?:[0-9]+|[1-9][0-9]{0,2}(?:\.[0-9]{3})+)(?:,[0-9]{1,2})?$/.test(text)){
       event.preventDefault();input.setCustomValidity('Format tempelan tidak valid. Gunakan angka atau format seperti 90.000.');input.reportValidity();
     }
   });

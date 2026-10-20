@@ -55,7 +55,7 @@ $selected_ids_raw = $_GET['ids'] ?? [];
 if (!is_array($selected_ids_raw)) {
     $selected_ids_raw = preg_split('/[,\s]+/', (string)$selected_ids_raw, -1, PREG_SPLIT_NO_EMPTY);
 }
-$selected_ids = array_values(array_unique(array_filter(array_map('intval', $selected_ids_raw), fn($id) => $id > 0)));
+$selected_ids = array_values(array_unique(array_filter(array_map('intval', $selected_ids_raw), fn($id) => $id !== 0)));
 
 if ($selected_mode && !$selected_ids) {
     $_SESSION['flash'] = ['type' => 'error', 'msg' => 'Pilih minimal satu transaksi untuk dicetak.'];
@@ -93,7 +93,7 @@ function money_plain($n): string {
 }
 
 function money_total($n): string {
-    return number_format((float)$n, 0, ',', '.');
+    $v=round((float)$n,2);return number_format($v,$v===floor($v)?0:2,',','.');
 }
 
 function month_code($value): string {
@@ -148,6 +148,20 @@ $period_start = $filter_tanggal_awal !== '' ? $filter_tanggal_awal . ' 00:00:00'
 $period_end = $filter_tanggal_akhir !== ''
     ? date('Y-m-d H:i:s', strtotime($filter_tanggal_akhir . ' +1 day'))
     : date('Y-m-d H:i:s', strtotime($period_start . ' +1 month'));
+if($selected_mode&&min($selected_ids)<0){
+    require_once __DIR__.'/../includes/payment_history.php';
+    require_once __DIR__.'/../includes/receipt_balances.php';
+    require_once __DIR__.'/../includes/receipt_print.php';
+    $documents=[];$scope=(int)($GLOBALS['app_unit_id']??unit_active_id());
+    try{foreach($selected_ids as $id){
+        unit_set_context($koneksi,$scope);$model=payment_history_model($koneksi,$id,false);$p=$model['payment']??null;
+        if(!$p||empty($model['capabilities']['can_print'])||!$p['TGL_BYR']||$p['TGL_BYR']<$period_start||$p['TGL_BYR']>=$period_end)throw new DomainException('Transaksi yang dipilih tidak tersedia atau tidak memiliki izin cetak.');
+        unit_set_context($koneksi,(int)$p['unit_id']);$p['owner_type']=empty($p['student_id'])&&$id<0?'account':'student';
+        $documents[]=['payment'=>$p,'school'=>unit_school_name((int)$p['unit_id']),'primary'=>$model['components'],'remaining'=>payment_receipt_remaining($koneksi,$p),'other'=>[],'period'=>payment_history_period($p),'words'=>receipt_money_words((float)$p['total_jumlah']),'date'=>spp_date_label($p['TGL_BYR'],true,$p['time_precision']??null),'signer'=>$p['source_operator']??$p['user_id']??'Tidak tercatat'];
+    }}catch(Throwable $e){http_response_code(403);exit('Transaksi yang dipilih tidak tersedia atau tidak memiliki izin cetak.');}
+    finally{unit_set_context($koneksi,$scope);}
+    receipt_http_output($documents,'Slip Pembayaran','Struk siap dicetak');exit;
+}
 $where_sql = 'WHERE b.TGL_BYR >= ? AND b.TGL_BYR < ?';
 $where_sql .= unit_student_selection_where();
 $types = 'ss';
@@ -198,6 +212,10 @@ $stmt->bind_param($types, ...$params);
 $stmt->execute();
 $rows = $stmt->get_result()->fetch_all(MYSQLI_ASSOC);
 $stmt->close();
+if(!$selected_mode){
+    require_once __DIR__.'/../includes/general_history.php';
+    $rows=general_payment_rows($koneksi,$period_start,$period_end,$filter_q,(string)($_GET['urut']??'terbaru'));
+}
 
 // Selected slips use the same print permissions as the report's row actions.
 if ($selected_mode) {
@@ -220,7 +238,7 @@ if ($selected_mode && !$rows) {
 
 $details_by_payment = [];
 $spp_allocations_by_payment = [];
-if ($rows) {
+if ($rows && $selected_mode) {
     $ids = array_map(fn($row) => (int)$row['id'], $rows);
     $placeholders = implode(',', array_fill(0, count($ids), '?'));
     $types = str_repeat('i', count($ids));
@@ -252,7 +270,7 @@ if (!$selected_mode) {
             . '<td>' . e($row['kelas_rombel_snapshot'] ?: ($row['KELAS_SISWA'] ?? '')) . '</td>'
             . '<td>' . e(trim(($row['BULAN'] ?? '') . ' ' . ($row['TAHUN'] ?? ''))) . '</td>'
             . '<td>' . e($row['sistem_pembayaran'] ?? '') . '</td>'
-            . '<td>' . e(spp_date_label($row['TGL_BYR'] ?? 'now',true)) . '</td>'
+            . '<td>' . e(spp_date_label($row['TGL_BYR'] ?? null,true,$row['time_precision']??null)) . '</td>'
             . '<td class="num">Rp ' . money_total($row['total_jumlah'] ?? 0) . '</td>'
             . '</tr>';
     }

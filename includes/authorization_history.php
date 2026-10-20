@@ -1,6 +1,7 @@
 <?php
 require_once __DIR__.'/payment_activity.php';
 require_once __DIR__.'/filter_choices.php';
+require_once __DIR__.'/payment_time.php';
 
 function authorization_history_source(): string
 {
@@ -92,12 +93,20 @@ function authorization_history_events(mysqli $db,int $id): array
 function authorization_proposed_snapshot(array $before,array $payload): array
 {
     $after=$before;
-    if(isset($payload['legacy_input'])){$v=$payload['legacy_input'];$after['payment']['TGL_BYR']=$v['date'];$after['payment']['BULAN']=$v['period'];$after['payment']['KETERANGAN']=$v['note'];$after['payment']['sistem_pembayaran']=$v['method']??$before['payment']['sistem_pembayaran']??'';$after['payment']['total_jumlah']=array_sum(array_column($v['items'],'amount'));$after['details']['legacy_items']=$v['items'];return $after;}
+    if(isset($payload['legacy_input'])){
+        $v=$payload['legacy_input'];
+        if(array_key_exists('time_precision',$v)||($v['date']??null)!==($before['payment']['source_date']??$before['payment']['TGL_BYR']??null)){
+            $date=spp_date_value($v['date']??null);$after['payment']['TGL_BYR']=$date?$date->format('Y-m-d H:i:s'):null;
+            $after['payment']['time_precision']=$v['time_precision']??($date?'datetime':'none');
+        }
+        $after['payment']['BULAN']=$v['period'];$after['payment']['KETERANGAN']=$v['note'];$after['payment']['sistem_pembayaran']=$v['method']??$before['payment']['sistem_pembayaran']??'';$after['payment']['total_jumlah']=array_sum(array_column($v['items'],'amount'));$after['details']['legacy_items']=$v['items'];return $after;
+    }
     $amount=static function($raw):float {
         $raw=trim((string)$raw);return is_numeric($raw)?(float)$raw:(float)str_replace(['.',','],['','.'],$raw);
     };
     foreach(['no_induk'=>'NO_INDUK','tanggal_bayar'=>'TGL_BYR','bulan_bayar'=>'BULAN','tahun_bayar'=>'TAHUN','sistem_pembayaran'=>'sistem_pembayaran','catatan'=>'KETERANGAN'] as $key=>$field)
         if(isset($payload[$key]))$after['payment'][$field]=$payload[$key];
+    if(isset($payload['tanggal_bayar'],$before['payment']['TGL_BYR']))try{$after['payment']['TGL_BYR']=payment_time_native_update((string)$payload['tanggal_bayar'],(string)$before['payment']['TGL_BYR']);}catch(DomainException $e){/* Retain an invalid proposal for the existing validation/approval flow. */}
     foreach(['uang_psb'=>'U_PSB','uang_spp'=>'U_SPP','uang_komite'=>'U_KOMITE','potongan_spp'=>'potong_spp'] as $key=>$field)
         if(isset($payload[$key]))$after['payment'][$field]=$amount($payload[$key]);
     $du=array_key_exists('uang_du',$payload)?$amount($payload['uang_du']):array_sum(array_column($before['details']['bayar_du']??[],'jumlah'));

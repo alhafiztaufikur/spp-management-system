@@ -145,8 +145,8 @@ if(($_GET['all_periods']??'')==='1')$periodLabel='Semua periode';
 <link rel="stylesheet" href="../assets/css/migrated_history.css?v=<?= filemtime(__DIR__.'/../assets/css/migrated_history.css') ?>">
 <link rel="stylesheet" href="../assets/css/savings_workspace.css?v=<?= filemtime(__DIR__.'/../assets/css/savings_workspace.css') ?>">
 <link rel="stylesheet" href="../assets/css/history_rombel_refinement.css?v=<?= filemtime(__DIR__.'/../assets/css/history_rombel_refinement.css') ?>">
-</head>
-<body>
+<link rel="stylesheet" href="../assets/css/payment_workspace_refinement.css?v=<?= filemtime(__DIR__.'/../assets/css/payment_workspace_refinement.css') ?>"></head>
+<body class="ui-time-polish">
 <div class="bg-orbs"><div class="orb orb-1"></div><div class="orb orb-2"></div><div class="orb orb-3"></div></div>
 <div class="layout">
   <?php include '../includes/sidebar.php'; ?>

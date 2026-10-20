@@ -17,6 +17,7 @@ function global_report_excel_body_style($sheet,array $section,array $positions,i
             $style['fill']=['fillType'=>'solid','startColor'=>['rgb'=>$key==='kelas'?'FFF4E4':$pale]];
         }
         $sheet->getStyle($letter($start).$first.':'.$letter($end).$last)->applyFromArray($style);
+        if($type==='datetime')foreach($section['rows'] as $offset=>$data)if(($data['time_precision']??'')==='date')$sheet->getStyle($letter($start).($first+$offset))->getNumberFormat()->setFormatCode('dd/mm/yyyy "· Jam tidak tercatat"');
         if($type==='status')foreach($section['rows'] as $offset=>$data)if(($data[$key]??'')==='Lunas'){
             $row=$first+$offset;
             $sheet->getStyle($letter($start).$row.':'.$letter($end).$row)->getFill()->setFillType('solid')->getStartColor()->setRGB('DFF5E8');

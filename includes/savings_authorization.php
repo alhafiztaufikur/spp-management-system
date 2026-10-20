@@ -53,14 +53,18 @@ function savings_ensure_baseline(mysqli $db,array $row,array $snapshot):void {
     $enriched=savings_enrich_rows($db,[array_merge($row,['nominal'=>$row['MASUK'],'keluar'=>$row['KELUAR']])])[0];
     savings_event($db,$row,'baseline',(int)$enriched['owner_id'],null,$snapshot,'baseline:'.$row['jenis'].':'.$id,null,'Snapshot data sebelum koreksi; waktu input asli tidak direkonstruksi.',true);
 }
-/** Accept plain rupiah or correctly grouped Indonesian thousands, never decimal/exponent syntax. */
-function savings_nominal_value($raw): int {
+/** Match savings entry precision so editing a fractional deposit never drops its cents. */
+function savings_nominal_value($raw): int|float {
+    // Existing approval payloads are JSON numbers, while HTML forms send text.
+    if(is_float($raw)){
+        if(!is_finite($raw)||abs($raw*100-round($raw*100))>0.00001)throw new RuntimeException('Nominal maksimal dua desimal.');
+        $raw=number_format($raw,2,'.','');
+    }
     if(!is_string($raw)&&!is_int($raw))throw new RuntimeException('Nominal harus berupa rupiah positif, maksimal 12 digit.');
-    $value=(string)$raw;
-    if(!preg_match('/^(?:[0-9]{1,12}|[1-9][0-9]{0,2}(?:\.[0-9]{3}){1,3})$/D',$value))throw new RuntimeException('Format nominal tidak valid. Gunakan angka atau pemisah ribuan, misalnya 90.000.');
-    $digits=str_replace('.','',$value);
-    if(strlen($digits)>12||(int)$digits<=0)throw new RuntimeException('Nominal harus berupa rupiah positif, maksimal 12 digit.');
-    return (int)$digits;
+    require_once __DIR__.'/savings_owners.php';
+    $canonical=so_amount((string)$raw);$cents=lf_cents($canonical);
+    if(strlen(explode('.',$canonical)[0])>12)throw new RuntimeException('Nominal harus berupa rupiah positif, maksimal 12 digit.');
+    return $cents%100===0?intdiv($cents,100):$cents/100;
 }
 function savings_edit_payload(array $source,string $action):array {
     if($action==='hapus')return [];
@@ -69,7 +73,7 @@ function savings_edit_payload(array $source,string $action):array {
     $d=DateTimeImmutable::createFromFormat('!Y-m-d H:i:s',$date,new DateTimeZone('Asia/Jakarta'));if(!$d||$d->format('Y-m-d H:i:s')!==$date)throw new RuntimeException('Tanggal/waktu WIB tidak valid.');
     if($d>new DateTimeImmutable('now',new DateTimeZone('Asia/Jakarta')))throw new RuntimeException('Tanggal transaksi tidak boleh di masa depan.');
     $note=$source['keterangan']??'';if(!is_string($note)||mb_strlen($note)>255)throw new RuntimeException('Keterangan maksimal 255 karakter.');
-    return ['nominal'=>(int)$raw,'tanggal'=>$date,'keterangan'=>trim($note)];
+    return ['nominal'=>$raw,'tanggal'=>$date,'keterangan'=>trim($note)];
 }
 function savings_request_find(mysqli $db,int $id,bool $lock=false):?array {
     $s=$db->prepare('SELECT r.*,a.nama requested_by_name,a.username requested_by_username,a.role requested_by_role FROM tabungan_otorisasi r JOIN admin a ON a.id=r.requested_by WHERE r.id=?'.($lock?' FOR UPDATE':''));$s->bind_param('i',$id);$s->execute();$r=$s->get_result()->fetch_assoc();$s->close();return $r?:null;
@@ -118,7 +122,7 @@ function savings_correct(mysqli $db,string $action,string $kind,int $id,array $s
         $afterRow=$row;if($operation==='edit'){$afterRow['TANGGAL']=$payload['tanggal'];$afterRow['keterangan']=$payload['keterangan'];$afterRow[$kind==='masuk'?'MASUK':'KELUAR']=$payload['nominal'];}
         $changed=[];foreach($ledger['rows'] as $entry){if($entry['jenis']===$kind&&(int)$entry['id']===$id){if($operation==='edit')$changed[]=$afterRow;}else $changed[]=$entry;}
         $balance=savings_ledger_balance($changed,true,$ledger['opening']);$table=$kind==='masuk'?'transaksi_m':'transaksi_k';
-        if($operation==='hapus'){$s=$db->prepare("DELETE FROM $table WHERE id=?");$s->bind_param('i',$id);}else{$column=$kind==='masuk'?'MASUK':'KELUAR';$s=$db->prepare("UPDATE $table SET $column=?,TANGGAL=?,keterangan=? WHERE id=?");$s->bind_param('issi',$payload['nominal'],$payload['tanggal'],$payload['keterangan'],$id);}$s->execute();$s->close();
+        if($operation==='hapus'){$s=$db->prepare("DELETE FROM $table WHERE id=?");$s->bind_param('i',$id);}else{$column=$kind==='masuk'?'MASUK':'KELUAR';$s=$db->prepare("UPDATE $table SET $column=?,TANGGAL=?,keterangan=? WHERE id=?");$s->bind_param('dssi',$payload['nominal'],$payload['tanggal'],$payload['keterangan'],$id);}$s->execute();$s->close();
         $newBalance=$balance/100;$s=$db->prepare('UPDATE tabungan SET SALDO=? WHERE NO_INDUK=?');$s->bind_param('ds',$newBalance,$row['NO_INDUK']);$s->execute();$s->close();
         if($r){$s=$db->prepare("UPDATE tabungan_otorisasi SET status='approved',decided_by=?,decision_note=?,decided_at=NOW(),applied_at=NOW() WHERE id=?");$s->bind_param('isi',$actor,$reason,$requestId);$s->execute();$s->close();savings_event($db,$row,'approved',$actor,$snapshot['data'],null,'approved:'.$requestId,$requestId,$reason);}
         $after=$operation==='edit'?savings_snapshot($afterRow,$ledger['student'])['data']:['deleted'=>true];$before=$snapshot['data'];$before['balance']=$ledger['balance'];$after['balance']=$balance;

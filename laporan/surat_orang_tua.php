@@ -10,8 +10,8 @@ $filters['status']='';unset($filters['_multi']['status']);filter_output_start();
 $today=report_letter_today();
 $students=report_student_debt_groups($koneksi,$filters,'',[],$today);
 $allFilters=$filters;$allFilters['kelas']='';unset($allFilters['_multi']['kelas']);$allFilters['q']='';
-$allStudents=report_student_debt_groups($koneksi,$allFilters,'',[],$today);
-$classStudents=($filters['kelas']!==''||!filter_is_all($filters['_multi']['kelas']??['*']))?report_student_debt_groups($koneksi,$filters,'',[],$today):[];
+$allStudents=$allFilters===$filters?$students:report_student_debt_groups($koneksi,$allFilters,'',[],$today);
+$classStudents=($filters['kelas']!==''||!filter_is_all($filters['_multi']['kelas']??['*']))?$students:[];
 $classes=report_classes($koneksi);
 $total=array_sum(array_map(static fn($student)=>(float)$student['total_tunggakan'],$students));
 ?>

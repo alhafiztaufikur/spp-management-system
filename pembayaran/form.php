@@ -151,8 +151,8 @@ unset($_SESSION['payment_draft']);
 <link rel="stylesheet" href="../assets/css/rombel_payment_refinement.css?v=<?= filemtime(__DIR__.'/../assets/css/rombel_payment_refinement.css') ?>">
 <link rel="stylesheet" href="../assets/css/payment_ui_polish.css?v=<?= filemtime(__DIR__ . '/../assets/css/payment_ui_polish.css') ?>">
 <link rel="stylesheet" href="../assets/css/history_rombel_refinement.css?v=<?= filemtime(__DIR__.'/../assets/css/history_rombel_refinement.css') ?>">
-</head>
-<body>
+<link rel="stylesheet" href="../assets/css/payment_workspace_refinement.css?v=<?= filemtime(__DIR__.'/../assets/css/payment_workspace_refinement.css') ?>"></head>
+<body class="ui-time-polish">
 
   <div class="bg-orbs">
     <div class="orb orb-1"></div><div class="orb orb-2"></div><div class="orb orb-3"></div>

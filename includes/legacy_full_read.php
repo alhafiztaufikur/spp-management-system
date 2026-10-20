@@ -3,6 +3,7 @@ require_once __DIR__.'/legacy_full_schema.php';
 require_once __DIR__.'/legacy_finance.php';
 require_once __DIR__.'/legacy_operational_read.php';
 require_once __DIR__.'/history_performance.php';
+require_once __DIR__.'/payment_time.php';
 function lful_read_ready(mysqli $db): bool {static $cache=[];$key=spl_object_id($db).':'.$db->query('SELECT DATABASE()')->fetch_row()[0];return $cache[$key]??=legacy_full_ready($db);}
 function lful_operator_key(int $unit,?string $operator): string {return 'legacy:'.$unit.':'.bin2hex((string)$operator);}
 function lful_operator_options(mysqli $db): array {
@@ -10,28 +11,35 @@ function lful_operator_options(mysqli $db): array {
     $out=[];$batches=[];
     foreach(hp_rows($db,"SELECT id,unit_id FROM legacy_full_batches WHERE state='completed'") as $b)$batches[(int)$b['unit_id']][]="'".$db->real_escape_string($b['id'])."'";
     if(!$batches)return [];
+    static $options=[];
+    $revision=lop_ready($db)?(int)hp_one($db,'SELECT COALESCE(MAX(id),0) revision FROM legacy_op_audit')['revision']:0;
+    $cacheKey=$db->thread_id.':'.hash('sha256',json_encode($batches).':'.$revision);
+    if(isset($options[$cacheKey]))return $options[$cacheKey];
     $clauses=[];foreach($batches as $unit=>$ids)$clauses[]='(unit_id='.$unit.' AND batch_id IN ('.implode(',',$ids).'))';$where='('.implode(' OR ',$clauses).')';
     $tables=['legacy_full_payments','legacy_full_journals'];if(lop_ready($db))array_push($tables,'legacy_op_payments','legacy_op_journals');
-    $parts=[];foreach($tables as $table)$parts[]="SELECT DISTINCT unit_id,source_operator FROM $table WHERE $where".($table==='legacy_op_journals'?" AND origin='legacy'":'');
+    // Operator IDs encode the exact source bytes. A case-insensitive DISTINCT
+    // can discard a valid ID (including case or trailing-space variants).
+    $parts=[];foreach($tables as $table)$parts[]="SELECT DISTINCT unit_id,CAST(source_operator AS BINARY) source_operator FROM $table WHERE $where".($table==='legacy_op_journals'?" AND origin='legacy'":'');
     foreach(hp_rows($db,implode(' UNION ',$parts)) as $r)$out[lful_operator_key((int)$r['unit_id'],$r['source_operator'])]='Legacy · '.unit_label((int)$r['unit_id']).' · '.($r['source_operator']?:'Tidak tercatat');
-    return $out;
+    return $options[$cacheKey]=$out;
 }
 /** Negative UI IDs are a disjoint read namespace, never written to bayar or authorization. */
 function lful_payment_source(mysqli $db): string {
     if(!lful_read_ready($db))return 'bayar';$columns=lf_rows($db,"SELECT COLUMN_NAME FROM information_schema.COLUMNS WHERE TABLE_SCHEMA=DATABASE() AND TABLE_NAME='bayar' ORDER BY ORDINAL_POSITION");
-    $mapping=['id'=>'-p.id','unit_id'=>'p.unit_id','NO_INDUK'=>'s.NO_INDUK','KELAS'=>'p.class_snapshot','kelas_rombel_snapshot'=>'p.class_snapshot','TGL_BYR'=>'p.source_date','total_jumlah'=>'p.total','user_id'=>"CONCAT('legacy:',p.unit_id,':',LOWER(HEX(COALESCE(p.source_operator,''))))",'BULAN'=>"''",'TAHUN'=>"''",'KETERANGAN'=>"CONCAT('Legacy · ',COALESCE(p.source_period,''))",'sistem_pembayaran'=>"'Legacy'",'created_at'=>'p.source_date','updated_at'=>'NULL'];
+    $time=payment_time_projection($db);
+    $mapping=['id'=>'-p.id','unit_id'=>'p.unit_id','NO_INDUK'=>'s.NO_INDUK','KELAS'=>'p.class_snapshot','kelas_rombel_snapshot'=>'p.class_snapshot','TGL_BYR'=>$time['value'],'total_jumlah'=>'p.total','user_id'=>"CONCAT('legacy:',p.unit_id,':',LOWER(HEX(COALESCE(p.source_operator,''))))",'BULAN'=>"''",'TAHUN'=>"''",'KETERANGAN'=>"CONCAT('Legacy · ',COALESCE(p.source_period,''))",'sistem_pembayaran'=>"'Legacy'",'created_at'=>'NULL','updated_at'=>$time['updated']];
     $select=[];foreach($columns as $c){$col=$c['COLUMN_NAME'];if(!preg_match('/^[a-zA-Z_0-9]+$/D',$col))throw new LogicException('Invalid column');$select[]=($mapping[$col]??'0').' AS `'.$col.'`';}
     $op=lop_ready($db)?' UNION ALL '.lop_payment_select($db,$columns):'';
-    return '(SELECT * FROM bayar UNION ALL SELECT '.implode(',',$select)." FROM legacy_full_payments p JOIN siswa s ON s.id=p.student_id AND s.unit_id=p.unit_id JOIN legacy_full_batches b ON b.id=p.batch_id AND b.unit_id=p.unit_id WHERE b.state='completed'".$op.')';
+    return '(SELECT * FROM bayar UNION ALL SELECT '.implode(',',$select)." FROM legacy_full_payments p JOIN siswa s ON s.id=p.student_id AND s.unit_id=p.unit_id JOIN legacy_full_batches b ON b.id=p.batch_id AND b.unit_id=p.unit_id".$time['join']." WHERE b.state='completed'".$op.')';
 }
 function lful_history_model(mysqli $db,int $id): array {
     if($id>1000000000&&lop_ready($db))return lop_payment_model($db,$id-1000000000);
-    if(!lful_read_ready($db))throw new OutOfBoundsException('Histori tidak ditemukan.');$p=lf_one($db,"SELECT p.*,s.NO_INDUK,s.NAMA,s.NO_induk_diknas,b.cutoff,src.backup_hash FROM legacy_full_payments p JOIN siswa s ON s.id=p.student_id AND s.unit_id=p.unit_id JOIN legacy_full_batches b ON b.id=p.batch_id AND b.unit_id=p.unit_id JOIN legacy_finance_sources src ON src.id=b.source_id AND src.unit_id=b.unit_id WHERE p.id=? AND b.state='completed'",[$id]);
-    if(!$p)throw new OutOfBoundsException('Histori tidak ditemukan pada unit ini.');$p['items']=lf_rows($db,'SELECT label,amount FROM legacy_full_items WHERE payment_id=? ORDER BY id',[$id]);return ['legacy'=>$p];
+    if(!lful_read_ready($db))throw new OutOfBoundsException('Histori tidak ditemukan.');$p=lf_one($db,"SELECT p.*,s.NO_INDUK,s.NAMA,s.NO_induk_diknas,b.cutoff,b.source_id,b.completed_at imported_at,src.backup_hash FROM legacy_full_payments p JOIN siswa s ON s.id=p.student_id AND s.unit_id=p.unit_id JOIN legacy_full_batches b ON b.id=p.batch_id AND b.unit_id=p.unit_id JOIN legacy_finance_sources src ON src.id=b.source_id AND src.unit_id=b.unit_id WHERE p.id=? AND b.state='completed'",[$id]);
+    if(!$p)throw new OutOfBoundsException('Histori tidak ditemukan pada unit ini.');$p+=payment_time_record($db,$p);$p['items']=lf_rows($db,'SELECT label,amount FROM legacy_full_items WHERE payment_id=? ORDER BY id',[$id]);return ['legacy'=>$p];
 }
 function lful_history_render(array $model): void {
     $p=$model['legacy'];$e=static fn($v)=>htmlspecialchars((string)$v,ENT_QUOTES,'UTF-8');
-    echo '<section class="ph-payment-box"><h3>'.$e($p['NAMA']).'</h3><p>'.(!empty($p['operational'])&&empty($p['student_id'])?'Identitas sumber ':'NIS ').$e($p['NO_INDUK']).' · '.$e(unit_label((int)$p['unit_id'])).'</p><h4>Histori Legacy</h4><p>'.($p['source_date']?$e(spp_date_label($p['source_date'],true)):'Tanggal tidak tercatat').'</p><p>Periode: '.$e($p['source_period']?:'Tidak tercatat').' · Kelas sumber: '.$e($p['class_snapshot']).'</p><dl class="ph-components">';
+    echo '<section class="ph-payment-box"><h3>'.$e($p['NAMA']).'</h3><p>'.(!empty($p['operational'])&&empty($p['student_id'])?'Identitas sumber ':'NIS ').$e($p['NO_INDUK']).' · '.$e(unit_label((int)$p['unit_id'])).'</p><h4>Histori Legacy</h4><p>'.$e(payment_time_label($p)).'</p><p>Periode: '.$e($p['source_period']?:'Tidak tercatat').' · Kelas sumber: '.$e($p['class_snapshot']).'</p><dl class="ph-components">';
     foreach($p['items'] as $i)echo '<div><dt>'.$e($i['label']).'</dt><dd>Rp '.$e(number_format((float)$i['amount'],2,',','.')).'</dd></div>';
     echo '</dl><strong>Total Rp '.$e(number_format((float)$p['total'],2,',','.')).'</strong><p>Operator Legacy: '.$e($p['source_operator']?:'Tidak tercatat').'</p>';
     if(!empty($p['operational']))echo '<p>Metode sumber: '.$e($p['method']?:'Tidak tercatat').'</p><p>'.$e($p['note']).'</p>';
@@ -46,10 +54,10 @@ function lful_report_matches_operator(array $f,int $unit,?string $operator): boo
 function lful_report_components(mysqli $db,array $f): array {
     if(!lful_read_ready($db)||!in_array(($f['metode']??''),['','Legacy'],true))return [];
     if(isset($f['_multi']['metode'])&&!filter_is_all($f['_multi']['metode'])&&!in_array('Legacy',$f['_multi']['metode'],true))return [];
-    $out=[];$rows=lf_rows($db,"SELECT p.*,s.NO_INDUK,s.NAMA,s.NO_induk_diknas,s.master_kelas_id,i.category,i.label,i.amount FROM legacy_full_payments p JOIN legacy_full_items i ON i.payment_id=p.id AND i.unit_id=p.unit_id JOIN siswa s ON s.id=p.student_id AND s.unit_id=p.unit_id JOIN legacy_full_batches b ON b.id=p.batch_id AND b.unit_id=p.unit_id WHERE b.state='completed' AND p.source_date>=? AND p.source_date<? ORDER BY p.source_date,p.id,i.id",[$f['tanggal_awal'].' 00:00:00',date('Y-m-d',strtotime($f['tanggal_akhir'].' +1 day')).' 00:00:00']);
-    foreach($rows as $p){if(!lful_report_matches_operator($f,(int)$p['unit_id'],$p['source_operator']))continue;$r=['id'=>-(int)$p['id'],'unit_id'=>$p['unit_id'],'tanggal'=>$p['source_date'],'nomor'=>'Legacy · '.substr($p['row_key'],0,12),'nis'=>$p['NO_INDUK'],'nis_diknas'=>$p['NO_induk_diknas'],'nama'=>$p['NAMA'],'kelas'=>$p['class_snapshot'],'master_kelas_id'=>$p['master_kelas_id']??null,'metode'=>'Legacy','operator'=>'Legacy · '.($p['source_operator']?:'Tidak tercatat'),'kategori_key'=>$p['category'],'komponen'=>$p['label'].' (Legacy)','nominal'=>(float)$p['amount'],'legacy'=>true];if(report_class_matches_row($f,$r)&&report_row_matches_filters($r,$f))$out[]=$r;}
+    $out=[];$rows=hp_rows($db,"SELECT p.*,s.NO_INDUK,s.NAMA,s.NO_induk_diknas,s.master_kelas_id,b.source_id,b.completed_at imported_at,i.category,i.label,i.amount FROM legacy_full_payments p JOIN legacy_full_items i ON i.payment_id=p.id AND i.unit_id=p.unit_id JOIN siswa s ON s.id=p.student_id AND s.unit_id=p.unit_id JOIN legacy_full_batches b ON b.id=p.batch_id AND b.unit_id=p.unit_id WHERE b.state='completed' AND p.source_date>=? AND p.source_date<? ORDER BY p.source_date,p.id,i.id",[$f['tanggal_awal'].' 00:00:00',date('Y-m-d',strtotime($f['tanggal_akhir'].' +1 day')).' 00:00:00']);
+    foreach($rows as $p){$p+=payment_time_record($db,$p);if(!lful_report_matches_operator($f,(int)$p['unit_id'],$p['source_operator']))continue;$r=['id'=>-(int)$p['id'],'unit_id'=>$p['unit_id'],'tanggal'=>$p['payment_datetime'],'time_precision'=>$p['time_precision'],'nomor'=>'Legacy · '.substr($p['row_key'],0,12),'nis'=>$p['NO_INDUK'],'nis_diknas'=>$p['NO_induk_diknas'],'nama'=>$p['NAMA'],'kelas'=>$p['class_snapshot'],'master_kelas_id'=>$p['master_kelas_id']??null,'metode'=>'Legacy','operator'=>'Legacy · '.($p['source_operator']?:'Tidak tercatat'),'kategori_key'=>$p['category'],'komponen'=>$p['label'].' (Legacy)','nominal'=>(float)$p['amount'],'legacy'=>true];if(report_class_matches_row($f,$r)&&report_row_matches_filters($r,$f))$out[]=$r;}
     if(lop_ready($db)){
-        foreach(lf_rows($db,"SELECT p.*,o.source_identity,o.name,o.student_id,s.NO_INDUK,s.NO_induk_diknas,COALESCE(s.master_kelas_id,g.master_kelas_id) master_kelas_id FROM legacy_op_payments p JOIN legacy_op_owners o ON o.id=p.owner_id AND o.unit_id=p.unit_id LEFT JOIN siswa s ON s.id=o.student_id AND s.unit_id=o.unit_id LEFT JOIN legacy_op_groups g ON g.id=o.group_id AND g.unit_id=o.unit_id JOIN legacy_full_batches b ON b.id=p.batch_id AND b.unit_id=p.unit_id WHERE b.state='completed' AND p.cancelled=0 AND p.source_date>=? AND p.source_date<?",[$f['tanggal_awal'].' 00:00:00',date('Y-m-d',strtotime($f['tanggal_akhir'].' +1 day')).' 00:00:00']) as $p){if(!lful_report_matches_operator($f,(int)$p['unit_id'],$p['source_operator']))continue;foreach(json_decode($p['items'],true) as $item){$r=['id'=>-(1000000000+(int)$p['id']),'unit_id'=>$p['unit_id'],'tanggal'=>$p['source_date'],'nomor'=>'Legacy · '.substr($p['row_key'],0,12),'nis'=>$p['NO_INDUK']??'rekening:'.$p['owner_id'],'nis_diknas'=>$p['NO_induk_diknas'],'nama'=>$p['name'],'kelas'=>$p['class_snapshot'],'master_kelas_id'=>$p['master_kelas_id']??null,'metode'=>'Legacy','operator'=>'Legacy · '.($p['source_operator']?:'Tidak tercatat'),'kategori_key'=>$item['category'],'komponen'=>$item['label'].' (Legacy)','nominal'=>(float)$item['amount'],'legacy'=>true];if(report_class_matches_row($f,$r)&&report_row_matches_filters($r,$f))$out[]=$r;}}
+        foreach(hp_rows($db,"SELECT p.*,o.source_identity,o.name,o.student_id,s.NO_INDUK,s.NO_induk_diknas,COALESCE(s.master_kelas_id,g.master_kelas_id) master_kelas_id,b.source_id,b.completed_at imported_at FROM legacy_op_payments p JOIN legacy_op_owners o ON o.id=p.owner_id AND o.unit_id=p.unit_id LEFT JOIN siswa s ON s.id=o.student_id AND s.unit_id=o.unit_id LEFT JOIN legacy_op_groups g ON g.id=o.group_id AND g.unit_id=o.unit_id JOIN legacy_full_batches b ON b.id=p.batch_id AND b.unit_id=p.unit_id WHERE b.state='completed' AND p.cancelled=0 AND p.source_date>=? AND p.source_date<?",[$f['tanggal_awal'].' 00:00:00',date('Y-m-d',strtotime($f['tanggal_akhir'].' +1 day')).' 00:00:00']) as $p){$p+=payment_time_record($db,$p);if(!lful_report_matches_operator($f,(int)$p['unit_id'],$p['source_operator']))continue;foreach(json_decode($p['items'],true) as $item){$r=['id'=>-(1000000000+(int)$p['id']),'unit_id'=>$p['unit_id'],'tanggal'=>$p['payment_datetime'],'time_precision'=>$p['time_precision'],'nomor'=>'Legacy · '.substr($p['row_key'],0,12),'nis'=>$p['NO_INDUK']??'rekening:'.$p['owner_id'],'nis_diknas'=>$p['NO_induk_diknas'],'nama'=>$p['name'],'kelas'=>$p['class_snapshot'],'master_kelas_id'=>$p['master_kelas_id']??null,'metode'=>'Legacy','operator'=>'Legacy · '.($p['source_operator']?:'Tidak tercatat'),'kategori_key'=>$item['category'],'komponen'=>$item['label'].' (Legacy)','nominal'=>(float)$item['amount'],'legacy'=>true];if(report_class_matches_row($f,$r)&&report_row_matches_filters($r,$f))$out[]=$r;}}
     }
     return $out;
 }
@@ -63,9 +71,32 @@ function lful_is_covered(mysqli $db,string $nis,string $category,string $period)
     if(str_starts_with($category,'biaya_lain:'))return (bool)lf_one($db,'SELECT id FROM legacy_full_coverage WHERE student_id=? AND category=?',[$s['student_id'],$category]);
     return (bool)lf_one($db,'SELECT id FROM legacy_full_coverage WHERE student_id=? AND category=? AND period=?',[$s['student_id'],$category,$period]);
 }
-function lful_coverage_status(mysqli $db,string $nis,string $category,string $period): ?array {
-    if(!lful_is_covered($db,$nis,$category,$period))return null;
-    $c=lf_one($db,'SELECT c.*,fs.review_id FROM legacy_full_coverage c JOIN legacy_full_students fs ON fs.student_id=c.student_id AND fs.unit_id=c.unit_id JOIN siswa s ON s.id=c.student_id AND s.unit_id=c.unit_id WHERE s.NO_INDUK=? AND c.category=? AND c.period=?',[$nis,$category,$period]);
+/** Request-local evidence for the same monthly cells; never retained across writes. */
+function lful_monthly_coverage_snapshot(mysqli $db,array $identities,string $category,array $periods): array {
+    $snapshot=['students'=>[],'coverage'=>[]];
+    if(!in_array($category,['spp','komite'],true))throw new InvalidArgumentException('Monthly coverage category required.');
+    if(!$identities||!$periods||!lful_read_ready($db))return $snapshot;
+    $marks=implode(',',array_fill(0,count($identities),'?'));
+    foreach(hp_rows($db,"SELECT s.NO_INDUK,f.student_id,f.review_id,f.settings FROM legacy_full_students f JOIN siswa s ON s.id=f.student_id AND s.unit_id=f.unit_id WHERE s.NO_INDUK IN ($marks)",$identities) as $student){
+        $student['settings']=json_decode($student['settings'],true,512,JSON_THROW_ON_ERROR);
+        $snapshot['students'][$student['NO_INDUK']]=$student;
+    }
+    $ids=array_column($snapshot['students'],'student_id');if(!$ids)return $snapshot;
+    $studentMarks=implode(',',array_fill(0,count($ids),'?'));$periodMarks=implode(',',array_fill(0,count($periods),'?'));
+    foreach(hp_rows($db,"SELECT * FROM legacy_full_coverage WHERE student_id IN ($studentMarks) AND category=? AND period IN ($periodMarks)",array_merge($ids,[$category],$periods)) as $coverage)
+        $snapshot['coverage'][$coverage['student_id']][$category][$coverage['period']]=$coverage;
+    return $snapshot;
+}
+function lful_coverage_status(mysqli $db,string $nis,string $category,string $period,?array $snapshot=null): ?array {
+    if($snapshot===null){
+        if(!lful_is_covered($db,$nis,$category,$period))return null;
+        $c=lf_one($db,'SELECT c.*,fs.review_id FROM legacy_full_coverage c JOIN legacy_full_students fs ON fs.student_id=c.student_id AND fs.unit_id=c.unit_id JOIN siswa s ON s.id=c.student_id AND s.unit_id=c.unit_id WHERE s.NO_INDUK=? AND c.category=? AND c.period=?',[$nis,$category,$period]);
+    }else{
+        $student=$snapshot['students'][$nis]??null;if(!$student)return null;
+        $c=$snapshot['coverage'][$student['student_id']][$category][$period]??null;
+        if(!$c&&!(in_array($category,['spp','komite'],true)&&$period<($student['settings']['start_period']??'')))return null;
+        if($c)$c['review_id']=$student['review_id'];
+    }
     if(!$c)return ['label'=>'Histori Legacy · kewajiban tidak tercatat','bill'=>0.0,'paid'=>0.0];
     if($c['disposition']!=='legacy_debt')return ['label'=>$c['disposition']==='settled'?'Sudah dibayar (Legacy)':'Tidak ditagihkan (Legacy)','bill'=>0.0,'paid'=>0.0];
     $label=['spp'=>'SPP','komite'=>'Komite','daftar_ulang'=>'Daftar Ulang','psb'=>'Uang PSB'][$category]??null;

@@ -57,9 +57,9 @@ function authorization_event_model(array $e): array {
     elseif (is_array($e['_proposal']??null) && $before) $changes=payment_activity_changes($before,authorization_proposed_snapshot($before,$e['_proposal']));
     if ($e['action']==='deleted') $changes[]=['label'=>'Status transaksi','before'=>'Aktif','after'=>'Dihapus'];
     foreach($changes as &$change) if($change['label']==='Biaya Lain') $change['label']='Total Daftar Ulang dan Biaya Lain'; unset($change);
-    return ['action'=>$e['action'],'label'=>payment_activity_labels()[$e['action']]??'Tidak tercatat',
+    return ['action'=>$e['action'],'label'=>!empty($e['reconstructed'])?'Catatan sumber Legacy':(payment_activity_labels()[$e['action']]??'Tidak tercatat'),
         'name'=>$e['actor_name']?:'Tidak tercatat','username'=>$e['actor_username']??'','role'=>$e['actor_role']??'',
-        'time'=>spp_date_label($e['occurred_at'],true),'authorization_id'=>$e['authorization_id']??null,
+        'time'=>spp_date_label($e['occurred_at'],true,$e['time_precision']??null),'authorization_id'=>$e['authorization_id']??null,
         'note'=>$e['note']??'','reconstructed'=>(bool)($e['reconstructed']??false),'changes'=>$changes,
         'proposed'=>str_starts_with($e['action'],'request_')];
 }

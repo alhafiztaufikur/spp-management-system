@@ -18,7 +18,7 @@ $flash = $_SESSION['flash'] ?? null;
 unset($_SESSION['flash']);
 
 function report_money($value): string {
-    return 'Rp ' . number_format((float)$value, 0, ',', '.');
+    $v=round((float)$value,2);return 'Rp ' . number_format($v,$v===floor($v)?0:2,',','.');
 }
 
 function report_e($value): string {
@@ -153,72 +153,15 @@ $studentSearchDisplay = $filter_q;
 $displayMatches=array_values(array_filter($studentOptions,static fn($o)=>(int)($_GET['student_id']??0)>0 ? (int)$o['student_id']===(int)$_GET['student_id'] : ($filter_q!==''&&($filter_q===$o['NO_INDUK']||$filter_q===(string)($o['NO_induk_diknas']??'')))));
 if(count($displayMatches)===1)$studentSearchDisplay=$displayMatches[0]['NAMA'];
 
-// Rekap pembayaran pada tanggal/periode transaksi.
-$stmt = $koneksi->prepare("
-    SELECT COUNT(*) AS jml_tx,
-           COALESCE(SUM(b.U_PSB), 0) AS psb,
-           COALESCE(SUM(b.U_SPP), 0) AS spp,
-           COALESCE(SUM(b.U_KOMITE), 0) AS komite,
-           COALESCE(SUM(b.potong_spp), 0) AS potongan_spp,
-           COALESCE(SUM(b.total_jumlah), 0) AS total
-    FROM bayar b
-    JOIN siswa s ON s.NO_INDUK = b.NO_INDUK AND s.unit_id=b.unit_id
-    WHERE b.TGL_BYR >= ? AND b.TGL_BYR < ? $studentSearchSql
-");
-report_bind($stmt, 'ss' . str_repeat('s', count($studentSearchParams)), array_merge([$periodStart, $periodEnd], $studentSearchParams));
-$stmt->execute();
-$bayar_recap = $stmt->get_result()->fetch_assoc();
-$stmt->close();
-
-$stmtBiayaLain = $koneksi->prepare("
-    SELECT d.nama_biaya_snapshot AS nama, COALESCE(SUM(d.nominal_snapshot), 0) AS total
-    FROM bayar_biaya_lain d
-    JOIN bayar b ON b.id = d.bayar_id
-    JOIN siswa s ON s.NO_INDUK = b.NO_INDUK AND s.unit_id=b.unit_id
-    WHERE b.TGL_BYR >= ? AND b.TGL_BYR < ? $studentSearchSql
-    GROUP BY d.nama_biaya_snapshot
-    ORDER BY d.nama_biaya_snapshot ASC
-");
-report_bind($stmtBiayaLain, 'ss' . str_repeat('s', count($studentSearchParams)), array_merge([$periodStart, $periodEnd], $studentSearchParams));
-$stmtBiayaLain->execute();
-$rekap_biaya_lain = $stmtBiayaLain->get_result()->fetch_all(MYSQLI_ASSOC);
-$stmtBiayaLain->close();
-
-$stmtDu = $koneksi->prepare("
-    SELECT COALESCE(SUM(bd.jumlah), 0) AS total_du
-    FROM bayar_du bd
-    JOIN bayar b ON b.id = bd.bayar_id
-    JOIN siswa s ON s.NO_INDUK = b.NO_INDUK AND s.unit_id=b.unit_id
-    WHERE b.TGL_BYR >= ? AND b.TGL_BYR < ? $studentSearchSql
-");
-report_bind($stmtDu, 'ss' . str_repeat('s', count($studentSearchParams)), array_merge([$periodStart, $periodEnd], $studentSearchParams));
-$stmtDu->execute();
-$total_du_periode = (float)($stmtDu->get_result()->fetch_assoc()['total_du'] ?? 0);
-$stmtDu->close();
-
-$stmt2 = $koneksi->prepare("SELECT COUNT(*) AS jml_tx, COALESCE(SUM(tm.MASUK),0) AS total_masuk FROM transaksi_m tm JOIN siswa s ON s.NO_INDUK = tm.NO_INDUK AND s.unit_id=tm.unit_id WHERE tm.TANGGAL >= ? AND tm.TANGGAL < ? $studentSearchSql");
-report_bind($stmt2, 'ss' . str_repeat('s', count($studentSearchParams)), array_merge([$periodStart, $periodEnd], $studentSearchParams));
-$stmt2->execute();
-$savingsIncoming = $stmt2->get_result()->fetch_assoc();
-$tab_masuk = (float)$savingsIncoming['total_masuk'];
-$stmt2->close();
-
-$stmt3 = $koneksi->prepare("SELECT COUNT(*) AS jml_tx, COALESCE(SUM(tk.KELUAR),0) AS total_keluar FROM transaksi_k tk JOIN siswa s ON s.NO_INDUK = tk.NO_INDUK AND s.unit_id=tk.unit_id WHERE tk.TANGGAL >= ? AND tk.TANGGAL < ? $studentSearchSql");
-report_bind($stmt3, 'ss' . str_repeat('s', count($studentSearchParams)), array_merge([$periodStart, $periodEnd], $studentSearchParams));
-$stmt3->execute();
-$savingsOutgoing = $stmt3->get_result()->fetch_assoc();
-$tab_keluar = (float)$savingsOutgoing['total_keluar'];
-$stmt3->close();
-
-if ($filter_q === '') {
-    $total_saldo = (float)$koneksi->query("SELECT COALESCE(SUM(SALDO),0) AS s FROM tabungan")->fetch_assoc()['s'];
-} else {
-    $stmtSaldo = $koneksi->prepare("SELECT COALESCE(SUM(t.SALDO),0) AS s FROM tabungan t JOIN siswa s ON s.NO_INDUK = t.NO_INDUK AND s.unit_id=t.unit_id WHERE 1=1 $studentSearchSql");
-    report_bind($stmtSaldo, str_repeat('s', count($studentSearchParams)), $studentSearchParams);
-    $stmtSaldo->execute();
-    $total_saldo = (float)($stmtSaldo->get_result()->fetch_assoc()['s'] ?? 0);
-    $stmtSaldo->close();
-}
+// The page and both export formats share the same scoped transaction readers.
+$bayar_recap=general_payment_summary($koneksi,$periodStart,$periodEnd,$filter_q);
+$bayar_recap+=['psb'=>0,'spp'=>0,'komite'=>0,'potongan_spp'=>0];
+$total_du_periode=0;
+$rekap_biaya_lain=general_payment_components($koneksi,$periodStart,$periodEnd,$filter_q);
+$savings=general_savings_read($koneksi,$periodStart,$periodEnd,$filter_q);
+$tab_masuk=(float)$savings['total_masuk'];$tab_keluar=(float)$savings['total_keluar'];
+$savingsIncoming=['jml_tx'=>(int)$savings['count_masuk']];$savingsOutgoing=['jml_tx'=>(int)$savings['count_keluar']];
+$total_saldo=general_savings_balance($koneksi,$filter_q);
 
 $bayar_detail = [];
 $unpaid_rows = [];
@@ -232,152 +175,12 @@ if($generalMultiple){
     $totalDetailRows=count($generalAllRows);$totalPages=total_pages($totalDetailRows,$perPage);$page=min($page,$totalPages);$offset=($page-1)*$perPage;
     $generalPageRows=array_slice($generalAllRows,$offset,$perPage);
 } elseif (!$isUnpaidReport) {
-    $whereDetail = 'b.TGL_BYR >= ? AND b.TGL_BYR < ?';
-    $detailTypes = 'ss';
-    $detailParams = [$periodStart, $periodEnd];
-    if ($report_type === 'sudah_bayar') {
-        $whereDetail .= ' AND b.total_jumlah > 0';
-    }
-    if ($studentSearchSql !== '') {
-        $whereDetail .= $studentSearchSql;
-        $detailTypes .= str_repeat('s', count($studentSearchParams));
-        $detailParams = array_merge($detailParams, $studentSearchParams);
-    }
-
-    $orderSql = match ($sort) {
-        'nama' => 's.NAMA ASC, b.TGL_BYR DESC',
-        'kelas' => 'CAST(b.KELAS AS UNSIGNED) ASC, b.kelas_rombel_snapshot ASC, s.NAMA ASC, b.TGL_BYR DESC',
-        'nominal_terbesar' => 'b.total_jumlah DESC, b.TGL_BYR DESC',
-        default => 'b.TGL_BYR DESC, b.id DESC',
-    };
-
-    $stmtDetailCount = $koneksi->prepare("
-        SELECT COUNT(*) AS total
-        FROM bayar b
-        JOIN siswa s ON s.NO_INDUK = b.NO_INDUK AND s.unit_id=b.unit_id
-        WHERE $whereDetail
-    ");
-    report_bind($stmtDetailCount, $detailTypes, $detailParams);
-    $stmtDetailCount->execute();
-    $totalDetailRows = (int)($stmtDetailCount->get_result()->fetch_assoc()['total'] ?? 0);
-    $stmtDetailCount->close();
-
-    $totalPages = total_pages($totalDetailRows, $perPage);
-    $page = min($page, $totalPages);
-    $offset = ($page - 1) * $perPage;
-
-    $stmt4 = $koneksi->prepare("
-        SELECT b.id, b.unit_id, s.NO_INDUK, s.NO_induk_diknas, s.NAMA,
-               COALESCE(NULLIF(b.kelas_rombel_snapshot,''),NULLIF(b.KELAS,''),s.KELAS) AS KELAS,
-               b.BULAN, b.TAHUN,
-               b.U_PSB, b.U_SPP, b.U_KOMITE,
-               b.sistem_pembayaran, b.total_jumlah, b.TGL_BYR
-        FROM bayar b
-        JOIN siswa s ON s.NO_INDUK = b.NO_INDUK AND s.unit_id=b.unit_id
-        WHERE $whereDetail
-        ORDER BY $orderSql
-        LIMIT ? OFFSET ?
-    ");
-    $detailTypesWithLimit = $detailTypes . 'ii';
-    $detailParamsWithLimit = array_merge($detailParams, [$perPage, $offset]);
-    report_bind($stmt4, $detailTypesWithLimit, $detailParamsWithLimit);
-    $stmt4->execute();
-    $bayar_detail = $stmt4->get_result()->fetch_all(MYSQLI_ASSOC);
-    $stmt4->close();
+    $totalDetailRows=$report_type==='sudah_bayar'?(int)general_payment_summary($koneksi,$periodStart,$periodEnd,$filter_q,true)['jml_tx']:(int)$bayar_recap['jml_tx'];
+    $totalPages=total_pages($totalDetailRows,$perPage);$page=min($page,$totalPages);$offset=($page-1)*$perPage;
+    $bayar_detail=general_payment_rows($koneksi,$periodStart,$periodEnd,$filter_q,$sort,$perPage,$offset,$report_type==='sudah_bayar');
 } else {
-    $periodMonthCode = $filter_bulan;
-    $periodMonthName = $bulan_label;
-    $periodMonthLegacy = (string)(int)$filter_bulan;
-    $orderUnpaid = match ($sort) {
-        'nama' => 'NAMA ASC',
-        'kelas' => 'CAST(KELAS AS UNSIGNED) ASC, NAMA ASC',
-        'nominal_terbesar', 'sisa_terbesar' => 'sisa DESC, NAMA ASC',
-        default => 'CAST(KELAS AS UNSIGNED) ASC, NAMA ASC',
-    };
-
-    if ($report_type === 'belum_spp') {
-        $stmtUnpaid = $koneksi->prepare("
-            SELECT *
-            FROM (
-                SELECT s.id AS student_id,s.unit_id,s.NO_INDUK, s.NO_induk_diknas, s.NAMA, ts.kelas_rombel_snapshot AS KELAS,
-                       ts.nominal_tagihan AS tagihan,
-                       COALESCE(SUM(CASE WHEN ab.status='active' THEN a.nominal_dari_bayar ELSE 0 END),0) AS sudah_bayar,
-                       GREATEST(ts.nominal_tagihan-COALESCE(SUM(CASE WHEN ab.status='active' THEN a.nominal_dari_bayar ELSE 0 END),0),0) AS sisa
-                FROM tagihan_spp ts JOIN siswa s ON s.NO_INDUK=ts.no_induk AND s.unit_id=ts.unit_id
-                LEFT JOIN spp_alokasi a ON a.tagihan_spp_id=ts.id
-                LEFT JOIN spp_alokasi_batch ab ON ab.id=a.batch_id
-                WHERE s.is_active=1 AND ts.status='open' AND ts.tahun=? AND ts.bulan=? AND ts.nominal_tagihan>0 $studentSearchSql
-                GROUP BY ts.id,s.NO_induk_diknas,s.NAMA,ts.kelas_rombel_snapshot
-            ) unpaid
-            WHERE sisa > 0
-            ORDER BY $orderUnpaid
-        ");
-        report_bind($stmtUnpaid, 'ss' . str_repeat('s', count($studentSearchParams)), array_merge([$filter_tahun, $periodMonthCode], $studentSearchParams));
-    } elseif ($report_type === 'belum_komite') {
-        $stmtUnpaid = $koneksi->prepare("
-            SELECT *
-            FROM (
-                SELECT s.id AS student_id,s.unit_id,s.NO_INDUK, s.NO_induk_diknas, s.NAMA, t.kelas_rombel_snapshot AS KELAS,
-                       t.nominal_tagihan AS tagihan,
-                       COALESCE(SUM(d.nominal), 0) AS sudah_bayar,
-                       GREATEST(t.nominal_tagihan - COALESCE(SUM(d.nominal), 0), 0) AS sisa
-                FROM tagihan_komite t
-                JOIN siswa s ON s.NO_INDUK = t.no_induk AND s.unit_id=t.unit_id
-                LEFT JOIN bayar_komite d ON d.tagihan_komite_id = t.id
-                WHERE s.is_active = 1
-                  AND t.status = 'open'
-                  AND t.tahun = ? AND t.bulan = ?
-                  AND t.nominal_tagihan > 0
-                  $studentSearchSql
-                GROUP BY t.id,s.NO_induk_diknas,s.NAMA,t.kelas_rombel_snapshot
-            ) unpaid
-            WHERE sisa > 0
-            ORDER BY $orderUnpaid
-        ");
-        report_bind($stmtUnpaid, 'ss' . str_repeat('s', count($studentSearchParams)), array_merge([$filter_tahun,$periodMonthCode], $studentSearchParams));
-    } elseif ($report_type === 'belum_du') {
-        $stmtUnpaid = $koneksi->prepare("
-            SELECT *
-            FROM (
-                SELECT s.id AS student_id,s.unit_id,s.NO_INDUK, s.NO_induk_diknas, s.NAMA, sta.kelas_rombel_snapshot AS KELAS,
-                       tdu.nominal_tagihan AS tagihan,
-                       COALESCE(SUM(bd.jumlah), 0) AS sudah_bayar,
-                       GREATEST(tdu.nominal_tagihan - COALESCE(SUM(bd.jumlah), 0), 0) AS sisa
-                FROM tagihan_daftar_ulang tdu
-                JOIN siswa s ON s.NO_INDUK = tdu.no_induk AND s.unit_id=tdu.unit_id
-                JOIN siswa_tahun_ajaran sta ON sta.id=tdu.penempatan_id
-                LEFT JOIN bayar_du bd ON bd.tagihan_daftar_ulang_id = tdu.id
-                WHERE s.is_active = 1 AND tdu.status='open' AND tdu.tahun_ajaran_snapshot = ? AND tdu.nominal_tagihan > 0 $studentSearchSql
-                GROUP BY tdu.id,s.NO_induk_diknas,s.NAMA,sta.kelas_rombel_snapshot
-            ) unpaid
-            WHERE sisa > 0
-            ORDER BY $orderUnpaid
-        ");
-        report_bind($stmtUnpaid, 's' . str_repeat('s', count($studentSearchParams)), array_merge([$academicYear], $studentSearchParams));
-    } else {
-        $stmtUnpaid = $koneksi->prepare("
-            SELECT *
-            FROM (
-                SELECT s.id AS student_id,s.unit_id,s.NO_INDUK, s.NO_induk_diknas, s.NAMA,
-                       t.kelas_rombel_snapshot AS KELAS, t.nama_snapshot AS komponen,
-                       t.nominal_tagihan AS tagihan,
-                       COALESCE(SUM(d.nominal_snapshot), 0) AS sudah_bayar,
-                       GREATEST(t.nominal_tagihan - COALESCE(SUM(d.nominal_snapshot), 0), 0) AS sisa
-                FROM tagihan_biaya_lain t
-                JOIN siswa s ON s.NO_INDUK=t.no_induk AND s.unit_id=t.unit_id
-                LEFT JOIN bayar_biaya_lain d ON d.tagihan_biaya_lain_id=t.id
-                WHERE s.is_active = 1 AND t.status='open' $studentSearchSql
-                GROUP BY t.id,s.NO_induk_diknas,s.NAMA,t.kelas_rombel_snapshot,t.nama_snapshot,t.nominal_tagihan
-            ) unpaid
-            WHERE sisa > 0
-            ORDER BY $orderUnpaid
-        ");
-        report_bind($stmtUnpaid, str_repeat('s', count($studentSearchParams)), $studentSearchParams);
-    }
-    $stmtUnpaid->execute();
-    $unpaid_rows = $stmtUnpaid->get_result()->fetch_all(MYSQLI_ASSOC);
-    $stmtUnpaid->close();
-    $totalDetailRows = count($unpaid_rows);
+    $unpaid_rows=general_unpaid($koneksi,$report_type,$filter_bulan,$filter_tahun,$bulan_label,$academicYear,$studentSearchSql,$studentSearchParams,$sort);
+    $totalDetailRows=count($unpaid_rows);
 }
 
 $financeTab = is_string($_GET['panel'] ?? null) && in_array($_GET['panel'], ['ringkasan','komponen','transaksi'], true) ? $_GET['panel'] : 'ringkasan';
@@ -678,7 +481,7 @@ $exportQuery = filter_build_query([
                   <td><?= report_e($b['BULAN']) ?> <?= report_e($b['TAHUN']) ?></td>
                   <td><?= report_e($b['sistem_pembayaran'] ?? 'VA') ?></td>
                   <td class="nominal"><?= report_money($b['total_jumlah']) ?></td>
-                  <td><?= spp_date_label($b['TGL_BYR'],true) ?></td>
+                  <td><?= spp_date_label($b['TGL_BYR'],true,$b['time_precision']??null) ?></td>
                   <td class="aksi-col"><?php if($receiptCaps['can_print']): ?><a class="btn-tbl btn-tbl-print" href="cetak_struk.php?id=<?= (int)$b['id'] ?>" target="_blank" rel="noopener"><?= finance_icon('print') ?>Cetak</a><?php else: ?><span class="report-secondary-id">Terkunci</span><?php endif; ?><details class="finance-row-menu"><summary aria-label="Lihat detail transaksi <?= (int)$b['id'] ?>">&middot;&middot;&middot;</summary><button type="button" class="open-payment-activity" hidden data-id="<?= (int)$b['id'] ?>" data-unit="<?= (int)$b['unit_id'] ?>">Riwayat Aktivitas</button><noscript><a href="../pembayaran/lihat.php?search=<?= urlencode($b['NO_INDUK']) ?>">Lihat riwayat siswa</a></noscript></details></td>
                 </tr>
                 <?php endforeach; endif; ?>

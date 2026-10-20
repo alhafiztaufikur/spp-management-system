@@ -9,19 +9,35 @@ function lt_actor(mysqli $db,int $actor,int $unit): array {
     return $a;
 }
 function lt_schema_ready(mysqli $db): bool {return transaction_authorization_column_exists($db,'transaksi_otorisasi','legacy_payment_id');}
-function lt_snapshot(array $v,array $identity): array {return ['payment'=>array_replace($v,$identity,['TGL_BYR'=>$v['source_date']??null,'total_jumlah'=>$v['total']??0,'BULAN'=>$v['source_period']??'','KETERANGAN'=>$v['note']??'','sistem_pembayaran'=>$v['method']??'']),'details'=>['legacy_items'=>$v['items']??[]]];}
+function lt_snapshot(array $v,array $identity,array $time=[]): array {
+    return ['payment'=>array_replace($v,$identity,['TGL_BYR'=>$time['payment_datetime']??$v['source_date']??null,'time_precision'=>$time['time_precision']??$v['_time_precision']??(empty($v['source_date'])?'none':'datetime'),'total_jumlah'=>$v['total']??0,'BULAN'=>$v['source_period']??'','KETERANGAN'=>$v['note']??'','sistem_pembayaran'=>$v['method']??'']),'details'=>['legacy_items'=>$v['items']??[]]];
+}
 function lt_events(mysqli $db,int $id): array {
     $p=lop_payment_model($db,$id)['legacy'];$rows=[];
     $identity=['id'=>-1000000000-$id,'NAMA'=>$p['NAMA'],'NO_INDUK'=>$p['NO_INDUK'],'unit_id'=>$p['unit_id']];
-    $rows[]=['id'=>0,'unit_id'=>$p['unit_id'],'action'=>'created','actor_name'=>$p['source_operator']?:'Tidak tercatat','actor_username'=>'','actor_role'=>'legacy_source','occurred_at'=>$p['source_date'],'before_snapshot'=>null,'after_snapshot'=>lf_json(['payment'=>$identity]),'note'=>'Operator sumber Legacy; bukan ID akun SistemSPP.','reconstructed'=>true];
-    foreach(lf_rows($db,"SELECT a.*,u.nama actor_name,u.username actor_username,u.role actor_role FROM legacy_op_audit a LEFT JOIN admin u ON u.id=a.actor_id WHERE a.entity_type IN ('payment','payment_request') AND a.entity_id=? ORDER BY a.created_at,a.id",[$id]) as $a){$v=json_decode($a['after_data'],true);$beforeSnapshot=$a['entity_type']==='payment_request'?$a['before_data']:lf_json(lt_snapshot(json_decode($a['before_data'],true),$identity));$afterSnapshot=$a['entity_type']==='payment_request'?null:lf_json(lt_snapshot($v,$identity));$rows[]=['id'=>$a['id'],'unit_id'=>$a['unit_id'],'action'=>$v['_action']??($a['entity_type']==='payment'?(!empty($v['cancelled'])?'deleted':'edited'):'request_edit'),'actor_name'=>$a['actor_name'],'actor_username'=>$a['actor_username'],'actor_role'=>$a['actor_role'],'occurred_at'=>$a['created_at'],'before_snapshot'=>$beforeSnapshot,'after_snapshot'=>$afterSnapshot,'note'=>$a['reason'],'authorization_id'=>$v['_request_id']??null];}
+    $audits=lf_rows($db,"SELECT a.*,u.nama actor_name,u.username actor_username,u.role actor_role FROM legacy_op_audit a LEFT JOIN admin u ON u.id=a.actor_id WHERE a.entity_type IN ('payment','payment_request') AND a.entity_id=? ORDER BY a.created_at,a.id",[$id]);
+    $evidence=payment_time_index($db)[$p['unit_id'].'|'.$p['source_id'].'|'.$p['row_key']]??[];
+    unset($evidence['override_precision']);$initial=$p['source_date'];
+    foreach($audits as $a)if($a['entity_type']==='payment'){$initial=json_decode($a['before_data'],true)['source_date'];break;}
+    $time=payment_time_resolve($initial,$evidence);
+    $rows[]=['id'=>0,'unit_id'=>$p['unit_id'],'action'=>'created','actor_name'=>$p['source_operator']?:'Tidak tercatat','actor_username'=>'','actor_role'=>'legacy_source','occurred_at'=>$time['payment_datetime'],'time_precision'=>$time['time_precision'],'before_snapshot'=>null,'after_snapshot'=>lf_json(['payment'=>$identity]),'note'=>'Catatan pembayaran dari sumber Legacy; waktu pembuatan sumber tidak tercatat.','reconstructed'=>true];
+    foreach($audits as $a){
+        $v=json_decode($a['after_data'],true);$beforeSnapshot=$a['before_data'];$afterSnapshot=null;
+        if($a['entity_type']==='payment'){
+            $before=json_decode($a['before_data'],true);$beforeSnapshot=lf_json(lt_snapshot($before,$identity,payment_time_resolve($before['source_date'],$evidence)));
+            if(array_key_exists('_time_precision',$v))$evidence['override_precision']=$v['_time_precision'];
+            elseif($before['source_date']!==$v['source_date'])$evidence['override_precision']=empty($v['source_date'])?'none':'datetime';
+            $afterSnapshot=lf_json(lt_snapshot($v,$identity,payment_time_resolve($v['source_date'],$evidence)));
+        }
+        $rows[]=['id'=>$a['id'],'unit_id'=>$a['unit_id'],'action'=>$v['_action']??($a['entity_type']==='payment'?(!empty($v['cancelled'])?'deleted':'edited'):'request_edit'),'actor_name'=>$a['actor_name'],'actor_username'=>$a['actor_username'],'actor_role'=>$a['actor_role'],'occurred_at'=>$a['created_at'],'before_snapshot'=>$beforeSnapshot,'after_snapshot'=>$afterSnapshot,'note'=>$a['reason'],'authorization_id'=>$v['_request_id']??null];
+    }
     return $rows;
 }
 function lt_model(mysqli $db,int $id,bool $deleted=false): array {
     $r=lop_payment_model($db,$id)['legacy'];if((bool)$r['cancelled']!==$deleted)throw new OutOfBoundsException('Transaksi tidak tersedia pada daftar ini.');
     $events=lt_events($db,$id);$request=lt_schema_ready($db)?lf_one($db,'SELECT *,request_reason reason FROM transaksi_otorisasi WHERE legacy_payment_id=? ORDER BY id DESC LIMIT 1',[$id]):null;
     $writable=!$deleted&&!unit_all_readonly()&&hasRole(['admin','kasir'])&&(!$request||$request['status']!=='pending');
-    $p=$r+['TGL_BYR'=>$r['source_date'],'total_jumlah'=>$r['total'],'kelas_transaksi'=>$r['class_snapshot'],'KELAS'=>$r['class_snapshot'],'KETERANGAN'=>$r['note'],'sistem_pembayaran'=>$r['method']?:'Tidak tercatat','created_at'=>null,'updated_at'=>null];$p['id']=-1000000000-$id;$p['BULAN']='';$p['TAHUN']='';
+    $p=$r+['TGL_BYR'=>$r['payment_datetime'],'total_jumlah'=>$r['total'],'kelas_transaksi'=>$r['class_snapshot'],'KELAS'=>$r['class_snapshot'],'KETERANGAN'=>$r['note'],'sistem_pembayaran'=>$r['method']?:'Tidak tercatat','created_at'=>null,'updated_at'=>null];$p['id']=-1000000000-$id;$p['BULAN']='';$p['TAHUN']='';
     if($deleted)$p['_deleted_event']=end($events);
     return ['payment'=>$p,'legacy_record'=>$r,'deleted'=>$deleted,'events'=>$events,'summary'=>['creator'=>$events[0],'last'=>end($events)],'request'=>$request,'components'=>array_map(fn($i)=>[$i['label'],$i['amount']],$r['items']),'batch_print'=>false,'capabilities'=>['can_edit'=>$writable,'can_delete'=>$writable,'can_print'=>!$deleted,'locked'=>false,'reason'=>($request&&$request['status']==='pending')?'Menunggu keputusan Super Admin.':'']];
 }
@@ -46,7 +62,7 @@ function lt_submit(mysqli $db,int $actor,int $unit,int $id,int $version,array $i
             lf_query($db,"INSERT INTO transaksi_otorisasi(transaction_source,legacy_payment_id,bayar_id,transaction_reference,no_induk_snapshot,student_name_snapshot,action,status,before_snapshot,snapshot_hash,proposed_payload,request_reason,requested_by) VALUES('legacy_op',?,NULL,?,?,?,?, 'pending',?,?,?,?,?)",[$id,'TRX-L-'.$unit.'-'.$id,$model['payment']['NO_INDUK'],$model['payment']['NAMA'],!empty($input['cancelled'])?'hapus':'edit',lf_json($snapshot),hash('sha256',lf_json($p)),lf_json($payload),$input['reason'],$actor]);
             $request=(int)$db->insert_id;lt_request_event($db,['unit_id'=>$unit,'legacy_payment_id'=>$id,'id'=>$request,'before_snapshot'=>lf_json($snapshot)],$actor,!empty($input['cancelled'])?'request_delete':'request_edit',$input['reason']);$result=['request_id'=>$request];
         }$db->commit();return $result;
-    }catch(Throwable $e){$db->rollback();throw $e;}
+    }catch(Throwable $e){$db->rollback();payment_time_invalidate($db);throw $e;}
 }
 function lt_approve(mysqli $db,int $requestId,int $actor,string $note): void {
     transaction_authorization_assert_super($db,$actor);$db->begin_transaction();try{
@@ -58,5 +74,5 @@ function lt_approve(mysqli $db,int $requestId,int $actor,string $note): void {
         $input=$payload['legacy_input'];$input['preview_expires']=time()+300;$input['confirmation']='SIMPAN KOREKSI';$pr=lop_correction_preview($db,$actor,(int)$r['unit_id'],'payment',(int)$p['id'],(int)$p['version'],$input);
         lop_correction_apply($db,$actor,(int)$r['unit_id'],'payment',(int)$p['id'],(int)$p['version'],$input,$pr['digest'],$payload['legacy_key'],false);
         transaction_authorization_decide($db,$requestId,'approved',$actor,$note);$db->commit();
-    }catch(Throwable $e){$db->rollback();throw $e;}
+    }catch(Throwable $e){$db->rollback();payment_time_invalidate($db);throw $e;}
 }

@@ -19,10 +19,10 @@ function finance_icon(string $name): string {
 function finance_payment_trend(mysqli $db,string $lastDay,string $studentSql,array $studentParams): array {
     $firstDay=date('Y-m-d',strtotime($lastDay.' -6 days'));
     $end=date('Y-m-d',strtotime($lastDay.' +1 day'));
-    $stmt=$db->prepare('SELECT DATE(b.TGL_BYR) day,COUNT(*) n FROM bayar b JOIN siswa s ON s.NO_INDUK=b.NO_INDUK AND s.unit_id=b.unit_id WHERE b.TGL_BYR>=? AND b.TGL_BYR<? '.$studentSql.' GROUP BY DATE(b.TGL_BYR)');
-    $values=array_merge([$firstDay,$end],$studentParams);
-    $stmt->bind_param('ss'.str_repeat('s',count($studentParams)),...$values);
-    $stmt->execute();$counts=array_column($stmt->get_result()->fetch_all(MYSQLI_ASSOC),'n','day');$stmt->close();
+    require_once __DIR__.'/general_history.php';
+    $source=mh_payment_source($db);
+    [$where,$values]=general_history_filter('b','TGL_BYR',$firstDay,$end,is_string($_GET['q']??null)?mb_substr(trim($_GET['q']),0,100):'');
+    $counts=array_column(hp_rows($db,"SELECT DATE(b.TGL_BYR) day,COUNT(*) n FROM $source b WHERE $where GROUP BY DATE(b.TGL_BYR)",$values),'n','day');
     $result=[];
     for($i=0;$i<7;$i++){ $day=date('Y-m-d',strtotime($firstDay.' +'.$i.' days'));$result[$day]=(int)($counts[$day]??0); }
     return $result;

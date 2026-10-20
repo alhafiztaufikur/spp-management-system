@@ -1,5 +1,20 @@
 # Riwayat Perubahan AI SistemSPP
 
+## 2026-10-21 - Perapihan tampilan dan pembacaan jam transaksi
+
+- Pulihkan pembacaan 793 jam Legacy dari arsip berdasarkan unit/sumber/row key; bedakan jam diketahui, hanya tanggal, serta tanpa tanggal pada histori, detail, aktivitas, struk, dan laporan/PDF/Excel. Timestamp transaksi tidak ditulis ulang.
+- Pisahkan waktu pembuatan, penyelesaian impor, dan koreksi yang diterapkan. Pertahankan jam native pada edit tanggal saja dan cegah edit catatan Legacy menyalin jam arsip ke database.
+- Rapikan Input Pembayaran, filter dan detail daftar ulang, edit Legacy dua kolom, rekap tabungan, serta pembungkusan status Global dengan komponen/tema existing.
+- Uji alur koreksi/persetujuan pada salinan terisolasi, baca kembali dokumen, cocokkan seluruh 793 jam dan baseline semua unit, serta verifikasi hash data utama. [Laporan audit, bukti, performa, dan pemulihan](UI_TIME_AUDIT_20261021.md).
+
+## 2026-10-20 - Pemulihan impor lengkap dan audit seluruh unit
+
+- Ambil `d681e84` dengan fast-forward, pertahankan koneksi lokal `db_spp_test2`, verifikasi dump asli serta cadangan melalui pemulihan terisolasi dan hash seluruh tabel.
+- Pulihkan FK/CHECK yang hilang melalui CLI idempotent; verifikasi arsip sebelum memperbaiki metadata digest tiga batch. Nominal transaksi dan saldo tidak ditulis ulang.
+- Lengkapi sumber Laporan Umum/PDF/Excel, audit Semua Unit, presisi koreksi tabungan, dan pembacaan arsip setelah restore; optimalkan pembacaan operator, kategori, dan jurnal tanpa mengganti layout/renderer.
+- Pertahankan ID operator Legacy pada formulir dan bedakan byte nama operator sumber; verifikasi filter serta seluruh 118.244 pembayaran/95.575 jurnal pada Excel lengkap. Gabungkan pembacaan bukti SPP bulanan dan ringkas proyeksi rekap tabungan dengan hasil yang sama.
+- Terapkan pada database lokal, uji seluruh modul/unit serta dokumen, dan hasilkan SQL lengkap yang sudah diuji pemulihannya. [Temuan, hasil pengujian, performa, serta pemulihan](IMPORT_AUDIT_20261020.md).
+
 ## 2026-10-20 - Perbaikan penerbitan dan sisa tagihan Legacy
 
 - Lengkapi DU pada tahun yang sudah terbit secara idempotent, pertahankan tarif awal Legacy dan snapshot cicilan. Aturan perubahan master berikutnya dicatat per tahun/tingkat dalam audit existing.

@@ -11,16 +11,19 @@ function spp_date_value($value): ?DateTimeImmutable {
         if($date&&(!$errors||(!$errors['warning_count']&&!$errors['error_count'])))return $date->setTimezone($zone);
     }return null;
 }
-function spp_date_label($value,bool $withTime=false):string {
+function spp_date_label($value,bool $withTime=false,?string $precision=null):string {
+    if($precision==='none')return $withTime?'Tanggal dan jam tidak tercatat':'Tanggal tidak tercatat';
     $date=spp_date_value($value);if(!$date)return '—';
+    if($withTime&&$precision==='date')return $date->format('d/m/Y').' · Jam tidak tercatat';
     $hasTime=$value instanceof DateTimeInterface||is_int($value)||preg_match('/[ T]\d{2}:\d{2}/',(string)$value);
     return $date->format('d/m/Y').($withTime&&$hasTime?' '.$date->format('H:i:s').' WIB':'');
 }
 
-function spp_date_parts($value):array {
+function spp_date_parts($value,?string $precision=null):array {
+    if($precision==='none')return ['date'=>'Tanggal tidak tercatat','time'=>'Jam tidak tercatat'];
     $date=spp_date_value($value);
     $hasTime=$value instanceof DateTimeInterface||is_int($value)||preg_match('/[ T]\d{2}:\d{2}/',(string)$value);
-    return ['date'=>$date?$date->format('d/m/Y'):'—','time'=>$date&&$hasTime?$date->format('H:i:s').' WIB':'—'];
+    return ['date'=>$date?$date->format('d/m/Y'):'—','time'=>$precision==='date'?'Jam tidak tercatat':($date&&$hasTime?$date->format('H:i:s').' WIB':'—')];
 }
 
 

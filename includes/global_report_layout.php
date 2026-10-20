@@ -7,7 +7,7 @@ function global_report_column_width(array $column, bool $print = false, array $r
         ? ['no'=>22,'unit'=>32,'nis'=>86,'nama'=>112,'kelas'=>40]
         : ['no'=>48,'unit'=>74,'nis'=>170,'nama'=>220,'kelas'=>98];
     if (isset($identity[$key])) return $identity[$key];
-    if (!$print) return $type==='datetime' ? 184 : (in_array($type,['money','money_optional','html'],true) ? 155 : 145);
+    if (!$print) return $type==='status' ? 240 : ($type==='datetime' ? 184 : (in_array($type,['money','money_optional','html'],true) ? 155 : 145));
     if (in_array($type,['money','money_optional','html'],true)) {
         $width = 72;
         foreach ($rows as $row) {

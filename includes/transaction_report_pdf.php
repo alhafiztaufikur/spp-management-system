@@ -19,8 +19,8 @@ function transaction_report_document_html(array $doc):string {
                 $values=[];$parts=1;
                 foreach($columns as $c){
                     $value=$row[$c['key']]??'';$isMoney=in_array($c['type'],['money','money_optional'],true);
-                    if($isMoney&&$value!=='')$value='Rp '.number_format((float)$value,0,',','.');
-                    elseif(in_array($c['type'],['date','datetime'],true))$value=spp_date_label($value,$c['type']==='datetime');
+                    if($isMoney&&$value!==''){$amount=round((float)$value,2);$value='Rp '.number_format($amount,$amount===floor($amount)?0:2,',','.');}
+                    elseif(in_array($c['type'],['date','datetime'],true))$value=spp_date_label($value,$c['type']==='datetime',$row['time_precision']??null);
                     $values[]=report_pdf_text_chunks((string)$value);$parts=max($parts,count($values[count($values)-1]));
                 }
                 for($part=0;$part<$parts;$part++){
@@ -29,7 +29,7 @@ function transaction_report_document_html(array $doc):string {
                     $html.='</tr>';
                 }
             }
-            $html.='</tbody></table><div class="subtotals">';foreach($section['totals'] as $totalRow)$html.='<p>'.$e($totalRow['label']).': <strong>Rp '.number_format((float)$totalRow['value'],0,',','.').'</strong></p>';$html.='</div>';
+            $html.='</tbody></table><div class="subtotals">';foreach($section['totals'] as $totalRow){$amount=round((float)$totalRow['value'],2);$html.='<p>'.$e($totalRow['label']).': <strong>Rp '.number_format($amount,$amount===floor($amount)?0:2,',','.').'</strong></p>';}$html.='</div>';
         }
     }
     return $html.'</body></html>';

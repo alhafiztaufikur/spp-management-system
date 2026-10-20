@@ -15,7 +15,7 @@ function report_artifact_valid(string $bytes,string $format):bool {
 function report_artifact_root():?string {
     $app=realpath(__DIR__.'/..');$base=getenv('SPP_REPORT_CACHE_DIR');
     if($base===false||$base==='')$base=sys_get_temp_dir().'/spp-report-cache-'.substr(hash('sha256',$app),0,12);
-    if(is_link($base)||(!is_dir($base)&&!@mkdir($base,0700,true)))return null;
+    if(is_link($base)||(!is_dir($base)&&!@mkdir($base,0700,true)&&!is_dir($base)))return null;
     $real=realpath($base);$normal=static fn($p)=>strtolower(str_replace('\\','/',$p));
     if(!$real||!is_writable($real))return null;
     $webroot=realpath($_SERVER['DOCUMENT_ROOT']??'');
@@ -43,11 +43,11 @@ function report_artifact_get(array $identity,array $model,string $format,callabl
     $account=['actor'=>(int)($_SESSION['admin_id']??0),'role'=>(string)($_SESSION['admin_role']??''),
         'database'=>[defined('DB_HOST')?DB_HOST:'',defined('DB_NAME')?DB_NAME:'',getenv('SPP_DB_PORT')?:3306]];
     static $version=null;
-    if($version===null){$version='report-original-layout-v2';foreach(['excel.php','authorization_pdf.php','transaction_report_pdf.php','global_report_matrix.php','global_report_layout.php','global_report_ui.php','report_pdf_text.php','date_format.php','report_artifact.php','../laporan/export_global.php','../laporan/export_pdf.php','../laporan/export_excel.php','../otorisasi_export_pdf.php','../composer.lock','../assets/img/school-logo.png','../assets/img/favicon.png'] as $file)if(is_file(__DIR__.'/'.$file))$version.=hash_file('sha256',__DIR__.'/'.$file);}
+    if($version===null){$version='report-original-layout-v2';foreach(['excel.php','authorization_pdf.php','transaction_report_pdf.php','global_report_matrix.php','global_report_layout.php','global_report_ui.php','global_report_excel.php','../assets/css/global_report_matrix.css','../assets/css/receipt_print.css','report_pdf_text.php','date_format.php','report_artifact.php','../laporan/export_global.php','../laporan/export_pdf.php','../laporan/export_excel.php','../otorisasi_export_pdf.php','../composer.lock','../assets/img/school-logo.png','../assets/img/favicon.png'] as $file)if(is_file(__DIR__.'/'.$file))$version.=hash_file('sha256',__DIR__.'/'.$file);}
     $key=hash('sha256',json_encode(['version'=>$version,'format'=>$format,'identity'=>$identity,'account'=>$account,'model'=>$model],JSON_UNESCAPED_UNICODE|JSON_PRESERVE_ZERO_FRACTION|JSON_THROW_ON_ERROR));
     $owner=$account;unset($owner['role']);
     $root=$cacheEnabled?report_artifact_root():null;$dir=$root?$root.'/'.substr(hash('sha256',json_encode($owner)),0,24):null;$lock=null;
-    if($dir&&(is_link($dir)||(!is_dir($dir)&&!@mkdir($dir,0700))))$dir=null;
+    if($dir&&(is_link($dir)||(!is_dir($dir)&&!@mkdir($dir,0700)&&!is_dir($dir))))$dir=null;
     if($dir){
         // A bounded set of locks avoids accumulating one coordination file per data revision.
         $lockPath=$dir.'/.lock-'.(hexdec(substr($key,0,2))%64);

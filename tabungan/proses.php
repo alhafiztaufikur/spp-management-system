@@ -137,6 +137,7 @@ try {
 
 } catch (Throwable $e) {
     $koneksi->rollback();
+    if ($e instanceof FinancialRequestReplayException) unset($_SESSION['savings_entry_draft']);
     if ($e instanceof mysqli_sql_exception) {
         error_log('Gagal menyimpan tabungan: kesalahan database ' . $e->getCode());
     }

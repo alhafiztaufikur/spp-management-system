@@ -1,4 +1,5 @@
 <?php
+require_once __DIR__.'/payment_time.php';
 function receipt_amount_words(int $number): string {
     $words = ['', 'satu', 'dua', 'tiga', 'empat', 'lima', 'enam', 'tujuh', 'delapan', 'sembilan', 'sepuluh', 'sebelas'];
     if ($number < 12) return $words[$number];
@@ -53,7 +54,7 @@ function receipt_print_document(array $receipts, string $title, string $toolbar,
       <?php if($savings): ?><tr class="receipt-line"><td colspan="2" style="padding-top:2mm"><strong>Keterangan:</strong> <?= nl2br($e($receipt['note']?:'—')) ?></td></tr><?php endif; ?>
       <tr class="receipt-closing"><td colspan="2">
         <table class="total"><tr><td><?= $savings?'JUMLAH '.($receipt['kind']==='masuk'?'SETORAN':'PENARIKAN'):'JUMLAH TOTAL' ?></td><td class="amount"><?= $e($money($p['total_jumlah'],true)) ?></td></tr></table>
-        <table class="receipt-footer"><tr><td class="footer-left"><p class="words"><strong>Terbilang:</strong> <?= $e($receipt['words']) ?></p><?php if($savings): ?><p>Saldo mengikuti urutan jurnal sampai transaksi ini.</p><?php else: ?><p><strong>Sistem Pembayaran:</strong> <?= $e(($p['sistem_pembayaran']??'')?:'Tidak tercatat') ?></p><p class="receipt-pay-time">Jam Bayar: <?= $e(!empty($p['TGL_BYR'])?date('H:i:s',strtotime($p['TGL_BYR'])).' WIB':'Tidak tercatat') ?></p><?php endif; ?></td><td class="footer-right"><div class="signature-date">Bekasi, <?= $e(!empty($p['TGL_BYR'])?date('d-m-Y',strtotime($p['TGL_BYR'])):$receipt['date']) ?></div><div>Bagian Keuangan</div><div class="signature-space"></div><strong><?= $e(mb_strtoupper((string)$receipt['signer'],'UTF-8')) ?></strong></td></tr></table>
+        <table class="receipt-footer"><tr><td class="footer-left"><p class="words"><strong>Terbilang:</strong> <?= $e($receipt['words']) ?></p><?php if($savings): ?><p>Saldo mengikuti urutan jurnal sampai transaksi ini.</p><?php else: ?><p><strong>Sistem Pembayaran:</strong> <?= $e(($p['sistem_pembayaran']??'')?:'Tidak tercatat') ?></p><p class="receipt-pay-time">Jam Bayar: <?= $e(payment_time_parts($p)['time']) ?></p><?php endif; ?></td><td class="footer-right"><div class="signature-date">Bekasi, <?= $e(!empty($p['TGL_BYR'])?date('d-m-Y',strtotime($p['TGL_BYR'])):$receipt['date']) ?></div><div>Bagian Keuangan</div><div class="signature-space"></div><strong><?= $e(mb_strtoupper((string)$receipt['signer'],'UTF-8')) ?></strong></td></tr></table>
       </td></tr></tbody>
     </table></article>
     <?php endforeach; ?>

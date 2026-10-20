@@ -5,7 +5,7 @@ function global_report_cell($value,string $type,array $row,string $key): string
 {
     if(in_array($type,['money','money_optional'],true))return $value===null||$value===''?($type==='money_optional'?'-':report_money(0)):report_e(report_money($value));
     if($type==='datetime'){
-        $parts=spp_date_parts($value);
+        $parts=spp_date_parts($value,$row['time_precision']??null);
         return '<span class="report-date">'.report_e($parts['date']).'</span>'.($parts['time']==='—'?'':'<span class="report-time">'.report_e($parts['time']).'</span>');
     }
     if($type==='date')return report_e(spp_date_label($value));
@@ -23,6 +23,7 @@ function global_report_column_class(array $column): string
 {
     $key=$column[0];$type=$column[2]??'text';
     if($key==='no')return 'report-col-no report-col-center';
+    if($type==='status'||$key==='status')return 'report-col-status report-col-center';
     if(in_array($type,['money','money_optional'],true))return 'report-col-money';
     if($type==='html')return 'report-col-month';
     if($type==='status'||in_array($key,['kelas','unit','jenis','periode'],true))return 'report-col-center';

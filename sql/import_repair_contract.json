@@ -1,0 +1,1896 @@
+{
+    "version": 1,
+    "source_commit": "d681e84202a62cd6f3816bb0a6cf6d647afd9eef",
+    "schema_sources": [
+        "sql/schema.payload",
+        "sql/migrate_units.php",
+        "includes/legacy_operational_schema.php",
+        "includes/workflow_update_schema.php",
+        "includes/rombel_update_schema.php"
+    ],
+    "checks": [
+        {
+            "table_name": "bayar_data",
+            "name": "chk_bayar_psb",
+            "clause": "(`U_PSB` >= 0)"
+        },
+        {
+            "table_name": "bayar_komite_data",
+            "name": "chk_bayar_komite_nominal",
+            "clause": "(`nominal` > 0)"
+        },
+        {
+            "table_name": "bayar_tahunan_siswa_data",
+            "name": "chk_bayar_tahunan_jumlah",
+            "clause": "(`jumlah` >= 0)"
+        },
+        {
+            "table_name": "legacy_debts_data",
+            "name": "legacy_debts_data_chk_1",
+            "clause": "(`amount` > 0)"
+        },
+        {
+            "table_name": "legacy_finance_reviews_data",
+            "name": "legacy_finance_reviews_data_chk_1",
+            "clause": "(`status` in (_utf8mb4'ready',_utf8mb4'held',_utf8mb4'applied'))"
+        },
+        {
+            "table_name": "legacy_finance_rows_data",
+            "name": "legacy_finance_rows_data_chk_1",
+            "clause": "(`reference_only` in (0,1))"
+        },
+        {
+            "table_name": "legacy_finance_rows_data",
+            "name": "legacy_finance_rows_data_chk_2",
+            "clause": "(`occurrence` > 0)"
+        },
+        {
+            "table_name": "legacy_finance_sources_data",
+            "name": "legacy_finance_sources_data_chk_1",
+            "clause": "(`published` in (0,1))"
+        },
+        {
+            "table_name": "legacy_full_batches_data",
+            "name": "legacy_full_batches_data_chk_1",
+            "clause": "(`state` in (_utf8mb4'verifying',_utf8mb4'blocked',_utf8mb4'completed'))"
+        },
+        {
+            "table_name": "legacy_full_coverage_data",
+            "name": "legacy_full_coverage_data_chk_1",
+            "clause": "(`disposition` in (_utf8mb4'settled',_utf8mb4'legacy_debt',_utf8mb4'not_applicable'))"
+        },
+        {
+            "table_name": "legacy_full_items_data",
+            "name": "legacy_full_items_data_chk_1",
+            "clause": "(`amount` >= 0)"
+        },
+        {
+            "table_name": "legacy_full_journals_data",
+            "name": "legacy_full_journals_data_chk_1",
+            "clause": "(((`incoming` > 0) and (`outgoing` = 0)) or ((`incoming` = 0) and (`outgoing` > 0)))"
+        },
+        {
+            "table_name": "legacy_full_payments_data",
+            "name": "legacy_full_payments_data_chk_1",
+            "clause": "(`total` >= 0)"
+        },
+        {
+            "table_name": "legacy_op_accounts_data",
+            "name": "legacy_op_accounts_data_chk_1",
+            "clause": "(`opening` >= 0)"
+        },
+        {
+            "table_name": "legacy_op_accounts_data",
+            "name": "legacy_op_accounts_data_chk_2",
+            "clause": "(`balance` >= 0)"
+        },
+        {
+            "table_name": "legacy_op_groups_data",
+            "name": "legacy_op_groups_data_chk_1",
+            "clause": "(`kind` in (_utf8mb4'academic',_utf8mb4'psb',_utf8mb4'out',_utf8mb4'alumni',_utf8mb4'account',_utf8mb4'legacy'))"
+        },
+        {
+            "table_name": "legacy_op_journals_data",
+            "name": "legacy_op_journals_data_chk_1",
+            "clause": "(((`incoming` > 0) and (`outgoing` = 0)) or ((`incoming` = 0) and (`outgoing` > 0)))"
+        },
+        {
+            "table_name": "legacy_op_journals_data",
+            "name": "legacy_op_journals_data_chk_3",
+            "clause": "(`cancelled` in (0,1))"
+        },
+        {
+            "table_name": "legacy_op_journals_data",
+            "name": "lop_journal_origin",
+            "clause": "(`origin` in (_utf8mb4'legacy',_utf8mb4'new',_utf8mb4'adjustment'))"
+        },
+        {
+            "table_name": "legacy_op_obligations_data",
+            "name": "legacy_op_obligations_data_chk_1",
+            "clause": "(`principal` >= 0)"
+        },
+        {
+            "table_name": "legacy_op_obligations_data",
+            "name": "legacy_op_obligations_data_chk_2",
+            "clause": "(`remaining` >= 0)"
+        },
+        {
+            "table_name": "legacy_op_owners_data",
+            "name": "legacy_op_owners_data_chk_1",
+            "clause": "(`kind` in (_utf8mb4'active',_utf8mb4'psb',_utf8mb4'out',_utf8mb4'alumni',_utf8mb4'account',_utf8mb4'legacy'))"
+        },
+        {
+            "table_name": "legacy_op_owners_data",
+            "name": "legacy_op_owners_data_chk_2",
+            "clause": "(`state` in (_utf8mb4'ready',_utf8mb4'held'))"
+        },
+        {
+            "table_name": "legacy_op_payments_data",
+            "name": "legacy_op_payments_data_chk_1",
+            "clause": "(`total` >= 0)"
+        },
+        {
+            "table_name": "legacy_op_payments_data",
+            "name": "legacy_op_payments_data_chk_2",
+            "clause": "(`cancelled` in (0,1))"
+        },
+        {
+            "table_name": "legacy_op_tariffs_data",
+            "name": "legacy_op_tariffs_data_chk_1",
+            "clause": "(`amount` >= 0)"
+        },
+        {
+            "table_name": "legacy_op_tariffs_data",
+            "name": "legacy_op_tariffs_data_chk_2",
+            "clause": "(`basis` in (_utf8mb4'legacy',_utf8mb4'master'))"
+        },
+        {
+            "table_name": "legacy_savings_openings_data",
+            "name": "legacy_savings_openings_data_chk_1",
+            "clause": "(`amount` >= 0)"
+        },
+        {
+            "table_name": "master_biaya_lain_data",
+            "name": "lop_tariff_pending",
+            "clause": "((`nominal` > 0) or ((`nominal` = 0) and (`is_active` = 0) and (`legacy_tariff_pending` = 1)))"
+        },
+        {
+            "table_name": "master_kelas_data",
+            "name": "lop_class_kind",
+            "clause": "((`legacy_kind` in (_utf8mb4'academic',_utf8mb4'alumni')) and ((`legacy_kind` <> _utf8mb4'alumni') or ((`tingkat` = 0) and (`is_active` = 0) and (`graduation_year` is not null) and (`graduation_year` between 2000 and 2099) and (`kode_rombel` = concat(_utf8mb4'Alumni',`graduation_year`)))))"
+        },
+        {
+            "table_name": "master_spp_tarif_data",
+            "name": "chk_master_spp_nominal",
+            "clause": "(`nominal_dasar` > 0)"
+        },
+        {
+            "table_name": "siswa_data",
+            "name": "chk_siswa_legacy_pending",
+            "clause": "((`legacy_pending` in (0,1)) and ((`legacy_pending` = 0) or ((`is_active` = 0) and (`KELAS` = _utf8mb4'LEGACY'))))"
+        },
+        {
+            "table_name": "siswa_data",
+            "name": "chk_siswa_potongan_psb",
+            "clause": "((`potongan_psb_nominal` >= 0) and (`potongan_psb_nominal` <= `PSB`))"
+        },
+        {
+            "table_name": "siswa_data",
+            "name": "chk_siswa_potongan_spp_nominal",
+            "clause": "(`potongan_spp_nominal` >= 0)"
+        },
+        {
+            "table_name": "siswa_data",
+            "name": "chk_siswa_psb",
+            "clause": "((`PSB` >= 0) and (`asal_psb` in (0,1)))"
+        },
+        {
+            "table_name": "siswa_tahun_ajaran_data",
+            "name": "chk_penempatan_psb_spp",
+            "clause": "((`spp_covered_by_psb` in (0,1)) and ((`spp_covered_by_psb` = 0) or (`spp_perbulan_snapshot` = 0)))"
+        },
+        {
+            "table_name": "spp_alokasi_batch_data",
+            "name": "chk_spp_alokasi_batch_nominal",
+            "clause": "(`uang_baru` >= 0)"
+        },
+        {
+            "table_name": "spp_alokasi_data",
+            "name": "chk_spp_alokasi_nominal",
+            "clause": "(`nominal_dari_bayar` > 0)"
+        },
+        {
+            "table_name": "tabungan_data",
+            "name": "chk_tabungan_saldo_nonnegative",
+            "clause": "(`SALDO` >= 0)"
+        },
+        {
+            "table_name": "tagihan_biaya_lain_data",
+            "name": "chk_tagihan_biaya_lain_nominal",
+            "clause": "(`nominal_tagihan` > 0)"
+        },
+        {
+            "table_name": "tagihan_daftar_ulang_data",
+            "name": "chk_tagihan_du_nominal",
+            "clause": "((`nominal_awal` >= 0) and (`nominal_tagihan` >= 0))"
+        },
+        {
+            "table_name": "tagihan_komite_data",
+            "name": "chk_tagihan_komite_nominal",
+            "clause": "(`nominal_tagihan` >= 0)"
+        },
+        {
+            "table_name": "tagihan_spp_data",
+            "name": "chk_tagihan_spp_bulan",
+            "clause": "(cast(`bulan` as unsigned) between 1 and 12)"
+        },
+        {
+            "table_name": "tagihan_spp_data",
+            "name": "chk_tagihan_spp_nominal",
+            "clause": "((`tarif_dasar_snapshot` >= 0) and (`potongan_nominal_ditetapkan_snapshot` >= 0) and (`potongan_nominal_snapshot` >= 0) and (`potongan_nominal_snapshot` <= `tarif_dasar_snapshot`) and (`nominal_tagihan` >= 0))"
+        },
+        {
+            "table_name": "tagihan_tahunan_siswa_data",
+            "name": "chk_tagihan_tahunan_nominal",
+            "clause": "((`nominal_awal` >= 0) and (`potongan` >= 0) and (`nominal_tagihan` >= 0))"
+        },
+        {
+            "table_name": "tahun_ajaran_data",
+            "name": "chk_tahun_ajaran_dates",
+            "clause": "(`tanggal_selesai` > `tanggal_mulai`)"
+        }
+    ],
+    "foreign_keys": [
+        {
+            "table_name": "admin",
+            "name": "fk_admin_unit",
+            "columns": [
+                "unit_id"
+            ],
+            "parent": "unit_sekolah",
+            "parent_columns": [
+                "id"
+            ],
+            "delete": "NO ACTION",
+            "update": "NO ACTION"
+        },
+        {
+            "table_name": "bayar_biaya_lain_data",
+            "name": "fk_bayar_biaya_lain_bayar",
+            "columns": [
+                "bayar_id"
+            ],
+            "parent": "bayar_data",
+            "parent_columns": [
+                "id"
+            ],
+            "delete": "CASCADE",
+            "update": "CASCADE"
+        },
+        {
+            "table_name": "bayar_biaya_lain_data",
+            "name": "fk_bayar_biaya_lain_master",
+            "columns": [
+                "master_biaya_lain_id"
+            ],
+            "parent": "master_biaya_lain_data",
+            "parent_columns": [
+                "id"
+            ],
+            "delete": "RESTRICT",
+            "update": "CASCADE"
+        },
+        {
+            "table_name": "bayar_biaya_lain_data",
+            "name": "fk_bayar_biaya_lain_tagihan",
+            "columns": [
+                "tagihan_biaya_lain_id"
+            ],
+            "parent": "tagihan_biaya_lain_data",
+            "parent_columns": [
+                "id"
+            ],
+            "delete": "RESTRICT",
+            "update": "CASCADE"
+        },
+        {
+            "table_name": "bayar_data",
+            "name": "fk_bayar_master_kelas",
+            "columns": [
+                "master_kelas_id"
+            ],
+            "parent": "master_kelas_data",
+            "parent_columns": [
+                "id"
+            ],
+            "delete": "RESTRICT",
+            "update": "CASCADE"
+        },
+        {
+            "table_name": "bayar_data",
+            "name": "fk_unit_nis_88a6514574ed904f",
+            "columns": [
+                "unit_id",
+                "NO_INDUK"
+            ],
+            "parent": "siswa_data",
+            "parent_columns": [
+                "unit_id",
+                "NO_INDUK"
+            ],
+            "delete": "CASCADE",
+            "update": "CASCADE"
+        },
+        {
+            "table_name": "bayar_du_data",
+            "name": "fk_bayar_du_bayar",
+            "columns": [
+                "bayar_id"
+            ],
+            "parent": "bayar_data",
+            "parent_columns": [
+                "id"
+            ],
+            "delete": "CASCADE",
+            "update": "CASCADE"
+        },
+        {
+            "table_name": "bayar_du_data",
+            "name": "fk_bayar_du_tagihan",
+            "columns": [
+                "tagihan_daftar_ulang_id"
+            ],
+            "parent": "tagihan_daftar_ulang_data",
+            "parent_columns": [
+                "id"
+            ],
+            "delete": "RESTRICT",
+            "update": "CASCADE"
+        },
+        {
+            "table_name": "bayar_du_data",
+            "name": "fk_unit_nis_c234efd52fa50680",
+            "columns": [
+                "unit_id",
+                "no_induk"
+            ],
+            "parent": "siswa_data",
+            "parent_columns": [
+                "unit_id",
+                "NO_INDUK"
+            ],
+            "delete": "CASCADE",
+            "update": "CASCADE"
+        },
+        {
+            "table_name": "bayar_komite_data",
+            "name": "fk_bayar_komite_bayar",
+            "columns": [
+                "bayar_id"
+            ],
+            "parent": "bayar_data",
+            "parent_columns": [
+                "id"
+            ],
+            "delete": "CASCADE",
+            "update": "CASCADE"
+        },
+        {
+            "table_name": "bayar_komite_data",
+            "name": "fk_bayar_komite_tagihan",
+            "columns": [
+                "tagihan_komite_id"
+            ],
+            "parent": "tagihan_komite_data",
+            "parent_columns": [
+                "id"
+            ],
+            "delete": "RESTRICT",
+            "update": "CASCADE"
+        },
+        {
+            "table_name": "bayar_spp_periode_data",
+            "name": "fk_bayar_spp_periode_bayar",
+            "columns": [
+                "bayar_id"
+            ],
+            "parent": "bayar_data",
+            "parent_columns": [
+                "id"
+            ],
+            "delete": "CASCADE",
+            "update": "CASCADE"
+        },
+        {
+            "table_name": "bayar_spp_periode_data",
+            "name": "fk_unit_nis_93fad8eb87c90324",
+            "columns": [
+                "unit_id",
+                "no_induk"
+            ],
+            "parent": "siswa_data",
+            "parent_columns": [
+                "unit_id",
+                "NO_INDUK"
+            ],
+            "delete": "CASCADE",
+            "update": "CASCADE"
+        },
+        {
+            "table_name": "bayar_tahunan_siswa_data",
+            "name": "fk_bayar_tahunan_bayar",
+            "columns": [
+                "bayar_id"
+            ],
+            "parent": "bayar_data",
+            "parent_columns": [
+                "id"
+            ],
+            "delete": "CASCADE",
+            "update": "CASCADE"
+        },
+        {
+            "table_name": "bayar_tahunan_siswa_data",
+            "name": "fk_bayar_tahunan_tagihan",
+            "columns": [
+                "tagihan_tahunan_id"
+            ],
+            "parent": "tagihan_tahunan_siswa_data",
+            "parent_columns": [
+                "id"
+            ],
+            "delete": "RESTRICT",
+            "update": "CASCADE"
+        },
+        {
+            "table_name": "bayar_tahunan_siswa_data",
+            "name": "fk_unit_nis_6dba3b1f6f2d4095",
+            "columns": [
+                "unit_id",
+                "no_induk"
+            ],
+            "parent": "siswa_data",
+            "parent_columns": [
+                "unit_id",
+                "NO_INDUK"
+            ],
+            "delete": "CASCADE",
+            "update": "CASCADE"
+        },
+        {
+            "table_name": "daftar_ulang_audit_log_data",
+            "name": "fk_du_audit_admin",
+            "columns": [
+                "admin_id"
+            ],
+            "parent": "admin",
+            "parent_columns": [
+                "id"
+            ],
+            "delete": "SET NULL",
+            "update": "CASCADE"
+        },
+        {
+            "table_name": "daftar_ulang_audit_log_data",
+            "name": "fk_du_audit_master",
+            "columns": [
+                "master_id"
+            ],
+            "parent": "daftar_ulang_data",
+            "parent_columns": [
+                "id"
+            ],
+            "delete": "SET NULL",
+            "update": "CASCADE"
+        },
+        {
+            "table_name": "daftar_ulang_audit_log_data",
+            "name": "fk_du_audit_year",
+            "columns": [
+                "tahun_ajaran_id"
+            ],
+            "parent": "tahun_ajaran_data",
+            "parent_columns": [
+                "id"
+            ],
+            "delete": "SET NULL",
+            "update": "CASCADE"
+        },
+        {
+            "table_name": "daftar_ulang_data",
+            "name": "fk_master_du_tahun",
+            "columns": [
+                "tahun_ajaran_id"
+            ],
+            "parent": "tahun_ajaran_data",
+            "parent_columns": [
+                "id"
+            ],
+            "delete": "RESTRICT",
+            "update": "CASCADE"
+        },
+        {
+            "table_name": "financial_component_migration_row",
+            "name": "fk_component_migration",
+            "columns": [
+                "migration_key"
+            ],
+            "parent": "financial_component_migration",
+            "parent_columns": [
+                "migration_key"
+            ],
+            "delete": "RESTRICT",
+            "update": "NO ACTION"
+        },
+        {
+            "table_name": "legacy_debt_masters_data",
+            "name": "legacy_debt_masters_data_ibfk_1",
+            "columns": [
+                "id"
+            ],
+            "parent": "master_biaya_lain_data",
+            "parent_columns": [
+                "id"
+            ],
+            "delete": "RESTRICT",
+            "update": "NO ACTION"
+        },
+        {
+            "table_name": "legacy_debt_masters_data",
+            "name": "legacy_debt_masters_data_ibfk_2",
+            "columns": [
+                "unit_id"
+            ],
+            "parent": "unit_sekolah",
+            "parent_columns": [
+                "id"
+            ],
+            "delete": "NO ACTION",
+            "update": "NO ACTION"
+        },
+        {
+            "table_name": "legacy_debt_masters_data",
+            "name": "lf_master_unit",
+            "columns": [
+                "unit_id",
+                "id"
+            ],
+            "parent": "master_biaya_lain_data",
+            "parent_columns": [
+                "unit_id",
+                "id"
+            ],
+            "delete": "NO ACTION",
+            "update": "NO ACTION"
+        },
+        {
+            "table_name": "legacy_debts_data",
+            "name": "legacy_debts_data_ibfk_1",
+            "columns": [
+                "unit_id",
+                "student_id"
+            ],
+            "parent": "siswa_data",
+            "parent_columns": [
+                "unit_id",
+                "id"
+            ],
+            "delete": "NO ACTION",
+            "update": "NO ACTION"
+        },
+        {
+            "table_name": "legacy_debts_data",
+            "name": "legacy_debts_data_ibfk_2",
+            "columns": [
+                "unit_id",
+                "review_id"
+            ],
+            "parent": "legacy_finance_reviews_data",
+            "parent_columns": [
+                "unit_id",
+                "id"
+            ],
+            "delete": "NO ACTION",
+            "update": "NO ACTION"
+        },
+        {
+            "table_name": "legacy_debts_data",
+            "name": "legacy_debts_data_ibfk_3",
+            "columns": [
+                "bill_id"
+            ],
+            "parent": "tagihan_biaya_lain_data",
+            "parent_columns": [
+                "id"
+            ],
+            "delete": "NO ACTION",
+            "update": "NO ACTION"
+        },
+        {
+            "table_name": "legacy_debts_data",
+            "name": "legacy_debts_data_ibfk_4",
+            "columns": [
+                "unit_id",
+                "master_id"
+            ],
+            "parent": "legacy_debt_masters_data",
+            "parent_columns": [
+                "unit_id",
+                "id"
+            ],
+            "delete": "NO ACTION",
+            "update": "NO ACTION"
+        },
+        {
+            "table_name": "legacy_debts_data",
+            "name": "legacy_debts_data_ibfk_5",
+            "columns": [
+                "applied_by"
+            ],
+            "parent": "admin",
+            "parent_columns": [
+                "id"
+            ],
+            "delete": "NO ACTION",
+            "update": "NO ACTION"
+        },
+        {
+            "table_name": "legacy_debts_data",
+            "name": "lf_bill_unit",
+            "columns": [
+                "unit_id",
+                "bill_id"
+            ],
+            "parent": "tagihan_biaya_lain_data",
+            "parent_columns": [
+                "unit_id",
+                "id"
+            ],
+            "delete": "NO ACTION",
+            "update": "NO ACTION"
+        },
+        {
+            "table_name": "legacy_finance_audit_data",
+            "name": "legacy_finance_audit_data_ibfk_1",
+            "columns": [
+                "unit_id",
+                "review_id"
+            ],
+            "parent": "legacy_finance_reviews_data",
+            "parent_columns": [
+                "unit_id",
+                "id"
+            ],
+            "delete": "NO ACTION",
+            "update": "NO ACTION"
+        },
+        {
+            "table_name": "legacy_finance_audit_data",
+            "name": "legacy_finance_audit_data_ibfk_2",
+            "columns": [
+                "actor_id"
+            ],
+            "parent": "admin",
+            "parent_columns": [
+                "id"
+            ],
+            "delete": "NO ACTION",
+            "update": "NO ACTION"
+        },
+        {
+            "table_name": "legacy_finance_maps_data",
+            "name": "legacy_finance_maps_data_ibfk_1",
+            "columns": [
+                "unit_id",
+                "source_id"
+            ],
+            "parent": "legacy_finance_sources_data",
+            "parent_columns": [
+                "unit_id",
+                "id"
+            ],
+            "delete": "NO ACTION",
+            "update": "NO ACTION"
+        },
+        {
+            "table_name": "legacy_finance_maps_data",
+            "name": "legacy_finance_maps_data_ibfk_2",
+            "columns": [
+                "unit_id",
+                "student_id"
+            ],
+            "parent": "siswa_data",
+            "parent_columns": [
+                "unit_id",
+                "id"
+            ],
+            "delete": "RESTRICT",
+            "update": "NO ACTION"
+        },
+        {
+            "table_name": "legacy_finance_reviews_data",
+            "name": "legacy_finance_reviews_data_ibfk_1",
+            "columns": [
+                "unit_id",
+                "map_id"
+            ],
+            "parent": "legacy_finance_maps_data",
+            "parent_columns": [
+                "unit_id",
+                "id"
+            ],
+            "delete": "NO ACTION",
+            "update": "NO ACTION"
+        },
+        {
+            "table_name": "legacy_finance_reviews_data",
+            "name": "legacy_finance_reviews_data_ibfk_2",
+            "columns": [
+                "reviewed_by"
+            ],
+            "parent": "admin",
+            "parent_columns": [
+                "id"
+            ],
+            "delete": "NO ACTION",
+            "update": "NO ACTION"
+        },
+        {
+            "table_name": "legacy_finance_rows_data",
+            "name": "legacy_finance_rows_data_ibfk_1",
+            "columns": [
+                "unit_id",
+                "source_id"
+            ],
+            "parent": "legacy_finance_sources_data",
+            "parent_columns": [
+                "unit_id",
+                "id"
+            ],
+            "delete": "RESTRICT",
+            "update": "NO ACTION"
+        },
+        {
+            "table_name": "legacy_finance_sources_data",
+            "name": "legacy_finance_sources_data_ibfk_1",
+            "columns": [
+                "unit_id"
+            ],
+            "parent": "unit_sekolah",
+            "parent_columns": [
+                "id"
+            ],
+            "delete": "NO ACTION",
+            "update": "NO ACTION"
+        },
+        {
+            "table_name": "legacy_finance_sources_data",
+            "name": "legacy_finance_sources_data_ibfk_2",
+            "columns": [
+                "imported_by"
+            ],
+            "parent": "admin",
+            "parent_columns": [
+                "id"
+            ],
+            "delete": "NO ACTION",
+            "update": "NO ACTION"
+        },
+        {
+            "table_name": "legacy_full_batches_data",
+            "name": "legacy_full_batches_data_ibfk_1",
+            "columns": [
+                "unit_id",
+                "source_id"
+            ],
+            "parent": "legacy_finance_sources_data",
+            "parent_columns": [
+                "unit_id",
+                "id"
+            ],
+            "delete": "NO ACTION",
+            "update": "NO ACTION"
+        },
+        {
+            "table_name": "legacy_full_batches_data",
+            "name": "legacy_full_batches_data_ibfk_2",
+            "columns": [
+                "actor_id"
+            ],
+            "parent": "admin",
+            "parent_columns": [
+                "id"
+            ],
+            "delete": "NO ACTION",
+            "update": "NO ACTION"
+        },
+        {
+            "table_name": "legacy_full_coverage_data",
+            "name": "legacy_full_coverage_data_ibfk_1",
+            "columns": [
+                "unit_id",
+                "batch_id"
+            ],
+            "parent": "legacy_full_batches_data",
+            "parent_columns": [
+                "unit_id",
+                "id"
+            ],
+            "delete": "NO ACTION",
+            "update": "NO ACTION"
+        },
+        {
+            "table_name": "legacy_full_coverage_data",
+            "name": "legacy_full_coverage_data_ibfk_2",
+            "columns": [
+                "unit_id",
+                "student_id"
+            ],
+            "parent": "siswa_data",
+            "parent_columns": [
+                "unit_id",
+                "id"
+            ],
+            "delete": "NO ACTION",
+            "update": "NO ACTION"
+        },
+        {
+            "table_name": "legacy_full_items_data",
+            "name": "legacy_full_items_data_ibfk_1",
+            "columns": [
+                "unit_id",
+                "payment_id"
+            ],
+            "parent": "legacy_full_payments_data",
+            "parent_columns": [
+                "unit_id",
+                "id"
+            ],
+            "delete": "NO ACTION",
+            "update": "NO ACTION"
+        },
+        {
+            "table_name": "legacy_full_journals_data",
+            "name": "legacy_full_journals_data_ibfk_1",
+            "columns": [
+                "unit_id",
+                "batch_id"
+            ],
+            "parent": "legacy_full_batches_data",
+            "parent_columns": [
+                "unit_id",
+                "id"
+            ],
+            "delete": "NO ACTION",
+            "update": "NO ACTION"
+        },
+        {
+            "table_name": "legacy_full_journals_data",
+            "name": "legacy_full_journals_data_ibfk_2",
+            "columns": [
+                "unit_id",
+                "student_id"
+            ],
+            "parent": "siswa_data",
+            "parent_columns": [
+                "unit_id",
+                "id"
+            ],
+            "delete": "NO ACTION",
+            "update": "NO ACTION"
+        },
+        {
+            "table_name": "legacy_full_payments_data",
+            "name": "legacy_full_payments_data_ibfk_1",
+            "columns": [
+                "unit_id",
+                "batch_id"
+            ],
+            "parent": "legacy_full_batches_data",
+            "parent_columns": [
+                "unit_id",
+                "id"
+            ],
+            "delete": "NO ACTION",
+            "update": "NO ACTION"
+        },
+        {
+            "table_name": "legacy_full_payments_data",
+            "name": "legacy_full_payments_data_ibfk_2",
+            "columns": [
+                "unit_id",
+                "student_id"
+            ],
+            "parent": "siswa_data",
+            "parent_columns": [
+                "unit_id",
+                "id"
+            ],
+            "delete": "NO ACTION",
+            "update": "NO ACTION"
+        },
+        {
+            "table_name": "legacy_full_students_data",
+            "name": "legacy_full_students_data_ibfk_1",
+            "columns": [
+                "unit_id",
+                "batch_id"
+            ],
+            "parent": "legacy_full_batches_data",
+            "parent_columns": [
+                "unit_id",
+                "id"
+            ],
+            "delete": "NO ACTION",
+            "update": "NO ACTION"
+        },
+        {
+            "table_name": "legacy_full_students_data",
+            "name": "legacy_full_students_data_ibfk_2",
+            "columns": [
+                "unit_id",
+                "student_id"
+            ],
+            "parent": "siswa_data",
+            "parent_columns": [
+                "unit_id",
+                "id"
+            ],
+            "delete": "NO ACTION",
+            "update": "NO ACTION"
+        },
+        {
+            "table_name": "legacy_full_students_data",
+            "name": "legacy_full_students_data_ibfk_3",
+            "columns": [
+                "unit_id",
+                "review_id"
+            ],
+            "parent": "legacy_finance_reviews_data",
+            "parent_columns": [
+                "unit_id",
+                "id"
+            ],
+            "delete": "NO ACTION",
+            "update": "NO ACTION"
+        },
+        {
+            "table_name": "legacy_op_accounts_data",
+            "name": "legacy_op_accounts_data_ibfk_1",
+            "columns": [
+                "unit_id",
+                "owner_id"
+            ],
+            "parent": "legacy_op_owners_data",
+            "parent_columns": [
+                "unit_id",
+                "id"
+            ],
+            "delete": "NO ACTION",
+            "update": "NO ACTION"
+        },
+        {
+            "table_name": "legacy_op_audit_data",
+            "name": "legacy_op_audit_data_ibfk_1",
+            "columns": [
+                "actor_id"
+            ],
+            "parent": "admin",
+            "parent_columns": [
+                "id"
+            ],
+            "delete": "NO ACTION",
+            "update": "NO ACTION"
+        },
+        {
+            "table_name": "legacy_op_groups_data",
+            "name": "legacy_op_groups_data_ibfk_1",
+            "columns": [
+                "unit_id",
+                "master_kelas_id"
+            ],
+            "parent": "master_kelas_data",
+            "parent_columns": [
+                "unit_id",
+                "id"
+            ],
+            "delete": "NO ACTION",
+            "update": "NO ACTION"
+        },
+        {
+            "table_name": "legacy_op_journals_data",
+            "name": "legacy_op_journals_data_ibfk_1",
+            "columns": [
+                "unit_id",
+                "batch_id"
+            ],
+            "parent": "legacy_full_batches_data",
+            "parent_columns": [
+                "unit_id",
+                "id"
+            ],
+            "delete": "NO ACTION",
+            "update": "NO ACTION"
+        },
+        {
+            "table_name": "legacy_op_journals_data",
+            "name": "legacy_op_journals_data_ibfk_2",
+            "columns": [
+                "unit_id",
+                "owner_id"
+            ],
+            "parent": "legacy_op_owners_data",
+            "parent_columns": [
+                "unit_id",
+                "id"
+            ],
+            "delete": "NO ACTION",
+            "update": "NO ACTION"
+        },
+        {
+            "table_name": "legacy_op_obligations_data",
+            "name": "legacy_op_obligations_data_ibfk_1",
+            "columns": [
+                "unit_id",
+                "owner_id"
+            ],
+            "parent": "legacy_op_owners_data",
+            "parent_columns": [
+                "unit_id",
+                "id"
+            ],
+            "delete": "NO ACTION",
+            "update": "NO ACTION"
+        },
+        {
+            "table_name": "legacy_op_obligations_data",
+            "name": "legacy_op_obligations_data_ibfk_2",
+            "columns": [
+                "unit_id",
+                "bill_id"
+            ],
+            "parent": "tagihan_biaya_lain_data",
+            "parent_columns": [
+                "unit_id",
+                "id"
+            ],
+            "delete": "NO ACTION",
+            "update": "NO ACTION"
+        },
+        {
+            "table_name": "legacy_op_owners_data",
+            "name": "legacy_op_owners_data_ibfk_1",
+            "columns": [
+                "unit_id",
+                "batch_id"
+            ],
+            "parent": "legacy_full_batches_data",
+            "parent_columns": [
+                "unit_id",
+                "id"
+            ],
+            "delete": "NO ACTION",
+            "update": "NO ACTION"
+        },
+        {
+            "table_name": "legacy_op_owners_data",
+            "name": "legacy_op_owners_data_ibfk_2",
+            "columns": [
+                "unit_id",
+                "group_id"
+            ],
+            "parent": "legacy_op_groups_data",
+            "parent_columns": [
+                "unit_id",
+                "id"
+            ],
+            "delete": "NO ACTION",
+            "update": "NO ACTION"
+        },
+        {
+            "table_name": "legacy_op_owners_data",
+            "name": "legacy_op_owners_data_ibfk_3",
+            "columns": [
+                "unit_id",
+                "student_id"
+            ],
+            "parent": "siswa_data",
+            "parent_columns": [
+                "unit_id",
+                "id"
+            ],
+            "delete": "NO ACTION",
+            "update": "NO ACTION"
+        },
+        {
+            "table_name": "legacy_op_payments_data",
+            "name": "legacy_op_payments_data_ibfk_1",
+            "columns": [
+                "unit_id",
+                "batch_id"
+            ],
+            "parent": "legacy_full_batches_data",
+            "parent_columns": [
+                "unit_id",
+                "id"
+            ],
+            "delete": "NO ACTION",
+            "update": "NO ACTION"
+        },
+        {
+            "table_name": "legacy_op_payments_data",
+            "name": "legacy_op_payments_data_ibfk_2",
+            "columns": [
+                "unit_id",
+                "owner_id"
+            ],
+            "parent": "legacy_op_owners_data",
+            "parent_columns": [
+                "unit_id",
+                "id"
+            ],
+            "delete": "NO ACTION",
+            "update": "NO ACTION"
+        },
+        {
+            "table_name": "legacy_op_pending_data",
+            "name": "legacy_op_pending_data_ibfk_1",
+            "columns": [
+                "unit_id",
+                "batch_id"
+            ],
+            "parent": "legacy_full_batches_data",
+            "parent_columns": [
+                "unit_id",
+                "id"
+            ],
+            "delete": "NO ACTION",
+            "update": "NO ACTION"
+        },
+        {
+            "table_name": "legacy_op_tariffs_data",
+            "name": "legacy_op_tariffs_data_ibfk_1",
+            "columns": [
+                "unit_id",
+                "student_id"
+            ],
+            "parent": "siswa_data",
+            "parent_columns": [
+                "unit_id",
+                "id"
+            ],
+            "delete": "NO ACTION",
+            "update": "NO ACTION"
+        },
+        {
+            "table_name": "legacy_op_tariffs_data",
+            "name": "legacy_op_tariffs_data_ibfk_2",
+            "columns": [
+                "unit_id",
+                "owner_id"
+            ],
+            "parent": "legacy_op_owners_data",
+            "parent_columns": [
+                "unit_id",
+                "id"
+            ],
+            "delete": "NO ACTION",
+            "update": "NO ACTION"
+        },
+        {
+            "table_name": "legacy_savings_openings_data",
+            "name": "legacy_savings_openings_data_ibfk_1",
+            "columns": [
+                "unit_id",
+                "student_id"
+            ],
+            "parent": "siswa_data",
+            "parent_columns": [
+                "unit_id",
+                "id"
+            ],
+            "delete": "RESTRICT",
+            "update": "NO ACTION"
+        },
+        {
+            "table_name": "legacy_savings_openings_data",
+            "name": "legacy_savings_openings_data_ibfk_2",
+            "columns": [
+                "unit_id",
+                "review_id"
+            ],
+            "parent": "legacy_finance_reviews_data",
+            "parent_columns": [
+                "unit_id",
+                "id"
+            ],
+            "delete": "NO ACTION",
+            "update": "NO ACTION"
+        },
+        {
+            "table_name": "legacy_savings_openings_data",
+            "name": "legacy_savings_openings_data_ibfk_3",
+            "columns": [
+                "applied_by"
+            ],
+            "parent": "admin",
+            "parent_columns": [
+                "id"
+            ],
+            "delete": "NO ACTION",
+            "update": "NO ACTION"
+        },
+        {
+            "table_name": "legacy_savings_openings_data",
+            "name": "legacy_savings_openings_data_ibfk_4",
+            "columns": [
+                "cancelled_by"
+            ],
+            "parent": "admin",
+            "parent_columns": [
+                "id"
+            ],
+            "delete": "NO ACTION",
+            "update": "NO ACTION"
+        },
+        {
+            "table_name": "legacy_student_import_data",
+            "name": "fk_legacy_student_unit",
+            "columns": [
+                "unit_id",
+                "student_id"
+            ],
+            "parent": "siswa_data",
+            "parent_columns": [
+                "unit_id",
+                "id"
+            ],
+            "delete": "RESTRICT",
+            "update": "NO ACTION"
+        },
+        {
+            "table_name": "master_spp_tahun_data",
+            "name": "fk_master_spp_tahun_ajaran",
+            "columns": [
+                "tahun_ajaran_id"
+            ],
+            "parent": "tahun_ajaran_data",
+            "parent_columns": [
+                "id"
+            ],
+            "delete": "RESTRICT",
+            "update": "CASCADE"
+        },
+        {
+            "table_name": "master_spp_tarif_data",
+            "name": "fk_master_spp_tarif_tahun",
+            "columns": [
+                "master_spp_tahun_id"
+            ],
+            "parent": "master_spp_tahun_data",
+            "parent_columns": [
+                "id"
+            ],
+            "delete": "CASCADE",
+            "update": "CASCADE"
+        },
+        {
+            "table_name": "siswa_audit_log_data",
+            "name": "fk_siswa_audit_admin",
+            "columns": [
+                "admin_id"
+            ],
+            "parent": "admin",
+            "parent_columns": [
+                "id"
+            ],
+            "delete": "SET NULL",
+            "update": "CASCADE"
+        },
+        {
+            "table_name": "siswa_audit_log_data",
+            "name": "fk_siswa_audit_siswa",
+            "columns": [
+                "siswa_id"
+            ],
+            "parent": "siswa_data",
+            "parent_columns": [
+                "id"
+            ],
+            "delete": "SET NULL",
+            "update": "CASCADE"
+        },
+        {
+            "table_name": "siswa_data",
+            "name": "fk_siswa_master_kelas",
+            "columns": [
+                "master_kelas_id"
+            ],
+            "parent": "master_kelas_data",
+            "parent_columns": [
+                "id"
+            ],
+            "delete": "RESTRICT",
+            "update": "CASCADE"
+        },
+        {
+            "table_name": "siswa_tahun_ajaran_data",
+            "name": "fk_penempatan_master_kelas",
+            "columns": [
+                "master_kelas_id"
+            ],
+            "parent": "master_kelas_data",
+            "parent_columns": [
+                "id"
+            ],
+            "delete": "RESTRICT",
+            "update": "CASCADE"
+        },
+        {
+            "table_name": "siswa_tahun_ajaran_data",
+            "name": "fk_penempatan_tahun_ajaran",
+            "columns": [
+                "tahun_ajaran_id"
+            ],
+            "parent": "tahun_ajaran_data",
+            "parent_columns": [
+                "id"
+            ],
+            "delete": "RESTRICT",
+            "update": "CASCADE"
+        },
+        {
+            "table_name": "siswa_tahun_ajaran_data",
+            "name": "fk_unit_nis_bc4add0b413d208e",
+            "columns": [
+                "unit_id",
+                "no_induk"
+            ],
+            "parent": "siswa_data",
+            "parent_columns": [
+                "unit_id",
+                "NO_INDUK"
+            ],
+            "delete": "RESTRICT",
+            "update": "CASCADE"
+        },
+        {
+            "table_name": "spp_alokasi_batch_data",
+            "name": "fk_spp_alokasi_batch_bayar",
+            "columns": [
+                "bayar_id"
+            ],
+            "parent": "bayar_data",
+            "parent_columns": [
+                "id"
+            ],
+            "delete": "CASCADE",
+            "update": "CASCADE"
+        },
+        {
+            "table_name": "spp_alokasi_batch_data",
+            "name": "fk_unit_nis_8f8d7b29c625edee",
+            "columns": [
+                "unit_id",
+                "no_induk"
+            ],
+            "parent": "siswa_data",
+            "parent_columns": [
+                "unit_id",
+                "NO_INDUK"
+            ],
+            "delete": "RESTRICT",
+            "update": "CASCADE"
+        },
+        {
+            "table_name": "spp_alokasi_data",
+            "name": "fk_spp_alokasi_batch",
+            "columns": [
+                "batch_id"
+            ],
+            "parent": "spp_alokasi_batch_data",
+            "parent_columns": [
+                "id"
+            ],
+            "delete": "CASCADE",
+            "update": "CASCADE"
+        },
+        {
+            "table_name": "spp_alokasi_data",
+            "name": "fk_spp_alokasi_tagihan",
+            "columns": [
+                "tagihan_spp_id"
+            ],
+            "parent": "tagihan_spp_data",
+            "parent_columns": [
+                "id"
+            ],
+            "delete": "RESTRICT",
+            "update": "CASCADE"
+        },
+        {
+            "table_name": "spp_audit_log_data",
+            "name": "fk_spp_audit_admin",
+            "columns": [
+                "admin_id"
+            ],
+            "parent": "admin",
+            "parent_columns": [
+                "id"
+            ],
+            "delete": "SET NULL",
+            "update": "CASCADE"
+        },
+        {
+            "table_name": "spp_audit_log_data",
+            "name": "fk_spp_audit_tahun",
+            "columns": [
+                "master_spp_tahun_id"
+            ],
+            "parent": "master_spp_tahun_data",
+            "parent_columns": [
+                "id"
+            ],
+            "delete": "SET NULL",
+            "update": "CASCADE"
+        },
+        {
+            "table_name": "tabungan_data",
+            "name": "fk_unit_nis_269e0632b4c0911f",
+            "columns": [
+                "unit_id",
+                "NO_INDUK"
+            ],
+            "parent": "siswa_data",
+            "parent_columns": [
+                "unit_id",
+                "NO_INDUK"
+            ],
+            "delete": "CASCADE",
+            "update": "CASCADE"
+        },
+        {
+            "table_name": "tagihan_biaya_lain_audit_log_data",
+            "name": "fk_tagihan_biaya_lain_audit_admin",
+            "columns": [
+                "admin_id"
+            ],
+            "parent": "admin",
+            "parent_columns": [
+                "id"
+            ],
+            "delete": "SET NULL",
+            "update": "CASCADE"
+        },
+        {
+            "table_name": "tagihan_biaya_lain_audit_log_data",
+            "name": "fk_tagihan_biaya_lain_audit_master",
+            "columns": [
+                "master_biaya_lain_id"
+            ],
+            "parent": "master_biaya_lain_data",
+            "parent_columns": [
+                "id"
+            ],
+            "delete": "SET NULL",
+            "update": "CASCADE"
+        },
+        {
+            "table_name": "tagihan_biaya_lain_data",
+            "name": "fk_tagihan_biaya_lain_admin",
+            "columns": [
+                "created_by"
+            ],
+            "parent": "admin",
+            "parent_columns": [
+                "id"
+            ],
+            "delete": "SET NULL",
+            "update": "CASCADE"
+        },
+        {
+            "table_name": "tagihan_biaya_lain_data",
+            "name": "fk_tagihan_biaya_lain_kelas",
+            "columns": [
+                "master_kelas_id"
+            ],
+            "parent": "master_kelas_data",
+            "parent_columns": [
+                "id"
+            ],
+            "delete": "RESTRICT",
+            "update": "CASCADE"
+        },
+        {
+            "table_name": "tagihan_biaya_lain_data",
+            "name": "fk_tagihan_biaya_lain_master",
+            "columns": [
+                "master_biaya_lain_id"
+            ],
+            "parent": "master_biaya_lain_data",
+            "parent_columns": [
+                "id"
+            ],
+            "delete": "RESTRICT",
+            "update": "CASCADE"
+        },
+        {
+            "table_name": "tagihan_biaya_lain_data",
+            "name": "fk_unit_nis_01121834f390312d",
+            "columns": [
+                "unit_id",
+                "no_induk"
+            ],
+            "parent": "siswa_data",
+            "parent_columns": [
+                "unit_id",
+                "NO_INDUK"
+            ],
+            "delete": "RESTRICT",
+            "update": "CASCADE"
+        },
+        {
+            "table_name": "tagihan_daftar_ulang_data",
+            "name": "fk_tagihan_du_master",
+            "columns": [
+                "master_daftar_ulang_id"
+            ],
+            "parent": "daftar_ulang_data",
+            "parent_columns": [
+                "id"
+            ],
+            "delete": "SET NULL",
+            "update": "CASCADE"
+        },
+        {
+            "table_name": "tagihan_daftar_ulang_data",
+            "name": "fk_tagihan_du_penempatan",
+            "columns": [
+                "penempatan_id"
+            ],
+            "parent": "siswa_tahun_ajaran_data",
+            "parent_columns": [
+                "id"
+            ],
+            "delete": "RESTRICT",
+            "update": "CASCADE"
+        },
+        {
+            "table_name": "tagihan_daftar_ulang_data",
+            "name": "fk_tagihan_du_tahun",
+            "columns": [
+                "tahun_ajaran_id"
+            ],
+            "parent": "tahun_ajaran_data",
+            "parent_columns": [
+                "id"
+            ],
+            "delete": "RESTRICT",
+            "update": "CASCADE"
+        },
+        {
+            "table_name": "tagihan_daftar_ulang_data",
+            "name": "fk_unit_nis_52d20d6cdc0b0552",
+            "columns": [
+                "unit_id",
+                "no_induk"
+            ],
+            "parent": "siswa_data",
+            "parent_columns": [
+                "unit_id",
+                "NO_INDUK"
+            ],
+            "delete": "RESTRICT",
+            "update": "CASCADE"
+        },
+        {
+            "table_name": "tagihan_komite_data",
+            "name": "fk_tagihan_komite_penempatan",
+            "columns": [
+                "penempatan_id"
+            ],
+            "parent": "siswa_tahun_ajaran_data",
+            "parent_columns": [
+                "id"
+            ],
+            "delete": "RESTRICT",
+            "update": "CASCADE"
+        },
+        {
+            "table_name": "tagihan_komite_data",
+            "name": "fk_tagihan_komite_tahun",
+            "columns": [
+                "tahun_ajaran_id"
+            ],
+            "parent": "tahun_ajaran_data",
+            "parent_columns": [
+                "id"
+            ],
+            "delete": "RESTRICT",
+            "update": "CASCADE"
+        },
+        {
+            "table_name": "tagihan_komite_data",
+            "name": "fk_unit_nis_673de514aaaf07e1",
+            "columns": [
+                "unit_id",
+                "no_induk"
+            ],
+            "parent": "siswa_data",
+            "parent_columns": [
+                "unit_id",
+                "NO_INDUK"
+            ],
+            "delete": "RESTRICT",
+            "update": "CASCADE"
+        },
+        {
+            "table_name": "tagihan_spp_data",
+            "name": "fk_tagihan_spp_kelas",
+            "columns": [
+                "master_kelas_id"
+            ],
+            "parent": "master_kelas_data",
+            "parent_columns": [
+                "id"
+            ],
+            "delete": "RESTRICT",
+            "update": "CASCADE"
+        },
+        {
+            "table_name": "tagihan_spp_data",
+            "name": "fk_tagihan_spp_master_tahun",
+            "columns": [
+                "master_spp_tahun_id"
+            ],
+            "parent": "master_spp_tahun_data",
+            "parent_columns": [
+                "id"
+            ],
+            "delete": "RESTRICT",
+            "update": "CASCADE"
+        },
+        {
+            "table_name": "tagihan_spp_data",
+            "name": "fk_tagihan_spp_penempatan",
+            "columns": [
+                "penempatan_id"
+            ],
+            "parent": "siswa_tahun_ajaran_data",
+            "parent_columns": [
+                "id"
+            ],
+            "delete": "RESTRICT",
+            "update": "CASCADE"
+        },
+        {
+            "table_name": "tagihan_spp_data",
+            "name": "fk_tagihan_spp_tahun",
+            "columns": [
+                "tahun_ajaran_id"
+            ],
+            "parent": "tahun_ajaran_data",
+            "parent_columns": [
+                "id"
+            ],
+            "delete": "RESTRICT",
+            "update": "CASCADE"
+        },
+        {
+            "table_name": "tagihan_spp_data",
+            "name": "fk_unit_nis_7ad39441710c01c1",
+            "columns": [
+                "unit_id",
+                "no_induk"
+            ],
+            "parent": "siswa_data",
+            "parent_columns": [
+                "unit_id",
+                "NO_INDUK"
+            ],
+            "delete": "RESTRICT",
+            "update": "CASCADE"
+        },
+        {
+            "table_name": "tagihan_tahunan_siswa_data",
+            "name": "fk_tagihan_tahunan_penempatan",
+            "columns": [
+                "penempatan_id"
+            ],
+            "parent": "siswa_tahun_ajaran_data",
+            "parent_columns": [
+                "id"
+            ],
+            "delete": "SET NULL",
+            "update": "CASCADE"
+        },
+        {
+            "table_name": "tagihan_tahunan_siswa_data",
+            "name": "fk_tagihan_tahunan_tahun",
+            "columns": [
+                "tahun_ajaran_id"
+            ],
+            "parent": "tahun_ajaran_data",
+            "parent_columns": [
+                "id"
+            ],
+            "delete": "RESTRICT",
+            "update": "CASCADE"
+        },
+        {
+            "table_name": "tagihan_tahunan_siswa_data",
+            "name": "fk_unit_nis_9f00ae8e2e9c8581",
+            "columns": [
+                "unit_id",
+                "no_induk"
+            ],
+            "parent": "siswa_data",
+            "parent_columns": [
+                "unit_id",
+                "NO_INDUK"
+            ],
+            "delete": "RESTRICT",
+            "update": "CASCADE"
+        },
+        {
+            "table_name": "transaksi_k_data",
+            "name": "fk_unit_nis_4c7956afd02cc590",
+            "columns": [
+                "unit_id",
+                "NO_INDUK"
+            ],
+            "parent": "siswa_data",
+            "parent_columns": [
+                "unit_id",
+                "NO_INDUK"
+            ],
+            "delete": "CASCADE",
+            "update": "CASCADE"
+        },
+        {
+            "table_name": "transaksi_m_data",
+            "name": "fk_transaksi_m_bayar",
+            "columns": [
+                "bayar_id"
+            ],
+            "parent": "bayar_data",
+            "parent_columns": [
+                "id"
+            ],
+            "delete": "CASCADE",
+            "update": "CASCADE"
+        },
+        {
+            "table_name": "transaksi_m_data",
+            "name": "fk_unit_nis_f717af2b06072f69",
+            "columns": [
+                "unit_id",
+                "NO_INDUK"
+            ],
+            "parent": "siswa_data",
+            "parent_columns": [
+                "unit_id",
+                "NO_INDUK"
+            ],
+            "delete": "CASCADE",
+            "update": "CASCADE"
+        },
+        {
+            "table_name": "transaksi_otorisasi_data",
+            "name": "fk_transaksi_otorisasi_bayar",
+            "columns": [
+                "bayar_id"
+            ],
+            "parent": "bayar_data",
+            "parent_columns": [
+                "id"
+            ],
+            "delete": "SET NULL",
+            "update": "CASCADE"
+        },
+        {
+            "table_name": "transaksi_otorisasi_data",
+            "name": "fk_transaksi_otorisasi_decider",
+            "columns": [
+                "decided_by"
+            ],
+            "parent": "admin",
+            "parent_columns": [
+                "id"
+            ],
+            "delete": "SET NULL",
+            "update": "CASCADE"
+        },
+        {
+            "table_name": "transaksi_otorisasi_data",
+            "name": "fk_transaksi_otorisasi_requester",
+            "columns": [
+                "requested_by"
+            ],
+            "parent": "admin",
+            "parent_columns": [
+                "id"
+            ],
+            "delete": "RESTRICT",
+            "update": "CASCADE"
+        },
+        {
+            "table_name": "tabungan_aktivitas_data",
+            "name": "tabungan_aktivitas_data_ibfk_1",
+            "columns": [
+                "unit_id"
+            ],
+            "parent": "unit_sekolah",
+            "parent_columns": [
+                "id"
+            ],
+            "delete": "NO ACTION",
+            "update": "NO ACTION"
+        },
+        {
+            "table_name": "tabungan_aktivitas_data",
+            "name": "tabungan_aktivitas_data_ibfk_2",
+            "columns": [
+                "actor_id"
+            ],
+            "parent": "admin",
+            "parent_columns": [
+                "id"
+            ],
+            "delete": "RESTRICT",
+            "update": "NO ACTION"
+        },
+        {
+            "table_name": "tabungan_aktivitas_data",
+            "name": "tabungan_aktivitas_data_ibfk_3",
+            "columns": [
+                "authorization_id"
+            ],
+            "parent": "tabungan_otorisasi_data",
+            "parent_columns": [
+                "id"
+            ],
+            "delete": "RESTRICT",
+            "update": "NO ACTION"
+        },
+        {
+            "table_name": "tabungan_otorisasi_data",
+            "name": "tabungan_otorisasi_data_ibfk_1",
+            "columns": [
+                "unit_id"
+            ],
+            "parent": "unit_sekolah",
+            "parent_columns": [
+                "id"
+            ],
+            "delete": "NO ACTION",
+            "update": "NO ACTION"
+        },
+        {
+            "table_name": "tabungan_otorisasi_data",
+            "name": "tabungan_otorisasi_data_ibfk_2",
+            "columns": [
+                "requested_by"
+            ],
+            "parent": "admin",
+            "parent_columns": [
+                "id"
+            ],
+            "delete": "RESTRICT",
+            "update": "NO ACTION"
+        },
+        {
+            "table_name": "tabungan_otorisasi_data",
+            "name": "tabungan_otorisasi_data_ibfk_3",
+            "columns": [
+                "decided_by"
+            ],
+            "parent": "admin",
+            "parent_columns": [
+                "id"
+            ],
+            "delete": "RESTRICT",
+            "update": "NO ACTION"
+        }
+    ]
+}

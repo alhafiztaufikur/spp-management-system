@@ -2,6 +2,7 @@
 require_once __DIR__.'/filter_choices.php';
 require_once __DIR__.'/spp_billing.php';
 require_once __DIR__.'/tagihan_tahunan.php';
+require_once __DIR__.'/general_history.php';
 function general_types():array{return ['semua'=>'Semua transaksi','sudah_bayar'=>'Yang sudah bayar','belum_spp'=>'SPP belum lunas','belum_komite'=>'Komite belum lunas','belum_du'=>'Daftar ulang belum lunas','belum_biaya_lain'=>'Biaya lain belum lunas'];}
 function general_choices(array $source):array{return filter_register('jenis_laporan',$source['jenis_laporan']??null,general_types(),'semua','semua');}
 function general_bind(mysqli_stmt $stmt,string $types,array $params):void{if($params)$stmt->bind_param($types,...$params);}
@@ -15,9 +16,8 @@ function general_sections(mysqli $db,array $choices,string $start,string $end,st
     foreach($types as $type){
         $columns=[['NO_INDUK','NIS'],['NO_induk_diknas','NIS Diknas'],['NAMA','Nama Siswa'],['KELAS','Kelas']];
         if(in_array($type,['semua','sudah_bayar'],true)){
-            $order=match($sort){'nama'=>'s.NAMA,b.TGL_BYR DESC','kelas'=>'b.KELAS,s.NAMA,b.TGL_BYR DESC','nominal_terbesar'=>'b.total_jumlah DESC,b.id DESC',default=>'b.TGL_BYR DESC,b.id DESC'};
-            $stmt=$db->prepare("SELECT b.unit_id,b.id,s.NO_INDUK,s.NO_induk_diknas,s.NAMA,COALESCE(NULLIF(b.kelas_rombel_snapshot,''),NULLIF(b.KELAS,''),s.KELAS) KELAS,b.BULAN,b.TAHUN,b.sistem_pembayaran,b.total_jumlah,b.TGL_BYR FROM bayar b JOIN siswa s ON s.NO_INDUK=b.NO_INDUK AND s.unit_id=b.unit_id WHERE b.TGL_BYR>=? AND b.TGL_BYR<?".($type==='sudah_bayar'?' AND b.total_jumlah>0':'').$where.' ORDER BY '.$order);
-            general_bind($stmt,'ss'.str_repeat('s',count($params)),array_merge([$start,$end],$params));$stmt->execute();$rows=$stmt->get_result()->fetch_all(MYSQLI_ASSOC);$stmt->close();
+            $rows=general_payment_rows($db,$start,$end,$search,$sort);
+            if($type==='sudah_bayar')$rows=array_values(array_filter($rows,static fn($r)=>(float)$r['total_jumlah']>0));
             foreach($rows as &$row)$row['periode']=$row['BULAN'].' '.$row['TAHUN'];unset($row);
             $columns=array_merge($columns,[['periode','Bulan Tagihan'],['sistem_pembayaran','Sistem Pembayaran'],['total_jumlah','Total Bayar','money'],['TGL_BYR','Tanggal Bayar','datetime']]);
             $totals=[['label'=>'Total Pembayaran','value'=>array_sum(array_column($rows,'total_jumlah'))]];
@@ -37,7 +37,7 @@ function general_section_html(array $section,int $start=0):string{
     echo '<section class="report-multiple-section"><h3>'.$e($section['title']).'</h3><div class="table-container"><table class="payment-table"><thead><tr><th>No</th>';
     foreach($section['columns'] as $column)echo '<th>'.$e($column[1]).'</th>';echo '</tr></thead><tbody>';
     if(!$section['rows'])echo '<tr><td colspan="'.(count($section['columns'])+1).'">Tidak ada data sesuai filter.</td></tr>';
-    foreach($section['rows'] as $i=>$row){echo '<tr><td>'.($start+$i+1).'</td>';foreach($section['columns'] as $column){$value=$row[$column[0]]??'';$type=$column[2]??'text';echo '<td'.($type==='money'?' class="nominal"':'').'>';echo $type==='money'?'Rp '.number_format((float)$value,0,',','.'):(in_array($type,['date','datetime'],true)?$e(spp_date_label($value,$type==='datetime')):$e($value));echo '</td>';}echo '</tr>';}
+    foreach($section['rows'] as $i=>$row){echo '<tr><td>'.($start+$i+1).'</td>';foreach($section['columns'] as $column){$value=$row[$column[0]]??'';$type=$column[2]??'text';echo '<td'.($type==='money'?' class="nominal"':'').'>';echo $type==='money'?'Rp '.number_format((float)$value,0,',','.'):(in_array($type,['date','datetime'],true)?$e(spp_date_label($value,$type==='datetime',$row['time_precision']??null)):$e($value));echo '</td>';}echo '</tr>';}
     echo '</tbody></table></div><div class="report-multiple-subtotals">';foreach($section['totals'] as $total)echo '<span>'.$e($total['label']).': <strong>Rp '.number_format($total['value'],0,',','.').'</strong></span>';echo '</div></section>';return ob_get_clean();
 }
 function general_excel_sections(array $sections):array{
@@ -140,5 +140,5 @@ function general_unpaid(mysqli $koneksi,string $report_type,string $filter_bulan
     $stmtUnpaid->execute();
     $result = $stmtUnpaid->get_result()->fetch_all(MYSQLI_ASSOC);
     $stmtUnpaid->close();
-    return $result;
+    return general_unpaid_history($koneksi,$result,$report_type,$filter_bulan,$filter_tahun,$academicYear);
 }

@@ -6,9 +6,17 @@ require_once __DIR__.'/pagination.php';
 
 /** The history screen and exports share owner IDs, unit scoping and predicates. */
 function mh_savings_read_query(mysqli $db,array $input,array $classFilter,array $operators,string $start,string $end,bool $summaryOnly=false): array {
-    $source=mh_savings_source($db,!$summaryOnly||!filter_is_all($operators));$where=' WHERE 1=1';$args=[];
-    if(($input['all_periods']??'')!=='1'){$where.=' AND t.TANGGAL>=? AND t.TANGGAL<?';$args=[$start,$end];}
     $q=is_string($input['nis']??'')?trim($input['nis']??''):'';
+    if($summaryOnly&&$q===''&&(int)($input['owner_id']??0)<=0&&(int)($input['student_id']??0)<=0&&filter_is_all($classFilter['values'])&&filter_is_all($operators)){
+        // The unfiltered recap needs three columns, not every owner's name,
+        // notes and class. Keep the same completed/cancelled/source predicates.
+        $parts=['SELECT t.TANGGAL,t.MASUK nominal,0 keluar FROM transaksi_m t','SELECT t.TANGGAL,0 nominal,t.KELUAR keluar FROM transaksi_k t'];
+        if(lful_read_ready($db))$parts[]="SELECT j.source_date,j.incoming,j.outgoing FROM legacy_full_journals j JOIN siswa s ON s.id=j.student_id AND s.unit_id=j.unit_id JOIN legacy_full_batches b ON b.id=j.batch_id AND b.unit_id=j.unit_id WHERE b.state='completed'";
+        if(lop_ready($db))$parts[]="SELECT j.source_date,IF(j.origin='adjustment',0,j.incoming),IF(j.origin='adjustment',0,j.outgoing) FROM legacy_op_journals j JOIN legacy_op_owners o ON o.id=j.owner_id AND o.unit_id=j.unit_id JOIN legacy_full_batches b ON b.id=j.batch_id AND b.unit_id=j.unit_id WHERE b.state='completed' AND j.cancelled=0";
+        $source=hp_sql($db,'('.implode(' UNION ALL ',$parts).')');
+    }else $source=mh_savings_source($db,!$summaryOnly||!filter_is_all($operators));
+    $where=' WHERE 1=1';$args=[];
+    if(($input['all_periods']??'')!=='1'){$where.=' AND t.TANGGAL>=? AND t.TANGGAL<?';$args=[$start,$end];}
     if($q!==''){$where.=' AND (t.NO_INDUK=? OR t.NO_induk_diknas=? OR t.NAMA LIKE ?)';array_push($args,$q,$q,'%'.$q.'%');}
     foreach(['owner_id'=>'legacy_owner_id','student_id'=>'student_id'] as $key=>$col)if((int)($input[$key]??0)>0){$where.=" AND t.$col=?";$args[]=(int)$input[$key];}
     $where.=filter_sql_values($classFilter['values'],'t.current_class_id');

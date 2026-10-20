@@ -19,7 +19,10 @@
     filtered.sort((a,b)=>{const x=value(a),y=value(b);return (typeof x==='number'?x-y:x.localeCompare(y,'id-ID'))*direction||(Number(b.id)-Number(a.id));});
     const fragment=document.createDocumentFragment();
     for(const r of filtered){
-      const tr=document.createElement('tr'),date=cell(String(r.tanggal||'').replace(/ WIB$/,''),'history-tanggal');if(String(r.tanggal).endsWith(' WIB')){const zone=document.createElement('small');zone.className='sh-timezone';zone.textContent=' WIB';date.append(zone);}tr.append(date,cell(r.periode),cell(r.komponen));
+      const tr=document.createElement('tr'),date=cell('','history-tanggal');
+      const day=document.createElement('span'),clock=document.createElement('small');
+      day.textContent=r.tanggal_date||r.tanggal||'Tanggal tidak tercatat';clock.textContent=r.tanggal_time||'';
+      date.append(day,clock);tr.append(date,cell(r.periode),cell(r.komponen));
       const td=cell(''),badge=document.createElement('span'),name=methodName(r.metode);badge.className='history-method sh-method-'+normalized(name);badge.textContent=name==='Qris'?'QRIS':name;td.append(badge);tr.append(td,cell(r.operator),cell(r.total,'history-total'));
       const actions=cell('','sh-row-actions'),button=document.createElement('button');button.type='button';button.className='sh-more';button.textContent='\u22ee';button.setAttribute('aria-label','Tindakan transaksi '+r.id);button.setAttribute('aria-haspopup','menu');button.setAttribute('aria-expanded','false');button.addEventListener('click',()=>openMenu(button,r));button.addEventListener('keydown',e=>{if(e.key==='ArrowDown'){e.preventDefault();openMenu(button,r);}});actions.append(button);tr.append(actions);fragment.append(tr);
     }

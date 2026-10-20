@@ -1,4 +1,5 @@
 <?php
+require_once __DIR__.'/date_format.php';
 
 function payment_activity_ready(mysqli $db): bool
 {
@@ -106,7 +107,9 @@ function payment_activity_changes(?array $before, ?array $after): array
     foreach ($labels as $key=>$label) {
         $a = $before['payment'][$key] ?? ''; $b = $after['payment'][$key] ?? '';
         $equal = in_array($key,$money,true) ? abs((float)$a-(float)$b)<.001 : (string)$a===(string)$b;
+        if($key==='TGL_BYR'&&($before['payment']['time_precision']??null)!==($after['payment']['time_precision']??null))$equal=false;
         if ($equal) continue;
+        if($key==='TGL_BYR'){$a=spp_date_label($a,true,$before['payment']['time_precision']??null);$b=spp_date_label($b,true,$after['payment']['time_precision']??null);}
         if (in_array($key,$money,true)) { $a='Rp '.number_format((float)$a,abs((float)$a-round((float)$a))>.00001?2:0,',','.'); $b='Rp '.number_format((float)$b,abs((float)$b-round((float)$b))>.00001?2:0,',','.'); }
         $changes[]=['label'=>$label,'before'=>(string)$a,'after'=>(string)$b];
     }
