@@ -44,7 +44,7 @@ try{
         $stamp=(string)($_POST['request_time']??date('Y-m-d H:i:s'));
         $saved=lop_bank_new($koneksi,(int)$_SESSION['admin_id'],unit_active_id(),(int)$target['owner_id'],['amount'=>number_format($nominal,2,'.',''),'direction'=>$aksi==='masuk'?'in':'out','date'=>$stamp,'note'=>$keterangan],hash('sha256','entry:'.$requestKey));
         unset($_SESSION['savings_entry_draft']);$jid=-1000000000-$saved['id'];$_SESSION['savings_print_prompt']=['jenis'=>$aksi,'id'=>$jid,'unit_id'=>unit_active_id()];$_SESSION['flash']=['type'=>'success','msg'=>'Transaksi tabungan berhasil disimpan.'];
-        header('Location: riwayat.php?'.http_build_query(['owner_id'=>$target['owner_id'],'all_periods'=>'1','jenis'=>$aksi,'id'=>$jid]));exit;
+        header('Location: riwayat.php?'.http_build_query(['owner_id'=>$target['owner_id'],'all_periods'=>'1','jenis'=>$aksi,'id'=>$jid,'after_save'=>'1']));exit;
     }
 }catch(Throwable $ex){$_SESSION['flash']=['type'=>'error','msg'=>$ex->getMessage()];header('Location: '.$fallback.'?'.http_build_query(array_intersect_key($_POST,array_flip(['student_id','owner_id']))));exit;}
 
@@ -132,7 +132,7 @@ try {
         'type' => 'success',
         'msg'  => 'Tabungan ' . $label . ' Rp ' . number_format($nominal, 0, ',', '.') . ' berhasil disimpan!'
     ];
-    header('Location: riwayat.php?' . http_build_query(['jenis'=>$aksi, 'id'=>$journalId]));
+    header('Location: riwayat.php?' . http_build_query(['jenis'=>$aksi, 'id'=>$journalId,'student_id'=>$target['student_id'],'after_save'=>'1']));
     exit;
 
 } catch (Throwable $e) {

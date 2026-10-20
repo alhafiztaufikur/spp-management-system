@@ -132,3 +132,8 @@ Histori operasional dapat dicetak, diedit, dibatalkan, dan dilihat aktivitasnya 
 ## Kredit dan penerbitan sesudah migrasi
 
 Tahun Terbit dapat melengkapi tagihan DU yang belum terbentuk. Kredit komponen PSB/DU dan SPP per bulan dibaca tanpa menambah kas. [Aturan bukti, prioritas tarif, dan struk](LEGACY_BILLING_REPAIR.md).
+
+
+## Kinerja pembacaan hasil migrasi
+
+Pembaruan pembaca 20 Oktober 2026 mempercepat riwayat pembayaran, DU, dan tabungan tanpa migrasi ulang atau perubahan skema. Fingerprint tetap lengkap; catatan manifest existing serta bukti database tidak berubah dijelaskan dalam [panduan optimasi](HISTORY_PERFORMANCE.md).

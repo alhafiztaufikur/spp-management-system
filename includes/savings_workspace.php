@@ -37,7 +37,7 @@ function savings_enrich_rows(mysqli $db, array $rows): array {
     $accounts=[];$actors=array_unique(array_filter($actors));
     if ($actors) foreach ($db->query('SELECT id,nama,username,role FROM admin WHERE id IN ('.implode(',',$actors).')')->fetch_all(MYSQLI_ASSOC) as $account) $accounts[(int)$account['id']]=$account;
     $historical=[];
-    if(function_exists('savings_authorization_ready')&&savings_authorization_ready($db))foreach($db->query("SELECT actor_id,actor_name nama,actor_username username,actor_role role FROM tabungan_aktivitas WHERE action IN ('created','baseline') AND actor_id>0 ORDER BY occurred_at,id")->fetch_all(MYSQLI_ASSOC) as $a)$historical[(int)$a['actor_id']]??=$a;
+    if($actors&&function_exists('savings_authorization_ready')&&savings_authorization_ready($db))foreach($db->query("SELECT actor_id,actor_name nama,actor_username username,actor_role role FROM tabungan_aktivitas WHERE action IN ('created','baseline') AND actor_id IN (".implode(',',$actors).") ORDER BY occurred_at,id")->fetch_all(MYSQLI_ASSOC) as $a)$historical[(int)$a['actor_id']]??=$a;
     $roles=['super_admin'=>'Super Admin','admin'=>'Admin','kasir'=>'Kasir','bendahara'=>'Bendahara'];
     foreach ($rows as &$row) {
         $proof=$evidence[(int)$row['unit_id'].'|'.$row['jenis'].'|'.$row['id']]??null;
@@ -57,7 +57,7 @@ function savings_enrich_rows(mysqli $db, array $rows): array {
 
 function savings_transaction(mysqli $db, string $kind, int $id): ?array {
     if (!in_array($kind,['masuk','keluar'],true) || $id===0) throw new InvalidArgumentException('Identitas transaksi tabungan tidak valid.');
-    $table=mh_savings_source($db);
+    $table=mh_savings_source($db,true,['id'=>$id,'kind'=>$kind]);
     $s=$db->prepare("SELECT * FROM $table t WHERE t.id=? AND t.jenis=?");
     $s->bind_param('is',$id,$kind);$s->execute();$row=$s->get_result()->fetch_assoc();$s->close();
     if (!$row) {

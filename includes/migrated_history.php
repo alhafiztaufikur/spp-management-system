@@ -2,6 +2,7 @@
 /** Read projections only. Never copy historical receipts into native cash tables. */
 require_once __DIR__.'/legacy_full_read.php';
 require_once __DIR__.'/filter_choices.php';
+require_once __DIR__.'/history_performance.php';
 
 function mh_has_column(mysqli $db,string $table,string $column): bool {
     static $cache=[];$key=$db->thread_id.'|'.$table.'|'.$column;
@@ -31,30 +32,51 @@ function mh_return_url(mixed $token,int $unit,string $kind,int $id): ?string {
     return $r['route'].'?'.http_build_query($r['query']);
 }
 
-function mh_payment_source(mysqli $db,bool $deleted=false): string {
+function mh_payment_source(mysqli $db,bool $deleted=false,?int $targetId=null): string {
     // Keep the list projection small; financial details are loaded for one selected ID.
-    $parts=[];
+    $parts=[];$nativeTarget=$targetId!==null?($targetId>0?' WHERE p.id='.$targetId:' WHERE FALSE'):'';$fullTarget=$targetId!==null?($targetId<0&&$targetId>=-1000000000?' AND p.id='.(-$targetId):' AND FALSE'):'';$opTarget=$targetId!==null?($targetId<-1000000000?' AND p.id='.(-1000000000-$targetId):' AND FALSE'):'';
     $parts[]="SELECT p.id,p.unit_id,p.NO_INDUK,p.TGL_BYR,p.total_jumlah,p.user_id,p.KELAS,p.kelas_rombel_snapshot,p.created_at,p.updated_at,p.BULAN,p.TAHUN,p.payment_link_version,
         s.id student_id,NULL legacy_owner_id,COALESCE(s.NAMA,'Tidak tercatat') NAMA,s.NO_induk_diknas,s.master_kelas_id current_class_id,IF(s.id IS NULL,'account','student') owner_type,'system' source_kind,
         COALESCE(NULLIF(p.kelas_rombel_snapshot,''),NULLIF(p.KELAS,''),s.KELAS,'Tidak tercatat') kelas_transaksi
-        FROM bayar p LEFT JOIN siswa s ON s.NO_INDUK=p.NO_INDUK AND s.unit_id=p.unit_id";
+        FROM bayar p LEFT JOIN siswa s ON s.NO_INDUK=p.NO_INDUK AND s.unit_id=p.unit_id $nativeTarget";
     if(!$deleted&&lful_read_ready($db))$parts[]="SELECT -p.id,p.unit_id,s.NO_INDUK,p.source_date,p.total,CONCAT('legacy:',p.unit_id,':',LOWER(HEX(COALESCE(p.source_operator,'')))),p.class_snapshot,p.class_snapshot,p.source_date,NULL,'','',0,s.id,NULL,s.NAMA,s.NO_induk_diknas,s.master_kelas_id,'student','legacy',p.class_snapshot
-        FROM legacy_full_payments p JOIN siswa s ON s.id=p.student_id AND s.unit_id=p.unit_id JOIN legacy_full_batches b ON b.id=p.batch_id AND b.unit_id=p.unit_id WHERE b.state='completed'";
+        FROM legacy_full_payments p JOIN siswa s ON s.id=p.student_id AND s.unit_id=p.unit_id JOIN legacy_full_batches b ON b.id=p.batch_id AND b.unit_id=p.unit_id WHERE b.state='completed' $fullTarget";
     if(lop_ready($db))$parts[]="SELECT -(1000000000+p.id),p.unit_id,COALESCE(s.NO_INDUK,o.source_identity),p.source_date,p.total,CONCAT('legacy:',p.unit_id,':',LOWER(HEX(COALESCE(p.source_operator,'')))),p.class_snapshot,p.class_snapshot,p.source_date,NULL,p.source_period,'',0,s.id,o.id,o.name,s.NO_induk_diknas,COALESCE(s.master_kelas_id,g.master_kelas_id),IF(s.id IS NULL,'account','student'),'legacy',p.class_snapshot
-        FROM legacy_op_payments p JOIN legacy_op_owners o ON o.id=p.owner_id AND o.unit_id=p.unit_id LEFT JOIN siswa s ON s.id=o.student_id AND s.unit_id=o.unit_id LEFT JOIN legacy_op_groups g ON g.id=o.group_id AND g.unit_id=o.unit_id JOIN legacy_full_batches b ON b.id=p.batch_id AND b.unit_id=p.unit_id WHERE b.state='completed' AND p.cancelled=".($deleted?'1':'0');
+        FROM legacy_op_payments p JOIN legacy_op_owners o ON o.id=p.owner_id AND o.unit_id=p.unit_id LEFT JOIN siswa s ON s.id=o.student_id AND s.unit_id=o.unit_id LEFT JOIN legacy_op_groups g ON g.id=o.group_id AND g.unit_id=o.unit_id JOIN legacy_full_batches b ON b.id=p.batch_id AND b.unit_id=p.unit_id WHERE b.state='completed' AND p.cancelled=".($deleted?'1':'0').$opTarget;
     if($deleted){
         $fields=['id'=>'BIGINT','unit_id'=>'INT','NO_INDUK'=>'VARCHAR(255)','TGL_BYR'=>'DATETIME','total_jumlah'=>'DECIMAL(15,2)','user_id'=>'VARCHAR(255)','KELAS'=>'VARCHAR(100)','kelas_rombel_snapshot'=>'VARCHAR(100)','created_at'=>'DATETIME','updated_at'=>'DATETIME','BULAN'=>'VARCHAR(100)','TAHUN'=>'VARCHAR(20)','payment_link_version'=>'INT'];
         $cols=[];foreach($fields as $n=>$type)$cols[]="`$n` $type PATH '$.payment.$n' NULL ON EMPTY NULL ON ERROR";
         $archive="(SELECT j.* FROM pembayaran_aktivitas a JOIN JSON_TABLE(CAST(a.before_snapshot AS JSON),'$' COLUMNS (".implode(',',$cols).")) j WHERE a.action='deleted' AND NOT EXISTS(SELECT 1 FROM pembayaran_aktivitas n WHERE n.payment_id=a.payment_id AND n.unit_id=a.unit_id AND n.action='deleted' AND n.id>a.id))";
         $parts[0]=str_replace('FROM bayar p','FROM '.$archive.' p',$parts[0]);
     }
-    return '('.implode(' UNION ALL ',$parts).')';
+    return hp_sql($db,'('.implode(' UNION ALL ',$parts).')');
 }
 
 function mh_choice(array $input,string $key,array $allowed,string $default): string {
     $v=$input[$key]??$default;
     if(!is_string($v)||!in_array($v,$allowed,true))throw new InvalidArgumentException('Filter '.$key.' tidak valid.');
     return $v;
+}
+
+/** Simple counts need neither financial JSON nor display joins. Complex filters
+ * deliberately retain the shared projection and its exact predicates. */
+function mh_payment_simple_count(mysqli $db,array $input,array $classFilter,array $operators,?array $period=null): ?int {
+    if(($input['view']??'')==='deleted'||!filter_is_all($classFilter['values'])||!filter_is_all($operators)
+        ||trim((string)($input['search']??''))!==''||(int)($input['student_id']??0)>0||(int)($input['owner_id']??0)>0||($input['du_only']??'')==='1')return null;
+    $kind=mh_choice($input,'source',['all','system','legacy'],'all');$owner=mh_choice($input,'owner_type',['all','student','account'],'all');
+    $parts=[];$args=[];
+    $date=static function(string $column,bool $legacy)use($input,$period,&$args):string{
+        if($period===null)return '';
+        if(($input['undated']??'')==='1')return $legacy?" AND $column IS NULL":' AND FALSE';
+        if(($input['all_periods']??'')==='1')return '';
+        array_push($args,...$period);return " AND $column>=? AND $column<?";
+    };
+    if($kind!=='legacy')$parts[]="SELECT COUNT(*) n FROM bayar p".($owner==='all'?'':' LEFT JOIN siswa s ON s.NO_INDUK=p.NO_INDUK AND s.unit_id=p.unit_id')." WHERE 1=1".($owner==='student'?' AND s.id IS NOT NULL':($owner==='account'?' AND s.id IS NULL':'')).$date('p.TGL_BYR',false);
+    if($kind!=='system'&&$owner!=='account'&&lful_read_ready($db))$parts[]="SELECT COUNT(*) n FROM legacy_full_payments p JOIN siswa s ON s.id=p.student_id AND s.unit_id=p.unit_id JOIN legacy_full_batches b ON b.id=p.batch_id AND b.unit_id=p.unit_id WHERE b.state='completed'".$date('p.source_date',true);
+    // owner_id has the existing unit/owner FK. Only owner-type filters need
+    // to join the owner; the unfiltered count cannot multiply receipts.
+    if($kind!=='system'&&lop_ready($db))$parts[]="SELECT COUNT(*) n FROM legacy_op_payments p".($owner==='all'?'':' JOIN legacy_op_owners o ON o.id=p.owner_id AND o.unit_id=p.unit_id')." JOIN legacy_full_batches b ON b.id=p.batch_id AND b.unit_id=p.unit_id WHERE b.state='completed' AND p.cancelled=0".($owner==='student'?' AND o.student_id IS NOT NULL':($owner==='account'?' AND o.student_id IS NULL':'')).$date('p.source_date',true);
+    return $parts?(int)lf_one($db,hp_sql($db,'SELECT COALESCE(SUM(n),0) n FROM ('.implode(' UNION ALL ',$parts).') counts'),$args)['n']:0;
 }
 
 /** Count, page and outside-period summary share exactly the same predicates. */
@@ -65,7 +87,12 @@ function mh_payment_page(mysqli $db,array $input,array $classFilter,array $opera
     if($kind!=='all'){$where.=' AND p.source_kind=?';$args[]=$kind;}
     if($owner!=='all'){$where.=' AND p.owner_type=?';$args[]=$owner;}
     $where.=filter_sql_values($classFilter['values'],'p.current_class_id');
-    $where.=history_operator_where($db,$operators,'p.id','p.unit_id');
+    if(!filter_is_all($operators)){
+        $legacy=[];$native=[];foreach($operators as $operator){if(str_starts_with((string)$operator,'legacy:'))$legacy[]="'".$db->real_escape_string($operator)."'";else $native[]=$operator;}
+        $clauses=[];if($native)$clauses[]=substr(history_operator_where($db,$native,'p.id','p.unit_id'),5);
+        if($legacy)$clauses[]='(p.id<0 AND p.user_id IN ('.implode(',',$legacy).'))';
+        $where.=' AND ('.implode(' OR ',$clauses).')';
+    }
     if((int)($input['student_id']??0)>0){$where.=' AND p.student_id=?';$args[]=(int)$input['student_id'];}
     if((int)($input['owner_id']??0)>0){$where.=' AND p.legacy_owner_id=?';$args[]=(int)$input['owner_id'];}
     $search=trim((string)($input['search']??''));
@@ -76,7 +103,7 @@ function mh_payment_page(mysqli $db,array $input,array $classFilter,array $opera
         if(lop_ready($db))$du[]="(p.id<-1000000000 AND EXISTS(SELECT 1 FROM legacy_op_payments dp WHERE dp.id=-p.id-1000000000 AND dp.unit_id=p.unit_id AND (dp.source_table='bayar_du' OR JSON_SEARCH(dp.items,'one','daftar_ulang',NULL,'$[*].category') IS NOT NULL)))";
         $where.=$du?' AND ('.implode(' OR ',$du).')':' AND 0=1';
     }
-    $all=(int)lf_one($db,"SELECT COUNT(*) n FROM $source p $where",$args)['n'];
+    $all=mh_payment_simple_count($db,$input,$classFilter,$operators)??(int)hp_one($db,"SELECT COUNT(*) n FROM $source p $where",$args)['n'];
     $period='';$periodArgs=[];$dateColumn='p.TGL_BYR';
     if(($input['view']??'')==='deleted'){
         $legacyDate=lop_ready($db)?" WHEN p.id<-1000000000 THEN (SELECT MAX(a.created_at) FROM legacy_op_audit a WHERE a.entity_type='payment' AND a.entity_id=-p.id-1000000000 AND a.unit_id=p.unit_id AND JSON_EXTRACT(a.after_data,'$.cancelled')=1) ":'';
@@ -85,32 +112,37 @@ function mh_payment_page(mysqli $db,array $input,array $classFilter,array $opera
     if(($input['undated']??'')==='1')$period=' AND p.id<0 AND p.TGL_BYR IS NULL';
     elseif(($input['all_periods']??'')!=='1'){$period=" AND $dateColumn>=? AND $dateColumn<?";$periodArgs=[$start,$end];}
     $params=array_merge($args,$periodArgs);
-    $total=$period===''?$all:(int)lf_one($db,"SELECT COUNT(*) n FROM $source p $where $period",$params)['n'];
+    $total=$period===''?$all:(mh_payment_simple_count($db,$input,$classFilter,$operators,[$start,$end])??(int)hp_one($db,"SELECT COUNT(*) n FROM $source p $where $period",$params)['n']);
     $pages=max(1,(int)ceil($total/$size));$page=min(max(1,$page),$pages);
     $selected=(int)($input['selected']??0);
-    if($selected&&($target=lf_one($db,"SELECT p.id,p.unit_id,p.TGL_BYR FROM $source p $where $period AND p.id=?",array_merge($params,[$selected])))){
+    $targetSource=$selected?mh_payment_source($db,($input['view']??'')==='deleted',$selected):$source;
+    if($selected&&($target=hp_one($db,"SELECT p.id,p.unit_id,p.TGL_BYR FROM $targetSource p $where $period AND p.id=?",array_merge($params,[$selected])))){
         $rankWhere=' AND (p.TGL_BYR>? OR (p.TGL_BYR<=>? AND (p.unit_id<? OR (p.unit_id=? AND p.id>?))) OR (? IS NULL AND p.TGL_BYR IS NOT NULL))';
-        $rank=(int)lf_one($db,"SELECT COUNT(*) n FROM $source p $where $period $rankWhere",array_merge($params,[$target['TGL_BYR'],$target['TGL_BYR'],$target['unit_id'],$target['unit_id'],$target['id'],$target['TGL_BYR']]))['n'];
+        $rank=(int)hp_one($db,"SELECT COUNT(*) n FROM $source p $where $period $rankWhere",array_merge($params,[$target['TGL_BYR'],$target['TGL_BYR'],$target['unit_id'],$target['unit_id'],$target['id'],$target['TGL_BYR']]))['n'];
         $page=intdiv($rank,$size)+1;
     }
     $offset=($page-1)*$size;
-    $rows=lf_rows($db,"SELECT p.* FROM $source p $where $period ORDER BY p.TGL_BYR DESC,p.unit_id,p.id DESC LIMIT $size OFFSET $offset",$params);
+    $rows=hp_rows($db,"SELECT p.* FROM $source p $where $period ORDER BY p.TGL_BYR DESC,p.unit_id,p.id DESC LIMIT $size OFFSET $offset",$params);
     return ['rows'=>$rows,'total'=>$total,'all'=>$all,'outside'=>$all-$total,'pages'=>$pages,'page'=>$page,'offset'=>$offset,
         'read_sql'=>"SELECT p.* FROM $source p $where $period ORDER BY p.TGL_BYR DESC,p.unit_id,p.id DESC",'read_args'=>$params];
 }
 
-function mh_savings_source(mysqli $db): string {
+function mh_savings_source(mysqli $db,bool $operatorEvidence=true,?array $target=null): string {
     require_once __DIR__.'/savings_operator.php';
-    $parts=[];
+    $parts=[];$targetId=(int)($target['id']??0);$targetKind=$target['kind']??'';
     foreach(['transaksi_m'=>'masuk','transaksi_k'=>'keluar'] as $table=>$kind){
         $amount=$kind==='masuk'?'t.MASUK nominal,0 keluar':'0 nominal,t.KELUAR keluar';
-        $actor=savings_operator_owner_sql('t.unit_id',"'$kind'",'t.id','t.user_id');
-        $parts[]="SELECT t.id,t.unit_id,t.NO_INDUK,s.id student_id,NULL legacy_owner_id,s.NAMA,s.NO_induk_diknas,s.KELAS,s.master_kelas_id current_class_id,t.TANGGAL,$amount,'$kind' jenis,t.user_id,t.keterangan,CAST(($actor) AS CHAR) operator_key,'native' origin,0 adjustment_delta FROM $table t LEFT JOIN siswa s ON s.NO_INDUK=t.NO_INDUK AND s.unit_id=t.unit_id";
+        $actor=$operatorEvidence?savings_operator_owner_sql('t.unit_id',"'$kind'",'t.id','t.user_id'):'0';
+        $targetWhere=$target?($targetId>0&&$targetKind===$kind?' WHERE t.id='.$targetId:' WHERE FALSE'):'';
+        $parts[]="SELECT t.id,t.unit_id,t.NO_INDUK,s.id student_id,NULL legacy_owner_id,s.NAMA,s.NO_induk_diknas,s.KELAS,s.master_kelas_id current_class_id,t.TANGGAL,$amount,'$kind' jenis,t.user_id,t.keterangan,CAST(($actor) AS CHAR) operator_key,'native' origin,0 adjustment_delta FROM $table t LEFT JOIN siswa s ON s.NO_INDUK=t.NO_INDUK AND s.unit_id=t.unit_id $targetWhere";
     }
-    if(lful_read_ready($db))$parts[]="SELECT -j.id,j.unit_id,s.NO_INDUK,s.id,NULL,s.NAMA,s.NO_induk_diknas,s.KELAS,s.master_kelas_id,j.source_date,j.incoming,j.outgoing,IF(j.incoming>0,'masuk','keluar'),CONCAT('Legacy · ',COALESCE(j.source_operator,'Tidak tercatat')),'Histori Legacy',CONCAT('legacy:',j.unit_id,':',LOWER(HEX(COALESCE(j.source_operator,'')))),'legacy',0 FROM legacy_full_journals j JOIN siswa s ON s.id=j.student_id AND s.unit_id=j.unit_id JOIN legacy_full_batches b ON b.id=j.batch_id AND b.unit_id=j.unit_id WHERE b.state='completed'";
-    if(lop_ready($db))$parts[]="SELECT -(1000000000+j.id),j.unit_id,COALESCE(s.NO_INDUK,o.source_identity),s.id,o.id,o.name,s.NO_induk_diknas,COALESCE(s.KELAS,o.source_class),COALESCE(s.master_kelas_id,g.master_kelas_id),j.source_date,IF(j.origin='adjustment',0,j.incoming),IF(j.origin='adjustment',0,j.outgoing),IF(j.incoming>0,'masuk','keluar'),IF(j.origin='legacy',CONCAT('Legacy · ',COALESCE(j.source_operator,'Tidak tercatat')),COALESCE(j.source_operator,'Tidak tercatat')),IF(j.origin='adjustment','Penyesuaian Saldo Migrasi',j.note),IF(j.origin='legacy',CONCAT('legacy:',j.unit_id,':',LOWER(HEX(COALESCE(j.source_operator,'')))),COALESCE(CAST((SELECT MIN(a.actor_id) FROM legacy_op_audit a WHERE a.unit_id=j.unit_id AND a.entity_type='bank_new' AND a.entity_id=j.id) AS CHAR),'0')),j.origin,IF(j.origin='adjustment',j.incoming-j.outgoing,0) FROM legacy_op_journals j JOIN legacy_op_owners o ON o.id=j.owner_id AND o.unit_id=j.unit_id LEFT JOIN siswa s ON s.id=o.student_id AND s.unit_id=o.unit_id LEFT JOIN legacy_op_groups g ON g.id=o.group_id AND g.unit_id=o.unit_id JOIN legacy_full_batches b ON b.id=j.batch_id AND b.unit_id=j.unit_id WHERE b.state='completed' AND j.cancelled=0";
+    $fullTarget=$target?($targetId<0&&$targetId>=-1000000000?' AND j.id='.(-$targetId):' AND FALSE'):'';
+    if(lful_read_ready($db))$parts[]="SELECT -j.id,j.unit_id,s.NO_INDUK,s.id,NULL,s.NAMA,s.NO_induk_diknas,s.KELAS,s.master_kelas_id,j.source_date,j.incoming,j.outgoing,IF(j.incoming>0,'masuk','keluar'),CONCAT('Legacy · ',COALESCE(j.source_operator,'Tidak tercatat')),'Histori Legacy',CONCAT('legacy:',j.unit_id,':',LOWER(HEX(COALESCE(j.source_operator,'')))),'legacy',0 FROM legacy_full_journals j JOIN siswa s ON s.id=j.student_id AND s.unit_id=j.unit_id JOIN legacy_full_batches b ON b.id=j.batch_id AND b.unit_id=j.unit_id WHERE b.state='completed' $fullTarget";
+    $opTarget=$target?($targetId<-1000000000?' AND j.id='.(-1000000000-$targetId):' AND FALSE'):'';
+    $newActor=$operatorEvidence?"COALESCE(CAST((SELECT MIN(a.actor_id) FROM legacy_op_audit a WHERE a.unit_id=j.unit_id AND a.entity_type='bank_new' AND a.entity_id=j.id) AS CHAR),'0')":"'0'";
+    if(lop_ready($db))$parts[]="SELECT -(1000000000+j.id),j.unit_id,COALESCE(s.NO_INDUK,o.source_identity),s.id,o.id,o.name,s.NO_induk_diknas,COALESCE(s.KELAS,o.source_class),COALESCE(s.master_kelas_id,g.master_kelas_id),j.source_date,IF(j.origin='adjustment',0,j.incoming),IF(j.origin='adjustment',0,j.outgoing),IF(j.incoming>0,'masuk','keluar'),IF(j.origin='legacy',CONCAT('Legacy · ',COALESCE(j.source_operator,'Tidak tercatat')),COALESCE(j.source_operator,'Tidak tercatat')),IF(j.origin='adjustment','Penyesuaian Saldo Migrasi',j.note),IF(j.origin='legacy',CONCAT('legacy:',j.unit_id,':',LOWER(HEX(COALESCE(j.source_operator,'')))),$newActor),j.origin,IF(j.origin='adjustment',j.incoming-j.outgoing,0) FROM legacy_op_journals j JOIN legacy_op_owners o ON o.id=j.owner_id AND o.unit_id=j.unit_id LEFT JOIN siswa s ON s.id=o.student_id AND s.unit_id=o.unit_id LEFT JOIN legacy_op_groups g ON g.id=o.group_id AND g.unit_id=o.unit_id JOIN legacy_full_batches b ON b.id=j.batch_id AND b.unit_id=j.unit_id WHERE b.state='completed' AND j.cancelled=0 $opTarget";
     $union=implode(' UNION ALL ',$parts);
-    return "(SELECT x.*,x.current_class_id master_kelas_id,mk.jenis rombel_jenis,mk.nama_custom rombel_nama,mk.tingkat,mk.kode_rombel,mk.is_placeholder FROM ($union) x LEFT JOIN master_kelas mk ON mk.id=x.current_class_id AND mk.unit_id=x.unit_id)";
+    return hp_sql($db,"(SELECT x.*,x.current_class_id master_kelas_id,mk.jenis rombel_jenis,mk.nama_custom rombel_nama,mk.tingkat,mk.kode_rombel,mk.is_placeholder FROM ($union) x LEFT JOIN master_kelas mk ON mk.id=x.current_class_id AND mk.unit_id=x.unit_id)");
 }
 
 /** Batch the bounded student page; DU detail rows never count as extra receipts. */

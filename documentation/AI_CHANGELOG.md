@@ -2490,3 +2490,8 @@ Salin template ini ke bagian paling atas setelah `Aturan Pencatatan`:
 - Seluruh pengujian mutasi menggunakan instance MySQL privat terisolasi. Tidak memasang skema, mengimpor data pada db_spp operasional, commit/push, atau memperbarui deployment.
 - Verifikasi: tiga `.dat` asli dipulihkan kembali; 3.000 siswa/63.000 baris simulasi besar; penerapan salinan SD/SMA dengan backup terverifikasi; regresi kas/tabungan/tunggakan/laporan/PDF/Excel; 36 kasus browser interaktif dan 48 kasus tampilan/palet, termasuk Chromium 109. Fingerprint 50 tabel operasional tetap identik.
 - Semua proses QA ditutup. Penghapusan berkas browser sementara dan instance QA ditolak pemeriksaan otomatis (**blocked by policy**); keduanya dipertahankan tanpa penghapusan alternatif. Tidak ada browser baru dipasang atau runtime importer utama dihapus.
+
+
+## 2026-10-20 - Optimasi riwayat dan tabungan
+
+Optimasi proyeksi pembayaran, agregasi DU sekali, rekap rekening terbatas halaman, lookup ID jurnal, streaming fingerprint, dan detail langsung setelah simpan. Endpoint baca/ekspor melepas sesi ketika aman; submit tabungan ganda dicegah. Tanpa perubahan skema atau data pengguna. Lihat [hasil pengujian dan batas kinerja](HISTORY_PERFORMANCE.md).

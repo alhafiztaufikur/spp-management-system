@@ -115,3 +115,8 @@ Pembayaran hasil migrasi operasional memakai detail dan struk aplikasi, edit/hap
 ## Input dan struk siswa migrasi
 
 Input Pembayaran membawa unit eksplisit dan menyediakan pemulihan isian serta formulir server tanpa JavaScript. Riwayat Data Siswa memakai dua tombol berikon; struk selalu menampilkan Sisa PSB/Sisa DU dengan status diketahui, belum dapat ditentukan, atau tidak berlaku. [Rincian dan screenshot pemeriksaan](LEGACY_BILLING_REPAIR.md).
+
+
+## Optimasi riwayat dan setelah simpan tabungan
+
+Setelah menyimpan, sistem membuka detail rekening yang tepat beserta saldo, struk, dan buku. Gunakan **Lihat Riwayat Rekening** atau **Rekap Semua Rekening** untuk membuka daftar lengkap. Semua filter dan tautan histori existing tetap tersedia. [Pengukuran dan batas pengujian](HISTORY_PERFORMANCE.md).

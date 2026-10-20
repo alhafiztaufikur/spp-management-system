@@ -1,5 +1,6 @@
 <?php
 require_once __DIR__.'/registration_combined.php';
+if(($_GET['output']??'')==='excel'&&session_status()===PHP_SESSION_ACTIVE)session_write_close();
 $data=rc_page($koneksi,$_GET);$e='authorization_escape';$query=array_replace($_GET,['page'=>$data['page'],'source'=>$data['source']]);unset($query['view']);$selected=(int)($_GET['selected']??0);$chosen=null;
 foreach($data['rows'] as $r)if((int)$r['id']===$selected&&(!(int)($_GET['selected_unit']??0)||(int)$r['unit_id']===(int)$_GET['selected_unit']))$chosen=$r;
 $chosen??=$data['rows'][0]??null;

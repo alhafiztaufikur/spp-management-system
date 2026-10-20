@@ -12,7 +12,7 @@ function so_amount(string $raw): string {
 function so_source(mysqli $db): string {
     $parts=["SELECT s.id student_id,0 owner_id,s.unit_id,s.NO_INDUK identity,s.NO_induk_diknas,s.NAMA name,s.master_kelas_id,s.KELAS,COALESCE(t.SALDO,0) balance,'student' owner_type,IF(s.is_active=1 OR t.NO_INDUK IS NOT NULL,'ready','archived') state,s.is_active FROM siswa s LEFT JOIN tabungan t ON t.NO_INDUK=s.NO_INDUK AND t.unit_id=s.unit_id WHERE s.legacy_pending=0"];
     if(lop_ready($db))$parts[]="SELECT 0,o.id,o.unit_id,o.source_identity,'',o.name,g.master_kelas_id,o.source_class,a.balance,'account',IF(o.state='ready' AND a.id IS NOT NULL,'ready','held'),1 FROM legacy_op_owners o LEFT JOIN legacy_op_accounts a ON a.owner_id=o.id AND a.unit_id=o.unit_id LEFT JOIN legacy_op_groups g ON g.id=o.group_id AND g.unit_id=o.unit_id JOIN legacy_full_batches b ON b.id=o.batch_id AND b.unit_id=o.unit_id WHERE o.student_id IS NULL AND b.state='completed'";
-    return '(SELECT x.*,mk.jenis rombel_jenis,mk.nama_custom rombel_nama,mk.tingkat,mk.kode_rombel,mk.is_placeholder FROM ('.implode(' UNION ALL ',$parts).') x LEFT JOIN master_kelas mk ON mk.id=x.master_kelas_id AND mk.unit_id=x.unit_id)';
+    return hp_sql($db,'(SELECT x.*,mk.jenis rombel_jenis,mk.nama_custom rombel_nama,mk.tingkat,mk.kode_rombel,mk.is_placeholder FROM ('.implode(' UNION ALL ',$parts).') x LEFT JOIN master_kelas mk ON mk.id=x.master_kelas_id AND mk.unit_id=x.unit_id)');
 }
 function so_page(mysqli $db,array $input): array {
     $source=so_source($db);$q=mb_substr(trim(is_string($input['q']??null)?$input['q']:''),0,100);$where=' WHERE 1=1';$args=[];

@@ -3,6 +3,7 @@ session_start();
 require_once __DIR__.'/../koneksi.php';require_once __DIR__.'/../includes/auth.php';requireRole(['admin','kasir','bendahara']);
 require_once __DIR__.'/../includes/savings_workspace.php';require_once __DIR__.'/../includes/migrated_savings.php';require_once __DIR__.'/../includes/savings_operator.php';require_once __DIR__.'/../includes/history_operator_filter.php';require_once __DIR__.'/../includes/history_class_filter.php';require_once __DIR__.'/../includes/migrated_history.php';require_once __DIR__.'/../includes/pagination.php';
 if($_SERVER['REQUEST_METHOD']!=='GET'){http_response_code(405);exit('Gunakan GET.');}
+if(session_status()===PHP_SESSION_ACTIVE)session_write_close();
 try {
     if(($_GET['view']??'active')!=='active')throw new InvalidArgumentException('Ekspor ini tersedia untuk transaksi aktif.');
     $format=mh_choice($_GET,'format',['xlsx','pdf'],'xlsx');$classes=history_class_filter($koneksi,$_GET);$ops=history_operator_choices($_GET['operator']??null,savings_operator_options($koneksi));

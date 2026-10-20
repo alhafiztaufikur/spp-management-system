@@ -2,10 +2,19 @@
 require_once __DIR__.'/legacy_full_schema.php';
 require_once __DIR__.'/legacy_finance.php';
 require_once __DIR__.'/legacy_operational_read.php';
+require_once __DIR__.'/history_performance.php';
 function lful_read_ready(mysqli $db): bool {static $cache=[];$key=spl_object_id($db).':'.$db->query('SELECT DATABASE()')->fetch_row()[0];return $cache[$key]??=legacy_full_ready($db);}
 function lful_operator_key(int $unit,?string $operator): string {return 'legacy:'.$unit.':'.bin2hex((string)$operator);}
 function lful_operator_options(mysqli $db): array {
-    if(!lful_read_ready($db))return [];$out=[];foreach(lf_rows($db,"SELECT DISTINCT p.unit_id,p.source_operator FROM legacy_full_payments p JOIN legacy_full_batches b ON b.id=p.batch_id AND b.unit_id=p.unit_id WHERE b.state='completed' UNION SELECT DISTINCT j.unit_id,j.source_operator FROM legacy_full_journals j JOIN legacy_full_batches b ON b.id=j.batch_id AND b.unit_id=j.unit_id WHERE b.state='completed'") as $r)$out[lful_operator_key((int)$r['unit_id'],$r['source_operator'])]='Legacy · '.unit_label((int)$r['unit_id']).' · '.($r['source_operator']?:'Tidak tercatat');if(lop_ready($db))foreach(lf_rows($db,"SELECT DISTINCT p.unit_id,p.source_operator FROM legacy_op_payments p JOIN legacy_full_batches b ON b.id=p.batch_id AND b.unit_id=p.unit_id WHERE b.state='completed' UNION SELECT DISTINCT j.unit_id,j.source_operator FROM legacy_op_journals j JOIN legacy_full_batches b ON b.id=j.batch_id AND b.unit_id=j.unit_id WHERE b.state='completed' AND j.origin='legacy'") as $r)$out[lful_operator_key((int)$r['unit_id'],$r['source_operator'])]='Legacy · '.unit_label((int)$r['unit_id']).' · '.($r['source_operator']?:'Tidak tercatat');return $out;
+    if(!lful_read_ready($db))return [];
+    $out=[];$batches=[];
+    foreach(hp_rows($db,"SELECT id,unit_id FROM legacy_full_batches WHERE state='completed'") as $b)$batches[(int)$b['unit_id']][]="'".$db->real_escape_string($b['id'])."'";
+    if(!$batches)return [];
+    $clauses=[];foreach($batches as $unit=>$ids)$clauses[]='(unit_id='.$unit.' AND batch_id IN ('.implode(',',$ids).'))';$where='('.implode(' OR ',$clauses).')';
+    $tables=['legacy_full_payments','legacy_full_journals'];if(lop_ready($db))array_push($tables,'legacy_op_payments','legacy_op_journals');
+    $parts=[];foreach($tables as $table)$parts[]="SELECT DISTINCT unit_id,source_operator FROM $table WHERE $where".($table==='legacy_op_journals'?" AND origin='legacy'":'');
+    foreach(hp_rows($db,implode(' UNION ',$parts)) as $r)$out[lful_operator_key((int)$r['unit_id'],$r['source_operator'])]='Legacy · '.unit_label((int)$r['unit_id']).' · '.($r['source_operator']?:'Tidak tercatat');
+    return $out;
 }
 /** Negative UI IDs are a disjoint read namespace, never written to bayar or authorization. */
 function lful_payment_source(mysqli $db): string {

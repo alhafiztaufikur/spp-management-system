@@ -1,0 +1,563 @@
+{
+  "date": "2026-10-20",
+  "schema_changes": false,
+  "financial_data_changes": false,
+  "database_targets": [
+    "db_spp",
+    "db_spp_test2"
+  ],
+  "counts": {
+    "legacy_payments": 118244,
+    "undated_du": 9288,
+    "legacy_accounts": 2418,
+    "journals": 95575
+  },
+  "tests": {
+    "read_acceptance": 56,
+    "native_only": 6,
+    "transaction_unification": 38,
+    "edge_cases": 20,
+    "bound_obligations": 5,
+    "tariffs": 18,
+    "spp_credits": 23,
+    "chromium109": 21,
+    "http_savings_scenarios": 10
+  },
+  "browser": "109.0.5412.0",
+  "read_benchmark": [
+    {
+      "unit": 1,
+      "route": "pembayaran/lihat.php",
+      "single_ms": [
+        719,
+        721,
+        706
+      ],
+      "five_users_ms": [
+        929,
+        956,
+        958,
+        957,
+        956
+      ],
+      "median_ms": 719,
+      "p95_ms": 721,
+      "concurrent_p95_ms": 958
+    },
+    {
+      "unit": 1,
+      "route": "pembayaran/riwayat_daftar_ulang.php",
+      "single_ms": [
+        1203,
+        1240,
+        1251
+      ],
+      "five_users_ms": [
+        1497,
+        1502,
+        1532,
+        1531,
+        1511
+      ],
+      "median_ms": 1240,
+      "p95_ms": 1251,
+      "concurrent_p95_ms": 1532
+    },
+    {
+      "unit": 1,
+      "route": "tabungan/riwayat.php",
+      "single_ms": [
+        1461,
+        1525,
+        1502
+      ],
+      "five_users_ms": [
+        1924,
+        1985,
+        1959,
+        1987,
+        1987
+      ],
+      "median_ms": 1502,
+      "p95_ms": 1525,
+      "concurrent_p95_ms": 1987
+    },
+    {
+      "unit": 2,
+      "route": "pembayaran/lihat.php",
+      "single_ms": [
+        682,
+        666,
+        667
+      ],
+      "five_users_ms": [
+        922,
+        879,
+        929,
+        922,
+        926
+      ],
+      "median_ms": 667,
+      "p95_ms": 682,
+      "concurrent_p95_ms": 929
+    },
+    {
+      "unit": 2,
+      "route": "pembayaran/riwayat_daftar_ulang.php",
+      "single_ms": [
+        1140,
+        1174,
+        1176
+      ],
+      "five_users_ms": [
+        1410,
+        1410,
+        1379,
+        1410,
+        1405
+      ],
+      "median_ms": 1174,
+      "p95_ms": 1176,
+      "concurrent_p95_ms": 1410
+    },
+    {
+      "unit": 2,
+      "route": "tabungan/riwayat.php",
+      "single_ms": [
+        649,
+        656,
+        671
+      ],
+      "five_users_ms": [
+        847,
+        861,
+        905,
+        902,
+        893
+      ],
+      "median_ms": 656,
+      "p95_ms": 671,
+      "concurrent_p95_ms": 905
+    },
+    {
+      "unit": 3,
+      "route": "pembayaran/lihat.php",
+      "single_ms": [
+        256,
+        259,
+        223
+      ],
+      "five_users_ms": [
+        294,
+        291,
+        292,
+        290,
+        288
+      ],
+      "median_ms": 256,
+      "p95_ms": 259,
+      "concurrent_p95_ms": 294
+    },
+    {
+      "unit": 3,
+      "route": "pembayaran/riwayat_daftar_ulang.php",
+      "single_ms": [
+        290,
+        318,
+        308
+      ],
+      "five_users_ms": [
+        349,
+        332,
+        348,
+        357,
+        355
+      ],
+      "median_ms": 308,
+      "p95_ms": 318,
+      "concurrent_p95_ms": 357
+    },
+    {
+      "unit": 3,
+      "route": "tabungan/riwayat.php",
+      "single_ms": [
+        272,
+        297,
+        302
+      ],
+      "five_users_ms": [
+        346,
+        358,
+        342,
+        362,
+        364
+      ],
+      "median_ms": 297,
+      "p95_ms": 302,
+      "concurrent_p95_ms": 364
+    },
+    {
+      "unit": 0,
+      "route": "pembayaran/lihat.php",
+      "single_ms": [
+        805,
+        789,
+        802
+      ],
+      "five_users_ms": [
+        1040,
+        1041,
+        1027,
+        1015,
+        1034
+      ],
+      "median_ms": 802,
+      "p95_ms": 805,
+      "concurrent_p95_ms": 1041
+    },
+    {
+      "unit": 0,
+      "route": "pembayaran/riwayat_daftar_ulang.php",
+      "single_ms": [
+        1947,
+        1958,
+        2057
+      ],
+      "five_users_ms": [
+        2295,
+        2356,
+        2350,
+        2363,
+        2362
+      ],
+      "median_ms": 1958,
+      "p95_ms": 2057,
+      "concurrent_p95_ms": 2363
+    },
+    {
+      "unit": 0,
+      "route": "tabungan/riwayat.php",
+      "single_ms": [
+        1343,
+        1329,
+        1337
+      ],
+      "five_users_ms": [
+        1754,
+        1672,
+        1745,
+        1760,
+        1759
+      ],
+      "median_ms": 1337,
+      "p95_ms": 1343,
+      "concurrent_p95_ms": 1760
+    }
+  ],
+  "heavy_benchmark": [
+    {
+      "route": "pembayaran/lihat.php?all_periods=1&page=11825",
+      "samples_ms": [
+        2878,
+        2835,
+        2791
+      ],
+      "median_ms": 2835,
+      "p95_ms": 2878
+    },
+    {
+      "route": "pembayaran/lihat.php?all_periods=1&search=Ahmad",
+      "samples_ms": [
+        2467,
+        2501,
+        2473
+      ],
+      "median_ms": 2473,
+      "p95_ms": 2501
+    },
+    {
+      "route": "pembayaran/lihat.php?all_periods=1&operator=legacy%3A1%3A31393937",
+      "samples_ms": [
+        1694,
+        1715,
+        1722
+      ],
+      "median_ms": 1715,
+      "p95_ms": 1722
+    },
+    {
+      "route": "pembayaran/riwayat_daftar_ulang.php?source=legacy&page=100",
+      "samples_ms": [
+        1988,
+        1985,
+        2041
+      ],
+      "median_ms": 1988,
+      "p95_ms": 2041
+    },
+    {
+      "route": "tabungan/riwayat.php?all_periods=1&saldo_q=Ahmad",
+      "samples_ms": [
+        4478,
+        4351,
+        4324
+      ],
+      "median_ms": 4351,
+      "p95_ms": 4478
+    }
+  ],
+  "savings_http": {
+    "results": [
+      {
+        "identity": {
+          "owner_id": 1337
+        },
+        "prefix": "before/",
+        "save_and_detail": {
+          "success": true,
+          "ms": 17877,
+          "url": "http://127.0.0.1:58250/before/tabungan/riwayat.php?owner_id=1337&all_periods=1&jenis=masuk&id=-1000095607"
+        },
+        "retry_once": true
+      },
+      {
+        "identity": {
+          "owner_id": 1337
+        },
+        "prefix": "",
+        "save_and_detail": {
+          "success": true,
+          "ms": 1325,
+          "url": "http://127.0.0.1:58250/tabungan/riwayat.php?owner_id=1337&all_periods=1&jenis=masuk&id=-1000095608&after_save=1"
+        },
+        "retry_once": true
+      },
+      {
+        "identity": {
+          "owner_id": 1337
+        },
+        "csrf_and_insufficient_balance": true
+      },
+      {
+        "identity": {
+          "student_id": 601
+        },
+        "prefix": "before/",
+        "save_and_detail": {
+          "success": true,
+          "ms": 11412,
+          "url": "http://127.0.0.1:58250/before/tabungan/riwayat.php?jenis=masuk&id=15"
+        },
+        "retry_once": true
+      },
+      {
+        "identity": {
+          "student_id": 601
+        },
+        "prefix": "",
+        "save_and_detail": {
+          "success": true,
+          "ms": 185,
+          "url": "http://127.0.0.1:58250/tabungan/riwayat.php?jenis=masuk&id=16&student_id=601&after_save=1"
+        },
+        "retry_once": true
+      },
+      {
+        "identity": {
+          "student_id": 601
+        },
+        "csrf_and_insufficient_balance": true
+      },
+      {
+        "concurrency": "same_account",
+        "five_users_ms": [
+          1332,
+          5813,
+          4672,
+          2433,
+          3566
+        ],
+        "exact_balance": true
+      },
+      {
+        "concurrency": "different_accounts",
+        "five_users_ms": [
+          3512,
+          5737,
+          4652,
+          2363,
+          1292
+        ],
+        "exact_balance": true
+      },
+      {
+        "concurrency": "student_account",
+        "five_users_ms": [
+          211,
+          162,
+          156,
+          187,
+          186
+        ],
+        "exact_balance": true
+      },
+      {
+        "competing_withdrawals": true,
+        "accepted": 1,
+        "no_negative_balance": true
+      }
+    ]
+  },
+  "request_metrics": {
+    "/pembayaran/lihat.php": {
+      "samples": 41,
+      "min_queries": 50,
+      "max_queries": 55,
+      "peak_memory_bytes": 10485760
+    },
+    "/pembayaran/riwayat_daftar_ulang.php": {
+      "samples": 35,
+      "min_queries": 48,
+      "max_queries": 51,
+      "peak_memory_bytes": 8388608
+    },
+    "/tabungan/riwayat.php": {
+      "samples": 35,
+      "min_queries": 57,
+      "max_queries": 62,
+      "peak_memory_bytes": 8388608
+    },
+    "/tabungan/proses.php": {
+      "samples": 29,
+      "min_queries": 11,
+      "max_queries": 54,
+      "peak_memory_bytes": 29360128
+    }
+  },
+  "bank_phases": {
+    "in": {
+      "validation_ms": 11.7,
+      "lock_queries_ms": 26.57,
+      "journal_ms": 0.51,
+      "balance_ms": 0.32,
+      "audit_ms": 0.28,
+      "fingerprint_ms": 950.32,
+      "commit_ms": 9.08,
+      "total_ms": 1132.05,
+      "peak_memory_bytes": 29360128
+    },
+    "out": {
+      "validation_ms": 0.4,
+      "lock_queries_ms": 25.18,
+      "journal_ms": 0.35,
+      "balance_ms": 0.31,
+      "audit_ms": 0.28,
+      "fingerprint_ms": 1066.62,
+      "commit_ms": 32.3,
+      "total_ms": 1244.41,
+      "peak_memory_bytes": 29360128
+    }
+  },
+  "golden_projection_equal": true,
+  "golden_normalization": "Trailing whitespace in DU display class only",
+  "fingerprint": {
+    "data_unchanged": true,
+    "changed_tables": [],
+    "tables_per_database": {
+      "db_spp": 51,
+      "db_spp_test2": 60
+    },
+    "protected_files_unchanged": true,
+    "schema_unchanged": true
+  },
+  "lab_http": [
+    {
+      "unit": 1,
+      "page": "payments",
+      "ms": 2236,
+      "content_verified": true
+    },
+    {
+      "unit": 1,
+      "page": "du",
+      "ms": 3995,
+      "content_verified": true
+    },
+    {
+      "unit": 1,
+      "page": "savings",
+      "ms": 4438,
+      "content_verified": true
+    },
+    {
+      "unit": 2,
+      "page": "payments",
+      "ms": 1878,
+      "content_verified": true
+    },
+    {
+      "unit": 2,
+      "page": "du",
+      "ms": 3877,
+      "content_verified": true
+    },
+    {
+      "unit": 2,
+      "page": "savings",
+      "ms": 2895,
+      "content_verified": true
+    },
+    {
+      "unit": 3,
+      "page": "payments",
+      "ms": 555,
+      "content_verified": true
+    },
+    {
+      "unit": 3,
+      "page": "du",
+      "ms": 944,
+      "content_verified": true
+    },
+    {
+      "unit": 3,
+      "page": "savings",
+      "ms": 775,
+      "content_verified": true
+    }
+  ],
+  "lab_saved_detail": {
+    "page": "saved_transaction",
+    "ms": 223,
+    "read_only": true,
+    "correct_journal": true
+  },
+  "limitations": [
+    "Five concurrent nonstudent writes serialize full batch fingerprints; observed worst 5.813 seconds.",
+    "Lab single-request DU/SD savings can exceed 3 seconds; private and actual lab timings are reported separately.",
+    "Existing completed-batch manifests contained empty-content working digests before this work; stored metadata was not rewritten. String batch-ID handling is fixed for future refreshes.",
+    "Small benchmark sample: three sequential reads and five simultaneous readers per route; no production saturation or physical printer test."
+  ],
+  "cleanup": {
+    "pending": false,
+    "owned_services_stopped": true,
+    "ports_closed": {
+      "58246": true,
+      "58250": true
+    },
+    "temporary_lab_sessions_removed": 3,
+    "temporary_private_sessions_removed": true,
+    "credential_files_removed": true
+  },
+  "request_metrics_scope": "Latest 111 read requests and 29 savings POST requests; totals include connection/bootstrap queries.",
+  "backup": {
+    "bytes": 457177841,
+    "sha256": "da3448aa7f0f859624201bfafa35b75d783112c14a52154489e2a308ec353261"
+  },
+  "installation": {
+    "files": 31,
+    "related_files_only": true,
+    "configuration_copied": false,
+    "hash_record": "C:\\laragon\\backups\\spp-management-system\\history_performance_20261020\\installation.json"
+  }
+}

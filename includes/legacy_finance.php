@@ -35,6 +35,15 @@ function lf_rows(mysqli $db,string $sql,array $args=[]): array { return lf_query
 function lf_iter_rows(mysqli $db,string $sql,array $args=[]): Generator {
     $result=lf_query($db,$sql,$args);try{while($row=$result->fetch_assoc())yield $row;}finally{$result->free();}
 }
+/** Prepared unbuffered traversal for large fingerprints. No second query may run
+ * on this connection until traversal finishes; callers only hash each row. */
+function lf_stream_rows(mysqli $db,string $sql,array $args=[]): Generator {
+    $s=$db->prepare($sql);if($args)$s->bind_param(str_repeat('s',count($args)),...$args);
+    $s->execute();$meta=$s->result_metadata();$row=[];$bound=[];
+    foreach($meta->fetch_fields() as $field){$row[$field->name]=null;$bound[]=&$row[$field->name];}
+    $meta->free();$s->bind_result(...$bound);
+    try{while($s->fetch())yield array_map(static fn($v)=>$v,$row);}finally{$s->close();}
+}
 function lf_one(mysqli $db,string $sql,array $args=[]): ?array { return lf_query($db,$sql,$args)->fetch_assoc(); }
 function lf_actor(mysqli $db,int $actor,int $unit,bool $write=false,bool $lock=false): void {
     if($unit<0||$unit>3||($write&&$unit===0)) throw new DomainException('Pilih SD, SMP, atau SMA untuk perubahan.');

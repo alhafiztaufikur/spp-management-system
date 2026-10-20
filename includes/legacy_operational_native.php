@@ -14,11 +14,11 @@ function lop_native_payment_changed(mysqli $db, ?array $before, ?array $after): 
     if (!lop_ready($db)) return;
     require_once __DIR__.'/legacy_billing.php';
     $owners=[];foreach([$before,$after] as $snapshot){$nis=(string)($snapshot['payment']['NO_INDUK']??$snapshot['NO_INDUK']??'');$student=lb_student($db,$nis);if($student)$owners[]=(int)$student['id'];}
-    $billingBatches=lb_sync_owners($db,$owners);lb_refresh_manifests($db,$billingBatches);
-    if(!$billIds)return;
+    $billingBatches=lb_sync_owners($db,$owners);
+    if(!$billIds){lb_refresh_manifests($db,$billingBatches);return;}
     require_once __DIR__.'/legacy_operational_corrections.php';
     sort($billIds, SORT_NUMERIC);
-    $batches = [];
+    $batches = array_fill_keys($billingBatches,true);
     foreach ($billIds as $billId) {
         $obligations = lf_rows($db, 'SELECT ob.*,o.batch_id FROM legacy_op_obligations ob
             JOIN legacy_op_owners o ON o.id=ob.owner_id AND o.unit_id=ob.unit_id
@@ -33,10 +33,5 @@ function lop_native_payment_changed(mysqli $db, ?array $before, ?array $after): 
             }
         }
     }
-    foreach (array_keys($batches) as $batchId) {
-        $batch = lf_one($db, 'SELECT manifest FROM legacy_full_batches WHERE id=? FOR UPDATE', [$batchId]);
-        $manifest = json_decode($batch['manifest'], true, 512, JSON_THROW_ON_ERROR);
-        $manifest['working_digest'] = lop_working_digest($db, $batchId);
-        lf_query($db, 'UPDATE legacy_full_batches SET manifest=? WHERE id=?', [lf_json($manifest), $batchId]);
-    }
+    lb_refresh_manifests($db,array_keys($batches));
 }

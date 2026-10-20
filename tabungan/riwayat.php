@@ -13,6 +13,9 @@ require_once '../includes/migrated_history.php';
 requireRole(['admin', 'kasir', 'bendahara']);
 if(is_file(__DIR__.'/../includes/savings_authorization.php'))require_once '../includes/savings_authorization.php';
 require_once '../includes/savings_operator.php';
+if(($_SERVER['REQUEST_METHOD']??'GET')==='GET'&&($_GET['after_save']??'')==='1'){
+    require __DIR__.'/../includes/savings_saved.php';exit;
+}
 $operatorOptions=savings_operator_options($koneksi);
 try{$operators=history_operator_choices($_GET['operator']??null,$operatorOptions);}
 catch(InvalidArgumentException $e){http_response_code(400);exit(savings_e($e->getMessage()));}
@@ -51,7 +54,8 @@ require_once '../includes/migrated_savings.php';
 $historyRead=mh_savings_read_query($koneksi,$_GET,$rombelFilter,$operators,$periodStart,$periodEnd);
 $historyUnionSql=$historyRead['sql'];$historyParams=$historyRead['args'];
 $historyTypes=str_repeat('s',count($historyParams));
-$stmtSummary = $koneksi->prepare("SELECT COUNT(*) AS total, COALESCE(SUM(nominal), 0) AS total_masuk, COALESCE(SUM(keluar), 0) AS total_keluar FROM ($historyUnionSql) tabungan_tx");
+$summaryRead=mh_savings_read_query($koneksi,$_GET,$rombelFilter,$operators,$periodStart,$periodEnd,true);$summaryUnionSql=$summaryRead['sql'];
+$stmtSummary = $koneksi->prepare("SELECT COUNT(*) AS total, COALESCE(SUM(nominal), 0) AS total_masuk, COALESCE(SUM(keluar), 0) AS total_keluar FROM ($summaryUnionSql) tabungan_tx");
 if($historyParams)$stmtSummary->bind_param($historyTypes, ...$historyParams);
 $stmtSummary->execute();
 $historySummary = $stmtSummary->get_result()->fetch_assoc() ?: ['total'=>0, 'total_masuk'=>0, 'total_keluar'=>0];
@@ -115,7 +119,7 @@ if($requestedSelection){try{[$selectionKind,$selectionId]=savings_http_identity(
 if($selectedTransaction&&!array_filter($rows,static fn($r)=>(int)$r['id']===(int)$selectedTransaction['id']&&$r['jenis']===$selectedTransaction['jenis']))$selectedTransaction=null;
 $originBack=$selectedTransaction&&!empty($selectedTransaction['student_id'])?mh_return_url($_GET['back_context']??null,(int)$selectedTransaction['unit_id'],'student',(int)$selectedTransaction['student_id']):null;
 $printTransaction=null;$prompt=$_SESSION['savings_print_prompt']??null;unset($_SESSION['savings_print_prompt']);
-if(is_array($prompt) && (unit_all_readonly() || (int)$prompt['unit_id']===unit_active_id())){$candidate=savings_transaction($koneksi,(string)$prompt['jenis'],(int)$prompt['id']);if($candidate && $candidate['can_print'])$printTransaction=$candidate;}
+if(is_array($prompt) && (unit_all_readonly() || (int)$prompt['unit_id']===unit_active_id())){$candidate=$selectedTransaction&&(int)$selectedTransaction['id']===(int)$prompt['id']&&$selectedTransaction['jenis']===$prompt['jenis']?$selectedTransaction:savings_transaction($koneksi,(string)$prompt['jenis'],(int)$prompt['id']);if($candidate && $candidate['can_print'])$printTransaction=$candidate;}
 unset($historyPaginationQuery['id'],$historyPaginationQuery['jenis']);
 $bln_names = ['01'=>'Januari','02'=>'Februari','03'=>'Maret','04'=>'April','05'=>'Mei','06'=>'Juni',
                '07'=>'Juli','08'=>'Agustus','09'=>'September','10'=>'Oktober','11'=>'November','12'=>'Desember'];
