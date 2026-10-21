@@ -368,7 +368,7 @@ $exportQuery = filter_build_query([
             </div>
             <div class="report-export-actions">
               <a href="export_excel.php?<?= general_page_e($exportQuery) ?>" class="btn btn-success" target="_blank" rel="noopener"><?= finance_icon('document') ?>Export Excel</a>
-              <a href="export_pdf.php?<?= general_page_e($exportQuery) ?>&amp;output=preview" class="btn btn-warning" target="_blank" rel="noopener"><?= finance_icon('document') ?>Export PDF</a>
+              <a href="export_pdf.php?<?= general_page_e($exportQuery) ?>&amp;output=preview&amp;return_to=report" class="btn btn-warning" target="_blank" rel="noopener"><?= finance_icon('document') ?>Export PDF</a>
             </div>
           </div>
         </form>

@@ -32,11 +32,10 @@ document.addEventListener('DOMContentLoaded', () => {
     source.type='hidden';source.required=false;
     let view=parse(day.value)||{year:new Date().getFullYear(),month:new Date().getMonth(),day:new Date().getDate()};
     const calendar=make('div',{id:id+'-calendar',className:'correction-calendar',hidden:true});calendar.setAttribute('role','dialog');calendar.setAttribute('aria-label','Kalender tanggal transaksi');
-    const header=make('div',{className:'correction-calendar-header'}),previous=make('button',{type:'button',textContent:'‹'}),next=make('button',{type:'button',textContent:'›'}),month=make('select'),year=make('select');
+    const header=make('div',{className:'correction-calendar-header'}),previous=make('button',{type:'button',textContent:'‹'}),next=make('button',{type:'button',textContent:'›'}),month=make('select'),year=make('input',{type:'number',min:'1000',max:'9999',step:'1',inputMode:'numeric'});
     previous.setAttribute('aria-label','Bulan sebelumnya');next.setAttribute('aria-label','Bulan berikutnya');month.setAttribute('aria-label','Bulan');year.setAttribute('aria-label','Tahun');
-    month.setAttribute('data-native-select','');year.setAttribute('data-native-select','');
+    month.setAttribute('data-native-select','');
     months.forEach((name,index)=>month.append(make('option',{value:String(index),textContent:name})));
-    for(let value=Math.min(1900,view.year);value<=Math.max(new Date().getFullYear()+1,view.year);value++)year.append(make('option',{value:String(value),textContent:String(value)}));
     header.append(previous,month,year,next);
     const weekdays=make('div',{className:'correction-calendar-weekdays'});['Sen','Sel','Rab','Kam','Jum','Sab','Min'].forEach(name=>weekdays.append(make('span',{textContent:name})));
     const grid=make('div',{className:'correction-calendar-days'}),footer=make('div',{className:'correction-calendar-footer'}),close=make('button',{type:'button',textContent:'Selesai'});
@@ -79,8 +78,11 @@ document.addEventListener('DOMContentLoaded', () => {
       if(!calendar.hidden)place();
     };
     toggle.addEventListener('click',()=>{if(!calendar.hidden){hide();return;}view=parse(day.value)||view;render();calendar.hidden=false;toggle.setAttribute('aria-expanded','true');place();(grid.querySelector('.is-selected')||grid.querySelector('button'))?.focus();});
-    month.addEventListener('change',()=>{view.month=Number(month.value);render();});year.addEventListener('change',()=>{view.year=Number(year.value);render();});
-    const move=amount=>{const date=new Date(view.year,view.month+amount,1),target=String(date.getFullYear());if(![...year.options].some(option=>option.value===target))return;view={year:date.getFullYear(),month:date.getMonth(),day:1};render();};
+    month.addEventListener('change',()=>{view.month=Number(month.value);render();});
+    const updateYear=()=>{if(/^\d{4}$/.test(year.value)&&year.checkValidity()&&Number(year.value)!==view.year){view.year=Number(year.value);render();}};
+    year.addEventListener('input',updateYear);year.addEventListener('change',()=>{updateYear();year.value=String(view.year);});
+    year.addEventListener('keydown',event=>{if(event.key==='Enter'){event.preventDefault();updateYear();year.value=String(view.year);}});
+    const move=amount=>{const date=new Date(view.year,view.month+amount,1);if(date.getFullYear()<1000||date.getFullYear()>9999)return;view={year:date.getFullYear(),month:date.getMonth(),day:1};render();};
     previous.addEventListener('click',()=>move(-1));next.addEventListener('click',()=>move(1));close.addEventListener('click',()=>hide(true));
     calendar.addEventListener('keydown',event=>{if(event.key==='Escape'){event.preventDefault();event.stopPropagation();hide(true);}});
     document.addEventListener('pointerdown',event=>{if(!calendar.contains(event.target)&&!widget.contains(event.target))hide();},{signal:lifetime.signal});

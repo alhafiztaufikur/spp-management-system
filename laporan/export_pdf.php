@@ -14,20 +14,18 @@ $reportUnitId=unit_report_scope($koneksi,(string)($_GET['unit']??''));
 if(($_GET['mode']??'')!=='selected' && (is_array($_GET['jenis_laporan']??null)||($_GET['jenis_laporan']??'semua')!=='semua')){
     $sppGeneralPdf=true;require __DIR__.'/export_excel.php';
     $detailCount=0;foreach(array_slice($sheets,1) as $sheet)foreach($sheet['sections'] as $section)$detailCount+=count($section['rows']);
-    $html=$detailCount>600?'':general_document_html($doc);
-    if(!in_array($_GET['output']??'preview',['pdf','inline'],true)){
-        require_once '../includes/report_preview.php';$downloadQuery=$_GET;$downloadQuery['output']='pdf';$inlineQuery=$_GET;$inlineQuery['output']='inline';
-        render_report_pdf_preview($html,['title'=>$doc['title'],'subtitle'=>$doc['subtitle'],'orientation'=>'landscape','unit'=>$reportUnitId,'generated'=>$doc['generated'],'pdf_url'=>'export_pdf.php?'.filter_build_query($inlineQuery),'row_count'=>$detailCount,'download_url'=>'export_pdf.php?'.filter_build_query($downloadQuery),'back_url'=>'index.php?'.filter_build_query($_GET)]);
-    }
-    require_once '../includes/pdf.php';require_pdf_library();require_once '../includes/report_artifact.php';
-    $stable=$doc;unset($stable['generated']);$query=$_GET;unset($query['output']);
-    $artifact=report_artifact_get(['route'=>'recap','unit'=>$reportUnitId,'query'=>$query],$stable,'pdf',static function()use($html,$doc,$detailCount){
+    require_once '../includes/report_artifact.php';
+    $stable=$doc;unset($stable['generated']);$query=$_GET;unset($query['output'],$query['return_to']);
+    $artifact=report_artifact_get(['route'=>'recap','unit'=>$reportUnitId,'query'=>$query],$stable,'pdf',static function()use($doc,$detailCount){
+        require_once __DIR__.'/../includes/pdf.php';require_pdf_library();
         if($detailCount>600){require_once __DIR__.'/../includes/transaction_report_pdf.php';require_once __DIR__.'/../includes/global_report_layout.php';return global_report_render_pdf_fragments(transaction_report_pdf_fragments($doc),'landscape');}
+        $html=general_document_html($doc);
         $options=new \Dompdf\Options();$options->setIsRemoteEnabled(false);$options->setChroot(realpath(__DIR__.'/..'));
         $pdf=new \Dompdf\Dompdf($options);$pdf->loadHtml($html,'UTF-8');$pdf->setPaper('A4','landscape');$pdf->render();
         $pdf->getCanvas()->page_text(705,571,'Halaman {PAGE_NUM} / {PAGE_COUNT}',$pdf->getFontMetrics()->getFont('DejaVu Sans'),8,[.3,.4,.35]);
         $bytes=$pdf->output();report_perf_mark('pdf');return $bytes;
     });
+    header('X-Report-Row-Count: '.$detailCount);
     report_artifact_stream($artifact,'rekap-laporan-transaksi.pdf','pdf',($_GET['output']??'pdf')!=='inline');
 }
 
@@ -64,6 +62,7 @@ if ($selected_mode && !$selected_ids) {
     header('Location: index.php?bulan=' . urlencode((string)$filter_bulan) . '&tahun=' . urlencode((string)$filter_tahun) . '&tanggal_awal=' . urlencode($filter_tanggal_awal) . '&tanggal_akhir=' . urlencode($filter_tanggal_akhir) . '&q=' . urlencode($filter_q));
     exit;
 }
+if(!$selected_mode&&session_status()===PHP_SESSION_ACTIVE)session_write_close();
 
 $bln_names = [
     1 => 'Januari', 2 => 'Februari', 3 => 'Maret', 4 => 'April',
@@ -180,6 +179,7 @@ if ($selected_ids) {
     array_push($params, ...$selected_ids);
 }
 
+if($selected_mode){
 $stmt = $koneksi->prepare("
     SELECT
         b.*,
@@ -214,6 +214,7 @@ $stmt->bind_param($types, ...$params);
 $stmt->execute();
 $rows = $stmt->get_result()->fetch_all(MYSQLI_ASSOC);
 $stmt->close();
+}
 if(!$selected_mode){
     require_once __DIR__.'/../includes/general_history.php';
     $rows=general_payment_rows($koneksi,$period_start,$period_end,$filter_q,(string)($_GET['urut']??'terbaru'));
@@ -304,22 +305,26 @@ if (!$selected_mode) {
             'orientation' => 'landscape',
             'download_url' => 'export_pdf.php?' . http_build_query($downloadQuery),
             'back_url' => 'index.php?' . http_build_query($backQuery),
+            'close_on_back' => ($_GET['return_to']??'')==='report',
         ]);
     }
 
-    require_once __DIR__ . '/../includes/pdf.php';
-    require_pdf_library();
-    $options = new \Dompdf\Options();
-    $options->set('isRemoteEnabled', false);
-    $options->set('isHtml5ParserEnabled', true);
-    $options->setDefaultMediaType('print');
-$options->setFontHeightRatio(1.0);
-    $dompdf = new \Dompdf\Dompdf($options);
-    $dompdf->loadHtml($html);
-    $dompdf->setPaper('A4', 'landscape');
-    $dompdf->render();
-    $dompdf->stream('rekap-laporan-keuangan.pdf', ['Attachment' => true]);
-    exit;
+    require_once __DIR__.'/../includes/report_artifact.php';
+    $query=$_GET;unset($query['output'],$query['return_to']);
+    $artifact=report_artifact_get(['route'=>'recap-payments','unit'=>$reportUnitId,'query'=>$query,'operator'=>$operator],['rows'=>$rows,'period'=>$periode],'pdf',static function()use($html){
+        require_once __DIR__.'/../includes/pdf.php';require_pdf_library();
+        $options = new \Dompdf\Options();
+        $options->set('isRemoteEnabled', false);
+        $options->set('isHtml5ParserEnabled', true);
+        $options->setDefaultMediaType('print');
+        $options->setFontHeightRatio(1.0);
+        $dompdf = new \Dompdf\Dompdf($options);
+        $dompdf->loadHtml($html);
+        $dompdf->setPaper('A4', 'landscape');
+        $dompdf->render();
+        return $dompdf->output();
+    });
+    report_artifact_stream($artifact,'rekap-laporan-keuangan.pdf','pdf',true);
 }
 
 if (!$rows && !$selected_mode) {

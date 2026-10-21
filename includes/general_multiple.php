@@ -52,8 +52,8 @@ function general_section_html(array $section,int $start=0):string{
         // Keep unit and national ID under the immutable identity, as in the payment table.
         $columns=array_values(array_filter($section['columns'],static fn($c)=>!in_array($c[0],['NO_induk_diknas','unit'],true)));
         $minimum=1000+(in_array('komponen',array_column($columns,0),true)?180:0);
-        echo '<div class="table-container"><table class="payment-table report-unpaid-table report-structured-table" style="--report-table-min:'.$minimum.'px;--report-id-left:48px;--report-name-left:184px"><colgroup><col style="width:48px">';
-        foreach($columns as $column)echo match($column[0]){'NO_INDUK'=>'<col style="width:136px">','NAMA'=>'<col>','KELAS'=>'<col style="width:80px">','komponen'=>'<col style="width:180px">',default=>'<col style="width:152px">'};
+        echo '<div class="table-container"><table class="payment-table report-unpaid-table report-structured-table" style="--report-table-min:'.$minimum.'px;--report-id-left:48px;--report-name-left:184px"><colgroup><col class="report-col-number">';
+        foreach($columns as $column)echo match($column[0]){'NO_INDUK'=>'<col class="report-col-id">','NAMA'=>'<col class="report-col-name">','KELAS'=>'<col class="report-col-class">','komponen'=>'<col class="report-col-component">',default=>'<col class="report-col-money">'};
         echo '</colgroup><thead><tr><th scope="col" class="report-number-col">No</th>';
         foreach($columns as $column)echo '<th scope="col" class="'.$class($column).'">'.$e($column[0]==='NO_INDUK'?'No. Induk':$column[1]).'</th>';echo '</tr></thead><tbody>';
         if(!$section['rows'])echo '<tr><td colspan="'.(count($columns)+1).'">Tidak ada tunggakan dengan sisa yang terbukti sesuai filter.</td></tr>';

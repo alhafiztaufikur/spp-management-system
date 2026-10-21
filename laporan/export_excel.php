@@ -9,7 +9,7 @@ requireRole(['admin', 'bendahara', 'kasir']);
 $reportUnitId=unit_report_scope($koneksi,(string)($_GET['unit']??''));
 require_once __DIR__.'/../includes/report_artifact.php';
 if(PHP_SAPI!=='cli'&&session_status()===PHP_SESSION_ACTIVE)session_write_close();
-report_perf_mark('validate');$koneksi->begin_transaction(MYSQLI_TRANS_START_READ_ONLY|MYSQLI_TRANS_START_WITH_CONSISTENT_SNAPSHOT);
+report_perf_mark('validate');
 
 require_once '../includes/general_multiple.php';
 $generalChoices=general_choices($_GET);
@@ -66,6 +66,19 @@ if ($filter_tanggal_awal !== '' && $filter_tanggal_akhir !== '') {
 
 if(($_GET['all_periods']??'')==='1')$period_label='Semua periode';
 if(($_GET['include_undated']??'')==='1')$period_label.=' (termasuk transaksi tanpa tanggal sesuai periode kewajiban)';
+
+// The PDF shell needs only filter labels; the PDF request builds the fresh report once.
+if(!empty($sppGeneralPdf)&&!in_array($_GET['output']??'preview',['pdf','inline'],true)){
+    require_once __DIR__.'/../includes/report_preview.php';
+    $downloadQuery=$_GET;$downloadQuery['output']='pdf';$inlineQuery=$_GET;$inlineQuery['output']='inline';$backQuery=$_GET;unset($backQuery['output'],$backQuery['return_to']);
+    render_report_pdf_preview('',[
+        'title'=>'Rekap Laporan Transaksi','subtitle'=>'Periode '.$period_label.($filter_q!==''?' | Pencarian: '.$filter_q:''),
+        'orientation'=>'landscape','unit'=>$reportUnitId,'row_count'=>null,
+        'pdf_url'=>'export_pdf.php?'.filter_build_query($inlineQuery),'download_url'=>'export_pdf.php?'.filter_build_query($downloadQuery),
+        'back_url'=>'index.php?'.filter_build_query($backQuery),'close_on_back'=>($_GET['return_to']??'')==='report','fit_viewport'=>true,
+    ]);
+}
+$koneksi->begin_transaction(MYSQLI_TRANS_START_READ_ONLY|MYSQLI_TRANS_START_WITH_CONSISTENT_SNAPSHOT);
 
 // Keep the existing three-sheet layout; read all matching historical and current rows.
 $selectedSections=is_array($_GET['jenis_laporan']??null)||($_GET['jenis_laporan']??'semua')!=='semua';

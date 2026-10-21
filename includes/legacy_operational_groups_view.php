@@ -4,7 +4,7 @@ require_once __DIR__.'/legacy_class_links.php';
 require_once __DIR__.'/legacy_directory_ui.php';
 $lgOpen=($_GET['lg_open']??'')==='1'||isset($_GET['lg_q'])||isset($_GET['lg_kind'])||isset($_GET['lg_page']);
 if(!$lgOpen): ?>
-<section class="main-card master-modern-card legacy-groups" id="legacy-groups"><div class="class-panel-heading"><span class="class-workspace-icon"><?= legacy_ui_icon('users') ?></span><div><h2>Kelompok dari Legacy</h2><p>Telusuri sumber migrasi saat diperlukan. Daftar kelompok belum dimuat.</p></div><a class="btn btn-ghost" href="master_kelas.php?lg_open=1#legacy-groups">Telusuri Kelompok Legacy</a></div></section>
+<section class="main-card master-modern-card legacy-groups" id="legacy-groups"><div class="class-panel-heading legacy-groups-heading"><span class="class-workspace-icon"><?= legacy_ui_icon('users') ?></span><div><h2>Kelompok dari Legacy</h2><p>Telusuri sumber migrasi saat diperlukan. Daftar kelompok belum dimuat.</p></div><a class="btn btn-ghost legacy-groups-browse" href="master_kelas.php?lg_open=1#legacy-groups">Telusuri Kelompok Legacy <span aria-hidden="true">&rarr;</span></a></div></section>
 <?php return; endif;
 if(lop_ready($koneksi)):
     $lgFilters=legacy_directory_filters($_GET,'lg_');$lgKinds=legacy_directory_kinds();

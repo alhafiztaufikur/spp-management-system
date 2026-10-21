@@ -138,6 +138,12 @@ function render_report_export_preview(string $documentHtml, array $options): voi
     </main>
     <script>
         (function(){
+            <?php if(!empty($options['close_on_back'])): ?>
+            document.querySelector('.preview-back')?.addEventListener('click',function(event){
+                if(event.button!==0||event.ctrlKey||event.metaKey||event.shiftKey||event.altKey)return;
+                event.preventDefault();const fallback=this.href;window.close();setTimeout(function(){location.href=fallback;},100);
+            });
+            <?php endif; ?>
             const frame=document.querySelector('[data-preview-frame]');
             const loading=document.querySelector('[data-preview-loading]');
             const printButton=document.querySelector('[data-preview-print]');
