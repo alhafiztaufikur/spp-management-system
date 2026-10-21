@@ -1,8 +1,14 @@
 <?php
 /** Read-only SQL projections. Scope comes from the connection, never request parameters. */
+function hp_connection_key(mysqli $db): string {
+    static $keys=[];$identity=spl_object_id($db).':'.$db->thread_id;
+    // CLI migration/tests may switch databases on one connection; HTTP never does.
+    if(PHP_SAPI==='cli')return $identity.':'.$db->query('SELECT DATABASE()')->fetch_row()[0];
+    return $keys[$identity]??=($identity.':'.$db->query('SELECT DATABASE()')->fetch_row()[0]);
+}
 function hp_sql(mysqli $db, string $sql,bool $ordered=false): string {
     static $tables=[],$identityIndexes=[],$schoolIds=[];
-    $schema=$db->query('SELECT DATABASE()')->fetch_row()[0];$key=$db->thread_id.':'.$schema;
+    $key=hp_connection_key($db);
     if(!isset($tables[$key])){
         $tables[$key]=[];
         $r=$db->query("SELECT v.TABLE_NAME,v.VIEW_DEFINITION FROM information_schema.VIEWS v WHERE v.TABLE_SCHEMA=DATABASE()");
@@ -49,3 +55,12 @@ function hp_sql(mysqli $db, string $sql,bool $ordered=false): string {
 
 function hp_rows(mysqli $db,string $sql,array $args=[]): array {return lf_rows($db,hp_sql($db,$sql),$args);}
 function hp_one(mysqli $db,string $sql,array $args=[]): ?array {return lf_one($db,hp_sql($db,$sql),$args);}
+
+/** Covering hints are optional and only touch the verified scoped base projections. */
+function hp_operator_sql(mysqli $db,string $sql): string {
+    static $available=[];$key=hp_connection_key($db);
+    if(!isset($available[$key]))$available[$key]=array_column($db->query("SELECT TABLE_NAME,INDEX_NAME FROM information_schema.STATISTICS WHERE TABLE_SCHEMA=DATABASE() AND INDEX_NAME IN ('idx_menu_journal_operator','idx_menu_payment_operator') GROUP BY TABLE_NAME,INDEX_NAME HAVING GROUP_CONCAT(COLUMN_NAME ORDER BY SEQ_IN_INDEX) IN ('unit_id,batch_id,source_operator,origin','unit_id,batch_id,source_operator')")->fetch_all(MYSQLI_ASSOC),'INDEX_NAME','TABLE_NAME');
+    $sql=hp_sql($db,$sql);
+    foreach($available[$key] as $table=>$index)$sql=str_replace('FROM `'.$table.'` WHERE','FROM `'.$table.'` FORCE INDEX (`'.$index.'`) WHERE',$sql);
+    return $sql;
+}

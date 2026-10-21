@@ -116,19 +116,28 @@ function report_optional_positions(mysqli $db,string $category,string $year): ar
     return $out;
 }
 function report_legacy_years(mysqli $db): array {
+    static $readCache=[];$cacheRead=PHP_SAPI!=='cli'&&($_SERVER['REQUEST_METHOD']??'')==='GET';
+    $cacheKey=$db->thread_id.':'.report_query_unit_id();
+    if($cacheRead&&isset($readCache[$cacheKey]))return $readCache[$cacheKey];
     $years=[];
     foreach(['legacy_full_payments'=>lful_read_ready($db),'legacy_op_payments'=>lop_ready($db)] as $table=>$ready){if(!$ready)continue;
         foreach(hp_rows($db,"SELECT DISTINCT p.source_period FROM $table p JOIN legacy_full_batches b ON b.id=p.batch_id AND b.unit_id=p.unit_id WHERE b.state='completed'".($table==='legacy_op_payments'?' AND p.cancelled=0':'')) as $p){$period=report_source_period((string)$p['source_period']);if($period&&$period['year']!=='')$years[$period['year']]=true;}
     }
+    if($cacheRead)$readCache[$cacheKey]=$years;
     return $years;
 }
 /** Stream and aggregate once per request/scope; keep exact source cents and stable identities. */
-function report_legacy_periods(mysqli $db): array {
+function report_legacy_periods(mysqli $db,?array $onlyPeriods=null): array {
     static $cache=[];
     $revision=lop_ready($db)?(int)hp_one($db,'SELECT COALESCE(MAX(id),0) n FROM legacy_op_audit')['n']:0;
-    $key=$db->thread_id.':'.report_query_unit_id().':'.$revision;
+    $key=$db->thread_id.':'.report_query_unit_id().':'.$revision.($onlyPeriods===null?'':':'.implode(',',$onlyPeriods));
     if(isset($cache[$key]))return $cache[$key];
     $out=['payments'=>[],'years'=>[]];
+    $periodWhere=static function(string $table)use($db,$onlyPeriods):string{
+        if($onlyPeriods===null)return '';$matches=[];
+        foreach(hp_rows($db,"SELECT DISTINCT source_period FROM $table".($table==='legacy_op_payments'?' WHERE cancelled=0':'')) as $row){$period=report_source_period((string)$row['source_period']);if($period&&in_array($period['key'],$onlyPeriods,true))$matches[]="'".$db->real_escape_string($row['source_period'])."'";}
+        return ' AND p.source_period IN ('.(implode(',',$matches)?:'NULL').')';
+    };
     if(report_query_unit_id()===0){
         foreach(lful_read_ready($db)?hp_rows($db,"SELECT DISTINCT p.source_period FROM legacy_full_payments p JOIN legacy_full_batches b ON b.id=p.batch_id AND b.unit_id=p.unit_id WHERE b.state='completed'"):[] as $p){$period=report_source_period((string)$p['source_period']);if($period&&$period['year']!=='')$out['years'][$period['year']]=true;}
         foreach(lop_ready($db)?hp_rows($db,"SELECT DISTINCT p.source_period FROM legacy_op_payments p JOIN legacy_full_batches b ON b.id=p.batch_id AND b.unit_id=p.unit_id WHERE b.state='completed' AND p.cancelled=0"):[] as $p){$period=report_source_period((string)$p['source_period']);if($period&&$period['year']!=='')$out['years'][$period['year']]=true;}
@@ -147,11 +156,11 @@ function report_legacy_periods(mysqli $db): array {
         }
     };
     if(lful_read_ready($db)){
-        $cursor=$db->query(hp_sql($db,"SELECT s.NO_INDUK,p.source_period,p.class_snapshot,i.category,i.amount FROM legacy_full_payments p JOIN legacy_full_items i ON i.payment_id=p.id AND i.unit_id=p.unit_id JOIN siswa s ON s.id=p.student_id AND s.unit_id=p.unit_id JOIN legacy_full_batches b ON b.id=p.batch_id AND b.unit_id=p.unit_id WHERE b.state='completed'"),MYSQLI_USE_RESULT);
+        $cursor=$db->query(hp_sql($db,"SELECT s.NO_INDUK,p.source_period,p.class_snapshot,i.category,i.amount FROM legacy_full_payments p JOIN legacy_full_items i ON i.payment_id=p.id AND i.unit_id=p.unit_id JOIN siswa s ON s.id=p.student_id AND s.unit_id=p.unit_id JOIN legacy_full_batches b ON b.id=p.batch_id AND b.unit_id=p.unit_id WHERE b.state='completed'".$periodWhere('legacy_full_payments')),MYSQLI_USE_RESULT);
         while($r=$cursor->fetch_assoc())$add($r,[['category'=>$r['category'],'amount'=>$r['amount']]]);$cursor->free();
     }
     if(lop_ready($db)){
-        $cursor=$db->query(hp_sql($db,"SELECT s.NO_INDUK,p.source_period,p.class_snapshot,p.items FROM legacy_op_payments p JOIN legacy_op_owners o ON o.id=p.owner_id AND o.unit_id=p.unit_id JOIN siswa s ON s.id=o.student_id AND s.unit_id=o.unit_id JOIN legacy_full_batches b ON b.id=p.batch_id AND b.unit_id=p.unit_id WHERE b.state='completed' AND p.cancelled=0"),MYSQLI_USE_RESULT);
+        $cursor=$db->query(hp_sql($db,"SELECT s.NO_INDUK,p.source_period,p.class_snapshot,p.items FROM legacy_op_payments p JOIN legacy_op_owners o ON o.id=p.owner_id AND o.unit_id=p.unit_id JOIN siswa s ON s.id=o.student_id AND s.unit_id=o.unit_id JOIN legacy_full_batches b ON b.id=p.batch_id AND b.unit_id=p.unit_id WHERE b.state='completed' AND p.cancelled=0".$periodWhere('legacy_op_payments')),MYSQLI_USE_RESULT);
         while($r=$cursor->fetch_assoc())$add($r,json_decode($r['items'],true,512,JSON_THROW_ON_ERROR));$cursor->free();
     }
     return $cache[$key]=$out;
@@ -180,7 +189,7 @@ function report_monthly_evidence(mysqli $db,string $category,array $months,array
         $nis=(string)$b['no_induk'];$cells[$nis][$period]=['bill'=>(float)$b['nominal_tagihan'],'paid'=>(float)$b['paid'],'status'=>$b['status'],'class'=>(string)$b['kelas_rombel_snapshot'],'native'=>true];
         $place($nis,lb_payment_year($period),(string)$b['kelas_rombel_snapshot'],(int)$b['master_kelas_id']);
     }
-    $legacy=report_legacy_periods($db);
+    $legacy=report_legacy_periods($db,$periods);
     foreach($legacy['payments'] as $nis=>$categories)foreach($categories[$category]??[] as $period=>$payment){
         if(!in_array($period,$periods,true))continue;
         if(!isset($cells[$nis][$period])){$cells[$nis][$period]=['bill'=>null,'paid'=>0.0,'status'=>'unknown','class'=>$payment['class'],'native'=>false];$place((string)$nis,lb_payment_year($period),$payment['class']);}
@@ -201,10 +210,11 @@ function report_monthly_evidence(mysqli $db,string $category,array $months,array
                 if(!$p){
                     $legacyStudent=$coverage['students'][$nis]??null;
                     $isHistorical=$legacyStudent&&$period<($legacyStudent['settings']['start_period']??'');
-                    $p=['bill'=>$isHistorical?null:0.0,'paid'=>0.0,'status'=>$isHistorical?'unknown':'unbilled','native'=>false];
+                    $p=['bill'=>$isHistorical?null:0.0,'paid'=>0.0,'status'=>$isHistorical?'unknown':'unbilled','native'=>false,'unissued'=>!$isHistorical];
                 }
                 $legacyStudent=$coverage['students'][$nis]??null;$explicit=$legacyStudent?($coverage['coverage'][$legacyStudent['student_id']][$category][$period]??null):null;
                 if(empty($p['native'])&&$explicit){
+                    unset($p['unissued']);
                     if($explicit['disposition']==='settled'){$p['bill']=null;$p['remaining']=0.0;$p['text']='Lunas';$p['status']='settled';}
                     elseif($explicit['disposition']==='legacy_debt'){
                         $p['bill']=null;
@@ -218,7 +228,7 @@ function report_monthly_evidence(mysqli $db,string $category,array $months,array
             $bill=$p['bill'];$amount=$p['paid'];$cancelled=$p['status']==='cancelled';$isUnknown=$bill===null;
             $text=$isUnknown?($amount>.001?'Ada Pembayaran':'Belum Diketahui'):($p['status']==='unbilled'?'Tidak Ditagihkan':($p['status']==='covered_psb'?'Tercakup Uang PSB':($p['status']==='waived'?'Potongan Penuh':($cancelled?'Dibatalkan':report_status_name($bill,$amount)))));
             $text=$p['text']??$text;$rest=$p['remaining']??($isUnknown?null:($cancelled?0.0:max(0,$bill-$amount)));
-            $row['periods'][$period]=['bill'=>$bill,'paid'=>$amount,'remaining'=>$rest,'text'=>$text,'status'=>report_status_key($text)];
+            $row['periods'][$period]=['bill'=>$bill,'paid'=>$amount,'remaining'=>$rest,'text'=>$text,'status'=>report_status_key($text),'evidence_state'=>!empty($p['unissued'])?'unissued':($rest===null?'rekonsiliasi':report_status_key($text))];
             $unknown=$unknown||$isUnknown;$unknownRemaining=$unknownRemaining||$rest===null;$known+=$cancelled?0:(float)$bill;$paid+=$amount;$remaining+=(float)$rest;
             $hasBill=$hasBill||(!empty($p['native'])||($bill??0)>.001||isset($p['remaining'])&&$p['status']!=='unbilled');$hasOpen=$hasOpen||(!$cancelled&&$p['status']!=='unbilled'&&(!$isUnknown||isset($p['remaining'])));$hasPaid=$hasPaid||$amount>.001;
         }

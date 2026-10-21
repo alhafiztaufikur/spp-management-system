@@ -8,17 +8,19 @@ require_once __DIR__.'/../includes/migrated_history.php';
 $students = $koneksi->query("
     SELECT s.id, s.NO_INDUK, s.unit_id, s.NO_induk_diknas, s.NAMA, s.KELAS,
            COALESCE(t.SALDO, 0) AS saldo,
-           COALESCE(m.jumlah, 0) + COALESCE(k.jumlah, 0) AS transaksi
+           0 AS transaksi
     FROM siswa s
     LEFT JOIN tabungan t ON t.NO_INDUK = s.NO_INDUK AND t.unit_id=s.unit_id
-    LEFT JOIN (SELECT unit_id,NO_INDUK, COUNT(*) AS jumlah FROM transaksi_m GROUP BY unit_id,NO_INDUK) m ON m.NO_INDUK = s.NO_INDUK AND m.unit_id=s.unit_id
-    LEFT JOIN (SELECT unit_id,NO_INDUK, COUNT(*) AS jumlah FROM transaksi_k GROUP BY unit_id,NO_INDUK) k ON k.NO_INDUK = s.NO_INDUK AND k.unit_id=s.unit_id
     WHERE s.legacy_pending=0
     ORDER BY s.NAMA, s.NO_INDUK
 ")->fetch_all(MYSQLI_ASSOC);
-$bookCounts=[];$bookSource=mh_savings_source($koneksi);foreach(lf_rows($koneksi,"SELECT student_id,COUNT(*) n FROM $bookSource t WHERE student_id IS NOT NULL AND origin<>'adjustment' GROUP BY student_id") as $count)$bookCounts[(int)$count['student_id']]=(int)$count['n'];
+$bookCountParts=[];
+foreach(['transaksi_m','transaksi_k'] as $table)$bookCountParts[]="SELECT s.id student_id,COUNT(*) n FROM $table j JOIN siswa s ON s.NO_INDUK=j.NO_INDUK AND s.unit_id=j.unit_id GROUP BY s.id";
+if(lful_read_ready($koneksi))$bookCountParts[]="SELECT j.student_id,COUNT(*) n FROM legacy_full_journals j JOIN legacy_full_batches b ON b.id=j.batch_id AND b.unit_id=j.unit_id WHERE b.state='completed' GROUP BY j.student_id";
+if(lop_ready($koneksi))$bookCountParts[]="SELECT o.student_id,COUNT(*) n FROM legacy_op_journals j JOIN legacy_op_owners o ON o.id=j.owner_id AND o.unit_id=j.unit_id JOIN legacy_full_batches b ON b.id=j.batch_id AND b.unit_id=j.unit_id WHERE o.student_id IS NOT NULL AND j.cancelled=0 AND j.origin<>'adjustment' AND b.state='completed' GROUP BY o.student_id";
+$bookCounts=array_column(hp_rows($koneksi,'SELECT student_id,SUM(n) n FROM ('.implode(' UNION ALL ',$bookCountParts).') counts GROUP BY student_id'),'n','student_id');
 foreach($students as &$bookStudent)$bookStudent['transaksi']=$bookCounts[(int)$bookStudent['id']]??0;unset($bookStudent);
-if(lop_ready($koneksi))$students=array_merge($students,lf_rows($koneksi,"SELECT 0 id,o.id owner_id,o.source_identity NO_INDUK,o.unit_id,'' NO_induk_diknas,o.name NAMA,o.source_class KELAS,a.balance saldo,(SELECT COUNT(*) FROM legacy_op_journals j WHERE j.owner_id=o.id AND j.unit_id=o.unit_id AND j.cancelled=0) transaksi FROM legacy_op_owners o JOIN legacy_op_accounts a ON a.owner_id=o.id AND a.unit_id=o.unit_id JOIN legacy_full_batches b ON b.id=o.batch_id AND b.unit_id=o.unit_id WHERE o.student_id IS NULL AND b.state='completed'"));
+if(lop_ready($koneksi))$students=array_merge($students,hp_rows($koneksi,"SELECT 0 id,o.id owner_id,o.source_identity NO_INDUK,o.unit_id,'' NO_induk_diknas,o.name NAMA,o.source_class KELAS,a.balance saldo,(SELECT COUNT(*) FROM legacy_op_journals j WHERE j.owner_id=o.id AND j.unit_id=o.unit_id AND j.cancelled=0) transaksi FROM legacy_op_owners o JOIN legacy_op_accounts a ON a.owner_id=o.id AND a.unit_id=o.unit_id JOIN legacy_full_batches b ON b.id=o.batch_id AND b.unit_id=o.unit_id WHERE o.student_id IS NULL AND b.state='completed'"));
 $classes = array_values(array_unique(array_map(static fn(array $student): string => (string)$student['KELAS'], $students)));
 sort($classes, SORT_NATURAL);
 
@@ -37,14 +39,12 @@ function print_book_escape($value): string
   <meta name="viewport" content="width=device-width, initial-scale=1.0">
   <title>Cetak Tabungan | SistemSPP</title>
   <link rel="icon" type="image/png" href="../assets/img/favicon.png?v=2">
-  <link rel="preconnect" href="https://fonts.googleapis.com">
-  <link href="https://fonts.googleapis.com/css2?family=Inter:wght@400;500;600;700;800&display=swap" rel="stylesheet">
-  <script>(function(){var t=localStorage.getItem('spp_theme')||'light';document.documentElement.setAttribute('data-theme',t);})();</script>
+<script>(function(){var t=localStorage.getItem('spp_theme')||'light';document.documentElement.setAttribute('data-theme',t);})();</script>
   <link rel="stylesheet" href="../assets/css/style.css?v=unitpalette4&amp;mtime=<?= filemtime(__DIR__ . '/../assets/css/style.css') ?>">
   <link rel="stylesheet" href="../assets/css/date_controls.css?v=unitpalette4&amp;mtime=<?= filemtime(__DIR__ . '/../assets/css/date_controls.css') ?>">
   <link rel="stylesheet" href="../assets/css/savings_print_page.css?v=<?= filemtime(__DIR__ . '/../assets/css/savings_print_page.css') ?>">
-</head>
-<body>
+<link rel="stylesheet" href="../assets/css/menu_refinements.css?v=<?= filemtime(__DIR__.'/../assets/css/menu_refinements.css') ?>"></head>
+<body class="savings-account-list">
 <div class="bg-orbs"><div class="orb orb-1"></div><div class="orb orb-2"></div><div class="orb orb-3"></div></div>
 <div class="layout">
   <?php include __DIR__ . '/../includes/sidebar.php'; ?>

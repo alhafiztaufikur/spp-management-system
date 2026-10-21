@@ -1,0 +1,4 @@
+<dialog class="sw-confirm-dialog savings-entry-dialog" id="savings-entry-dialog" aria-labelledby="savings-entry-dialog-title" aria-describedby="savings-entry-dialog-message">
+  <header class="sw-confirm-heading"><span aria-hidden="true"><?= savings_icon('wallet') ?></span><div><small>PERIKSA TRANSAKSI</small><h3 id="savings-entry-dialog-title">Tabungan belum tersimpan</h3></div></header>
+  <div class="sw-confirm-body"><p id="savings-entry-dialog-message"></p><dl class="sw-confirm-summary" id="savings-entry-dialog-summary" hidden><div><dt>Saldo tersedia</dt><dd id="savings-entry-dialog-balance"></dd></div><div><dt>Nominal penarikan</dt><dd id="savings-entry-dialog-amount"></dd></div></dl><div class="sw-confirm-actions"><button type="button" class="btn btn-primary" id="savings-entry-dialog-close">Mengerti</button></div></div>
+</dialog>

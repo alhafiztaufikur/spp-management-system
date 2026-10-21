@@ -375,13 +375,14 @@ function annual_fee_sync_legacy_paid_mirror(mysqli $db, ?string $noInduk = null)
     // Dipertahankan sebagai shim kompatibilitas; seluruh nilai dibaca dari histori bayar.
 }
 
-function annual_fee_payload_for_options(mysqli $db, int $excludePaymentId = 0): array {
+function annual_fee_payload_for_options(mysqli $db, int $excludePaymentId = 0, ?string $noInduk = null): array {
     $payload = [];
+    $filter=$noInduk===null?'':" AND t.no_induk='".$db->real_escape_string($noInduk)."'";
     $stmt = $db->prepare("SELECT t.no_induk, t.tahun_ajaran_snapshot, t.komponen, t.nominal_tagihan,
         COALESCE(SUM(CASE WHEN d.bayar_id IS NULL OR d.bayar_id <> ? THEN d.jumlah ELSE 0 END), 0) AS paid
         FROM tagihan_tahunan_siswa t
         LEFT JOIN bayar_tahunan_siswa d ON d.tagihan_tahunan_id = t.id
-        WHERE t.status = 'open'
+        WHERE t.status = 'open' $filter
         GROUP BY t.id, t.no_induk, t.tahun_ajaran_snapshot, t.komponen, t.nominal_tagihan");
     $stmt->bind_param('i', $excludePaymentId);
     $stmt->execute();

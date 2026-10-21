@@ -4,7 +4,7 @@ require_once __DIR__.'/legacy_finance.php';
 require_once __DIR__.'/legacy_operational_read.php';
 require_once __DIR__.'/history_performance.php';
 require_once __DIR__.'/payment_time.php';
-function lful_read_ready(mysqli $db): bool {static $cache=[];$key=spl_object_id($db).':'.$db->query('SELECT DATABASE()')->fetch_row()[0];return $cache[$key]??=legacy_full_ready($db);}
+function lful_read_ready(mysqli $db): bool {static $cache=[];$key=hp_connection_key($db);return $cache[$key]??=legacy_full_ready($db);}
 function lful_operator_key(int $unit,?string $operator): string {return 'legacy:'.$unit.':'.bin2hex((string)$operator);}
 function lful_operator_options(mysqli $db): array {
     if(!lful_read_ready($db))return [];
@@ -20,7 +20,7 @@ function lful_operator_options(mysqli $db): array {
     // Operator IDs encode the exact source bytes. A case-insensitive DISTINCT
     // can discard a valid ID (including case or trailing-space variants).
     $parts=[];foreach($tables as $table)$parts[]="SELECT DISTINCT unit_id,CAST(source_operator AS BINARY) source_operator FROM $table WHERE $where".($table==='legacy_op_journals'?" AND origin='legacy'":'');
-    foreach(hp_rows($db,implode(' UNION ',$parts)) as $r)$out[lful_operator_key((int)$r['unit_id'],$r['source_operator'])]='Legacy · '.unit_label((int)$r['unit_id']).' · '.($r['source_operator']?:'Tidak tercatat');
+    foreach(lf_rows($db,hp_operator_sql($db,implode(' UNION ',$parts))) as $r)$out[lful_operator_key((int)$r['unit_id'],$r['source_operator'])]='Legacy · '.unit_label((int)$r['unit_id']).' · '.($r['source_operator']?:'Tidak tercatat');
     return $options[$cacheKey]=$out;
 }
 /** Negative UI IDs are a disjoint read namespace, never written to bayar or authorization. */

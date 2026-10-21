@@ -27,6 +27,7 @@ $editId = max(0, (int)($_GET['edit_id'] ?? 0));
 $transactionStarted = false;
 
 try { unit_resolve_student($koneksi,$noInduk,(int)($_GET['student_id']??0)); }catch(Throwable $e){http_response_code(409);echo json_encode(['ok'=>false,'message'=>$e->getMessage()]);exit;}
+if(($_SERVER['REQUEST_METHOD']??'GET')==='GET')lb_scope_student_read($koneksi,$noInduk);
 
 try {
     if ($noInduk === '' || $bulan === '' || !preg_match('/^\d{4}$/', $tahun)) {
@@ -66,6 +67,10 @@ try {
         $status['komite'] = ['exists'=>(bool)$komite,'total'=>(float)($komite['nominal_tagihan'] ?? 0),'paid'=>max(0,$komitePaid)];
     }
     $status['obligations']=payment_obligations($koneksi,$noInduk);
+    if(($_GET['details']??'')==='1'){
+        require_once '../includes/payment_student_details.php';
+        $status['payment_details']=payment_student_details($koneksi,$noInduk,$editId);
+    }
     $status['edit_dependency'] = spp_billing_schema_ready($koneksi) ? null : ($editId > 0 ? spp_edit_dependency($koneksi, $editId, false) : null);
     $koneksi->commit();
     $transactionStarted = false;

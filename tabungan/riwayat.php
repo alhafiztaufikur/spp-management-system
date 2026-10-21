@@ -137,15 +137,13 @@ if(($_GET['all_periods']??'')==='1')$periodLabel='Semua periode';
   <meta name="viewport" content="width=device-width, initial-scale=1.0" />
   <title>Riwayat Tabungan | SistemSPP</title>
   <link rel="icon" type="image/png" href="../assets/img/favicon.png?v=2" />
-  <link rel="preconnect" href="https://fonts.googleapis.com" />
-  <link href="https://fonts.googleapis.com/css2?family=Inter:wght@300;400;500;600;700;800&display=swap" rel="stylesheet" />
-  <script>(function(){var t=localStorage.getItem('spp_theme')||'light';document.documentElement.setAttribute('data-theme',t);})();</script>
+<script>(function(){var t=localStorage.getItem('spp_theme')||'light';document.documentElement.setAttribute('data-theme',t);})();</script>
   <link rel="stylesheet" href="../assets/css/style.css?v=unitpalette4&amp;mtime=<?= filemtime(__DIR__ . '/../assets/css/style.css') ?>" />
   <link rel="stylesheet" href="../assets/css/date_controls.css?v=unitpalette4&amp;mtime=<?= filemtime(__DIR__ . '/../assets/css/date_controls.css') ?>" />
 <link rel="stylesheet" href="../assets/css/migrated_history.css?v=<?= filemtime(__DIR__.'/../assets/css/migrated_history.css') ?>">
 <link rel="stylesheet" href="../assets/css/savings_workspace.css?v=<?= filemtime(__DIR__.'/../assets/css/savings_workspace.css') ?>">
 <link rel="stylesheet" href="../assets/css/history_rombel_refinement.css?v=<?= filemtime(__DIR__.'/../assets/css/history_rombel_refinement.css') ?>">
-<link rel="stylesheet" href="../assets/css/payment_workspace_refinement.css?v=<?= filemtime(__DIR__.'/../assets/css/payment_workspace_refinement.css') ?>"></head>
+<link rel="stylesheet" href="../assets/css/payment_workspace_refinement.css?v=<?= filemtime(__DIR__.'/../assets/css/payment_workspace_refinement.css') ?>"><link rel="stylesheet" href="../assets/css/menu_refinements.css?v=<?= filemtime(__DIR__.'/../assets/css/menu_refinements.css') ?>"><link rel="stylesheet" href="../assets/css/desktop_transaction_refinements.css?v=<?= filemtime(__DIR__.'/../assets/css/desktop_transaction_refinements.css') ?>"></head>
 <body class="ui-time-polish">
 <div class="bg-orbs"><div class="orb orb-1"></div><div class="orb orb-2"></div><div class="orb orb-3"></div></div>
 <div class="layout">
@@ -183,13 +181,13 @@ if(($_GET['all_periods']??'')==='1')$periodLabel='Semua periode';
             </select>
           </div>
           <?php if(($_GET['all_periods']??'')==='1'): ?><input type="hidden" name="all_periods" value="1"><?php endif; ?>
-          <div class="sw-filter-actions"><a class="btn btn-ghost" href="riwayat.php?<?= savings_e(http_build_query(array_replace($_GET,['all_periods'=>'1','page'=>1,'id'=>null,'jenis'=>null]))) ?>">Semua Periode</a>
+          <div class="sw-filter-actions"><div class="sw-toolbar-group sw-toolbar-filter" role="group" aria-label="Filter riwayat"><a class="btn btn-ghost" href="riwayat.php?<?= savings_e(http_build_query(array_replace($_GET,['all_periods'=>'1','page'=>1,'id'=>null,'jenis'=>null]))) ?>">Semua Periode</a>
             <button type="submit" name="all_periods" value="0" class="btn btn-primary"><?= savings_icon('check') ?>Tampilkan Rekap</button>
             <a href="riwayat.php" class="btn btn-ghost"><?= savings_icon('reload') ?>Reset</a>
-            <?php if (hasRole(['admin','kasir'])): ?>
-            <a href="masuk.php" class="btn btn-primary"><?= savings_icon('up') ?>Tabungan Masuk</a>
+            </div><?php if (hasRole(['admin','kasir'])): ?>
+            <div class="sw-toolbar-group" role="group" aria-label="Transaksi tabungan"><a href="masuk.php" class="btn btn-primary"><?= savings_icon('up') ?>Tabungan Masuk</a>
             <a href="keluar.php" class="btn btn-warning"><?= savings_icon('down') ?>Tabungan Keluar</a>
-<?php if(!$archiveView): ?><a class="btn btn-ghost" href="export_history.php?<?= savings_e(http_build_query(array_replace($_GET,['format'=>'xlsx']))) ?>">Excel - Semua Hasil</a><a class="btn btn-ghost" href="export_history.php?<?= savings_e(http_build_query(array_replace($_GET,['format'=>'pdf']))) ?>">Cetak Halaman Ini</a>            <a href="<?= savings_e('../laporan/template.php?'.http_build_query(['template'=>'tabungan-siswa','tanggal_awal'=>$filter_tanggal_awal,'tanggal_akhir'=>$filter_tanggal_akhir,'q'=>$filter_nis,'student_id'=>max(0,(int)($_GET['student_id']??0)),'owner_id'=>max(0,(int)($_GET['owner_id']??0)),'all_periods'=>$_GET['all_periods']??'0','kelas'=>$rombelFilter['values'],'operator'=>$operators,'siswa_status'=>'all'])) ?>" class="btn btn-ghost"><?= savings_icon('print') ?>Cetak Laporan</a><?php endif; ?>
+</div><?php if(!$archiveView): ?><div class="sw-toolbar-group sw-toolbar-export" role="group" aria-label="Ekspor dan cetak"><a class="btn btn-ghost" href="export_history.php?<?= savings_e(http_build_query(array_replace($_GET,['format'=>'xlsx']))) ?>">Excel - Semua Hasil</a><a class="btn btn-ghost" href="export_history.php?<?= savings_e(http_build_query(array_replace($_GET,['format'=>'pdf']))) ?>">Cetak Halaman Ini</a>            <a href="<?= savings_e('../laporan/template.php?'.http_build_query(['template'=>'tabungan-siswa','tanggal_awal'=>$filter_tanggal_awal,'tanggal_akhir'=>$filter_tanggal_akhir,'q'=>$filter_nis,'student_id'=>max(0,(int)($_GET['student_id']??0)),'owner_id'=>max(0,(int)($_GET['owner_id']??0)),'all_periods'=>$_GET['all_periods']??'0','kelas'=>$rombelFilter['values'],'operator'=>$operators,'siswa_status'=>'all'])) ?>" class="btn btn-ghost"><?= savings_icon('print') ?>Cetak Laporan</a></div><?php endif; ?>
             <?php endif; ?>
           </div>
           <noscript><label>Tanggal mulai<input class="field-input" type="date" name="tanggal_awal" value="<?= savings_e($filter_tanggal_awal) ?>"></label><label>Tanggal akhir<input class="field-input" type="date" name="tanggal_akhir" value="<?= savings_e($filter_tanggal_akhir) ?>"></label><label>Nama / identitas<input class="field-input" name="nis" value="<?= savings_e($filter_nis) ?>"></label></noscript>
@@ -206,5 +204,5 @@ if(($_GET['all_periods']??'')==='1')$periodLabel='Semua periode';
 
 <script src="../assets/js/savings_history.js?v=<?= filemtime(__DIR__.'/../assets/js/savings_history.js') ?>"></script>
 <?php if(is_file(__DIR__.'/../assets/js/savings_correction.js')): ?><script src="../assets/js/savings_correction.js?v=<?= filemtime(__DIR__.'/../assets/js/savings_correction.js') ?>"></script><?php endif; ?>
-</body>
+<script src="../assets/js/correction_datetime.js?v=<?= filemtime(__DIR__.'/../assets/js/correction_datetime.js') ?>"></script></body>
 </html>

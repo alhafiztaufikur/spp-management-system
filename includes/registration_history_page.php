@@ -1,8 +1,7 @@
 <!DOCTYPE html>
 <html lang="id" data-palette="<?= unit_palette_for_view() ?>"><head>
 <meta charset="utf-8"><meta name="viewport" content="width=device-width,initial-scale=1"><title>Riwayat Daftar Ulang | SistemSPP</title>
-<link rel="icon" href="../assets/img/favicon.png?v=2"><link rel="preconnect" href="https://fonts.googleapis.com"><link href="https://fonts.googleapis.com/css2?family=Inter:wght@400;500;600;700;800&display=swap" rel="stylesheet">
-<?php foreach(['style','payment_history','payment_details','registration_history','workspace_readability','rombel_payment_refinement','payment_ui_polish'] as $css): ?><link rel="stylesheet" href="../assets/css/<?= $css ?>.css?v=<?= filemtime(__DIR__.'/../assets/css/'.$css.'.css') ?>"><?php endforeach; ?>
+<link rel="icon" href="../assets/img/favicon.png?v=2"><?php foreach(['style','payment_history','payment_details','registration_history','workspace_readability','rombel_payment_refinement','payment_ui_polish'] as $css): ?><link rel="stylesheet" href="../assets/css/<?= $css ?>.css?v=<?= filemtime(__DIR__.'/../assets/css/'.$css.'.css') ?>"><?php endforeach; ?>
 <script>document.documentElement.dataset.theme=localStorage.getItem('spp_theme')||'light';</script>
 </head><body class="payment-history-page registration-history-page" data-readable-workspace="registration-history"><div class="layout">
 <?php include __DIR__.'/sidebar.php'; ?>

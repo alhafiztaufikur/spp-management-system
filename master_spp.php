@@ -7,6 +7,7 @@ require_once 'includes/reports.php';
 require_once 'includes/spp_rate_confirmation.php';
 require_once 'includes/student_tariff_consistency.php';
 requireRole(['admin', 'kasir']);
+lop_preview_tariffs($koneksi);
 if (!spp_billing_schema_ready($koneksi)) die('Schema Master SPP belum tersedia. Hubungi operator untuk migrasi skema.');
 if (empty($_SESSION['csrf_master_spp'])) $_SESSION['csrf_master_spp']=bin2hex(random_bytes(32));
 if (empty($_SESSION['csrf_prior_debt'])) $_SESSION['csrf_prior_debt']=bin2hex(random_bytes(32));
@@ -190,8 +191,6 @@ $yearStart = (int)substr($selectedYear, 0, 4);
   <meta charset="UTF-8"><meta name="viewport" content="width=device-width,initial-scale=1">
   <title>Master Penerbitan SPP | SistemSPP</title>
   <link rel="icon" href="assets/img/favicon.png?v=2">
-  <link rel="preconnect" href="https://fonts.googleapis.com">
-  <link href="https://fonts.googleapis.com/css2?family=Inter:wght@300;400;500;600;700;800&display=swap" rel="stylesheet">
   <link rel="stylesheet" href="assets/css/style.css?v=unitpalette5&amp;mtime=<?= filemtime(__DIR__ . '/assets/css/style.css') ?>">
   <link rel="stylesheet" href="assets/css/date_controls.css?v=unitpalette5&amp;mtime=<?= filemtime(__DIR__ . '/assets/css/date_controls.css') ?>">
   <link rel="stylesheet" href="assets/css/master_spp.css?v=<?= filemtime(__DIR__ . '/assets/css/master_spp.css') ?>">

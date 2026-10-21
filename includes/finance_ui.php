@@ -20,7 +20,8 @@ function finance_payment_trend(mysqli $db,string $lastDay,string $studentSql,arr
     $firstDay=date('Y-m-d',strtotime($lastDay.' -6 days'));
     $end=date('Y-m-d',strtotime($lastDay.' +1 day'));
     require_once __DIR__.'/general_history.php';
-    $source=mh_payment_source($db);
+    // Recovered clocks retain the stored calendar date; a daily count needs no clock join.
+    $source=mh_payment_source($db,false,null,false);
     [$where,$values]=general_history_filter('b','TGL_BYR',$firstDay,$end,is_string($_GET['q']??null)?mb_substr(trim($_GET['q']),0,100):'');
     $counts=array_column(hp_rows($db,"SELECT DATE(b.TGL_BYR) day,COUNT(*) n FROM $source b WHERE $where GROUP BY DATE(b.TGL_BYR)",$values),'n','day');
     $result=[];

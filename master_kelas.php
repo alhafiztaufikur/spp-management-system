@@ -255,7 +255,7 @@ require_once __DIR__.'/includes/master_workspace_ui.php';
 <link rel="stylesheet" href="assets/css/rombel_payment_refinement.css?v=<?= filemtime(__DIR__.'/assets/css/rombel_payment_refinement.css') ?>">
 <link rel="stylesheet" href="assets/css/legacy_workspace.css?v=<?= filemtime(__DIR__.'/assets/css/legacy_workspace.css') ?>">
 <link rel="stylesheet" href="assets/css/special_classes.css?v=<?= filemtime(__DIR__.'/assets/css/special_classes.css') ?>">
-</head>
+<link rel="stylesheet" href="assets/css/menu_refinements.css?v=<?= filemtime(__DIR__.'/assets/css/menu_refinements.css') ?>"></head>
 <body data-readable-workspace="master-classes">
 <div class="bg-orbs"><div class="orb orb-1"></div><div class="orb orb-2"></div><div class="orb orb-3"></div></div>
 <div class="layout">
@@ -364,7 +364,9 @@ require_once __DIR__.'/includes/master_workspace_ui.php';
         <div class="field-row"><label class="field-label" for="promotion-source-level">Tingkat Asal</label><select id="promotion-source-level" name="source_level" class="field-input field-select" required><option value="">Pilih tingkat</option><option value="psb" <?= $monitorPsb?'selected':'' ?>>PSB</option><?php foreach(range($unitMinLevel,$unitMaxLevel) as $grade): ?><option value="<?= $grade ?>" <?= $currentPromotionLevel===$grade?'selected':'' ?>>Kelas <?= $grade ?><?= $grade===$unitMaxLevel?' (Kelulusan)':'' ?></option><?php endforeach; ?></select></div>
         <div class="field-row"><span class="field-label" id="promotion-target-label"><?= $monitorPsb?(unit_all_readonly()?'Mode Tampilan':'Kelas Tujuan'):((!$customPromotion && $currentPromotionLevel===$unitMaxLevel)?'Tahun Kelulusan':'Tahun Ajaran Tujuan') ?></span><strong id="promotion-target-year"><?= $monitorPsb?(unit_all_readonly()?'Pemantauan PSB':'Kelas '.$unitMinLevel):htmlspecialchars(((!$customPromotion && $currentPromotionLevel===$unitMaxLevel)?$sourceYear:$nextAcademicYear)?:'Pilih tahun asal') ?></strong><small><?= $monitorPsb?(unit_all_readonly()?'Pilih satu unit untuk menempatkan siswa PSB.':'Penempatan awal pada tahun ajaran '.$psbYear.'.'):((!$customPromotion && $currentPromotionLevel===$unitMaxLevel)?'Kelulusan memakai tahun asal, tanpa membuat penempatan tahun berikutnya.':'Tepat satu tahun berikutnya; tahun mendatang belum boleh menjadi asal.') ?></small></div>
         <div class="report-filter-actions"><button class="btn btn-primary" type="submit"><?= master_workspace_icon('send') ?>Tampilkan Peserta</button></div>
+      <input type="hidden" name="show_participants" value="1">
       </form>
+      <p class="promotion-context-pending" id="promotion-context-pending" role="status" tabindex="-1" hidden>Pilihan belum diterapkan. Klik Tampilkan Peserta untuk memuat daftar yang sesuai sebelum memproses siswa.</p>
       <noscript><a class="btn btn-ghost" href="master_kelas.php?source_level=psb#naik-kelas">Lihat Siswa PSB</a></noscript>
       <?php else: ?><p class="payment-auto-note">Pilih SD, SMP, atau SMA untuk mengelola rombel dan memproses tahun ajaran. Semua Unit digunakan untuk pemantauan.</p><a class="btn btn-ghost" href="master_kelas.php?source_level=psb#naik-kelas">Lihat PSB</a><?php endif; ?>
     </section>

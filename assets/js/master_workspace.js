@@ -10,7 +10,8 @@ document.addEventListener('DOMContentLoaded', function () {
       const input = card.querySelector('.rupiah-input');
       const rate = Number((input.value || '').replace(/\D/g, '')) || 0;
       const estimate = rate * Number(card.dataset.students || 0);
-      card.querySelector('[data-du-estimate]').textContent = money(estimate);
+      const estimateOutput=card.querySelector('[data-du-estimate]');
+      if(estimateOutput)estimateOutput.textContent = money(estimate);
       total += estimate;
     });
     const output = form.querySelector('[data-du-total-estimate]');

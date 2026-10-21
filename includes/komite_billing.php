@@ -157,9 +157,9 @@ function komite_save_payment(mysqli $db, int $paymentId, ?array $bill, float $am
     $stmt->bind_param('iid',$paymentId,$billId,$amount);$stmt->execute();$stmt->close();
 }
 
-function komite_payment_payload(mysqli $db, int $excludePaymentId=0): array {
-    $result=[];
-    $stmt=$db->prepare("SELECT tk.no_induk,tk.bulan,tk.tahun,tk.nominal_tagihan,COALESCE(SUM(CASE WHEN bk.bayar_id<>? THEN bk.nominal ELSE 0 END),0) paid FROM tagihan_komite tk LEFT JOIN bayar_komite bk ON bk.tagihan_komite_id=tk.id WHERE tk.status='open' GROUP BY tk.id");
+function komite_payment_payload(mysqli $db, int $excludePaymentId=0, ?string $noInduk=null): array {
+    $result=[];$filter=$noInduk===null?'':" AND tk.no_induk='".$db->real_escape_string($noInduk)."'";
+    $stmt=$db->prepare("SELECT tk.no_induk,tk.bulan,tk.tahun,tk.nominal_tagihan,COALESCE(SUM(CASE WHEN bk.bayar_id<>? THEN bk.nominal ELSE 0 END),0) paid FROM tagihan_komite tk LEFT JOIN bayar_komite bk ON bk.tagihan_komite_id=tk.id WHERE tk.status='open' $filter GROUP BY tk.id");
     $stmt->bind_param('i',$excludePaymentId);$stmt->execute();
     foreach ($stmt->get_result()->fetch_all(MYSQLI_ASSOC) as $row) {
         $key=$row['bulan'].'-'.$row['tahun'];

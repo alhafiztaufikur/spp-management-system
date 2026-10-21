@@ -23,6 +23,10 @@ function one_time_fee_totals_from_student(array $student): array {
  * @return array<string,array{label:string,total:float,paid:float,remaining:float}>
  */
 function one_time_fee_status(mysqli $db, string $noInduk, int $excludePaymentId = 0, bool $forUpdate = false): array {
+    static $readCache=[];
+    $cacheRead=PHP_SAPI!=='cli'&&($_SERVER['REQUEST_METHOD']??'')==='GET'&&!$forUpdate;
+    $cacheKey=$db->thread_id.':'.(int)($GLOBALS['app_unit_id']??unit_active_id()).':'.$noInduk.':'.$excludePaymentId;
+    if($cacheRead&&isset($readCache[$cacheKey]))return $readCache[$cacheKey];
     $lock = $forUpdate ? ' FOR UPDATE' : '';
     $stmt = $db->prepare('SELECT PSB,potongan_psb_nominal FROM siswa WHERE NO_INDUK=? LIMIT 1' . $lock);
     $stmt->bind_param('s', $noInduk);
@@ -64,6 +68,7 @@ function one_time_fee_status(mysqli $db, string $noInduk, int $excludePaymentId 
             'remaining' => max(0, $total - $paidAmount),
         ];
     }
+    if($cacheRead)$readCache[$cacheKey]=$result;
     return $result;
 }
 

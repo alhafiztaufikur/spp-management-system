@@ -140,15 +140,16 @@ function du_assert_payment_amount(array $bill, float $amount): void {
 }
 
 /** @return array<string,array<int,array<string,mixed>>> */
-function du_selectable_bills_payload(mysqli $db, int $excludePaymentId = 0, int $alwaysIncludeBillId = 0): array {
+function du_selectable_bills_payload(mysqli $db, int $excludePaymentId = 0, int $alwaysIncludeBillId = 0, ?string $noInduk = null): array {
     $current = du_current_academic_year();
+    $filter=$noInduk===null?'':" AND tdu.no_induk='".$db->real_escape_string($noInduk)."'";
     $stmt = $db->prepare("SELECT tdu.id,tdu.no_induk,tdu.kelas_snapshot,tdu.tahun_ajaran_snapshot,
             tdu.nominal_tagihan,tdu.status,ta.status AS tahun_status,
             COALESCE(SUM(CASE WHEN bd.bayar_id IS NULL OR bd.bayar_id<>? THEN bd.jumlah ELSE 0 END),0) AS terbayar
         FROM tagihan_daftar_ulang tdu
         JOIN tahun_ajaran ta ON ta.id=tdu.tahun_ajaran_id
         LEFT JOIN bayar_du bd ON bd.tagihan_daftar_ulang_id=tdu.id
-        WHERE tdu.status='open' AND tdu.tahun_ajaran_snapshot<=?
+        WHERE tdu.status='open' AND tdu.tahun_ajaran_snapshot<=? $filter
         GROUP BY tdu.id,tdu.no_induk,tdu.kelas_snapshot,tdu.tahun_ajaran_snapshot,
                  tdu.nominal_tagihan,tdu.status,ta.status
         ORDER BY tdu.tahun_ajaran_snapshot,tdu.id");

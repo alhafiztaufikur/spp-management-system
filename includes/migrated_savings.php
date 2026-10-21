@@ -43,7 +43,9 @@ function mh_account_activity_many(mysqli $db,array $rows): array {
     }
     if(lop_ready($db)){
         $filters=[];if($studentIds)$filters[]='o.student_id IN ('.implode(',',array_unique($studentIds)).')';if($ownerIds)$filters[]='o.id IN ('.implode(',',array_unique($ownerIds)).')';
-        $parts[]="SELECT j.unit_id,IF(o.student_id IS NULL,CONCAT('o:',o.id),CONCAT('s:',o.student_id)) owner_key,MAX(j.source_date) last_activity,COUNT(*) journal_count FROM legacy_op_journals j JOIN legacy_op_owners o ON o.id=j.owner_id AND o.unit_id=j.unit_id JOIN legacy_full_batches b ON b.id=j.batch_id AND b.unit_id=j.unit_id WHERE (".implode(' OR ',$filters).") AND j.cancelled=0 AND j.origin<>'adjustment' AND b.state='completed' GROUP BY j.unit_id,owner_key";
+        $selectedOwners=array_column(hp_rows($db,'SELECT o.id FROM legacy_op_owners o WHERE '.implode(' OR ',$filters)),'id');
+        $selectedOwners=implode(',',array_map('intval',$selectedOwners))?:'0';
+        $parts[]="SELECT j.unit_id,IF(o.student_id IS NULL,CONCAT('o:',o.id),CONCAT('s:',o.student_id)) owner_key,MAX(j.source_date) last_activity,COUNT(*) journal_count FROM legacy_op_journals j JOIN legacy_op_owners o ON o.id=j.owner_id AND o.unit_id=j.unit_id JOIN legacy_full_batches b ON b.id=j.batch_id AND b.unit_id=j.unit_id WHERE j.owner_id IN ($selectedOwners) AND j.cancelled=0 AND j.origin<>'adjustment' AND b.state='completed' GROUP BY j.unit_id,owner_key";
     }
     $activity=[];if($parts)foreach(hp_rows($db,'SELECT unit_id,owner_key,MAX(last_activity) last_activity,SUM(journal_count) journal_count FROM ('.implode(' UNION ALL ',$parts).') a GROUP BY unit_id,owner_key') as $j)$activity[$j['unit_id'].'|'.$j['owner_key']]=$j;
     foreach($rows as &$r){$j=$activity[$r['unit_id'].'|'.($r['student_id']?'s:'.$r['student_id']:'o:'.$r['legacy_owner_id'])]??[];$r['last_activity']=$j['last_activity']??null;$r['journal_count']=(int)($j['journal_count']??0);}unset($r);return $rows;

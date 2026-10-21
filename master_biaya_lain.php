@@ -15,7 +15,8 @@ function master_amount($value): float {
 }
 
 function master_redirect(): void {
-    header('Location: master_biaya_lain.php');
+    $tab=$_POST['master_tab']??$_GET['master_tab']??'aktif';if(!is_string($tab)||!in_array($tab,['aktif','nonaktif','hapus'],true))$tab='aktif';
+    header('Location: master_biaya_lain.php?master_tab='.$tab.'#daftar-master-biaya');
     exit;
 }
 
@@ -191,6 +192,11 @@ $masterList = $koneksi->query("
     ) t ON t.master_biaya_lain_id = m.id
     ORDER BY m.is_active DESC, m.nama ASC
 ");
+$masterRows=$masterList->fetch_all(MYSQLI_ASSOC);
+$masterTab=is_string($_GET['master_tab']??null)&&in_array($_GET['master_tab'],['aktif','nonaktif','hapus'],true)?$_GET['master_tab']:'aktif';
+$masterCounts=['aktif'=>0,'nonaktif'=>0,'hapus'=>0];
+foreach($masterRows as &$master){$master['reserved']=lf_reserved_master($koneksi,(int)$master['id']);$master['can_delete']=!$master['reserved']&&(int)$master['jumlah_pemakaian']===0&&(int)$master['jumlah_tagihan']===0;$masterCounts[$master['is_active']?'aktif':'nonaktif']++;if($master['can_delete'])$masterCounts['hapus']++;}unset($master);
+$masterRows=array_values(array_filter($masterRows,static fn($m)=>$masterTab==='hapus'?$m['can_delete']:(bool)$m['is_active']===($masterTab==='aktif')));
 $activeMasters = $koneksi->query("SELECT * FROM master_biaya_lain WHERE is_active=1 AND jenis_pembayaran='tidak_berulang' ORDER BY nama")->fetch_all(MYSQLI_ASSOC);
 $activeMasters=array_values(array_filter($activeMasters,static fn($master)=>!lf_reserved_master($koneksi,(int)$master['id'])));
 $activeClasses = array_values(array_filter(class_all($koneksi,true),static fn($c)=>in_array(class_kind($c),['reguler','psb'],true)));
@@ -204,8 +210,6 @@ require_once __DIR__ . '/includes/master_workspace_ui.php';
   <meta name="viewport" content="width=device-width, initial-scale=1.0" />
   <title>Master Biaya Lain | SistemSPP</title>
   <link rel="icon" type="image/png" href="assets/img/favicon.png?v=2" />
-  <link rel="preconnect" href="https://fonts.googleapis.com" />
-  <link href="https://fonts.googleapis.com/css2?family=Inter:wght@300;400;500;600;700;800&display=swap" rel="stylesheet" />
   <link rel="stylesheet" href="assets/css/style.css?v=unitpalette4&amp;mtime=<?= filemtime(__DIR__ . '/assets/css/style.css') ?>" />
   <link rel="stylesheet" href="assets/css/date_controls.css?v=unitpalette4&amp;mtime=<?= filemtime(__DIR__ . '/assets/css/date_controls.css') ?>" />
   <link rel="stylesheet" href="assets/css/master_biaya_lain.css?v=<?= filemtime(__DIR__ . '/assets/css/master_biaya_lain.css') ?>" />
@@ -213,7 +217,7 @@ require_once __DIR__ . '/includes/master_workspace_ui.php';
   <script>(function(){var t=localStorage.getItem('spp_theme')||'light';document.documentElement.setAttribute('data-theme',t);})();</script>
 <link rel="stylesheet" href="assets/css/rombel_payment_refinement.css?v=<?= filemtime(__DIR__.'/assets/css/rombel_payment_refinement.css') ?>">
 <link rel="stylesheet" href="assets/css/payment_ui_polish.css?v=<?= filemtime(__DIR__ . '/assets/css/payment_ui_polish.css') ?>">
-</head>
+<link rel="stylesheet" href="assets/css/menu_refinements.css?v=<?= filemtime(__DIR__.'/assets/css/menu_refinements.css') ?>"></head>
 <body data-readable-workspace="master-fees">
   <div class="bg-orbs"><div class="orb orb-1"></div><div class="orb orb-2"></div><div class="orb orb-3"></div></div>
   <div class="layout">
@@ -271,7 +275,7 @@ require_once __DIR__ . '/includes/master_workspace_ui.php';
           <div><h2><?= $editData ? 'Edit Master Biaya' : 'Tambah Master Biaya' ?></h2><?php if($editData): ?><p>Perbarui jenis biaya; transaksi lama tetap memakai tarif sebelumnya.</p><?php endif; ?></div>
         </div>
         <form method="POST" action="master_biaya_lain.php" id="form-master-biaya">
-          <input type="hidden" name="csrf_token" value="<?= htmlspecialchars($_SESSION['csrf_master_biaya_lain']) ?>" />
+          <input type="hidden" name="master_tab" value="<?= htmlspecialchars($masterTab) ?>"><input type="hidden" name="csrf_token" value="<?= htmlspecialchars($_SESSION['csrf_master_biaya_lain']) ?>" />
           <input type="hidden" name="aksi" value="<?= $editData ? 'update' : 'tambah' ?>" />
           <input type="hidden" name="id" value="<?= (int)($editData['id'] ?? 0) ?>" />
           <div class="fields-grid master-fee-form">
@@ -305,14 +309,15 @@ require_once __DIR__ . '/includes/master_workspace_ui.php';
       </div>
 
       <div class="main-card master-modern-card master-modern-list fee-list-panel" id="daftar-master-biaya" style="margin-top:0">
-        <div class="card-title-row fee-panel-heading"><span class="fee-icon"><?= master_workspace_icon('document') ?></span><div><h2>Daftar Master Biaya (<?= $masterList->num_rows ?>)</h2></div></div>
+        <div class="card-title-row fee-panel-heading"><span class="fee-icon"><?= master_workspace_icon('document') ?></span><div><h2>Daftar Master Biaya (<?= count($masterRows) ?>)</h2></div></div>
+        <nav class="fee-master-tabs" aria-label="Bagian master biaya"><?php foreach(['aktif'=>'Aktif','nonaktif'=>'Nonaktif','hapus'=>'Bisa Dihapus'] as $tab=>$label): ?><a href="master_biaya_lain.php?master_tab=<?= $tab ?>#daftar-master-biaya" <?= $masterTab===$tab?'aria-current="page"':'' ?>><?= $label ?><span class="badge-count"><?= $masterCounts[$tab] ?></span></a><?php endforeach; ?></nav>
         <div class="table-container">
           <table class="payment-table responsive-table">
             <thead><tr><th>No</th><th>Nama Biaya</th><th>Nominal</th><th>Jenis</th><th>Status</th><th>Tagihan Terbit</th><th>Transaksi</th><th>Aksi</th></tr></thead>
             <tbody>
-              <?php if ($masterList->num_rows === 0): ?>
-              <tr><td colspan="8"><div class="empty-state"><p>Belum ada master biaya lain</p><span>Tambahkan biaya dari formulir di atas.</span></div></td></tr>
-              <?php else: $no = 1; while ($item = $masterList->fetch_assoc()): ?>
+              <?php if (!$masterRows): ?>
+              <tr><td colspan="8"><div class="empty-state"><p>Tidak ada master pada bagian ini</p><span>Pilih bagian lain atau tambahkan master biaya.</span></div></td></tr>
+              <?php else: $no = 1; foreach ($masterRows as $item): ?>
               <tr>
                 <td data-label="No"><?= $no++ ?></td>
                 <td data-label="Nama Biaya"><strong><?= unit_record_badge($item) ?><?= htmlspecialchars($item['nama']) ?></strong></td>
@@ -322,21 +327,22 @@ require_once __DIR__ . '/includes/master_workspace_ui.php';
                 <td data-label="Transaksi"><span class="badge-count"><?= (int)$item['jumlah_pemakaian'] ?>x</span></td>
                 <td data-label="Aksi" class="aksi-col">
                   <?php if(lf_reserved_master($koneksi,(int)$item['id'])): ?><span class="master-status">Pengesahan Legacy</span><?php else: ?>
-                  <a class="btn-tbl btn-tbl-edit" href="master_biaya_lain.php?edit=<?= (int)$item['id'] ?>">Edit</a>
+                  <a class="btn-tbl btn-tbl-edit" href="master_biaya_lain.php?master_tab=<?= $masterTab ?>&amp;edit=<?= (int)$item['id'] ?>">Edit</a>
                   <form method="POST" action="master_biaya_lain.php" style="display:inline">
-                    <input type="hidden" name="csrf_token" value="<?= htmlspecialchars($_SESSION['csrf_master_biaya_lain']) ?>" />
+                    <input type="hidden" name="master_tab" value="<?= htmlspecialchars($masterTab) ?>"><input type="hidden" name="csrf_token" value="<?= htmlspecialchars($_SESSION['csrf_master_biaya_lain']) ?>" />
                     <input type="hidden" name="aksi" value="toggle" /><input type="hidden" name="id" value="<?= (int)$item['id'] ?>" /><input type="hidden" name="target_active" value="<?= $item['is_active'] ? '0' : '1' ?>" />
                     <button class="btn-tbl btn-tbl-toggle" type="submit"><?= $item['is_active'] ? 'Nonaktifkan' : 'Aktifkan' ?></button>
                   </form>
                   <form method="POST" action="master_biaya_lain.php" style="display:inline" onsubmit="return confirm('Hapus master biaya <?= htmlspecialchars(addslashes($item['nama'])) ?>?')">
-                    <input type="hidden" name="csrf_token" value="<?= htmlspecialchars($_SESSION['csrf_master_biaya_lain']) ?>" />
+                    <input type="hidden" name="master_tab" value="<?= htmlspecialchars($masterTab) ?>"><input type="hidden" name="csrf_token" value="<?= htmlspecialchars($_SESSION['csrf_master_biaya_lain']) ?>" />
                     <input type="hidden" name="aksi" value="hapus" /><input type="hidden" name="id" value="<?= (int)$item['id'] ?>" />
                     <button class="btn-tbl btn-tbl-del" type="submit" <?= ((int)$item['jumlah_pemakaian'] > 0 || (int)$item['jumlah_tagihan'] > 0) ? 'disabled title="Sudah memiliki tagihan atau transaksi"' : '' ?>>Hapus</button>
                   </form>
                   <?php endif; ?>
+                  <?php if(!$item['can_delete']): ?><small class="fee-master-lock"><?= $item['reserved']?'Dikelola melalui pengesahan Legacy.':'Tidak dapat dihapus: sudah memiliki tagihan atau transaksi.' ?></small><?php endif; ?>
                 </td>
               </tr>
-              <?php endwhile; endif; ?>
+              <?php endforeach; endif; ?>
             </tbody>
           </table>
         </div>

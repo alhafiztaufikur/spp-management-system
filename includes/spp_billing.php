@@ -369,6 +369,10 @@ function spp_publish_students(mysqli $db, int $masterYearId, array $students, ar
 
 
 function spp_open_bills(mysqli $db, string $noInduk, bool $forUpdate=false): array {
+    static $readCache=[];
+    $cacheRead=PHP_SAPI!=='cli'&&($_SERVER['REQUEST_METHOD']??'')==='GET'&&!$forUpdate;
+    $cacheKey=$db->thread_id.':'.(int)($GLOBALS['app_unit_id']??unit_active_id()).':'.$noInduk;
+    if($cacheRead&&isset($readCache[$cacheKey]))return $readCache[$cacheKey];
     $sql="SELECT ts.*,COALESCE(SUM(CASE WHEN ab.status='active' THEN a.nominal_dari_bayar ELSE 0 END),0) paid
       FROM tagihan_spp ts LEFT JOIN spp_alokasi a ON a.tagihan_spp_id=ts.id LEFT JOIN spp_alokasi_batch ab ON ab.id=a.batch_id
       WHERE ts.no_induk=? AND ts.status='open'
@@ -376,7 +380,9 @@ function spp_open_bills(mysqli $db, string $noInduk, bool $forUpdate=false): arr
     if($forUpdate)$sql.=' FOR UPDATE';
     $stmt=$db->prepare($sql);$stmt->bind_param('s',$noInduk);$stmt->execute();$rows=$stmt->get_result()->fetch_all(MYSQLI_ASSOC);$stmt->close();
     foreach($rows as &$row){$row['legacy_paid']=lb_spp_credit($db,$noInduk,$row['bulan'],$row['tahun']);$row['paid']=(float)$row['paid']+$row['legacy_paid'];$row['remaining']=max(0,(float)$row['nominal_tagihan']-$row['paid']);}unset($row);
-    return array_values(array_filter($rows,static fn($r)=>$r['remaining']>.001));
+    $rows=array_values(array_filter($rows,static fn($r)=>$r['remaining']>.001));
+    if($cacheRead)$readCache[$cacheKey]=$rows;
+    return $rows;
 }
 
 function spp_published_period_status(mysqli $db, string $noInduk, string $month, string $year, int $excludePaymentId=0): array {
@@ -410,14 +416,15 @@ function spp_published_period_status(mysqli $db, string $noInduk, string $month,
     return $status;
 }
 
-function spp_payment_payload(mysqli $db, int $excludePaymentId = 0): array {
+function spp_payment_payload(mysqli $db, int $excludePaymentId = 0, ?string $noInduk = null): array {
     $payload=[];
-    $result=$db->query('SELECT NO_INDUK FROM siswa');
+    $filter=$noInduk===null?'':" AND ts.no_induk='".$db->real_escape_string($noInduk)."'";
+    $result=$db->query('SELECT NO_INDUK FROM siswa'.($noInduk===null?'':" WHERE NO_INDUK='".$db->real_escape_string($noInduk)."'"));
     while($row=$result->fetch_assoc())$payload[$row['NO_INDUK']]=['tagihan'=>[]];
     $excludeAllocation=$excludePaymentId>0?' AND (ab.bayar_id IS NULL OR ab.bayar_id<>'.(int)$excludePaymentId.')':'';
     $result=$db->query("SELECT ts.*,ta.label tahun_ajaran,COALESCE(SUM(CASE WHEN ab.status='active'".$excludeAllocation." THEN a.nominal_dari_bayar ELSE 0 END),0) paid
       FROM tagihan_spp ts JOIN tahun_ajaran ta ON ta.id=ts.tahun_ajaran_id LEFT JOIN spp_alokasi a ON a.tagihan_spp_id=ts.id LEFT JOIN spp_alokasi_batch ab ON ab.id=a.batch_id
-      WHERE ts.status='open' GROUP BY ts.id ORDER BY CAST(ts.tahun AS UNSIGNED),CAST(ts.bulan AS UNSIGNED)");
+      WHERE ts.status='open' $filter GROUP BY ts.id ORDER BY CAST(ts.tahun AS UNSIGNED),CAST(ts.bulan AS UNSIGNED)");
     while($row=$result->fetch_assoc()){
         $row['paid']=(float)$row['paid']+lb_spp_credit($db,$row['no_induk'],$row['bulan'],$row['tahun']);
         $remaining=max(0,(float)$row['nominal_tagihan']-(float)$row['paid']);if($remaining<=.001)continue;

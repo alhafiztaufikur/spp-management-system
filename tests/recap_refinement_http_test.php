@@ -1,0 +1,42 @@
+<?php
+if(PHP_SAPI!=='cli')exit(1);
+require_once __DIR__.'/http_form_scope.php';spp_test_assert_database_target();
+require_once __DIR__.'/../koneksi.php';spp_test_assert_database_target($koneksi);
+require_once __DIR__.'/../includes/legacy_operational_corrections.php';
+$base=(string)getenv('SPP_TEST_BASE_URL');spp_test_assert_http_clone($base,DB_NAME);
+$qa=(string)getenv('SPP_RECAP_QA');$fixture=json_decode(file_get_contents($qa.'/fixture.json'),true,512,JSON_THROW_ON_ERROR);$checks=0;$cookie='';
+function rh_check(bool $ok,string $label):void{global $checks;if(!$ok)throw new RuntimeException($label);$checks++;}
+function rh_http(string $path,?array $data=null):array{global $base,$cookie;$c=curl_init($base.'/'.$path);curl_setopt_array($c,[CURLOPT_RETURNTRANSFER=>true,CURLOPT_HEADER=>true,CURLOPT_COOKIE=>'PHPSESSID='.$cookie,CURLOPT_TIMEOUT=>90]);if($data!==null)curl_setopt_array($c,[CURLOPT_POST=>true,CURLOPT_POSTFIELDS=>http_build_query($data)]);$raw=curl_exec($c);if($raw===false)throw new RuntimeException(curl_error($c));$n=curl_getinfo($c,CURLINFO_HEADER_SIZE);$code=curl_getinfo($c,CURLINFO_RESPONSE_CODE);curl_close($c);$body=substr($raw,$n);rh_check(!preg_match('/Fatal error|Warning:|Uncaught /',$body),'No runtime error');return [$code,$body,substr($raw,0,$n)];}
+function rh_form(string $html,string $field):array{$dom=new DOMDocument();@$dom->loadHTML($html);$xp=new DOMXPath($dom);$forms=$xp->query('//form[.//input[@name="'.$field.'"]]');rh_check($forms->length>0,'Correct application form');$form=$forms->item(0);$data=[];foreach($form->getElementsByTagName('input') as $input){if($input->getAttribute('type')==='checkbox'&&!$input->hasAttribute('checked'))continue;$name=$input->getAttribute('name');if($name!=='')$data[$name]=$input->getAttribute('value');}foreach($form->getElementsByTagName('textarea') as $input)$data[$input->getAttribute('name')]=$input->textContent;return $data;}
+foreach([1,2,3] as $unit){
+ $_SESSION=['admin_role'=>'admin','active_unit_id'=>$unit];unit_set_context($koneksi,$unit);$cookie=$fixture['sessions']['admin'][$unit];$id=(int)$fixture['samples'][$unit]['id'];$path='legacy_correction.php?kind=journal&id='.$id;$before=lop_record($koneksi,'journal',$id);
+ [$status,$html]=rh_http($path);rh_check($status===200,'Admin journal page accessible');$fields=rh_form($html,'incoming_display');rh_check((int)$fields['owner_id']===(int)$before['owner_id'],'Owner fixed on admin form');$fields['incoming_display']=number_format((lf_cents($before['incoming'])+13)/100,2,',','.');$fields['reason']='Pengujian HTTP Administrator pada salinan database.';
+ [$status,$html]=rh_http($path,$fields);rh_check($status===200&&str_contains($html,'Simpan koreksi ini?'),'Preview succeeds');$save=rh_form($html,'digest');$save['confirmation']='SIMPAN KOREKSI';$save['action']='save';
+ [$status,$html]=rh_http($path,$save);rh_check($status===200&&str_contains($html,'Koreksi tersimpan'),'Admin saves directly');$after=lop_record($koneksi,'journal',$id);rh_check(lf_cents($after['incoming'])===lf_cents($before['incoming'])+13,'Exact cents stored');rh_check($after['source_operator']===$before['source_operator'],'Original operator unchanged');
+ rh_http($path,$save);rh_check((int)lop_record($koneksi,'journal',$id)['version']===(int)$after['version'],'HTTP replay does not duplicate');
+ [$status,$html]=rh_http($path);$restore=rh_form($html,'incoming_display');$restore['incoming_display']=number_format(lf_cents($before['incoming'])/100,2,',','.');$restore['reason']='Pemulihan nominal asli setelah pengujian HTTP.';
+ [$status,$html]=rh_http($path,$restore);rh_check($status===200,'Restore preview');$restoreSave=rh_form($html,'digest');$restoreSave['confirmation']='SIMPAN KOREKSI';$restoreSave['action']='save';rh_http($path,$restoreSave);rh_check(lop_record($koneksi,'journal',$id)['incoming']===$before['incoming'],'Original amount restored');
+ $bad=$restore;$bad['csrf_token']='invalid';[$status]=rh_http($path,$bad);rh_check($status===403,'Invalid CSRF rejected');$bad=$restore;$bad['_operational_unit']=$unit===1?'2':'1';[$status]=rh_http($path,$bad);rh_check($status===409,'Changed form unit rejected');
+ [$status]=rh_http('legacy_correction.php?kind=payment&id=1');rh_check($status===403,'Payment correction still restricted');
+ [$status]=rh_http('legacy_accounts.php');rh_check($status===400,'Existing directory still requires its batch/class context');
+}
+// Native savings Administrator correction through the actual rendered form.
+$unit=1;$cookie=$fixture['sessions']['admin'][1];$_SESSION=['admin_role'=>'admin','active_unit_id'=>1];unit_set_context($koneksi,1);
+$student=$koneksi->query("SELECT s.id,s.NO_INDUK,t.SALDO FROM siswa s JOIN tabungan t ON t.NO_INDUK=s.NO_INDUK AND t.unit_id=s.unit_id WHERE s.is_active=1 AND s.legacy_pending=0 ORDER BY s.id LIMIT 1")->fetch_assoc();
+[$status,$html]=rh_http('tabungan/masuk.php?student_id='.$student['id']);$entry=rh_form($html,'request_key');$entry['nominal']='100.000,13';$entry['keterangan']='QA native savings correction';rh_http('tabungan/proses.php',$entry);
+$native=$koneksi->query("SELECT * FROM transaksi_m WHERE NO_INDUK='".$koneksi->real_escape_string($student['NO_INDUK'])."' ORDER BY id DESC LIMIT 1")->fetch_assoc();rh_check($native&&lf_cents($native['MASUK'])===10000013,'Native fixture deposit');
+[$status,$html]=rh_http('tabungan/riwayat.php?all_periods=1&jenis=masuk&id='.$native['id']);$edit=rh_form($html,'expected_hash');$edit['action']='direct_edit';$edit['nominal']='100.000,26';$edit['tanggal']=$native['TANGGAL'];$edit['keterangan']='QA direct administrator edit';$edit['reason']='Pembetulan nominal oleh Administrator untuk pengujian.';[$status]=rh_http('tabungan/koreksi.php',$edit);rh_check($status===303,'Native Administrator direct edit accepted');
+rh_check(lf_cents($koneksi->query('SELECT MASUK FROM transaksi_m WHERE id='.(int)$native['id'])->fetch_row()[0])===10000026,'Native cents corrected');
+[$status,$html]=rh_http('tabungan/riwayat.php?all_periods=1&jenis=masuk&id='.$native['id']);$delete=rh_form($html,'expected_hash');$delete['action']='direct_hapus';$delete['reason']='Hapus transaksi fixture setelah pengujian selesai.';rh_http('tabungan/koreksi.php',$delete);
+rh_check(!$koneksi->query('SELECT id FROM transaksi_m WHERE id='.(int)$native['id'])->num_rows,'Native test deposit removed through existing service');rh_check(lf_cents($koneksi->query("SELECT SALDO FROM tabungan WHERE NO_INDUK='".$koneksi->real_escape_string($student['NO_INDUK'])."'")->fetch_row()[0])===lf_cents($student['SALDO']),'Native balance restored');
+// A master can become used between viewing the deletable tab and submitting Hapus.
+$name='QA deletable master '.bin2hex(random_bytes(5));$stmt=$koneksi->prepare("INSERT INTO master_biaya_lain(nama,nominal,is_active,jenis_pembayaran) VALUES(?,1000,0,'tidak_berulang')");$stmt->bind_param('s',$name);$stmt->execute();$master=(int)$koneksi->insert_id;$stmt->close();$bill=0;
+try{
+ [$status,$html]=rh_http('master_biaya_lain.php?master_tab=hapus');rh_check(str_contains($html,$name),'Unused inactive master appears in deletable tab');
+ $fields=rh_form($html,'master_tab');$remove=['csrf_token'=>$fields['csrf_token'],'_operational_unit'=>'1','aksi'=>'hapus','id'=>$master,'master_tab'=>'hapus'];
+ $stmt=$koneksi->prepare("INSERT INTO tagihan_biaya_lain(master_biaya_lain_id,no_induk,nama_snapshot,nominal_tagihan,status,created_by) VALUES(?,?,?,1000,'open',?)");$actor=$fixture['actors']['admin'][1];$stmt->bind_param('issi',$master,$student['NO_INDUK'],$name,$actor);$stmt->execute();$bill=(int)$koneksi->insert_id;$stmt->close();
+ rh_http('master_biaya_lain.php',$remove);rh_check((bool)$koneksi->query('SELECT id FROM master_biaya_lain WHERE id='.$master)->num_rows,'Used-after-render master cannot be deleted');
+ [$status,$html]=rh_http('master_biaya_lain.php?master_tab=nonaktif');rh_check(str_contains($html,$name)&&str_contains($html,'Tidak dapat dihapus'),'Inactive tab explains lock');
+ lf_query($koneksi,'DELETE FROM tagihan_biaya_lain WHERE id=?',[$bill]);$bill=0;rh_http('master_biaya_lain.php',$remove);rh_check(!$koneksi->query('SELECT id FROM master_biaya_lain WHERE id='.$master)->num_rows,'Unused fixture master can be removed');
+}finally{if($bill)lf_query($koneksi,'DELETE FROM tagihan_biaya_lain WHERE id=?',[$bill]);lf_query($koneksi,'DELETE FROM master_biaya_lain WHERE id=?',[$master]);}
+echo "PASS $checks HTTP checks: direct journal/native Administrator edits, precision, replay, access, CSRF, unit guard and restored balances.\n";

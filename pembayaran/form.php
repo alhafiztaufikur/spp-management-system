@@ -21,8 +21,6 @@ $activeAcademicYearSql = $koneksi->real_escape_string($activeAcademicYear);
 $siswa_sql = "
     SELECT
         s.*,
-        COALESCE(p.paid_psb, 0) AS paid_psb,
-        COALESCE(du.paid_du, 0) AS paid_du,
         mk.tingkat AS master_tingkat, mk.kode_rombel, mk.is_placeholder,
         (SELECT ta_l.label FROM siswa_tahun_ajaran sta_l
          JOIN tahun_ajaran ta_l ON ta_l.id=sta_l.tahun_ajaran_id
@@ -30,16 +28,6 @@ $siswa_sql = "
          ORDER BY ta_l.label DESC LIMIT 1) AS graduation_year
     FROM siswa s
     LEFT JOIN master_kelas mk ON mk.id=s.master_kelas_id
-    LEFT JOIN (
-        SELECT unit_id,NO_INDUK, SUM(U_PSB) AS paid_psb
-        FROM bayar
-        GROUP BY unit_id,NO_INDUK
-    ) p ON p.NO_INDUK = s.NO_INDUK AND p.unit_id=s.unit_id
-    LEFT JOIN (
-        SELECT unit_id,no_induk, SUM(jumlah) AS paid_du
-        FROM bayar_du
-        GROUP BY unit_id,no_induk
-    ) du ON du.no_induk = s.NO_INDUK AND du.unit_id=s.unit_id
     WHERE s.KELAS NOT IN ('CUSTOM','OUT') AND (s.is_active = 1 OR (
         EXISTS(SELECT 1 FROM siswa_tahun_ajaran sta_l WHERE sta_l.no_induk=s.NO_INDUK AND sta_l.unit_id=s.unit_id AND sta_l.status='lulus')
         AND (EXISTS(
@@ -55,57 +43,6 @@ $siswa_sql = "
     ) ORDER BY s.NAMA ASC
 ";
 $siswa_list = $koneksi->query($siswa_sql);
-$psbOptions=one_time_fee_payload_for_options($koneksi);
-
-$period_payments = [];
-$spp_paid_result = $koneksi->query("
-    SELECT NO_INDUK, BULAN, TAHUN, SUM(U_SPP) AS paid_spp, SUM(U_KOMITE) AS paid_komite
-    FROM bayar
-    GROUP BY NO_INDUK, BULAN, TAHUN
-");
-while ($paid = $spp_paid_result->fetch_assoc()) {
-    $bulan_key = month_code($paid['BULAN']);
-    $periodKey = $bulan_key . '-' . $paid['TAHUN'];
-    $period_payments[$paid['NO_INDUK']]['spp'][$periodKey] =
-        ($period_payments[$paid['NO_INDUK']]['spp'][$periodKey] ?? 0) + (float)$paid['paid_spp'];
-    $period_payments[$paid['NO_INDUK']]['komite'][$periodKey] =
-        ($period_payments[$paid['NO_INDUK']]['komite'][$periodKey] ?? 0) + (float)$paid['paid_komite'];
-}
-
-$spp_placements = [];
-$placementResult = $koneksi->query("SELECT sta.no_induk, ta.label AS tahun_ajaran, sta.spp_perbulan_snapshot,sta.spp_covered_by_psb
-    FROM siswa_tahun_ajaran sta
-    JOIN tahun_ajaran ta ON ta.id = sta.tahun_ajaran_id
-    WHERE sta.status = 'aktif'
-    ORDER BY sta.no_induk, ta.label");
-while ($placement = $placementResult->fetch_assoc()) {
-    $spp_placements[$placement['no_induk']][] = [
-        'tahun_ajaran' => (string)$placement['tahun_ajaran'],
-        'tarif' => (float)$placement['spp_perbulan_snapshot'],
-        'covered_by_psb' => (int)$placement['spp_covered_by_psb'],
-    ];
-}
-$published_spp_payload = spp_billing_schema_ready($koneksi) ? spp_payment_payload($koneksi) : [];
-$komite_payload = komite_payment_payload($koneksi);
-
-$du_bills = du_selectable_bills_payload($koneksi);
-
-$annual_fee_payload = annual_fee_payload_for_options($koneksi);
-
-$biaya_lain_bills = [];
-$billResult = $koneksi->query("SELECT t.id,t.no_induk,t.master_biaya_lain_id,t.nama_snapshot nama,
-    t.nominal_tagihan nominal,COALESCE(SUM(d.nominal_snapshot),0) paid
-    FROM tagihan_biaya_lain t
-    LEFT JOIN bayar_biaya_lain d ON d.tagihan_biaya_lain_id=t.id
-    WHERE t.status='open'
-    GROUP BY t.id ORDER BY t.nama_snapshot");
-while ($bill = $billResult->fetch_assoc()) {
-    $bill['id']=(int)$bill['id']; $bill['master_id']=(int)$bill['master_biaya_lain_id'];
-    $bill['nominal']=(float)$bill['nominal']; $bill['paid']=(float)$bill['paid'];
-    $bill['sisa']=max(0,$bill['nominal']-$bill['paid']);
-    if ($bill['sisa'] > .001) $biaya_lain_bills[$bill['no_induk']][]=$bill;
-}
-
 function month_code($value) {
     $map = [
         'Januari' => '01', 'Februari' => '02', 'Maret' => '03', 'April' => '04',
@@ -140,9 +77,7 @@ unset($_SESSION['payment_draft']);
   <title>Input Pembayaran | SistemSPP</title>
   <link rel="icon" type="image/png" href="../assets/img/favicon.png?v=2" />
   <meta name="description" content="Form input transaksi pembayaran siswa." />
-  <link rel="preconnect" href="https://fonts.googleapis.com" />
-  <link href="https://fonts.googleapis.com/css2?family=Inter:wght@300;400;500;600;700;800&display=swap" rel="stylesheet" />
-  <link rel="stylesheet" href="../assets/css/style.css?v=duselector8&amp;mtime=<?= filemtime(__DIR__ . '/../assets/css/style.css') ?>" />
+<link rel="stylesheet" href="../assets/css/style.css?v=duselector8&amp;mtime=<?= filemtime(__DIR__ . '/../assets/css/style.css') ?>" />
   <link rel="stylesheet" href="../assets/css/date_controls.css?v=duselector8&amp;mtime=<?= filemtime(__DIR__ . '/../assets/css/date_controls.css') ?>" />
   <link rel="stylesheet" href="../assets/css/payment_history.css?v=<?= filemtime(__DIR__ . "/../assets/css/payment_history.css") ?>">
   <link rel="stylesheet" href="../assets/css/payment_details.css?v=<?= filemtime(__DIR__ . "/../assets/css/payment_details.css") ?>">
@@ -290,7 +225,7 @@ unset($_SESSION['payment_draft']);
                 <input type="text" id="siswa-search" list="siswa-list" placeholder="Ketik nama, NIS, atau NIS Diknas..." oninput="pilihSiswaDatalist(this)" autocomplete="off" />
               </div>
               <datalist id="siswa-list">
-                <?php while ($s = $siswa_list->fetch_assoc()): $psbOption=$psbOptions[$s['NO_INDUK']]['psb']??['total'=>0,'paid'=>0,'known'=>false]; ?>
+                <?php while ($s = $siswa_list->fetch_assoc()): ?>
                 <option value="<?= htmlspecialchars($s['NAMA']) ?>"
                   data-nis="<?= htmlspecialchars($s['NO_INDUK']) ?>" data-student-id="<?= (int)$s['id'] ?>"
                   data-diknas="<?= htmlspecialchars((string)($s['NO_induk_diknas'] ?? '')) ?>"
@@ -298,18 +233,9 @@ unset($_SESSION['payment_draft']);
                   data-kelas="<?= htmlspecialchars($s['graduation_year'] ? ('LULUS · TA '.$s['graduation_year']) : class_label(['tingkat'=>$s['master_tingkat']?:$s['KELAS'],'kode_rombel'=>$s['kode_rombel']??'BELUM','is_placeholder'=>$s['is_placeholder']??1])) ?>"
                   data-is-graduate="<?= $s['graduation_year'] ? '1' : '0' ?>"
                   data-graduation-year="<?= htmlspecialchars((string)$s['graduation_year']) ?>"
-                  data-psb-known="<?= !empty($psbOption['known'])?'1':'0' ?>" data-total-psb="<?= money_attr($psbOption['total']) ?>"
+                  data-payment-details-lazy="1"
                   data-total-spp="<?= money_attr($s['SPP_PERBULAN']) ?>"
-                  data-total-komite="<?= money_attr($s['POMG']) ?>"
-                  data-paid-psb="<?= money_attr($psbOption['paid']) ?>"
-                  data-paid-spp-periods="<?= htmlspecialchars(json_encode($period_payments[$s['NO_INDUK']]['spp'] ?? []), ENT_QUOTES, 'UTF-8') ?>"
-                  data-spp-placements="<?= htmlspecialchars(json_encode($spp_placements[$s['NO_INDUK']] ?? [], JSON_UNESCAPED_UNICODE), ENT_QUOTES, 'UTF-8') ?>"
-                  data-spp-billing="<?= htmlspecialchars(json_encode($published_spp_payload[$s['NO_INDUK']] ?? ['saldo'=>0,'tagihan'=>[]], JSON_UNESCAPED_UNICODE), ENT_QUOTES, 'UTF-8') ?>"
-                  data-komite-billing="<?= htmlspecialchars(json_encode($komite_payload[$s['NO_INDUK']] ?? [], JSON_UNESCAPED_UNICODE), ENT_QUOTES, 'UTF-8') ?>"
-                  data-paid-komite-periods="<?= htmlspecialchars(json_encode($period_payments[$s['NO_INDUK']]['komite'] ?? []), ENT_QUOTES, 'UTF-8') ?>"
-                  data-annual-fees="<?= htmlspecialchars(json_encode($annual_fee_payload[$s['NO_INDUK']] ?? [], JSON_UNESCAPED_UNICODE), ENT_QUOTES, 'UTF-8') ?>"
-                  data-du-bills="<?= htmlspecialchars(json_encode($du_bills[$s['NO_INDUK']] ?? []), ENT_QUOTES, 'UTF-8') ?>"
-                  data-biaya-lain-bills="<?= htmlspecialchars(json_encode($biaya_lain_bills[$s['NO_INDUK']] ?? [], JSON_UNESCAPED_UNICODE), ENT_QUOTES, 'UTF-8') ?>">
+                  data-total-komite="<?= money_attr($s['POMG']) ?>">
                   <?= htmlspecialchars($s['NAMA']) ?> (<?= htmlspecialchars($s['graduation_year'] ? ('LULUS · TA '.$s['graduation_year']) : class_label(['tingkat'=>$s['master_tingkat']?:$s['KELAS'],'kode_rombel'=>$s['kode_rombel']??'BELUM','is_placeholder'=>$s['is_placeholder']??1])) ?>)
                 </option>
                 <?php endwhile; ?>

@@ -1,0 +1,87 @@
+/* Scoped presentation refinements; no transaction or report filtering rules. */
+.correction-date-refined .correction-form>label:not(.legacy-check-row){display:flex;flex-direction:column;align-items:stretch;justify-content:flex-start;gap:9px}
+.correction-date-refined .correction-form>label:not(.legacy-check-row)>input:not([type="hidden"]),.correction-date-refined .correction-form>label>select{height:48px;margin:0}
+.correction-date-refined .correction-form>label:not(.legacy-check-row)>small{font-size:11px;line-height:1.6;color:var(--text-muted)}
+.correction-datetime{display:grid;grid-template-columns:minmax(0,1.25fr) minmax(145px,1fr);gap:10px;min-width:0;width:100%}
+.sw-editor-dialog .correction-datetime{grid-template-columns:minmax(0,1fr);gap:8px}
+.correction-day-control,.correction-clock-control{display:flex;align-items:center;position:relative;min-width:0;height:48px;box-sizing:border-box;border:1px solid var(--border);border-radius:10px;background:var(--bg-surface)}
+.correction-day-control:focus-within,.correction-clock-control:focus-within{border-color:var(--accent);box-shadow:0 0 0 3px var(--accent-glow)}
+.correction-datetime input,.correction-refined .correction-form .correction-datetime input{display:block;min-width:0;width:100%;height:46px;min-height:46px;box-sizing:border-box;padding:11px 12px;border:0!important;outline:none;box-shadow:none!important;background:transparent;border-radius:10px;color:var(--text-primary);font-size:13px;font-variant-numeric:tabular-nums;margin:0}
+.correction-datetime .correction-clock-control input{padding-right:43px}
+.correction-calendar-toggle{flex:0 0 42px;display:flex;align-items:center;justify-content:center;height:44px;margin:1px;border:0;border-radius:8px;background:transparent;color:var(--accent);cursor:pointer}
+.correction-calendar-toggle:hover{background:var(--accent-glow)}
+.correction-calendar-toggle:focus-visible{outline:2px solid var(--accent);outline-offset:-3px}
+.correction-clock-zone{position:absolute;right:11px;font-size:10px;font-weight:750;color:var(--text-muted);pointer-events:none}
+.correction-calendar{position:fixed;z-index:1800;padding:16px;box-sizing:border-box;border:1px solid var(--border);border-radius:16px;background:var(--bg-surface);color:var(--text-primary);box-shadow:0 18px 55px #102a2029;font:13px/1.5 var(--font-body,Arial,sans-serif)}
+.correction-calendar[hidden]{display:none}
+.correction-calendar-header{display:grid;grid-template-columns:32px minmax(0,1fr) 82px 32px;gap:7px;align-items:center;margin-bottom:15px}
+.correction-calendar-header select{height:36px;min-width:0;width:100%;padding:6px 8px;box-sizing:border-box;border:1px solid var(--border);border-radius:8px;background:var(--bg-card);color:var(--text-primary);font-size:12px;font-weight:650}
+.correction-calendar button{color:var(--text-primary);cursor:pointer;font:inherit;border:0;background:transparent;border-radius:8px}
+.correction-calendar-header button{height:34px;font-size:24px;line-height:1}
+.correction-calendar button:hover{background:var(--accent-glow);color:var(--accent)}
+.correction-calendar button:focus-visible,.correction-calendar select:focus-visible{outline:2px solid var(--accent);outline-offset:1px}
+.correction-calendar-weekdays,.correction-calendar-days{display:grid;grid-template-columns:repeat(7,minmax(0,1fr));gap:4px;text-align:center}
+.correction-calendar-weekdays{font-size:10px;font-weight:700;color:var(--text-muted);margin-bottom:7px}
+.correction-calendar-days button{height:34px;font-variant-numeric:tabular-nums}
+.correction-calendar-days button.is-selected{background:var(--accent);color:var(--bg-base,#fff);font-weight:750}
+.correction-calendar-footer{display:flex;align-items:center;justify-content:space-between;gap:12px;padding-top:12px;margin-top:12px;border-top:1px solid var(--border);font-size:10px;color:var(--text-muted)}
+.correction-calendar-footer button{color:var(--accent);font-size:12px;font-weight:700;padding:7px 10px}
+
+@media(min-width:1100px){
+  /* Match the reference: title and unit on the left, compact filters on the right. */
+  body#global-report-workspace.recap-filter-refined .report-template-shell .recap-report-header{grid-template-columns:minmax(240px,.9fr) minmax(540px,1.1fr)!important;gap:32px!important;align-items:start}
+  body#global-report-workspace.recap-filter-refined .recap-report-copy{padding:2px 18px 0 0;min-width:0}
+  body#global-report-workspace.recap-filter-refined .recap-report-copy h1{font-size:clamp(25px,2.05vw,34px);line-height:1.3;margin:12px 0 10px;overflow-wrap:normal}
+  body#global-report-workspace.recap-filter-refined .recap-report-copy p{font-size:13px;line-height:1.7}
+  body#global-report-workspace.recap-filter-refined .global-unit-selector{margin:22px 0 0;max-width:100%}
+  body#global-report-workspace.recap-filter-refined .global-unit-options{gap:4px;padding:6px}
+  body#global-report-workspace.recap-filter-refined .global-unit-choice{min-height:44px;padding:9px 5px;font-size:12px}
+  body#global-report-workspace.recap-filter-refined .report-template-shell .report-template-filters{grid-template-columns:repeat(3,minmax(0,1fr))!important;gap:15px 12px!important;align-items:start;padding:0;margin:0;min-width:0}
+  body#global-report-workspace.recap-filter-refined .report-template-shell .report-template-filters .field-label{font-size:10px;letter-spacing:.02em;line-height:1.5;min-height:15px;margin:0 0 7px}
+  body#global-report-workspace.recap-filter-refined .report-template-shell .report-template-filters .field-row{gap:0;min-width:0}
+  body#global-report-workspace.recap-filter-refined .report-template-shell .report-template-filters :is(.field-input,.spp-select-trigger,.report-date-range-button,.search-box){height:46px;min-height:46px;box-sizing:border-box;border-radius:10px;font-size:12px}
+  body#global-report-workspace.recap-filter-refined .report-template-shell .report-template-filters .report-date-range-button{padding:10px 12px;gap:8px;line-height:1.4}
+  body#global-report-workspace.recap-filter-refined .report-template-shell .report-template-filters .report-date-range-icon{flex:none}
+  body#global-report-workspace.recap-filter-refined .report-template-shell .report-template-filters .report-date-range-value{white-space:normal!important;overflow:visible!important;text-overflow:clip!important;font-size:11px;line-height:1.3}
+  body#global-report-workspace.recap-filter-refined .report-template-shell .report-template-filters .search-box input{font-size:12px;padding:12px 10px;min-width:0}
+  body#global-report-workspace.recap-filter-refined .report-template-shell .report-template-filters>.report-filter-heading{margin-bottom:2px;grid-column:1/-1!important}
+  body#global-report-workspace.recap-filter-refined .report-template-shell .report-template-filters .report-per-page-field{order:2!important;grid-column:1!important}
+  body#global-report-workspace.recap-filter-refined .report-template-shell .report-template-filters .report-student-field{order:2!important;grid-column:2/span 2!important}
+  body#global-report-workspace.recap-filter-refined .report-template-shell .report-template-filters>.report-undated-field,body#global-report-workspace.recap-filter-refined .report-template-shell .report-template-filters>.field-row:has(input[name="include_undated"]){order:3!important;grid-column:1/-1!important;padding:12px 14px;min-height:66px;border-radius:10px;font-size:12px}
+  body#global-report-workspace.recap-filter-refined .report-template-shell .report-template-filters>.report-filter-actions{order:4!important;grid-column:1/-1!important;display:grid!important;grid-template-columns:2fr 1fr;gap:10px;padding:4px;margin:0;border:0;border-radius:10px;background:var(--bg-surface)}
+  body#global-report-workspace.recap-filter-refined .report-template-shell .report-template-filters>.report-filter-actions>.btn{width:100%!important;min-width:0;min-height:42px;justify-content:center;font-size:12px;grid-column:auto!important;grid-row:auto!important;display:flex!important}
+  body#global-report-workspace.recap-filter-refined[data-report-template="kas-tabungan"] .report-template-shell .report-template-filters>.report-date-range-field{grid-column:span 2!important}
+  body#global-report-workspace.recap-filter-refined[data-report-template="tabungan-siswa"] .report-template-shell .report-template-filters>.report-date-range-field{grid-column:1/span 2!important;grid-row:2!important}
+  body#global-report-workspace.recap-filter-refined[data-report-template="tabungan-siswa"] .report-template-shell .report-template-filters>.report-all-period-field{grid-column:3!important;grid-row:2!important}
+  .report-period-toggle{position:relative;display:flex;align-items:center;gap:9px;min-width:0;height:46px;padding:10px 11px;border:1px solid var(--border);border-radius:10px;background:var(--bg-surface);box-sizing:border-box;cursor:pointer;font-size:12px;font-weight:650;color:var(--text-secondary)}
+  .report-period-toggle input{position:absolute;opacity:0;width:1px;height:1px}
+  .report-period-switch{position:relative;flex:none;width:30px;height:18px;border-radius:99px;background:var(--border-hover);transition:background .15s}
+  .report-period-switch::after{content:"";position:absolute;top:3px;left:3px;width:12px;height:12px;background:var(--bg-surface);box-shadow:0 1px 3px #0002;border-radius:50%;transition:transform .15s}
+  .report-period-toggle:has(input:checked){background:var(--accent-glow);border-color:var(--accent);color:var(--accent)}
+  .report-period-toggle input:checked+.report-period-switch{background:var(--accent)}
+  .report-period-toggle input:checked+.report-period-switch::after{transform:translateX(12px)}
+  .report-period-toggle:has(input:focus-visible){outline:2px solid var(--accent);outline-offset:3px}
+
+  /* Widths come from colgroup, so header/body and sticky offsets share one geometry. */
+  .report-general-page .finance-transactions .payment-table.report-structured-table{width:100%;min-width:var(--report-table-min);table-layout:fixed;border-collapse:separate;border-spacing:0}
+  .report-general-page .finance-transactions .payment-table.report-structured-table :is(th,td){width:auto;min-width:0;max-width:none;box-sizing:border-box;padding:14px 14px;vertical-align:middle;text-align:center;font-size:12px;line-height:1.6;overflow-wrap:normal}
+  .report-general-page .finance-transactions .payment-table.report-structured-table th{font-size:10.5px;font-weight:750;letter-spacing:.03em;line-height:1.5;white-space:normal}
+  .report-general-page .finance-transactions .payment-table.report-structured-table :is(.report-name-col,.report-component-col){text-align:left;white-space:normal;overflow-wrap:anywhere}
+  .report-general-page .finance-transactions .payment-table.report-structured-table .nominal{text-align:right;font-variant-numeric:tabular-nums;white-space:nowrap}
+  .report-general-page .finance-transactions .payment-table.report-structured-table .report-secondary-id{display:block;margin-top:5px;font-size:10px;line-height:1.4;white-space:normal;overflow-wrap:anywhere;color:var(--text-muted)}
+  .report-general-page .finance-transactions .payment-table.report-structured-table :is(.select-col,.report-number-col,.report-id-col,.report-name-col){position:sticky;z-index:2;background:var(--bg-surface)}
+  .report-general-page .finance-transactions .payment-table.report-structured-table .select-col{left:0;padding:10px}
+  .report-general-page .finance-transactions .payment-table.report-structured-table .report-number-col{left:0}
+  .report-general-page .finance-transactions .payment-table.report-structured-table.has-report-selection .report-number-col{left:40px}
+  .report-general-page .finance-transactions .payment-table.report-structured-table .report-id-col{left:var(--report-id-left)}
+  .report-general-page .finance-transactions .payment-table.report-structured-table .report-name-col{left:var(--report-name-left);box-shadow:4px 0 7px #10291d08}
+  .report-general-page .finance-transactions .payment-table.report-structured-table th:is(.select-col,.report-number-col,.report-id-col,.report-name-col){z-index:6}
+  .report-general-page .finance-transactions .payment-table.report-structured-table :is(.kelas-badge,.badge-nis){max-width:100%;box-sizing:border-box;font-size:11px;line-height:1.5}
+  .report-general-page .finance-transactions .payment-table.report-structured-table .kelas-badge{min-width:48px;padding:4px 8px}
+  .report-general-page .finance-transactions .payment-table.report-structured-table .report-date-day{display:block;white-space:nowrap}
+  .report-general-page .finance-transactions .payment-table.report-structured-table .report-date-time{display:block;margin-top:3px;font-size:11px;line-height:1.5;color:var(--text-muted);white-space:normal}
+  .report-general-page .finance-transactions .payment-table.report-structured-table .report-unknown-amount{font-size:11px;white-space:normal;font-weight:500;color:var(--text-muted)}
+  .report-general-page .finance-transactions .payment-table.report-structured-table .aksi-col{right:0;text-align:center;white-space:normal;box-shadow:-4px 0 7px #10291d08}
+  .report-general-page .finance-transactions .payment-table.report-structured-table .btn-tbl-print{justify-content:center;min-height:36px;padding:8px 10px;font-size:11px}
+  .report-general-page .finance-transactions .report-multiple-subtotals{display:flex;align-items:center;flex-wrap:wrap;gap:12px 24px;line-height:1.7}
+}

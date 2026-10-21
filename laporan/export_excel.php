@@ -64,16 +64,17 @@ if ($filter_tanggal_awal !== '' && $filter_tanggal_akhir !== '') {
     $period_label = $bulan_label . ' ' . $filter_tahun;
 }
 
+if(($_GET['all_periods']??'')==='1')$period_label='Semua periode';
+if(($_GET['include_undated']??'')==='1')$period_label.=' (termasuk transaksi tanpa tanggal sesuai periode kewajiban)';
+
 // Keep the existing three-sheet layout; read all matching historical and current rows.
-$rows=general_payment_rows($koneksi,$period_start,$period_end,$filter_q,(string)($_GET['urut']??'terbaru'));
+$selectedSections=is_array($_GET['jenis_laporan']??null)||($_GET['jenis_laporan']??'semua')!=='semua';
+$rows=$selectedSections?[]:general_payment_rows($koneksi,$period_start,$period_end,$filter_q,(string)($_GET['urut']??'terbaru'));
 $komponen_rows=general_payment_components($koneksi,$period_start,$period_end,$filter_q);
 $tab_rows=general_savings_read($koneksi,$period_start,$period_end,$filter_q,true);
 foreach($tab_rows as &$tab){$tab['nominal']=$tab['amount'];if($tab['origin']==='legacy')$tab['keterangan']='Legacy · '.$tab['keterangan'];}unset($tab);
 
-$preview_total_pembayaran = 0.0;
-foreach ($rows as $row) {
-    $preview_total_pembayaran += (float)$row['total_jumlah'];
-}
+$preview_total_pembayaran=(float)general_payment_summary($koneksi,$period_start,$period_end,$filter_q)['total'];
 $preview_total_tab_masuk = 0.0;
 $preview_total_tab_keluar = 0.0;
 foreach ($tab_rows as $tab) {
@@ -96,11 +97,11 @@ $totals=[['label'=>'Total Pembayaran','value'=>$preview_total_pembayaran]];
 $tabTotals=[['label'=>'Total Masuk','value'=>$preview_total_tab_masuk],['label'=>'Total Keluar','value'=>$preview_total_tab_keluar]];
 $summary=[['label'=>'Pembayaran','value'=>$preview_total_pembayaran],['label'=>'Tabungan Masuk','value'=>$preview_total_tab_masuk],['label'=>'Tabungan Keluar','value'=>$preview_total_tab_keluar]];
 $sheets=[['name'=>'Ringkasan','sections'=>[spp_excel_section('Ringkasan Keuangan',[spp_excel_column('label','Ringkasan'),spp_excel_column('value','Nominal','money')],$summary,[],false),spp_excel_section('Rincian Komponen Pembayaran',[spp_excel_column('nama','Komponen'),spp_excel_column('total','Nominal','money')],$komponen_rows,$totals,false)]],['name'=>'Pembayaran','sections'=>[spp_excel_section('Transaksi Pembayaran',$paymentColumns,$rows,$totals)]],['name'=>'Tabungan','sections'=>[spp_excel_section('Transaksi Tabungan',$savingColumns,$tab_rows,$tabTotals)]]];
-if(is_array($_GET['jenis_laporan']??null)||($_GET['jenis_laporan']??'semua')!=='semua'){
+if($selectedSections){
     $generalSections=general_sections($koneksi,$generalChoices,$period_start,$period_end,$filter_q,(string)($_GET['urut']??'terbaru'));
     $sheets[1]['sections']=general_excel_sections($generalSections);
     foreach($generalSections as $section)foreach($section['totals'] as $total)$summary[]=['label'=>$section['title'].' - '.$total['label'],'value'=>$total['value']];
-    $sheets[0]['sections'][0]['rows']=$summary;
+    $sheets[0]['sections'][0]['rows']=$summary;unset($generalSections,$section);
 }
 $koneksi->commit();report_perf_mark('query_model');
 $doc=spp_excel_document('Rekap Laporan Transaksi','Periode '.$period_label.($filter_q!==''?' | Pencarian: '.$filter_q:''),$reportUnitId,$sheets);

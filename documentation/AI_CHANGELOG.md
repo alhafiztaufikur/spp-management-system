@@ -1,5 +1,29 @@
 # Riwayat Perubahan AI SistemSPP
 
+> [Penjelasan lengkap perubahan menu, Tabungan, dan laporan untuk tim](RINGKASAN_PERUBAHAN_MENU_DAN_LAPORAN_20261022.md) merangkum seluruh pekerjaan setelah `e80ba02`, kebutuhan konfigurasi/indeks, hasil pengujian, serta batas yang masih ada.
+
+## 2026-10-22 - Perapihan desktop koreksi dan laporan
+
+- Sejajarkan Pemilik/tanggal koreksi Tabungan; tambahkan kalender Indonesia dan jam 24 jam dengan payload ISO serta ketepatan waktu existing.
+- Selaraskan kolom/header/isi kelima tabel Daftar Transaksi dan ratakan tengah seluruh isi PDF, tanpa mengubah pembaca atau model ekspor.
+- Susun empat filter rekap Global mengikuti referensi: judul/unit di kiri, filter tiga kolom di kanan, serta sakelar Semua periode. Perubahan susunan dibatasi desktop.
+- Verifikasi 164 model, 107 HTTP, browser tiga lebar desktop/dua tema, dialog koreksi biasa/Legacy, dan pembacaan ulang tiga PDF lengkap. Konfigurasi dan data pengguna tetap; tanpa migrasi. [Rincian dan bukti lokal](PERAPIHAN_DESKTOP_TRANSAKSI_20261022.md).
+
+## 2026-10-22 - Perapihan menu dan audit kelengkapan rekap
+
+- Rapikan penerbitan DU, pagination/Alumni/koreksi Tabungan, tiga tab master biaya, proses Naik Kelas melalui tombol, header/menu peserta, tabel transaksi dan empat filter Global.
+- Izinkan Administrator mengoreksi nominal/tanggal/catatan jurnal tabungan operasional Legacy dengan pratinjau dan audit; pemindahan pemilik/pembatalan serta hak pembayaran/impor tetap dibatasi seperti semula.
+- Tampilkan lima bagian laporan dengan pagination mandiri melalui fragment JSON, pembatalan respons lama, Back/Forward dan fallback GET. Selaraskan bukti bulanan, tanpa tanggal, total serta ekspor; angka nol tidak otomatis berarti lunas.
+- Uji salinan: 164 model, 107 HTTP, 3.264 rekonsiliasi Global pada baseline/hasil, regresi existing, browser responsif/tema, serta 14 PDF/XLSX dibaca kembali. Data/skema pengguna dan `koneksi.php` identik; tanpa migrasi baru.
+- p95 pagination SD 115–541 ms; DU Semua Unit masih 1,17 detik dan Global Transaksi Tabungan 1,23 detik. [Perubahan, rekonsiliasi, screenshot dan pengukuran](AUDIT_REKAP_DAN_MENU_20261022.md).
+
+## 2026-10-21 - Kecepatan menu dan perapihan transaksi
+
+- Muat rincian pembayaran per siswa, batalkan respons lama, dan kurangi pembacaan arsip/query berulang dengan hasil perhitungan yang sama. Sajikan font existing secara lokal.
+- Rapikan persetujuan tunggakan DU, panel/pagination/nominal tabungan, popup saldo, tombol riwayat, serta cetak seluruh buku pemilik. Samakan tabel/cetak laporan tunggal dan gabungan; tambah Nominal terkecil.
+- Terapkan empat indeks tambahan secara idempotent pada `db_spp_test2`; konfigurasi pengguna dan isi data tetap. Uji mutasi hanya pada salinan: 265 pemeriksaan model, 100 HTTP, browser responsif/tema, dan kesetaraan 42.462 baris arsip beserta urutan.
+- Input Pembayaran terukur 969 → 158 ms pada uji bergantian. Target waktu belum tercapai pada seluruh arsip/Ringkasan; [pengukuran, batas performa, dan bukti](AUDIT_PERFORMA_MENU_20261021.md).
+
 ## 2026-10-21 - Audit Laporan Global setelah migrasi Legacy
 
 - Satukan bukti kewajiban/pembayaran Status, SPP Tahunan dan Per Item; tampilkan komponen histori serta kredit tanpa tagihan native dengan pokok tidak diketahui, tanpa tarif/tanggal buatan.

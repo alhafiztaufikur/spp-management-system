@@ -1,6 +1,12 @@
 <?php
 require_once __DIR__.'/migrated_savings.php';
 require_once __DIR__.'/kelas.php';
+/** Savings presentation only; keep the recorded class and graduation year intact. */
+function so_class_label(array $class):string {
+    if(!class_is_alumni($class))return class_label($class);
+    if(!empty($class['graduation_year']))return 'Alumni '.(int)$class['graduation_year'];
+    return preg_replace('/^Alumni(20[0-9]{2})$/i','Alumni $1',(string)($class['kode_rombel']?:'Alumni'));
+}
 /** Accept normal rupiah input while preserving exact cents. */
 function so_amount(string $raw): string {
     $raw=trim($raw);
@@ -12,7 +18,7 @@ function so_amount(string $raw): string {
 function so_source(mysqli $db): string {
     $parts=["SELECT s.id student_id,0 owner_id,s.unit_id,s.NO_INDUK identity,s.NO_induk_diknas,s.NAMA name,s.master_kelas_id,s.KELAS,COALESCE(t.SALDO,0) balance,'student' owner_type,IF(s.is_active=1 OR t.NO_INDUK IS NOT NULL,'ready','archived') state,s.is_active FROM siswa s LEFT JOIN tabungan t ON t.NO_INDUK=s.NO_INDUK AND t.unit_id=s.unit_id WHERE s.legacy_pending=0"];
     if(lop_ready($db))$parts[]="SELECT 0,o.id,o.unit_id,o.source_identity,'',o.name,g.master_kelas_id,o.source_class,a.balance,'account',IF(o.state='ready' AND a.id IS NOT NULL,'ready','held'),1 FROM legacy_op_owners o LEFT JOIN legacy_op_accounts a ON a.owner_id=o.id AND a.unit_id=o.unit_id LEFT JOIN legacy_op_groups g ON g.id=o.group_id AND g.unit_id=o.unit_id JOIN legacy_full_batches b ON b.id=o.batch_id AND b.unit_id=o.unit_id WHERE o.student_id IS NULL AND b.state='completed'";
-    return hp_sql($db,'(SELECT x.*,mk.jenis rombel_jenis,mk.nama_custom rombel_nama,mk.tingkat,mk.kode_rombel,mk.is_placeholder FROM ('.implode(' UNION ALL ',$parts).') x LEFT JOIN master_kelas mk ON mk.id=x.master_kelas_id AND mk.unit_id=x.unit_id)');
+    return hp_sql($db,'(SELECT x.*,mk.jenis rombel_jenis,mk.nama_custom rombel_nama,mk.tingkat,mk.kode_rombel,mk.is_placeholder,mk.legacy_kind,mk.graduation_year FROM ('.implode(' UNION ALL ',$parts).') x LEFT JOIN master_kelas mk ON mk.id=x.master_kelas_id AND mk.unit_id=x.unit_id)');
 }
 function so_page(mysqli $db,array $input): array {
     $source=so_source($db);$q=mb_substr(trim(is_string($input['q']??null)?$input['q']:''),0,100);$where=' WHERE 1=1';$args=[];
@@ -20,7 +26,7 @@ function so_page(mysqli $db,array $input): array {
     $type=mh_choice($input,'owner_type',['all','student','account'],'all');if($type!=='all'){$where.=' AND owner_type=?';$args[]=$type;}
     $class=max(0,(int)($input['class_id']??0));if($class){$where.=' AND master_kelas_id=?';$args[]=$class;}
     $total=(int)lf_one($db,"SELECT COUNT(*) n FROM $source x $where",$args)['n'];$pages=max(1,(int)ceil($total/25));$page=min($pages,max(1,(int)($input['page']??1)));$offset=($page-1)*25;
-    $rows=lf_rows($db,"SELECT x.* FROM $source x $where ORDER BY name,unit_id,student_id,owner_id LIMIT 25 OFFSET $offset",$args);foreach($rows as &$r)$r['class_label']=class_label($r);unset($r);
+    $rows=lf_rows($db,"SELECT x.* FROM $source x $where ORDER BY name,unit_id,student_id,owner_id LIMIT 25 OFFSET $offset",$args);foreach($rows as &$r){$r['class_label']=so_class_label($r);$r['alumni_label']=class_is_alumni($r)?$r['class_label']:'';}unset($r);
     return compact('rows','total','page','pages','offset','q','type','class');
 }
 function so_resolve(mysqli $db,array $input,bool $write=false): array {
@@ -33,5 +39,5 @@ function so_resolve(mysqli $db,array $input,bool $write=false): array {
     if($write&&(unit_active_id()===0||(int)$r['unit_id']!==unit_active_id()))throw new DomainException('Pilih satu unit rekening.');
     if($write&&$r['state']!=='ready')throw new DomainException('Rekening belum siap atau diblokir. Selesaikan pemeriksaan rekening terlebih dahulu.');
     if($r['student_id']){lop_bank_assert_ready($db,$r['identity'],(int)$r['unit_id']);if(lop_ready($db)&&lf_one($db,"SELECT id FROM legacy_op_owners WHERE student_id=? AND state<>'ready'",[$r['student_id']]))throw new DomainException('Rekening belum siap.');}
-    $r['class_label']=class_label($r);return $r;
+    $r['class_label']=so_class_label($r);$r['alumni_label']=class_is_alumni($r)?$r['class_label']:'';return $r;
 }

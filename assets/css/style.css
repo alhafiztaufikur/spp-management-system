@@ -2,7 +2,7 @@
    SistemSPP - Material 3 Design Overhaul
    ============================================ */
 
-@import url('https://fonts.googleapis.com/css2?family=Inter:wght@300;400;500;600;700;800&family=Outfit:wght@400;500;600;700;800&display=swap');
+@import url('local_fonts.css?v=20261021');
 
 /* ── M3 CSS Variables (Light Mode Default) ─── */
 :root {

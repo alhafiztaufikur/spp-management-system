@@ -15,6 +15,7 @@ $nis=trim($nis);session_write_close();
 if($nis===''){echo json_encode(['ok'=>true,'period'=>'Pilih siswa untuk melihat transaksi.','rows'=>[],'scopes'=>[],'scope'=>'active']);exit;}
 try {
     try{$student=unit_resolve_student($koneksi,$nis,(int)$studentId);}catch(mysqli_sql_exception $e){throw $e;}catch(RuntimeException $e){history_fail(409,'student_scope_mismatch','Siswa tidak tersedia atau tidak sesuai unit. Pilih ulang siswa.');}
+    lb_scope_student_read($koneksi,$nis);
     $context=payment_history_current_context($koneksi,$nis);
     $s=$koneksi->prepare('SELECT DISTINCT riwayat_tahun_ajaran FROM bayar WHERE NO_INDUK=? ORDER BY riwayat_tahun_ajaran DESC');$s->bind_param('s',$nis);$s->execute();$years=$s->get_result()->fetch_all(MYSQLI_ASSOC);$s->close();
     $scopes=[['value'=>'active','label'=>'Penempatan Aktif: '.$context['year'].' · '.$context['class']],['value'=>'all','label'=>'Semua Tahun']];
@@ -40,10 +41,11 @@ try {
           'total'=>'Rp '.number_format((float)$p['total_jumlah'],0,',','.'),'context_year'=>$p['riwayat_tahun_ajaran'],'context_class'=>$p['riwayat_kelas_snapshot']];
     }
     require_once '../includes/migrated_history.php';
-    $legacy=mh_student_legacy_history($koneksi,$student);
+    $legacyIds=mh_student_legacy_ids($koneksi,$student);$legacyCount=count($legacyIds);
+    $legacy=in_array($scope,['all','unknown'],true)?mh_student_legacy_history($koneksi,$student,$legacyIds):[];
     if($scope==='all'||$scope==='unknown')$rows=array_merge($rows,$legacy);
     usort($rows,static fn($a,$b)=>strcmp((string)$b['tanggal_raw'],(string)$a['tanggal_raw'])?:($b['id']<=>$a['id']));
-    foreach($scopes as &$historyScope)if($historyScope['value']==='unknown')$historyScope['label']='Riwayat Lama / Legacy: '.count($legacy).' transaksi Legacy';unset($historyScope);
+    foreach($scopes as &$historyScope)if($historyScope['value']==='unknown')$historyScope['label']='Riwayat Lama / Legacy: '.$legacyCount.' transaksi Legacy';unset($historyScope);
     echo json_encode(['ok'=>true,'period'=>'History pembayaran '.$student['NAMA'].': '.count($rows).' transaksi · '.($scope==='all'?'Semua Tahun':($scope==='unknown'?'Konteks belum tercatat':'TA '.$year)),
-      'rows'=>$rows,'scopes'=>$scopes,'scope'=>$scope,'legacy_count'=>count($legacy),'active_context'=>$context,'student_id'=>(int)$student['id'],'unit_id'=>(int)$student['unit_id']],JSON_UNESCAPED_UNICODE|JSON_INVALID_UTF8_SUBSTITUTE|JSON_THROW_ON_ERROR);
+      'rows'=>$rows,'scopes'=>$scopes,'scope'=>$scope,'legacy_count'=>$legacyCount,'active_context'=>$context,'student_id'=>(int)$student['id'],'unit_id'=>(int)$student['unit_id']],JSON_UNESCAPED_UNICODE|JSON_INVALID_UTF8_SUBSTITUTE|JSON_THROW_ON_ERROR);
 }catch(Throwable $e){error_log('History siswa gagal: '.get_class($e).' code='.(int)$e->getCode().' unit='.unit_active_id());history_fail(503,'history_unavailable','Riwayat pembayaran belum dapat dimuat. Silakan coba lagi.');}

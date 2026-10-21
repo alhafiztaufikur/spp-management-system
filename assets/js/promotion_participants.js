@@ -7,6 +7,8 @@ document.addEventListener('DOMContentLoaded',()=>{
   const disclosure=document.getElementById('participants-disclosure'),toggle=disclosure.querySelector(':scope>summary'),form=document.getElementById('participants-export-form');
   let page=1,filtered=rows,visible=[],menu=null,opener=null;const text=(tag,value)=>Object.assign(document.createElement(tag),{textContent:String(value)});
   function closeMenu(focus=false){if(!menu)return;const old=menu;menu=null;old.panel.hidden=true;window.sppFloatingPanels?.hide(old.panel);old.button.setAttribute('aria-expanded','false');if(focus)old.button.focus();}
+  const scroll=root.querySelector('.participants-table-scroll');
+  scroll?.addEventListener('scroll',()=>{if(!menu)return;const area=scroll.getBoundingClientRect(),button=menu.button.getBoundingClientRect();if(button.bottom<=area.top||button.top>=area.bottom||button.right<=area.left||button.left>=area.right)closeMenu();},{passive:true});
   function selectionSummary(){
     root.querySelector('[data-participants-selected]').textContent=selected.size+' siswa dipilih';root.querySelector('[data-participants-export-scope]').textContent=selected.size?'Ekspor '+selected.size+' peserta terpilih':'Ekspor seluruh '+filtered.length+' hasil pencarian';
     visible.forEach(r=>{const el=nodes.get(String(r.id));el.classList.toggle('is-selected',selected.has(String(r.id)));el.querySelector('[data-participant-check]').checked=selected.has(String(r.id));});

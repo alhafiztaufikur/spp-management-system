@@ -21,9 +21,30 @@ function payment_time_archive(array $raw): array {
     return ['original'=>$original,'value'=>$embedded?$original:($parsed?$date->format('Y-m-d').' '.$parsed->format('H:i:s'):$original),'precision'=>$embedded||$parsed?'datetime':'date','conflict'=>(bool)$conflict];
 }
 function &payment_time_cache(): array {static $cache=[];return $cache;}
-function payment_time_invalidate(mysqli $db): void {$cache=&payment_time_cache();unset($cache[$db->thread_id]);}
+function payment_time_invalidate(mysqli $db): void {$cache=&payment_time_cache();unset($cache[$db->thread_id],$GLOBALS['journal_time_cache'][$db->thread_id]);}
 
-/** Cache only the immutable archive evidence; applied corrections always come from SQL. */
+/** SQL Server savings archives contain dates without a separate clock column. */
+function journal_time_overrides(mysqli $db):array {
+    if(!function_exists('lop_ready')||!lop_ready($db))return [];
+    $scope=(int)($GLOBALS['app_unit_id']??unit_active_id());$thread=$db->thread_id;
+    if(PHP_SAPI==='cli'||!isset($GLOBALS['journal_time_cache'][$thread][$scope])){
+        $overrides=[];
+        foreach(hp_rows($db,"SELECT entity_id,before_data,after_data FROM legacy_op_audit WHERE entity_type='journal' ORDER BY id") as $event){
+            $before=json_decode($event['before_data'],true);$after=json_decode($event['after_data'],true);
+            if(isset($after['_time_precision']))$overrides[(int)$event['entity_id']]=$after['_time_precision'];
+            elseif(($before['source_date']??null)!==($after['source_date']??null))$overrides[(int)$event['entity_id']]=empty($after['source_date'])?'none':'datetime';
+        }
+        $GLOBALS['journal_time_cache'][$thread][$scope]=$overrides;
+    }
+    return $GLOBALS['journal_time_cache'][$thread][$scope];
+}
+function journal_time_precision(mysqli $db,int $id,string $origin,?string $stamp):string {
+    if(!$stamp)return 'none';
+    if($id>0||in_array($origin,['native','new','adjustment'],true))return 'datetime';
+    if($id<-1000000000){$override=journal_time_overrides($db)[-$id-1000000000]??null;if($override!==null)return $override;}
+    return substr($stamp,11,8)==='00:00:00'?'date':'datetime';
+}
+
 function payment_time_archive_cache(mysqli $db,int $scope,array $batches,?array $write=null): ?array {
     require_once __DIR__.'/report_artifact.php';$root=report_artifact_root();if(!$root)return null;
     $database=$db->query('SELECT @@server_uuid,DATABASE(),@@port')->fetch_row();

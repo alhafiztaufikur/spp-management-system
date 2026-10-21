@@ -1,9 +1,19 @@
 <?php
 require_once __DIR__.'/legacy_operational_schema.php';
 function lop_read_one(mysqli $db,string $sql,array $values): ?array {$s=$db->prepare($sql);$s->bind_param(str_repeat('s',count($values)),...$values);$s->execute();$row=$s->get_result()->fetch_assoc();$s->close();return $row;}
+/** Request-local batch for Master SPP's read-only preview; writers query live rows. */
+function lop_preview_tariffs(mysqli $db): void {
+    if(($_SERVER['REQUEST_METHOD']??'')!=='GET'||!lop_ready($db))return;
+    require_once __DIR__.'/history_performance.php';
+    $key=$db->thread_id.':'.(int)($GLOBALS['app_unit_id']??unit_active_id());
+    $GLOBALS['lop_preview_tariffs'][$key]=array_column(hp_rows($db,"SELECT s.NO_INDUK,t.amount FROM legacy_op_tariffs t JOIN siswa s ON s.id=t.student_id AND s.unit_id=t.unit_id WHERE t.basis='legacy'"),'amount','NO_INDUK');
+}
 function lop_tariff(mysqli $db,string $nis,?string $year=null): ?float {
     require_once __DIR__.'/legacy_billing.php';if(lb_spp_override($db,$nis,$year??(function_exists('du_current_academic_year')?du_current_academic_year():((int)date('Y')-((int)date('n')<7?1:0)).'/'.((int)date('Y')+((int)date('n')<7?0:1)))))return null;
-    if(!lop_ready($db))return null;$r=lop_read_one($db,"SELECT t.amount FROM legacy_op_tariffs t JOIN siswa s ON s.id=t.student_id AND s.unit_id=t.unit_id WHERE s.NO_INDUK=? AND t.basis='legacy'",[$nis]);return $r?(float)$r['amount']:null;
+    if(!lop_ready($db))return null;
+    $key=$db->thread_id.':'.(int)($GLOBALS['app_unit_id']??unit_active_id());
+    if(($_SERVER['REQUEST_METHOD']??'')==='GET'&&isset($GLOBALS['lop_preview_tariffs'][$key]))return isset($GLOBALS['lop_preview_tariffs'][$key][$nis])?(float)$GLOBALS['lop_preview_tariffs'][$key][$nis]:null;
+    $r=lop_read_one($db,"SELECT t.amount FROM legacy_op_tariffs t JOIN siswa s ON s.id=t.student_id AND s.unit_id=t.unit_id WHERE s.NO_INDUK=? AND t.basis='legacy'",[$nis]);return $r?(float)$r['amount']:null;
 }
 function lop_opening(mysqli $db,int $student,int $unit): ?array {
     if(!lop_ready($db))return null;return lop_read_one($db,'SELECT a.opening amount,a.effective_date FROM legacy_op_accounts a JOIN legacy_op_owners o ON o.id=a.owner_id AND o.unit_id=a.unit_id WHERE o.student_id=? AND o.unit_id=?',[$student,$unit]);

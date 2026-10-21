@@ -46,12 +46,12 @@ function mh_payment_source(mysqli $db,bool $deleted=false,int|array|null $target
     $parts[]="SELECT p.id,p.unit_id,p.NO_INDUK,p.TGL_BYR,p.total_jumlah,p.user_id,p.KELAS,p.kelas_rombel_snapshot,p.created_at,p.updated_at,p.BULAN,p.TAHUN,p.payment_link_version,
         s.id student_id,NULL legacy_owner_id,COALESCE(s.NAMA,'Tidak tercatat') NAMA,s.NO_induk_diknas,s.master_kelas_id current_class_id,IF(s.id IS NULL,'account','student') owner_type,'system' source_kind,
         COALESCE(NULLIF(p.kelas_rombel_snapshot,''),NULLIF(p.KELAS,''),s.KELAS,'Tidak tercatat') kelas_transaksi,
-        IF(p.TGL_BYR IS NULL,'none','datetime') time_precision,NULL imported_at,p.TGL_BYR stored_datetime
+        IF(p.TGL_BYR IS NULL,'none','datetime') time_precision,NULL imported_at,p.TGL_BYR stored_datetime,CONCAT_WS(' ',p.BULAN,p.TAHUN) evidence_period
         FROM bayar p LEFT JOIN siswa s ON s.NO_INDUK=p.NO_INDUK AND s.unit_id=p.unit_id $nativeTarget";
     $time=$withTime&&(lful_read_ready($db)||lop_ready($db))?payment_time_projection($db):['value'=>'p.source_date','precision'=>"IF(p.source_date IS NULL,'none','date')",'updated'=>'NULL','join'=>''];
-    if(!$deleted&&lful_read_ready($db))$parts[]="SELECT -p.id,p.unit_id,s.NO_INDUK,".$time['value'].",p.total,CONCAT('legacy:',p.unit_id,':',LOWER(HEX(COALESCE(p.source_operator,'')))),p.class_snapshot,p.class_snapshot,NULL,".$time['updated'].",'','',0,s.id,NULL,s.NAMA,s.NO_induk_diknas,s.master_kelas_id,'student','legacy',p.class_snapshot,".$time['precision'].",b.completed_at,p.source_date
+    if(!$deleted&&lful_read_ready($db))$parts[]="SELECT -p.id,p.unit_id,s.NO_INDUK,".$time['value'].",p.total,CONCAT('legacy:',p.unit_id,':',LOWER(HEX(COALESCE(p.source_operator,'')))),p.class_snapshot,p.class_snapshot,NULL,".$time['updated'].",'','',0,s.id,NULL,s.NAMA,s.NO_induk_diknas,s.master_kelas_id,'student','legacy',p.class_snapshot,".$time['precision'].",b.completed_at,p.source_date,p.source_period
         FROM legacy_full_payments p JOIN siswa s ON s.id=p.student_id AND s.unit_id=p.unit_id JOIN legacy_full_batches b ON b.id=p.batch_id AND b.unit_id=p.unit_id ".$time['join']." WHERE b.state='completed' $fullTarget";
-    if(lop_ready($db))$parts[]="SELECT -(1000000000+p.id),p.unit_id,COALESCE(s.NO_INDUK,o.source_identity),".$time['value'].",p.total,CONCAT('legacy:',p.unit_id,':',LOWER(HEX(COALESCE(p.source_operator,'')))),p.class_snapshot,p.class_snapshot,NULL,".$time['updated'].",p.source_period,'',0,s.id,o.id,o.name,s.NO_induk_diknas,COALESCE(s.master_kelas_id,g.master_kelas_id),IF(s.id IS NULL,'account','student'),'legacy',p.class_snapshot,".$time['precision'].",b.completed_at,p.source_date
+    if(lop_ready($db))$parts[]="SELECT -(1000000000+p.id),p.unit_id,COALESCE(s.NO_INDUK,o.source_identity),".$time['value'].",p.total,CONCAT('legacy:',p.unit_id,':',LOWER(HEX(COALESCE(p.source_operator,'')))),p.class_snapshot,p.class_snapshot,NULL,".$time['updated'].",p.source_period,'',0,s.id,o.id,o.name,s.NO_induk_diknas,COALESCE(s.master_kelas_id,g.master_kelas_id),IF(s.id IS NULL,'account','student'),'legacy',p.class_snapshot,".$time['precision'].",b.completed_at,p.source_date,p.source_period
         FROM legacy_op_payments p JOIN legacy_op_owners o ON o.id=p.owner_id AND o.unit_id=p.unit_id LEFT JOIN siswa s ON s.id=o.student_id AND s.unit_id=o.unit_id LEFT JOIN legacy_op_groups g ON g.id=o.group_id AND g.unit_id=o.unit_id JOIN legacy_full_batches b ON b.id=p.batch_id AND b.unit_id=p.unit_id ".$time['join']." WHERE b.state='completed' AND p.cancelled=".($deleted?'1':'0').$opTarget;
     if($deleted){
         $fields=['id'=>'BIGINT','unit_id'=>'INT','NO_INDUK'=>'VARCHAR(255)','TGL_BYR'=>'DATETIME','total_jumlah'=>'DECIMAL(15,2)','user_id'=>'VARCHAR(255)','KELAS'=>'VARCHAR(100)','kelas_rombel_snapshot'=>'VARCHAR(100)','created_at'=>'DATETIME','updated_at'=>'DATETIME','BULAN'=>'VARCHAR(100)','TAHUN'=>'VARCHAR(20)','payment_link_version'=>'INT'];
@@ -176,7 +176,7 @@ function mh_student_counts_many(mysqli $db,array $students): array {
     foreach(['transaksi_m','transaksi_k'] as $table)$parts[]="SELECT s.id,0,COUNT(*) FROM $table p JOIN siswa s ON s.unit_id=p.unit_id AND s.NO_INDUK=p.NO_INDUK WHERE s.id IN ($ids) GROUP BY s.id";
     if(lful_read_ready($db))foreach(['payments','journals'] as $table){$amount=$table==='payments'?'COUNT(*),0':'0,COUNT(*)';$parts[]="SELECT p.student_id,$amount FROM legacy_full_$table p JOIN legacy_full_batches b ON b.id=p.batch_id AND b.unit_id=p.unit_id WHERE p.student_id IN ($ids) AND b.state='completed' GROUP BY p.student_id";}
     if(lop_ready($db))foreach(['payments','journals'] as $table){$amount=$table==='payments'?'COUNT(*),0':'0,COUNT(*)';$extra=$table==='journals'?" AND p.origin<>'adjustment'":'';$parts[]="SELECT o.student_id,$amount FROM legacy_op_$table p JOIN legacy_op_owners o ON o.id=p.owner_id AND o.unit_id=p.unit_id JOIN legacy_full_batches b ON b.id=p.batch_id AND b.unit_id=p.unit_id WHERE o.student_id IN ($ids) AND b.state='completed' AND p.cancelled=0 $extra GROUP BY o.student_id";}
-    $out=[];foreach(lf_rows($db,'SELECT id,SUM(payments) payments,SUM(journals) journals FROM ('.implode(' UNION ALL ',$parts).') counts GROUP BY id') as $r)$out[(int)$r['id']]=['payments'=>(int)$r['payments'],'journals'=>(int)$r['journals'],'total'=>(int)$r['payments']+(int)$r['journals']];return $out;
+    $out=[];foreach(hp_rows($db,'SELECT id,SUM(payments) payments,SUM(journals) journals FROM ('.implode(' UNION ALL ',$parts).') counts GROUP BY id') as $r)$out[(int)$r['id']]=['payments'=>(int)$r['payments'],'journals'=>(int)$r['journals'],'total'=>(int)$r['payments']+(int)$r['journals']];return $out;
 }
 function mh_student_counts(mysqli $db,int $unit,string $nis,?int $studentId=null): array {
     $s=lf_one($db,'SELECT id FROM siswa WHERE unit_id=? AND NO_INDUK=? AND (?=0 OR id=?)',[$unit,$nis,$studentId??0,$studentId??0]);
@@ -193,8 +193,21 @@ function mh_receipts_many(mysqli $db,array $rows): array {
     }return $out;
 }
 
-function mh_student_legacy_history(mysqli $db,array $student): array {
-    $source=mh_payment_source($db);$rows=[];
+function mh_student_legacy_ids(mysqli $db,array $student): array {
+    $parts=[];$values=[];
+    if(lful_read_ready($db)){
+        $parts[]="SELECT -p.id id FROM legacy_full_payments p JOIN legacy_full_batches b ON b.id=p.batch_id AND b.unit_id=p.unit_id WHERE p.student_id=? AND p.unit_id=? AND b.state='completed'";
+        array_push($values,(int)$student['id'],(int)$student['unit_id']);
+    }
+    if(lop_ready($db)){
+        $parts[]="SELECT -(1000000000+p.id) id FROM legacy_op_payments p JOIN legacy_op_owners o ON o.id=p.owner_id AND o.unit_id=p.unit_id JOIN legacy_full_batches b ON b.id=p.batch_id AND b.unit_id=p.unit_id WHERE o.student_id=? AND p.unit_id=? AND p.cancelled=0 AND b.state='completed'";
+        array_push($values,(int)$student['id'],(int)$student['unit_id']);
+    }
+    return $parts?array_map('intval',array_column(hp_rows($db,implode(' UNION ALL ',$parts),$values),'id')):[];
+}
+function mh_student_legacy_history(mysqli $db,array $student,?array $ids=null): array {
+    $ids??=mh_student_legacy_ids($db,$student);if(!$ids)return [];
+    $source=mh_payment_source($db,false,$ids);$rows=[];
     $payments=lf_rows($db,"SELECT p.* FROM $source p WHERE p.id<0 AND p.student_id=? AND p.unit_id=? ORDER BY p.TGL_BYR DESC,p.id DESC",[$student['id'],$student['unit_id']]);$receipts=mh_receipts_many($db,$payments);
     foreach($payments as $p){
         $receipt=$receipts[(int)$p['id']];$components=array_column($receipt['items'],'label');

@@ -6,8 +6,8 @@
 define('DB_HOST', getenv('SPP_DB_HOST') ?: 'localhost');
 define('DB_USER', getenv('SPP_DB_USER') ?: 'root');
 define('DB_PASS', getenv('SPP_DB_PASS') !== false ? getenv('SPP_DB_PASS') : '');
-define('DB_NAME', getenv('SPP_DB_NAME') ?: 'db_spp');
-if (PHP_SAPI !== 'cli' && DB_NAME === 'db_spp'
+define('DB_NAME', getenv('SPP_DB_NAME') ?: 'db_spp_test2');
+if (PHP_SAPI !== 'cli' && DB_NAME === 'db_spp_test2'
     && is_file(__DIR__ . '/tmp/financial_migration.lock')) {
     http_response_code(503);
     header('Retry-After: 60');
@@ -26,7 +26,7 @@ date_default_timezone_set('Asia/Jakarta');
 require_once __DIR__.'/includes/date_format.php';
 
 try {
-    $reportMeasured=PHP_SAPI!=='cli'&&in_array(str_replace('\\','/',realpath($_SERVER['SCRIPT_FILENAME']??'')?:''),array_map(static fn($path)=>str_replace('\\','/',__DIR__.'/'.$path),['laporan/export_global.php','laporan/export_pdf.php','laporan/export_excel.php','otorisasi_export_pdf.php']),true);
+    $reportMeasured=getenv('SPP_REQUEST_METRICS')==='1'||PHP_SAPI!=='cli'&&in_array(str_replace('\\','/',realpath($_SERVER['SCRIPT_FILENAME']??'')?:''),array_map(static fn($path)=>str_replace('\\','/',__DIR__.'/'.$path),['laporan/export_global.php','laporan/export_pdf.php','laporan/export_excel.php','otorisasi_export_pdf.php']),true);
     if($reportMeasured)require_once __DIR__.'/includes/report_metrics.php';
     $koneksi = $reportMeasured?new ReportMeasuredConnection(DB_HOST, DB_USER, DB_PASS, DB_NAME, $dbPort):new mysqli(DB_HOST, DB_USER, DB_PASS, DB_NAME, $dbPort);
     if ($koneksi->connect_error) {

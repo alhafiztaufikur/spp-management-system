@@ -206,17 +206,21 @@ function pilihSiswaDatalist(input) {
     
     // Match if exact match or if user is backspacing but NIS is still at the beginning
     if (val === opt.value || val === nis || val === nama || val.startsWith(nis)) {
+      if(previousNis!==nis)refreshPaymentHistory('');
       if (window.sppPublishedBilling && previousNis !== nis) clearPaymentAmountsOnContextChange(true);
       document.getElementById('disp-nis').value = nis || '';
       document.getElementById('disp-nama').value = nama || '';
       document.getElementById('disp-kelas').value = opt.dataset.kelas || '';
       applyDefaultDaftarUlangClass(opt);
       refreshBiayaLainOptions();
-      refreshBiayaLainBillsFromServer(nis || '');
+      if(opt.dataset.paymentDetailsLazy!=='1')refreshBiayaLainBillsFromServer(nis || '');
       applyStudentPaymentDetails(opt);
-      refreshPaymentHistory(nis || '');
       if(previousNis!==nis)closeSppWarning();
-      scheduleSppStatusCheck(sppStatusUiReady&&!window.sppEditPaymentId&&previousNis!==nis,null,previousNis!==nis);
+      if(sppStatusTimer)window.clearTimeout(sppStatusTimer);
+      sppStatusTimer=null;
+      requestSppStatus({interactive:sppStatusUiReady&&!window.sppEditPaymentId&&previousNis!==nis,summary:previousNis!==nis}).then(()=>{
+        if(selectedStudentOption()===opt)refreshPaymentHistory(nis || '');
+      });
       found = true;
       break;
     }
@@ -1394,6 +1398,7 @@ let sppStatusUiReady = false;
 let sppStatusTimer = null;
 let sppStatusRequestId = 0;
 let sppStatusAbortController = null;
+let sppStatusInFlight = null;
 let sppWarningRestoreFocus = null;
 let sppWarningPrimaryAction = null;
 let sppWarningSecondaryAction = null;
@@ -1415,7 +1420,7 @@ function currentSppStatusContext() {
     bulan,
     tahun,
     editId,
-    key: [noInduk, bulan, tahun, editId].join('|')
+    key: [window.sppPaymentHistoryUnit,selectedStudentOption()?.dataset.studentId,noInduk,bulan,tahun,editId].join('|')
   };
 }
 
@@ -1424,6 +1429,7 @@ function resetSppStatusState() {
   sppStatusTimer = null;
   if (sppStatusAbortController) sppStatusAbortController.abort();
   sppStatusAbortController = null;
+  sppStatusInFlight = null;
   sppStatusRequestId += 1;
   sppStatusState.contextKey = '';
   sppStatusState.pending = false;
@@ -1586,6 +1592,12 @@ function sppEditDependencyBlocks(dependency, proposedAmount = null) {
 
 function applySppStatusPayload(payload) {
   const opt=selectedStudentOption();
+  if(opt&&payload.payment_details){
+    Object.entries(payload.payment_details).forEach(([key,value])=>{opt.dataset[key]=value!==null&&typeof value==='object'?JSON.stringify(value):String(value??'');});
+    opt.dataset.otherFeeChoicesLoaded='1';
+    applyStudentPaymentDetails(opt);
+    restorePaymentDraftOtherFees();
+  }
 
   const selected = payload?.selected;
   if (selected && Number.isFinite(Number(selected.tariff)) && Number.isFinite(Number(selected.paid))) {
@@ -1611,8 +1623,13 @@ async function requestSppStatus(options = {}) {
     refreshSppInstallmentAvailability();
     return null;
   }
+  if(!force&&sppStatusState.pending&&sppStatusState.contextKey===context.key&&sppStatusInFlight){
+    const payload=await sppStatusInFlight;
+    if(interactive&&options.summary&&currentSppStatusContext()?.key===context.key)showPaymentObligations(payload,sourceElement);
+    return payload;
+  }
 
-  if (!force && sppStatusState.contextKey === context.key && sppStatusState.payload && !sppStatusState.pending) {
+  if (!force && sppStatusState.contextKey === context.key && sppStatusState.payload?.ok && !sppStatusState.pending) {
     const cached = sppStatusState.payload;
     if (interactive && sppEditDependencyBlocks(cached.edit_dependency)) {
       showSppWarning(cached.edit_dependency, sourceElement);
@@ -1632,11 +1649,16 @@ async function requestSppStatus(options = {}) {
   sppStatusState.payload = null;
   refreshSppInstallmentAvailability();
 
+  let finishRequest;
+  const pending=new Promise(resolve=>{finishRequest=resolve;});
+  sppStatusInFlight=pending;
+  let completedPayload=null;
   try {
     const url = new URL(urlValue, window.location.href);
     url.searchParams.set('no_induk', context.noInduk);
     if(Number.isInteger(window.sppPaymentHistoryUnit))url.searchParams.set('unit_id',String(window.sppPaymentHistoryUnit));
     if(selectedStudentOption()?.dataset.studentId)url.searchParams.set('student_id',selectedStudentOption().dataset.studentId);
+    if(selectedStudentOption()?.dataset.paymentDetailsLazy==='1')url.searchParams.set('details','1');
     url.searchParams.set('bulan', context.bulan);
     url.searchParams.set('tahun', context.tahun);
     if (context.editId > 0) url.searchParams.set('edit_id', String(context.editId));
@@ -1651,6 +1673,7 @@ async function requestSppStatus(options = {}) {
 
     sppStatusState.pending = false;
     sppStatusState.payload = payload;
+    completedPayload=payload;
     applySppStatusPayload(payload);
     if (interactive && sppEditDependencyBlocks(payload.edit_dependency)) {
       showSppWarning(payload.edit_dependency, sourceElement, force);
@@ -1667,6 +1690,9 @@ async function requestSppStatus(options = {}) {
     refreshSppInstallmentAvailability();
     if (interactive) showSppWarning(payload, sourceElement, force);
     return payload;
+  } finally {
+    finishRequest(completedPayload);
+    if(sppStatusInFlight===pending)sppStatusInFlight=null;
   }
 }
 
@@ -1952,19 +1978,24 @@ function initPromotionBatchSelector() {
   if(context&&!context.dataset.ready){
     context.dataset.ready='1';
     const year=document.getElementById('promotion-source-year'),level=document.getElementById('promotion-source-level');
+    const mode=document.getElementById('promotion-mode');
+    const applied=[year.value,level.value,mode?.value].join('|');
     const changed=()=>{
       // PSB is a read-only view of current candidates, without a source placement/year.
       year.disabled = level.value === 'psb';
       year.required = !year.disabled;
-      if (level.value === 'psb') { context.requestSubmit(); return; }
       const match=/^(\d{4})\/(\d{4})$/.exec(year.selectedOptions[0]?.textContent.trim()||'');
-      const graduation=context.dataset.custom!=='1'&&Number(level.value)===Number(context.dataset.lastLevel);
-      document.getElementById('promotion-target-label').textContent=graduation?'Tahun Kelulusan':'Tahun Ajaran Tujuan';
-      document.getElementById('promotion-target-year').textContent=match?(graduation?match[0]:(Number(match[1])+1)+'/'+(Number(match[2])+1)):'Pilih tahun asal';
-      const old=document.getElementById('promotion-submit-button');if(old)old.disabled=true;
-      if(year.value&&level.value)context.requestSubmit();
+      const graduation=mode?.value!=='custom'&&Number(level.value)===Number(context.dataset.lastLevel);
+      document.getElementById('promotion-target-label').textContent=level.value==='psb'?'Kelas Tujuan':(graduation?'Tahun Kelulusan':'Tahun Ajaran Tujuan');
+      document.getElementById('promotion-target-year').textContent=level.value==='psb'?'Penempatan PSB':(match?(graduation?match[0]:(Number(match[1])+1)+'/'+(Number(match[2])+1)):'Pilih tahun asal');
+      const pending=[year.value,level.value,mode?.value].join('|')!==applied;
+      document.getElementById('promotion-context-pending')?.toggleAttribute('hidden',!pending);
+      const panel=document.querySelector('.class-participants-panel');if(panel)panel.dataset.contextPending=pending?'1':'0';
+      const batch=document.getElementById('promotion-batch-form');if(batch)batch.inert=pending;
+      document.querySelectorAll('#promotion-batch-form button[type="submit"],#promotion-submit-button').forEach(button=>{if(pending){if(!('contextDisabled' in button.dataset))button.dataset.contextDisabled=button.disabled?'1':'0';button.disabled=true;}else if('contextDisabled' in button.dataset){button.disabled=button.dataset.contextDisabled==='1';delete button.dataset.contextDisabled;}});
     };
-    year.addEventListener('change',changed);level.addEventListener('change',changed);document.getElementById('promotion-mode')?.addEventListener('change',()=>context.requestSubmit());
+    year.addEventListener('change',changed);level.addEventListener('change',changed);mode?.addEventListener('change',changed);
+    document.getElementById('promotion-batch-form')?.addEventListener('submit',event=>{if([year.value,level.value,mode?.value].join('|')!==applied){event.preventDefault();event.stopImmediatePropagation();document.getElementById('promotion-context-pending')?.focus();}},true);
   }
   const form = document.getElementById('promotion-batch-form');
   if (!form || form.dataset.promotionReady === '1') return;
@@ -2417,6 +2448,8 @@ async function restorePaymentDraft() {
   if (opt) {
     setValue('siswa-search', opt.value);
     pilihSiswaDatalist(document.getElementById('siswa-search'));
+    // Lazy options must arrive before restoring the selected bill and draft amounts.
+    await requestSppStatus({interactive:false});
   }
   if (draft.tagihan_daftar_ulang_id) {
     setValue('tagihan-daftar-ulang-id', draft.tagihan_daftar_ulang_id);
@@ -2425,7 +2458,6 @@ async function restorePaymentDraft() {
   for (const [key,id] of Object.entries({uang_psb:'psb-input',uang_komite:'komite-input',uang_du:'du-input'})) {
     if (draft[key] !== undefined && !document.getElementById(id)?.readOnly) setValue(id,formatRupiahString(parseNumber(draft[key])));
   }
-  if (opt) await requestSppStatus({interactive:false,force:true});
   if (draft.uang_spp !== undefined && !document.getElementById('spp-input')?.readOnly) setValue('spp-input',formatRupiahString(parseNumber(draft.uang_spp)));
   window.paymentDraftOtherFees = draft;
   restorePaymentDraftOtherFees();

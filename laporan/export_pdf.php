@@ -12,15 +12,17 @@ $reportUnitId=unit_report_scope($koneksi,(string)($_GET['unit']??''));
 
 // Multi-filter recaps use the same three-sheet document as the XLSX export.
 if(($_GET['mode']??'')!=='selected' && (is_array($_GET['jenis_laporan']??null)||($_GET['jenis_laporan']??'semua')!=='semua')){
-    $sppGeneralPdf=true;require __DIR__.'/export_excel.php';$html=general_document_html($doc);
+    $sppGeneralPdf=true;require __DIR__.'/export_excel.php';
     $detailCount=0;foreach(array_slice($sheets,1) as $sheet)foreach($sheet['sections'] as $section)$detailCount+=count($section['rows']);
+    $html=$detailCount>600?'':general_document_html($doc);
     if(!in_array($_GET['output']??'preview',['pdf','inline'],true)){
         require_once '../includes/report_preview.php';$downloadQuery=$_GET;$downloadQuery['output']='pdf';$inlineQuery=$_GET;$inlineQuery['output']='inline';
         render_report_pdf_preview($html,['title'=>$doc['title'],'subtitle'=>$doc['subtitle'],'orientation'=>'landscape','unit'=>$reportUnitId,'generated'=>$doc['generated'],'pdf_url'=>'export_pdf.php?'.filter_build_query($inlineQuery),'row_count'=>$detailCount,'download_url'=>'export_pdf.php?'.filter_build_query($downloadQuery),'back_url'=>'index.php?'.filter_build_query($_GET)]);
     }
     require_once '../includes/pdf.php';require_pdf_library();require_once '../includes/report_artifact.php';
     $stable=$doc;unset($stable['generated']);$query=$_GET;unset($query['output']);
-    $artifact=report_artifact_get(['route'=>'recap','unit'=>$reportUnitId,'query'=>$query],$stable,'pdf',static function()use($html){
+    $artifact=report_artifact_get(['route'=>'recap','unit'=>$reportUnitId,'query'=>$query],$stable,'pdf',static function()use($html,$doc,$detailCount){
+        if($detailCount>600){require_once __DIR__.'/../includes/transaction_report_pdf.php';require_once __DIR__.'/../includes/global_report_layout.php';return global_report_render_pdf_fragments(transaction_report_pdf_fragments($doc),'landscape');}
         $options=new \Dompdf\Options();$options->setIsRemoteEnabled(false);$options->setChroot(realpath(__DIR__.'/..'));
         $pdf=new \Dompdf\Dompdf($options);$pdf->loadHtml($html,'UTF-8');$pdf->setPaper('A4','landscape');$pdf->render();
         $pdf->getCanvas()->page_text(705,571,'Halaman {PAGE_NUM} / {PAGE_COUNT}',$pdf->getFontMetrics()->getFont('DejaVu Sans'),8,[.3,.4,.35]);

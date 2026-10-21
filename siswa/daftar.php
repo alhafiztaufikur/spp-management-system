@@ -543,8 +543,6 @@ if(in_array($previewLevel,['CUSTOM','OUT'],true))$sppRatePreview=['base'=>0,'net
   <meta name="viewport" content="width=device-width, initial-scale=1.0" />
   <title>Data Siswa | SistemSPP</title>
   <link rel="icon" type="image/png" href="../assets/img/favicon.png?v=2" />
-  <link rel="preconnect" href="https://fonts.googleapis.com" />
-  <link href="https://fonts.googleapis.com/css2?family=Inter:wght@300;400;500;600;700;800&display=swap" rel="stylesheet" />
   <link rel="stylesheet" href="../assets/css/style.css?v=unitpalette4&amp;mtime=<?= filemtime(__DIR__ . '/../assets/css/style.css') ?>" />
   <link rel="stylesheet" href="../assets/css/date_controls.css?v=unitpalette4&amp;mtime=<?= filemtime(__DIR__ . '/../assets/css/date_controls.css') ?>" />
   <link rel="stylesheet" href="../assets/css/master_workspace.css?v=<?= filemtime(__DIR__ . '/../assets/css/master_workspace.css') ?>" />
