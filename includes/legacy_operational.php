@@ -9,7 +9,7 @@ require_once __DIR__.'/legacy_operational_checks.php';
 require_once __DIR__.'/legacy_operational_resolution.php';
 require_once __DIR__.'/legacy_migration_automation.php';
 require_once __DIR__.'/legacy_class_links.php';
-const LOP_VERSION=11;
+const LOP_VERSION=12;
 const LOP_ID_OFFSET=1000000000;
 function lop_date(mixed $value): ?string {if(is_string($value)&&preg_match('/^\d{4}-\d{2}-\d{2}T\d{2}:\d{2}$/D',$value))$value.=':00';return lful_date($value);}
 function lop_require(mysqli $db): void {if(!lop_ready($db))throw new DomainException('Pasang skema operasional Legacy melalui CLI.');}
@@ -50,7 +50,7 @@ function lop_prepare(array $records,array $cfg,int $unit,?string $sourceDate,arr
     [$records,$history,$references,$resolutions]=lop_resolved_source_rows($records,$cfg,$sourceDate);$automatic=[];
     $replacementErrors=[];
     $cfg=lop_replace_main_banks($records,$cfg,$sourceDate,$replacementErrors);
-    $sourceComponents=lful_catalog($records);foreach($sourceComponents as $key=>$c){$cfg['_component_names'][$key]=$c['name'];if(!empty($c['ambiguous']))$cfg['_component_conflicts'][$key]=$c['source_names'];}
+    $sourceComponents=lful_catalog($records,$cfg);$cfg=lcs_configure($cfg,$sourceComponents);foreach($sourceComponents as $key=>$c){$cfg['_component_names'][$key]=$c['name'];if(!empty($c['ambiguous']))$cfg['_component_conflicts'][$key]=$c['source_names'];}
     $groups=[];$by=[];$pending=$replacementErrors;$owners=[];$payments=[];$journals=[];$sum=0;$balances=0;
     foreach($records as $r){if($r['reference_only']&&!legacy_source_additional_savings($r))continue;if(legacy_source_additional_savings($r))continue;$identity=lful_identity(legacy_source_identity($r['raw']));if($identity===''){$pending[]=lop_pending('',(string)$r['row_key'],'identity','identity_missing','Identitas sumber belum tercatat.',$r);continue;}$by[$identity][]=$r;
         if($r['table']==='siswa'){$g=lop_group((string)($r['raw']['KELAS']??''),$unit);$groups[$g['code']]??=$g+['aliases'=>[],'identities'=>[]];$groups[$g['code']]['aliases'][(string)($r['raw']['KELAS']??'')]=true;$groups[$g['code']]['identities'][]=$identity;}}

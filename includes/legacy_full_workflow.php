@@ -79,7 +79,7 @@ function lful_suggestions(mysqli $db,string $id): array {
     $components=[];foreach($cat['components'] as $c){$key=$c['key'];$saved=$profile['components'][$key]??[];$target=$c['suggestion']?:lful_history_category($key);$origin='Usulan berdasarkan kolom sumber';
         if(isset($saved['master_name'])){$target='';$origin='Master dalam profil tidak tersedia; pilih pasangan kembali';foreach($masterNames as $m)if($m['nama']===$saved['master_name']){$target='biaya_lain:'.$m['id'];$origin='Profil unit yang pernah disahkan';}}
         elseif(isset($saved['category'])){$target=$saved['category'];$origin='Profil unit yang pernah disahkan';}
-        if($c['column']==='U_SORGA'){$target=lful_history_category($key);$origin='Kebijakan yayasan: U_SORGA sudah dihentikan';}
+        if($c['column']==='U_SORGA'){$target=lcs_komite_enabled($cfg)?'komite':lful_history_category($key);$origin=lcs_komite_enabled($cfg)?'U_SORGA adalah pembayaran Komite sesuai pengesahan sumber Legacy':'Aturan arsip pekerjaan lama: Histori Saja';}
         if(!empty($c['is_pomg'])){$target='komite';$origin='POMG adalah Komite, sesuai pengesahan yayasan';}
         if($c['savings'])$target='savings_reference';$components[$key]=$c+['suggested_category'=>$target,'origin'=>$origin];
     }

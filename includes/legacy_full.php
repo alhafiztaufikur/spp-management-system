@@ -29,19 +29,23 @@ function lful_component_key(string $table,string $column,array $raw): string {
     $label=preg_match('/^JUMLAH([1-4])$/D',$column,$m)?trim((string)($raw['LAIN_LAIN'.$m[1]]??'')):'';
     return $table.'.'.$column.($label!==''?':'.substr(hash('sha256',$label),0,16):'');
 }
-function lful_catalog(array $records): array {
-    return lful_component_catalog($records);
+function lful_catalog(array $records,array $config=[]): array {
+    return lcs_catalog(lful_component_catalog($records),$config);
 }
 function lful_stage(mysqli $db,array $job): void {
     lful_require($db);lf_actor($db,(int)$job['actor'],(int)$job['unit'],true);lful_empty($db,(int)$job['unit']);lf_stage($db,$job);
     [$records,$manifest]=lf_extract_read($job,true);
-    $settings=['cutoff'=>'','year_id'=>0,'evidence'=>'','accounting_reason'=>'','other_policy'=>'','discount_policy'=>'','du_policy'=>'','notes_accepted'=>false,'components'=>[],'students'=>[],'new_masters'=>[]];
-    if(is_file(legacy_root().'/'.$job['id'].'/operational-request.json')){
+    $q=lful_store();$saved=$q->prepare('SELECT settings FROM full_drafts WHERE job=?');$saved->execute([$job['id']]);$existing=$saved->fetchColumn();
+    $ruleFile=legacy_root().'/'.$job['id'].'/migration-rules.json';$rules=is_file($ruleFile)?json_decode(file_get_contents($ruleFile),true,32,JSON_THROW_ON_ERROR):[];
+    $newRule=($rules['job']??'')===$job['id']&&(int)($rules['unit']??0)===(int)$job['unit']&&($rules['source_hash']??'')===$job['hash']&&($rules['komite_mapping_version']??0)===LCS_KOMITE_MAPPING_VERSION;
+    $settings=$existing!==false?json_decode($existing,true,512,JSON_THROW_ON_ERROR):['komite_mapping_version'=>$newRule?LCS_KOMITE_MAPPING_VERSION:0,'cutoff'=>'','year_id'=>0,'evidence'=>'','accounting_reason'=>'','other_policy'=>'','discount_policy'=>'','du_policy'=>'','notes_accepted'=>false,'components'=>[],'students'=>[],'new_masters'=>[]];
+    if($existing===false&&is_file(legacy_root().'/'.$job['id'].'/operational-request.json')){
         $settings=lop_source_setup($records,$manifest,$settings,(int)$job['unit']);
         $settings['year_id']=lop_default_year($db);
     }
-    $q=lful_store();$q->prepare('INSERT OR IGNORE INTO full_drafts(job,settings) VALUES(?,?)')->execute([$job['id'],lf_json($settings)]);
-    file_put_contents(legacy_root().'/'.$job['id'].'/full_catalog.json',lf_json(lful_prepared($records,$manifest)+['component_catalog_version'=>4,'source_fee_masters'=>lful_source_fee_masters($records),'components'=>array_values(lful_catalog($records)),'manifest'=>$manifest]));
+    $components=lful_catalog($records,$settings);$settings=lcs_configure($settings,$components);
+    $q->prepare('INSERT OR IGNORE INTO full_drafts(job,settings) VALUES(?,?)')->execute([$job['id'],lf_json($settings)]);
+    file_put_contents(legacy_root().'/'.$job['id'].'/full_catalog.json',lf_json(lful_prepared($records,$manifest)+['component_catalog_version'=>4,'source_fee_masters'=>lful_source_fee_masters($records),'components'=>array_values($components),'manifest'=>$manifest]));
     if(($settings['mode']??'')==='operational')lop_review_source($job);
     legacy_update($job['id'],['state'=>'ready','stage'=>'Lengkapi Data','message'=>'Sumber diperiksa. Lengkapi pemetaan dan jalankan simulasi sebelum migrasi.']);
 }
@@ -53,6 +57,7 @@ function lful_catalog_read(string $id): array {
         if(!is_file($dir.'/source.dat')||!is_file($dir.'/finance.jsonl')||!hash_equals($d['job_info']['hash'],hash_file('sha256',$dir.'/source.dat'))||!hash_equals((string)$catalog['manifest']['rows_sha256'],hash_file('sha256',$dir.'/finance.jsonl')))throw new DomainException('Sumber berubah atau tidak lengkap. Unggah dan periksa ulang backup.');
         if(($catalog['component_catalog_version']??0)<4||($catalog['rules_version']??0)!==LFUL_RULES_VERSION){[$records,$manifest]=lf_extract_read($d['job_info'],true);$catalog=array_replace($catalog,lful_prepared($records,$manifest),['source_fee_masters'=>lful_source_fee_masters($records),'components'=>array_values(lful_catalog($records)),'component_catalog_version'=>4]);file_put_contents($file,lf_json($catalog),LOCK_EX);}
         if(lma_enabled($d['settings']))$catalog['components']=lma_catalog_components($catalog['components']);
+        $catalog['components']=lcs_catalog($catalog['components'],$d['settings']);
         return $catalog;
     }
     $db=$GLOBALS['koneksi']??null;if($db instanceof mysqli){$source=lf_one($db,'SELECT s.manifest FROM legacy_full_batches b JOIN legacy_finance_sources s ON s.id=b.source_id AND s.unit_id=b.unit_id WHERE b.id=?',[$id]);if($source)return ['students'=>[],'components'=>[],'manifest'=>json_decode($source['manifest'],true,512,JSON_THROW_ON_ERROR)];}
@@ -80,7 +85,8 @@ function lful_save(mysqli $db,int $actor,int $unit,string $id,int $version,array
         if(!is_array($patch['op_bulk_audit'])||!in_array($patch['op_bulk_audit']['scope']??'',['all','students','components','savings','payments'],true))throw new DomainException('Pengesahan kelompok tidak valid.');
         $config['op_bulk_audit']=array_replace($patch['op_bulk_audit'],['actor'=>$actor,'accepted_at'=>date(DATE_ATOM),'source_version'=>$version]);
     }
-    foreach(['students','components','additional_savings','op_savings','op_journals'] as $section)if(isset($patch[$section])){if(!is_array($patch[$section])||count($patch[$section])>5000)throw new DomainException('Pemetaan tidak valid.');foreach($patch[$section] as $key=>$value){if(!is_array($value))throw new DomainException('Pemetaan tidak valid.');if($section==='components'&&lma_enabled($config)&&isset($value['category'])&&!isset($value['automatic_mapping']))$value['automatic_mapping']=false;$config[$section][(string)$key]=array_replace($config[$section][(string)$key]??[],$value);}}
+    foreach(['students','components','additional_savings','op_savings','op_journals'] as $section)if(isset($patch[$section])){if(!is_array($patch[$section])||count($patch[$section])>5000)throw new DomainException('Pemetaan tidak valid.');foreach($patch[$section] as $key=>$value){if(!is_array($value))throw new DomainException('Pemetaan tidak valid.');if($section==='components'&&(lma_enabled($config)||lcs_komite_enabled($config))&&isset($value['category'])&&!isset($value['automatic_mapping']))$value['automatic_mapping']=false;$config[$section][(string)$key]=array_replace($config[$section][(string)$key]??[],$value);}}
+    if(isset($patch['components'])&&lcs_komite_enabled($config)){$catalog??=lful_catalog_read($id);$config=lcs_configure($config,$catalog['components']);}
     foreach($patch['op_savings']??[] as $fix){if(($fix['confirmed']??false)!==true||mb_strlen(trim((string)($fix['evidence']??'')))<10||mb_strlen((string)($fix['evidence']??''))>1000)throw new DomainException('Sahkan saldo FIX dan isi bukti minimal 10 karakter.');lf_cents($fix['amount']??null);}
     foreach($patch['additional_savings']??[] as $key=>$decision)if(($decision['reason']??'')==='replace_main'){
         $catalog??=lful_catalog_read($id);$ledger=$catalog['additional_savings'][$key]??null;$target=$decision['target_identity']??null;
@@ -161,7 +167,8 @@ function lful_simulate(mysqli $db,string $id,bool $persist=true): array {
     // CLI has no browser session; billing helpers must use the job's unit bounds.
     if(PHP_SAPI==='cli')$_SESSION['active_unit_id']=$unit;
     [$records,$manifest]=lf_extract_read($job,true);$issues=[];$notes=[];$add=static function(string $identity,string $message,string $code='student_invalid')use(&$issues){$issues[]=legacy_ui_issue($identity,$message,$code);};
-    foreach(lful_catalog($records) as $key=>$component){$config['_component_names'][$key]=$component['name'];if(!empty($component['ambiguous']))$config['_component_conflicts'][$key]=$component['source_names'];}
+    $components=lful_catalog($records,$config);$config=lcs_configure($config,$components);
+    foreach($components as $key=>$component){$config['_component_names'][$key]=$component['name'];if(!empty($component['ambiguous']))$config['_component_conflicts'][$key]=$component['source_names'];}
     $issues=array_merge($issues,lful_additional_savings_issues(lful_additional_savings($records,$manifest['source_date']??null),$config['additional_savings']??[]));
     if(($config['du_policy']??'')==='reference'&&array_filter($records,static fn($r)=>$r['table']==='bayar_du'))$notes[]=['identity'=>'Unit','message'=>'Tabel bayar_du disimpan sebagai referensi karena sudah tercakup pembayaran utama, sesuai bukti hubungan komponen. Tidak ditambahkan ke total histori lagi.'];
     if(($config['other_policy']??'')==='reference'&&array_filter($records,static fn($r)=>$r['table']==='bayar'&&isset($r['raw']['U_LAIN'])&&(string)$r['raw']['U_LAIN']!=='0'))$notes[]=['identity'=>'Unit','message'=>'U_LAIN disimpan sebagai referensi sesuai bukti hubungan komponen; hanya rincian yang dihitung dalam histori.'];

@@ -25,6 +25,7 @@ function lop_bulk_patch(array $records,array $catalog,array $settings,int $unit,
         $patch['op_import_unmatched']=true;
     }
     if(in_array($scope,['all','components'],true)){
+        $catalog['components']=lcs_catalog($catalog['components'],$settings);
         $proposals=$settings['new_masters']??[];
         foreach($catalog['components'] as $c){
             $key=$c['key'];$old=$settings['components'][$key]??[];
@@ -34,7 +35,7 @@ function lop_bulk_patch(array $records,array $catalog,array $settings,int $unit,
             $category=$old['category']??'';
             // Keep meaningful explicit mappings; upgrade automatic history-only suggestions.
             if(!empty($c['savings']))$category='savings_reference';
-            elseif($c['column']==='U_SORGA')$category=lful_history_category($key);
+            elseif($c['column']==='U_SORGA')$category=lcs_komite_enabled($settings)?(($old['automatic_mapping']??true)===false?$category:'komite'):lful_history_category($key);
             elseif(!empty($c['suggestion']))$category=$category&&!str_starts_with($category,'histori:')?$category:$c['suggestion'];
             elseif(!$category||str_starts_with($category,'histori:')){
                 $sourceNames=$c['source_names']??[];sort($sourceNames,SORT_STRING);

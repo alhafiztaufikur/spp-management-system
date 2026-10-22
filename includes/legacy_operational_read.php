@@ -1,4 +1,5 @@
 <?php
+require_once __DIR__.'/legacy_component_semantics.php';
 require_once __DIR__.'/legacy_operational_schema.php';
 function lop_read_one(mysqli $db,string $sql,array $values): ?array {$s=$db->prepare($sql);$s->bind_param(str_repeat('s',count($values)),...$values);$s->execute();$row=$s->get_result()->fetch_assoc();$s->close();return $row;}
 /** Request-local batch for Master SPP's read-only preview; writers query live rows. */

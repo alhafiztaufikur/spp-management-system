@@ -226,10 +226,10 @@ function report_categories(mysqli $db): array {
         if($scope>0&&isset($allHistory[$db->thread_id])&&$revision<=$allHistory[$db->thread_id]['revision']){
             $labels=$allHistory[$db->thread_id]['units'][$scope]??[];
         }else{
-            if(function_exists('lful_read_ready')&&lful_read_ready($db))foreach(hp_rows($db,"SELECT DISTINCT i.unit_id,i.category,i.label FROM legacy_full_items i JOIN legacy_full_payments p ON p.id=i.payment_id AND p.unit_id=i.unit_id JOIN legacy_full_batches b ON b.id=p.batch_id AND b.unit_id=p.unit_id WHERE b.state='completed' AND i.category LIKE 'histori:%' ORDER BY i.category") as $r)$labels[$r['category']]=$byUnit[$r['unit_id']][$r['category']]=$r['label'].' (Legacy)';
+            if(function_exists('lful_read_ready')&&lful_read_ready($db))foreach(hp_rows($db,"SELECT DISTINCT i.unit_id,i.source_column,i.category,i.label FROM legacy_full_items i JOIN legacy_full_payments p ON p.id=i.payment_id AND p.unit_id=i.unit_id JOIN legacy_full_batches b ON b.id=p.batch_id AND b.unit_id=p.unit_id WHERE b.state='completed' AND i.category LIKE 'histori:%' ORDER BY i.category") as $r)$labels[$r['category']]=$byUnit[$r['unit_id']][$r['category']]=lcs_component_view($r)['display_label'].' (Legacy)';
             if($ready){
                 $cursor=report_scoped_query($db,hp_sql($db,"SELECT p.unit_id,p.items FROM legacy_op_payments p JOIN legacy_full_batches b ON b.id=p.batch_id AND b.unit_id=p.unit_id WHERE b.state='completed' AND p.cancelled=0"),MYSQLI_USE_RESULT);
-                try{while($row=$cursor->fetch_assoc())foreach(json_decode($row['items'],true) as $item)if(str_starts_with($item['category'],'histori:'))$labels[$item['category']]=$byUnit[$row['unit_id']][$item['category']]=$item['label'].' (Legacy)';}
+                try{while($row=$cursor->fetch_assoc())foreach(json_decode($row['items'],true) as $item)if(str_starts_with($item['category'],'histori:'))$labels[$item['category']]=$byUnit[$row['unit_id']][$item['category']]=lcs_component_view($item)['display_label'].' (Legacy)';}
                 finally{$cursor->free();}
             }
             if($scope===0)$allHistory[$db->thread_id]=['revision'=>$revision,'units'=>$byUnit];
@@ -354,7 +354,7 @@ function report_status_data(mysqli $db, array $f): array {
     return ['title'=>$label,'subtitle'=>'Status kewajiban · '.$period,'columns'=>$columns,'rows'=>$rows];
 }
 
-function report_payment_components(mysqli $db, array $f): array {
+function report_payment_components(mysqli $db, array $f,bool $cashProjection=false): array {
     $start=$f['tanggal_awal'].' 00:00:00';$end=date('Y-m-d H:i:s',strtotime($f['tanggal_akhir'].' +1 day'));
     $where=[!empty($f['include_undated'])?'((b.TGL_BYR>=? AND b.TGL_BYR<?) OR b.TGL_BYR IS NULL)':'(b.TGL_BYR>=? AND b.TGL_BYR<?)'];$types='ss';$params=[$start,$end];
     $paymentClassWhere = report_class_where($f,'b','KELAS');
@@ -366,7 +366,7 @@ function report_payment_components(mysqli $db, array $f): array {
     if($f['metode']!==''){$where[]='b.sistem_pembayaran=?';$types.='s';$params[]=$f['metode'];}
     $stmt=$db->prepare('SELECT b.*,s.id student_id,s.is_active student_active,s.NAMA,s.NO_induk_diknas FROM bayar b LEFT JOIN siswa s ON s.NO_INDUK=b.NO_INDUK AND s.unit_id=b.unit_id'.$operatorJoin.' WHERE '.implode(' AND ',$where).' ORDER BY b.TGL_BYR,b.id');
     $stmt->bind_param($types,...$params);$stmt->execute();$payments=$stmt->get_result()->fetch_all(MYSQLI_ASSOC);$stmt->close();
-    if(!$payments)return lful_report_components($db,$f);
+    if(!$payments)return lful_report_components($db,$f,$cashProjection);
     $ids=array_column($payments,'id');$idList=implode(',',array_map('intval',$ids));$extra=[];$du=[];
     foreach(report_scoped_query($db,"SELECT bayar_id,master_biaya_lain_id,tagihan_biaya_lain_id,nama_biaya_snapshot,nominal_snapshot FROM bayar_biaya_lain WHERE bayar_id IN ($idList)")->fetch_all(MYSQLI_ASSOC) as $d)$extra[$d['bayar_id']][]=$d;
     foreach(report_scoped_query($db,"SELECT bayar_id,jumlah FROM bayar_du WHERE bayar_id IN ($idList)")->fetch_all(MYSQLI_ASSOC) as $d)$du[$d['bayar_id']]=(float)$d['jumlah'];
@@ -377,17 +377,18 @@ function report_payment_components(mysqli $db, array $f): array {
       foreach($extra[$p['id']]??[] as $d)$rows[]=array_merge($base,['kategori_key'=>$d['master_biaya_lain_id']?'biaya_lain:'.$d['master_biaya_lain_id']:'biaya_lain','bill_id'=>(int)($d['tagihan_biaya_lain_id']??0),'optional_fee'=>$d['tagihan_biaya_lain_id']===null,'komponen'=>$d['nama_biaya_snapshot'],'nominal'=>(float)$d['nominal_snapshot']]);
       if((float)$p['potong_spp']>0)$rows[]=array_merge($base,['kategori_key'=>'potongan','komponen'=>'Potongan SPP','nominal'=>-(float)$p['potong_spp']]);
     }
-    return array_values(array_filter(array_merge($rows,lful_report_components($db,$f)),static fn($r)=>report_component_matches($r,$f)));
+    return array_values(array_filter(array_merge($rows,lful_report_components($db,$f,$cashProjection)),static fn($r)=>report_component_matches($r,$f)));
 }
 
 function report_receipt_data(mysqli $db,array $f):array{
-    $components=report_payment_components($db,$f);$category=$f['kategori'];
+    $components=report_payment_components($db,$f,true);$category=$f['kategori'];
     $selected=$f['_multi']['kategori']??[$category];$all=filter_is_all($selected)||in_array('semua',$selected,true)||$selected===[''];
-    if(!$all)$components=array_values(array_filter($components,static fn($r)=>in_array($r['kategori_key'],$selected,true)));
+    if(!$all)$components=array_values(array_filter($components,static fn($r)=>in_array($r['kategori_key'],$selected,true)||in_array($r['source_category']??$r['kategori_key'],$selected,true)));
     if($f['q']!==''||($f['student_id']??0)>0)$components=array_values(array_filter($components,fn($r)=>report_row_matches_filters($r,$f)));
     $allCategories=report_categories($db);
     $allCategories['potongan']='Potongan SPP';
-    $wantedCategories=array_intersect_key($allCategories,array_fill_keys($all?array_column($components,'kategori_key'):$selected,true));
+    $displaySelected=array_map(static fn($key)=>$key===lcs_sorga_history_key()?'komite':$key,$selected);
+    $wantedCategories=array_intersect_key($allCategories,array_fill_keys($all?array_column($components,'kategori_key'):$displaySelected,true));
     $orderedCategories=[];foreach($allCategories as $key=>$label)if(isset($wantedCategories[$key]))$orderedCategories[$key]=$label;
     $columns=[['nis','NIS','nis'],['nama','Nama Siswa'],['kelas','Kelas','kelas']];
     foreach($orderedCategories as $key=>$label)$columns[]=[$key,$label,'money_optional'];
@@ -954,7 +955,7 @@ function report_settlement_component_summary(array $components,bool $merge=false
     return $rows;
 }
 function report_settlement_data(mysqli $db,array $f):array{
-    $components=report_payment_components($db,$f);if(empty($f['_global_report']))$components=array_values(array_filter($components,static fn($r)=>empty($r['legacy'])));
+    $components=report_payment_components($db,$f,!empty($f['_global_report']));if(empty($f['_global_report']))$components=array_values(array_filter($components,static fn($r)=>empty($r['legacy'])));
     if(!empty($f['_global_report'])){$labels=report_categories($db);foreach($components as &$c){$name=$labels[$c['kategori_key']]??$c['komponen'];$name=preg_replace('/^Biaya Lain /','',$name);$c['komponen']=preg_replace('/ \(Legacy\)$/','',$name);}unset($c);}
     $componentSummary=report_settlement_component_summary($components,!empty($f['_global_report']));
     $payByMethod=['Tunai'=>0,'VA'=>0,'Qris'=>0];

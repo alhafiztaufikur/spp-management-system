@@ -3,7 +3,7 @@
 function lop_source_setup(array $records, array $manifest, array $settings, int $unit): array
 {
     // Only the initial preparation opts in. Published and previously prepared jobs keep their rules.
-    if(!isset($settings['mode']))$settings['automation_version']=LMA_VERSION;
+    if(!isset($settings['mode'])){$settings['automation_version']=LMA_VERSION;$settings['komite_mapping_version']??=LCS_KOMITE_MAPPING_VERSION;}
     $settings['source_fingerprint'] = $manifest['fingerprint'];
     $settings['mode'] = 'operational';
     $reason = 'Menggunakan data pada backup Legacy yang diperiksa; sumber asli tetap tersimpan.';
@@ -31,7 +31,7 @@ function lop_source_setup(array $records, array $manifest, array $settings, int 
             ]))
         ]);
     }
-    foreach (lful_catalog($records) as $key=>$component) {
+    foreach (lful_catalog($records,$settings) as $key=>$component) {
         if (!empty($settings['components'][$key]['category'])) continue;
         $settings['components'][$key] = [
             'category'=>$component['savings'] ? 'savings_reference' :
@@ -39,7 +39,7 @@ function lop_source_setup(array $records, array $manifest, array $settings, int 
             'reason'=>$reason, 'confirmed'=>empty($component['ambiguous']), 'automatic_mapping'=>true
         ];
     }
-    return $settings;
+    return lcs_configure($settings,lful_catalog($records,$settings));
 }
 
 function lop_default_year(mysqli $db): int

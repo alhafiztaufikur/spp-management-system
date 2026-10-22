@@ -128,6 +128,7 @@ function lma_configure(array $records,array $cfg,int $unit,array $masters=[]): a
     foreach($records as $r)if($r['table']==='bayar')try{if(lf_cents($r['raw']['U_KEGIATAN']??'0')>0){$activities++;if(isset($context['du'][lma_du_key($r)]))$matchedActivities++;}}catch(DomainException $ignored){}
     if($activities>0&&$activities===$matchedActivities&&($cfg['components']['bayar.U_KEGIATAN']['automatic_mapping']??true)!==false)$cfg['components']['bayar.U_KEGIATAN']=['category'=>'daftar_ulang','reason'=>$reason,'confirmed'=>true,'automatic_mapping'=>true];
     foreach($context['fees'] as $columns)foreach($columns as $column=>$d){
+        if(lcs_komite_enabled($cfg)&&strcasecmp($d['source_code'],'POMG')===0)continue;
         $slot=substr($column,-1);$componentKey=lful_component_key('bayar',$column,['LAIN_LAIN'.$slot=>$d['source_code']]);
         if(($cfg['components'][$componentKey]['automatic_mapping']??true)===false)continue;
         if($d['name']===null)continue;$key='auto-fee:'.hash('sha256',$d['name']);
@@ -152,6 +153,7 @@ function lma_payment(array $r,array $cfg,array $masters,array $context): ?array 
     $activityMap=$cfg['components']['bayar.U_KEGIATAN']??[];
     $du=isset($context['du'][lma_du_key($r)])&&(($activityMap['automatic_mapping']??true)!==false||($activityMap['category']??'')==='daftar_ulang');$evidence=[];
     foreach($context['fees'][$r['row_key']]??[] as $column=>$decision){
+        if(lcs_komite_enabled($cfg)&&legacy_source_is_pomg($column,$r['raw']))continue;
         $key=lful_component_key('bayar',$column,$r['raw']);$old=$cfg['components'][$key]??[];
         if(isset($old['automatic_mapping'])&&$old['automatic_mapping']===false)continue;
         $target=$decision['name']!==null?$cfg['components']['auto-fee:'.hash('sha256',$decision['name'])]['category']:lful_history_category($key);
@@ -162,11 +164,13 @@ function lma_payment(array $r,array $cfg,array $masters,array $context): ?array 
     if($du){$key=lful_component_key('bayar','U_KEGIATAN',$r['raw']);$cfg['components'][$key]=['category'=>'daftar_ulang','confirmed'=>true,'reason'=>'Rekap DU cocok dengan jumlah pembayaran asal pada tahun ajaran dan kelas yang sama.'];}
     $p=lful_payment($r,$cfg,$masters);if($p===null)return null;
     foreach($p['items'] as &$item){
-        $sourceCode=preg_match('/^JUMLAH([1-4])$/D',$item['column'],$slot)?trim((string)($r['raw']['LAIN_LAIN'.$slot[1]]??'')):null;
-        $d=$evidence[$item['column']]??['status'=>'direct','rule'=>'source_column','source_code'=>$sourceCode];
+        $existing=$item['migration']??[];
+        if(lcs_komite_enabled($cfg)&&$item['column']==='U_SORGA'&&$item['category']==='komite')$existing+=['source_code'=>'U_SORGA','rule'=>'sorga_is_komite','komite_mapping_version'=>LCS_KOMITE_MAPPING_VERSION];
+        $sourceCode=preg_match('/^JUMLAH([1-4])$/D',$item['column'],$slot)?trim((string)($r['raw']['LAIN_LAIN'.$slot[1]]??'')):($existing['source_code']??null);
+        $d=$evidence[$item['column']]??['status'=>'direct','rule'=>$existing['rule']??'source_column','source_code'=>$sourceCode];
         $period=$item['category']==='daftar_ulang'&&$du?lma_year((string)($r['raw']['th_ajaran']??'')):$p['period'];
         if($item['category']==='daftar_ulang'&&$du)$d=['status'=>'direct','rule'=>'du_recap_reconciled','source_code'=>null];
-        $item['migration']=['version'=>LMA_VERSION,'period'=>$period,'source_row_key'=>$r['row_key'],'source_code'=>$d['source_code'],'status'=>$d['status'],'rule'=>$d['rule'],'priority'=>$d['priority']??lma_priority($r['raw'],$context['active']??[])];
+        $item['migration']=array_replace($existing,['version'=>LMA_VERSION,'period'=>$period,'source_row_key'=>$r['row_key'],'source_code'=>$d['source_code'],'status'=>$d['status'],'rule'=>$d['rule'],'priority'=>$d['priority']??lma_priority($r['raw'],$context['active']??[])]);
     }unset($item);return $p;
 }
 /** Additional evidence cannot silently replace a valid main account. */

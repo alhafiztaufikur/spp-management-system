@@ -2,6 +2,7 @@
 /** Private job storage. SQL Server backups are never executed by an HTTP request. */
 require_once __DIR__.'/legacy_schema.php';
 require_once __DIR__.'/legacy_source.php';
+require_once __DIR__.'/legacy_component_semantics.php';
 function legacy_root(): string {
     $base=getenv('SPP_LEGACY_STORAGE')?:'C:/laragon/data/spp-legacy-import';
     $root=rtrim(str_replace('\\','/',$base),'/').'/'.DB_NAME;
@@ -66,6 +67,7 @@ function legacy_enqueue(string $file,string $name,int $unit,int $actor,string $c
     $id=bin2hex(random_bytes(16));$dir=legacy_root().'/'.$id;mkdir($dir,0700);
     $hash=hash_file('sha256',$file);if(!copy($file,$dir.'/source.dat'))throw new RuntimeException('Penyimpanan unggahan gagal.');
     if(hash_file('sha256',$dir.'/source.dat')!==$hash)throw new RuntimeException('Hash unggahan tidak cocok.');
+    if($category==='full'&&file_put_contents($dir.'/migration-rules.json',json_encode(['job'=>$id,'unit'=>$unit,'source_hash'=>$hash,'komite_mapping_version'=>LCS_KOMITE_MAPPING_VERSION],JSON_THROW_ON_ERROR),LOCK_EX)===false)throw new RuntimeException('Aturan pekerjaan migrasi belum dapat disimpan.');
     $name=mb_substr(basename(str_replace('\\','/',$name)),0,255);
     $s=legacy_queue()->prepare('INSERT INTO jobs(id,unit,actor,name,hash,state,stage,created,updated,category) VALUES(?,?,?,?,?,"queued","Periksa Backup",?,?,?)');$s->execute([$id,$unit,$actor,$name,$hash,time(),time(),$category]);
     return legacy_job($id);
