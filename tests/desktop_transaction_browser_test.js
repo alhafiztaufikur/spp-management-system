@@ -25,7 +25,7 @@ const root=process.argv[2];assert(root?.includes('desktop_refinements_'));const 
     if(template==='tabungan-siswa'&&width===1654&&theme==='light'){const toggle=page.locator('.report-period-toggle');await toggle.click();assert(await page.locator('[name=all_periods]').isChecked());await page.locator('.report-template-filters button[type=submit]').click();await page.waitForLoadState();assert(new URL(page.url()).searchParams.get('all_periods')==='1');assert(await page.locator('[name=all_periods]').isChecked());await page.goto(base+'/laporan/template.php?template='+template+'&tanggal_awal=2026-10-01&tanggal_akhir=2026-10-21');}
     if(width===1654)await page.screenshot({path:root+'/artifacts/global-'+template+'-'+theme+'.png',fullPage:true});
    }
-   await page.goto(base+'/laporan/index.php?panel=transaksi&jenis_laporan%5B%5D=*&tanggal_awal=2026-10-01&tanggal_akhir=2026-10-21');assert.equal(await page.locator('[data-report-section]').count(),5);assert.equal(await page.locator('[data-finance-tab=transaksi]').getAttribute('aria-current'),'page');
+   await page.goto(base+'/laporan/index.php?panel=transaksi&jenis_laporan%5B%5D=*&tanggal_awal=2026-10-01&tanggal_akhir=2026-10-21');assert.equal(await page.locator('[data-report-section]').count(),1);assert.equal(await page.locator('[data-finance-tab]').count(),3);
    for(const table of await page.locator('.report-structured-table').all()){
     const geometry=await table.evaluate(table=>{const headers=[...table.tHead.rows[0].cells],row=[...table.tBodies[0].rows].find(row=>row.cells.length===headers.length);if(!row)return true;return headers.every((head,index)=>{const a=head.getBoundingClientRect(),b=row.cells[index].getBoundingClientRect();const expected=head.classList.contains('nominal')?'right':head.matches('.report-name-col,.report-component-col')?'left':'center';return Math.abs(a.x-b.x)<1&&Math.abs(a.width-b.width)<1&&getComputedStyle(head).textAlign===expected&&getComputedStyle(row.cells[index]).textAlign===expected;});});assert(geometry,'Every header matches its body column');
    }
@@ -33,7 +33,7 @@ const root=process.argv[2];assert(root?.includes('desktop_refinements_'));const 
    await payment.evaluate(el=>el.scrollLeft=0);
    if(width===1654)await page.screenshot({path:root+'/artifacts/transactions-'+theme+'.png',fullPage:true});
   }
-  checks.push('Desktop 1366/1654/1920, light/dark, four reference filter layouts, all-period toggle, five aligned tables and sticky identities');assert.deepEqual(errors,[]);
-  fs.writeFileSync(root+'/browser-results.json',JSON.stringify({ok:true,checks,errors,originalDate:original},null,2));console.log('PASS desktop correction, Global filters, five report tables, date payload and themes');
+  checks.push('Desktop 1366/1654/1920, light/dark, four reference filter layouts, all-period toggle, one aligned payment table and sticky identities');assert.deepEqual(errors,[]);
+  fs.writeFileSync(root+'/browser-results.json',JSON.stringify({ok:true,checks,errors,originalDate:original},null,2));console.log('PASS desktop correction, Global filters, one payment table, date payload and themes');
  }finally{await browser.close();}
 })().catch(error=>{console.error(error);process.exitCode=1;});

@@ -353,6 +353,8 @@ require_once __DIR__.'/includes/master_workspace_ui.php';
       <div class="master-class-summary"><div><span>Hasil Filter</span><strong><?= number_format($classTotalRows) ?></strong></div><div><span>Rombel Aktif</span><strong><?= number_format($classActiveCount) ?></strong></div><div><span>Rombel Nonaktif</span><strong><?= number_format($classInactiveCount) ?></strong></div></div>
     </aside>
       </div>
+    <?php require __DIR__.'/includes/special_classes_view.php'; ?>
+    <?php require __DIR__.'/includes/legacy_operational_groups_view.php'; ?>
     </section>
     <section id="naik-kelas" data-class-panel="promotion" aria-label="Proses tahun ajaran">
     <section class="main-card master-modern-card class-context-panel">
@@ -489,7 +491,7 @@ require_once __DIR__.'/includes/master_workspace_ui.php';
               <?php foreach ($promotionTargets as $target): ?><li><span class="class-rombel-icon" aria-hidden="true"><?= master_workspace_icon('layers') ?></span><div><strong><?= htmlspecialchars($target['label']) ?></strong><small>Kelas <?= (int)$target['tingkat'] ?></small></div></li><?php endforeach; ?>
               <?php if (!$promotionTargets): ?><li class="class-context-empty">Belum ada rombel aktif pada tingkat tujuan.</li><?php endif; ?>
             </ul>
-            <?php else: ?><div class="alert alert-info">Kelulusan memindahkan siswa ke Alumni<?= promotion_alumni_year($sourceYear) ?> dan mempertahankan seluruh riwayat kelas.</div><?php endif; ?>
+            <?php endif; ?>
           <div class="promotion-submit-bar"><div><strong id="promotion-submit-summary">Belum ada siswa dipilih</strong><span><?= (!$customPromotion && $currentPromotionLevel === $unitMaxLevel) ? 'Siswa terpilih masuk Alumni'.promotion_alumni_year($sourceYear).'.' : 'Rombel tujuan dapat diatur berbeda untuk setiap siswa.' ?></span></div><button class="btn btn-primary" id="promotion-submit-button" type="submit" disabled><?= (!$customPromotion && $currentPromotionLevel === $unitMaxLevel) ? 'Luluskan' : 'Naikkan' ?> 0 Siswa</button></div>
           </aside>
         </form>
@@ -503,8 +505,6 @@ require_once __DIR__.'/includes/master_workspace_ui.php';
       <?php participants_held($promotionHeld,$participantsModel); ?>
     </div>
     </section>
-    <?php require __DIR__.'/includes/special_classes_view.php'; ?>
-    <?php require __DIR__.'/includes/legacy_operational_groups_view.php'; ?>
     </div>
   </main>
 </div>

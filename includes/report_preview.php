@@ -26,6 +26,8 @@ function render_report_export_preview(string $documentHtml, array $options): voi
 {
     if(!empty($options['pdf_url'])){require_once __DIR__.'/report_pdf_preview.php';render_native_report_preview($options);}
     $global=($options['presentation']??'')==='global';
+    $transaction=($options['presentation']??'')==='transaction';
+    $styled=$global||$transaction;$pdfActions=!empty($options['pdf_actions']);
     $palette=[1=>'165c44',2=>'203e80',3=>'832a35',0=>'513080'][(int)($options['unit']??1)]??'165c44';
     $title = (string)($options['title'] ?? 'Preview Laporan');
     $subtitle = (string)($options['subtitle'] ?? 'Periksa data sebelum mengunduh laporan.');
@@ -92,14 +94,17 @@ function render_report_export_preview(string $documentHtml, array $options): voi
             .preview-frame{min-height:420px}
         }
         @media print{.preview-toolbar,.preview-meta,.preview-help{display:none!important}.preview-stage{padding:0}.preview-frame-shell{width:100%;border:0;box-shadow:none}}
-        <?php if($global): ?>
+        <?php if($styled): ?>
         :root{--green:#<?= $palette ?>;--green-dark:#<?= $palette ?>}body{font-size:14px}.preview-button{font-size:13px;min-height:44px;border-radius:10px}.preview-heading h1{font-size:18px}.preview-eyebrow{display:none}.preview-toolbar{padding:18px 24px}.preview-frame-shell{border-radius:14px}.preview-help{display:none}.preview-button.primary:hover{background:var(--green-dark)}
         html[data-theme="dark"]{--canvas:#111820;--line:#32404b;--muted:#acb8c3;color-scheme:dark}html[data-theme="dark"] body{color:#eef3f7}html[data-theme="dark"] .preview-toolbar{background:#1b2530}html[data-theme="dark"] .preview-button:not(.primary),html[data-theme="dark"] .preview-back,html[data-theme="dark"] .preview-meta span{background:#25323e;color:#eef3f7;border-color:var(--line)}
         <?php endif; ?>
+        <?php if(!empty($options['full_width'])): ?>
+        .preview-frame-shell{width:100%;max-width:none}.preview-status{margin:0;padding:8px 20px;color:var(--muted);font-size:12px;text-align:center}.preview-button[aria-disabled=true]{opacity:.6;cursor:wait}.preview-button:focus-visible{outline:3px solid var(--green);outline-offset:3px}[hidden]{display:none!important}
+        <?php endif; ?>
     </style>
-    <?php if($global): ?><script>document.documentElement.dataset.theme=localStorage.getItem('spp_theme')||'light';</script><?php endif; ?>
+    <?php if($styled): ?><script>document.documentElement.dataset.theme=localStorage.getItem('spp_theme')||'light';</script><?php endif; ?>
 </head>
-<body>
+<body<?php if($pdfActions): ?> data-transaction-preview data-pdf-url="<?= report_preview_escape($options['pdf_url_action']) ?>" data-html-url="<?= report_preview_escape($options['html_url']) ?>" data-model="<?= report_preview_escape($options['model_fingerprint']) ?>" data-filename="rekap-laporan-transaksi.pdf"<?php endif; ?>>
     <header class="preview-toolbar">
         <div class="preview-heading">
             <a class="preview-back" href="<?= report_preview_escape($backUrl) ?>" title="Kembali ke laporan" aria-label="Kembali ke laporan">
@@ -118,7 +123,7 @@ function render_report_export_preview(string $documentHtml, array $options): voi
                 Cetak
             </button>
             <?php endif; ?>
-            <a class="preview-button primary" href="<?= report_preview_escape($downloadUrl) ?>">
+            <a class="preview-button primary" data-preview-download href="<?= report_preview_escape($downloadUrl) ?>">
                 <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><path d="M21 15v4a2 2 0 0 1-2 2H5a2 2 0 0 1-2-2v-4"/><path d="m7 10 5 5 5-5"/><path d="M12 15V3"/></svg>
                 Download <?= report_preview_escape($fileType) ?>
             </a>
@@ -126,10 +131,11 @@ function render_report_export_preview(string $documentHtml, array $options): voi
     </header>
     <div class="preview-meta" aria-label="Informasi dokumen">
         <span><?= report_preview_escape($documentLabel) ?></span>
-        <span><?= number_format($rowCount) ?> data</span>
-        <span>Dibuat <?= report_preview_escape($generated) ?></span>
+        <span data-preview-count><?= number_format($rowCount) ?> data</span>
+        <span data-preview-generated>Dibuat <?= report_preview_escape($generated) ?></span>
     </div>
-    <?php if(!$global): ?><div class="preview-help"><svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><circle cx="12" cy="12" r="10"/><path d="M12 16v-4"/><path d="M12 8h.01"/></svg><span>Periksa isi laporan berikut sebelum mengunduh<?= $showPrint ? ' atau mencetak' : '' ?>.</span></div>
+    <?php if($pdfActions): ?><p class="preview-status" role="status" aria-live="polite"><span data-preview-status>Pratinjau siap. Menyiapkan file PDF…</span> <button type="button" class="preview-button" data-preview-retry hidden>Coba Lagi</button></p><?php endif; ?>
+    <?php if(!$styled): ?><div class="preview-help"><svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><circle cx="12" cy="12" r="10"/><path d="M12 16v-4"/><path d="M12 8h.01"/></svg><span>Periksa isi laporan berikut sebelum mengunduh<?= $showPrint ? ' atau mencetak' : '' ?>.</span></div>
     <?php endif; ?><main class="preview-stage">
         <div class="preview-frame-shell">
             <div class="preview-loading" data-preview-loading>Menyiapkan tampilan dokumen...</div>
@@ -165,18 +171,22 @@ function render_report_export_preview(string $documentHtml, array $options): voi
             if(frame){
                 frame.addEventListener('load',function(){
                     ready=true;
+                    frame.dataset.ready='1';
                     if(loading)loading.hidden=true;
                     resizeFrame();
                     const body=frame.contentDocument&&frame.contentDocument.body;
+                    if(resizeObserver)resizeObserver.disconnect();
                     if(body&&window.ResizeObserver){resizeObserver=new ResizeObserver(resizeFrame);resizeObserver.observe(body);}
                     window.setTimeout(resizeFrame,120);
+                    document.dispatchEvent(new Event('report-preview-ready'));
                     <?php if($autoPrint): ?>window.setTimeout(printDocument,180);<?php endif; ?>
                 });
                 window.addEventListener('resize',resizeFrame,{passive:true});
             }
-            if(printButton){printButton.addEventListener('click',function(){if(ready)printDocument();});}
+            <?php if(!$pdfActions): ?>if(printButton){printButton.addEventListener('click',function(){if(ready)printDocument();});}<?php endif; ?>
         })();
     </script>
+    <?php if($pdfActions): ?><script src="../assets/js/transaction_report_preview.js?v=<?= filemtime(__DIR__.'/../assets/js/transaction_report_preview.js') ?>"></script><?php endif; ?>
 </body>
 </html>
     <?php

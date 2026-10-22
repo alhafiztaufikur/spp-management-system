@@ -24,7 +24,7 @@ function multi_readback($book,array $doc):void{
     }
 }
 $cases=0;
-require_once __DIR__.'/../includes/general_multiple.php';
+require_once __DIR__.'/../includes/transaction_report.php';
 try{
     multi_assert(filter_choices(['b','a','b'],['a'=>'A','b'=>'B'])===['a','b'],'Deduplication/canonical order');
     foreach([[],[['a']],['*','a'],['not-available']] as $invalid){$rejected=false;try{filter_choices($invalid,['a'=>'A']);}catch(InvalidArgumentException $expected){$rejected=true;}multi_assert($rejected,'Invalid array accepted');}
@@ -66,9 +66,9 @@ try{
             $query=['jenis_laporan'=>$choices,'tanggal_awal'=>'2026-09-01','tanggal_akhir'=>'2026-10-06','unit'=>'active','urut'=>'nama'];
             $screen=multi_get('laporan/index.php',$query);multi_assert(str_contains($screen,'urut=nama'),'Export order parameter missing');
             $book=test_excel_read(multi_get('laporan/export_excel.php',$query+['download'=>1]));
-            $sections=general_sections($koneksi,general_choices($query),'2026-09-01 00:00:00','2026-10-07 00:00:00','','nama');
-            multi_readback($book,['sheets'=>[['name'=>'Pembayaran','sections'=>general_excel_sections($sections)]]]);
-            multi_assert($book->getSheetCount()===3,'General report worksheets');$book->disconnectWorksheets();
+            $section=transaction_report_section($koneksi,'2026-09-01 00:00:00','2026-10-07 00:00:00','','nama');
+            multi_readback($book,['sheets'=>[['name'=>'Transaksi Pembayaran','sections'=>[transaction_report_export_section($koneksi,$section)]]]]);
+            multi_assert($book->getSheetCount()===1,'Payment-only worksheet');$book->disconnectWorksheets();
             multi_get('laporan/export_pdf.php',$query);$cases+=3;
         }
         multi_get('laporan/template.php',['template'=>'status','kategori'=>['']],400);multi_get('laporan/template.php',['template'=>'status','kategori'=>['invalid']],400);multi_get('laporan/template.php',['template'=>'status','tahun_ajaran'=>['1900/1901']],400);

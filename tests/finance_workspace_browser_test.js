@@ -34,24 +34,24 @@ const period='tanggal_awal=2026-10-01&tanggal_akhir=2026-10-07';
      assert.equal(await page.locator('.finance-stat.is-payment strong').innerText(),money(expected.payment_total));
      assert.equal(await page.locator('.finance-stat.is-count strong').innerText(),String(expected.rows.length));
      assert.equal(await page.locator('.finance-stat.is-in strong').innerText(),money(expected.incoming.total));assert.equal(await page.locator('.finance-stat.is-out strong').innerText(),money(expected.outgoing.total));
-     await page.locator('[data-finance-tab="komponen"]').click();assert.equal(await page.locator('.finance-transactions').isVisible(),false);assert.equal(await page.locator('.finance-components').isVisible(),true);
-     await page.locator('[data-finance-tab="transaksi"]').click();assert.equal(await page.locator('.finance-components').isVisible(),false);await page.reload();assert.equal(await page.locator('.finance-results').getAttribute('data-finance-panel'),'transaksi');
+     assert.equal(await page.locator('.finance-transactions').isVisible(),true);assert.equal(await page.locator('[data-finance-tab]').count(),3);
+     await page.reload();assert.equal(await page.locator('[data-report-section=semua]').count(),1);
     }
     states++;
    }
   }
   // All pages match source identities, not merely the first visible table.
   const got=[];for(let p=1;p<=Math.max(1,Math.ceil(fixture.units[unit].rows.length/50));p++){
-   await page.goto(base+'/laporan/index.php?'+period+'&per_page=50&page='+p+'&panel=transaksi');
-   got.push(...await page.locator('#tbl-laporan .row-print-check').evaluateAll(rows=>rows.map(row=>Number(row.value))));
+   await page.goto(base+'/laporan/index.php?'+period+'&per_page=50&section_page[semua]='+p+'&panel=transaksi');
+   got.push(...await page.locator('.report-transactions-table .row-print-check').evaluateAll(rows=>rows.map(row=>Number(row.value))));
    for(const link of await page.locator('.du-pagination-footer a').all()){assert.equal(new URL(await link.getAttribute('href'),base+'/laporan/').searchParams.get('panel'),'transaksi');}
   }assert.deepEqual(got,fixture.units[unit].rows.map(r=>Number(r.id)));
-  // Strict multiple report selection still renders named sections and keeps export parameters.
+  // Obsolete selectors cannot restore removed report types.
   await page.goto(base+'/laporan/index.php?'+period+'&jenis_laporan[]=sudah_bayar&jenis_laporan[]=belum_du&panel=transaksi&per_page=50');
-  assert.ok(await page.locator('.report-multiple-section').count()>0);assert.match(await page.locator('.report-multiple-section h3').first().innerText(),/Yang sudah bayar|Daftar ulang/);
-  assert.deepEqual(Array.from(new URL(await page.locator('.report-export-actions a').first().getAttribute('href'),base+'/laporan/').searchParams).filter(([key])=>/^jenis_laporan\[.*\]$/.test(key)).map(([,value])=>value),['sudah_bayar','belum_du']);
-  assert.equal((await page.request.get(base+'/laporan/index.php?jenis_laporan[]=invalid')).status(),400);
-  await page.goto(base+'/laporan/index.php?'+period+'&q=NO_MATCH_FINANCE_QA');assert.equal(await page.locator('.finance-stat.is-count strong').innerText(),'0');assert.match(await page.locator('#tbl-laporan').innerText(),/Belum ada data/);
+  assert.equal(await page.locator('[data-report-section]').count(),1);assert.equal(await page.locator('[data-report-section=semua]').count(),1);
+  assert.equal(new URL(await page.locator('.report-export-actions a').first().getAttribute('href'),base+'/laporan/').searchParams.has('jenis_laporan'),false);
+  assert.equal((await page.request.get(base+'/laporan/index.php?jenis_laporan[]=invalid')).status(),200);
+  await page.goto(base+'/laporan/index.php?'+period+'&q=NO_MATCH_FINANCE_QA');assert.equal(await page.locator('.finance-stat.is-count strong').innerText(),'0');assert.match(await page.locator('.report-transactions-table').innerText(),/Tidak ada transaksi/);
   if(unit===1){
    await page.evaluate(()=>{localStorage.setItem('spp_theme','light');document.documentElement.dataset.theme='light'});await page.setViewportSize({width:1600,height:1000});
    await page.goto(base+'/laporan/index.php?'+period);await page.locator('.finance-row-menu summary').first().click();await page.locator('.open-payment-activity').first().click();await page.waitForFunction(()=>document.querySelector('.payment-activity-content').textContent&&!document.querySelector('.payment-activity-content').textContent.includes('Memuat'));assert.ok(await page.locator('.payment-activity-list').count()>0);await page.locator('[data-close-activity]').click();
@@ -67,6 +67,6 @@ const period='tanggal_awal=2026-10-01&tanggal_akhir=2026-10-07';
   if(role!=='kasir'){await page.waitForTimeout(120);for(const box of await page.locator('.row-print-check:disabled').all())assert.equal(await box.isDisabled(),true);const locked=await page.locator('.row-print-check:disabled').first().getAttribute('value');if(locked)assert.equal((await page.request.get(base+'/laporan/export_pdf.php?'+period+'&mode=selected&ids[]='+locked)).status(),403);}
   await context.close();
  }
- const nojs=await browser.newContext({javaScriptEnabled:false});await nojs.addCookies([{name:'PHPSESSID',value:fixture.units[3].cookies.PHPSESSID,url:base}]);const page=await nojs.newPage();await page.goto(base+'/laporan/index.php?'+period);await page.locator('[data-finance-tab="transaksi"]').click();assert.equal(await page.locator('.finance-results').getAttribute('data-finance-panel'),'transaksi');assert.equal(await page.locator('#sidebar-unit-select').isVisible(),true);await nojs.close();
- console.log('OK: '+states+' visual/search states; filter/source totals, all pages, tabs, activity, print permissions, unit switches, and no-JS fallback.');
+ const nojs=await browser.newContext({javaScriptEnabled:false});await nojs.addCookies([{name:'PHPSESSID',value:fixture.units[3].cookies.PHPSESSID,url:base}]);const page=await nojs.newPage();await page.goto(base+'/laporan/index.php?'+period);assert.equal(await page.locator('.report-transactions-table').count(),1);assert.equal(await page.locator('#sidebar-unit-select').isVisible(),true);await nojs.close();
+ console.log('OK: '+states+' visual/search states; filter/source totals, all pages, payment-only routing, activity, print permissions, unit switches, and no-JS fallback.');
 }finally{await browser.close()}})().catch(e=>{console.error(e);process.exit(1)});

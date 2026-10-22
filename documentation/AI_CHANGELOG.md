@@ -2,6 +2,19 @@
 
 > [Penjelasan lengkap perubahan menu, Tabungan, dan laporan untuk tim](RINGKASAN_PERUBAHAN_MENU_DAN_LAPORAN_20261022.md) merangkum seluruh pekerjaan setelah `e80ba02`, kebutuhan konfigurasi/indeks, hasil pengujian, serta batas yang masih ada.
 
+## 2026-10-22 - Pemulihan tab desktop dan preview transaksi
+
+- Pulihkan Ringkasan dengan rekap komponen samping, Komponen Pembayaran dan Daftar Transaksi; tetap satu tabel pembayaran dan empat kartu. Gabungkan kategori native/Legacy berdasarkan bukti, dengan penjumlahan dalam sen.
+- Tampilkan preview HTML desktop sebelum pembuatan PDF; cetak/unduh tetap memakai PDF server dan cache privat dengan pemeriksaan sumber terbaru, termasuk klik saat preload berlangsung.
+- Verifikasi empat unit, seluruh 118.253 pembayaran, ekspor, browser, cache bersamaan dan kegagalan/retry. Data, konfigurasi lokal, desain file PDF dan layanan backup tetap. [Perilaku, pengukuran dan hasil uji](TAB_DAN_PREVIEW_LAPORAN_TRANSAKSI_20261022.md).
+
+## 2026-10-22 - Fokus transaksi dan pemisahan panel rombel
+
+- Batasi Kelas Khusus/Kelompok Legacy ke Kelola Rombel; perbaiki resolusi anchor dan hapus penjelasan kelulusan berulang.
+- Tampilkan satu tabel pembayaran native/Legacy; pertahankan empat kartu, filter dan bukti Cetak Dipilih. URL jenis laporan lama tidak lagi membuka tunggakan.
+- Samakan model pembayaran layar/PDF/Excel; Excel satu lembar Transaksi Pembayaran, PDF umum berupa tabel, serta rincian komponen dibaca berkelompok.
+- Verifikasi sumber dalam sen, empat unit, ekspor, URL lama, browser responsif/tema dan CRUD kelas pada clone. Data/skema pengguna dan konfigurasi koneksi tetap. Backup hanya berupa rekomendasi. [Perilaku dan hasil uji](FOKUS_LAPORAN_TRANSAKSI_20261022.md).
+
 ## 2026-10-22 - Perapihan desktop koreksi dan laporan
 
 - Sejajarkan Pemilik/tanggal koreksi Tabungan; tambahkan kalender Indonesia dan jam 24 jam dengan payload ISO serta ketepatan waktu existing.

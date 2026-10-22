@@ -1,5 +1,6 @@
 (() => {
  'use strict';
+ if(window.reportDesktopHtmlRedirect)return;
  const root=document.querySelector('[data-native-pdf]');if(!root)return;
  const frame=root.querySelector('[data-pdf-frame]'),message=root.querySelector('[data-pdf-message]'),retry=root.querySelector('[data-pdf-retry]'),print=root.querySelector('[data-pdf-print]'),download=root.querySelector('[data-pdf-download]');
  let blobUrl=null,busy=false,fingerprint=null,controller=null;

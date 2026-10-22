@@ -28,6 +28,7 @@
 .correction-calendar-footer button{color:var(--accent);font-size:12px;font-weight:700;padding:7px 10px}
 
 @media(min-width:1100px){
+  .report-general-page .finance-payment-results>.main-card{animation:none}
   /* Match the reference: title and unit on the left, compact filters on the right. */
   body#global-report-workspace.recap-filter-refined .report-template-shell .recap-report-header{grid-template-columns:minmax(240px,.9fr) minmax(540px,1.1fr)!important;gap:32px!important;align-items:start}
   body#global-report-workspace.recap-filter-refined .recap-report-copy{padding:2px 18px 0 0;min-width:0}
@@ -113,3 +114,18 @@
   html body.report-general-page[data-readable-workspace="finance"] .finance-results{grid-template-columns:minmax(0,1fr)}
 }
 @media(min-width:1024px) and (max-width:1200px){.report-general-page .finance-transactions .btn-tbl-print svg{display:none}}
+
+/* Presentation tabs are desktop-only; smaller workspaces keep the payment table. */
+@media(min-width:1100px){
+  .report-general-page .finance-tabs{display:flex}
+  .report-general-page .finance-components{display:block}
+  html body.report-general-page[data-readable-workspace="finance"] .finance-payment-results[data-finance-panel=ringkasan]{grid-template-columns:minmax(240px,.29fr) minmax(0,1fr)}
+  .report-general-page .finance-payment-results[data-finance-panel=komponen]>.finance-transactions,
+  .report-general-page .finance-payment-results[data-finance-panel=transaksi]>.finance-components{display:none}
+  .report-general-page .finance-components .card-header{display:flex;flex-direction:column;align-items:flex-start}
+  .report-general-page .finance-components .finance-components-table th{text-align:left}
+  .report-general-page .finance-components .finance-components-table .nominal{text-align:right;white-space:nowrap}
+  .report-general-page .finance-components .finance-components-table tbody tr:last-child{background:transparent}
+  .report-general-page .finance-components .finance-components-table tfoot{background:var(--accent-glow)}
+  .report-general-page .finance-components .finance-components-table tfoot :is(th,td){font-weight:750}
+}

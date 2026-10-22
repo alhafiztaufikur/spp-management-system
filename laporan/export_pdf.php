@@ -10,12 +10,31 @@ require_once '../includes/payment_permissions.php';
 requireRole(['admin', 'bendahara', 'kasir']);
 $reportUnitId=unit_report_scope($koneksi,(string)($_GET['unit']??''));
 
-// Multi-filter recaps use the same three-sheet document as the XLSX export.
-if(($_GET['mode']??'')!=='selected' && (is_array($_GET['jenis_laporan']??null)||($_GET['jenis_laporan']??'semua')!=='semua')){
+// General exports are payment tables; only explicit selection uses existing slips.
+if(($_GET['mode']??'')!=='selected'){
     $sppGeneralPdf=true;require __DIR__.'/export_excel.php';
-    $detailCount=0;foreach(array_slice($sheets,1) as $sheet)foreach($sheet['sections'] as $section)$detailCount+=count($section['rows']);
+    $detailCount=0;foreach($sheets as $sheet)foreach($sheet['sections'] as $section)$detailCount+=count($section['rows']);
     require_once '../includes/report_artifact.php';
-    $stable=$doc;unset($stable['generated']);$query=$_GET;unset($query['output'],$query['return_to']);
+    $stable=$doc;unset($stable['generated']);$query=$_GET;unset($query['output'],$query['return_to'],$query['panel']);
+    $modelFingerprint=hash('sha256',json_encode($stable,JSON_UNESCAPED_UNICODE|JSON_PRESERVE_ZERO_FRACTION|JSON_THROW_ON_ERROR));
+    header('X-Report-Model: '.$modelFingerprint);
+    header('X-Report-Row-Count: '.$detailCount);
+    if(($_GET['output']??'')==='html'){
+        require_once __DIR__.'/../includes/report_preview.php';
+        $htmlQuery=$_GET;$htmlQuery['output']='html';$inlineQuery=$_GET;$inlineQuery['output']='inline';$downloadQuery=$_GET;$downloadQuery['output']='pdf';
+        $backQuery=$_GET;unset($backQuery['output'],$backQuery['return_to']);
+        header('Cache-Control: private, no-store');
+        $previewHtml=spp_excel_preview_html($doc);report_perf_mark('html');
+        $timings=[];foreach($GLOBALS['report_perf']??[] as $phase=>$ms)$timings[]=preg_replace('/[^a-z_]/','',$phase).';dur='.round($ms,2);
+        if($timings)header('Server-Timing: '.implode(', ',$timings));
+        render_report_export_preview($previewHtml,[
+            'presentation'=>'transaction','title'=>$doc['title'],'subtitle'=>$doc['subtitle'],'unit'=>$doc['unit'],
+            'generated'=>$doc['generated'],'row_count'=>$detailCount,'orientation'=>'landscape','full_width'=>true,
+            'pdf_actions'=>true,'model_fingerprint'=>$modelFingerprint,'pdf_url_action'=>'export_pdf.php?'.filter_build_query($inlineQuery),
+            'html_url'=>'export_pdf.php?'.filter_build_query($htmlQuery),'download_url'=>'export_pdf.php?'.filter_build_query($downloadQuery),
+            'back_url'=>'index.php?'.filter_build_query($backQuery),'close_on_back'=>($_GET['return_to']??'')==='report',
+        ]);
+    }
     $artifact=report_artifact_get(['route'=>'recap','unit'=>$reportUnitId,'query'=>$query],$stable,'pdf',static function()use($doc,$detailCount){
         require_once __DIR__.'/../includes/pdf.php';require_pdf_library();
         if($detailCount>600){require_once __DIR__.'/../includes/transaction_report_pdf.php';require_once __DIR__.'/../includes/global_report_layout.php';return global_report_render_pdf_fragments(transaction_report_pdf_fragments($doc),'landscape');}

@@ -4,6 +4,12 @@ document.addEventListener('DOMContentLoaded', function () {
   const tabs = [...document.querySelectorAll('[data-class-tab]')];
   const sections = [...document.querySelectorAll('[data-class-panel]')];
   const fragments = { '#kelola-rombel': 'manage', '#naik-kelas': 'promotion' };
+  function tabForAnchor() {
+    if (fragments[location.hash]) return fragments[location.hash];
+    let id;
+    try { id = decodeURIComponent(location.hash.slice(1)); } catch (_) { return null; }
+    return document.getElementById(id)?.closest('[data-class-panel]')?.dataset.classPanel;
+  }
   function activateTab(name, focus) {
     document.querySelector('.class-workspace').dataset.classMode = name;
     document.querySelector('.class-page-heading h1').textContent = name === 'manage' ? 'Kelola Rombel' : 'Master Kelas/Rombel';
@@ -28,9 +34,10 @@ document.addEventListener('DOMContentLoaded', function () {
     });
     const query = new URLSearchParams(location.search);
     const parameters = new Set([...query.keys()].map(key => key.split('[')[0]));
-    const managing = ['edit', 'q_kelas', 'tingkat_kelas', 'status_kelas', 'class_per_page', 'class_page'].some(key => parameters.has(key));
+    const managing = ['edit', 'q_kelas', 'tingkat_kelas', 'status_kelas', 'class_per_page', 'class_page'].some(key => parameters.has(key))
+      || [...parameters].some(key => key.startsWith('special_') || key.startsWith('lg_'));
     const promoting = ['source_year_id', 'source_level', 'source_rombel', 'source_rombel_filter', 'promotion_q'].some(key => parameters.has(key));
-    const initial = fragments[location.hash] || (managing ? 'manage' : promoting ? 'promotion' : 'manage');
+    const initial = tabForAnchor() || (managing ? 'manage' : promoting ? 'promotion' : 'manage');
     activateTab(initial, false);
     tabs.forEach((tab, index) => {
       tab.addEventListener('click', event => {
@@ -50,7 +57,7 @@ document.addEventListener('DOMContentLoaded', function () {
         history.replaceState(null, '', tabs[target].hash);
       });
     });
-    window.addEventListener('hashchange', () => activateTab(fragments[location.hash] || initial, false));
+    window.addEventListener('hashchange', () => activateTab(tabForAnchor() || initial, false));
   }
 
   const panel = document.querySelector('.class-list-panel');

@@ -196,7 +196,7 @@ html body[data-readable-workspace="finance"] .finance-hero .recap-report-copy h1
 html body[data-readable-workspace="finance"] .finance-hero .recap-report-copy p {font-size:var(--read-body);line-height:1.6;}
 html body[data-readable-workspace="finance"] :is(.finance-breadcrumb,.finance-trend-copy,.finance-summary-note,.finance-table-note,.badge-count,.report-secondary-id,.report-secondary-unit,.finance-stat small) {font-size:var(--read-note);line-height:1.6;}
 html body[data-readable-workspace="finance"] .finance-catalog {font-size:var(--read-label);width:240px;padding:1rem;}
-html body[data-readable-workspace="finance"] .report-general-shell .report-general-filter {grid-template-columns:minmax(180px,1fr) minmax(300px,1.4fr) repeat(3,minmax(150px,1fr))!important;padding:1.5rem!important;gap:1.125rem!important;}
+html body[data-readable-workspace="finance"] .report-general-shell .report-general-filter {grid-template-columns:repeat(4,minmax(0,1fr))!important;padding:1.5rem!important;gap:1.125rem!important;}
 html body[data-readable-workspace="finance"] .report-general-filter .field-label {font-size:var(--read-label);line-height:1.5;margin-bottom:.5rem;}
 html body[data-readable-workspace="finance"] .report-general-filter .spp-select-trigger {font-size:var(--read-body);height:3rem!important;min-height:3rem!important;max-height:3rem!important;}
 html body[data-readable-workspace="finance"] .report-general-filter :is(.field-input,.report-date-range-button,.finance-scope-value) {font-size:var(--read-body);line-height:1.5;min-height:3rem;height:auto;}
@@ -211,7 +211,7 @@ html body[data-readable-workspace="finance"] .finance-stat {padding:1.25rem;gap:
 html body[data-readable-workspace="finance"] .finance-stat strong {font-size:var(--read-number);line-height:1.3;}
 html body[data-readable-workspace="finance"] .finance-stat div>span {font-size:var(--read-label);line-height:1.5;}
 html body[data-readable-workspace="finance"] .finance-tabs a {font-size:var(--read-label);line-height:1.5;padding:.875rem 1.125rem;min-height:2.75rem;box-sizing:border-box;}
-html body[data-readable-workspace="finance"] .finance-results {grid-template-columns:minmax(280px,.33fr) minmax(0,1fr);gap:1rem;padding:1rem;}
+html body[data-readable-workspace="finance"] .finance-results {grid-template-columns:minmax(0,1fr);gap:1rem;padding:1rem;}
 html body[data-readable-workspace="finance"] .finance-results[data-finance-panel=komponen],html body[data-readable-workspace="finance"] .finance-results[data-finance-panel=transaksi] {grid-template-columns:minmax(0,1fr);}
 html body[data-readable-workspace="finance"] .finance-results .card-header {padding:1.125rem;gap:.75rem;}
 html body[data-readable-workspace="finance"] .finance-results :is(.card-title,.report-multiple-section h3) {font-size:var(--read-panel);line-height:1.4;}
@@ -246,7 +246,6 @@ html body[data-readable-workspace="finance"] :is(.payment-activity-event-heading
   html body[data-readable-workspace="finance"] .finance-results {grid-template-columns:minmax(0,1fr);}
 }
 @media(max-width:1400px) {
-  html body[data-readable-workspace="finance"] .report-general-shell .report-general-filter {grid-template-columns:repeat(2,minmax(0,1fr))!important;}
   html body[data-readable-workspace="finance"] .report-general-filter>.field-row.full-span,html body[data-readable-workspace="finance"] .report-general-filter>.report-general-actions {grid-column:1/-1!important;}
   html body[data-readable-workspace="finance"] .report-general-filter>.report-general-actions {grid-template-columns:repeat(2,minmax(0,1fr))!important;}
   html body[data-readable-workspace="finance"] .finance-stats {grid-template-columns:repeat(2,minmax(0,1fr));}
@@ -283,7 +282,6 @@ html body[data-readable-workspace="finance"] :is(.payment-activity-event-heading
   html body[data-readable-workspace="parent"] .parent-header-art {display:none;}
   html body[data-readable-workspace="parent"] .parent-copy-dialog header {gap:.625rem;}
   html body[data-readable-workspace="parent"] .parent-dialog-icon {display:none;}
-  html body[data-readable-workspace="finance"] .report-general-shell .report-general-filter {grid-template-columns:minmax(0,1fr)!important;padding:1rem!important;}
   html body[data-readable-workspace="finance"] .finance-catalog {width:100%;}
   html body[data-readable-workspace="finance"] .report-general-filter>.report-general-actions {grid-template-columns:minmax(0,1fr)!important;}
   html body[data-readable-workspace="finance"] .finance-stats {grid-template-columns:minmax(0,1fr);}
@@ -502,4 +500,11 @@ body[data-readable-workspace="students"] .student-finance-link:focus-visible{out
  html body[data-readable-workspace="students"] .responsive-table td.aksi-col{display:flex!important;flex-direction:row!important;flex-wrap:wrap;gap:8px}
  html body[data-readable-workspace="students"] .responsive-table td.aksi-col::before{flex-basis:100%}
  html body[data-readable-workspace="students"] .responsive-table td.aksi-col .btn-tbl{width:auto;flex:1;margin:0}
+}
+
+@media(max-width:1099px) {
+  html body[data-readable-workspace="finance"] .report-general-shell .report-general-filter {grid-template-columns:repeat(2,minmax(0,1fr))!important;}
+}
+@media(max-width:699px) {
+  html body[data-readable-workspace="finance"] .report-general-shell .report-general-filter {grid-template-columns:minmax(0,1fr)!important;}
 }

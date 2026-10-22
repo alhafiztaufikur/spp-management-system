@@ -43,7 +43,8 @@ function general_sections(mysqli $db,array $choices,string $start,string $end,st
 }
 function general_section_html(array $section,int $start=0):string{
     $e=static fn($v)=>htmlspecialchars((string)$v,ENT_QUOTES,'UTF-8');ob_start();
-    echo '<section class="report-multiple-section"><h3>'.$e($section['title']).'</h3>';
+    echo '<section class="report-multiple-section">';
+    if(empty($section['hide_heading']))echo '<h3>'.$e($section['title']).'</h3>';
     if(in_array($section['type']??'', ['semua','sudah_bayar'],true)){
         require_once __DIR__.'/transaction_report_table.php';
         echo transaction_report_table($GLOBALS['koneksi'],$section['rows'],$start,true);
