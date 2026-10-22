@@ -121,7 +121,8 @@ function report_legacy_years(mysqli $db): array {
     if($cacheRead&&isset($readCache[$cacheKey]))return $readCache[$cacheKey];
     $years=[];
     foreach(['legacy_full_payments'=>lful_read_ready($db),'legacy_op_payments'=>lop_ready($db)] as $table=>$ready){if(!$ready)continue;
-        foreach(hp_rows($db,"SELECT DISTINCT p.source_period FROM $table p JOIN legacy_full_batches b ON b.id=p.batch_id AND b.unit_id=p.unit_id WHERE b.state='completed'".($table==='legacy_op_payments'?' AND p.cancelled=0':'')) as $p){$period=report_source_period((string)$p['source_period']);if($period&&$period['year']!=='')$years[$period['year']]=true;}
+        $extra=$table==='legacy_op_payments'?", CASE WHEN JSON_CONTAINS_PATH(p.items,'one','$[0].migration') THEN (".lb_du_year_sql('p').") ELSE NULL END migration_du_year":'';
+        foreach(hp_rows($db,"SELECT DISTINCT p.source_period$extra FROM $table p JOIN legacy_full_batches b ON b.id=p.batch_id AND b.unit_id=p.unit_id WHERE b.state='completed'".($table==='legacy_op_payments'?' AND p.cancelled=0':'')) as $p){$period=report_source_period((string)$p['source_period']);if($period&&$period['year']!=='')$years[$period['year']]=true;if(lma_year((string)($p['migration_du_year']??''))!=='')$years[$p['migration_du_year']]=true;}
     }
     if($cacheRead)$readCache[$cacheKey]=$years;
     return $years;
@@ -136,11 +137,12 @@ function report_legacy_periods(mysqli $db,?array $onlyPeriods=null): array {
     $periodWhere=static function(string $table)use($db,$onlyPeriods):string{
         if($onlyPeriods===null)return '';$matches=[];
         foreach(hp_rows($db,"SELECT DISTINCT source_period FROM $table".($table==='legacy_op_payments'?' WHERE cancelled=0':'')) as $row){$period=report_source_period((string)$row['source_period']);if($period&&in_array($period['key'],$onlyPeriods,true))$matches[]="'".$db->real_escape_string($row['source_period'])."'";}
-        return ' AND p.source_period IN ('.(implode(',',$matches)?:'NULL').')';
+        $condition='p.source_period IN ('.(implode(',',$matches)?:'NULL').')';
+        if($table==='legacy_op_payments'){$years=[];foreach($onlyPeriods as $wanted)if(lma_year((string)$wanted)!=='')$years[]="'".$db->real_escape_string($wanted)."'";if($years)$condition.=' OR (JSON_CONTAINS_PATH(p.items,\'one\',\'$[0].migration\') AND ('.lb_du_year_sql('p').') IN ('.implode(',',$years).'))';}
+        return ' AND ('.$condition.')';
     };
     if(report_query_unit_id()===0){
-        foreach(lful_read_ready($db)?hp_rows($db,"SELECT DISTINCT p.source_period FROM legacy_full_payments p JOIN legacy_full_batches b ON b.id=p.batch_id AND b.unit_id=p.unit_id WHERE b.state='completed'"):[] as $p){$period=report_source_period((string)$p['source_period']);if($period&&$period['year']!=='')$out['years'][$period['year']]=true;}
-        foreach(lop_ready($db)?hp_rows($db,"SELECT DISTINCT p.source_period FROM legacy_op_payments p JOIN legacy_full_batches b ON b.id=p.batch_id AND b.unit_id=p.unit_id WHERE b.state='completed' AND p.cancelled=0"):[] as $p){$period=report_source_period((string)$p['source_period']);if($period&&$period['year']!=='')$out['years'][$period['year']]=true;}
+        $out['years']=report_legacy_years($db);
         return $cache[$key]=$out;
     }
     $add=static function(array $p,array $items)use(&$out):void {
@@ -148,7 +150,8 @@ function report_legacy_periods(mysqli $db,?array $onlyPeriods=null): array {
         $period=report_source_period((string)$p['source_period']);if(!$period)return;
         if($period['year']!=='')$out['years'][$period['year']]=true;
         foreach($items as $item){
-            $category=(string)$item['category'];$periodKey=$category==='daftar_ulang'?lb_payment_year((string)$p['source_period']):$period['key'];
+            $category=(string)$item['category'];$periodKey=$category==='daftar_ulang'?lb_payment_year(lma_item_period($item,(string)$p['source_period'])):$period['key'];
+            if($category==='daftar_ulang'&&$periodKey!=='')$out['years'][$periodKey]=true;
             if(in_array($category,['spp','komite'],true)&&$period['kind']!=='monthly')continue;
             if($periodKey==='')continue;
             $cell=&$out['payments'][$p['NO_INDUK']][$category][$periodKey];

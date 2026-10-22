@@ -11,7 +11,7 @@ function lop_review_source(array $job,string $bankIdentity=''): array {
     }}finally{fclose($file);}$tmp=$cacheFile.'.'.bin2hex(random_bytes(5)).'.partial';file_put_contents($tmp,lf_json(['rules'=>LOP_VERSION,'rows_sha256'=>$manifest['rows_sha256'],'records'=>$studentRecords,'statuses'=>$statuses]),LOCK_EX);if(!rename($tmp,$cacheFile))@unlink($tmp);return [$records,$manifest,$statuses];
 }
 function lop_preview_store(string $id,array $plan,int $version,string $fingerprint): void {
-    $preview=array_intersect_key($plan,array_flip(['owners','groups','summary','pending','history','automatic','references','resolutions']));foreach($preview['owners'] as &$owner)unset($owner['raw'],$owner['decision'],$owner['group_policy']);unset($owner);
+    $preview=array_intersect_key($plan,array_flip(['owners','groups','summary','pending','history','automatic','references','resolutions','migration_evidence']));foreach($preview['owners'] as &$owner)unset($owner['raw'],$owner['decision'],$owner['group_policy']);unset($owner);
     $data=['version'=>$version,'rules'=>LOP_VERSION,'fingerprint'=>$fingerprint,'preview'=>$preview];$file=legacy_root().'/'.$id.'/operational-preview.json';$tmp=$file.'.'.bin2hex(random_bytes(5)).'.partial';file_put_contents($tmp,lf_json($data),LOCK_EX);if(!rename($tmp,$file)){@unlink($tmp);throw new RuntimeException('Pratinjau belum dapat disimpan.');}
 }
 function lop_preview_load(array $draft,array $catalog,array $records,array $cfg): array {

@@ -28,5 +28,5 @@ lft_assert(count($groups)===1&&$groups[0]['rows']===2,'Shared owner cause still 
 $bad=$rows;$bad[6]['raw']['U_LAIN']='200';lft_assert((bool)array_filter(lop_prepare($bad,$cfg,1,$m['source_date'])['pending'],fn($p)=>$p['section']==='payment'),'Nonzero contradictory total silently changed');
 foreach(['0','700','1000'] as $amount){$cfg['additional_savings'][$extraKey]['amount']=$amount;$p=lop_prepare($rows,$cfg,1,$m['source_date']);lft_assert($p['owners']['21220001']['savings']['balance']===lf_money(lf_cents($amount)),'FIX zero/up/down rejected');}
 $cfg['additional_savings'][$extraKey]['amount']='-1';$p=lop_prepare($rows,$cfg,1,$m['source_date']);lft_assert($p['summary']['savings_total']==='1000.00'&&count($p['pending'])>0,'Negative FIX accepted');
-lft_assert(count(array_filter($proposal['patch']['new_masters'],fn($p)=>!empty($p['tariff_pending'])))===2,'Pending master proposals not grouped by source name');
+lft_assert(count(array_filter($proposal['patch']['new_masters'],fn($p)=>!empty($p['tariff_pending'])))===1,'Unresolved ambiguous code became a combined master');
 echo "PASS: mass approval, source fee names/conflicts, alumni/testing/unmatched owners, exact details totals, primary replacement FIX up/down/zero, grouped causes, negative/contradictory rejection.\n";

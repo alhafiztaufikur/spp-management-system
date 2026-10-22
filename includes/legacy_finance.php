@@ -108,8 +108,9 @@ function lf_extract_stream(array $job,?array &$manifest=null): Generator {
     foreach($manifest['counts'] as $table=>$count)if(($counts[$table]??0)!==(int)$count)throw new DomainException('Jumlah baris ekstraksi tidak cocok.');
     sort($hashes,SORT_STRING);$manifest['fingerprint']=hash('sha256',implode("\n",$hashes));$manifest['total']=array_sum($counts);
 }
-function lf_extract_read(array $job,bool $operationalOnly=false): array {
+function lf_extract_read(array $job,bool $operationalOnly=false,bool $feeEvidence=false): array {
     $records=[];$manifest=null;foreach(lf_extract_stream($job,$manifest) as $record)if(!$operationalOnly||!$record['reference_only']||in_array($record['table'],['lain'],true)||legacy_source_additional_savings($record))$records[]=$record;
+    if($feeEvidence)$records=lma_reference_evidence($job,$records);
     return [$records,$manifest];
 }
 /** A bounded display sample, not an input to publication or simulation. */

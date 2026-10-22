@@ -52,6 +52,7 @@ function lful_catalog_read(string $id): array {
         $dir=legacy_root().'/'.$id;
         if(!is_file($dir.'/source.dat')||!is_file($dir.'/finance.jsonl')||!hash_equals($d['job_info']['hash'],hash_file('sha256',$dir.'/source.dat'))||!hash_equals((string)$catalog['manifest']['rows_sha256'],hash_file('sha256',$dir.'/finance.jsonl')))throw new DomainException('Sumber berubah atau tidak lengkap. Unggah dan periksa ulang backup.');
         if(($catalog['component_catalog_version']??0)<4||($catalog['rules_version']??0)!==LFUL_RULES_VERSION){[$records,$manifest]=lf_extract_read($d['job_info'],true);$catalog=array_replace($catalog,lful_prepared($records,$manifest),['source_fee_masters'=>lful_source_fee_masters($records),'components'=>array_values(lful_catalog($records)),'component_catalog_version'=>4]);file_put_contents($file,lf_json($catalog),LOCK_EX);}
+        if(lma_enabled($d['settings']))$catalog['components']=lma_catalog_components($catalog['components']);
         return $catalog;
     }
     $db=$GLOBALS['koneksi']??null;if($db instanceof mysqli){$source=lf_one($db,'SELECT s.manifest FROM legacy_full_batches b JOIN legacy_finance_sources s ON s.id=b.source_id AND s.unit_id=b.unit_id WHERE b.id=?',[$id]);if($source)return ['students'=>[],'components'=>[],'manifest'=>json_decode($source['manifest'],true,512,JSON_THROW_ON_ERROR)];}
@@ -79,7 +80,7 @@ function lful_save(mysqli $db,int $actor,int $unit,string $id,int $version,array
         if(!is_array($patch['op_bulk_audit'])||!in_array($patch['op_bulk_audit']['scope']??'',['all','students','components','savings','payments'],true))throw new DomainException('Pengesahan kelompok tidak valid.');
         $config['op_bulk_audit']=array_replace($patch['op_bulk_audit'],['actor'=>$actor,'accepted_at'=>date(DATE_ATOM),'source_version'=>$version]);
     }
-    foreach(['students','components','additional_savings','op_savings','op_journals'] as $section)if(isset($patch[$section])){if(!is_array($patch[$section])||count($patch[$section])>5000)throw new DomainException('Pemetaan tidak valid.');foreach($patch[$section] as $key=>$value){if(!is_array($value))throw new DomainException('Pemetaan tidak valid.');$config[$section][(string)$key]=array_replace($config[$section][(string)$key]??[],$value);}}
+    foreach(['students','components','additional_savings','op_savings','op_journals'] as $section)if(isset($patch[$section])){if(!is_array($patch[$section])||count($patch[$section])>5000)throw new DomainException('Pemetaan tidak valid.');foreach($patch[$section] as $key=>$value){if(!is_array($value))throw new DomainException('Pemetaan tidak valid.');if($section==='components'&&lma_enabled($config)&&isset($value['category'])&&!isset($value['automatic_mapping']))$value['automatic_mapping']=false;$config[$section][(string)$key]=array_replace($config[$section][(string)$key]??[],$value);}}
     foreach($patch['op_savings']??[] as $fix){if(($fix['confirmed']??false)!==true||mb_strlen(trim((string)($fix['evidence']??'')))<10||mb_strlen((string)($fix['evidence']??''))>1000)throw new DomainException('Sahkan saldo FIX dan isi bukti minimal 10 karakter.');lf_cents($fix['amount']??null);}
     foreach($patch['additional_savings']??[] as $key=>$decision)if(($decision['reason']??'')==='replace_main'){
         $catalog??=lful_catalog_read($id);$ledger=$catalog['additional_savings'][$key]??null;$target=$decision['target_identity']??null;
@@ -114,7 +115,7 @@ function lful_date(mixed $value): ?string {
 function lful_period(string $v): bool {return preg_match('/^[12][0-9]{3}-(0[1-9]|1[0-2])$/D',$v)===1||preg_match('/^([12][0-9]{3})\/([12][0-9]{3})$/D',$v,$m)===1&&(int)$m[2]===(int)$m[1]+1;}
 function lful_projection_fingerprint(array $payments,array $journals,array $resolved=[]): string {
     $logical=array_flip($resolved);
-    $hashes=[];foreach($payments as $p){$items=[];foreach($p['items'] as $i)$items[]=array_map('strval',[$i['column'],$logical[$i['category']]??$i['category'],$i['label'],$i['amount']]);sort($items);$hashes[]=hash('sha256',lf_json(['payment',array_map(static fn($v)=>(string)($v??''),[$p['identity'],$p['row_key'],$p['source_table'],$p['date'],$p['operator'],$p['period'],$p['class'],$p['total']]),$items]));}
+    $hashes=[];foreach($payments as $p){$items=[];foreach($p['items'] as $i){$entry=array_map('strval',[$i['column'],$logical[$i['category']]??$i['category'],$i['label'],$i['amount']]);if(($i['migration']['version']??0)===LMA_VERSION)$entry[]=lf_canonical($i['migration']);$items[]=$entry;}sort($items);$hashes[]=hash('sha256',lf_json(['payment',array_map(static fn($v)=>(string)($v??''),[$p['identity'],$p['row_key'],$p['source_table'],$p['date'],$p['operator'],$p['period'],$p['class'],$p['total']]),$items]));}
     foreach($journals as $j)$hashes[]=hash('sha256',lf_json(['journal',array_map(static fn($v)=>(string)($v??''),[$j['identity'],$j['row_key'],$j['date'],$j['operator'],$j['incoming'],$j['outgoing']])]));sort($hashes,SORT_STRING);return hash('sha256',implode("\n",$hashes));
 }
 /** Pure projection builder: raw archive never becomes an editable contemporary receipt. */

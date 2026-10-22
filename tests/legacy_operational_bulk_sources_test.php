@@ -14,7 +14,7 @@ foreach($jobs as $source){
     foreach($plan['pending'] as $p)if($p['code']==='owner_review')lft_assert(!empty($plan['owners'][$p['identity']]['group_policy']['confirmed']),'Bulk left an unapproved source group');
     if($source['unit']===1&&$source['version']==='2026'){
         $heldPayments=array_values(array_filter($plan['pending'],fn($p)=>$p['section']==='payment'));
-        lft_assert($manifest['counts']['siswa']===1133&&$plan['summary']['payments']===46852&&count($heldPayments)===0&&$plan['summary']['du_anomalies']===3,'Latest SD nonnegative payment records not carried together');
+        lft_assert($manifest['counts']['siswa']===1133&&$plan['summary']['payments']===(lma_enabled($cfg)?$manifest['counts']['bayar']:46852)&&count($heldPayments)===0&&$plan['summary']['du_anomalies']===3,'Latest SD nonnegative payment records not carried together');
         foreach($heldPayments as $held)lft_assert($held['message']==='Nominal negatif atau memiliki lebih dari dua desimal.','Valid payment still requires individual review');
     }
     $results[]=$source+['source_fingerprint'=>$manifest['fingerprint'],'summary'=>$plan['summary'],'reasons'=>$reasons];

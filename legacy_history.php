@@ -4,6 +4,8 @@ $kind=is_string($_GET['kind']??null)?$_GET['kind']:'history';$labels=['history'=
 try{lf_http_bootstrap($koneksi);if($_SERVER['REQUEST_METHOD']!=='GET')throw new DomainException('Metode tidak diizinkan.',405);
     if(!is_string($_GET['id']??null))throw new DomainException('Pekerjaan tidak valid.',400);$id=$_GET['id'];$job=lop_history_job($koneksi,$id);
     if(($job['category']??'')!=='full'||(unit_active_id()!==0&&unit_active_id()!==(int)$job['unit']))throw new DomainException('Unit pekerjaan tidak sesuai.',403);
+    $batchInfo=lf_one($koneksi,'SELECT manifest FROM legacy_full_batches WHERE id=?',[$id]);$historySettings=$batchInfo?(json_decode($batchInfo['manifest'],true)['mapping']??[]):lful_draft($id)['settings'];
+    if(lma_enabled($historySettings)){$labels+=['du_reconciled'=>'Rekap DU Tercakup Pembayaran','du_unresolved'=>'Rekap DU Belum Terkonfirmasi'];$title=$labels[$kind]??$title;}
     $csv=($_GET['format']??'')==='csv';$result=lop_history_search($koneksi,$job,$_GET,$csv);
     if($csv){header('Content-Type: text/csv; charset=utf-8');header('Content-Disposition: attachment; filename="catatan-legacy.csv"');$out=fopen('php://output','w');fputcsv($out,['Tanggal Sumber','Tabel','Jenis','Nominal Asli','Data Asli']);foreach($result['rows'] as $r)fputcsv($out,array_map('lf_csv_cell',[$r['date'],$r['source_table'],$r['kind'],lf_json($r['amounts']),lf_json($r['raw'])]));exit;}
 }catch(DomainException|InvalidArgumentException $e){if($e->getCode()===403){http_response_code(403);exit('Hanya Super Admin pada unit yang sesuai dapat membaca histori.');}http_response_code(in_array($e->getCode(),[400,403,404,405],true)?$e->getCode():409);$error=$e->getMessage();}

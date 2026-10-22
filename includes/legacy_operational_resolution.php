@@ -1,4 +1,5 @@
 <?php
+require_once __DIR__.'/legacy_migration_automation.php';
 /** Authorized migration policy: decisions are derived again from immutable source rows. */
 function lop_reference_record(array $record,string $kind,string $reason): array {
     $amounts=[];foreach(legacy_source_money_columns($record) as $column)$amounts[$column]=legacy_source_money_value($record,$column);
@@ -8,6 +9,7 @@ function lop_separate_record(array $record,array $cfg=[]): ?array {
     if(!in_array($record['table'],['bayar','bayar_du','tabungan','transaksi_m','transaksi_k','tb_total','tb_masuk','tb_keluar','tbg'],true))return null;
     if(trim((string)legacy_source_identity($record['raw']))==='')return lop_reference_record($record,'unidentified','Menunggu pemilik; sumber tetap tersimpan terpisah, tanpa saldo atau kas aktif.');
     if($record['table']==='bayar_du')try{if(lf_cents($record['raw']['jumlah']??null,true)<0)return lop_reference_record($record,'du_anomaly','Referensi Anomali DU; nilai negatif asli bukan penerimaan, pengembalian uang atau tagihan.');}catch(DomainException $e){}
+    if($record['table']==='bayar_du'&&lma_enabled($cfg)){$matched=isset($cfg['_du_matches'][lma_du_key($record)]);return lop_reference_record($record,$matched?'du_reconciled':'du_unresolved',$matched?'Rekap DU telah tercakup pada pembayaran asal; tidak menambah penerimaan.':'Rekap DU belum mempunyai pasangan pembayaran yang meyakinkan; nominal sumber tetap diarsipkan.');}
     if(in_array($record['table'],['transaksi_m','transaksi_k'],true)&&empty($cfg['op_journals'][$record['row_key']]))try{
         if(lf_cents($record['raw']['MASUK']??'0')===0&&lf_cents($record['raw']['KELUAR']??'0')===0)return lop_reference_record($record,'zero_journal','Jurnal nol disimpan sebagai referensi; tidak ada perpindahan uang.');
     }catch(DomainException $e){}

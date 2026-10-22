@@ -36,6 +36,7 @@ function lop_extra_source(array $job): array {
 function lop_review_extra_banks(array $records,array $cfg,?string $snapshot,array $owners,array &$pending): void {
     foreach(lful_additional_savings($records,$snapshot) as $key=>$ledger){
         $decision=$cfg['additional_savings'][$key]??[];
+        if(lma_enabled($cfg)&&in_array($decision['reason']??'',['keep_main','historical_snapshot'],true)&&!empty($owners[$ledger['identity']]['savings'])&&hash_equals($ledger['fingerprint'],(string)($decision['fingerprint']??'')))continue;
         if(in_array($decision['reason']??'',['duplicate','retired_zero'],true)&&!lful_additional_savings_issues([$key=>$ledger],[$key=>$decision]))continue;
         if(($decision['reason']??'')==='replace_main'){
             $target=$decision['target_identity']??'';

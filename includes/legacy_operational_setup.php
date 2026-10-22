@@ -2,6 +2,8 @@
 /** Source defaults prepare working data; they never certify unknown debts or fix balances. */
 function lop_source_setup(array $records, array $manifest, array $settings, int $unit): array
 {
+    // Only the initial preparation opts in. Published and previously prepared jobs keep their rules.
+    if(!isset($settings['mode']))$settings['automation_version']=LMA_VERSION;
     $settings['source_fingerprint'] = $manifest['fingerprint'];
     $settings['mode'] = 'operational';
     $reason = 'Menggunakan data pada backup Legacy yang diperiksa; sumber asli tetap tersimpan.';
@@ -34,7 +36,7 @@ function lop_source_setup(array $records, array $manifest, array $settings, int 
         $settings['components'][$key] = [
             'category'=>$component['savings'] ? 'savings_reference' :
                 ($component['suggestion'] ?: lful_history_category($key)),
-            'reason'=>$reason, 'confirmed'=>empty($component['ambiguous'])
+            'reason'=>$reason, 'confirmed'=>empty($component['ambiguous']), 'automatic_mapping'=>true
         ];
     }
     return $settings;

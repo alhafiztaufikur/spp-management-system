@@ -28,6 +28,9 @@ function lop_bulk_patch(array $records,array $catalog,array $settings,int $unit,
         $proposals=$settings['new_masters']??[];
         foreach($catalog['components'] as $c){
             $key=$c['key'];$old=$settings['components'][$key]??[];
+            if(lma_enabled($settings)&&preg_match('/^JUMLAH[1-4]$/D',$c['column'])){
+                $patch['components'][$key]=$old+['category'=>lful_history_category($key),'reason'=>$reason,'confirmed'=>true,'automatic_mapping'=>true];++$counts['components'];continue;
+            }
             $category=$old['category']??'';
             // Keep meaningful explicit mappings; upgrade automatic history-only suggestions.
             if(!empty($c['savings']))$category='savings_reference';
@@ -60,6 +63,11 @@ function lop_bulk_patch(array $records,array $catalog,array $settings,int $unit,
             if(!empty($settings['additional_savings'][$key]['confirmed']))continue;
             if(!empty($ledger['duplicate_proven']))$type='duplicate';
             elseif(!empty($ledger['retired_zero_proven']))$type='retired_zero';
+            elseif(lma_enabled($settings)){
+                $matches=array_values(array_filter($catalog['students']??[],fn($s)=>(string)$s['identity']===$ledger['identity']));$student=count($matches)===1?$matches[0]:null;
+                $decision=lma_bank_decision($ledger,$student,$settings);if(!$decision)continue;
+                $patch['additional_savings'][$key]=$decision+['fingerprint'=>$ledger['fingerprint'],'evidence'=>$reason,'confirmed'=>true];++$counts['matching_savings'];continue;
+            }
             elseif(!empty($ledger['reconciliation']['ready'])&&$ledger['identity']!=='Tanpa identitas siswa'){
                 $matches=array_values(array_filter($catalog['students']??[],fn($s)=>(string)$s['identity']===$ledger['identity']));$student=count($matches)===1?$matches[0]:null;
                 if(!$student||($student['source_count']??0)!==1||($student['savings']['accounts']??0)!==1||!empty($settings['op_savings'][$ledger['identity']]['confirmed']))continue;
@@ -74,6 +82,10 @@ function lop_bulk_patch(array $records,array $catalog,array $settings,int $unit,
                 $replacements[]=['name'=>$student['name'],'identity'=>$target,'before'=>$student['savings']['balance'],'after'=>$amount];
             }
         }
+    }
+    if(lma_enabled($settings)&&in_array($scope,['all','components'],true)){
+        [$configured]=lma_configure($records,array_replace_recursive($settings,$patch),$unit,$masters);
+        $patch['components']=$configured['components'];$patch['new_masters']=$configured['new_masters']??[];$counts['new_masters']=count($patch['new_masters']);
     }
     $patch['op_bulk_audit']=['scope'=>$scope,'source'=>$catalog['manifest']['fingerprint'],'reason'=>$reason];
     return ['patch'=>$patch,'counts'=>$counts,'replacements'=>$replacements];

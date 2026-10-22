@@ -2,6 +2,7 @@
 /** Shared, source-backed opening obligations. Historical credit is never new cash. */
 require_once __DIR__.'/legacy_operational_read.php';
 require_once __DIR__.'/legacy_finance.php';
+require_once __DIR__.'/legacy_migration_automation.php';
 require_once __DIR__.'/history_performance.php';
 const LB_RULE_VERSION = 1;
 // Only for arithmetic results already proven from exact source cents.
@@ -64,7 +65,10 @@ function lb_cache(mysqli $db, bool $refresh=false): array {
         foreach($items as $i)if(lb_psb_item($i))$out['paid'][$owner]['psb']=($out['paid'][$owner]['psb']??0)+lf_cents($i['amount']);
         $du=$p['source_table']==='bayar_du'?lb_result_cents($p['total']):0;if($p['source_table']!=='bayar_du')foreach($items as $i)if(($i['category']??'')==='daftar_ulang')$du+=lf_cents($i['amount']);
         $month=lb_payment_month((string)$p['source_period']);if($month!=='')foreach($items as $i)if(($i['category']??'')==='spp')$out['paid'][$owner]['spp'][$month]=($out['paid'][$owner]['spp'][$month]??0)+lf_cents($i['amount']);
-        $year=lb_payment_year((string)$p['source_period']);$out['paid'][$owner]['du'][$year]=($out['paid'][$owner]['du'][$year]??0)+$du;
+        $year=lb_payment_year((string)$p['source_period']);
+        if($p['source_table']!=='bayar_du'&&array_filter($items,static fn($i)=>($i['category']??'')==='daftar_ulang'&&($i['migration']['version']??0)===LMA_VERSION)){
+            foreach($items as $item)if(($item['category']??'')==='daftar_ulang'){$itemYear=lb_payment_year(lma_item_period($item,(string)$p['source_period']));$out['paid'][$owner]['du'][$itemYear]=($out['paid'][$owner]['du'][$itemYear]??0)+lf_cents($item['amount']);}
+        }else $out['paid'][$owner]['du'][$year]=($out['paid'][$owner]['du'][$year]??0)+$du;
     }$cursor->free();
     return $cache[$key]=$out;
 }
@@ -206,11 +210,16 @@ function lb_payment_year(string $period): string {
     else return '';
     if($month<1||$month>12||$year<2000||$year>2200)return '';$first=$year-($month<7?1:0);return $first.'/'.($first+1);
 }
-function lb_du_year_sql(string $alias='p'): string {
+function lma_legacy_du_year_sql(string $alias='p'): string {
     if(!preg_match('/^[a-z]+$/D',$alias))throw new LogicException('Invalid alias');$v="TRIM($alias.source_period)";
     return "CASE WHEN $v REGEXP '^[12][0-9]{3}/[12][0-9]{3}$' AND CAST(RIGHT($v,4) AS UNSIGNED)=CAST(LEFT($v,4) AS UNSIGNED)+1 THEN $v WHEN $v REGEXP '^(0?[1-9]|1[0-2]) [12][0-9]{3}$' THEN CONCAT(CAST(RIGHT($v,4) AS UNSIGNED)-(CAST(SUBSTRING_INDEX($v,' ',1) AS UNSIGNED)<7),'/',CAST(RIGHT($v,4) AS UNSIGNED)+(CAST(SUBSTRING_INDEX($v,' ',1) AS UNSIGNED)>=7)) WHEN $v REGEXP '^[12][0-9]{3}-(0[1-9]|1[0-2])$' THEN CONCAT(CAST(LEFT($v,4) AS UNSIGNED)-(CAST(RIGHT($v,2) AS UNSIGNED)<7),'/',CAST(LEFT($v,4) AS UNSIGNED)+(CAST(RIGHT($v,2) AS UNSIGNED)>=7)) ELSE NULL END";
 }
 
+function lb_du_year_sql(string $alias='p'): string {
+    $legacy=lma_legacy_du_year_sql($alias);
+    $period="(SELECT MIN(mp.period) FROM JSON_TABLE(CAST($alias.items AS JSON),'$[*]' COLUMNS(category VARCHAR(100) PATH '$.category',version INT PATH '$.migration.version' NULL ON EMPTY,period VARCHAR(9) PATH '$.migration.period' NULL ON EMPTY)) mp WHERE mp.category='daftar_ulang' AND mp.version=1 AND mp.period REGEXP '^20[0-9]{2}/20[0-9]{2}$' AND CAST(RIGHT(mp.period,4) AS UNSIGNED)=CAST(LEFT(mp.period,4) AS UNSIGNED)+1)";
+    return "CASE WHEN JSON_CONTAINS_PATH($alias.items,'one','$[0].migration') THEN COALESCE($period,$legacy) ELSE $legacy END";
+}
 function lb_payment_month(string $period): string {
     $period=trim($period);if(preg_match('~^(\d{1,2}) (\d{4})$~D',$period,$m)){$month=(int)$m[1];$year=(int)$m[2];}elseif(preg_match('~^(\d{4})-(\d{2})$~D',$period,$m)){$year=(int)$m[1];$month=(int)$m[2];}else return '';
     return $month>=1&&$month<=12&&$year>=2000&&$year<=2200?sprintf('%04d-%02d',$year,$month):'';

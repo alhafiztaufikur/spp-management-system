@@ -1,4 +1,5 @@
 <?php
+require_once __DIR__.'/legacy_migration_automation.php';
 require_once __DIR__.'/legacy_full.php';require_once __DIR__.'/legacy_operational_read.php';
 /** Narrow operational permission; importing and payment corrections retain their own gates. */
 function lop_correction_actor(mysqli $db,int $actor,int $unit,string $kind,?array $before=null,array $input=[],bool $lock=false):array {
@@ -76,9 +77,12 @@ function lop_correction_preview(mysqli $db,int $actor,int $unit,string $kind,int
             $old=null;foreach($before['items'] as $v)if($v['column']===$column)$old=$v;
             $changed=!$old||$old['amount']!==$amount||$old['category']!==$category||$ownerId!==(int)$before['owner_id']||$after['cancelled']!==(int)$before['cancelled'];
             if($old&&!str_starts_with($old['category'],'histori:')&&empty($old['obligation_id'])&&($old['category']!==$category||$ownerId!==(int)$before['owner_id']))throw new DomainException('Sahkan kewajiban asal sebelum mengubah komponen atau membatalkan pembayaran.');
-            $binding=(int)($i['obligation_id']??0);if($binding){$o=lf_one($db,'SELECT * FROM legacy_op_obligations WHERE id=? AND owner_id=? AND category=?',[$binding,$ownerId,$category]);if(!$o)throw new DomainException('Hubungan tagihan tidak sesuai pemilik/komponen.');$period=trim((string)($input['period']??$before['source_period']));if(in_array($category,['spp','komite'],true)?lop_month($period)!==$o['period']:!str_contains($period,$o['period']))throw new DomainException('Periode pembayaran harus cocok dengan kewajiban tujuan.');$obligations[$binding]=true;}
+            $binding=(int)($i['obligation_id']??0);if($binding){$o=lf_one($db,'SELECT * FROM legacy_op_obligations WHERE id=? AND owner_id=? AND category=?',[$binding,$ownerId,$category]);if(!$o)throw new DomainException('Hubungan tagihan tidak sesuai pemilik/komponen.');$period=trim((string)($input['period']??$before['source_period']));if(($old['category']??null)===$category)$period=lma_item_period($old,$period);if(in_array($category,['spp','komite'],true)?lop_month($period)!==$o['period']:!str_contains($period,$o['period']))throw new DomainException('Periode pembayaran harus cocok dengan kewajiban tujuan.');$obligations[$binding]=true;}
             elseif($changed&&!str_starts_with($category,'histori:')&&(!$old||$old['category']!==$category||$ownerId!==(int)$before['owner_id']))throw new DomainException('Hubungkan komponen ke kewajiban yang disahkan pada peninjauan migrasi sebelum mengubah nominal atau pemilik.');
-            $after['items'][]=compact('column','category','label','amount')+($binding?['obligation_id'=>$binding]:[]);$total+=lf_cents($amount);
+            // Source provenance survives an authorized correction; posted metadata is never trusted.
+            $preserved=($old['migration']['version']??0)===LMA_VERSION?['migration'=>$old['migration']]:[];
+            if($preserved&&$category==='daftar_ulang'&&$old['category']!==$category){$preserved['migration']['source_period']??=$preserved['migration']['period'];$preserved['migration']['period']=$binding?$o['period']:trim((string)($input['period']??$before['source_period']));}
+            $after['items'][]=compact('column','category','label','amount')+($binding?['obligation_id'=>$binding]:[])+$preserved;$total+=lf_cents($amount);
         }
         foreach($before['items'] as $oldItem)if(!isset($seen[$oldItem['column']])&&!str_starts_with($oldItem['category'],'histori:')&&empty($oldItem['obligation_id']))throw new DomainException('Hubungkan kewajiban sebelum menghapus rincian pembayaran.');
         if($total>999999999999999)throw new DomainException('Total melampaui batas.');$after['total']=lf_money($total);$after['source_period']=trim((string)($input['period']??$before['source_period']));if(mb_strlen($after['source_period'])>100)throw new DomainException('Periode terlalu panjang.');
