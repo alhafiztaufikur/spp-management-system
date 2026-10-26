@@ -1,4 +1,25 @@
 /* Scoped refinements; unit palettes and the financial forms remain authoritative. */
+/* Keep the original card grid; fit the calendar inside the date field only. */
+.payment-date-card { padding-left: 8px; padding-right: 8px; }
+.payment-date-card .id-date-control { display: block; min-height: 44px; }
+.payment-date-card #tgl-bayar-display {
+  display: block;
+  padding-left: 8px;
+  padding-right: 34px;
+  font-size: 14px;
+  font-variant-numeric: tabular-nums;
+}
+.payment-date-card .id-date-picker {
+  position: absolute;
+  top: 50%;
+  right: 4px;
+  transform: translateY(-50%);
+  width: 26px;
+  height: 36px;
+  border: 0;
+  background: transparent;
+  font-size: 20px;
+}
 .ui-time-polish{--payment-control-height:48px}
 .ui-time-polish .form-payment-table th{font-size:12px;line-height:1.5;padding:14px}
 .ui-time-polish .form-payment-table td{padding:14px;vertical-align:middle}

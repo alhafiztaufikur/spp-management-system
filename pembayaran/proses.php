@@ -18,6 +18,7 @@ require_once '../includes/payment_form_feedback.php';
 require_once '../includes/transaction_authorization.php';
 require_once '../includes/financial_request.php';
 require_once '../includes/payment_return.php';
+require_once '../includes/transaction_entry_date.php';
 
 $returnContext = is_string($_POST['return_context'] ?? null) ? $_POST['return_context'] : '';
 $returnPaymentId = (int)($_POST['id'] ?? 0);
@@ -224,10 +225,10 @@ function reject_removed_payment_components(array $source): void {
     }
 }
 
-function validate_payment_context(string $tanggal, string $bulan, string $tahun): void {
+function validate_payment_context(string $tanggal, string $bulan, string $tahun, bool $customEntryDate = false): void {
     require_once __DIR__.'/../includes/legacy_full_read.php';
     $db=$GLOBALS['koneksi'];
-    if(lful_read_ready($db)){$cutover=lf_one($db,'SELECT cutoff FROM legacy_full_batches WHERE unit_id=?',[unit_active_id()]);if($cutover&&$tanggal<$cutover['cutoff'])throw new RuntimeException('Tanggal pembayaran mendahului waktu peralihan Legacy.');}
+    if(!$customEntryDate&&lful_read_ready($db)){$cutover=lf_one($db,'SELECT cutoff FROM legacy_full_batches WHERE unit_id=?',[unit_active_id()]);if($cutover&&$tanggal<$cutover['cutoff'])throw new RuntimeException('Tanggal pembayaran mendahului waktu peralihan Legacy.');}
     if (!in_array($bulan, ['01','02','03','04','05','06','07','08','09','10','11','12'], true)) {
         throw new RuntimeException('Bulan pembayaran tidak valid.');
     }
@@ -627,8 +628,7 @@ if ($aksi === 'input') {
     $_SESSION['payment_draft']=payment_capture_draft($_POST);
     $requestKey = (string)($_POST['request_key'] ?? '');
     $no_induk        = trim($_POST['no_induk'] ?? '');
-    // Transaksi baru selalu memakai waktu server Asia/Jakarta.
-    $tanggal_bayar   = date('Y-m-d H:i:s');
+    $tanggal_bayar   = '';
     $bulan_bayar     = normalize_month_code($_POST['bulan_bayar'] ?? '');
     $tahun_bayar     = $_POST['tahun_bayar'] ?? date('Y');
     $sistem_pembayaran = $_POST['sistem_pembayaran'] ?? '';
@@ -666,6 +666,7 @@ if ($aksi === 'input') {
     payment_activity_begin_transaction($koneksi);
 
     try {
+        $tanggal_bayar = transaction_entry_timestamp($_POST['tanggal_bayar'] ?? null);
         financial_request_reserve($koneksi, $requestKey, 'pembayaran', (int)$_SESSION['admin_id']);
         $usePublishedSpp = spp_billing_schema_ready($koneksi);
         if ($payment_plan !== 'monthly') throw new RuntimeException('Pembayaran banyak bulan sedang ditangguhkan. Gunakan transaksi bulanan.');
@@ -678,7 +679,7 @@ if ($aksi === 'input') {
             'Potongan SPP' => $potongan_spp
         ]);
         reject_disabled_payment_savings($legacy_tabungan_input);
-        validate_payment_context($tanggal_bayar, $bulan_bayar, (string)$tahun_bayar);
+        validate_payment_context($tanggal_bayar, $bulan_bayar, (string)$tahun_bayar, true);
         if ($usePublishedSpp && $potongan_spp > 0.001) throw new RuntimeException('Potongan manual saat pembayaran SPP sudah tidak didukung. Atur nominal potongannya pada Master Siswa.');
         if (!$usePublishedSpp && $potongan_spp > $uang_spp) throw new RuntimeException('Potongan SPP tidak boleh melebihi pembayaran SPP.');
         $siswa_data = validate_student_and_komite($koneksi, $no_induk, $bulan_bayar, $tahun_bayar, $uang_komite);
@@ -789,8 +790,7 @@ if ($aksi === 'input') {
                 $tahun_ajaran_du, $kelas_du, $row_discount, $row_total,
                 $batch_token, $batch_sequence, $batch_count
             );
-            $stmt->execute();
-            $bayar_id = $koneksi->insert_id;
+            $bayar_id = transaction_entry_insert($koneksi, $tanggal_bayar, static fn() => $stmt->execute());
             payment_history_stamp($koneksi,(int)$bayar_id,$no_induk);
             $stmtClass = $koneksi->prepare('UPDATE bayar SET master_kelas_id=NULLIF(?,0), kelas_rombel_snapshot=? WHERE id=?');
             $stmtClass->bind_param('isi', $master_kelas_id, $kelas_rombel_snapshot, $bayar_id);

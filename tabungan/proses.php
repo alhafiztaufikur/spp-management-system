@@ -9,6 +9,7 @@ require_once '../includes/auth.php';
 require_once '../includes/financial_request.php';
 require_once '../includes/savings_notes.php';
 require_once '../includes/savings_authorization.php';
+require_once '../includes/transaction_entry_date.php';
 requireRole(['admin', 'kasir']);
 
 if ($_SERVER['REQUEST_METHOD'] !== 'POST') {
@@ -18,7 +19,6 @@ if ($_SERVER['REQUEST_METHOD'] !== 'POST') {
 
 $aksi      = $_POST['aksi'] ?? '';
 $no_induk = is_string($_POST['no_induk']??'')?trim($_POST['no_induk']??''):'';
-$tanggal   = date('Y-m-d');
 $rawNominal = is_string($_POST['nominal']??'')?trim($_POST['nominal']??''):'';
 $nominal = preg_match('/^[0-9]+(?:[.,][0-9]{1,2})?$/D',$rawNominal)?(float)str_replace(',','.',$rawNominal):NAN;
 $keterangan = is_string($_POST['keterangan']??'')?trim($_POST['keterangan']??''):'';
@@ -35,13 +35,16 @@ if (empty($_SESSION['csrf_savings']) || !hash_equals($_SESSION['csrf_savings'], 
 require_once __DIR__.'/../includes/savings_owners.php';
 $_SESSION['savings_entry_draft']=$_POST;
 try{
+    $tanggal_dt=transaction_entry_timestamp($_POST['tanggal']??null);
     $canonicalAmount=so_amount($rawNominal);$nominal=(float)$canonicalAmount;if(mb_strlen($keterangan)>255)throw new DomainException('Keterangan maksimal 255 karakter.');
     $target=so_resolve($koneksi,$_POST,true);$no_induk=$target['identity'];
     if(!is_finite($nominal)||$nominal<=0||$nominal>9999999999999.99||!in_array($aksi,['masuk','keluar'],true))throw new DomainException('Isi nominal positif dengan maksimal dua desimal.');
     if(!preg_match('/^[a-f0-9]{32}$/D',$requestKey))throw new DomainException('Kunci transaksi tidak valid.');
     if($target['owner_type']==='account'){
         require_once __DIR__.'/../includes/legacy_operational_bank.php';
-        $stamp=(string)($_POST['request_time']??date('Y-m-d H:i:s'));
+        $requestTime=$_POST['request_time']??null;
+        if(!is_string($requestTime))throw new DomainException('Waktu formulir tidak valid. Muat ulang formulir.');
+        $stamp=transaction_entry_timestamp($_POST['tanggal']??null,$requestTime);
         $saved=lop_bank_new($koneksi,(int)$_SESSION['admin_id'],unit_active_id(),(int)$target['owner_id'],['amount'=>number_format($nominal,2,'.',''),'direction'=>$aksi==='masuk'?'in':'out','date'=>$stamp,'note'=>$keterangan],hash('sha256','entry:'.$requestKey));
         unset($_SESSION['savings_entry_draft']);$jid=-1000000000-$saved['id'];$_SESSION['savings_print_prompt']=['jenis'=>$aksi,'id'=>$jid,'unit_id'=>unit_active_id()];$_SESSION['flash']=['type'=>'success','msg'=>'Transaksi tabungan berhasil disimpan.'];
         header('Location: riwayat.php?'.http_build_query(['owner_id'=>$target['owner_id'],'all_periods'=>'1','jenis'=>$aksi,'id'=>$jid,'after_save'=>'1']));exit;
@@ -64,8 +67,6 @@ if (!savings_notes_ready($koneksi)) {
     header('Location: ' . $fallback);
     exit;
 }
-
-$tanggal_dt = $tanggal . ' ' . date('H:i:s');
 
 // Mulai DB transaction untuk konsistensi
 $koneksi->begin_transaction();
@@ -114,8 +115,7 @@ try {
         );
         $stmt3->bind_param('ssdss', $no_induk, $tanggal_dt, $nominal, $user_id, $keterangan);
     }
-    $stmt3->execute();
-    $journalId = (int)$koneksi->insert_id;
+    $journalId = transaction_entry_insert($koneksi, $tanggal_dt, static fn() => $stmt3->execute());
     $stmt3->close();
 
     $newRow=['id'=>$journalId,'unit_id'=>unit_active_id(),'NO_INDUK'=>$no_induk,'TANGGAL'=>$tanggal_dt,'MASUK'=>$aksi==='masuk'?$nominal:0,'KELUAR'=>$aksi==='keluar'?$nominal:0,'user_id'=>$user_id,'keterangan'=>$keterangan,'jenis'=>$aksi];
