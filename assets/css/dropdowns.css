@@ -77,3 +77,21 @@
 /* Search is opt-in for long operator lists. */
 .spp-multi-search{display:block;width:100%;box-sizing:border-box;border:1px solid var(--border);border-radius:9px;background:var(--bg-surface);color:var(--text-primary);padding:11px 12px;margin:0 0 8px;font:inherit;min-height:42px}
 .spp-multi-option[hidden]{display:none!important}
+
+/* Desktop payment DU options: one identity header and three aligned amount rows. */
+@media(min-width:769px){
+ .spp-dropdown-panel.du-selector-menu .du-selector-menu-header{margin:0 0 8px;padding:10px 12px 14px;gap:5px}
+ .spp-dropdown-panel.du-selector-menu .du-selector-menu-header>strong{font-size:15px;line-height:1.5}
+ .spp-dropdown-panel.du-selector-menu .du-selector-option{grid-template-columns:16px minmax(0,1fr);gap:12px;padding:14px!important;margin-top:7px;border:1px solid var(--border);border-radius:12px}
+ .spp-dropdown-panel.du-selector-menu .du-selector-option::before{grid-row:1;align-self:start;margin-top:5px}
+ .spp-dropdown-panel.du-selector-menu .du-option-heading{grid-column:2;grid-row:1;align-items:flex-start;gap:14px}
+ .spp-dropdown-panel.du-selector-menu .du-option-title{display:grid;gap:3px;min-width:0}
+ .spp-dropdown-panel.du-selector-menu .du-option-title>strong{font-size:15px;line-height:1.5}
+ .spp-dropdown-panel.du-selector-menu .du-option-title>span{font-size:12px}
+ .spp-dropdown-panel.du-selector-menu .du-option-badge{padding:5px 9px;font-size:10px;flex:none}
+ .spp-dropdown-panel.du-selector-menu .du-option-values{grid-column:2;display:grid;grid-template-columns:minmax(0,1fr);gap:0;border-top:1px solid var(--border);padding-top:5px}
+ .spp-dropdown-panel.du-selector-menu .du-option-values>span{display:flex;align-items:baseline;justify-content:space-between;gap:16px;padding:7px 0}
+ .spp-dropdown-panel.du-selector-menu .du-option-values small{font-size:12px;line-height:1.5}
+ .spp-dropdown-panel.du-selector-menu .du-option-values strong{font-size:14px;line-height:1.5;text-align:right;white-space:nowrap;overflow:visible;text-overflow:clip;overflow-wrap:normal;font-variant-numeric:tabular-nums}
+ .spp-dropdown-panel.du-selector-menu .du-option-values>span:last-child{border-top:1px solid var(--border);margin-top:3px;padding-top:10px}
+}

@@ -2,6 +2,7 @@
 require_once __DIR__.'/legacy_operational_read.php';
 
 require_once __DIR__ . '/daftar_ulang.php';
+require_once __DIR__.'/spp_student_tariff.php';
 
 class SppBillingOrderException extends RuntimeException {
     public function __construct(public readonly string $bulan, public readonly string $tahun) {
@@ -101,6 +102,7 @@ function spp_sync_student_discount(mysqli $db, string $noInduk, float $discountA
     $stmt->bind_param('si',$noInduk,$placementId);$stmt->execute();$bills=$stmt->get_result()->fetch_all(MYSQLI_ASSOC);$stmt->close();
     $update=$db->prepare('UPDATE tagihan_spp SET potongan_nominal_ditetapkan_snapshot=?,potongan_nominal_snapshot=?,nominal_tagihan=?,status=? WHERE id=?');
     foreach($bills as $bill){
+        if(sct_rule($db,$noInduk,$bill['bulan'],$bill['tahun']))continue;
         if((int)$bill['allocated']===1||lb_spp_credit($db,$noInduk,$bill['bulan'],$bill['tahun'])>.001){$locked++;continue;}
         $net=spp_net_tariff((float)$bill['tarif_dasar_snapshot'],$discountAmount);$status=$net['net']<=.001?'waived':'open';$id=(int)$bill['id'];
         $update->bind_param('dddsi',$discountAmount,$net['discount'],$net['net'],$status,$id);$update->execute();$updated++;
@@ -251,6 +253,7 @@ function spp_master_correct_published_rates(mysqli $db, int $id, array $rates, s
     $updated=0;$locked=0;
     foreach ($bills as $bill) {
         $level=(int)$bill['tingkat_snapshot'];if (!isset($changed[$level])) continue;
+        if(sct_rule($db,(string)$bill['no_induk'],$bill['bulan'],$bill['tahun'])){$locked++;continue;}
         $billId=(int)$bill['id'];$paid->bind_param('i',$billId);$paid->execute();$allocated=$paid->get_result()->num_rows>0;
         if ($allocated || lb_spp_credit($db,(string)$bill['no_induk'],$bill['bulan'],$bill['tahun'])>.001 || !in_array($bill['status'],['open','waived'],true)) { $locked++;continue; }
         $base=$changed[$level];$net=spp_net_tariff($base,(float)$bill['potongan_nominal_ditetapkan_snapshot']);$status=$net['net']<=.001?'waived':'open';
@@ -315,6 +318,43 @@ function spp_month_label(string $month): string {
     return $names[str_pad((string)(int)$month,2,'0',STR_PAD_LEFT)]??$month;
 }
 
+/** Shared SPP-only emitter. Caller owns eligibility checks, student locks and transaction. */
+function spp_publish_placement_periods(mysqli $db,int $masterYearId,array $master,array $placement,array $rates,string $start,?array $allowedPeriods=null,bool $restoreCancellations=true): array {
+    $created=0;$skipped=0;$legacyCovered=0;$nis=(string)$placement['no_induk'];$yearId=(int)$master['tahun_ajaran_id'];
+    $periods=spp_academic_periods((string)$master['label']);
+    if(!in_array($start,array_column($periods,'bulan'),true))throw new RuntimeException('Bulan mulai tagihan tidak valid.');
+    $insert=$db->prepare("INSERT IGNORE INTO tagihan_spp(master_spp_tahun_id,tahun_ajaran_id,penempatan_id,no_induk,tingkat_snapshot,master_kelas_id,kelas_rombel_snapshot,bulan,tahun,tarif_dasar_snapshot,potongan_nominal_ditetapkan_snapshot,potongan_nominal_snapshot,nominal_tagihan,status)
+      VALUES(?,?,?,?,?,?,?,?,?,?,?,?,?,?)");
+    $level=(int)$placement['kelas'];$base=lop_tariff($db,(string)$placement['no_induk'],(string)$master['label'])??(float)$rates[$level];$discount=(float)$placement['potongan_spp_nominal'];
+    $net=spp_net_tariff($base,$discount);$covered=(int)$placement['spp_covered_by_psb']===1;
+    $sourcePlan=lb_spp_override($db,$nis,(string)$master['label'])?[]:lb_monthly_plan($db,$nis)['positions'];
+    $startIndex=0;
+    foreach($periods as $idx=>$period) if($period['bulan']===$start){$startIndex=$idx;break;}
+    foreach($periods as $idx=>$period){
+        if($idx<$startIndex)continue;
+        if($allowedPeriods!==null&&!in_array($period['tahun'].'-'.$period['bulan'],$allowedPeriods,true))continue;
+        require_once __DIR__.'/legacy_full_read.php';if(lful_is_covered($db,$nis,'spp',$period['tahun'].'-'.str_pad($period['bulan'],2,'0',STR_PAD_LEFT))){$legacyCovered++;continue;}
+        $planned=lmp_publication($sourcePlan['spp|'.$period['tahun'].'-'.$period['bulan']]??null,$period['tahun'].'-'.$period['bulan'],lb_result_cents($base),lb_result_cents($discount),$covered);
+        $billBase=$planned['gross']/100;$billDiscount=$planned['discount']/100;$billNet=$planned['principal']/100;
+        $status=$planned['status'];
+        $declaredDiscount=$discount;
+        if(!$covered&&sct_rule($db,(string)$nis,$period['bulan'],$period['tahun'])){
+            $custom=sct_period_rate($db,(string)$nis,$period['bulan'],$period['tahun'],[]);
+            $billBase=$custom['base'];$billDiscount=0.0;$declaredDiscount=0.0;$billNet=$custom['net'];$status=$billNet<=.001?'waived':'open';
+        }
+        $placementId=(int)$placement['id'];$classId=(int)($placement['master_kelas_id']??0);$classIdParam=$classId?:null;
+        $classLabel=(string)$placement['kelas_rombel_snapshot'];$month=$period['bulan'];$year=$period['tahun'];
+        $insert->bind_param('iiisiisssdddds',$masterYearId,$yearId,$placementId,$nis,$level,$classIdParam,$classLabel,$month,$year,$billBase,$declaredDiscount,$billDiscount,$billNet,$status);
+        $insert->execute(); if($insert->affected_rows===1)$created++;else{
+            if(!$restoreCancellations){$skipped++;continue;}
+            $restore=$db->prepare("UPDATE tagihan_spp SET status=?,cancel_reason=NULL,tarif_dasar_snapshot=?,potongan_nominal_ditetapkan_snapshot=?,potongan_nominal_snapshot=?,nominal_tagihan=?,tingkat_snapshot=?,master_kelas_id=?,kelas_rombel_snapshot=?,penempatan_id=? WHERE no_induk=? AND bulan=? AND tahun=? AND status='cancelled' AND cancel_reason LIKE 'Koreksi pendaftaran awal PSB:%' AND NOT EXISTS(SELECT 1 FROM spp_alokasi WHERE tagihan_spp_id=tagihan_spp.id)");
+            $restore->bind_param('sddddiisisss',$status,$billBase,$declaredDiscount,$billDiscount,$billNet,$level,$classIdParam,$classLabel,$placementId,$nis,$month,$year);$restore->execute();if($restore->affected_rows)$created++;else$skipped++;$restore->close();
+        }
+    }
+    $insert->close();
+    return ['created'=>$created,'existing'=>$skipped,'legacy_covered'=>$legacyCovered];
+}
+
 function spp_publish_students(mysqli $db, int $masterYearId, array $students, array $startMonths = [], bool $useLegacyTariffs = false): array {
     $stmt=$db->prepare('SELECT mst.status,ta.id tahun_ajaran_id,ta.label FROM master_spp_tahun mst JOIN tahun_ajaran ta ON ta.id=mst.tahun_ajaran_id WHERE mst.id=? FOR UPDATE');
     $stmt->bind_param('i',$masterYearId);$stmt->execute();$master=$stmt->get_result()->fetch_assoc();$stmt->close();
@@ -331,8 +371,6 @@ function spp_publish_students(mysqli $db, int $masterYearId, array $students, ar
     $find=$db->prepare("SELECT sta.id,sta.no_induk,sta.kelas,sta.master_kelas_id,sta.kelas_rombel_snapshot,sta.spp_covered_by_psb,sta.komite_mulai_bulan,s.potongan_spp_nominal,s.is_active
       FROM siswa_tahun_ajaran sta JOIN siswa s ON s.NO_INDUK=sta.no_induk AND s.unit_id=sta.unit_id
       WHERE sta.status<>'dibatalkan' AND sta.tahun_ajaran_id=? AND sta.no_induk=? AND CAST(sta.kelas AS UNSIGNED) " . unit_level_between_sql() . " LIMIT 1 FOR UPDATE");
-    $insert=$db->prepare("INSERT IGNORE INTO tagihan_spp(master_spp_tahun_id,tahun_ajaran_id,penempatan_id,no_induk,tingkat_snapshot,master_kelas_id,kelas_rombel_snapshot,bulan,tahun,tarif_dasar_snapshot,potongan_nominal_ditetapkan_snapshot,potongan_nominal_snapshot,nominal_tagihan,status)
-      VALUES(?,?,?,?,?,?,?,?,?,?,?,?,?,?)");
     foreach(array_keys($selected) as $nis){
         $yearId=(int)$master['tahun_ajaran_id'];$find->bind_param('is',$yearId,$nis);$find->execute();$placement=$find->get_result()->fetch_assoc();
         if(!$placement || (int)$placement['is_active']!==1){$ineligible[]=$nis;continue;}
@@ -344,27 +382,10 @@ function spp_publish_students(mysqli $db, int $masterYearId, array $students, ar
             komite_set_start_month($db,(int)$placement['id'],(string)$startMonths[$nis]);
         }
         komite_sync_placement($db,(int)$placement['id']);
-        $level=(int)$placement['kelas'];$base=lop_tariff($db,(string)$placement['no_induk'],(string)$master['label'])??(float)$rates[$level];$discount=(float)$placement['potongan_spp_nominal'];
-        $net=spp_net_tariff($base,$discount);$covered=(int)$placement['spp_covered_by_psb']===1;
-        $sourcePlan=lb_spp_override($db,$nis,(string)$master['label'])?[]:lb_monthly_plan($db,$nis)['positions'];
-        $start=(string)($startMonths[$nis]??$placement['komite_mulai_bulan']??'07');$startIndex=0;
-        foreach($periods as $idx=>$period) if($period['bulan']===$start){$startIndex=$idx;break;}
-        foreach($periods as $idx=>$period){
-            if($idx<$startIndex)continue;
-            require_once __DIR__.'/legacy_full_read.php';if(lful_is_covered($db,$nis,'spp',$period['tahun'].'-'.str_pad($period['bulan'],2,'0',STR_PAD_LEFT))){$legacyCovered++;continue;}
-            $planned=lmp_publication($sourcePlan['spp|'.$period['tahun'].'-'.$period['bulan']]??null,$period['tahun'].'-'.$period['bulan'],lb_result_cents($base),lb_result_cents($discount),$covered);
-            $billBase=$planned['gross']/100;$billDiscount=$planned['discount']/100;$billNet=$planned['principal']/100;
-            $status=$planned['status'];
-            $placementId=(int)$placement['id'];$classId=(int)($placement['master_kelas_id']??0);$classIdParam=$classId?:null;
-            $classLabel=(string)$placement['kelas_rombel_snapshot'];$month=$period['bulan'];$year=$period['tahun'];
-            $insert->bind_param('iiisiisssdddds',$masterYearId,$yearId,$placementId,$nis,$level,$classIdParam,$classLabel,$month,$year,$billBase,$discount,$billDiscount,$billNet,$status);
-            $insert->execute(); if($insert->affected_rows===1)$created++;else{
-                $restore=$db->prepare("UPDATE tagihan_spp SET status=?,cancel_reason=NULL,tarif_dasar_snapshot=?,potongan_nominal_ditetapkan_snapshot=?,potongan_nominal_snapshot=?,nominal_tagihan=?,tingkat_snapshot=?,master_kelas_id=?,kelas_rombel_snapshot=?,penempatan_id=? WHERE no_induk=? AND bulan=? AND tahun=? AND status='cancelled' AND cancel_reason LIKE 'Koreksi pendaftaran awal PSB:%' AND NOT EXISTS(SELECT 1 FROM spp_alokasi WHERE tagihan_spp_id=tagihan_spp.id)");
-                $restore->bind_param('sddddiisisss',$status,$billBase,$discount,$billDiscount,$billNet,$level,$classIdParam,$classLabel,$placementId,$nis,$month,$year);$restore->execute();if($restore->affected_rows)$created++;else$skipped++;$restore->close();
-            }
-        }
+        $emitted=spp_publish_placement_periods($db,$masterYearId,$master,$placement,$rates,(string)($startMonths[$nis]??$placement['komite_mulai_bulan']??'07'));
+        $created+=$emitted['created'];$skipped+=$emitted['existing'];$legacyCovered+=$emitted['legacy_covered'];
     }
-    $find->close();$insert->close();
+    $find->close();
     if($created>0){$stmt=$db->prepare("UPDATE master_spp_tahun SET status='published',published_at=COALESCE(published_at,NOW()) WHERE id=? AND status='draft'");$stmt->bind_param('i',$masterYearId);$stmt->execute();$stmt->close();}
     spp_write_audit($db,$masterYearId,null,'terbitkan_tagihan',null,['siswa'=>count($selected),'tagihan_baru'=>$created,'tidak_memenuhi'=>$ineligible],$created);
     return ['created'=>$created,'existing'=>$skipped,'legacy_covered'=>$legacyCovered,'before_transition'=>$beforeTransition,'ineligible'=>$ineligible];

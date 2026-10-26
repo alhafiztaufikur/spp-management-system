@@ -106,3 +106,11 @@
 .fee-workspace .fee-preview-grid .report-summary-card>.fee-icon{display:inline-flex;align-items:center;justify-content:center;padding:0;line-height:1;background:var(--accent-glow);color:var(--accent);}
 .fee-workspace .fee-preview-grid .fee-icon>svg{display:block;width:21px;height:21px;flex:none;margin:0;}
 .fee-optional-guide p,.fee-optional-guide li{font-size:14px;line-height:1.8;color:var(--text-muted)}.fee-optional-guide p{margin:0 0 16px}.fee-optional-guide ol{padding-left:20px;margin:0 0 18px}.fee-optional-guide li+li{margin-top:8px}.fee-optional-guide .btn{margin-top:4px}
+
+/* Transaction summaries follow the student history's icon/link/count pattern. */
+.fee-workspace .fee-master-transactions{display:flex;flex-direction:column;gap:7px;min-width:164px;max-width:240px}
+.fee-workspace .fee-transaction-caption,.fee-workspace .fee-transaction-empty{font-size:11px;line-height:1.5;color:var(--text-muted);font-weight:600}
+.fee-workspace .fee-transaction-link{display:flex;align-items:center;gap:7px;padding:8px 10px;border:1px solid var(--border);background:var(--bg-card);border-radius:9px;color:var(--text-secondary);font-size:12px;font-weight:600;text-decoration:none;min-height:36px;box-sizing:border-box;white-space:nowrap}
+.fee-workspace .fee-transaction-link svg{width:16px;height:16px;color:var(--accent);flex:none}.fee-workspace .fee-transaction-link strong{margin-left:auto;padding:1px 7px;border-radius:6px;background:var(--accent-glow);color:var(--accent);font-size:11px;font-variant-numeric:tabular-nums}.fee-workspace .fee-transaction-link:hover{background:var(--accent-glow);border-color:var(--accent)}.fee-workspace .fee-transaction-link:focus-visible{outline:2px solid var(--accent);outline-offset:2px}
+.fee-workspace .fee-transaction-amount{display:flex;flex-wrap:wrap;align-items:baseline;justify-content:space-between;gap:4px 10px;font-variant-numeric:tabular-nums;line-height:1.5}.fee-workspace .fee-transaction-amount>span{font-size:10px;color:var(--text-muted)}.fee-workspace .fee-transaction-amount>strong{font-size:12px;color:var(--text-primary);overflow-wrap:anywhere}.fee-workspace .fee-transaction-link.is-cancelled{color:var(--text-muted)}
+@media(max-width:700px){.fee-workspace .fee-master-transactions{width:100%;min-width:0;max-width:none}.fee-workspace .fee-transaction-link{white-space:normal}}

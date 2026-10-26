@@ -132,7 +132,7 @@
   let sequence=0, active=null;const instances=new Set(),enhanced=new WeakMap();
   const icon='<svg class="spp-select-chevron" aria-hidden="true" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><path d="m6 9 6 6 6-6"/></svg>';
   function position(panel,button){
-    window.sppFloatingPanels.position(panel,button);
+    window.sppFloatingPanels.position(panel,button,panel.classList.contains('du-selector-menu')&&matchMedia('(min-width:769px)').matches?{minWidth:520}:{});
   }
   function controlLabel(select){
     const copy=(select.labels?.[0]||select.closest('.field-row')?.querySelector('label'))?.cloneNode(true);
@@ -145,7 +145,7 @@
   function setCaption(caption,value){if(caption.textContent!==value)caption.textContent=value;}
   function identify(wrap,select){wrap.dataset.control=select.name.replace('[]','');}
   function watchAnchor(record){
-    window.sppFloatingPanels.show(record.panel,record.button,{onClose:()=>{if(active===record)close();}});
+    window.sppFloatingPanels.show(record.panel,record.button,{...(record.panel.classList.contains('du-selector-menu')&&matchMedia('(min-width:769px)').matches?{minWidth:520}:{}),onClose:()=>{if(active===record)close();}});
   }
   function close(restore=false){if(!active)return;const old=active;active=null;old.close();if(restore){old.button.focus({preventScroll:true});old.close();}}
   function focusOption(item,panel){
@@ -198,7 +198,7 @@
     if(menu.dataset.sppLegacyReady)return;menu.dataset.sppLegacyReady='1';menu.classList.add('spp-dropdown-panel');menu.tabIndex=-1;
     const note=modeNote(false);
     const record={owner,button,panel:menu,close(){owner.classList.remove('is-open');if(!owner.classList.contains('payment-year-picker'))menu.hidden=true;button.setAttribute('aria-expanded','false');window.sppFloatingPanels.hide(menu);}};
-    function decorate(){if(!menu.contains(note))menu.prepend(note);menu.querySelectorAll(options).forEach(item=>item.classList.add('spp-dropdown-option'));button.title=button.textContent.trim();}
+    function decorate(){if(!menu.classList.contains('du-selector-menu')&&!menu.contains(note))menu.prepend(note);menu.querySelectorAll(options).forEach(item=>item.classList.add('spp-dropdown-option'));button.title=button.textContent.trim();}
     function sync(){decorate();if(isOpen()){
       const opening=active!==record;button.setAttribute('aria-expanded','true');if(opening){close();active=record;watchAnchor(record);}
       watchAnchor(record);position(menu,button);
