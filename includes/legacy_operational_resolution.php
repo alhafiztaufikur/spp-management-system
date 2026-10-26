@@ -25,13 +25,13 @@ function lop_precision_balance(mixed $value,int $journal): ?string {
     return $cents===$journal?lf_money($cents):null;
 }
 /** Existing explicit FIX always wins. Only a unique header and valid journals can resolve. */
-function lop_resolve_bank(array $rows,array $fix,?string $snapshot,string $identity,array &$resolutions,?int $sourceJournal=null): array {
+function lop_resolve_bank(array $rows,array $fix,?string $snapshot,string $identity,array &$resolutions,?int $sourceJournal=null,bool $allowSourceBalanceFix=true): array {
     $headers=[];$bankRows=[];foreach($rows as $key=>$r)if(in_array($r['table'],['tabungan','transaksi_m','transaksi_k'],true)){$bankRows[]=$r;if($r['table']==='tabungan')$headers[]=$key;}
     if(count($headers)!==1)return [$rows,$fix];$key=$headers[0];$original=$rows[$key]['raw']['SALDO']??null;
     $journal=lf_reconcile(array_values(array_filter($bankRows,fn($r)=>$r['table']!=='tabungan')),$snapshot);
     try{$normalized=lop_precision_balance($original,$sourceJournal??(lf_cents($journal['incoming'])-lf_cents($journal['outgoing'])));}catch(DomainException $e){$normalized=null;}
     if($normalized!==null){$rows[$key]['raw']['SALDO']=$normalized;$resolutions['precision:'.$identity]=['kind'=>'precision_balance','identity'=>$identity,'row_key'=>$rows[$key]['row_key'],'original'=>$original,'amount'=>$normalized,'reason'=>'Normalisasi residu presisi sesuai jurnal, toleransi maksimal Rp0.000001; sumber asli tidak diubah.'];}
-    if($fix)return [$rows,$fix];
+    if($fix||!$allowSourceBalanceFix)return [$rows,$fix];
     $bankRows=array_values(array_filter($rows,fn($r)=>in_array($r['table'],['tabungan','transaksi_m','transaksi_k'],true)));$bank=lf_reconcile($bankRows,$snapshot);
     if($bank['accounts']!==1||$bank['balance']===null||!in_array('Saldo sumber berbeda dengan jumlah jurnal.',$bank['issues'],true))return [$rows,$fix];
     $candidate=['amount'=>$bank['balance'],'confirmed'=>true,'evidence'=>'Pemeriksaan sistem: saldo akhir mengikuti kolom SALDO backup sesuai kebijakan peralihan yang disahkan; jurnal asli tetap tersimpan.','system_resolved'=>true];

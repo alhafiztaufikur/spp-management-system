@@ -17,6 +17,6 @@ function payment_receipt_remaining(mysqli $db,array $payment): array {
     if($bill&&$bill['status']==='open')$lines[]=['Sisa DU',(float)$bill['sisa']];
     else {$proof=$year!==''?lb_du_source($db,$nis,$year):null;
         $remaining=$proof&&!empty($proof['known'])?max(0,$proof['total']-lb_du_credit($db,$nis,$year)-lb_native_du_cents($db,$nis,$year)/100):null;
-        $lines[]=['Sisa DU',$remaining,'Belum dapat ditentukan'];
+        $lines[]=['Sisa DU',$remaining,'-'];
     }return $lines;
 }

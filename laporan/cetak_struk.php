@@ -21,6 +21,10 @@ if ($paymentId === 0) {
     exit;
 }
 
+require_once __DIR__.'/../includes/other_fee_usage.php';
+try { other_fee_assert_history_payment($koneksi,$_GET,$paymentId); }
+catch(InvalidArgumentException $e) { http_response_code(400);exit(htmlspecialchars($e->getMessage(),ENT_QUOTES,'UTF-8')); }
+
 function receipt_e($value): string {
     return htmlspecialchars((string)$value, ENT_QUOTES, 'UTF-8');
 }

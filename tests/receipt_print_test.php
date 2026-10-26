@@ -13,7 +13,10 @@ for($i=1;$i<=35;$i++)$long['other'][]=['Biaya tambahan nomor '.$i.' dengan keter
 $cases['long']=[$long];
 $noNis=$receipt;$noNis['payment']['NO_induk_diknas']='';$noNis['signer']='admin';$cases['no-nis']=[$noNis];
 $longWords=$receipt;$longWords['words']='Sembilan ratus sembilan puluh sembilan miliar sembilan ratus sembilan puluh sembilan juta sembilan ratus sembilan puluh sembilan ribu sembilan ratus sembilan puluh sembilan rupiah';$cases['long-words']=[$longWords];
+$unknownDu=$receipt;$unknownDu['remaining']=[['Sisa PSB',0],['Sisa DU',null]];
+$cases['unknown-du']=[$unknownDu];$cases['annual-unknown-du']=array_fill(0,12,$unknownDu);
 foreach($cases as $name=>$receipts){
+    if(str_contains($name,'unknown-du')){ob_start();receipt_print_document($receipts,'Struk Uji','Struk siap dicetak',true);$unknownHtml=ob_get_clean();if(str_contains($unknownHtml,'Belum dapat ditentukan')||substr_count($unknownHtml,'class="amount">-</td>')!==count($receipts))throw new RuntimeException('Unknown DU must remain a dash on every receipt.');}
     ob_start();receipt_print_document($receipts,'Struk Uji','Struk siap dicetak',true);$html=ob_get_clean();if(str_contains($html,'Sisa Komite'))throw new RuntimeException('Komite remaining must not appear on the slip.');if($name==='no-nis'&&(!str_contains($html,'ADMIN')||str_contains($html,'NIS Diknas')))throw new RuntimeException('Signer capitalization or missing NIS rendering.');file_put_contents($dir.'/receipt-'.$name.'.html',$html);
     $options=new \Dompdf\Options();$options->setDefaultMediaType('print');$options->setIsRemoteEnabled(false);$options->setFontHeightRatio(1.0);
     $pdf=new \Dompdf\Dompdf($options);$pdf->loadHtml($html,'UTF-8');$pdf->setPaper([0,0,612,396]);$pdf->render();$pages=$pdf->getCanvas()->get_page_count();

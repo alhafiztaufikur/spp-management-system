@@ -1,6 +1,6 @@
 <?php
 /** Prepared suggestions are not attestations. Every accepted decision is versioned. */
-const LFUL_RULES_VERSION = 8;
+const LFUL_RULES_VERSION = 11;
 require_once __DIR__.'/legacy_source_review.php';
 function lful_next_period(mixed $cutoff): string {
     if(!is_string($cutoff)||$cutoff==='')return '';
@@ -79,7 +79,7 @@ function lful_suggestions(mysqli $db,string $id): array {
     $components=[];foreach($cat['components'] as $c){$key=$c['key'];$saved=$profile['components'][$key]??[];$target=$c['suggestion']?:lful_history_category($key);$origin='Usulan berdasarkan kolom sumber';
         if(isset($saved['master_name'])){$target='';$origin='Master dalam profil tidak tersedia; pilih pasangan kembali';foreach($masterNames as $m)if($m['nama']===$saved['master_name']){$target='biaya_lain:'.$m['id'];$origin='Profil unit yang pernah disahkan';}}
         elseif(isset($saved['category'])){$target=$saved['category'];$origin='Profil unit yang pernah disahkan';}
-        if($c['column']==='U_SORGA'){$target=lful_history_category($key);$origin='Kebijakan yayasan: U_SORGA sudah dihentikan';}
+        if($c['column']==='U_SORGA'){$target='komite';$origin='U_SORGA adalah Komite/POMG pada semua unit, pengesahan 24 Oktober 2026';}
         if(!empty($c['is_pomg'])){$target='komite';$origin='POMG adalah Komite, sesuai pengesahan yayasan';}
         if($c['savings'])$target='savings_reference';$components[$key]=$c+['suggested_category'=>$target,'origin'=>$origin];
     }
@@ -102,7 +102,7 @@ function lful_group_preview(mysqli $db,string $id,int $version,array $input): ar
             if(str_starts_with($category,'histori:')&&$category!==lful_history_category($identity))throw new DomainException('Kategori histori tidak sesuai komponen.');
             if($category===''||($c['savings']&&(($settings['confirmed']??false)!==true))){$exceptions[]=$identity;continue;}
             $patch['components'][$identity]=['category'=>$category,'reason'=>$evidence,'confirmed'=>($settings['confirmed']??false)===true,'provenance'=>['type'=>'group','source'=>$suggest['source_fingerprint']]];
-            $samples[]=['identity'=>$identity,'name'=>$c['name'],'before'=>$old,'after'=>$patch['components'][$identity],'display'=>str_starts_with($category,'histori:')?'Histori Saja':($category==='savings_reference'?'Tabungan · referensi jurnal':$category)];continue;
+            $samples[]=['identity'=>$identity,'name'=>$c['name'],'before'=>$old,'after'=>$patch['components'][$identity],'display'=>str_starts_with($category,'histori:')?'Histori Saja':($category==='savings_reference'?'Tabungan Â· referensi jurnal':$category)];continue;
         }
         $s=$suggest['students'][$identity]??null;if(!$s)throw new DomainException('Identitas kelompok tidak ditemukan.');$old=$s['current'];
         if($type==='students'){
@@ -134,7 +134,7 @@ function lful_group_preview(mysqli $db,string $id,int $version,array $input): ar
             }
             $next['coverage']=$existing;$next['obligations_attested']=true;$next['obligations_evidence']=$evidence;
         }
-        $display=match($type){'savings'=>'Saldo sumber '.$s['savings']['balance'].' · jurnal '.$s['savings']['journal_balance'].' · selisih '.$s['savings']['difference'],'obligations'=>count($next['coverage']).' rincian periode; seluruh sisa kewajiban disahkan',default=>($next['kind']==='alumni'?'Alumni · tanpa tagihan baru':'Siswa aktif · mulai '.$next['start_period'].' · potongan '.$next['discount'])};
+        $display=match($type){'savings'=>'Saldo sumber '.$s['savings']['balance'].' Â· jurnal '.$s['savings']['journal_balance'].' Â· selisih '.$s['savings']['difference'],'obligations'=>count($next['coverage']).' rincian periode; seluruh sisa kewajiban disahkan',default=>($next['kind']==='alumni'?'Alumni Â· tanpa tagihan baru':'Siswa aktif Â· mulai '.$next['start_period'].' Â· potongan '.$next['discount'])};
         $patch['students'][$identity]=$next;$samples[]=['identity'=>$identity,'name'=>$s['name'],'before'=>$old,'after'=>$next,'display'=>$display];
     }
     $payload=['type'=>$type,'identities'=>$ids,'settings'=>$settings,'evidence'=>$evidence,'replace'=>$replace];

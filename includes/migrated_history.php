@@ -4,6 +4,7 @@ require_once __DIR__.'/legacy_full_read.php';
 require_once __DIR__.'/filter_choices.php';
 require_once __DIR__.'/history_performance.php';
 require_once __DIR__.'/payment_time.php';
+require_once __DIR__.'/other_fee_usage.php';
 
 function mh_has_column(mysqli $db,string $table,string $column): bool {
     static $cache=[];$key=$db->thread_id.'|'.$table.'|'.$column;
@@ -22,7 +23,7 @@ function mh_students_source(mysqli $db): string {
 function mh_return_create(string $route,array $query,int $unit,string $kind,int $id): string {
     if(!in_array($route,['pembayaran/lihat.php','pembayaran/riwayat_daftar_ulang.php','tabungan/riwayat.php','legacy_accounts.php','siswa/daftar.php'],true))throw new InvalidArgumentException('Tujuan kembali tidak valid.');
     $allowed=['owner','status','kelas','tingkat','back_context','special_members','special_member_page','saldo_q','saldo_status','saldo_class','saldo_page','page','per_page','selected','selected_unit','search','q','view','student_id','owner_id','nis','tanggal_awal','tanggal_akhir','all_periods','undated','source','owner_type','rombel','operator','batch','group','class_id','id','jenis','lg_open','lg_q','lg_kind','lg_page','special_q','special_kind','special_status','special_page'];
-    $query=array_intersect_key($query,array_flip($allowed));
+    $allowed[]='fee_master_id';$query=array_intersect_key($query,array_flip($allowed));
     foreach($_SESSION['history_returns']??[] as $key=>$r)if($r['expires']<time())unset($_SESSION['history_returns'][$key]);
     while(count($_SESSION['history_returns']??[])>=100)array_shift($_SESSION['history_returns']);
     $token=bin2hex(random_bytes(24));$_SESSION['history_returns'][$token]=['route'=>$route,'query'=>$query,'unit'=>$unit,'kind'=>$kind,'id'=>$id,'actor'=>(int)($_SESSION['admin_id']??0),'expires'=>time()+7200];return $token;
@@ -81,7 +82,7 @@ function mh_choice(array $input,string $key,array $allowed,string $default): str
  * deliberately retain the shared projection and its exact predicates. */
 function mh_payment_simple_count(mysqli $db,array $input,array $classFilter,array $operators,?array $period=null): ?int {
     if(($input['view']??'')==='deleted'||!filter_is_all($classFilter['values'])||!filter_is_all($operators)
-        ||trim((string)($input['search']??''))!==''||(int)($input['student_id']??0)>0||(int)($input['owner_id']??0)>0||($input['du_only']??'')==='1')return null;
+        ||isset($input['fee_master_id'])||trim((string)($input['search']??''))!==''||(int)($input['student_id']??0)>0||(int)($input['owner_id']??0)>0||($input['du_only']??'')==='1')return null;
     $kind=mh_choice($input,'source',['all','system','legacy'],'all');$owner=mh_choice($input,'owner_type',['all','student','account'],'all');
     $parts=[];$args=[];
     $date=static function(string $column,bool $legacy)use($input,$period,&$args):string{
@@ -101,6 +102,9 @@ function mh_payment_simple_count(mysqli $db,array $input,array $classFilter,arra
 /** Count, page and outside-period summary share exactly the same predicates. */
 function mh_payment_page(mysqli $db,array $input,array $classFilter,array $operators,string $start,string $end,int $page,int $size): array {
     $source=mh_payment_source($db,($input['view']??'')==='deleted');$where=' WHERE 1=1';$args=[];
+    $feeMaster=other_fee_history_context($db,$input);
+    if($feeMaster)$where.=other_fee_history_predicate($db,$feeMaster,($input['view']??'')==='deleted');
+    $feeSelect=$feeMaster?','.other_fee_history_amount_sql($db,$feeMaster,($input['view']??'')==='deleted').' fee_amount':'';
     $kind=mh_choice($input,'source',['all','system','legacy'],'all');
     $owner=mh_choice($input,'owner_type',['all','student','account'],'all');
     if($kind!=='all'){$where.=' AND p.source_kind=?';$args[]=$kind;}
@@ -144,11 +148,11 @@ function mh_payment_page(mysqli $db,array $input,array $classFilter,array $opera
         $page=intdiv($rank,$size)+1;
     }
     $offset=($page-1)*$size;
-    $rows=hp_rows($db,"SELECT p.* FROM $pageSource p $where $period ORDER BY p.TGL_BYR DESC,p.unit_id,p.id DESC LIMIT $size OFFSET $offset",$params);
+    $rows=hp_rows($db,"SELECT p.*$feeSelect FROM $pageSource p $where $period ORDER BY p.TGL_BYR DESC,p.unit_id,p.id DESC LIMIT $size OFFSET $offset",$params);
     if($compact&&$rows){$hydrate=mh_payment_source($db,false,array_column($rows,'id'));$rows=hp_rows($db,"SELECT p.* FROM $hydrate p ORDER BY p.TGL_BYR DESC,p.unit_id,p.id DESC");}
     $undated=($input['view']??'')==='deleted'?0:(mh_payment_simple_count($db,array_replace($input,['undated'=>'1','all_periods'=>'0']),$classFilter,$operators,[$start,$end])??(int)hp_one($db,"SELECT COUNT(*) n FROM $source p $where AND p.id<0 AND p.TGL_BYR IS NULL",$args)['n']);
-    return ['rows'=>$rows,'total'=>$total,'all'=>$all,'undated'=>$undated,'outside'=>$all-$total,'pages'=>$pages,'page'=>$page,'offset'=>$offset,
-        'read_sql'=>"SELECT p.* FROM $source p $where $period ORDER BY p.TGL_BYR DESC,p.unit_id,p.id DESC",'read_args'=>$params];
+    return ['fee_master'=>$feeMaster,'rows'=>$rows,'total'=>$total,'all'=>$all,'undated'=>$undated,'outside'=>$all-$total,'pages'=>$pages,'page'=>$page,'offset'=>$offset,
+        'read_sql'=>"SELECT p.*$feeSelect FROM $source p $where $period ORDER BY p.TGL_BYR DESC,p.unit_id,p.id DESC",'read_args'=>$params];
 }
 
 function mh_savings_source(mysqli $db,bool $operatorEvidence=true,?array $target=null): string {
@@ -183,14 +187,14 @@ function mh_student_counts(mysqli $db,int $unit,string $nis,?int $studentId=null
     return $s?(mh_student_counts_many($db,[$s])[(int)$s['id']]??['payments'=>0,'journals'=>0,'total'=>0]):['payments'=>0,'journals'=>0,'total'=>0];
 }
 
-/** Hydrate only receipt fields for a bounded page, in at most three queries. */
+/** Hydrate a bounded receipt page and its source references, without writes. */
 function mh_receipts_many(mysqli $db,array $rows): array {
     $full=[];$op=[];foreach($rows as $p){$id=(int)$p['id'];if($id<-1000000000)$op[]=-$id-1000000000;elseif($id<0)$full[]=-$id;}$out=[];
-    if($op&&lop_ready($db))foreach(lf_rows($db,"SELECT p.*,o.student_id,o.name NAMA,o.source_identity NO_INDUK,s.NO_induk_diknas FROM legacy_op_payments p JOIN legacy_op_owners o ON o.id=p.owner_id AND o.unit_id=p.unit_id LEFT JOIN siswa s ON s.id=o.student_id AND s.unit_id=o.unit_id JOIN legacy_full_batches b ON b.id=p.batch_id AND b.unit_id=p.unit_id WHERE p.id IN (".implode(',',$op).") AND b.state='completed'") as $p){$p['items']=json_decode($p['items'],true,64,JSON_THROW_ON_ERROR);$p['operational']=true;$out[-1000000000-(int)$p['id']]=$p;}
+    if($op&&lop_ready($db))foreach(lf_rows($db,"SELECT p.*,b.source_id,o.student_id,o.name NAMA,o.source_identity NO_INDUK,s.NO_induk_diknas FROM legacy_op_payments p JOIN legacy_op_owners o ON o.id=p.owner_id AND o.unit_id=p.unit_id LEFT JOIN siswa s ON s.id=o.student_id AND s.unit_id=o.unit_id JOIN legacy_full_batches b ON b.id=p.batch_id AND b.unit_id=p.unit_id WHERE p.id IN (".implode(',',$op).") AND b.state='completed'") as $p){$p['items']=json_decode($p['items'],true,64,JSON_THROW_ON_ERROR);$p['operational']=true;$out[-1000000000-(int)$p['id']]=$p;}
     if($full&&lful_read_ready($db)){
-        foreach(lf_rows($db,"SELECT p.*,s.NAMA,s.NO_INDUK FROM legacy_full_payments p JOIN siswa s ON s.id=p.student_id AND s.unit_id=p.unit_id JOIN legacy_full_batches b ON b.id=p.batch_id AND b.unit_id=p.unit_id WHERE p.id IN (".implode(',',$full).") AND b.state='completed'") as $p){$p['items']=[];$out[-(int)$p['id']]=$p;}
-        foreach(lf_rows($db,'SELECT payment_id,label,amount FROM legacy_full_items WHERE payment_id IN ('.implode(',',$full).') ORDER BY id') as $i)if(isset($out[-(int)$i['payment_id']]))$out[-(int)$i['payment_id']]['items'][]=$i;
-    }return $out;
+        foreach(lf_rows($db,"SELECT p.*,b.source_id,s.NAMA,s.NO_INDUK FROM legacy_full_payments p JOIN siswa s ON s.id=p.student_id AND s.unit_id=p.unit_id JOIN legacy_full_batches b ON b.id=p.batch_id AND b.unit_id=p.unit_id WHERE p.id IN (".implode(',',$full).") AND b.state='completed'") as $p){$p['items']=[];$out[-(int)$p['id']]=$p;}
+        foreach(lf_rows($db,'SELECT payment_id,source_column,category,label,amount FROM legacy_full_items WHERE payment_id IN ('.implode(',',$full).') ORDER BY id') as $i)if(isset($out[-(int)$i['payment_id']]))$out[-(int)$i['payment_id']]['items'][]=$i;
+    }return lfet_hydrate_receipts($db,$out);
 }
 
 function mh_student_legacy_ids(mysqli $db,array $student): array {

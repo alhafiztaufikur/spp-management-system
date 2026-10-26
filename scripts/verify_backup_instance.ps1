@@ -191,7 +191,7 @@ function Remove-OwnedWorkspace {
 try {
     $ConfigFile = Assert-PlainPath $ConfigFile
     $config = Get-Content -LiteralPath $ConfigFile -Raw | ConvertFrom-Json
-    if ($config.version -ne 1 -or $config.database -notmatch '^db_spp(?:_(?:audit|test)_[a-z0-9_]+)?$') { throw 'Konfigurasi verifikasi tidak valid.' }
+    if ($config.version -ne 1 -or $config.database -notmatch '^db_spp(?:_(?:audit|test)_[a-z0-9_]+|_test[0-9]+)?$') { throw 'Konfigurasi verifikasi tidak valid.' }
     $JobDirectory = Assert-PlainPath $JobDirectory
     $storage = Assert-PlainPath $config.storage_root
     $jobId = Split-Path -Leaf $JobDirectory

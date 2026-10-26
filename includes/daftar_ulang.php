@@ -509,6 +509,18 @@ function du_publish_year_from_active_students(mysqli $db, int $yearId, string $l
     $year = $stmt->get_result()->fetch_assoc(); $stmt->close();
     if (!$year || $year['label'] !== $label) throw new RuntimeException('Tahun ajaran penerbitan tidak valid.');
     if ($year['status'] === 'closed') throw new RuntimeException('Tahun ajaran yang sudah ditutup tidak dapat diterbitkan ulang.');
+    if($label===du_current_academic_year()&&lop_ready($db)&&hp_one($db,"SELECT id FROM legacy_full_batches WHERE state='completed' LIMIT 1")){
+        require_once __DIR__.'/legacy_du.php';$result=ldu_reconcile($db,(int)($_SESSION['admin_id']??0),$label);
+        // Explicit publication still serves native students added after migration.
+        foreach(hp_rows($db,"SELECT p.id,p.no_induk FROM siswa_tahun_ajaran p JOIN siswa s ON s.NO_INDUK=p.no_induk AND s.unit_id=p.unit_id WHERE p.tahun_ajaran_id=? AND p.status='aktif' AND s.is_active=1 AND NOT EXISTS(SELECT 1 FROM legacy_op_owners o WHERE o.student_id=s.id AND o.unit_id=s.unit_id)",[$yearId]) as $p){
+            if(hp_one($db,'SELECT id FROM tagihan_daftar_ulang WHERE no_induk=? AND tahun_ajaran_id=?',[$p['no_induk'],$yearId]))continue;
+            $hasRate=hp_one($db,'SELECT d.id FROM siswa_tahun_ajaran s JOIN Daftar_ulang d ON d.kelas=s.kelas AND d.tahun_ajaran_id=s.tahun_ajaran_id AND d.unit_id=s.unit_id WHERE s.id=? AND d.Jumlah>0',[$p['id']]);
+            if(!$hasRate){$result['unknown']++;continue;}
+            if(du_create_bill_for_placement($db,(int)$p['id'],true,true)){$result['bills_created']++;du_publish_proven_legacy_year($db,$yearId,$label,(int)($_SESSION['admin_id']??0));}
+        }
+        $GLOBALS['du_publish_result']=['created'=>$result['bills_created'],'unknown'=>$result['unknown'],'existing'=>$result['existing']];
+        return $result['bills_created'];
+    }
     $alreadyPublished=$year['status']==='published';
     [$unitFirst,$unitLast]=unit_level_bounds();
     $regularClasses=unit_level_in_sql();

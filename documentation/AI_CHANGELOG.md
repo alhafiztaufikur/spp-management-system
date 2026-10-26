@@ -1,6 +1,48 @@
 # Riwayat Perubahan AI SistemSPP
 
+## 2026-10-26 - Label struk dan ringkasan Komite Legacy
+
+- Satukan perhitungan posisi Komite untuk rincian, payload formulir dan pop-up: pembayaran native + kredit Legacy per unit/siswa/periode. Hilangkan tunggakan semu Raisa untuk 14 periode yang sebenarnya lunas; kewajiban nyata dan aturan pasangan SPP–Komite tetap berlaku.
+- Tampilkan nama item tanpa tambahan ID Legacy/kode/slot pada riwayat, struk dan rincian ekspor. Metadata sumber serta hubungan master tidak dihapus. Sisa DU yang belum diketahui tampil `-`, tetap null secara internal.
+- Perbandingan 1.731 siswa bertagihan Komite di ketiga unit lulus, berikut pengujian koreksi/pembatalan, kredit periode mendatang, struk/PDF/PNG dan fixture tahunan. Tidak melakukan migrasi ulang atau perubahan data pengguna.
+- Lihat [verifikasi struk dan Komite](LEGACY_RECEIPT_KOMITE_20261026.md).
+
+## 2026-10-26 - Master biaya membaca pemakaian Legacy
+
+- Hubungkan kolom Transaksi, jumlah rincian/nominal, tab Bisa Dihapus dan POST hapus ke satu pembaca native, Legacy operasional dan arsip lama. Riwayat batal, koreksi dan kewajiban melindungi master tanpa menambah kas aktif.
+- Angka Transaksi membuka Riwayat Pembayaran existing melalui konteks `fee_master_id`; pagination, rincian, struk dan PDF/Excel mempertahankan konteks dan akses unit. Nominal komponen dipisahkan dari total seluruh struk.
+- Selaraskan penguncian master pada koreksi, rekonsiliasi dan penetapan kewajiban. Kegagalan membaca sumber menolak penghapusan, bukan dianggap nol pemakaian.
+- 31 pemeriksaan transaksi, 48 HTTP, 56 fixture biaya dan regresi penulisan otomasi lulus pada server terisolasi. Runner verify ketiga unit menghasilkan nol perubahan dan memverifikasi 39/51/23 master. Tidak menerapkan migrasi atau perubahan skema/data pengguna.
+- Lihat [hasil pengujian master biaya](LEGACY_FEE_MASTER_USAGE_20261026.md).
+
+## 2026-10-26 - Penerapan Legacy SD/SMP/SMA ke db_spp_test3
+
+- Terapkan ketiga sumber melalui runner resmi setelah backup/restore, fixture penulisan/publikasi dan migrasi salinan lulus. Gunakan waktu snapshot masing-masing backup, 17 Oktober 2026.
+- Impor 2.289 siswa master dan 108.956 pembayaran Legacy senilai Rp82.187.356.252, tanpa menyalin penerimaan ke tabel native. Rekonstruksi PSB, DU, SPP–Komite dan kredit periode mendatang; 24.297 rincian biaya mempunyai jejak sumber.
+- Dukung konfigurasi/installer/verifier/worker untuk target bernomor, akun backup terpisah, konfigurasi mengikuti database aktif dan override eksplisit. Catat snapshot serta checksum restore dalam bukti verifier.
+- Perbaiki affected rows pada pengayaan, proposal biaya tanpa bentrok kapitalisasi, fingerprint JSON bertingkat dan publikasi ulang tanpa perubahan. Batasi cache bulanan pada data yang dipakai perencana, pisahkan memori CLI dan HTTP.
+- Operasional 14 menahan selisih saldo yang belum terbukti pada migrasi baru, tanpa jurnal penyeimbang. Keputusan batch lama dan koreksi eksplisit tetap dipertahankan.
+- 56 pemeriksaan biaya, 16 perencana dan 30 integrasi bulanan lulus; penulisan/publikasi, gangguan/rollback dan backup diuji pada server terisolasi. GUI, struk, laporan penerimaan/SPP tahunan, PDF dan Excel lulus pada target. Pengulangan semua unit nol perubahan dengan checksum seluruh tabel tetap.
+- Laporkan pengecualian sumber dan lokasi artefak privat pada [hasil migrasi test3](LEGACY_MIGRATION_TEST3_20261026.md). `.gitignore` dan `koneksi.php` pengguna tidak diubah.
+
+## 2026-10-26 - Otomatisasi pelacakan transaksi biaya lain
+
+- Satukan pemroses rincian biaya untuk unggahan GUI dan runner Codex; unggahan penuh memakai pipeline otomatis secara bawaan. Pemetaan manual tetap opsional.
+- Simpan identitas detail unit/sumber/baris/slot, kode asli/normalisasi, ID struk, master tujuan dan bukti. Kode kosong/ambigu diterima otomatis; struk bernominal tidak sah ditahan terpisah.
+- Sambungkan pembaca rincian, struk dan ekspor existing; siapkan pengayaan batch lama dengan audit dan tanpa menggandakan kas. Tidak menambah filter, tombol, menu atau tabel.
+- Naikkan workflow 10, operasional 13 dan otomasi 3; pertahankan metadata 1–2 serta aturan PSB/DU/SPP/Komite.
+- 53 pemeriksaan pelacakan dan suite regresi murni lulus. Uji penulisan terisolasi disiapkan dan wajib dijalankan sebelum apply berikutnya; tidak ada koneksi/apply/backfill/DDL pada database pengguna dalam pekerjaan ini. `.gitignore` pengguna tetap. [Rincian](LEGACY_FEE_TRACE_20261026.md).
+
 > [Penjelasan lengkap perubahan menu, Tabungan, dan laporan untuk tim](RINGKASAN_PERUBAHAN_MENU_DAN_LAPORAN_20261022.md) merangkum seluruh pekerjaan setelah `e80ba02`, kebutuhan konfigurasi/indeks, hasil pengujian, serta batas yang masih ada.
+
+## 2026-10-24 - PSB dan rekonstruksi SPP–Komite Legacy
+
+- Gunakan perhitungan PSB yang sama pada master, kasir, laporan dan migrasi; pisahkan pokok/potongan dan hitung pembayaran kumulatif sekali. Raisa tetap 8A, net/paid Rp7.395.000 dan sisa nol.
+- Petakan U_SORGA menjadi Komite/POMG di SD/SMP/SMA. Keputusan ini menggantikan catatan pensiun/Histori Saja U_SORGA pada riwayat perubahan sebelumnya.
+- Rekonstruksi periode sejak 2020 memakai tarif/kelas sumber dan kredit bulan mendatang; hilangkan larangan terbit sebelum November. Pertahankan tagihan existing dan koreksi pengguna; bukti belum cukup masuk peninjauan existing.
+- Sediakan runner preview/apply/verify dan panduan AGENTS/runbook. Migrasi baru dan rekonsiliasi existing memakai engine yang sama, tanpa menu/tombol baru.
+- Terapkan pada db_spp_test2 sesudah uji salinan serta restore backup terverifikasi. Verifikasi ulang ketiga unit nol perubahan; seluruh arsip, identitas, kas dan tabungan cocok dengan fingerprint sebelum perbaikan. Perubahan pengguna pada .gitignore dipertahankan.
+- Uji 15 perencana, 30 integrasi, GUI/API/ekspor, penerimaan baru/retry/pembatalan, migrasi sumber baru dan backup. [Hasil dan pengecualian](LEGACY_BILLING_REPAIR_20261024.md), [prosedur migrasi](LEGACY_MIGRATION_RUNBOOK.md).
 
 ## 2026-10-22 - Pemulihan tab desktop dan preview transaksi
 

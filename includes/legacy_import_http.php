@@ -1,6 +1,8 @@
 <?php
 require_once __DIR__.'/legacy_full_http.php';
 require_once __DIR__.'/legacy_ui.php';
+/** Full uploads use the same automatic pipeline as Codex; archive is an explicit legacy opt-out. */
+function legacy_http_operational_upload(string $category,array $input): bool {return $category==='full'&&($input['mode']??'operational')!=='archive';}
 function legacy_http_actor(mysqli $db,string $category,bool $write=false): void {
     if($category!=='students'){lf_actor($db,(int)($_SESSION['admin_id']??0),unit_active_id(),$write);return;}
     if(!operational_role()||!lf_one($db,"SELECT id FROM admin WHERE id=? AND is_active=1 AND role IN ('super_admin','admin')",[(int)($_SESSION['admin_id']??0)]))throw new DomainException('Akun pengelola operasional aktif diperlukan.',403);
@@ -25,7 +27,7 @@ function legacy_http_upload(mysqli $db,array $input,array $files): array {
         return legacy_job($previous['job']);
     }
     $health=legacy_readiness($db);if(!$health['ready'])throw new DomainException('Layanan pemeriksaan belum siap. Periksa ringkasan kesiapan.',503);
-    $operational=($input['mode']??'')==='operational';if($operational){lop_require($db);if(!$health['operational_worker'])throw new DomainException('Mulai ulang worker untuk memakai migrasi operasional terbaru.',503);}
+    $operational=legacy_http_operational_upload($category,$input);if($operational){lop_require($db);if(!$health['operational_worker'])throw new DomainException('Mulai ulang worker untuk memakai migrasi operasional terbaru.',503);}
     if($category==='finance'&&(!legacy_finance_ready($db)||!$health['finance_worker']))throw new DomainException('Histori Keuangan belum siap. Pasang skema dan mulai ulang worker.',503);
     if($category==='full'){lful_require($db);lful_empty($db,$unit);if(!$health['full_worker'])throw new DomainException('Mulai ulang worker sebelum migrasi penuh.',503);}
     $job=legacy_enqueue($file['tmp_name'],$file['name'],$unit,$actor,$category);

@@ -339,18 +339,22 @@ function spp_publish_students(mysqli $db, int $masterYearId, array $students, ar
         // Manual Legacy activation creates only a placement. Explicit publication prepares
         // its Komite pair too; INSERT IGNORE preserves existing bills and paid snapshots.
         require_once __DIR__.'/komite_billing.php';
+        if(isset($startMonths[$nis])){
+            if(!in_array((string)$startMonths[$nis],array_column($periods,'bulan'),true))throw new RuntimeException('Bulan mulai tagihan tidak valid.');
+            komite_set_start_month($db,(int)$placement['id'],(string)$startMonths[$nis]);
+        }
         komite_sync_placement($db,(int)$placement['id']);
         $level=(int)$placement['kelas'];$base=lop_tariff($db,(string)$placement['no_induk'],(string)$master['label'])??(float)$rates[$level];$discount=(float)$placement['potongan_spp_nominal'];
         $net=spp_net_tariff($base,$discount);$covered=(int)$placement['spp_covered_by_psb']===1;
+        $sourcePlan=lb_spp_override($db,$nis,(string)$master['label'])?[]:lb_monthly_plan($db,$nis)['positions'];
         $start=(string)($startMonths[$nis]??$placement['komite_mulai_bulan']??'07');$startIndex=0;
         foreach($periods as $idx=>$period) if($period['bulan']===$start){$startIndex=$idx;break;}
         foreach($periods as $idx=>$period){
-            $opening=lb_student($db,$nis);$minimum=(string)($opening['settings']['start_period']??'');
-            if($minimum!==''&&($period['tahun'].'-'.$period['bulan'])<$minimum){$beforeTransition++;continue;}
             if($idx<$startIndex)continue;
             require_once __DIR__.'/legacy_full_read.php';if(lful_is_covered($db,$nis,'spp',$period['tahun'].'-'.str_pad($period['bulan'],2,'0',STR_PAD_LEFT))){$legacyCovered++;continue;}
-            $billBase=$covered?0:$base;$billDiscount=$covered?0:$net['discount'];$billNet=$covered?0:$net['net'];
-            $status=$covered?'covered_psb':($billNet<=.001?'waived':'open');
+            $planned=lmp_publication($sourcePlan['spp|'.$period['tahun'].'-'.$period['bulan']]??null,$period['tahun'].'-'.$period['bulan'],lb_result_cents($base),lb_result_cents($discount),$covered);
+            $billBase=$planned['gross']/100;$billDiscount=$planned['discount']/100;$billNet=$planned['principal']/100;
+            $status=$planned['status'];
             $placementId=(int)$placement['id'];$classId=(int)($placement['master_kelas_id']??0);$classIdParam=$classId?:null;
             $classLabel=(string)$placement['kelas_rombel_snapshot'];$month=$period['bulan'];$year=$period['tahun'];
             $insert->bind_param('iiisiisssdddds',$masterYearId,$yearId,$placementId,$nis,$level,$classIdParam,$classLabel,$month,$year,$billBase,$discount,$billDiscount,$billNet,$status);

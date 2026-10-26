@@ -1,5 +1,10 @@
 [CmdletBinding()]
 param(
+    [ValidatePattern('^db_spp(?:_(?:audit|test)_[a-z0-9_]+|_test[0-9]+)?$')][string]$DatabaseName = 'db_spp',
+    [ValidateSet('127.0.0.1','localhost')][string]$DatabaseHost = '127.0.0.1',
+    [ValidateRange(1,65535)][int]$DatabasePort = 3306,
+    [ValidatePattern('^[a-zA-Z0-9_]{1,32}$')][string]$BackupUser = '',
+    [string]$ConfirmTarget = '',
     [string]$ConfigFile = 'C:\laragon\data\spp-backup\db_spp\config.json',
     [string]$MysqlBin = '',
     [string]$PhpExecutable = '',
@@ -114,7 +119,7 @@ function Test-BackupTaskSchedule($Task, [string]$ApplicationRoot) {
 function Invoke-Mysql([string]$DefaultsFile, [string]$Sql) {
     $psi = New-Object Diagnostics.ProcessStartInfo
     $psi.FileName = Join-Path $MysqlBin 'mysql.exe'
-    $mysqlArgs = @(('--defaults-file=' + $DefaultsFile), '--host=127.0.0.1', '--port=3306', '--protocol=TCP', '--batch', '--skip-column-names', '--raw', '--connect-timeout=10', '--default-character-set=utf8mb4')
+    $mysqlArgs = @(('--defaults-file=' + $DefaultsFile), ('--host=' + $DatabaseHost), ('--port=' + $DatabasePort), '--protocol=TCP', '--batch', '--skip-column-names', '--raw', '--connect-timeout=10', '--default-character-set=utf8mb4')
     $psi.Arguments = ($mysqlArgs | ForEach-Object { Quote-NativeArgument $_ }) -join ' '
     $psi.UseShellExecute = $false
     $psi.CreateNoWindow = $true
@@ -149,6 +154,17 @@ function Escape-Option([string]$Value) {
 }
 
 try {
+    if (!$PSBoundParameters.ContainsKey('ConfigFile')) { $ConfigFile = 'C:\laragon\data\spp-backup\' + $DatabaseName + '\config.json' }
+    if (!$PSBoundParameters.ContainsKey('StorageRoot')) { $StorageRoot = 'C:\laragon\backups\spp-management-system\daily\' + $DatabaseName }
+    if (!$PSBoundParameters.ContainsKey('TaskName') -and $DatabaseName -ne 'db_spp') { $TaskName = 'SistemSPP Database Backup ' + $DatabaseName }
+    if (!$BackupUser) {
+        if ($DatabaseName -eq 'db_spp') { $BackupUser = 'spp_backup_local' }
+        else {
+            $digest = [Security.Cryptography.SHA256]::Create().ComputeHash([Text.Encoding]::UTF8.GetBytes($DatabaseName))
+            $BackupUser = 'spp_backup_' + ([BitConverter]::ToString($digest).Replace('-','').Substring(0,16).ToLowerInvariant())
+        }
+    }
+    $databaseIdentifier = '`' + $DatabaseName + '`'
     $ConfigFile = Assert-PlainPath $ConfigFile
     # Reuse an installed configuration before detecting Laragon's active runtimes.
     # Never assume the developer's PHP/MySQL version also exists on another PC.
@@ -194,7 +210,7 @@ try {
     $config = $null
     if (Test-Path -LiteralPath $ConfigFile -PathType Leaf) {
         $config = Get-Content -LiteralPath $ConfigFile -Raw | ConvertFrom-Json
-        if ($config.version -ne 1 -or $config.database -ne 'db_spp' -or $config.app_root -ne $appRoot -or $config.task_user -ne $owner.Name -or $config.source_defaults_file -ne $defaultsFile) {
+        if ($config.version -ne 1 -or $config.database -ne $DatabaseName -or $config.host -ne $DatabaseHost -or [int]$config.port -ne $DatabasePort -or $config.app_root -ne $appRoot -or $config.task_user -ne $owner.Name -or $config.source_defaults_file -ne $defaultsFile) {
             throw 'Konfigurasi yang ada bukan milik instalasi atau pengguna ini; tidak diambil alih.'
         }
         if ($config.storage_root -ne $StorageRoot -or $config.mysql_bin -ne $MysqlBin -or $config.php_executable -ne $PhpExecutable -or $config.task_name -ne $TaskName) {
@@ -202,11 +218,11 @@ try {
         }
         Assert-PlainPath $defaultsFile | Out-Null
         $identity = (Invoke-Mysql $defaultsFile 'SELECT @@server_uuid, @@datadir, VERSION(), CURRENT_USER();').Split("`t")
-        if ($identity.Count -ne 4 -or $identity[0] -ne $config.server_uuid -or $identity[1] -ne $config.datadir -or $identity[3] -ne 'spp_backup_local@127.0.0.1') {
+        if ($identity.Count -ne 4 -or $identity[0] -ne $config.server_uuid -or $identity[1] -ne $config.datadir -or $identity[3] -ne ($BackupUser+'@127.0.0.1')) {
             throw 'Identitas server atau akun backup berubah; konfigurasi lama dipertahankan.'
         }
     } else {
-        if (!$ConfirmMain) { throw 'Penyediaan akun pada db_spp memerlukan -ConfirmMain setelah pengujian salinan lulus.' }
+        if (($DatabaseName -eq 'db_spp' -and !$ConfirmMain) -or ($DatabaseName -ne 'db_spp' -and $ConfirmTarget -cne $DatabaseName)) { throw 'Sebutkan -ConfirmMain untuk db_spp atau -ConfirmTarget yang sama persis dengan DatabaseName.' }
         if ($AdminDefaultsFile) {
             $AdminDefaultsFile = Assert-PlainPath $AdminDefaultsFile
             if (!(Test-Path -LiteralPath $AdminDefaultsFile -PathType Leaf)) { throw 'Berkas opsi administrator tidak ditemukan.' }
@@ -214,27 +230,27 @@ try {
             $temporaryAdminFile = Join-Path $configDirectory ('admin-' + [Guid]::NewGuid().ToString('N') + '.cnf')
             $adminUser = if ($env:SPP_DB_USER) { $env:SPP_DB_USER } else { 'root' }
             $adminPassword = if ($null -ne $env:SPP_DB_PASS) { $env:SPP_DB_PASS } else { '' }
-            $options = "[client]`r`nhost=127.0.0.1`r`nport=3306`r`nprotocol=TCP`r`nuser=`"$(Escape-Option $adminUser)`"`r`npassword=`"$(Escape-Option $adminPassword)`"`r`n"
+            $options = "[client]`r`nhost=$DatabaseHost`r`nport=$DatabasePort`r`nprotocol=TCP`r`nuser=`"$(Escape-Option $adminUser)`"`r`npassword=`"$(Escape-Option $adminPassword)`"`r`n"
             [IO.File]::WriteAllText($temporaryAdminFile, $options, $utf8)
             $AdminDefaultsFile = $temporaryAdminFile
         }
         $identity = (Invoke-Mysql $AdminDefaultsFile 'SELECT @@server_uuid, @@datadir, VERSION();').Split("`t")
         if ($identity.Count -ne 3 -or !(Test-BackupMysqlVersion $identity[2])) { throw 'Pencadangan lokal ini memerlukan MySQL 8.0.30 atau lebih baru pada seri 8.0, atau MySQL 8.4.' }
-        $databaseExists = Invoke-Mysql $AdminDefaultsFile "SELECT COUNT(*) FROM information_schema.SCHEMATA WHERE SCHEMA_NAME='db_spp';"
-        if ($databaseExists -ne '1') { throw 'Database lokal db_spp tidak ditemukan.' }
-        $otherEngines = Invoke-Mysql $AdminDefaultsFile "SELECT COUNT(*) FROM information_schema.TABLES WHERE TABLE_SCHEMA='db_spp' AND TABLE_TYPE='BASE TABLE' AND ENGINE <> 'InnoDB';"
+        $databaseExists = Invoke-Mysql $AdminDefaultsFile "SELECT COUNT(*) FROM information_schema.SCHEMATA WHERE SCHEMA_NAME='$DatabaseName';"
+        if ($databaseExists -ne '1') { throw 'Database target tidak ditemukan.' }
+        $otherEngines = Invoke-Mysql $AdminDefaultsFile "SELECT COUNT(*) FROM information_schema.TABLES WHERE TABLE_SCHEMA='$DatabaseName' AND TABLE_TYPE='BASE TABLE' AND ENGINE <> 'InnoDB';"
         if ($otherEngines -ne '0') { throw 'Seluruh tabel fisik harus InnoDB agar snapshot konsisten.' }
-        $accountExists = Invoke-Mysql $AdminDefaultsFile "SELECT COUNT(*) FROM mysql.user WHERE User='spp_backup_local' AND Host='127.0.0.1';"
+        $accountExists = Invoke-Mysql $AdminDefaultsFile "SELECT COUNT(*) FROM mysql.user WHERE User='$BackupUser' AND Host='127.0.0.1';"
         $provision = $null
         if (Test-Path -LiteralPath $provisionFile -PathType Leaf) {
             $provision = Get-Content -LiteralPath $provisionFile -Raw | ConvertFrom-Json
-            if ($provision.version -ne 1 -or $provision.owner_sid -ne $ownerSid -or $provision.app_root -ne $appRoot -or $provision.database -ne 'db_spp' -or $provision.server_uuid -ne $identity[0] -or $provision.datadir -ne $identity[1] -or $provision.defaults_file -ne $defaultsFile) {
+            if ($provision.version -ne 1 -or $provision.owner_sid -ne $ownerSid -or $provision.app_root -ne $appRoot -or $provision.database -ne $DatabaseName -or $provision.server_uuid -ne $identity[0] -or $provision.datadir -ne $identity[1] -or $provision.defaults_file -ne $defaultsFile -or ($provision.PSObject.Properties.Name -contains 'backup_user' -and $provision.backup_user -ne $BackupUser)) {
                 throw 'Jurnal penyediaan akun tidak cocok; akun dan berkas tidak diambil alih.'
             }
         } elseif ($accountExists -ne '0' -or (Test-Path -LiteralPath $defaultsFile)) {
             throw 'Akun atau berkas opsi sudah ada tanpa jurnal kepemilikan; periksa secara manual.'
         } else {
-            $provision = [ordered]@{version=1;owner_sid=$ownerSid;app_root=$appRoot;database='db_spp';server_uuid=$identity[0];datadir=$identity[1];defaults_file=$defaultsFile;created_at=[DateTimeOffset]::UtcNow.ToString('o')}
+            $provision = [ordered]@{version=1;owner_sid=$ownerSid;app_root=$appRoot;database=$DatabaseName;backup_user=$BackupUser;server_uuid=$identity[0];datadir=$identity[1];defaults_file=$defaultsFile;created_at=[DateTimeOffset]::UtcNow.ToString('o')}
             Write-PrivateJson $provisionFile $provision
         }
         if (Test-Path -LiteralPath $defaultsFile -PathType Leaf) {
@@ -246,24 +262,24 @@ try {
         } else {
             if ($accountExists -ne '0') { throw 'Akun milik jurnal tidak memiliki kredensial privat; akun tidak diubah.' }
             $password = New-RandomPassword
-            $options = "[client]`r`nhost=127.0.0.1`r`nport=3306`r`nprotocol=TCP`r`nuser=spp_backup_local`r`npassword=`"$password`"`r`n"
+            $options = "[client]`r`nhost=$DatabaseHost`r`nport=$DatabasePort`r`nprotocol=TCP`r`nuser=$BackupUser`r`npassword=`"$password`"`r`n"
             [IO.File]::WriteAllText($defaultsFile + '.new', $options, $utf8)
             Move-Item -LiteralPath ($defaultsFile + '.new') -Destination $defaultsFile -Force
         }
         if ($accountExists -ne '0') {
             $ownedIdentity = (Invoke-Mysql $defaultsFile 'SELECT @@server_uuid, @@datadir, CURRENT_USER();').Split("`t")
-            if ($ownedIdentity.Count -ne 3 -or $ownedIdentity[0] -ne $identity[0] -or $ownedIdentity[1] -ne $identity[1] -or $ownedIdentity[2] -ne 'spp_backup_local@127.0.0.1') {
+            if ($ownedIdentity.Count -ne 3 -or $ownedIdentity[0] -ne $identity[0] -or $ownedIdentity[1] -ne $identity[1] -or $ownedIdentity[2] -ne ($BackupUser+'@127.0.0.1')) {
                 throw 'Akun yang sudah ada tidak cocok dengan kredensial jurnal; akun tidak diubah.'
             }
         }
-        $functionExists = Invoke-Mysql $AdminDefaultsFile "SELECT COUNT(*) FROM information_schema.ROUTINES WHERE ROUTINE_SCHEMA='db_spp' AND ROUTINE_NAME='current_unit_id' AND ROUTINE_TYPE='FUNCTION';"
-        $grants = if ($accountExists -eq '0') { "CREATE USER 'spp_backup_local'@'127.0.0.1' IDENTIFIED BY '$password';" } else { '' }
-        $grants += " GRANT SELECT, SHOW VIEW, TRIGGER, EVENT ON db_spp.* TO 'spp_backup_local'@'127.0.0.1'; GRANT SHOW_ROUTINE ON *.* TO 'spp_backup_local'@'127.0.0.1';"
-        if ($functionExists -eq '1') { $grants += " GRANT EXECUTE ON FUNCTION db_spp.current_unit_id TO 'spp_backup_local'@'127.0.0.1';" }
+        $functionExists = Invoke-Mysql $AdminDefaultsFile "SELECT COUNT(*) FROM information_schema.ROUTINES WHERE ROUTINE_SCHEMA='$DatabaseName' AND ROUTINE_NAME='current_unit_id' AND ROUTINE_TYPE='FUNCTION';"
+        $grants = if ($accountExists -eq '0') { "CREATE USER '$BackupUser'@'127.0.0.1' IDENTIFIED BY '$password';" } else { '' }
+        $grants += " GRANT SELECT, SHOW VIEW, TRIGGER, EVENT ON ${databaseIdentifier}.* TO '$BackupUser'@'127.0.0.1'; GRANT SHOW_ROUTINE ON *.* TO '$BackupUser'@'127.0.0.1';"
+        if ($functionExists -eq '1') { $grants += " GRANT EXECUTE ON FUNCTION ${databaseIdentifier}.current_unit_id TO '$BackupUser'@'127.0.0.1';" }
         Invoke-Mysql $AdminDefaultsFile $grants | Out-Null
         $config = [ordered]@{
             version = 1; app_root = $appRoot; mysql_bin = $MysqlBin; php_executable = $PhpExecutable
-            storage_root = $StorageRoot; database = 'db_spp'; host = '127.0.0.1'; port = 3306
+            storage_root = $StorageRoot; database = $DatabaseName; host = $DatabaseHost; port = $DatabasePort
             server_uuid = $identity[0]; datadir = $identity[1]; source_defaults_file = $defaultsFile
             task_name = $TaskName; task_user = $owner.Name; installed_at = $provision.created_at
         }

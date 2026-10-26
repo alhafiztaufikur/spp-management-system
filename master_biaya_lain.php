@@ -4,6 +4,7 @@ if (!isset($_SESSION['admin_id'])) { header('Location: login.php'); exit; }
 require_once 'koneksi.php';
 require_once 'includes/auth.php';
 require_once 'includes/biaya_lain.php';
+require_once 'includes/other_fee_usage.php';
 require_once 'includes/legacy_finance.php';
 requireRole(['admin', 'kasir']);
 
@@ -132,6 +133,7 @@ if ($_SERVER['REQUEST_METHOD'] === 'POST') {
     if ($aksi === 'hapus') {
         $id = (int)($_POST['id'] ?? 0);
         try {
+            $koneksi->query('SET TRANSACTION ISOLATION LEVEL READ COMMITTED');
             $koneksi->begin_transaction();
             // Penerbitan mengambil kunci master sebelum membuat tagihan. Hapus harus
             // mengambil kunci yang sama sebelum menghitung relasi dan menghapus.
@@ -144,11 +146,8 @@ if ($_SERVER['REQUEST_METHOD'] === 'POST') {
                 master_redirect();
             }
 
-            $stmtCount = $koneksi->prepare('SELECT (SELECT COUNT(*) FROM bayar_biaya_lain WHERE master_biaya_lain_id=?) + (SELECT COUNT(*) FROM tagihan_biaya_lain WHERE master_biaya_lain_id=?) AS jumlah');
-            $stmtCount->bind_param('ii', $id, $id); $stmtCount->execute();
-            $jumlahPemakaian = (int)$stmtCount->get_result()->fetch_assoc()['jumlah'];
-            $stmtCount->close();
-            if ($jumlahPemakaian > 0) {
+            $usage=other_fee_master_usage($koneksi,$id)[0]??null;
+            if (!$usage || !$usage['can_delete']) {
                 $koneksi->commit();
                 $_SESSION['flash'] = ['type' => 'error', 'msg' => 'Master sudah dipakai pada transaksi dan tidak dapat dihapus. Nonaktifkan agar tidak muncul di pembayaran baru.'];
             } else {
@@ -176,26 +175,12 @@ if ($editId > 0) {
     $stmt->close();
 }
 
-$masterList = $koneksi->query("
-    SELECT m.*, COALESCE(d.jumlah_pemakaian,0) AS jumlah_pemakaian,
-           COALESCE(t.jumlah_tagihan,0) AS jumlah_tagihan,
-           COALESCE(t.nominal_tagihan,0) AS nominal_tagihan
-    FROM master_biaya_lain m
-    LEFT JOIN (
-        SELECT master_biaya_lain_id, COUNT(*) AS jumlah_pemakaian
-        FROM bayar_biaya_lain GROUP BY master_biaya_lain_id
-    ) d ON d.master_biaya_lain_id = m.id
-    LEFT JOIN (
-        SELECT master_biaya_lain_id, COUNT(*) AS jumlah_tagihan,
-               SUM(nominal_tagihan) AS nominal_tagihan
-        FROM tagihan_biaya_lain GROUP BY master_biaya_lain_id
-    ) t ON t.master_biaya_lain_id = m.id
-    ORDER BY m.is_active DESC, m.nama ASC
-");
-$masterRows=$masterList->fetch_all(MYSQLI_ASSOC);
+try {$masterRows=other_fee_master_usage($koneksi);}
+catch(Throwable $error){error_log('Pembacaan pemakaian master biaya: '.$error->getMessage());http_response_code(503);exit('Pemakaian master biaya belum dapat dibaca. Muat ulang sebelum mengubah atau menghapus master.');}
+usort($masterRows,static fn($a,$b)=>(int)$b['is_active']<=>(int)$a['is_active']?:strnatcasecmp($a['nama'],$b['nama']));
 $masterTab=is_string($_GET['master_tab']??null)&&in_array($_GET['master_tab'],['aktif','nonaktif','hapus'],true)?$_GET['master_tab']:'aktif';
 $masterCounts=['aktif'=>0,'nonaktif'=>0,'hapus'=>0];
-foreach($masterRows as &$master){$master['reserved']=lf_reserved_master($koneksi,(int)$master['id']);$master['can_delete']=!$master['reserved']&&(int)$master['jumlah_pemakaian']===0&&(int)$master['jumlah_tagihan']===0;$masterCounts[$master['is_active']?'aktif':'nonaktif']++;if($master['can_delete'])$masterCounts['hapus']++;}unset($master);
+foreach($masterRows as &$master){$master['reserved']=lf_reserved_master($koneksi,(int)$master['id']);$masterCounts[$master['is_active']?'aktif':'nonaktif']++;if($master['can_delete'])$masterCounts['hapus']++;}unset($master);
 $masterRows=array_values(array_filter($masterRows,static fn($m)=>$masterTab==='hapus'?$m['can_delete']:(bool)$m['is_active']===($masterTab==='aktif')));
 $activeMasters = $koneksi->query("SELECT * FROM master_biaya_lain WHERE is_active=1 AND jenis_pembayaran='tidak_berulang' ORDER BY nama")->fetch_all(MYSQLI_ASSOC);
 $activeMasters=array_values(array_filter($activeMasters,static fn($master)=>!lf_reserved_master($koneksi,(int)$master['id'])));
@@ -316,7 +301,7 @@ require_once __DIR__ . '/includes/master_workspace_ui.php';
             <thead><tr><th>No</th><th>Nama Biaya</th><th>Nominal</th><th>Jenis</th><th>Status</th><th>Tagihan Terbit</th><th>Transaksi</th><th>Aksi</th></tr></thead>
             <tbody>
               <?php if (!$masterRows): ?>
-              <tr><td colspan="8"><div class="empty-state"><p>Tidak ada master pada bagian ini</p><span>Pilih bagian lain atau tambahkan master biaya.</span></div></td></tr>
+              <tr><td colspan="8"><div class="empty-state"><p>Tidak ada master pada bagian ini</p><span><?= $masterTab==='aktif'&&$masterCounts['nonaktif']>0?'Master hasil migrasi tersedia pada tab Nonaktif. Tarifnya belum ditetapkan untuk pembayaran baru.':'Pilih bagian lain atau tambahkan master biaya.' ?></span></div></td></tr>
               <?php else: $no = 1; foreach ($masterRows as $item): ?>
               <tr>
                 <td data-label="No"><?= $no++ ?></td>
@@ -324,7 +309,7 @@ require_once __DIR__ . '/includes/master_workspace_ui.php';
                 <td data-label="Nominal" class="nominal"><?= lf_reserved_master($koneksi,(int)$item['id'])?'Per pengesahan':(!empty($item['legacy_tariff_pending'])&&(float)$item['nominal']===0.0?'Tarif belum ditetapkan':'Rp '.number_format((float)$item['nominal'],0,',','.')) ?></td>
                 <td data-label="Jenis"><?= $item['jenis_pembayaran']==='berulang'?'Berulang':'Tidak Berulang' ?></td><td data-label="Status"><span class="master-status <?= $item['is_active'] ? 'is-active' : 'is-inactive' ?>"><?= $item['is_active'] ? 'Aktif' : 'Nonaktif' ?></span></td>
                 <td data-label="Tagihan Terbit"><span class="badge-count"><?= (int)$item['jumlah_tagihan'] ?></span></td>
-                <td data-label="Transaksi"><span class="badge-count"><?= (int)$item['jumlah_pemakaian'] ?>x</span></td>
+                <td data-label="Transaksi"><?php if($item['jumlah_pemakaian']): ?><a class="badge-count" href="pembayaran/lihat.php?<?= htmlspecialchars(http_build_query(['fee_master_id'=>(int)$item['id'],'all_periods'=>'1'])) ?>" title="Lihat transaksi <?= htmlspecialchars($item['nama']) ?>"><?= number_format($item['jumlah_pemakaian'],0,',','.') ?>x</a><small class="fee-master-lock"><?= number_format($item['jumlah_rincian'],0,',','.') ?> rincian · Rp <?= number_format((float)$item['nominal_pemakaian'],2,',','.') ?></small><?php else: ?><span class="badge-count">0x</span><?php endif; ?><?php if($item['jumlah_batal']): ?><small class="fee-master-lock"><a href="pembayaran/lihat.php?<?= htmlspecialchars(http_build_query(['fee_master_id'=>(int)$item['id'],'all_periods'=>'1','view'=>'deleted'])) ?>"><?= (int)$item['jumlah_batal'] ?> transaksi batal</a></small><?php endif; ?></td>
                 <td data-label="Aksi" class="aksi-col">
                   <?php if(lf_reserved_master($koneksi,(int)$item['id'])): ?><span class="master-status">Pengesahan Legacy</span><?php else: ?>
                   <a class="btn-tbl btn-tbl-edit" href="master_biaya_lain.php?master_tab=<?= $masterTab ?>&amp;edit=<?= (int)$item['id'] ?>">Edit</a>
@@ -336,7 +321,7 @@ require_once __DIR__ . '/includes/master_workspace_ui.php';
                   <form method="POST" action="master_biaya_lain.php" style="display:inline" onsubmit="return confirm('Hapus master biaya <?= htmlspecialchars(addslashes($item['nama'])) ?>?')">
                     <input type="hidden" name="master_tab" value="<?= htmlspecialchars($masterTab) ?>"><input type="hidden" name="csrf_token" value="<?= htmlspecialchars($_SESSION['csrf_master_biaya_lain']) ?>" />
                     <input type="hidden" name="aksi" value="hapus" /><input type="hidden" name="id" value="<?= (int)$item['id'] ?>" />
-                    <button class="btn-tbl btn-tbl-del" type="submit" <?= ((int)$item['jumlah_pemakaian'] > 0 || (int)$item['jumlah_tagihan'] > 0) ? 'disabled title="Sudah memiliki tagihan atau transaksi"' : '' ?>>Hapus</button>
+                    <button class="btn-tbl btn-tbl-del" type="submit" <?= !$item['can_delete'] ? 'disabled title="Sudah memiliki tagihan atau riwayat transaksi"' : '' ?>>Hapus</button>
                   </form>
                   <?php endif; ?>
                   <?php if(!$item['can_delete']): ?><small class="fee-master-lock"><?= $item['reserved']?'Dikelola melalui pengesahan Legacy.':'Tidak dapat dihapus: sudah memiliki tagihan atau transaksi.' ?></small><?php endif; ?>

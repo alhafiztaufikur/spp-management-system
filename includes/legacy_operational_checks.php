@@ -20,6 +20,8 @@ function lop_problem_action(array $problem): array {
         'identity_ambiguous','identity_invalid','nis_duplicate'=>['title'=>'Identitas perlu dicocokkan','label'=>'Periksa identitas','section'=>'people'],
         'owner_review'=>['title'=>'Kelompok pemilik belum disahkan','label'=>'Sahkan kelompok','section'=>'groups'],
         'payment_review'=>['title'=>'Pembayaran perlu dilengkapi','label'=>'Periksa pembayaran','section'=>'components'],
+        'fee_transaction_held'=>['title'=>'Transaksi diarsipkan otomatis','label'=>'Lihat sumber','section'=>'components'],
+        'monthly_evidence'=>['title'=>'Bukti tagihan perlu dilengkapi','label'=>'Buka peninjauan','section'=>'people'],
         'savings_review'=>['title'=>'Saldo tabungan perlu dikonfirmasi','label'=>'Isi Jumlah Sebenarnya','section'=>'savings'],
         'additional_savings_review','additional_savings_target'=>['title'=>'Rekening tambahan perlu dikonfirmasi','label'=>'Tinjau rekening tambahan','section'=>'savings'],
         default=>['title'=>'Data perlu dilengkapi','label'=>'Buka peninjauan','section'=>'people'],

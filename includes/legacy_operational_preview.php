@@ -16,9 +16,17 @@ function lop_preview_store(string $id,array $plan,int $version,string $fingerpri
 }
 function lop_preview_load(array $draft,array $catalog,array $records,array $cfg): array {
     $file=legacy_root().'/'.$draft['job_info']['id'].'/operational-preview.json';if(is_file($file)){$data=json_decode(file_get_contents($file),true,512,JSON_THROW_ON_ERROR);if(($data['rules']??0)===LOP_VERSION&&($data['version']??0)===(int)$draft['version']&&($data['fingerprint']??'')===$catalog['manifest']['fingerprint'])return lop_preview_banks($data['preview'],$draft,$catalog,$cfg);}
-    $preview=lop_prepare($records,$cfg,(int)$draft['job_info']['unit'],$catalog['manifest']['source_date']);if(($draft['simulation']['mode']??'')==='operational'&&($draft['simulation']['rules_version']??0)===LOP_VERSION)$preview['summary']=$draft['simulation']['summary'];return lop_preview_banks($preview,$draft,$catalog,$cfg);
+    $previewCfg=$cfg;$previewCfg['_monthly_partial']=true;
+    $preview=lop_prepare($records,$previewCfg,(int)$draft['job_info']['unit'],$catalog['manifest']['source_date']);if(($draft['simulation']['mode']??'')==='operational'&&($draft['simulation']['rules_version']??0)===LOP_VERSION)$preview['summary']=$draft['simulation']['summary'];return lop_preview_banks($preview,$draft,$catalog,$cfg);
 }
 
 function lop_preview_banks(array $preview,array $draft,array $catalog,array $cfg): array {
+    $db=$GLOBALS['koneksi']??null;
+    if($db instanceof mysqli){
+        require_once __DIR__.'/history_performance.php';$seen=[];
+        foreach($preview['pending'] as $p){$v=$p['payload']??[];$seen[$p['identity'].'|'.($v['category']??'').'|'.($v['period']??'').'|'.$p['message']]=true;}
+        foreach(hp_rows($db,"SELECT * FROM legacy_op_pending WHERE batch_id=? AND code='monthly_evidence' AND resolved=0",[$draft['job_info']['id']]) as $p){$v=json_decode($p['payload'],true);$key=$p['source_identity'].'|'.($v['category']??'').'|'.($v['period']??'').'|'.$p['message'];if(isset($seen[$key]))continue;$seen[$key]=true;$preview['pending'][]=lop_pending($p['source_identity'],$p['row_key'],'obligations',$p['code'],$p['message'],$v);}
+        $preview['summary']['pending']=count($preview['pending']);$preview['summary']['review_tasks']=count(lop_pending_groups($preview));
+    }
     $index=lop_bank_index($draft['job_info'],$catalog['manifest']);foreach($preview['owners'] as $key=>&$o){$effective=$o['bank_summary']??[];$o['bank_summary']=$index[$key]??['accounts'=>0,'additional_accounts'=>0,'source_balance'=>null,'journal_balance'=>null,'status'=>'Tidak tercatat'];if(($effective['accounts']??0)>0)$o['bank_summary']=array_replace($o['bank_summary'],$effective);$fix=$cfg['op_savings'][$key]??[];$o['bank_summary']['fixed_balance']=!empty($fix['confirmed'])?($fix['amount']??null):null;}unset($o);return $preview;
 }

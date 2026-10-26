@@ -18,7 +18,7 @@ function spp_test_isolated_manifest(?mysqli $db = null): array {
         if (!isset($manifest[$key]) || !is_scalar($manifest[$key])) throw new RuntimeException('Isolated-instance manifest is incomplete.');
     }
     if (($manifest['version'] ?? 0) !== 1 || ($manifest['isolated_test'] ?? null) !== true
-        || $manifest['database'] !== 'db_spp' || $manifest['host'] !== '127.0.0.1'
+        || !preg_match('/^db_spp(?:_test[0-9]+)?$/D',(string)$manifest['database']) || $manifest['host'] !== '127.0.0.1'
         || !preg_match('/^[a-f0-9-]{36}$/Di', (string)$manifest['server_uuid'])
         || !preg_match('/^[a-f0-9-]{36}$/Di', (string)$manifest['source_server_uuid'])
         || strtolower($manifest['server_uuid']) === strtolower($manifest['source_server_uuid'])

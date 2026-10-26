@@ -124,6 +124,7 @@ if ($_SERVER['REQUEST_METHOD'] === 'POST') {
             $koneksi->begin_transaction();
             promotion_actor_lock($koneksi);
             $oldStudent = $action === 'update' ? find_student($koneksi, $id, true) : null;
+            $effectiveStudent=$oldStudent?lb_psb_effective($koneksi,$oldStudent):[];
             if ($action === 'update' && !$oldStudent) throw new RuntimeException('Data siswa tidak ditemukan.');
             [$noInduk, $name, $class, $classId] = validate_student_identity($koneksi, $_POST, $oldStudent);
             if ($oldStudent && $noInduk !== (string)$oldStudent['NO_INDUK']) {
@@ -160,7 +161,7 @@ if ($_SERVER['REQUEST_METHOD'] === 'POST') {
                 // Stored DECIMAL values use a dot, while form values use Indonesian grouping.
                 // An omitted field must retain its value, not be reparsed as a grouped amount.
                 $values[$column] = $column!=='potongan_spp_nominal'&&array_key_exists($postMap[$column],$_POST)
-                    ? student_amount($_POST[$postMap[$column]]) : (float)($oldStudent[$column]??0);
+                    ? student_amount($_POST[$postMap[$column]]) : (float)($effectiveStudent[$column]??0);
             }
             $nisDiknas = trim((string)($_POST['no_induk_diknas'] ?? $oldStudent['NO_induk_diknas'] ?? ''));
             if ($nisDiknas !== '' && !preg_match('/^[0-9]{10}$/', $nisDiknas)) {
@@ -189,9 +190,6 @@ if ($_SERVER['REQUEST_METHOD'] === 'POST') {
 
             if($values['potongan_psb_nominal']>$values['PSB'])throw new RuntimeException('Potongan PSB tidak boleh melebihi Uang PSB.');
             $asalPsb = $class==='0'?1:(int)($oldStudent['asal_psb']??0);
-            if (!$asalPsb && $values['PSB'] > (float)($oldStudent['PSB'] ?? 0) + 0.001) {
-                throw new RuntimeException('Uang PSB hanya dapat diatur untuk siswa yang pertama kali didaftarkan di kelas PSB.');
-            }
             if ($action === 'tambah' && $class === '0' && $values['PSB'] <= 0.001) {
                 throw new RuntimeException('Nominal Uang PSB wajib diisi untuk siswa kelas PSB.');
             }
@@ -244,7 +242,7 @@ if ($_SERVER['REQUEST_METHOD'] === 'POST') {
                 $stmtClass->bind_param('ii', $classId, $id); $stmtClass->execute(); $stmtClass->close();
                 $tariffSync = null;
                 $placementId = class_sync_student_current_year($koneksi, $noInduk, $classId, $spp, $pomg, $active===1, $tariffSync);
-                if ($placementId) komite_set_start_month($koneksi,$placementId,$komiteStartMonth);
+                $startChanged=$placementId?komite_set_start_month($koneksi,$placementId,$komiteStartMonth):false;
                 if ($placementId) du_create_bill_for_placement($koneksi, $placementId);
                 $stateStmt=$koneksi->prepare('UPDATE siswa SET is_active=?,asal_psb=? WHERE id=?');$stateStmt->bind_param('iii',$active,$asalPsb,$id);$stateStmt->execute();$stateStmt->close();
                 $after = find_student($koneksi, $id);
@@ -276,7 +274,7 @@ if ($_SERVER['REQUEST_METHOD'] === 'POST') {
                 $sppDiscountSync = $active === 1 && $placementId
                     ? spp_sync_student_discount($koneksi, $noInduk, $sppDiscountAmount, $placementId)
                     : ['updated' => 0, 'locked' => 0];
-                if ($placementId) komite_set_start_month($koneksi,$placementId,$komiteStartMonth);
+                $startChanged=$placementId?komite_set_start_month($koneksi,$placementId,$komiteStartMonth):false;
                 if(abs((float)$oldStudent['DAFTAR_ULANG']-$daftarUlang)>.001||abs((float)$oldStudent['potong_du']-$potongDu)>.001||abs((float)$oldStudent['tot_du']-$totDu)>.001)lb_mark_du_individual($koneksi,$noInduk,du_current_academic_year());
                 $duBillBefore = du_find_bill($koneksi, $noInduk, (int)date('n'), (int)date('Y'), true);
                 $duBillId = $placementId ? du_create_bill_for_placement($koneksi, $placementId, false) : null;
@@ -297,7 +295,7 @@ if ($_SERVER['REQUEST_METHOD'] === 'POST') {
                 $repairedComponents = array_values(array_diff($syncedComponents, $requestedComponents));
                 $lockedRequested = array_values(array_intersect($lockedComponents, $requestedComponents));
                 $masterChanged = student_snapshots_differ($before, $afterSnapshot);
-                $hasEffectiveChange = $masterChanged || count($syncedComponents) > 0;
+                $hasEffectiveChange = $masterChanged || count($syncedComponents) > 0 || !empty($startChanged);
 
                 if (!$hasEffectiveChange) {
                     $koneksi->commit();
@@ -324,6 +322,7 @@ if ($_SERVER['REQUEST_METHOD'] === 'POST') {
 
                 $messageParts = [];
                 if ($masterChanged) $messageParts[] = "Data siswa $name berhasil diperbarui.";
+                if (!empty($startChanged)) $messageParts[] = 'Bulan mulai tagihan Komite diperbarui.';
                 if ($updatedComponents) {
                     $messageParts[] = count($updatedComponents) . ' komponen tagihan tahun ' . $syncAudit['tahun_ajaran'] . ' ikut diperbarui.';
                 }
@@ -498,7 +497,7 @@ $resetQuery = $_GET;
 unset($resetQuery['edit'], $resetQuery['reset_form']);
 $resetQuery['reset_form'] = '1';
 $resetFormUrl = 'daftar.php?' . http_build_query($resetQuery);
-$formStudent = $editStudent ?? [];
+$formStudent = $editStudent ? lb_psb_effective($koneksi,$editStudent) : [];
 $editGraduate=$editStudent&&student_has_graduated($koneksi,$editStudent);
 if($editGraduate)$classOptions=array_values(array_filter($classOptions,static fn($c)=>(int)$c['id']===(int)$editStudent['master_kelas_id']));
 $komiteStartMonth = '07';

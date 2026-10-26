@@ -1,3 +1,7 @@
+> Pembaruan 24 Oktober 2026: ikuti [prosedur migrasi lengkap](LEGACY_MIGRATION_RUNBOOK.md). U_SORGA adalah Komite/POMG pada SD, SMP, SMA; keputusan ini menggantikan aturan lama.
+
+> Pembaruan 26 Oktober 2026: unggahan Migrasi Penuh memakai pipeline otomatis yang sama dengan runner Codex. Pelacakan biaya lain per struk/slot tidak membutuhkan pemetaan pengguna. Workflow 10, operasional 13, otomasi 3; metadata 1–2 tetap terbaca. [Rincian dan pengujian sebelum apply berikutnya](LEGACY_FEE_TRACE_20261026.md).
+
 # Migrasi penuh dari sistem lama
 
 **Peninjauan operasional 19 Oktober 2026:** nama biaya dari master Legacy, saran Alumni, Rekening Uji, master nonaktif tanpa tarif, dan Saldo FIX dengan penyesuaian beraudit tersedia pada mode operasional. Lihat [langkah terbaru](LEGACY_OPERATIONAL_MIGRATION.md#peninjauan-kelompok-komponen-dan-saldo-fix--19-oktober-2026). Memerlukan pembaruan skema CLI pada database tujuan, lalu restart worker; pekerjaan ini tidak memasangnya pada database utama/Copy.
@@ -6,7 +10,7 @@
 
 Panduan layar terbaru: [Cara menggunakan Import Legacy](LEGACY_UI_GUIDE.md). Pilihan awal terdiri dari Migrasi Penuh, Impor Siswa, dan Histori Keuangan. Tahap serta bagian peninjauan dapat dibuka kembali melalui URL dan tetap bekerja tanpa JavaScript.
 
-**Pengesahan komponen, 17 Oktober 2026:** yayasan memastikan **POMG adalah Komite bulanan**. Usulan tarif siswa mengambil POMG sumber; nominal tetap disahkan pada aktivasi atau peninjauan migrasi. Kelompok dapat mengikuti nominal POMG tiap siswa atau menggunakan nominal kelompok yang dipilih secara eksplisit. Rincian pembayaran bernama tepat POMG diusulkan sebagai Komite; arsip sumber tetap utuh dan aturan total/rincian tetap mencegah penghitungan ganda. U_SORGA tidak dipetakan ke Komite. Aturan peninjauan menjadi versi 5; simulasi/konfirmasi lama harus diperiksa ulang, dan worker perlu dimulai ulang setelah source diperbarui.
+**Pengesahan komponen, 17 Oktober 2026:** yayasan memastikan **POMG adalah Komite bulanan**. Usulan tarif siswa mengambil POMG sumber; nominal tetap disahkan pada aktivasi atau peninjauan migrasi. Kelompok dapat mengikuti nominal POMG tiap siswa atau menggunakan nominal kelompok yang dipilih secara eksplisit. Rincian pembayaran bernama tepat POMG diusulkan sebagai Komite; arsip sumber tetap utuh dan aturan total/rincian tetap mencegah penghitungan ganda. U_SORGA dipetakan ke Komite/POMG pada semua unit (keputusan 24 Oktober 2026). Aturan peninjauan menjadi versi 5; simulasi/konfirmasi lama harus diperiksa ulang, dan worker perlu dimulai ulang setelah source diperbarui.
 
 Mode **Migrasi Penuh** ditujukan untuk server yayasan dengan database SistemSPP yang bersih. Pengerjaan fitur dan pengujian tidak mengimpor data ke database operasional PC pengembangan.
 
@@ -41,7 +45,7 @@ Alur utama: **Unggah → Periksa Hasil → Selesaikan Pengecualian → Konfirmas
 1. **Siapkan dan unggah.** Pilih unit tujuan kosong, buka Import Legacy → Migrasi Penuh, lalu periksa kartu kesiapan. Tentukan waktu peralihan WIB dan hentikan pencatatan sistem lama saat membuat backup final. Unggah satu `.dat` untuk unit tersebut. Pemeriksaan sumber berjalan di worker; halaman memperbarui status dan tetap menyediakan Muat Ulang.
 2. **Periksa hasil.** Isi waktu peralihan, tahun ajaran, dan referensi bukti yayasan. Buka Aturan Pembayaran Lama untuk mengesahkan hubungan Lain-Lain/rincian, potongan SPP, dan pembayaran DU berdasarkan contoh sumber. Ringkasan menunjukkan kelompok kelas, variasi tarif sumber, serta tarif Master SPP.
 3. **Sahkan kelompok dan selesaikan pengecualian.** Buka Siswa & Kelas, Komponen Biaya, Tabungan, atau Tunggakan. Pada pengesahan kelompok, pilih kelas sumber dan Tampilkan Kelompok. Status/kelas/tarif, usulan komponen, saldo cocok, serta kewajiban memiliki pratinjau tersendiri. Pilih siswa tertentu bila diperlukan; tanpa pilihan individual, seluruh kelas sumber menjadi sasaran. Periksa daftar nama dan perbandingan sebelum → sesudah, lalu klik Sahkan Data. Kembali Mengubah mengembalikan isian tanpa pengesahan. Pergantian kelas sumber memuat anggota baru dan membersihkan pilihan sementara. Pilihan yang sudah dikoreksi dipertahankan kecuali opsi penggantian dipilih. Nominal SPP yang berbeda dengan tarif efektif kelas ditahan untuk koreksi individual; selisih tidak otomatis menjadi potongan.
-   Untuk komponen, pilihan Histori Saja tidak meminta tarif atau membuat master. U_SORGA diusulkan sebagai Histori Saja berdasarkan kebijakan penghentian. SPP/DU memakai usulan sumber; komponen lain dapat tetap menjadi histori atau dipasangkan ke master. Kolom tabungan pada pembayaran tetap memerlukan pengesahan hubungan dengan jurnal.
+   Untuk komponen, pilihan Histori Saja tidak meminta tarif atau membuat master. U_SORGA dipetakan ke Komite/POMG berdasarkan keputusan 24 Oktober 2026. SPP/DU memakai usulan sumber; komponen lain dapat tetap menjadi histori atau dipasangkan ke master. Kolom tabungan pada pembayaran tetap memerlukan pengesahan hubungan dengan jurnal.
    Untuk kewajiban, isi hanya periode/status/sisa nominal yang sama pada siswa terpilih; rincian individual dapat diperbaiki lewat Tinjau Siswa. Bukti dan persetujuan seluruh kewajiban wajib diisi, termasuk bila tidak ada sisa tambahan. Status DU tahun peralihan tetap wajib dinyatakan untuk siswa aktif. Rekening berselisih dan identitas ambigu ditangani pada daftar pengecualian. Ketiadaan tagihan tidak otomatis berarti lunas.
 4. **Jalankan simulasi dan konfirmasi.** Simulasi berjalan dalam antrean agar permintaan browser tidak menunggu perhitungan besar. Selesaikan Harus Diperbaiki, tinjau catatan histori, lalu buka konfirmasi akhir. Periksa siswa aktif/alumni, histori, saldo, tunggakan, mulai penagihan, dan master baru nonaktif. Perubahan sumber, master, atau draf membatalkan hasil lama; konfirmasi final berlaku lima menit.
 5. **Tunggu Selesai.** Worker menguji pemulihan backup tujuan, menerapkan satu unit dalam transaksi, mencocokkan hasil, lalu menguji backup hasil. Gunakan SistemSPP setelah Migrasi Selesai. Jika tertahan sesudah commit, gunakan Verifikasi Ulang; jangan mengunggah ulang sebagai sinkronisasi atau mengubah status secara manual.
@@ -138,3 +142,11 @@ Backup terbaru harus diperiksa dan disimulasikan sendiri. Informasi yang tidak p
 ## Backup terbaru tanpa ekstensi ? 17 Oktober 2026
 
 Impor mendukung `.dat`, `.bak`, dan file tanpa ekstensi melalui pemeriksaan isi dan profil 2019/2026. Lihat [panduan backup terbaru](LEGACY_BACKUP_2026.md). Dukungan pembacaan tidak mengesahkan saldo, identitas, atau kewajiban yang masih bermasalah.
+
+
+Pembaruan DU 26 Oktober 2026: alur sumber baru dan rekonsiliasi existing memakai
+perencana DU yang sama sampai tagihan siswa serta Master Daftar Ulang. Aturan
+workflow 11, operasional 15, otomasi 4, billing 3, DU 1 menggantikan versi sebelumnya.
+Lihat [prosedur DU wajib](LEGACY_MIGRATION_RUNBOOK.md#pelacakan-du-wajib-untuk-sumber-baru-dan-existing).
+Tahun draf dapat diterbitkan per siswa yang terbukti, tanpa menunggu semua kelas.
+Rekap bayar_du bukan kas tambahan; bukti tidak lengkap menjadi pengecualian otomatis.

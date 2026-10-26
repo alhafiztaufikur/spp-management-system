@@ -72,8 +72,9 @@ function lful_save(mysqli $db,int $actor,int $unit,string $id,int $version,array
     if(isset($config['mode'])&&!in_array($config['mode'],['archive','operational'],true))throw new DomainException('Mode tidak valid.');
     if(($config['mode']??'')==='operational')lop_require($db);
     if(($config['mode']??'')==='operational')foreach($config['op_groups']??[] as $key=>$group){if(!is_array($group))throw new DomainException('Kelompok tidak valid.');if(!empty($group['target_class_id'])){$class=class_find($db,(int)$group['target_class_id'],true);if(!$class||$class['is_placeholder']||(int)$class['tingkat']===0)throw new DomainException('Rombel tujuan harus kelas akademik aktif pada unit ini.');$group['level']=(int)$class['tingkat'];$group['rombel']=$class['kode_rombel'];}else{unset($group['level'],$group['rombel']);}$config['op_groups'][$key]=$group;}
-    foreach(['cutoff','year_id','evidence','other_policy','discount_policy','du_policy','accounting_reason','notes_accepted','workflow_version','op_bulk_audit'] as $k)if(array_key_exists($k,$patch))$config[$k]=$patch[$k];
-    foreach(['op_import_unmatched','op_accept_matching_savings'] as $flag)if(array_key_exists($flag,$patch)){
+    if(array_key_exists('du_target_year',$patch)&&(!is_string($patch['du_target_year'])||$patch['du_target_year']!==du_current_academic_year()))throw new DomainException('Tahun DU harus sama dengan tahun ajaran berjalan; buat simulasi ulang.');
+    foreach(['cutoff','year_id','evidence','other_policy','discount_policy','du_policy','accounting_reason','notes_accepted','workflow_version','op_bulk_audit','du_target_year'] as $k)if(array_key_exists($k,$patch))$config[$k]=$patch[$k];
+    foreach(['op_import_unmatched','op_accept_matching_savings','op_preserve_unproven_balances'] as $flag)if(array_key_exists($flag,$patch)){
         if(!is_bool($patch[$flag]))throw new DomainException('Pilihan persetujuan tidak valid.');$config[$flag]=$patch[$flag];
     }
     if(isset($patch['op_bulk_audit'])){
@@ -113,9 +114,19 @@ function lful_date(mixed $value): ?string {
     $v=$m[1].' '.($m[2]??'00:00:00');$dt=DateTimeImmutable::createFromFormat('!Y-m-d H:i:s',$v);if(!$dt||$dt->format('Y-m-d H:i:s')!==$v)throw new DomainException('Tanggal sumber tidak valid.');return $v;
 }
 function lful_period(string $v): bool {return preg_match('/^[12][0-9]{3}-(0[1-9]|1[0-2])$/D',$v)===1||preg_match('/^([12][0-9]{3})\/([12][0-9]{3})$/D',$v,$m)===1&&(int)$m[2]===(int)$m[1]+1;}
+/** JSON columns reorder object keys, including nested trace evidence. Lists stay ordered. */
+function lful_projection_metadata(array $metadata): string {
+    $normalize=static function(mixed $value)use(&$normalize):mixed {
+        if(!is_array($value))return $value;
+        if(!array_is_list($value))ksort($value,SORT_STRING);
+        foreach($value as &$child)$child=$normalize($child);unset($child);
+        return $value;
+    };
+    return lf_json($normalize($metadata));
+}
 function lful_projection_fingerprint(array $payments,array $journals,array $resolved=[]): string {
     $logical=array_flip($resolved);
-    $hashes=[];foreach($payments as $p){$items=[];foreach($p['items'] as $i){$entry=array_map('strval',[$i['column'],$logical[$i['category']]??$i['category'],$i['label'],$i['amount']]);if(($i['migration']['version']??0)===LMA_VERSION)$entry[]=lf_canonical($i['migration']);$items[]=$entry;}sort($items);$hashes[]=hash('sha256',lf_json(['payment',array_map(static fn($v)=>(string)($v??''),[$p['identity'],$p['row_key'],$p['source_table'],$p['date'],$p['operator'],$p['period'],$p['class'],$p['total']]),$items]));}
+    $hashes=[];foreach($payments as $p){$items=[];foreach($p['items'] as $i){$entry=array_map('strval',[$i['column'],$logical[$i['category']]??$i['category'],$i['label'],$i['amount']]);if(lma_metadata_supported($i['migration']['version']??0)){$meta=$i['migration'];if(isset($meta['target_category'])){$meta['target_category']=$logical[$meta['target_category']]??$meta['target_category'];unset($meta['target_master_id']);}$entry[]=$meta['version']>=3?lful_projection_metadata($meta):lf_canonical($meta);}$items[]=$entry;}sort($items);$hashes[]=hash('sha256',lf_json(['payment',array_map(static fn($v)=>(string)($v??''),[$p['identity'],$p['row_key'],$p['source_table'],$p['date'],$p['operator'],$p['period'],$p['class'],$p['total']]),$items]));}
     foreach($journals as $j)$hashes[]=hash('sha256',lf_json(['journal',array_map(static fn($v)=>(string)($v??''),[$j['identity'],$j['row_key'],$j['date'],$j['operator'],$j['incoming'],$j['outgoing']])]));sort($hashes,SORT_STRING);return hash('sha256',implode("\n",$hashes));
 }
 /** Pure projection builder: raw archive never becomes an editable contemporary receipt. */
@@ -136,12 +147,12 @@ function lful_payment(array $r,array $config,array $masterNames): ?array {
     }
     $items=[];$total=0;foreach($values as $c=>$amount){if($amount===0)continue;$key=lful_component_key($table,$c,$raw);$map=$config['components'][$key]??null;
         if(!$map)throw new DomainException('Komponen belum dipetakan: '.$key.'. Tambahkan master biaya bila belum tersedia.');
-        $category=(string)($map['category']??'');
+        $category=$c==='U_SORGA'?'komite':(string)($map['category']??'');
         if(lful_savings_column($c)){
             if($category!=='savings_reference'||($map['confirmed']??false)!==true||mb_strlen(trim((string)($map['reason']??'')))<10)throw new DomainException('Sahkan hubungan kolom tabungan dengan jurnal; tidak boleh menjadi penerimaan biaya: '.$key);
             continue;
         }
-        $label=$category===lful_history_category($key)?($map['source_name']??$config['_component_names'][$key]??lful_history_label($table,$c,$raw)):lful_category_label($category,$masterNames,$config['new_masters']??[]);
+        $label=preg_match('/^histori:[a-f0-9]{32}$/D',$category)?($map['source_name']??$config['_component_names'][$key]??lful_history_label($table,$c,$raw)):lful_category_label($category,$masterNames,$config['new_masters']??[]);
         if(!empty($config['_component_conflicts'][$key])){
             $expected=$config['_component_conflicts'][$key];$accepted=$map['accepted_source_names']??[];
             if(!is_array($accepted))$accepted=[];sort($expected,SORT_STRING);sort($accepted,SORT_STRING);

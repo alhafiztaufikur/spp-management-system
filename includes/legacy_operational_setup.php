@@ -3,7 +3,11 @@
 function lop_source_setup(array $records, array $manifest, array $settings, int $unit): array
 {
     // Only the initial preparation opts in. Published and previously prepared jobs keep their rules.
-    if(!isset($settings['mode']))$settings['automation_version']=LMA_VERSION;
+    if(!isset($settings['mode'])){
+        $settings['automation_version']=LMA_VERSION;
+        $settings['op_preserve_unproven_balances']=true;
+        require_once __DIR__.'/daftar_ulang.php';$settings['du_target_year']=du_current_academic_year();
+    }
     $settings['source_fingerprint'] = $manifest['fingerprint'];
     $settings['mode'] = 'operational';
     $reason = 'Menggunakan data pada backup Legacy yang diperiksa; sumber asli tetap tersimpan.';
@@ -46,5 +50,8 @@ function lop_default_year(mysqli $db): int
 {
     $start = (int)date('Y') - ((int)date('n') < 7 ? 1 : 0);
     $year = lf_one($db, "SELECT id FROM tahun_ajaran WHERE label=? AND status<>'closed'", [$start.'/'.($start+1)]);
-    return (int)($year['id']??0);
+    if ($year) return (int)$year['id'];
+    require_once __DIR__.'/spp_billing.php';
+    $master=spp_master_ensure_year($db,$start.'/'.($start+1));
+    return (int)$master['tahun_ajaran_id'];
 }

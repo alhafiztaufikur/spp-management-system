@@ -28,13 +28,13 @@ function lop_bulk_patch(array $records,array $catalog,array $settings,int $unit,
         $proposals=$settings['new_masters']??[];
         foreach($catalog['components'] as $c){
             $key=$c['key'];$old=$settings['components'][$key]??[];
-            if(lma_enabled($settings)&&preg_match('/^JUMLAH[1-4]$/D',$c['column'])){
+            if(preg_match('/^JUMLAH[1-4]$/D',$c['column'])){
                 $patch['components'][$key]=$old+['category'=>lful_history_category($key),'reason'=>$reason,'confirmed'=>true,'automatic_mapping'=>true];++$counts['components'];continue;
             }
             $category=$old['category']??'';
             // Keep meaningful explicit mappings; upgrade automatic history-only suggestions.
             if(!empty($c['savings']))$category='savings_reference';
-            elseif($c['column']==='U_SORGA')$category=lful_history_category($key);
+            elseif($c['column']==='U_SORGA')$category='komite';
             elseif(!empty($c['suggestion']))$category=$category&&!str_starts_with($category,'histori:')?$category:$c['suggestion'];
             elseif(!$category||str_starts_with($category,'histori:')){
                 $sourceNames=$c['source_names']??[];sort($sourceNames,SORT_STRING);
@@ -42,7 +42,7 @@ function lop_bulk_patch(array $records,array $catalog,array $settings,int $unit,
                 if(mb_strlen($name)>100)$name=mb_substr($name,0,88).' '.substr(hash('sha256',$name),0,10);
                 $existing=null;foreach($masters as $m)if(mb_strtolower(trim($m['nama']))===mb_strtolower(trim($name))){$existing=$m;break;}
                 if($existing)$category='biaya_lain:'.$existing['id'];
-                else{$proposalKey=lful_proposal_key('legacy-fee:'.$name);$category=lful_new_category($proposalKey);
+                else{$proposalKey=lful_proposal_key('legacy-fee:'.mb_strtolower(trim($name)));$category=lful_new_category($proposalKey);
                     $proposals[$proposalKey]=array_replace(['name'=>$name,'nominal'=>'0.00','tariff_pending'=>true,'reason'=>$reason],$proposals[$proposalKey]??[],['confirmed'=>true]);}
             }
             $map=array_replace($old,['category'=>$category,'confirmed'=>true,'reason'=>$old['reason']??$reason]);

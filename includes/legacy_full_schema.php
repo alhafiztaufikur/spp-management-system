@@ -30,11 +30,23 @@ function legacy_full_schema_apply(mysqli $db): void {
     foreach(['tagihan_spp_data'=>'spp','tagihan_komite_data'=>'komite','tagihan_daftar_ulang_data'=>'daftar_ulang','tagihan_biaya_lain_data'=>'other'] as $table=>$category){
         $period=match($category){'spp','komite'=>"CONCAT(NEW.tahun,'-',LPAD(NEW.bulan,2,'0'))",'daftar_ulang'=>'NEW.tahun_ajaran_snapshot',default=>"DATE_FORMAT(COALESCE(NEW.created_at,NOW()),'%Y-%m')"};
         $cat=$category==='other'?"CONCAT('biaya_lain:',NEW.master_biaya_lain_id)":"'$category'";
-        $prior=in_array($category,['spp','komite'],true)?" OR $period<JSON_UNQUOTE(JSON_EXTRACT(fs.settings,'$.start_period'))":'';
+        $prior=''; // Cutover is metadata, not an automatic coverage disposition.
         $coveragePeriod=$category==='other'?'TRUE':"c.period=$period";
         $name='lful_coverage_'.substr(hash('sha256',$table),0,16);
         $db->query("DROP TRIGGER IF EXISTS $name");
         $db->query("CREATE TRIGGER $name BEFORE INSERT ON $table FOR EACH ROW BEGIN IF COALESCE(@legacy_full_apply,0)<>1 AND EXISTS(SELECT 1 FROM legacy_full_students_data fs JOIN siswa_data s ON s.id=fs.student_id AND s.unit_id=fs.unit_id WHERE fs.unit_id=NEW.unit_id AND s.NO_INDUK=NEW.no_induk AND (EXISTS(SELECT 1 FROM legacy_full_coverage_data c WHERE c.unit_id=fs.unit_id AND c.student_id=fs.student_id AND c.category=$cat AND $coveragePeriod)$prior)) THEN SIGNAL SQLSTATE '45000' SET MESSAGE_TEXT='Periode sudah tercakup migrasi Legacy'; END IF; END");
     }
     foreach(['bayar_data'=>'TGL_BYR','transaksi_m_data'=>'TANGGAL','transaksi_k_data'=>'TANGGAL'] as $table=>$column){$name='lful_cutoff_'.substr(hash('sha256',$table),0,18);if(!(int)$db->query("SELECT COUNT(*) FROM information_schema.TRIGGERS WHERE TRIGGER_SCHEMA=DATABASE() AND TRIGGER_NAME='$name'")->fetch_row()[0])$db->query("CREATE TRIGGER $name BEFORE INSERT ON $table FOR EACH ROW BEGIN IF COALESCE(@legacy_full_apply,0)<>1 AND EXISTS(SELECT 1 FROM legacy_full_batches_data WHERE unit_id=NEW.unit_id AND NEW.`$column`<cutoff) THEN SIGNAL SQLSTATE '45000' SET MESSAGE_TEXT='Tanggal transaksi mendahului peralihan Legacy'; END IF; END");}
+}
+
+/** Narrow upgrade for installed databases; no table/data changes or other guards. */
+function legacy_monthly_schema_upgrade(mysqli $db): int {
+    if(PHP_SAPI!=='cli')throw new LogicException('Gunakan runner CLI.');$changed=0;
+    foreach(['tagihan_spp_data'=>'spp','tagihan_komite_data'=>'komite'] as $table=>$category){
+        $name='lful_coverage_'.substr(hash('sha256',$table),0,16);
+        $row=$db->query("SELECT ACTION_STATEMENT FROM information_schema.TRIGGERS WHERE TRIGGER_SCHEMA=DATABASE() AND TRIGGER_NAME='$name'")->fetch_assoc();
+        if($row&&!str_contains($row['ACTION_STATEMENT'],'start_period'))continue;
+        $db->query("DROP TRIGGER IF EXISTS $name");
+        $db->query("CREATE TRIGGER $name BEFORE INSERT ON $table FOR EACH ROW BEGIN IF COALESCE(@legacy_full_apply,0)<>1 AND EXISTS(SELECT 1 FROM legacy_full_students_data fs JOIN siswa_data s ON s.id=fs.student_id AND s.unit_id=fs.unit_id WHERE fs.unit_id=NEW.unit_id AND s.NO_INDUK=NEW.no_induk AND EXISTS(SELECT 1 FROM legacy_full_coverage_data c WHERE c.unit_id=fs.unit_id AND c.student_id=fs.student_id AND c.category='$category' AND c.period=CONCAT(NEW.tahun,'-',LPAD(NEW.bulan,2,'0')))) THEN SIGNAL SQLSTATE '45000' SET MESSAGE_TEXT='Periode sudah tercakup migrasi Legacy'; END IF; END");$changed++;
+    }return $changed;
 }

@@ -46,7 +46,7 @@ $visibleComponents=array_values(array_filter($catalog['components'],static funct
             <?php endif; ?>
           </select>
         </label>
-        <label>Alasan / bukti pemetaan<textarea name="components[<?= lful_e($c['key']) ?>][reason]" minlength="10" maxlength="1000"><?= lful_e($map['reason']??($c['column']==='U_SORGA'?'U_SORGA sudah dihentikan; dipertahankan sebagai histori tanpa tagihan baru.':'')) ?></textarea></label>
+        <label>Alasan / bukti pemetaan<textarea name="components[<?= lful_e($c['key']) ?>][reason]" minlength="10" maxlength="1000"><?= lful_e($map['reason']??($c['column']==='U_SORGA'?'U_SORGA adalah pembayaran Komite/POMG pada semua unit.':'')) ?></textarea></label>
         <?php if($c['savings']): ?><label><input type="checkbox" name="components[<?= lful_e($c['key']) ?>][confirmed]" value="1" <?= !empty($map['confirmed'])?'checked':'' ?>> Saya sudah memeriksa hubungan nominal ini dengan jurnal tabungan; tidak dihitung sebagai pembayaran biaya.</label><?php endif; ?>
         <details><summary>Contoh bukti sumber</summary><ul>
         <?php foreach($c['evidence'] as $e): ?><li>NIS <?= lful_e($e['student']??'Tidak tercatat') ?> · <?= lful_e($e['date']?spp_date_label($e['date'],true):'Tanggal tidak tercatat') ?> · <?= lful_e($e['amount']) ?><?php if($e['row_key']): ?><br><small><?= lful_e($e['row_key']) ?></small><?php endif; ?></li><?php endforeach; ?>

@@ -23,12 +23,17 @@ function db_backup_private_path(string $path): string {
     if($normal===$web||str_starts_with($normal,$web.'/')||str_starts_with($normal,'c:/laragon/www/'))throw new RuntimeException('Backup storage must be outside the web root.');
     return $resolved;
 }
-function db_backup_config_path(): string { return getenv('SPP_BACKUP_CONFIG')?:'C:/laragon/data/spp-backup/db_spp/config.json'; }
+function db_backup_config_path(): string {
+    if ($override=getenv('SPP_BACKUP_CONFIG')) return $override;
+    $database=defined('DB_NAME')?DB_NAME:(getenv('SPP_DB_NAME')?:'db_spp');
+    if (!preg_match('/^db_spp(?:_(?:audit|test)_[a-z0-9_]+|_test[0-9]+)?$/D',$database)) throw new RuntimeException('Backup target invalid.');
+    return 'C:/laragon/data/spp-backup/'.$database.'/config.json';
+}
 function db_backup_config(): array {
     $path=db_backup_private_path(db_backup_config_path());
     $c=json_decode(file_get_contents($path),true,32,JSON_THROW_ON_ERROR);
     foreach(['app_root','mysql_bin','php_executable','storage_root','database','host','port','server_uuid','datadir','source_defaults_file','installed_at'] as $key)if(!isset($c[$key])||!is_scalar($c[$key]))throw new RuntimeException('Backup configuration incomplete.');
-    if(($c['version']??0)!==1||!preg_match('/^db_spp(?:_audit_[a-z0-9_]+)?$/D',(string)$c['database'])||!in_array($c['host'],['127.0.0.1','localhost','::1'],true)||filter_var($c['port'],FILTER_VALIDATE_INT,['options'=>['min_range'=>1,'max_range'=>65535]])===false)throw new RuntimeException('Backup target invalid.');
+    if(($c['version']??0)!==1||!preg_match('/^db_spp(?:_(?:audit|test)_[a-z0-9_]+|_test[0-9]+)?$/D',(string)$c['database'])||!in_array($c['host'],['127.0.0.1','localhost','::1'],true)||filter_var($c['port'],FILTER_VALIDATE_INT,['options'=>['min_range'=>1,'max_range'=>65535]])===false)throw new RuntimeException('Backup target invalid.');
     if(db_backup_normal_path(realpath($c['app_root'])?:'')!==db_backup_normal_path(realpath(__DIR__.'/..')))throw new RuntimeException('Backup application identity differs.');
     $c['storage_root']=db_backup_private_path($c['storage_root']); $c['source_defaults_file']=db_backup_private_path($c['source_defaults_file']);
     if(!is_dir($c['storage_root'].'/jobs'))throw new RuntimeException('Backup storage is not installed.');

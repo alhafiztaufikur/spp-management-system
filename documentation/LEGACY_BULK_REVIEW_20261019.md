@@ -1,3 +1,5 @@
+> Pembaruan 24 Oktober 2026: ikuti [prosedur migrasi lengkap](LEGACY_MIGRATION_RUNBOOK.md). U_SORGA adalah Komite/POMG pada SD, SMP, SMA; keputusan ini menggantikan aturan lama.
+
 # Persetujuan massal Migrasi Operasional Legacy
 
 ## Cara menggunakan
@@ -13,7 +15,7 @@ Saldo sebenarnya menjadi **saldo akhir utama**, bukan tambahan setoran. Contoh: 
 ## Aturan persetujuan
 
 - Alumni yang dikenali disahkan per kelompok/tahun. Kelompok khusus belum diklasifikasikan ditampung sebagai rekening nonakademik. Identitas transaksi tanpa master siswa ditampung sebagai **Pemilik Legacy tanpa master siswa**, menggunakan ID internal dan identitas sumber; tidak dibuatkan siswa/NIS palsu atau SPP otomatis.
-- Nama biaya mengikuti master Legacy; nama yang sama berbagi usulan. Jika satu kode memiliki beberapa nama, persetujuan massal mempertahankan gabungan nama sumber dan setiap rincian pembayaran. Usulan baru dibuat nonaktif dengan **Tarif belum ditetapkan**, bukan biaya gratis. POMG tetap Komite, U_SORGA tetap Histori Saja.
+- Nama biaya mengikuti master Legacy; nama yang sama berbagi usulan. Jika satu kode memiliki beberapa nama, persetujuan massal mempertahankan gabungan nama sumber dan setiap rincian pembayaran. Usulan baru dibuat nonaktif dengan **Tarif belum ditetapkan**, bukan biaya gratis. POMG tetap Komite, U_SORGA menjadi Komite/POMG pada semua unit (keputusan 24 Oktober 2026).
 - Jika U_LAIN nol, rincian yang benar-benar tersimpan menjadi nominal pembayaran. Jika total sudah mencakup rincian, keduanya dihitung sekali. Total positif yang bertentangan dengan rincian tetap ditampilkan sebagai pengecualian.
 - Tabungan utama yang cocok tidak perlu diisi ulang. Untuk tambahan yang cocok dan memiliki satu pasangan utama yang jelas, ringkasan massal menampilkan saldo lama → baru sebelum disahkan. Pengesahan saldo manual yang sudah tersimpan dipertahankan.
 - Masalah ditampilkan menurut kelompok penyebab dan jumlah catatan terkait. Angka kelompok masalah berbeda dari jumlah transaksi sumber; rincian dan arsip tidak dibuang untuk mengecilkan angka.

@@ -1,6 +1,7 @@
 # IDE and Editor Files
 .vscode/
 .idea/
+.codex-attachments/
 *.suo
 *.ntvs*
 *.njsproj

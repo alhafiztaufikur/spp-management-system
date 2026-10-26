@@ -75,7 +75,9 @@ function transaction_report_component_totals(mysqli $db,string $start,string $en
 function transaction_report_components(mysqli $db,array $rows): array {
     $out=[];$items=transaction_report_item_sql($db);
     foreach(array_chunk($rows,500) as $chunk){
-        $selected=[];foreach($chunk as $row)$selected[]='SELECT '.(int)$row['id'].' id,'.(int)$row['unit_id'].' unit_id';
+        foreach(mh_receipts_many($db,$chunk) as $id=>$receipt)foreach($receipt['items'] as $item){$value=round((float)$item['amount'],2);$out[$id][]=$item['label'].': Rp '.number_format($value,$value===floor($value)?0:2,',','.');}
+        $selected=[];foreach($chunk as $row)if((int)$row['id']>0)$selected[]='SELECT '.(int)$row['id'].' id,'.(int)$row['unit_id'].' unit_id';
+        if(!$selected)continue;
         foreach(hp_rows($db,'WITH chosen AS ('.implode(' UNION ALL ',$selected).") SELECT * FROM ($items) items ORDER BY payment_id,CASE WHEN payment_id>0 THEN CASE component_key WHEN 'psb' THEN 1 WHEN 'spp' THEN 2 WHEN 'komite' THEN 3 WHEN 'potongan_spp' THEN 4 WHEN 'daftar_ulang' THEN 6 ELSE 5 END ELSE 0 END,detail_order") as $item){
             $value=round((float)$item['amount'],2);
             $out[(int)$item['payment_id']][]=$item['label'].': Rp '.number_format($value,$value===floor($value)?0:2,',','.');

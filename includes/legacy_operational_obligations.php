@@ -13,6 +13,8 @@ function lop_create_payable(mysqli $db,int $unit,int $actor,array $owner,array $
     return (int)lf_one($db,'SELECT bill_id FROM legacy_debts WHERE student_id=? AND obligation_key=?',[$student['id'],$key])['bill_id'];
 }
 function lop_apply_obligations(mysqli $db,int $unit,int $actor,string $batch,int $sourceId,array $sim,array $targets): void {
+    $feeLocks=[];foreach($sim['owners'] as $person)foreach($person['decision']['coverage']??[] as $coverage)$feeLocks[]=$coverage;
+    other_fee_lock_items($db,$unit,$feeLocks);
     foreach($sim['owners'] as $identity=>$person){if(!$person['ready']||!$person['student'])continue;$ownerId=(int)$targets[$identity]['id'];$owner=lf_one($db,'SELECT * FROM legacy_op_owners WHERE id=? FOR UPDATE',[$ownerId]);
         foreach($person['decision']['coverage']??[] as $coverage){
             $category=(string)($coverage['category']??'');$period=(string)($coverage['period']??'');$evidence=trim((string)($coverage['evidence']??''));

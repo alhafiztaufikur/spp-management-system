@@ -1,3 +1,7 @@
+> Pembaruan 24 Oktober 2026: ikuti [prosedur migrasi lengkap](LEGACY_MIGRATION_RUNBOOK.md). U_SORGA adalah Komite/POMG pada SD, SMP, SMA; keputusan ini menggantikan aturan lama.
+
+> Pembaruan 26 Oktober 2026: rincian biaya lain dipetakan dan dilacak otomatis pada unggahan GUI dan runner Codex. Kode kosong/ambigu tetap diterima dengan status belum teridentifikasi; pengguna tidak wajib mengesahkan setiap komponen. Jalur manual merupakan koreksi opsional. Tidak ada filter/menu baru. [Alur dan batas pengujian](LEGACY_FEE_TRACE_20261026.md).
+
 # Menggunakan Import Legacy
 
 ## Membaca hasil migrasi yang sudah selesai
@@ -45,7 +49,7 @@ Setelah impor siswa, pilih **Aktifkan Siswa Legacy**. Setelah arsip keuangan ter
 
 Pada **Aktifkan & Tempatkan**, pilih kelas/rombel dan tahun ajaran. SPP mengikuti master; **POMG pada sumber Legacy adalah Komite** dan diusulkan sebagai nominal bulanan, lalu tetap diperiksa sebelum konfirmasi. Jika JavaScript tidak aktif, gunakan **Tampilkan Tarif** setelah memilih kelas/tahun. Validasi gagal mempertahankan siswa dan isian. Aktivasi hanya membuat penempatan awal; tagihan diterbitkan melalui master setelahnya.
 
-Pada Migrasi Penuh, usulan Komite juga mengambil POMG masing-masing siswa. Pengesahan kelompok dapat memakai **Gunakan Komite dari POMG masing-masing siswa**; lepas pilihan ini bila ingin menetapkan nominal kelompok secara eksplisit. Koreksi individual tersimpan tetap dilindungi. POMG pada rincian pembayaran diusulkan ke Komite tanpa menjumlahkan ulang total Lain-Lain. U_SORGA tetap Histori Saja.
+Pada Migrasi Penuh, usulan Komite juga mengambil POMG masing-masing siswa. Pengesahan kelompok dapat memakai **Gunakan Komite dari POMG masing-masing siswa**; lepas pilihan ini bila ingin menetapkan nominal kelompok secara eksplisit. Koreksi individual tersimpan tetap dilindungi. POMG pada rincian pembayaran diusulkan ke Komite tanpa menjumlahkan ulang total Lain-Lain. U_SORGA menjadi Komite/POMG pada semua unit (keputusan 24 Oktober 2026).
 
 Formulir utama tetap bekerja tanpa JavaScript. Saat proses berjalan, gunakan **Muat Ulang Status**. Dengan JavaScript, halaman memeriksa status otomatis dan memperingatkan jika ada perubahan yang belum disimpan. Unggah ulang formulir yang sama tidak membuat pekerjaan kedua; penerapan ulang tetap mengikuti pengaman backend.
 

@@ -1,9 +1,16 @@
 <?php
 if(PHP_SAPI!=='cli'){http_response_code(404);exit;}
+$memoryLimit=trim((string)ini_get('memory_limit'));
+if($memoryLimit!=='-1'){
+    $memoryUnits=['g'=>1073741824,'m'=>1048576,'k'=>1024];
+    if((int)$memoryLimit*($memoryUnits[strtolower(substr($memoryLimit,-1))]??1)<1536*1048576)ini_set('memory_limit','1536M');
+}
 require_once __DIR__.'/../koneksi.php';require_once __DIR__.'/../includes/legacy_import.php';
 require_once __DIR__.'/../includes/legacy_finance.php';
 require_once __DIR__.'/../includes/legacy_full.php';
-if(DB_NAME!=='db_spp' && (!preg_match('/^db_spp_(audit|test)_/D',DB_NAME)||getenv('SPP_TEST_ALLOW_MUTATION')!=='1'))throw new RuntimeException('Worker target not permitted');
+require_once __DIR__.'/../includes/legacy_monthly_planner.php';
+require_once __DIR__.'/../includes/legacy_du.php';
+if(DB_NAME!=='db_spp' && (!preg_match('/^db_spp_(?:(?:audit|test)_[a-z0-9_]+|test[0-9]+)$/D',DB_NAME)||getenv('SPP_TEST_ALLOW_MUTATION')!=='1'))throw new RuntimeException('Worker target not permitted');
 $root=legacy_root();
 $runPowerShell=static function(array $args):array{
     $pipes=[];$proc=proc_open(array_merge(['powershell.exe','-NoProfile','-NonInteractive','-ExecutionPolicy','Bypass','-File',__DIR__.'/legacy_extract.ps1'],$args),[0=>['pipe','r'],1=>['pipe','w'],2=>['pipe','w']],$pipes);if(!is_resource($proc))throw new RuntimeException('PowerShell unavailable');fclose($pipes[0]);$out=stream_get_contents($pipes[1]);$err=stream_get_contents($pipes[2]);fclose($pipes[1]);fclose($pipes[2]);return [proc_close($proc),$out,$err];
@@ -13,9 +20,20 @@ $lock=fopen($root.'/worker.lock','c');if(!flock($lock,LOCK_EX|LOCK_NB))throw new
 $lastHealth=0;$sqlReady=false;
 $heartbeat=static function()use($root,$runPowerShell,&$lastHealth,&$sqlReady){
     if(time()-$lastHealth>30){$check=$runPowerShell(['-JobDirectory',$root,'-Unit','1','-Health']);$sqlReady=$check[0]===0;$lastHealth=time();}
-    file_put_contents($root.'/heartbeat.json',json_encode(['time'=>time(),'pid'=>getmypid(),'database'=>DB_NAME,'sql_ready'=>$sqlReady,'categories'=>['students','finance','full'],'workflow_version'=>LFUL_RULES_VERSION,'source_reader_version'=>LEGACY_SOURCE_READER_VERSION,'operational_version'=>LOP_VERSION]));
+    file_put_contents($root.'/heartbeat.json',json_encode(['time'=>time(),'pid'=>getmypid(),'database'=>DB_NAME,'sql_ready'=>$sqlReady,'categories'=>['students','finance','full'],'workflow_version'=>LFUL_RULES_VERSION,'source_reader_version'=>LEGACY_SOURCE_READER_VERSION,'operational_version'=>LOP_VERSION,'automation_version'=>LMA_VERSION,'monthly_version'=>LMP_VERSION,'fee_trace_version'=>LEGACY_FEE_TRACE_VERSION,'du_version'=>LDU_VERSION,'billing_version'=>LB_RULE_VERSION]));
 };
 $q=legacy_queue();
+$ruleFiles=[__FILE__,__DIR__.'/../includes/legacy_full.php',__DIR__.'/../includes/legacy_full_components.php',__DIR__.'/../includes/legacy_full_workflow.php',__DIR__.'/../includes/legacy_operational.php',__DIR__.'/../includes/legacy_operational_setup.php',__DIR__.'/../includes/legacy_operational_resolution.php',__DIR__.'/../includes/legacy_operational_bulk.php',__DIR__.'/../includes/legacy_migration_automation.php',__DIR__.'/../includes/legacy_monthly_planner.php',__DIR__.'/../includes/legacy_billing_reconstruction.php',__DIR__.'/../includes/legacy_fee_trace.php',__DIR__.'/../includes/legacy_fee_reconstruction.php'];
+$ruleFiles[]=__DIR__.'/../includes/legacy_billing.php';
+$ruleFiles[]=__DIR__.'/../includes/other_fee_usage.php';
+$ruleFiles[]=__DIR__.'/../includes/legacy_operational_corrections.php';
+$ruleFiles[]=__DIR__.'/../includes/legacy_operational_obligations.php';
+$ruleFiles[]=__DIR__.'/../includes/komite_billing.php';
+$ruleFiles[]=__DIR__.'/../includes/legacy_du.php';
+$ruleFiles[]=__DIR__.'/../includes/legacy_du_planner.php';
+$ruleFiles[]=__DIR__.'/../includes/daftar_ulang.php';
+$ruleSignature=static fn()=>hash('sha256',implode('|',array_map(static fn($file)=>hash_file('sha256',$file),$ruleFiles)));
+$loadedRules=$ruleSignature();
 $restorePaths=database_access_paths(DB_NAME,(int)$dbPort);
 $restoreGeneration=is_file($restorePaths['generation'])?trim(file_get_contents($restorePaths['generation'])):'0';
 // Interrupted pre-commit jobs are held for explicit retry; application is idempotent via manifest.
@@ -24,6 +42,7 @@ $q->exec("UPDATE jobs SET state='failed',message='Worker berhenti. Tinjau hasil 
 $q->exec("UPDATE jobs SET state='apply_queued' WHERE state='applying'");
 $q->exec("UPDATE jobs SET state='simulate_queued' WHERE state='simulating'");
 do {
+    if(!hash_equals($loadedRules,$ruleSignature())){fwrite(STDERR,"Aturan migrasi berubah. Mulai ulang worker dan jalankan simulasi ulang.\n");break;}
     $heartbeat();
     $currentGeneration=is_file($restorePaths['generation'])?trim(file_get_contents($restorePaths['generation'])):'0';
     if($currentGeneration!==$restoreGeneration){fwrite(STDERR,"Database dipulihkan. Mulai ulang worker setelah meninjau antrean Legacy.\n");break;}

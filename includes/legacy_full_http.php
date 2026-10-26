@@ -16,7 +16,7 @@ function lful_http(mysqli $db,string $action,array $input,bool $write): array {
         if(($d['settings']['mode']??'')!=='operational')throw new DomainException('Persetujuan massal untuk migrasi operasional.');
         $scope=$input['scope']??'all';if(!is_string($scope))throw new DomainException('Pilihan persetujuan tidak valid.');
         $catalog=lful_catalog_read($id);[$records]=lop_review_source($d['job_info']);
-        if(lma_enabled($d['settings'])&&in_array($scope,['all','components'],true))[$records]=lf_extract_read($d['job_info'],true,true);
+        if(in_array($scope,['all','components'],true))[$records]=lf_extract_read($d['job_info'],true,true);
         $proposal=lop_bulk_patch($records,$catalog,$d['settings'],$unit,$scope,lf_rows($db,'SELECT id,nama FROM master_biaya_lain ORDER BY id'));
         $digest=hash('sha256',lf_json([$id,$actor,$unit,$version,$scope,$catalog['manifest']['rows_sha256'],lful_masters_digest($db),$proposal]));
         if($action==='full_bulk_preview')return ['scope'=>$scope,'counts'=>$proposal['counts'],'digest'=>$digest,'new_masters'=>array_values($proposal['patch']['new_masters']??[]),'replacements'=>$proposal['replacements']];

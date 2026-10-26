@@ -11,6 +11,11 @@ function lop_preview_tariffs(mysqli $db): void {
 function lop_tariff(mysqli $db,string $nis,?string $year=null): ?float {
     require_once __DIR__.'/legacy_billing.php';if(lb_spp_override($db,$nis,$year??(function_exists('du_current_academic_year')?du_current_academic_year():((int)date('Y')-((int)date('n')<7?1:0)).'/'.((int)date('Y')+((int)date('n')<7?0:1)))))return null;
     if(!lop_ready($db))return null;
+    $student=lb_student($db,$nis);
+    if($year!==null&&$student&&$year!==$student['migration_year']){
+        $rates=[];foreach(lb_monthly_plan($db,$nis)['positions'] as $position)if($position['category']==='spp'&&$position['year']===$year)$rates[$position['gross']]=true;
+        return count($rates)===1?(int)array_key_first($rates)/100:null;
+    }
     $key=$db->thread_id.':'.(int)($GLOBALS['app_unit_id']??unit_active_id());
     if(($_SERVER['REQUEST_METHOD']??'')==='GET'&&isset($GLOBALS['lop_preview_tariffs'][$key]))return isset($GLOBALS['lop_preview_tariffs'][$key][$nis])?(float)$GLOBALS['lop_preview_tariffs'][$key][$nis]:null;
     $r=lop_read_one($db,"SELECT t.amount FROM legacy_op_tariffs t JOIN siswa s ON s.id=t.student_id AND s.unit_id=t.unit_id WHERE s.NO_INDUK=? AND t.basis='legacy'",[$nis]);return $r?(float)$r['amount']:null;
@@ -34,5 +39,5 @@ function lop_payment_select(mysqli $db,array $columns): string {
 }
 function lop_payment_model(mysqli $db,int $id): array {
     $p=lop_read_one($db,"SELECT p.*,o.student_id,o.name NAMA,o.source_identity NO_INDUK,s.NO_induk_diknas,b.cutoff,b.source_id,b.completed_at imported_at,src.backup_hash FROM legacy_op_payments p JOIN legacy_op_owners o ON o.id=p.owner_id AND o.unit_id=p.unit_id LEFT JOIN siswa s ON s.id=o.student_id AND s.unit_id=o.unit_id JOIN legacy_full_batches b ON b.id=p.batch_id AND b.unit_id=p.unit_id JOIN legacy_finance_sources src ON src.id=b.source_id AND src.unit_id=b.unit_id WHERE p.id=? AND b.state='completed'",[$id]);if(!$p)throw new OutOfBoundsException('Transaksi migrasi tidak ditemukan pada unit ini.');
-    require_once __DIR__.'/payment_time.php';$p+=payment_time_record($db,$p);$p['items']=json_decode($p['items'],true,64,JSON_THROW_ON_ERROR);$p['operational']=true;return ['legacy'=>$p];
+    require_once __DIR__.'/payment_time.php';require_once __DIR__.'/legacy_fee_trace_read.php';$p+=payment_time_record($db,$p);$p['items']=json_decode($p['items'],true,64,JSON_THROW_ON_ERROR);$p['operational']=true;$p=lfet_hydrate_receipts($db,[$p])[0];return ['legacy'=>$p];
 }

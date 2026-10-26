@@ -89,7 +89,7 @@ if($_SERVER['REQUEST_METHOD']==='POST'){
             }
             $starts=is_array($_POST['start_month']??null)?$_POST['start_month']:[];
             $result=spp_publish_students($koneksi,$masterId,$students,$starts);
-            $message=$result['created'].' tagihan SPP baru diterbitkan; '.$result['existing'].' tagihan existing dipertahankan; '.($result['legacy_covered']??0).' periode tercakup Legacy; '.($result['before_transition']??0).' periode sebelum peralihan tidak ditagih.';
+            $message=$result['created'].' tagihan SPP baru diterbitkan; '.$result['existing'].' tagihan existing dipertahankan; '.($result['legacy_covered']??0).' periode dengan keputusan Legacy dipertahankan. Kredit pembayaran lama diperhitungkan pada bulannya.';
             if($result['existing'])$message.=' '.$result['existing'].' tagihan sudah tersedia.';
             if($result['ineligible'])$message.=' '.count($result['ineligible']).' siswa dilewati karena penempatannya belum valid.';
             $_SESSION['flash']=['type'=>'success','msg'=>$message];

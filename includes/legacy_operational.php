@@ -9,7 +9,7 @@ require_once __DIR__.'/legacy_operational_checks.php';
 require_once __DIR__.'/legacy_operational_resolution.php';
 require_once __DIR__.'/legacy_migration_automation.php';
 require_once __DIR__.'/legacy_class_links.php';
-const LOP_VERSION=11;
+const LOP_VERSION=15;
 const LOP_ID_OFFSET=1000000000;
 function lop_date(mixed $value): ?string {if(is_string($value)&&preg_match('/^\d{4}-\d{2}-\d{2}T\d{2}:\d{2}$/D',$value))$value.=':00';return lful_date($value);}
 function lop_require(mysqli $db): void {if(!lop_ready($db))throw new DomainException('Pasang skema operasional Legacy melalui CLI.');}
@@ -45,7 +45,7 @@ function lop_coverage_plan(array $coverage,array $payments,string $identity,stri
 }
 /** Pure planning: no master, student, bill or account is written by simulation. */
 function lop_prepare(array $records,array $cfg,int $unit,?string $sourceDate,array $masters=[],?array $automation=null): array {
-    if(lma_enabled($cfg)&&$automation===null)[$cfg,$automation]=lma_configure($records,$cfg,$unit,array_map(static fn($id,$name)=>['id'=>$id,'nama'=>$name],array_keys($masters),array_values($masters)));
+    if($automation===null)[$cfg,$automation]=lma_configure($records,$cfg,$unit,array_map(static fn($id,$name)=>['id'=>$id,'nama'=>$name],array_keys($masters),array_values($masters)));
     if(lma_enabled($cfg))$cfg['_du_matches']=$automation['du']??[];
     [$records,$history,$references,$resolutions]=lop_resolved_source_rows($records,$cfg,$sourceDate);$automatic=[];
     $replacementErrors=[];
@@ -83,7 +83,7 @@ function lop_prepare(array $records,array $cfg,int $unit,?string $sourceDate,arr
         if(!$ready)$pending[]=lop_pending($identity,$r['row_key'],'owner','owner_review','Sahkan jenis kelompok, tarif dan sisa kewajiban sebelum rekening digunakan.',['group'=>$g['code']]);
         $bankRows=array_values(array_filter($rows,fn($v)=>in_array($v['table'],['tabungan','transaksi_m','transaksi_k'],true)));$originalBank=$bankRows?lf_reconcile($bankRows,$sourceDate):null;$bankError=null;
         $fix=$cfg['op_savings'][$identity]??[];
-        try{$rows=lop_effective_bank_rows($rows,$cfg);[$rows,$fix]=lop_resolve_bank($rows,$fix,$sourceDate,$identity,$resolutions,$originalBank?(lf_cents($originalBank['incoming'])-lf_cents($originalBank['outgoing'])):null);}catch(DomainException $e){$bankError=$e->getMessage();}
+        try{$rows=lop_effective_bank_rows($rows,$cfg);[$rows,$fix]=lop_resolve_bank($rows,$fix,$sourceDate,$identity,$resolutions,$originalBank?(lf_cents($originalBank['incoming'])-lf_cents($originalBank['outgoing'])):null,empty($cfg['op_preserve_unproven_balances']));}catch(DomainException $e){$bankError=$e->getMessage();}
         $bankRows=array_values(array_filter($rows,fn($v)=>in_array($v['table'],['tabungan','transaksi_m','transaksi_k'],true)));
         $bank=$bankRows?lf_reconcile($bankRows,$sourceDate):null;
         if($bank)try{$bank=lop_fixed_bank($bankRows,$sourceDate,$fix);$bank['source_balance']=$originalBank['balance']??$bank['source_balance'];}catch(DomainException $e){$bankError=$e->getMessage();}
@@ -100,11 +100,11 @@ function lop_prepare(array $records,array $cfg,int $unit,?string $sourceDate,arr
                 try{
                     $config=$cfg;foreach(lful_catalog([$v]) as $key=>$c)if(!isset($config['components'][$key]))$config['components'][$key]=['category'=>$c['suggestion']?:lful_history_category($key),'reason'=>$cfg['accounting_reason']??''];
                     $auto=lop_payment_auto_check($v,$config);if($auto)$config['other_policy']='source_details';
-                    $p=lma_enabled($cfg)?lma_payment($v,$config,$masters,$automation??[]):lful_payment($v,$config,$masters);if($p===null)continue;
+                    $p=lma_payment($v,$config,$masters,$automation??[]);if($p===null)continue;
                     if($p['date']&&$p['date']>($cfg['cutoff']??''))throw new DomainException('Tanggal transaksi melewati waktu peralihan.');
                     $status=trim((string)($v['raw']['rstatus']??''));if($status!==''){$rule=$cfg['op_status_rules'][$status]??[];if(mb_strlen(trim((string)($rule['evidence']??'')))<10||!in_array($rule['action']??'',['include','reference'],true))throw new DomainException('Sahkan arti status transaksi sumber terlebih dahulu.');if($rule['action']==='reference')continue;}
                     $p['identity']=$identity;$p['method']=trim((string)($v['raw']['cara_bayar']??''))?:null;$p['note']=(string)($v['raw']['KETERANGAN']??'');if(mb_strlen($p['note'])>1000||mb_strlen((string)$p['method'])>100||mb_strlen($p['period'])>100||mb_strlen($p['class'])>100)throw new DomainException('Rincian sumber melebihi batas penyimpanan; periksa transaksi ini.');$payments[]=$p;if($auto)$automatic[$v['row_key']]=$auto;$sum+=lf_cents($p['total']);
-                }catch(DomainException $e){$pending[]=lop_pending($identity,$v['row_key'],'payment','payment_review',$e->getMessage(),$v);}
+                }catch(DomainException $e){$feeHeld=lfet_source_has_fees($v);$pending[]=lop_pending($identity,$v['row_key'],'payment',$feeHeld?'fee_transaction_held':'payment_review',($feeHeld?'Diarsipkan otomatis; transaksi valid lain tetap diproses. ':'').$e->getMessage(),$v);}
             }elseif($bank&&in_array($v['table'],['transaksi_m','transaksi_k'],true)){$journals[]=['identity'=>$identity,'row_key'=>$v['row_key'],'date'=>lful_date($v['raw']['TANGGAL']),'operator'=>$v['raw']['user_id']??null,'incoming'=>lf_money(lf_cents($v['raw']['MASUK']??'0')),'outgoing'=>lf_money(lf_cents($v['raw']['KELUAR']??'0'))];}
         }
     }
@@ -129,13 +129,26 @@ function lop_prepare(array $records,array $cfg,int $unit,?string $sourceDate,arr
         $summary['primary_banks_retained']=count(array_filter($cfg['additional_savings']??[],fn($d)=>in_array($d['reason']??'',['keep_main','historical_snapshot'],true)));
         $summary['additional_bank_exceptions']=count(array_filter($cfg['additional_savings']??[],fn($d)=>!empty($d['additional_issues'])));
     }
-    $result=compact('owners','groups','payments','journals','pending','summary','history','automatic','references','resolutions');
+    require_once __DIR__.'/legacy_billing.php';
+    $monthlyPayments=[];$sourceRaw=[];$monthly=[];$monthlyExceptions=0;
+    foreach($records as $record)$sourceRaw[$record['row_key']]=$record['raw'];
+    foreach($payments as $payment)$monthlyPayments[$payment['identity']][]=['row_key'=>$payment['row_key'],'source_period'=>$payment['period'],'class_snapshot'=>$payment['class'],'items'=>$payment['items'],'raw'=>$sourceRaw[$payment['row_key']]??[],'cancelled'=>false];
+    foreach($owners as $identity=>$owner)if(empty($cfg['_monthly_partial'])&&$owner['ready']&&$owner['student']){
+        $context=['id'=>0,'unit_id'=>$unit,'student_id'=>1,'NO_INDUK'=>$owner['nis'],'kind'=>$owner['kind'],'raw'=>$owner['raw'],'migration_year'=>$cfg['_monthly_year']??lb_payment_year(substr($cfg['cutoff'],0,7))];
+        $planned=lmp_plan($context,$monthlyPayments[$identity]??[]);$monthly[$identity]=$planned;
+        foreach($planned['exceptions'] as $exception){$reviewed=false;foreach($owner['decision']['coverage']??[] as $decision)if(($decision['category']??'')===$exception['category']&&($decision['period']??'')===$exception['period']){$reviewed=true;break;}if($reviewed)continue;$monthlyExceptions++;$pending[]=lop_pending((string)$identity,hash('sha256','monthly|'.$identity.'|'.$exception['category'].'|'.$exception['period']),'obligations','monthly_evidence',$exception['reason'],$exception);}
+    }
+    $summary['monthly_rule']=LMP_VERSION;$summary['monthly_positions']=array_sum(array_map(static fn($p)=>count($p['positions']),$monthly));$summary['monthly_exceptions']=$monthlyExceptions;
+    require_once __DIR__.'/daftar_ulang.php';$summary['du_plan']=ldu_source_preview($records,$owners,$payments,$cfg['du_target_year']??du_current_academic_year());
+    $summary['pending']=count($pending);$summary['review_tasks']=count(lop_pending_groups(['owners'=>$owners,'pending'=>$pending]));
+    $summary['fee_trace']=lfet_summary($payments,$pending);
+    $result=compact('owners','groups','payments','journals','pending','summary','history','automatic','references','resolutions','monthly');
     if(lma_enabled($cfg))$result['migration_evidence']=['banks'=>array_filter($cfg['additional_savings']??[],fn($d)=>in_array($d['reason']??'',['keep_main','historical_snapshot'],true))];
     return $result;
 }
 function lop_simulate(mysqli $db,string $id,bool $persist=true): array {
     lop_require($db);$d=lful_draft($id);$unit=(int)$d['job_info']['unit'];unit_set_context($db,$unit);if(PHP_SAPI==='cli')$_SESSION['active_unit_id']=$unit;
-    [$records,$manifest]=lf_extract_read($d['job_info'],true,lma_enabled($d['settings']));$cfg=$d['settings'];$cfg['source_fingerprint']=$manifest['fingerprint'];$cfg['_class_labels']=lop_source_labels($d['job_info']);$issues=[];
+    [$records,$manifest]=lf_extract_read($d['job_info'],true,true);$cfg=$d['settings'];$cfg['source_fingerprint']=$manifest['fingerprint'];$cfg['_fee_source_key']=$d['job_info']['hash'];$cfg['_class_labels']=lop_source_labels($d['job_info']);$issues=[];
     $batch=lf_one($db,'SELECT * FROM legacy_full_batches WHERE id=?',[$id]);if(!$batch)try{lful_empty($db,$unit);}catch(DomainException $e){$issues[]=legacy_ui_issue('Unit',$e->getMessage(),'unit_not_empty');}
     if($batch){$existingManifest=json_decode($batch['manifest'],true);$resolved=$existingManifest['resolved_masters']??[];foreach($cfg['components']??[] as $key=>$component){$cfg['components'][$key]['category']=$resolved[$component['category']]??$component['category'];}foreach($cfg['students']??[] as $identity=>$student)foreach($student['coverage']??[] as $n=>$c)$cfg['students'][$identity]['coverage'][$n]['category']=$resolved[$c['category']]??$c['category'];}
     foreach($cfg['students']??[] as $identity=>$student)unset($cfg['students'][$identity]['_already_ready']);if($batch)foreach(lf_rows($db,"SELECT source_identity FROM legacy_op_owners WHERE batch_id=? AND state='ready'",[$id]) as $owner)$cfg['students'][$owner['source_identity']]['_already_ready']=true;
@@ -143,8 +156,10 @@ function lop_simulate(mysqli $db,string $id,bool $persist=true): array {
     $year=lf_one($db,"SELECT * FROM tahun_ajaran WHERE id=? AND status<>'closed'",[(int)($cfg['year_id']??0)]);if(!$year)$issues[]=legacy_ui_issue('Unit','Pilih tahun ajaran terbuka.','year_missing');
     if($year&&lf_one($db,"SELECT id FROM master_spp_tahun WHERE tahun_ajaran_id=? AND status='closed'",[$year['id']]))$issues[]=legacy_ui_issue('Unit','Tahun penerbitan SPP masih ditutup. Buka kembali melalui Master SPP.','year_missing');
     if(mb_strlen(trim((string)($cfg['evidence']??'')))<10)$issues[]=legacy_ui_issue('Unit','Isi bukti peralihan.','transition_evidence');
-    $cfg['cutoff']=$cutoff;$names=[];foreach(lf_rows($db,'SELECT id,nama FROM master_biaya_lain') as $m)$names[(int)$m['id']]=$m['nama'];
-    $automation=null;if(lma_enabled($cfg))[$cfg,$automation]=lma_configure($records,$cfg,$unit,array_map(static fn($id,$name)=>['id'=>$id,'nama'=>$name],array_keys($names),array_values($names)));
+    require_once __DIR__.'/daftar_ulang.php';$cfg['du_target_year']??=du_current_academic_year();
+    if($cfg['du_target_year']!==du_current_academic_year())$issues[]=legacy_ui_issue('DU','Tahun DU berubah sejak persiapan. Jalankan simulasi dengan tahun ajaran berjalan.','year_missing');
+    $cfg['cutoff']=$cutoff;$cfg['_monthly_year']=$year['label']??'';$names=[];foreach(lf_rows($db,'SELECT id,nama FROM master_biaya_lain') as $m)$names[(int)$m['id']]=$m['nama'];
+    [$cfg,$automation]=lma_configure($records,$cfg,$unit,array_map(static fn($id,$name)=>['id'=>$id,'nama'=>$name],array_keys($names),array_values($names)));
     $proposals=[];try{$proposals=lful_proposals($db,$cfg);}catch(DomainException $e){$issues[]=legacy_ui_issue('Komponen',$e->getMessage(),'components_invalid');}
     foreach($cfg['op_groups']??[] as $code=>$policy){$g=lop_group((string)$code,$unit);$level=$policy['level']??$g['level'];$rombel=$policy['rombel']??$g['rombel'];$cfg['op_groups'][$code]['_class_unavailable']=false;if(($policy['kind']??$g['kind'])==='academic'&&$level!==null){$class=lf_one($db,'SELECT is_active,is_placeholder FROM master_kelas WHERE tingkat=? AND kode_rombel=?',[$level,$rombel]);$cfg['op_groups'][$code]['_class_unavailable']=$class&&(!$class['is_active']||$class['is_placeholder']);}}
     $plan=lop_prepare($records,$cfg,$unit,$manifest['source_date'],$names,$automation);unset($records);$plan['summary']['new_masters']=count($proposals);if(!array_filter($plan['owners'],fn($o)=>$o['ready']))$issues[]=legacy_ui_issue('Unit','Sahkan sedikitnya satu kelompok yang siap.','no_students');
@@ -169,9 +184,10 @@ function lop_native_digest(mysqli $db): string {
     $hash=hash_init('sha256');foreach(['siswa','siswa_tahun_ajaran','bayar','bayar_du','bayar_biaya_lain','transaksi_m','transaksi_k','tabungan','tagihan_spp','tagihan_komite','tagihan_daftar_ulang','tagihan_biaya_lain'] as $table){hash_update($hash,$table);foreach(lf_iter_rows($db,"SELECT * FROM $table ORDER BY id") as $row)hash_update($hash,lf_json($row));}return hash_final($hash);
 }
 function lop_projection(mysqli $db,string $batch): array {
+    require_once __DIR__.'/history_performance.php';
     $payments=[];$journals=[];$paymentKeys=[];$journalKeys=[];
-    foreach(lf_rows($db,'SELECT p.*,o.source_identity FROM legacy_op_payments p JOIN legacy_op_owners o ON o.id=p.owner_id AND o.unit_id=p.unit_id WHERE p.batch_id=? ORDER BY p.id',[$batch]) as $p){$paymentKeys[$p['row_key']]=true;if($p['cancelled'])continue;$payments[]=['identity'=>$p['source_identity'],'row_key'=>$p['row_key'],'source_table'=>$p['source_table'],'date'=>$p['source_date'],'operator'=>$p['source_operator'],'period'=>$p['source_period'],'class'=>$p['class_snapshot'],'total'=>$p['total'],'items'=>json_decode($p['items'],true)];}
-    foreach(lf_rows($db,'SELECT j.*,o.source_identity FROM legacy_op_journals j JOIN legacy_op_owners o ON o.id=j.owner_id AND o.unit_id=j.unit_id WHERE j.batch_id=? ORDER BY j.id',[$batch]) as $j){$journalKeys[$j['row_key']]=true;if($j['cancelled'])continue;$journals[]=['identity'=>$j['source_identity'],'row_key'=>$j['row_key'],'date'=>$j['source_date'],'operator'=>$j['source_operator'],'incoming'=>$j['incoming'],'outgoing'=>$j['outgoing']];}return [$payments,$journals,$paymentKeys,$journalKeys];
+    foreach(hp_rows($db,'SELECT p.*,o.source_identity FROM legacy_op_payments p JOIN legacy_op_owners o ON o.id=p.owner_id AND o.unit_id=p.unit_id WHERE p.batch_id=? ORDER BY p.id',[$batch]) as $p){$paymentKeys[$p['row_key']]=true;if($p['cancelled'])continue;$payments[]=['identity'=>$p['source_identity'],'row_key'=>$p['row_key'],'source_table'=>$p['source_table'],'date'=>$p['source_date'],'operator'=>$p['source_operator'],'period'=>$p['source_period'],'class'=>$p['class_snapshot'],'total'=>$p['total'],'items'=>json_decode($p['items'],true)];}
+    foreach(hp_rows($db,'SELECT j.*,o.source_identity FROM legacy_op_journals j JOIN legacy_op_owners o ON o.id=j.owner_id AND o.unit_id=j.unit_id WHERE j.batch_id=? ORDER BY j.id',[$batch]) as $j){$journalKeys[$j['row_key']]=true;if($j['cancelled'])continue;$journals[]=['identity'=>$j['source_identity'],'row_key'=>$j['row_key'],'date'=>$j['source_date'],'operator'=>$j['source_operator'],'incoming'=>$j['incoming'],'outgoing'=>$j['outgoing']];}return [$payments,$journals,$paymentKeys,$journalKeys];
 }
 function lop_check_result(mysqli $db,string $id): array {
     require_once __DIR__.'/history_performance.php';
@@ -182,17 +198,25 @@ function lop_check_result(mysqli $db,string $id): array {
         unit_set_context($db,(int)$batch['unit_id']);
         try{return lop_check_result($db,$id);}finally{unit_set_context($db,0);}
     }
+    // Restore verification also audits the committed batch before publication.
+    // This opt-in is local to this exact check; normal reads still require completed.
+    if($batch['state']!=='completed'&&($GLOBALS['lb_pending_batch']??null)!==$id){
+        require_once __DIR__.'/legacy_billing.php';$previous=$GLOBALS['lb_pending_batch']??null;$GLOBALS['lb_pending_batch']=$id;lb_cache($db,true);
+        try{return lop_check_result($db,$id);}finally{if($previous===null)unset($GLOBALS['lb_pending_batch']);else $GLOBALS['lb_pending_batch']=$previous;lb_cache($db,true);}
+    }
     $source=lf_source_fingerprint($db,(int)$batch['unit_id'],(int)$batch['source_id']);if(!hash_equals($m['source_fingerprint'],$source['fingerprint'])||!hash_equals($m['working_digest'],lop_working_digest($db,$id)))throw new DomainException('Fingerprint sumber atau hasil kerja berbeda.');
-    foreach(hp_rows($db,'SELECT p.* FROM legacy_op_payments p WHERE batch_id=?',[$id]) as $p){$total=0;foreach(json_decode($p['items'],true) as $i)$total+=lf_cents($i['amount']);if($total!==lf_cents($p['total']))throw new DomainException('Total rincian pembayaran tidak cocok.');}
+    foreach(hp_rows($db,'SELECT p.* FROM legacy_op_payments p WHERE batch_id=?',[$id]) as $p){$p['items']=json_decode($p['items'],true,512,JSON_THROW_ON_ERROR);lfet_validate_payment($p);}
     foreach(hp_rows($db,'SELECT a.*,o.student_id,o.batch_id FROM legacy_op_accounts a JOIN legacy_op_owners o ON o.id=a.owner_id AND o.unit_id=a.unit_id WHERE o.batch_id=?',[$id]) as $a){$legacy=0;$new=0;foreach(hp_rows($db,'SELECT * FROM legacy_op_journals WHERE owner_id=? AND cancelled=0',[$a['owner_id']]) as $j){$v=lf_cents($j['incoming'])-lf_cents($j['outgoing']);if(in_array($j['origin'],['legacy','adjustment'],true))$legacy+=$v;else $new+=$v;}if($legacy!==lf_cents($a['opening'])||(!$a['student_id']&&$legacy+$new!==lf_cents($a['balance'])))throw new DomainException('Saldo dan jurnal hasil kerja tidak cocok.');}
     require_once __DIR__.'/legacy_operational_corrections.php';
     foreach(hp_rows($db,'SELECT ob.* FROM legacy_op_obligations ob JOIN legacy_op_owners o ON o.id=ob.owner_id AND o.unit_id=ob.unit_id WHERE o.batch_id=?',[$id]) as $ob){require_once __DIR__.'/legacy_billing.php';$position=lb_obligation_position($db,$ob);if($position){if($position['principal']!==lf_cents($ob['principal']))throw new DomainException('Pokok kewajiban belum sesuai bukti sumber.');$remaining=$position['remaining'];}else{$remaining=lf_cents($ob['principal'])-lop_obligation_paid($db,(int)$ob['id']);if($remaining<0)throw new DomainException('Kewajiban terbayar melebihi pokok.');}if(lf_cents($ob['remaining'])!==$remaining)throw new DomainException('Catatan sisa kewajiban belum sesuai dengan pembayaran.');if($ob['bill_id']){$bill=hp_one($db,'SELECT nominal_tagihan FROM tagihan_biaya_lain WHERE id=?',[$ob['bill_id']]);$native=hp_one($db,'SELECT COALESCE(SUM(nominal_snapshot),0) paid FROM bayar_biaya_lain WHERE tagihan_biaya_lain_id=?',[$ob['bill_id']]);if(!$bill||lf_cents((string)$bill['nominal_tagihan'])-lf_cents((string)$native['paid'])!==$remaining)throw new DomainException('Sisa kewajiban dan tagihan tidak cocok.');}}
+    if(isset($m['monthly_reconstruction']['du'])){require_once __DIR__.'/legacy_du.php';ldu_verify($db);}
     return $m['summary'];
 }
 /** Each publication/resume is atomic. Ready entities are never overwritten by a retry. */
 function lop_apply(mysqli $db,array $job,array $sim,string $backup): void {
     if(PHP_SAPI!=='cli')throw new LogicException('Penerapan melalui worker.');$id=$job['id'];$unit=(int)$job['unit'];$actor=(int)$job['actor'];
     require_once __DIR__.'/database_backup.php';db_backup_archive(db_backup_store(),$backup);
+    require_once __DIR__.'/daftar_ulang.php';if(($sim['config']['du_target_year']??du_current_academic_year())!==du_current_academic_year())throw new DomainException('Tahun DU berganti; simulasi ulang diperlukan sebelum menerapkan.');
     $db->begin_transaction();$db->query('SET @legacy_full_apply=1');try{
         lop_actor($db,$actor,$unit,true);$draft=lful_draft($id);$confirmation=$draft['confirmed'];if(!$confirmation||$confirmation['expires']<time()||$confirmation['actor']!==$actor||$confirmation['unit']!==$unit||$confirmation['version']!==(int)$draft['version']||!hash_equals($confirmation['digest'],$sim['digest']))throw new DomainException('Konfirmasi berubah atau kedaluwarsa sebelum penerapan.');$prior=lf_one($db,'SELECT * FROM legacy_full_batches WHERE id=? FOR UPDATE',[$id]);if(!$prior)lful_empty($db,$unit,true);
         foreach(['tahun_ajaran','master_kelas','master_spp_tahun','master_spp_tarif','master_biaya_lain'] as $table)lf_rows($db,"SELECT id FROM $table FOR UPDATE");
@@ -200,7 +224,7 @@ function lop_apply(mysqli $db,array $job,array $sim,string $backup): void {
         if(!$prior){lf_publish($db,$job,true);$source=lf_one($db,'SELECT id FROM legacy_finance_sources WHERE backup_hash=?',[$job['hash']]);$manifest=['mode'=>'operational','mapping'=>$cfg,'summary'=>$sim['summary'],'source_fingerprint'=>$sim['source_fingerprint'],'source_hash'=>$job['hash']];lf_query($db,'INSERT INTO legacy_full_batches(id,unit_id,source_id,version,digest,cutoff,year_id,manifest,before_backup,actor_id) VALUES(?,?,?,?,?,?,?,?,?,?)',[$id,$unit,$source['id'],$sim['version'],$sim['digest'],$sim['cutoff'],$cfg['year_id'],lf_json($manifest),$backup,$actor]);}
         else{$manifest=json_decode($prior['manifest'],true,512,JSON_THROW_ON_ERROR);if(($manifest['mode']??'')!=='operational'||$manifest['source_hash']!==$job['hash'])throw new DomainException('Batch sumber tidak sesuai.');lf_query($db,"UPDATE legacy_full_batches SET state='verifying' WHERE id=?",[$id]);$source=['id'=>$prior['source_id']];}
         $resolved=lful_create_proposals($db,$unit,$sim['new_masters']??[]);$manifest['resolved_masters']=array_merge($manifest['resolved_masters']??[],$resolved);
-        foreach($sim['payments'] as &$payment)foreach($payment['items'] as &$item)$item['category']=$resolved[$item['category']]??$item['category'];unset($payment,$item);foreach($sim['owners'] as &$person)foreach($person['decision']['coverage']??[] as $n=>$coverage)$person['decision']['coverage'][$n]['category']=$resolved[$coverage['category']]??$coverage['category'];unset($person);
+        foreach($sim['payments'] as &$payment)foreach($payment['items'] as &$item)$item=lfet_resolve_item($item,$resolved);unset($payment,$item);foreach($sim['owners'] as &$person)foreach($person['decision']['coverage']??[] as $n=>$coverage)$person['decision']['coverage'][$n]['category']=$resolved[$coverage['category']]??$coverage['category'];unset($person);
         [$expectedPayments,$expectedJournals,$paymentKeys,$journalKeys]=lop_projection($db,$id);foreach($sim['payments'] as $payment)if(!isset($paymentKeys[$payment['row_key']]))$expectedPayments[]=$payment;foreach($sim['journals'] as $journal)if(!isset($journalKeys[$journal['row_key']]))$expectedJournals[]=$journal;$expectedProjection=lful_projection_fingerprint($expectedPayments,$expectedJournals,$manifest['resolved_masters']);unset($expectedPayments,$expectedJournals,$paymentKeys,$journalKeys);
         lful_test_point($db,'after_masters');
         $groupIds=[];foreach($sim['groups'] as $code=>$g){$policy=$cfg['op_groups'][$code]??[];$kind=$policy['kind']??$g['kind'];$classId=null;$hasReady=false;foreach($sim['owners'] as $o)if($o['ready']&&$o['group']===$code&&$o['student']){$hasReady=true;break;}
@@ -231,19 +255,36 @@ function lop_apply(mysqli $db,array $job,array $sim,string $backup): void {
             if(($j['origin']??'')==='adjustment'){$fix=$sim['owners'][$j['identity']]['balance_fix']??$cfg['op_savings'][$j['identity']];$bank=$sim['owners'][$j['identity']]['savings'];$record=lf_one($db,'SELECT id FROM legacy_op_journals WHERE batch_id=? AND row_key=?',[$id,$j['row_key']]);lf_query($db,"INSERT IGNORE INTO legacy_op_audit(unit_id,actor_id,entity_type,entity_id,request_key,reason,before_data,after_data) VALUES(?,?,'balance_fix',?,?,?,?,?)",[$unit,$actor,$record['id'],hash('sha256','balance-fix:'.$id.':'.$j['row_key']),$fix['evidence'],lf_json(['source_balance'=>$bank['source_balance'],'source_balance_raw'=>$bank['source_balance_raw']??null,'journal_balance'=>lf_money(lf_cents($bank['incoming'])-lf_cents($bank['outgoing']))]),lf_json(['fixed_balance'=>$bank['balance'],'adjustment'=>$bank['adjustment'],'cutoff'=>$sim['cutoff']])]);}
         }
         require_once __DIR__.'/legacy_operational_obligations.php';lop_apply_obligations($db,$unit,$actor,$id,$source['id'],$sim,$targets);
-        [$actualPayments,$actualJournals]=lop_projection($db,$id);$actualProjection=lful_projection_fingerprint($actualPayments,$actualJournals,$manifest['resolved_masters']);unset($actualPayments,$actualJournals);if(!hash_equals($expectedProjection,$actualProjection))throw new DomainException('Jumlah atau isi transaksi hasil berbeda dari pratinjau yang disahkan.');$manifest['publication_projection_fingerprint']=$actualProjection;
-        $active=[];$starts=[];foreach($sim['owners'] as $o)if($o['kind']==='active'&&$o['ready']){$active[]=$o['nis'];$starts[$o['nis']]=substr(lful_next_period($sim['cutoff']),5,2);}
-        if($active){$master=spp_master_ensure_year($db,$sim['year']['label'],true);spp_publish_students($db,(int)$master['id'],$active,$starts,true);}
+        [$actualPayments,$actualJournals]=lop_projection($db,$id);$actualProjection=lful_projection_fingerprint($actualPayments,$actualJournals,$manifest['resolved_masters']);
+        if(!hash_equals($expectedProjection,$actualProjection)){
+            $samples=[];
+            foreach(['payments'=>[$sim['payments'],$actualPayments],'journals'=>[$sim['journals'],$actualJournals]] as $kind=>[$wanted,$stored]){
+                $index=[];foreach($stored as $row)$index[$row['row_key']]=$row;
+                foreach($wanted as $row){$actual=$index[$row['row_key']]??null;
+                    $left=$kind==='payments'?lful_projection_fingerprint([$row],[],$manifest['resolved_masters']):lful_projection_fingerprint([],[$row]);
+                    $right=$actual?($kind==='payments'?lful_projection_fingerprint([$actual],[],$manifest['resolved_masters']):lful_projection_fingerprint([],[$actual])):null;
+                    if($left!==$right){$samples[]=['kind'=>$kind,'expected'=>$row,'actual'=>$actual];if(count($samples)>=10)break;}
+                }
+                if(count($samples)>=10)break;
+            }
+            file_put_contents(legacy_root().'/'.$id.'/projection-mismatch.json',lf_json(['expected_digest'=>$expectedProjection,'actual_digest'=>$actualProjection,'expected_counts'=>[count($sim['payments']),count($sim['journals'])],'actual_counts'=>[count($actualPayments),count($actualJournals)],'samples'=>$samples]));
+            throw new DomainException('Jumlah atau isi transaksi hasil berbeda dari pratinjau yang disahkan.');
+        }
+        unset($actualPayments,$actualJournals);$manifest['publication_projection_fingerprint']=$actualProjection;
         lf_query($db,'UPDATE legacy_op_pending SET resolved=1 WHERE batch_id=?',[$id]);foreach($sim['pending'] as $p)lf_query($db,'INSERT INTO legacy_op_pending(unit_id,batch_id,source_identity,row_key,section,code,message,payload) VALUES(?,?,?,?,?,?,?,?) ON DUPLICATE KEY UPDATE message=VALUES(message),payload=VALUES(payload),version=version+1,resolved=0',[$unit,$id,$p['identity'],$p['row'],$p['section'],$p['code'],$p['message'],lf_json($p['payload'])]);
+        require_once __DIR__.'/legacy_billing_reconstruction.php';
+        $GLOBALS['lb_pending_batch']=$id;
+        $manifest['monthly_reconstruction']=lbr_reconcile($db,$actor);$manifest['monthly_reconstruction_rule']=LMP_VERSION;$manifest['monthly_reconstruction_summary']=array_intersect_key($manifest['monthly_reconstruction'],array_flip(['psb_aligned','komite_recategorized','monthly_created','start_month_aligned','obligations_created','obligations_aligned']));
         $manifest['automatic_checks']=['rules_version'=>LOP_VERSION,'payments'=>$sim['automatic'],'accepted_history'=>$sim['history'],'references'=>$sim['references'],'resolutions'=>$sim['resolutions']];$manifest['summary']=$sim['summary'];$manifest['mapping']=$cfg;$manifest['working_digest']=lop_working_digest($db,$id);$manifest['pending']=(int)lf_one($db,'SELECT COUNT(*) n FROM legacy_op_pending WHERE batch_id=? AND resolved=0',[$id])['n'];lf_query($db,'UPDATE legacy_full_batches SET manifest=?,version=?,digest=? WHERE id=?',[lf_json($manifest),$sim['version'],$sim['digest'],$id]);
         lop_check_result($db,$id);lf_audit($db,$unit,$actor,null,'operational_apply',['batch'=>$id,'digest'=>$sim['digest'],'summary'=>$sim['summary']]);lful_test_point($db,'before_commit');$db->commit();
-    }catch(Throwable $e){$db->rollback();throw $e;}finally{$db->query('SET @legacy_full_apply=0');}
+    }catch(Throwable $e){$db->rollback();throw $e;}finally{unset($GLOBALS['lb_pending_batch']);lb_cache($db,true);$db->query('SET @legacy_full_apply=0');}
 }
 function lop_run(mysqli $db,array $job): void {
     lop_require($db);$id=$job['id'];$actor=(int)$job['actor'];$unit=(int)$job['unit'];unit_set_context($db,$unit);if(PHP_SAPI==='cli')$_SESSION=array_replace($_SESSION??[],['admin_id'=>$actor,'admin_role'=>'super_admin','active_unit_id'=>$unit]);lop_actor($db,$actor,$unit);$paths=database_access_paths(DB_NAME,(int)$GLOBALS['dbPort']);$lock=lful_application_access($job,$paths);
     $verifying=false;try{$d=lful_draft($id);$c=$d['confirmed'];$prior=lf_one($db,'SELECT * FROM legacy_full_batches WHERE id=?',[$id]);
+        if($prior&&$prior['state']==='completed'&&(int)$prior['version']===(int)$d['version']){lb_cache($db,true);lop_check_result($db,$id);return;}
         if(!$prior||(int)$prior['version']!==(int)$d['version']){if(!$c||$c['actor']!==$actor||$c['unit']!==$unit||$c['expires']<time()||$c['version']!==(int)$d['version'])throw new DomainException('Konfirmasi kedaluwarsa atau berubah.');$sim=lop_simulate($db,$id,false);if(!$sim['ready']||!hash_equals($sim['digest'],$c['digest']))throw new DomainException('Simulasi berubah.');$digest=$sim['digest'];unset($sim);$backup=lful_backup($db,$actor,$id,'before');lop_apply($db,$job,['digest'=>$digest],$backup);}
         $verifying=true;$batch=lf_one($db,'SELECT * FROM legacy_full_batches WHERE id=?',[$id]);$m=json_decode($batch['manifest'],true,512,JSON_THROW_ON_ERROR);$fp=lf_source_fingerprint($db,$unit,(int)$batch['source_id']);if(!hash_equals($m['source_fingerprint'],$fp['fingerprint'])||!hash_equals($m['working_digest'],lop_working_digest($db,$id)))throw new DomainException('Verifikasi isi hasil berbeda.');
-        $after=lful_backup($db,$actor,$id,'after');lf_query($db,"UPDATE legacy_full_batches SET state='completed',after_backup=?,completed_at=NOW() WHERE id=?",[$after,$id]);$pending=$m['pending'];legacy_update($id,['state'=>'imported','stage'=>$pending?'Siap digunakan — masih ada data perlu diperiksa':'Migrasi Selesai','message'=>$pending?$pending.' data ditahan terpisah; kelompok valid siap digunakan.':'Hasil dan backup terverifikasi.']);
+        $after=lful_backup($db,$actor,$id,'after');lf_query($db,"UPDATE legacy_full_batches SET state='completed',after_backup=?,completed_at=NOW() WHERE id=?",[$after,$id]);lb_cache($db,true);if(isset($m['monthly_reconstruction']['du'])){require_once __DIR__.'/legacy_du.php';ldu_verify($db);}$pending=$m['pending'];legacy_update($id,['state'=>'imported','stage'=>$pending?'Siap digunakan â€” masih ada data perlu diperiksa':'Migrasi Selesai','message'=>$pending?$pending.' data ditahan terpisah; kelompok valid siap digunakan.':'Hasil dan backup terverifikasi.']);
     }catch(Throwable $e){$batch=lf_one($db,'SELECT id,state FROM legacy_full_batches WHERE id=?',[$id]);if($batch&&($verifying||$batch['state']!=='completed'))lf_query($db,"UPDATE legacy_full_batches SET state='blocked' WHERE id=?",[$id]);throw $e;}finally{database_access_release($lock);}
 }

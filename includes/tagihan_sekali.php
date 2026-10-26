@@ -55,7 +55,7 @@ function one_time_fee_status(mysqli $db, string $noInduk, int $excludePaymentId 
     }
 
     $totals = one_time_fee_totals_from_student($student);
-    $opening=lb_psb_source($db,$noInduk);if($opening&&$opening['known']){if((float)$student['PSB']<=0)$totals['psb']=$opening['total'];$paid['psb']=(float)($paid['psb']??0)+$opening['paid'];}
+    $opening=lb_psb_source($db,$noInduk);$position=lb_psb_position($db,$noInduk,$student,(float)($paid['psb']??0));$totals['psb']=$position['total'];$paid['psb']=$position['paid'];
     $result = [];
     foreach (one_time_fee_components() as $key => $cfg) {
         $total = (float)$totals[$key];
@@ -83,7 +83,7 @@ function one_time_fee_payload_for_options(mysqli $db, int $excludePaymentId = 0)
     $payload = [];
     while ($row = $rows->fetch_assoc()) {
         $totals = one_time_fee_totals_from_student($row);
-        $opening=lb_psb_source($db,$row['NO_INDUK']);if($opening&&$opening['known']){if((float)$row['PSB']<=0)$totals['psb']=$opening['total'];$row['paid_psb']=(float)$row['paid_psb']+$opening['paid'];}
+        $opening=lb_psb_source($db,$row['NO_INDUK']);$position=lb_psb_position($db,$row['NO_INDUK'],$row,(float)$row['paid_psb']);$totals['psb']=$position['total'];$row['paid_psb']=$position['paid'];
         foreach (one_time_fee_components() as $key => $cfg) {
             $payload[$row['NO_INDUK']][$key] = [
                 'known'=>$opening===null||$opening['known'],

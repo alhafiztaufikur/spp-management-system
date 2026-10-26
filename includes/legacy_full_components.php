@@ -7,7 +7,7 @@ function lful_savings_column(string $column): bool {
 }
 function lful_source_fee_masters(array $records): array {
     $out=[];foreach($records as $r)if($r['table']==='lain'){$raw=array_change_key_case($r['raw'],CASE_UPPER);$code=trim((string)($raw['KODE']??''));$name=trim((string)($raw['NAMA']??''));if($code!==''&&$name!=='')$out[$code][$name]=true;}
-    foreach($out as &$names)$names=array_keys($names);unset($names);ksort($out,SORT_STRING);return $out;
+    foreach($out as &$names){$names=array_keys($names);sort($names,SORT_STRING);}unset($names);ksort($out,SORT_STRING);return $out;
 }
 function lful_component_catalog(array $records): array {
     $sourceMasters=lful_source_fee_masters($records);$out=[];$names=['U_SPP'=>'SPP','U_PANGKAL'=>'Uang Pangkal','U_BANGUNAN'=>'Uang Bangunan','U_SERAGAM'=>'Uang Seragam','U_KEGIATAN'=>'Uang Kegiatan','U_MAKAN'=>'Uang Makan','U_INFAQ'=>'Infaq','U_LAIN'=>'Lain-Lain'];
@@ -19,13 +19,13 @@ function lful_component_catalog(array $records): array {
             $key=lful_component_key($r['table'],$column,$r['raw']);
             $label=preg_match('/^JUMLAH([1-4])$/D',$column,$m)?(trim((string)($r['raw']['LAIN_LAIN'.$m[1]]??''))?:$column):$column;
             $out[$key]??=['key'=>$key,'table'=>$r['table'],'column'=>$column,'label'=>$label,'name'=>$r['table']==='bayar_du'&&$column==='jumlah'?'Daftar Ulang':($names[$column]??$label),'count'=>0,'invalid_count'=>0,'total_cents'=>0,'min_cents'=>null,'max_cents'=>null,'evidence'=>[],
-                'suggestion'=>$column==='U_SPP'?'spp':($r['table']==='bayar_du'&&$column==='jumlah'?'daftar_ulang':''),'savings'=>lful_savings_column($column),'proposal_key'=>lful_proposal_key($key)];
-            if(legacy_source_is_pomg($column,$r['raw'])){$out[$key]['is_pomg']=true;$out[$key]['name']='Komite (POMG)';$out[$key]['suggestion']='komite';}
+                'suggestion'=>$column==='U_SPP'?'spp':($column==='U_PANGKAL'?'psb':($r['table']==='bayar_du'&&$column==='jumlah'?'daftar_ulang':'')),'savings'=>lful_savings_column($column),'proposal_key'=>lful_proposal_key($key)];
+            if($column==='U_SORGA'||legacy_source_is_pomg($column,$r['raw'])){$out[$key]['is_pomg']=true;$out[$key]['name']='Komite (POMG)';$out[$key]['suggestion']='komite';}
             if(preg_match('/^JUMLAH[1-4]$/D',$column)){
                 $code=trim($label===$column?'':$label);$matched=$sourceMasters[$code]??[];
                 $out[$key]['source_code']=$code;$out[$key]['source_names']=$matched;$out[$key]['ambiguous']=count($matched)>1;
                 $name=count($matched)===1?$matched[0]:($code===''||$code==='022'?'Lain Test':$code);
-                $out[$key]['name']=$name;$out[$key]['proposal_key']=lful_proposal_key('legacy-fee:'.$name);
+                $out[$key]['name']=!empty($out[$key]['is_pomg'])?'Komite (POMG)':$name;$out[$key]['proposal_key']=lful_proposal_key('legacy-fee:'.mb_strtolower(trim($name)));
                 $out[$key]['group_key']='fee:'.($code!==''?$code:'unidentified');
             }
             $c=&$out[$key];$c['count']++;
@@ -70,6 +70,6 @@ function lful_create_proposals(mysqli $db,int $unit,array $proposals): array {
     }return $resolved;
 }
 function lful_resolve_projection(array $sim,array $resolved): array {
-    foreach($sim['payments'] as &$p)foreach($p['items'] as &$i)$i['category']=$resolved[$i['category']]??$i['category'];unset($p,$i);
+    foreach($sim['payments'] as &$p)foreach($p['items'] as &$i)$i=lfet_resolve_item($i,$resolved);unset($p,$i);
     foreach($sim['students'] as &$s)foreach($s['coverage'] as &$c)$c['category']=$resolved[$c['category']]??$c['category'];unset($s,$c);return $sim;
 }

@@ -65,12 +65,15 @@ function report_annual_evidence(mysqli $db,array $f): array {
         if(($f['siswa_status']==='active'&&!(int)$s['is_active'])||($f['siswa_status']==='archived'&&(int)$s['is_active']))continue;
         $nis=$s['NO_INDUK'];$source=lb_student($db,$nis);$native=$bills[$nis]??null;$placement=$placements[$nis]??null;$credit=$legacy['payments'][$nis]['daftar_ulang'][$year]??null;
         if($category==='daftar_ulang'&&!$native&&!$placement&&!$credit&&(!$source||$source['migration_year']!==$year))continue;
-        $proof=$category==='psb'?lb_psb_source($db,$nis):lb_du_source($db,$nis,$year);
-        $known=$category==='psb'?(!$source||!empty($proof['known'])):($native!==null||!empty($proof['known'])||!$source);
-        $bill=$category==='psb'?max(0,(float)$s['PSB']-(float)$s['potongan_psb_nominal']):($native!==null?(float)$native['nominal_tagihan']:(float)($proof['total']??0));
-        if($category==='psb'&&$source&&$known&&$bill<=0)$bill=(float)$proof['total'];
-        $psbCredit=$category==='psb'?(!empty($proof['known'])?(float)$proof['paid']:($source?(lb_cache($db)['paid'][$source['id']]['psb']??0)/100:0.0)):0.0;
-        $paid=$category==='psb'?($nativePsb[$nis]??0)+$psbCredit:($native!==null?(float)$native['paid']:0)+($credit['paid']??0)/100;
+        if($category==='psb'){
+            $position=lb_psb_position($db,$nis,$s,$nativePsb[$nis]??0.0);
+            $known=$position['known'];$bill=$position['total'];$paid=$position['paid'];
+        }else{
+            $proof=lb_du_source($db,$nis,$year);
+            $known=$native!==null||!empty($proof['known'])||!$source;
+            $bill=$native!==null?(float)$native['nominal_tagihan']:(float)($proof['total']??0);
+            $paid=($native!==null?(float)$native['paid']:0)+($credit['paid']??0)/100;
+        }
         if(!$known)$bill=null;
         $cancelled=($native['status']??'')==='cancelled';$status=$known?report_billing_status((float)$bill,$paid,$cancelled?'cancelled':'open'):($paid>.001?'Ada Pembayaran':'Belum Diketahui');
         $label=$category==='psb'?class_label($s):($native['kelas_rombel_snapshot']??$placement['kelas_rombel_snapshot']??$credit['class']??'Tidak tercatat');
@@ -212,7 +215,7 @@ function report_monthly_evidence(mysqli $db,string $category,array $months,array
                 if($p&&$p['class']!==$row['kelas'])$p=null;
                 if(!$p){
                     $legacyStudent=$coverage['students'][$nis]??null;
-                    $isHistorical=$legacyStudent&&$period<($legacyStudent['settings']['start_period']??'');
+                    $isHistorical=(bool)$legacyStudent;
                     $p=['bill'=>$isHistorical?null:0.0,'paid'=>0.0,'status'=>$isHistorical?'unknown':'unbilled','native'=>false,'unissued'=>!$isHistorical];
                 }
                 $legacyStudent=$coverage['students'][$nis]??null;$explicit=$legacyStudent?($coverage['coverage'][$legacyStudent['student_id']][$category][$period]??null):null;
