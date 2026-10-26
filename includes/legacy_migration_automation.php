@@ -176,11 +176,13 @@ function lma_payment(array $r,array $cfg,array $masters,array $context): ?array 
     $p=lful_payment($r,$cfg,$masters);if($p===null)return null;
     foreach($p['items'] as &$item){
         if(!lma_enabled($cfg)&&!lfet_is_detail($item))continue;
-        $sourceCode=preg_match('/^JUMLAH([1-4])$/D',$item['column'],$slot)?trim((string)($r['raw']['LAIN_LAIN'.$slot[1]]??'')):null;
-        $d=$evidence[$item['column']]??['status'=>'direct','rule'=>'source_column','source_code'=>$sourceCode];
+        $existing=$item['migration']??[];
+        if($item['column']==='U_SORGA'&&$item['category']==='komite')$existing+=['source_code'=>'U_SORGA','rule'=>'sorga_is_komite','komite_mapping_version'=>LCS_KOMITE_MAPPING_VERSION];
+        $sourceCode=preg_match('/^JUMLAH([1-4])$/D',$item['column'],$slot)?trim((string)($r['raw']['LAIN_LAIN'.$slot[1]]??'')):($existing['source_code']??null);
+        $d=$evidence[$item['column']]??['status'=>'direct','rule'=>$existing['rule']??'source_column','source_code'=>$sourceCode];
         $period=$item['category']==='daftar_ulang'&&$du?lma_year((string)($r['raw']['th_ajaran']??'')):$p['period'];
         if($item['category']==='daftar_ulang'&&$du)$d=['status'=>'direct','rule'=>'du_recap_reconciled','source_code'=>null];
-        $item['migration']=['version'=>LMA_VERSION,'period'=>$period,'source_row_key'=>$r['row_key'],'source_code'=>$d['source_code'],'status'=>$d['status'],'rule'=>$d['rule'],'priority'=>$d['priority']??lma_priority($r['raw'],$context['active']??[])];
+        $item['migration']=array_replace($existing,['version'=>LMA_VERSION,'period'=>$period,'source_row_key'=>$r['row_key'],'source_code'=>$d['source_code'],'status'=>$d['status'],'rule'=>$d['rule'],'priority'=>$d['priority']??lma_priority($r['raw'],$context['active']??[])]);
         if($item['category']==='daftar_ulang')$item['migration']+=['du_trace_version'=>1,'source_record_id'=>lfet_source_id($r['raw']),'source_unit_id'=>$context['unit_id'],'source_key'=>$context['source_key'],'du_grade'=>trim((string)($r['raw']['kelas_du']??''))];
         if(lfet_is_detail($item))$item['migration']+=lfet_metadata($r,$context,$item['column'],$d,$item['category']);
     }unset($item);return $p;

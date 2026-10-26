@@ -50,7 +50,7 @@ function lop_prepare(array $records,array $cfg,int $unit,?string $sourceDate,arr
     [$records,$history,$references,$resolutions]=lop_resolved_source_rows($records,$cfg,$sourceDate);$automatic=[];
     $replacementErrors=[];
     $cfg=lop_replace_main_banks($records,$cfg,$sourceDate,$replacementErrors);
-    $sourceComponents=lful_catalog($records);foreach($sourceComponents as $key=>$c){$cfg['_component_names'][$key]=$c['name'];if(!empty($c['ambiguous']))$cfg['_component_conflicts'][$key]=$c['source_names'];}
+    $sourceComponents=lful_catalog($records,$cfg);$cfg=lcs_configure($cfg,$sourceComponents);foreach($sourceComponents as $key=>$c){$cfg['_component_names'][$key]=$c['name'];if(!empty($c['ambiguous']))$cfg['_component_conflicts'][$key]=$c['source_names'];}
     $groups=[];$by=[];$pending=$replacementErrors;$owners=[];$payments=[];$journals=[];$sum=0;$balances=0;
     foreach($records as $r){if($r['reference_only']&&!legacy_source_additional_savings($r))continue;if(legacy_source_additional_savings($r))continue;$identity=lful_identity(legacy_source_identity($r['raw']));if($identity===''){$pending[]=lop_pending('',(string)$r['row_key'],'identity','identity_missing','Identitas sumber belum tercatat.',$r);continue;}$by[$identity][]=$r;
         if($r['table']==='siswa'){$g=lop_group((string)($r['raw']['KELAS']??''),$unit);$groups[$g['code']]??=$g+['aliases'=>[],'identities'=>[]];$groups[$g['code']]['aliases'][(string)($r['raw']['KELAS']??'')]=true;$groups[$g['code']]['identities'][]=$identity;}}

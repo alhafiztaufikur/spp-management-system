@@ -16,7 +16,12 @@ function payment_history_period(array $p): string
 function payment_history_model(mysqli $db,int $id,bool $deleted): array
 {
     if($id<-1000000000){require_once __DIR__.'/legacy_transactions.php';return lt_model($db,-$id-1000000000,$deleted);}
-    if($id<0&&!$deleted)return lful_history_model($db,-$id)+['capabilities'=>['can_edit'=>false,'can_delete'=>false,'can_print'=>true]];
+    if($id<0&&!$deleted){
+        $model=lful_history_model($db,-$id);$record=$model['legacy'];
+        // The shared slip renderer consumes this read-only adapter for both formats.
+        $payment=$record+['TGL_BYR'=>$record['payment_datetime'],'total_jumlah'=>$record['total'],'kelas_transaksi'=>$record['class_snapshot'],'KELAS'=>$record['class_snapshot'],'BULAN'=>'','TAHUN'=>''];$payment['id']=$id;
+        return $model+['payment'=>$payment,'components'=>array_map(fn($item)=>[lcs_component_view($item)['display_label'],$item['amount']],$record['items']),'capabilities'=>['can_edit'=>false,'can_delete'=>false,'can_print'=>true]];
+    }
     if($id<=0) throw new OutOfBoundsException('Transaksi tidak ditemukan pada unit ini.');
     $details=[];
     if($deleted) {

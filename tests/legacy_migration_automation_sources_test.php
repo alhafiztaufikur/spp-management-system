@@ -25,9 +25,9 @@ foreach(lf_rows($db,'SELECT id,unit_id,manifest,fingerprint FROM legacy_finance_
     $sourcePayments=count(array_filter($records,fn($r)=>$r['table']==='bayar'));
     lft_assert(count($plan['payments'])===$sourcePayments,'Pembayaran asal terlewat atau rekap DU menjadi penerimaan baru pada unit '.$unit);
     lft_assert(ma_source_digest($records)===$before,'Isi arsip berubah dalam simulasi');
-    foreach($plan['payments'] as $payment){lft_assert($payment['source_table']==='bayar','Rekap menjadi kuitansi');$sum=0;foreach($payment['items'] as $item)$sum+=lf_cents($item['amount']);lft_assert($sum===lf_cents($payment['total']),'Total rincian berubah');}
+    $komiteItems=0;foreach($plan['payments'] as $payment){lft_assert($payment['source_table']==='bayar','Rekap menjadi kuitansi');$sum=0;foreach($payment['items'] as $item){$sum+=lf_cents($item['amount']);if(lcs_komite_enabled($cfg)&&$item['column']==='U_SORGA'){$komiteItems++;lft_assert($item['category']==='komite'&&$item['label']==='Komite'&&($item['migration']['source_code']??'')==='U_SORGA','Arti Komite pada sumber belum diterapkan');}}lft_assert($sum===lf_cents($payment['total']),'Total rincian berubah');}
     if($unit===1){foreach(['202107048'=>'0.00','202107049'=>'90000.00','212207087'=>'135000.00','252601093'=>'1340000.00'] as $nis=>$balance)lft_assert(($plan['owners'][$nis]['savings']['balance']??null)===$balance,'Sumber saldo salah untuk '.$nis);}
-    echo lf_json(['unit'=>$unit,'source_payments'=>$sourcePayments,'summary'=>$plan['summary']]).PHP_EOL;
+    echo lf_json(['unit'=>$unit,'source_payments'=>$sourcePayments,'komite_source_items'=>$komiteItems,'summary'=>$plan['summary']]).PHP_EOL;
     $audited[$unit]=true;
     unset($plan,$records,$cfg,$catalog,$patch);gc_collect_cycles();
 }

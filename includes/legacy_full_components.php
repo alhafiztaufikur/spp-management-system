@@ -1,4 +1,5 @@
 <?php
+require_once __DIR__.'/legacy_component_semantics.php';
 /** Component proposals stay in the private draft until the cutover transaction. */
 function lful_new_category(string $key): string { return 'biaya_baru:'.$key; }
 function lful_proposal_key(string $component): string { return 'm_'.substr(hash('sha256',$component),0,16); }

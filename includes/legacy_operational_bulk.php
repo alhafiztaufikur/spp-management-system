@@ -25,6 +25,7 @@ function lop_bulk_patch(array $records,array $catalog,array $settings,int $unit,
         $patch['op_import_unmatched']=true;
     }
     if(in_array($scope,['all','components'],true)){
+        $catalog['components']=lcs_catalog($catalog['components'],$settings);
         $proposals=$settings['new_masters']??[];
         foreach($catalog['components'] as $c){
             $key=$c['key'];$old=$settings['components'][$key]??[];

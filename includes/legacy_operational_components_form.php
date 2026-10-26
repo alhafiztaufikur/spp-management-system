@@ -2,6 +2,7 @@
 function lop_review_components(mysqli $db,array $catalog,array $cfg): void {
     global $id;$groups=[];$used=[];$masters=lf_rows($db,'SELECT id,nama FROM master_biaya_lain ORDER BY nama');
     if(lma_enabled($cfg))$catalog['components']=lma_catalog_components($catalog['components']);
+    $catalog['components']=lcs_catalog($catalog['components'],$cfg);
     foreach($catalog['components'] as $c){$key=$c['group_key']??$c['key'];$groups[$key]??=['name'=>$c['name'],'rows'=>[],'count'=>0,'total'=>0];$groups[$key]['rows'][]=$c;$groups[$key]['count']+=$c['count'];if($c['total']!==null)$groups[$key]['total']+=lf_cents($c['total']);if(!empty($c['source_code']))$used[$c['source_code']]=true;}
     $page=max(1,(int)($_GET['page']??1));
     echo '<section class="dbt-card"><h2>Komponen pembayaran</h2><p>Nama mengikuti master Legacy. Histori memakai nominal pembayaran asli; master baru dibuat nonaktif tanpa menerbitkan tagihan.</p><div class="lop-group-list">';

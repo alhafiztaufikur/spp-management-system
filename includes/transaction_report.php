@@ -42,15 +42,24 @@ function transaction_report_section(mysqli $db,string $start,string $end,string 
  */
 function transaction_report_item_sql(mysqli $db): string {
     $parts=[];
+    $append=static function(string $id,string $unit,string $key,string $label,string $amount,string $order,string $tail)use(&$parts):void{
+        $parts[]="SELECT $id payment_id,$unit unit_id,".lcs_sql_text($key).' component_key,'.lcs_sql_text($label)." label,CAST($amount AS DECIMAL(20,2)) amount,$order detail_order $tail";
+    };
     foreach(['U_PSB'=>['psb','PSB'],'U_SPP'=>['spp','SPP'],'U_KOMITE'=>['komite','Komite'],'potong_spp'=>['potongan_spp','Potongan SPP']] as $column=>[$key,$label]){
         $amount=$column==='potong_spp'?'-n.'.$column:'n.'.$column;
         // Some native columns are DOUBLE. Round each stored item to cents before SUM.
-        $parts[]="SELECT n.id payment_id,n.unit_id,'$key' component_key,'$label' label,CAST($amount AS DECIMAL(20,2)) amount,0 detail_order FROM chosen c STRAIGHT_JOIN bayar n ON n.id=c.id AND n.unit_id=c.unit_id WHERE c.id>0 AND n.$column<>0";
+        $append('n.id','n.unit_id',"'$key'","'$label'",$amount,'0',"FROM chosen c STRAIGHT_JOIN bayar n ON n.id=c.id AND n.unit_id=c.unit_id WHERE c.id>0 AND n.$column<>0");
     }
-    $parts[]="SELECT d.bayar_id,d.unit_id,CASE WHEN COALESCE(d.master_biaya_lain_id,t.master_biaya_lain_id)>0 THEN CONCAT('biaya_lain:',COALESCE(d.master_biaya_lain_id,t.master_biaya_lain_id)) WHEN NULLIF(TRIM(d.legacy_key),'') IS NOT NULL THEN CONCAT('snapshot_key:',d.unit_id,':',d.legacy_key) ELSE CONCAT('snapshot_item:',d.unit_id,':',d.id) END,d.nama_biaya_snapshot,d.nominal_snapshot,d.id FROM chosen c STRAIGHT_JOIN bayar_biaya_lain d ON d.bayar_id=c.id AND d.unit_id=c.unit_id LEFT JOIN tagihan_biaya_lain t ON t.id=d.tagihan_biaya_lain_id AND t.unit_id=d.unit_id WHERE c.id>0 AND d.nominal_snapshot<>0";
-    $parts[]="SELECT d.bayar_id,d.unit_id,'daftar_ulang','Daftar Ulang',d.jumlah,d.id FROM chosen c STRAIGHT_JOIN bayar_du d ON d.bayar_id=c.id AND d.unit_id=c.unit_id WHERE c.id>0 AND d.jumlah<>0";
-    if(lful_read_ready($db))$parts[]="SELECT -i.payment_id,i.unit_id,COALESCE(NULLIF(i.category,''),CONCAT('unmapped:full:',i.unit_id,':',i.id)),i.label,i.amount,i.id FROM chosen c STRAIGHT_JOIN legacy_full_items i ON i.payment_id=-c.id AND i.unit_id=c.unit_id WHERE c.id<0 AND c.id>-1000000000 AND i.amount<>0";
-    if(lop_ready($db))$parts[]="SELECT -1000000000-p.id,p.unit_id,COALESCE(NULLIF(j.category,''),CONCAT('unmapped:op:',p.unit_id,':',p.id,':',j.position)),j.label,j.amount,j.position FROM chosen c STRAIGHT_JOIN legacy_op_payments p ON p.id=-1000000000-c.id AND p.unit_id=c.unit_id JOIN JSON_TABLE(CAST(p.items AS JSON),'$[*]' COLUMNS(position FOR ORDINALITY,category VARCHAR(255) PATH '$.category' NULL ON EMPTY,label VARCHAR(255) PATH '$.label',amount DECIMAL(15,2) PATH '$.amount')) j WHERE c.id<-1000000000 AND j.amount<>0";
+    $append('d.bayar_id','d.unit_id',"CASE WHEN COALESCE(d.master_biaya_lain_id,t.master_biaya_lain_id)>0 THEN CONCAT('biaya_lain:',COALESCE(d.master_biaya_lain_id,t.master_biaya_lain_id)) WHEN NULLIF(TRIM(d.legacy_key),'') IS NOT NULL THEN CONCAT('snapshot_key:',d.unit_id,':',d.legacy_key) ELSE CONCAT('snapshot_item:',d.unit_id,':',d.id) END",'d.nama_biaya_snapshot','d.nominal_snapshot','d.id',"FROM chosen c STRAIGHT_JOIN bayar_biaya_lain d ON d.bayar_id=c.id AND d.unit_id=c.unit_id LEFT JOIN tagihan_biaya_lain t ON t.id=d.tagihan_biaya_lain_id AND t.unit_id=d.unit_id WHERE c.id>0 AND d.nominal_snapshot<>0");
+    $append('d.bayar_id','d.unit_id',"'daftar_ulang'","'Daftar Ulang'",'d.jumlah','d.id',"FROM chosen c STRAIGHT_JOIN bayar_du d ON d.bayar_id=c.id AND d.unit_id=c.unit_id WHERE c.id>0 AND d.jumlah<>0");
+    if(lful_read_ready($db)){
+        $key=lcs_cash_category_sql('i.source_column','i.category');$label=lcs_display_label_sql('i.source_column','i.category','i.label');
+        $append('-i.payment_id','i.unit_id',"COALESCE(NULLIF(($key),''),CONCAT('unmapped:full:',i.unit_id,':',i.id))",$label,'i.amount','i.id',"FROM chosen c STRAIGHT_JOIN legacy_full_items i ON i.payment_id=-c.id AND i.unit_id=c.unit_id WHERE c.id<0 AND c.id>-1000000000 AND i.amount<>0");
+    }
+    if(lop_ready($db)){
+        $key=lcs_cash_category_sql('j.source_column','j.category');$label=lcs_display_label_sql('j.source_column','j.category','j.label');
+        $append('-1000000000-p.id','p.unit_id',"COALESCE(NULLIF(($key),''),CONCAT('unmapped:op:',p.unit_id,':',p.id,':',j.position))",$label,'j.amount','j.position',"FROM chosen c STRAIGHT_JOIN legacy_op_payments p ON p.id=-1000000000-c.id AND p.unit_id=c.unit_id JOIN JSON_TABLE(CAST(p.items AS JSON),'$[*]' COLUMNS(position FOR ORDINALITY,source_column VARCHAR(64) PATH '$.column' NULL ON EMPTY,category VARCHAR(255) PATH '$.category' NULL ON EMPTY,label VARCHAR(255) PATH '$.label',amount DECIMAL(15,2) PATH '$.amount')) j WHERE c.id<-1000000000 AND j.amount<>0");
+    }
     return implode(' UNION ALL ',$parts);
 }
 
@@ -59,7 +68,9 @@ function transaction_report_component_totals(mysqli $db,string $start,string $en
     $source=mh_payment_source($db,false,null,false);
     [$where,$args]=general_history_filter('p','stored_datetime',$start,$end,$search,$db);
     $items=transaction_report_item_sql($db);
-    $rows=hp_rows($db,"WITH chosen AS (SELECT p.id,p.unit_id FROM $source p WHERE $where), items AS ($items) SELECT component_key,MIN(label) label,SUM(amount) amount,GROUP_CONCAT(DISTINCT unit_id ORDER BY unit_id) units FROM items GROUP BY component_key ORDER BY component_key",$args);
+    // DISTINCT is also an optimizer barrier: reused chosen branches must not inherit
+    // contradictory signed-ID conditions from other UNION branches (MySQL 8.0).
+    $rows=hp_rows($db,"WITH chosen AS (SELECT DISTINCT p.id,p.unit_id FROM $source p WHERE $where), items AS ($items) SELECT component_key,MIN(label) label,SUM(amount) amount,GROUP_CONCAT(DISTINCT unit_id ORDER BY unit_id) units FROM items GROUP BY component_key ORDER BY component_key",$args);
     $labels=['psb'=>'PSB','spp'=>'SPP','komite'=>'Komite','daftar_ulang'=>'Daftar Ulang','potongan_spp'=>'Potongan SPP'];
     $counts=[];
     foreach($rows as &$row){$row['label']=$labels[$row['component_key']]??$row['label'];$row['cents']=transaction_report_cents($row['amount']);$counts[$row['label']]=($counts[$row['label']]??0)+1;}unset($row);
@@ -75,7 +86,7 @@ function transaction_report_component_totals(mysqli $db,string $start,string $en
 function transaction_report_components(mysqli $db,array $rows): array {
     $out=[];$items=transaction_report_item_sql($db);
     foreach(array_chunk($rows,500) as $chunk){
-        foreach(mh_receipts_many($db,$chunk) as $id=>$receipt)foreach($receipt['items'] as $item){$value=round((float)$item['amount'],2);$out[$id][]=$item['label'].': Rp '.number_format($value,$value===floor($value)?0:2,',','.');}
+        foreach(mh_receipts_many($db,$chunk) as $id=>$receipt)foreach($receipt['items'] as $item){$value=round((float)$item['amount'],2);$out[$id][]=lcs_component_view($item)['display_label'].': Rp '.number_format($value,$value===floor($value)?0:2,',','.');}
         $selected=[];foreach($chunk as $row)if((int)$row['id']>0)$selected[]='SELECT '.(int)$row['id'].' id,'.(int)$row['unit_id'].' unit_id';
         if(!$selected)continue;
         foreach(hp_rows($db,'WITH chosen AS ('.implode(' UNION ALL ',$selected).") SELECT * FROM ($items) items ORDER BY payment_id,CASE WHEN payment_id>0 THEN CASE component_key WHEN 'psb' THEN 1 WHEN 'spp' THEN 2 WHEN 'komite' THEN 3 WHEN 'potongan_spp' THEN 4 WHEN 'daftar_ulang' THEN 6 ELSE 5 END ELSE 0 END,detail_order") as $item){

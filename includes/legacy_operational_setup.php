@@ -5,6 +5,7 @@ function lop_source_setup(array $records, array $manifest, array $settings, int 
     // Only the initial preparation opts in. Published and previously prepared jobs keep their rules.
     if(!isset($settings['mode'])){
         $settings['automation_version']=LMA_VERSION;
+        $settings['komite_mapping_version']??=LCS_KOMITE_MAPPING_VERSION;
         $settings['op_preserve_unproven_balances']=true;
         require_once __DIR__.'/daftar_ulang.php';$settings['du_target_year']=du_current_academic_year();
     }
@@ -35,7 +36,7 @@ function lop_source_setup(array $records, array $manifest, array $settings, int 
             ]))
         ]);
     }
-    foreach (lful_catalog($records) as $key=>$component) {
+    foreach (lful_catalog($records,$settings) as $key=>$component) {
         if (!empty($settings['components'][$key]['category'])) continue;
         $settings['components'][$key] = [
             'category'=>$component['savings'] ? 'savings_reference' :
@@ -43,7 +44,7 @@ function lop_source_setup(array $records, array $manifest, array $settings, int 
             'reason'=>$reason, 'confirmed'=>empty($component['ambiguous']), 'automatic_mapping'=>true
         ];
     }
-    return $settings;
+    return lcs_configure($settings,lful_catalog($records,$settings));
 }
 
 function lop_default_year(mysqli $db): int

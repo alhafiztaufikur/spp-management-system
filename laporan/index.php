@@ -151,7 +151,11 @@ $bayar_recap=['total'=>$section['totals'][0]['value'],'jml_tx'=>$section['row_co
 $generalSections=[$section];
 $totalDetailRows=$section['row_count'];
 $bayar_detail=$section['rows'];
-$componentTotals=transaction_report_component_totals($koneksi,$periodStart,$periodEnd,$filter_q);
+$componentTotals=[];$componentReadError=false;
+try{
+    $componentTotals=transaction_report_component_totals($koneksi,$periodStart,$periodEnd,$filter_q);
+    if(!$componentTotals&&abs((float)$bayar_recap['total'])>=0.005)throw new UnexpectedValueException('Filtered payments have a nonzero total but component aggregation is empty.');
+}catch(Throwable $error){$componentReadError=true;error_log('Transaction report components: '.$error->getMessage());}
 $koneksi->commit();
 $sectionQuery['section_page']=['semua'=>$section['page']];
 
@@ -326,9 +330,9 @@ $exportQuery = filter_build_query([
         <header class="card-header"><h3 class="card-title" id="finance-components-title">Rekap Komponen Pembayaran</h3><small class="finance-table-note"><?= general_page_e($periodLabel) ?></small></header>
         <div class="table-container"><table class="payment-table finance-components-table">
           <thead><tr><th scope="col">Komponen</th><th scope="col" class="nominal">Total (Rp)</th></tr></thead>
-          <tbody><?php if(!$componentTotals): ?><tr><td colspan="2">Tidak ada pembayaran sesuai filter.</td></tr><?php endif; ?>
+          <tbody><?php if($componentReadError): ?><tr><td colspan="2">Rekap komponen belum dapat dimuat. <a href="index.php?<?= general_page_e(filter_build_query($sectionQuery)) ?>">Muat ulang laporan</a></td></tr><?php elseif(!$componentTotals): ?><tr><td colspan="2"><?= $totalDetailRows===0?'Tidak ada pembayaran sesuai filter.':'Tidak ada rincian pembayaran bernominal pada transaksi ini.' ?></td></tr><?php endif; ?>
           <?php foreach($componentTotals as $component): ?><tr data-component-key="<?= general_page_e($component['component_key']) ?>" data-cents="<?= $component['cents'] ?>"><td><?= general_page_e($component['label']) ?></td><td class="nominal"><?= general_page_e(general_page_money($component['cents']/100)) ?></td></tr><?php endforeach; ?></tbody>
-          <tfoot><tr><th scope="row">Total</th><td class="nominal"><?= general_page_e(general_page_money(array_sum(array_column($componentTotals,'cents'))/100)) ?></td></tr></tfoot>
+          <tfoot><tr><th scope="row">Total</th><td class="nominal"><?= $componentReadError?'—':general_page_e(general_page_money(array_sum(array_column($componentTotals,'cents'))/100)) ?></td></tr></tfoot>
         </table></div>
       </section>
       <div class="main-card finance-transactions" aria-labelledby="finance-transactions-title">
