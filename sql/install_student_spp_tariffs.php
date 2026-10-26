@@ -11,6 +11,8 @@ require_once __DIR__.'/../includes/spp_student_tariff.php';
 require_once __DIR__.'/../includes/legacy_migration_verification.php';
 $target=lmr_target($koneksi);
 if($target['database_name']!==$database||(int)$target['port']!==$port)throw new RuntimeException('Identitas target berbeda.');
+$preflight=sct_constraint_inspect($koneksi,true);
+if($preflight['conflicts']||$preflight['invalid'])throw new RuntimeException('Preflight gagal: '.json_encode($preflight,JSON_UNESCAPED_UNICODE|JSON_THROW_ON_ERROR));
 $ready=sct_ready($koneksi);
 $changed=0;
 if($mode==='apply'&&!$ready){
@@ -18,4 +20,4 @@ if($mode==='apply'&&!$ready){
     try {lmr_backup_check($koneksi,$o['backup-proof']??'');$changed=sct_schema_apply($koneksi);}
     finally {database_access_release($lock);}
 }
-echo json_encode(['target'=>$target,'mode'=>$mode,'pending'=>sct_ready($koneksi)?0:1,'changes'=>$changed,'backfill'=>0],JSON_PRETTY_PRINT|JSON_THROW_ON_ERROR).PHP_EOL;
+echo json_encode(['target'=>$target,'mode'=>$mode,'pending'=>sct_ready($koneksi)?0:1,'changes'=>$changed,'backfill'=>0,'preflight'=>$preflight],JSON_PRETTY_PRINT|JSON_THROW_ON_ERROR).PHP_EOL;

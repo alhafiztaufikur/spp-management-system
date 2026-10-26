@@ -63,9 +63,9 @@ function one_time_fee_status(mysqli $db, string $noInduk, int $excludePaymentId 
         $result[$key] = [
             'known'=>$opening===null||$opening['known'],'billing_state'=>$opening!==null&&!$opening['known']?'unknown':'known','basis'=>$opening['basis']??'system',
             'label' => $cfg['label'],
-            'total' => $total,
+            'total' => $position['known']?$total:null,
             'paid' => $paidAmount,
-            'remaining' => max(0, $total - $paidAmount),
+            'remaining' => $position['known']?max(0, $total - $paidAmount):null,
         ];
     }
     if($cacheRead)$readCache[$cacheKey]=$result;
@@ -87,7 +87,7 @@ function one_time_fee_payload_for_options(mysqli $db, int $excludePaymentId = 0)
         foreach (one_time_fee_components() as $key => $cfg) {
             $payload[$row['NO_INDUK']][$key] = [
                 'known'=>$opening===null||$opening['known'],
-                'total' => (float)$totals[$key],
+                'total' => $position['known']?(float)$totals[$key]:null,
                 'paid' => (float)($row['paid_' . $key] ?? 0),
             ];
         }

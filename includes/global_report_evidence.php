@@ -49,7 +49,7 @@ function report_component_class_matches(mysqli $db,array $f,array $row): bool {
     return report_class_matches_row($f,$row);
 }
 function report_evidence_notes(array $report,string $template,array $f): array {
-    $notes=[];
+    $notes=$report['notes']??[];
     foreach($report['sections']??[] as $part)$notes=array_merge($notes,$part['notes']??[]);
     if(report_uses_transaction_dates($template,$f)&&!empty($f['include_undated']))$notes[]='Termasuk transaksi tanpa tanggal sesuai periode kewajiban';
     if(array_filter($report['rows'],static fn($r)=>!empty($r['_incomplete'])))$notes[]='Total kewajiban hanya mencakup nominal yang diketahui';
@@ -75,7 +75,7 @@ function report_annual_evidence(mysqli $db,array $f): array {
             $paid=($native!==null?(float)$native['paid']:0)+($credit['paid']??0)/100;
         }
         if(!$known)$bill=null;
-        $cancelled=($native['status']??'')==='cancelled';$status=$known?report_billing_status((float)$bill,$paid,$cancelled?'cancelled':'open'):($paid>.001?'Ada Pembayaran':'Belum Diketahui');
+        $cancelled=($native['status']??'')==='cancelled';$status=$known?report_billing_status((float)$bill,$paid,$cancelled?'cancelled':'open'):($paid>.001?'Perlu Rekonsiliasi':'Belum Diketahui');
         $label=$category==='psb'?class_label($s):($native['kelas_rombel_snapshot']??$placement['kelas_rombel_snapshot']??$credit['class']??'Tidak tercatat');
         $row=['nis'=>$nis,'student_id'=>(int)$s['id'],'unit_id'=>(int)$s['unit_id'],'nis_diknas'=>$s['NO_induk_diknas']??'','nama'=>$s['NAMA'],'kelas'=>$label,'master_kelas_id'=>$category==='psb'?$s['master_kelas_id']:($native['master_kelas_id']??$placement['master_kelas_id']??0),'tingkat'=>$category==='psb'?$s['KELAS']:($placement['kelas']??$label),'periode'=>$category==='psb'?'Sekali saat masuk':$year,'tagihan'=>$bill,'terbayar'=>$paid,'sisa'=>$known?($cancelled?0.0:max(0,$bill-$paid)):null,'status'=>$status,'_status'=>$status,'_incomplete'=>!$known];
         $row['tanggal_dibuat']=$source?null:$s['created_at'];
@@ -85,16 +85,19 @@ function report_annual_evidence(mysqli $db,array $f): array {
     return ['title'=>report_categories($db)[$category],'subtitle'=>'Status kewajiban · '.($category==='psb'?'Sekali saat masuk':$year),'columns'=>[['nis','NIS'],['nama','Nama Siswa'],['kelas','Kelas'],['periode','Periode'],['tagihan','Tagihan','money_optional'],['terbayar','Terbayar','money'],['sisa','Sisa','money_optional'],['status','Status','status']],'rows'=>report_filter_rows($rows,$f)];
 }
 /** Payment evidence with no native bill remains visible, without inventing a principal/date. */
+function report_billing_identity(array $row): string {
+    return (int)($row['unit_id']??report_query_unit_id()).'|'.(string)$row['nis'].'|'.$row['komponen_key'].'|'.($row['periode_code']??($row['tahun_ajaran']??''));
+}
 function report_billing_legacy_rows(mysqli $db,array $f,array $existing): array {
     if(!empty($f['filter_tanggal_tagihan'])&&$f['tanggal_awal']!=='')return [];
-    $seen=[];foreach($existing as $r){$period=$r['periode_code']??($r['tahun_ajaran']??'');$seen[$r['nis'].'|'.$r['komponen_key'].'|'.$period]=true;}
+    $seen=[];foreach($existing as $key=>$r)$seen[is_array($r)?report_billing_identity($r):(string)$key]=true;
     $students=[];foreach(hp_rows($db,'SELECT * FROM siswa WHERE legacy_pending=0') as $s)$students[$s['NO_INDUK']]=$s;
     $classes=[];foreach(class_all($db,false) as $c)$classes[class_label($c)]=$c;
     $rows=[];
     foreach(report_legacy_periods($db)['payments'] as $nis=>$categories){$s=$students[$nis]??null;if(!$s)continue;
         if(($f['siswa_status']==='active'&&!(int)$s['is_active'])||($f['siswa_status']==='archived'&&(int)$s['is_active']))continue;
         foreach($categories as $category=>$periods){if(!in_array($category,['spp','komite','daftar_ulang'],true))continue;
-            foreach($periods as $period=>$p){if(isset($seen[$nis.'|'.$category.'|'.$period])||$p['paid']<=0)continue;$c=$classes[$p['class']]??null;
+            foreach($periods as $period=>$p){if(isset($seen[(int)$s['unit_id'].'|'.$nis.'|'.$category.'|'.$period])||$p['paid']<=0)continue;$c=$classes[$p['class']]??null;
                 $row=['nis'=>(string)$nis,'student_id'=>(int)$s['id'],'unit_id'=>(int)$s['unit_id'],'nis_diknas'=>$s['NO_induk_diknas']??'','nama'=>$s['NAMA'],'kelas'=>$p['class']?:'Tidak tercatat','master_kelas_id'=>$c['id']??0,'tingkat'=>$c['tingkat']??$p['class'],'komponen'=>['spp'=>'SPP','komite'=>'Komite','daftar_ulang'=>'Daftar Ulang'][$category],'komponen_key'=>$category,'periode'=>$category==='daftar_ulang'?$period:report_months()[substr($period,5,2)].' '.substr($period,0,4),'periode_code'=>$period,'tahun_ajaran'=>lb_payment_year($period),'tanggal_dibuat'=>null,'tagihan'=>null,'terbayar'=>$p['paid']/100,'sisa'=>null,'status'=>'Ada Pembayaran','_status'=>'Ada Pembayaran','_incomplete'=>true];
                 if(report_class_matches_row($f,$row))$rows[]=$row;
             }

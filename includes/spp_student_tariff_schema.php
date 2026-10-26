@@ -1,7 +1,10 @@
 <?php
 /** Additive installation only; never run DDL from a page request. */
+require_once __DIR__.'/spp_student_tariff_constraints.php';
 function sct_schema_apply(mysqli $db): int {
     if(PHP_SAPI!=='cli')throw new LogicException('Pemasangan tarif khusus hanya melalui CLI.');
+    $preflight=sct_constraint_inspect($db,true);
+    if($preflight['conflicts']||$preflight['invalid'])throw new RuntimeException('Preflight tarif SPP ditolak: '.json_encode($preflight,JSON_UNESCAPED_UNICODE|JSON_THROW_ON_ERROR));
     $exists=(int)$db->query("SELECT COUNT(*) FROM information_schema.TABLES WHERE TABLE_SCHEMA=DATABASE() AND TABLE_NAME='spp_tarif_siswa_data'")->fetch_row()[0];
     $changed=0;
     if(!$exists){$db->query("CREATE TABLE spp_tarif_siswa_data (
@@ -38,6 +41,8 @@ function sct_schema_apply(mysqli $db): int {
         $db->query("CREATE TRIGGER $name BEFORE $event ON spp_tarif_siswa_data FOR EACH ROW BEGIN $body END");
         $changed++;
     }
+    $constraints=sct_constraint_inspect($db,true);
+    foreach($constraints['missing'] as $sql){$db->query($sql);$changed++;}
     unset($GLOBALS['sct_ready'][$db->thread_id]);
     return $changed;
 }

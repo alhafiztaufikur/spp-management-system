@@ -91,12 +91,18 @@ function lb_student(mysqli $db,string $nis,?int $unit=null): ?array {return lb_c
 function lb_amount($value): ?int {try{return $value===null||$value===''?null:lf_cents($value);}catch(Throwable $e){return null;}}
 function lb_du_credit(mysqli $db,string $nis,string $year,?int $unit=null): float {$s=lb_student($db,$nis,$unit);return $s?(lb_cache($db)['paid'][$s['id']]['du'][$year]??0)/100:0.0;}
 function lb_psb_source(mysqli $db,string $nis): ?array {
-    $s=lb_student($db,$nis);if(!$s)return null;$raw=$s['raw']??[];$gross=lb_amount($raw['tot_pangkal']??null);$discount=lb_amount($raw['potong_pangkal']??null);$net=lb_amount($raw['PANGKAL']??null);$paid=lb_amount($raw['PANGKAL_BAYAR']??null);$data=lb_cache($db);
-    $unknown=['known'=>false,'total'=>0.0,'paid'=>0.0,'remaining'=>0.0,'billing_state'=>'unknown','basis'=>'legacy','reason'=>'Dasar atau pembayaran PSB sumber belum lengkap.'];
-    if(!empty($s['ambiguous'])||$gross===null||$discount===null||$net===null||$paid===null||$gross-$discount!==$net||$paid<($data['original_psb'][$s['id']]??0))return $unknown;
+    $s=lb_student($db,$nis);if(!$s)return null;$raw=$s['raw']??[];$data=lb_cache($db);
+    return lb_psb_evidence($raw,!empty($s['ambiguous']),$data['original_psb'][$s['id']]??0,$data['paid'][$s['id']]['psb']??0,$s['source_row_key']??'');
+}
+
+/** Header credit is cumulative; invalid headers never erase corrected receipt evidence. */
+function lb_psb_evidence(array $raw,bool $ambiguous,int $original,int $current,string $sourceRow=''): array {
+    $gross=lb_amount($raw['tot_pangkal']??null);$discount=lb_amount($raw['potong_pangkal']??null);$net=lb_amount($raw['PANGKAL']??null);$paid=lb_amount($raw['PANGKAL_BAYAR']??null);
+    $unknown=['known'=>false,'total'=>null,'gross'=>null,'discount'=>null,'paid'=>max(0,$current)/100,'paid_known'=>true,'remaining'=>null,'billing_state'=>'reconciliation','basis'=>'legacy','reason'=>'Dasar atau pembayaran PSB sumber belum lengkap.'];
+    if($ambiguous||$gross===null||$discount===null||$net===null||$paid===null||$gross<0||$discount<0||$net<0||$gross-$discount!==$net||$paid<$original)return $unknown+['credit_basis'=>'detail','source_row_key'=>$sourceRow];
     // The cumulative source header includes its detailed receipts. Only the correction delta is added.
-    $credit=$paid+($data['paid'][$s['id']]['psb']??0)-($data['original_psb'][$s['id']]??0);
-    return ['known'=>true,'total'=>$net/100,'paid'=>max(0,$credit)/100,'remaining'=>max(0,$net-$credit)/100,'billing_state'=>'known','basis'=>'legacy','gross'=>$gross/100,'discount'=>$discount/100,'source_row_key'=>$s['source_row_key']];
+    $credit=$paid+$current-$original;
+    return ['known'=>true,'total'=>$net/100,'paid'=>max(0,$credit)/100,'remaining'=>max(0,$net-$credit)/100,'billing_state'=>'known','basis'=>'legacy','gross'=>$gross/100,'discount'=>$discount/100,'paid_known'=>true,'credit_basis'=>'cumulative_header_delta','source_row_key'=>$sourceRow];
 }
 function lb_du_source(mysqli $db,string $nis,string $year): ?array {
     $s=lb_student($db,$nis);if(!$s)return null;return ldu_source_proof($s,lb_cache($db)['tariffs'][$s['source_id']]??[],$year);
@@ -189,7 +195,7 @@ function lb_reconcile(mysqli $db,int $actor,bool $apply=false): array {
 /** Shared report adaptor: credit changes outstanding balances, never cash totals. */
 function lb_report_amounts(mysqli $db,string $nis,string $category,string $year,float $bill,float $paid): ?array {
     $s=lb_student($db,$nis);if(!$s)return null;
-    if($category==='psb'){$position=lb_psb_position($db,$nis,$s,$paid);return $position['known']?$position:['known'=>false,'total'=>null,'paid'=>$paid,'remaining'=>null];}
+    if($category==='psb'){$position=lb_psb_position($db,$nis,$s,$paid);return $position;}
     elseif($category==='daftar_ulang'){$proof=lb_du_source($db,$nis,$year);$issued=hp_one($db,"SELECT nominal_tagihan,status FROM tagihan_daftar_ulang WHERE no_induk=? AND tahun_ajaran_snapshot=?",[$nis,$year]);if(!$issued&&empty($proof['known']))return ['known'=>false,'total'=>null,'paid'=>$paid,'remaining'=>null];if($issued&&$issued['status']!=='open')return ['known'=>false,'total'=>null,'paid'=>$paid,'remaining'=>null];$bill=$issued?(float)$issued['nominal_tagihan']:(float)$proof['total'];$paid+=lb_du_credit($db,$nis,$year);}
     else return null;
     return ['known'=>true,'total'=>$bill,'paid'=>$paid,'remaining'=>max(0,$bill-$paid)];
@@ -253,8 +259,8 @@ function lb_psb_effective(mysqli $db,array $student): array {
 /** Canonical PSB position for master forms, cashier, obligations, and reports. */
 function lb_psb_position(mysqli $db,string $nis,array $student,float $nativePaid=0): array {
     $proof=lb_psb_source($db,$nis);$student['NO_INDUK']=$nis;$effective=lb_psb_effective($db,$student);
-    $gross=(float)($effective['PSB']??0);$discount=(float)($effective['potongan_psb_nominal']??0);$total=max(0,$gross-$discount);$paid=$nativePaid+(!empty($proof['known'])?$proof['paid']:0);
-    return ['known'=>$proof===null||!empty($proof['known']),'total'=>$total,'paid'=>$paid,'remaining'=>max(0,$total-$paid),'gross'=>$gross,'discount'=>$discount,'basis'=>$proof['basis']??'system'];
+    $gross=(float)($effective['PSB']??0);$discount=(float)($effective['potongan_psb_nominal']??0);$total=max(0,$gross-$discount);$paid=$nativePaid+($proof['paid']??0);$known=$proof===null||!empty($proof['known']);
+    return ['known'=>$known,'total'=>$known?$total:null,'paid'=>$paid,'paid_known'=>true,'remaining'=>$known?max(0,$total-$paid):null,'gross'=>$known?$gross:null,'discount'=>$known?$discount:null,'basis'=>$proof['basis']??'system','billing_state'=>$known?'known':'reconciliation','reason'=>$proof['reason']??null,'credit_basis'=>$proof['credit_basis']??'native'];
 }
 
 function lb_native_du_cents(mysqli $db,string $nis,string $year): int {

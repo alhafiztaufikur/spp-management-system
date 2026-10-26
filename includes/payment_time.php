@@ -38,10 +38,10 @@ function journal_time_overrides(mysqli $db):array {
     }
     return $GLOBALS['journal_time_cache'][$thread][$scope];
 }
-function journal_time_precision(mysqli $db,int $id,string $origin,?string $stamp):string {
+function journal_time_precision(mysqli $db,int $id,string $origin,?string $stamp,?array $overrides=null):string {
     if(!$stamp)return 'none';
     if($id>0||in_array($origin,['native','new','adjustment'],true))return 'datetime';
-    if($id<-1000000000){$override=journal_time_overrides($db)[-$id-1000000000]??null;if($override!==null)return $override;}
+    if($id<-1000000000){$override=($overrides??journal_time_overrides($db))[-$id-1000000000]??null;if($override!==null)return $override;}
     return substr($stamp,11,8)==='00:00:00'?'date':'datetime';
 }
 

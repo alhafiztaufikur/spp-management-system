@@ -1,11 +1,12 @@
 <?php
 /** Explicit final SPP rates, scoped to one student and academic period. */
+require_once __DIR__.'/spp_student_tariff_constraints.php';
 function sct_ready(mysqli $db): bool {
     $key=$db->thread_id;
     return $GLOBALS['sct_ready'][$key]??= (int)$db->query("SELECT
         (SELECT COUNT(*) FROM information_schema.TABLES WHERE TABLE_SCHEMA=DATABASE() AND ((TABLE_NAME='spp_tarif_siswa_data' AND TABLE_TYPE='BASE TABLE') OR (TABLE_NAME='spp_tarif_siswa' AND TABLE_TYPE='VIEW')))+
         (SELECT COUNT(*) FROM information_schema.TRIGGERS WHERE TRIGGER_SCHEMA=DATABASE() AND TRIGGER_NAME IN ('spp_tarif_siswa_data_i','spp_tarif_siswa_data_u','spp_tarif_siswa_data_d'))
-    ")->fetch_row()[0]===5;
+    ")->fetch_row()[0]===5 && (($contract=sct_constraint_inspect($db)) && !$contract['missing'] && !$contract['conflicts']);
 }
 function sct_invalidate(mysqli $db): void {unset($GLOBALS['sct_rules'][$db->thread_id]);}
 function sct_rules(mysqli $db): array {
