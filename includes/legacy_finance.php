@@ -109,7 +109,8 @@ function lf_extract_stream(array $job,?array &$manifest=null): Generator {
     sort($hashes,SORT_STRING);$manifest['fingerprint']=hash('sha256',implode("\n",$hashes));$manifest['total']=array_sum($counts);
 }
 function lf_extract_read(array $job,bool $operationalOnly=false,bool $feeEvidence=false): array {
-    $records=[];$manifest=null;foreach(lf_extract_stream($job,$manifest) as $record)if(!$operationalOnly||!$record['reference_only']||in_array($record['table'],['lain'],true)||legacy_source_additional_savings($record))$records[]=$record;
+    // DU simulation needs the same source tariffs as reconciliation after publication.
+    $records=[];$manifest=null;foreach(lf_extract_stream($job,$manifest) as $record)if(!$operationalOnly||!$record['reference_only']||in_array($record['table'],['lain','Daftar_ulang','du'],true)||legacy_source_additional_savings($record))$records[]=$record;
     if($feeEvidence)$records=lma_reference_evidence($job,$records);
     return [$records,$manifest];
 }

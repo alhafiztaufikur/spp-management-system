@@ -6,8 +6,8 @@
 define('DB_HOST', getenv('SPP_DB_HOST') ?: 'localhost');
 define('DB_USER', getenv('SPP_DB_USER') ?: 'root');
 define('DB_PASS', getenv('SPP_DB_PASS') !== false ? getenv('SPP_DB_PASS') : '');
-define('DB_NAME', getenv('SPP_DB_NAME') ?: 'db_spp_test2');
-if (PHP_SAPI !== 'cli' && DB_NAME === 'db_spp_test2'
+define('DB_NAME', getenv('SPP_DB_NAME') ?: 'db_spp');
+if (PHP_SAPI !== 'cli' && DB_NAME === 'db_spp'
     && is_file(__DIR__ . '/tmp/financial_migration.lock')) {
     http_response_code(503);
     header('Retry-After: 60');

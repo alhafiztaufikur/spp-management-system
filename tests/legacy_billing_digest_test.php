@@ -10,7 +10,11 @@ try{
     $batch=hp_one($db,"SELECT id,manifest FROM legacy_full_batches WHERE state='completed'");
     bdt_check(json_decode($batch['manifest'],true)['working_digest']===lop_working_digest($db,$batch['id']),'Fixture begins with a valid committed digest');
     $master=hp_one($db,"SELECT m.id FROM master_spp_tahun m JOIN tahun_ajaran y ON y.id=m.tahun_ajaran_id AND y.unit_id=m.unit_id WHERE y.label='2026/2027'");
-    $state=spp_master_state($db,(int)$master['id']);$rates=spp_master_rates($db,(int)$master['id']);$expected=spp_master_rate_version($state,$rates);$rates[1]+=123;
+    $state=spp_master_state($db,(int)$master['id']);$rates=spp_master_rates($db,(int)$master['id']);$expected=spp_master_rate_version($state,$rates);
+    // A fresh migration can preserve individual rates without setting class rates.
+    // Supply valid administrative fixture rates only inside this rolled-back test.
+    foreach(range(1,6) as $grade)if(($rates[$grade]??0)<=0)$rates[$grade]=1000;
+    $rates[1]+=123;
     $paid=null;foreach(hp_rows($db,'SELECT * FROM tagihan_spp WHERE master_spp_tahun_id=? AND tingkat_snapshot=1 AND bulan=?',[$master['id'],'07']) as $b)if(lb_spp_credit($db,$b['no_induk'],$b['bulan'],$b['tahun'])>0){$paid=$b;break;}
     $result=spp_master_correct_published_rates($db,(int)$master['id'],$rates,$expected,true);
     bdt_check($result['bills_updated']>0&&$result['bills_locked']>0,'Only eligible unpaid SPP snapshots change');
