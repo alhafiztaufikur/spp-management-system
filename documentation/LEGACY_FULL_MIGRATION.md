@@ -146,7 +146,7 @@ Impor mendukung `.dat`, `.bak`, dan file tanpa ekstensi melalui pemeriksaan isi 
 
 Pembaruan DU 26 Oktober 2026: alur sumber baru dan rekonsiliasi existing memakai
 perencana DU yang sama sampai tagihan siswa serta Master Daftar Ulang. Aturan
-workflow 11, operasional 15, otomasi 4, billing 3, DU 1 menggantikan versi sebelumnya.
+workflow 12, operasional 16, otomasi 5, billing 4, DU 2 menggantikan versi sebelumnya.
 Lihat [prosedur DU wajib](LEGACY_MIGRATION_RUNBOOK.md#pelacakan-du-wajib-untuk-sumber-baru-dan-existing).
 Tahun draf dapat diterbitkan per siswa yang terbukti, tanpa menunggu semua kelas.
 Rekap bayar_du bukan kas tambahan; bukti tidak lengkap menjadi pengecualian otomatis.

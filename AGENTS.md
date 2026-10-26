@@ -51,7 +51,17 @@ wajib diperiksa.
   serta potongan harus terbukti. `bayar_du` sumber adalah bukti rekap, bukan kas kedua.
   Terbitkan tahun draf melalui fungsi resmi tanpa menunggu semua kelas lengkap.
   Data belum terbukti menjadi pengecualian otomatis, bukan nol/lunas atau tugas wajib pengguna.
-- Versi saat ini: workflow 11, operasional 15, otomasi 4, billing 3, DU 1.
-  Metadata otomasi versi 1, 2, dan 3 tetap terbaca; worker/simulasi lama wajib ditolak.
+- Versi saat ini: workflow 12, operasional 16, otomasi 5, billing 4, DU 2.
+  Metadata otomasi versi 1, 2, 3, dan 4 tetap terbaca; worker/simulasi lama wajib ditolak.
 
 Rincian DU: [pelacakan otomatis dan pengujian](documentation/LEGACY_DU_TRACE_20261026.md).
+
+- Master DU memakai satu formulir **Simpan Tarif & Lengkapi Tagihan**. Tarif kosong
+  berarti belum ditetapkan/tidak diubah; kelas lain tidak wajib lengkap. Tarif kelas
+  awal boleh ditambahkan pada tahun Terbit. Tarif admin adalah dasar kewajiban baru
+  yang diaudit terpisah dari bukti Legacy; tidak menimpa snapshot terbayar/koreksi.
+- DU kelas 1/7/10 tidak dikecualikan. Header individual lengkap dapat membuktikan
+  pokok/potongan/net tanpa tarif kelas. Rincian berlabel DU yang tegas mengikuti
+  tahun dan kelas kewajibannya, bukan tanggal kas. PSB lunas tidak membuktikan DU.
+- Regresi wajib: tarif kelas awal kosong pada tahun Terbit, input baru tersimpan
+  sebelum penerbitan, kredit lama tetap berlaku, serta pengulangan nol perubahan.

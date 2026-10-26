@@ -246,7 +246,7 @@ function report_status_name(float $bill, float $paid): string {
     if ($paid > $bill + .001) return 'Perlu Rekonsiliasi';
     return 'Lunas';
 }
-function report_status_key(string $status): string { if(str_contains($status,'Legacy')){if(str_starts_with($status,'Lunas')||str_starts_with($status,'Sudah dibayar'))return 'lunas';if(str_starts_with($status,'Cicilan'))return 'cicilan';if(str_starts_with($status,'Tunggakan Legacy')&&!str_contains($status,'pemeriksaan'))return 'belum_bayar';if(str_starts_with($status,'Tidak ditagihkan'))return 'tidak_ditagihkan';if(str_starts_with($status,'Dibatalkan'))return 'dibatalkan';return 'rekonsiliasi';}return ['Tidak Ditagihkan'=>'tidak_ditagihkan','Belum Bayar'=>'belum_bayar','Cicilan'=>'cicilan','Lunas'=>'lunas','Tercakup Uang PSB'=>'lunas','Potongan Penuh'=>'lunas','Perlu Rekonsiliasi'=>'rekonsiliasi','Dibatalkan'=>'dibatalkan','Ada Pembayaran'=>'ada_pembayaran','Belum Diketahui'=>'rekonsiliasi'][$status] ?? ''; }
+function report_status_key(string $status): string { if(str_contains($status,'Legacy')){if(str_starts_with($status,'Lunas')||str_starts_with($status,'Sudah dibayar'))return 'lunas';if(str_starts_with($status,'Cicilan'))return 'cicilan';if(str_starts_with($status,'Tunggakan Legacy')&&!str_contains($status,'pemeriksaan'))return 'belum_bayar';if(str_starts_with($status,'Tidak ditagihkan'))return 'tidak_ditagihkan';if(str_starts_with($status,'Dibatalkan'))return 'dibatalkan';return 'rekonsiliasi';}return ['Tidak Ditagihkan'=>'tidak_ditagihkan','Belum Bayar'=>'belum_bayar','Cicilan'=>'cicilan','Lunas'=>'lunas','Tercakup Uang PSB'=>'lunas','Potongan Penuh'=>'lunas','Perlu Rekonsiliasi'=>'rekonsiliasi','Dibatalkan'=>'dibatalkan','Ada Pembayaran'=>'ada_pembayaran','Ada Pembayaran di Luar Periode'=>'ada_pembayaran','Belum Diketahui'=>'rekonsiliasi'][$status] ?? ''; }
 function report_row_search_text(array $row): string {
     return implode(' ', array_filter([
         $row['nis'] ?? $row['no_induk'] ?? $row['NO_INDUK'] ?? '',
@@ -335,20 +335,18 @@ function report_status_data(mysqli $db, array $f): array {
         $period = $f['tahun_ajaran'];
     } elseif (str_starts_with($category,'biaya_lain:')) {
         $masterId=(int)substr($category,11);
-        $sql="SELECT s.NO_INDUK no_induk,s.NO_induk_diknas nis_diknas,s.NAMA nama,COALESCE(t.kelas_rombel_snapshot,CASE WHEN mk.tingkat=0 AND UPPER(mk.kode_rombel) LIKE 'ALUMNI%' THEN mk.kode_rombel WHEN mk.is_placeholder=1 THEN CONCAT('Kelas ',mk.tingkat,' (Belum Ditentukan)') ELSE CONCAT(mk.tingkat,UPPER(mk.kode_rombel)) END) kelas,
+        $sql="SELECT s.id student_id,s.unit_id,s.NO_INDUK no_induk,s.NO_induk_diknas nis_diknas,s.NAMA nama,COALESCE(t.kelas_rombel_snapshot,CASE WHEN mk.tingkat=0 AND UPPER(mk.kode_rombel) LIKE 'ALUMNI%' THEN mk.kode_rombel WHEN mk.is_placeholder=1 THEN CONCAT('Kelas ',mk.tingkat,' (Belum Ditentukan)') ELSE CONCAT(mk.tingkat,UPPER(mk.kode_rombel)) END) kelas,
           t.id bill_id,COALESCE(t.master_kelas_id,s.master_kelas_id) master_kelas_id,COALESCE(t.nominal_tagihan,0) tagihan,t.status bill_status,COALESCE(SUM(d.nominal_snapshot),0) terbayar
           FROM siswa s LEFT JOIN master_kelas mk ON mk.id=s.master_kelas_id LEFT JOIN tagihan_biaya_lain t ON t.no_induk=s.NO_INDUK AND t.unit_id=s.unit_id AND t.master_biaya_lain_id=?
           LEFT JOIN bayar_biaya_lain d ON d.tagihan_biaya_lain_id=t.id WHERE 1=1".($f['siswa_status']==='active'?' AND s.is_active=1':($f['siswa_status']==='archived'?' AND s.is_active=0':''))." GROUP BY s.id,s.NO_INDUK,s.NO_induk_diknas,s.NAMA,s.master_kelas_id,t.id,t.master_kelas_id,t.kelas_rombel_snapshot,t.nominal_tagihan,t.status,mk.tingkat,mk.kode_rombel,mk.is_placeholder ORDER BY kelas,s.NAMA";
         $stmt=$db->prepare(hp_sql($db,$sql));$stmt->bind_param('i',$masterId);$stmt->execute();$data=$stmt->get_result()->fetch_all(MYSQLI_ASSOC);$stmt->close();$period='Satu kali per tagihan';
     } else $data = [];
-    $optional=str_starts_with($category,'biaya_lain:')?report_optional_positions($db,$category,$f['tahun_ajaran']):[];
     foreach($data??[] as $item){
         $bill=(float)$item['tagihan'];$paid=(float)$item['terbayar'];$status=report_billing_status($bill,$paid,(string)($item['bill_status']??'open'));
-        $row=['nis'=>$item['no_induk'],'bill_id'=>(int)($item['bill_id']??0),'master_kelas_id'=>(int)($item['master_kelas_id']??0),'tingkat'=>(string)(int)($item['kelas']??0),'nis_diknas'=>$item['nis_diknas']??'','nama'=>$item['nama'],'kelas'=>$item['kelas']??'-','periode'=>$period,'tagihan'=>$bill,'terbayar'=>$paid,'sisa'=>$status==='Dibatalkan'?0.0:max(0,$bill-$paid),'status'=>$status,'_status'=>$status];
+        $row=['nis'=>$item['no_induk'],'student_id'=>(int)($item['student_id']??0),'unit_id'=>(int)($item['unit_id']??report_query_unit_id()),'bill_id'=>(int)($item['bill_id']??0),'master_kelas_id'=>(int)($item['master_kelas_id']??0),'tingkat'=>(string)(int)($item['kelas']??0),'nis_diknas'=>$item['nis_diknas']??'','nama'=>$item['nama'],'kelas'=>$item['kelas']??'-','periode'=>$period,'tagihan'=>$bill,'terbayar'=>$paid,'sisa'=>$status==='Dibatalkan'?0.0:max(0,$bill-$paid),'status'=>$status,'_status'=>$status];
         if(!str_starts_with($category,'biaya_lain:')||report_class_matches_row($f,$row))$rows[]=$row;
     }
-    $assignedOptional=[];
-    if(str_starts_with($category,'biaya_lain:'))foreach($rows as &$r){$entry=$optional[$r['nis']]??[];$r['pembayaran_opsional']=isset($assignedOptional[$r['nis']])?0:($entry['paid']??0)/100;$assignedOptional[$r['nis']]=true;if($r['tagihan']<=.001&&$r['pembayaran_opsional']>.001){$r['status']=$r['_status']='Ada Pembayaran';if(!empty($entry['legacy'])){$r['tagihan']=$r['sisa']=null;$r['_incomplete']=true;}}}unset($r);
+    if(str_starts_with($category,'biaya_lain:'))$rows=report_fee_status_rows($db,$f,$rows);
     $rows=report_filter_rows($rows,$f);
     $columns=[['nis','NIS'],['nama','Nama Siswa'],['kelas','Kelas'],['periode','Periode'],['tagihan','Tagihan','money_optional'],['terbayar','Terbayar','money'],['sisa','Sisa','money_optional'],['status','Status','status']];if(str_starts_with($category,'biaya_lain:'))array_splice($columns,6,0,[['pembayaran_opsional','Pembayaran Tanpa Tagihan','money']]);
     return ['title'=>$label,'subtitle'=>'Status kewajiban · '.$period,'columns'=>$columns,'rows'=>$rows];
@@ -477,6 +475,11 @@ function report_item_data(mysqli $db,array $f):array{
         }
     } else {
         $periodLabel=report_item_date_period_label($f);$subtitle='Tanggal transaksi: '.$periodLabel;$components=report_payment_components($db,$f);
+        if(str_starts_with($category,'biaya_lain:')){
+            $statusFilters=$f;$statusFilters['status']='';unset($statusFilters['_multi']['status']);
+            $statusData=report_status_data($db,$statusFilters);
+            $rows=report_fee_item_rows($db,$f,$statusData['rows'],$components);
+        }else{
         $wanted=$category;$paid=[];$paidByBill=[];$optionalPaid=[];$componentStudents=[];foreach($components as $component)if($component['kategori_key']===$wanted){$componentStudents[$component['nis']]=$component;
             if(!empty($component['bill_id']))$paidByBill[$component['bill_id']]=($paidByBill[$component['bill_id']]??0)+(float)$component['nominal'];
             // Historical receipts have no native bill allocation. An opening bill
@@ -501,6 +504,7 @@ function report_item_data(mysqli $db,array $f):array{
             if($cancelled){$row['status']=$row['_status']='Dibatalkan';$row['sisa']=0.0;}
             if(($row['kelas']??'')===''||($row['kelas']??'')==='-')$row['kelas']='Belum diatur';
             $rows[]=$row;
+        }
         }
     }
     $rows=report_filter_rows($rows,$f);$columns=[['nis','NIS'],['nama','Nama Siswa'],['kelas','Kelas'],['periode','Periode'],['tagihan','Tagihan','money_optional'],['terbayar',str_starts_with($category,'biaya_lain')?'Dibayar Tagihan':'Dibayar','money']];if(str_starts_with($category,'biaya_lain'))$columns[]=['pembayaran_opsional','Pembayaran Tanpa Tagihan','money'];$columns=array_merge($columns,[['sisa','Sisa','money_optional'],['status','Status','status']]);return ['title'=>'Rekap Pembayaran per Item: '.$label,'subtitle'=>$subtitle,'columns'=>$columns,'rows'=>$rows];
@@ -671,6 +675,7 @@ function report_billing_history_group_students(array $rows): array {
         $groups[$nis]['total_tagihan']+=(float)($row['tagihan']??0);
         $groups[$nis]['total_terbayar']+=(float)($row['terbayar']??0);
         $groups[$nis]['total_sisa']+=(float)($row['sisa']??0);
+        $groups[$nis]['unknown_remaining']=($groups[$nis]['unknown_remaining']??false)||($row['sisa']??null)===null;
         $groups[$nis]['item_count']++;
         $groups[$nis]['items'][]=$row;
     }
@@ -692,10 +697,16 @@ function report_billing_history_group_students(array $rows): array {
             $components[$key]['tagihan']+=(float)$item['tagihan'];
             $components[$key]['terbayar']+=(float)$item['terbayar'];
             $components[$key]['sisa']+=(float)$item['sisa'];
+            $components[$key]['unknown_remaining']=($components[$key]['unknown_remaining']??false)||($item['sisa']??null)===null;
+            $components[$key]['legacy_payment_only']=($components[$key]['legacy_payment_only']??false)||!empty($item['legacy_payment_only']);
             $components[$key]['item_count']++;
         }
-        foreach($components as &$component)if(empty($component['known_count']))$component['tagihan']=null;unset($component);
+        foreach($components as &$component){
+            if(empty($component['known_count']))$component['tagihan']=null;
+            if($component['unknown_remaining']&&$component['sisa']<=.001)$component['sisa']=null;
+        }unset($component);
         if(empty($group['known_count']))$group['total_tagihan']=null;
+        if($group['unknown_remaining']&&$group['total_sisa']<=.001)$group['total_sisa']=null;
         $group['components']=array_values($components);
         usort($group['components'],static fn($a,$b)=>[
             report_billing_history_component_order($a['komponen_key']),
@@ -713,6 +724,13 @@ function report_billing_history_group_students(array $rows): array {
         (int)$b['tingkat'],mb_strtolower((string)$b['kelas']),mb_strtolower((string)$b['nama']),(string)$b['nis'],
     ]);
     return $result;
+}
+/** Keep payment-only evidence visible inside the existing component cell. */
+function report_billing_component_value(?array $component): mixed {
+    if(!$component)return null;
+    if(empty($component['legacy_payment_only']))return $component['tagihan'];
+    return ['text'=>'Tagihan '.report_money($component['tagihan']),
+        'sub'=>'Dibayar '.report_money($component['terbayar'])."\nSisa ".report_money($component['sisa'])];
 }
 function report_billing_history_component_columns(array $groups): array {
     $columns=[];

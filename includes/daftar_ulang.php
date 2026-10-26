@@ -417,6 +417,7 @@ function du_sync_open_bills_for_master_rate(
     foreach ($bills as $bill) {
         if((float)$bill['paid']>0.001||lb_du_credit($db,(string)$bill['no_induk'],$yearLabel)>0.001)continue;
         $source=lb_student($db,(string)$bill['no_induk']);
+        if((float)$bill['nominal_tagihan']<=.001||abs((float)$bill['nominal_awal']-$oldAmount)>.001||!empty($source['settings']['billing_v1']['du_individual'][$yearLabel]))continue;
         if (!$source && $isCurrentYear) {
             $legacyUnset = (float)$bill['DAFTAR_ULANG'] <= 0
                 && (float)$bill['potong_du'] <= 0
@@ -509,16 +510,21 @@ function du_publish_year_from_active_students(mysqli $db, int $yearId, string $l
     $year = $stmt->get_result()->fetch_assoc(); $stmt->close();
     if (!$year || $year['label'] !== $label) throw new RuntimeException('Tahun ajaran penerbitan tidak valid.');
     if ($year['status'] === 'closed') throw new RuntimeException('Tahun ajaran yang sudah ditutup tidak dapat diterbitkan ulang.');
-    if($label===du_current_academic_year()&&lop_ready($db)&&hp_one($db,"SELECT id FROM legacy_full_batches WHERE state='completed' LIMIT 1")){
+    if($label===du_current_academic_year()){
+        $existing=(int)hp_one($db,'SELECT COUNT(*) n FROM tagihan_daftar_ulang WHERE tahun_ajaran_id=?',[$yearId])['n'];
         require_once __DIR__.'/legacy_du.php';$result=ldu_reconcile($db,(int)($_SESSION['admin_id']??0),$label);
+        // Current live membership is evidence for native students, never historical membership.
+        $regular=unit_level_in_sql();
+        lf_query($db,"INSERT INTO siswa_tahun_ajaran(tahun_ajaran_id,no_induk,kelas,master_kelas_id,kelas_rombel_snapshot,spp_perbulan_snapshot,komite_snapshot,status) SELECT ?,s.NO_INDUK,s.KELAS,s.master_kelas_id,CONCAT(s.KELAS,COALESCE(m.kode_rombel,'')),s.SPP_PERBULAN,s.POMG,'aktif' FROM siswa s LEFT JOIN master_kelas m ON m.id=s.master_kelas_id AND m.unit_id=s.unit_id WHERE s.is_active=1 AND s.KELAS IN $regular AND NOT EXISTS(SELECT 1 FROM siswa_tahun_ajaran p WHERE p.unit_id=s.unit_id AND p.no_induk=s.NO_INDUK AND p.tahun_ajaran_id=?) AND NOT EXISTS(SELECT 1 FROM legacy_op_owners o WHERE o.student_id=s.id AND o.unit_id=s.unit_id)",[$yearId,$yearId]);
         // Explicit publication still serves native students added after migration.
         foreach(hp_rows($db,"SELECT p.id,p.no_induk FROM siswa_tahun_ajaran p JOIN siswa s ON s.NO_INDUK=p.no_induk AND s.unit_id=p.unit_id WHERE p.tahun_ajaran_id=? AND p.status='aktif' AND s.is_active=1 AND NOT EXISTS(SELECT 1 FROM legacy_op_owners o WHERE o.student_id=s.id AND o.unit_id=s.unit_id)",[$yearId]) as $p){
             if(hp_one($db,'SELECT id FROM tagihan_daftar_ulang WHERE no_induk=? AND tahun_ajaran_id=?',[$p['no_induk'],$yearId]))continue;
             $hasRate=hp_one($db,'SELECT d.id FROM siswa_tahun_ajaran s JOIN Daftar_ulang d ON d.kelas=s.kelas AND d.tahun_ajaran_id=s.tahun_ajaran_id AND d.unit_id=s.unit_id WHERE s.id=? AND d.Jumlah>0',[$p['id']]);
             if(!$hasRate){$result['unknown']++;continue;}
-            if(du_create_bill_for_placement($db,(int)$p['id'],true,true)){$result['bills_created']++;du_publish_proven_legacy_year($db,$yearId,$label,(int)($_SESSION['admin_id']??0));}
+            if(hp_one($db,"SELECT d.id FROM legacy_debts d JOIN legacy_debt_masters m ON m.id=d.master_id AND m.unit_id=d.unit_id JOIN siswa s ON s.id=d.student_id AND s.unit_id=d.unit_id WHERE s.NO_INDUK=? AND m.period=? AND m.component IN ('Daftar Ulang','DU')",[$p['no_induk'],$label]))continue;
+            if(du_create_bill_for_placement($db,(int)$p['id'],true,true)){$result['bills_created']++;du_publish_proven_legacy_year($db,$yearId,$label,(int)($_SESSION['admin_id']??0),'admin_tariff_students');}
         }
-        $GLOBALS['du_publish_result']=['created'=>$result['bills_created'],'unknown'=>$result['unknown'],'existing'=>$result['existing']];
+        $GLOBALS['du_publish_result']=['created'=>$result['bills_created'],'unknown'=>$result['unknown'],'existing'=>$existing];
         return $result['bills_created'];
     }
     $alreadyPublished=$year['status']==='published';

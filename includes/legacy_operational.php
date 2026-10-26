@@ -9,7 +9,7 @@ require_once __DIR__.'/legacy_operational_checks.php';
 require_once __DIR__.'/legacy_operational_resolution.php';
 require_once __DIR__.'/legacy_migration_automation.php';
 require_once __DIR__.'/legacy_class_links.php';
-const LOP_VERSION=15;
+const LOP_VERSION=16;
 const LOP_ID_OFFSET=1000000000;
 function lop_date(mixed $value): ?string {if(is_string($value)&&preg_match('/^\d{4}-\d{2}-\d{2}T\d{2}:\d{2}$/D',$value))$value.=':00';return lful_date($value);}
 function lop_require(mysqli $db): void {if(!lop_ready($db))throw new DomainException('Pasang skema operasional Legacy melalui CLI.');}
@@ -204,7 +204,8 @@ function lop_check_result(mysqli $db,string $id): array {
         require_once __DIR__.'/legacy_billing.php';$previous=$GLOBALS['lb_pending_batch']??null;$GLOBALS['lb_pending_batch']=$id;lb_cache($db,true);
         try{return lop_check_result($db,$id);}finally{if($previous===null)unset($GLOBALS['lb_pending_batch']);else $GLOBALS['lb_pending_batch']=$previous;lb_cache($db,true);}
     }
-    $source=lf_source_fingerprint($db,(int)$batch['unit_id'],(int)$batch['source_id']);if(!hash_equals($m['source_fingerprint'],$source['fingerprint'])||!hash_equals($m['working_digest'],lop_working_digest($db,$id)))throw new DomainException('Fingerprint sumber atau hasil kerja berbeda.');
+    $source=lf_source_fingerprint($db,(int)$batch['unit_id'],(int)$batch['source_id']);if(!hash_equals($m['source_fingerprint'],$source['fingerprint']))throw new DomainException('Fingerprint arsip sumber berbeda.');
+    if(!hash_equals($m['working_digest'],lop_working_digest($db,$id))){require_once __DIR__.'/legacy_billing_digest.php';$prior=lop_prior_billing_digest($db,$id);if(!$prior||!hash_equals($m['working_digest'],$prior['digest']))throw new DomainException('Fingerprint sumber atau hasil kerja berbeda.');$m['verified_prior_spp_sync']=$prior['derived_rows'];}
     foreach(hp_rows($db,'SELECT p.* FROM legacy_op_payments p WHERE batch_id=?',[$id]) as $p){$p['items']=json_decode($p['items'],true,512,JSON_THROW_ON_ERROR);lfet_validate_payment($p);}
     foreach(hp_rows($db,'SELECT a.*,o.student_id,o.batch_id FROM legacy_op_accounts a JOIN legacy_op_owners o ON o.id=a.owner_id AND o.unit_id=a.unit_id WHERE o.batch_id=?',[$id]) as $a){$legacy=0;$new=0;foreach(hp_rows($db,'SELECT * FROM legacy_op_journals WHERE owner_id=? AND cancelled=0',[$a['owner_id']]) as $j){$v=lf_cents($j['incoming'])-lf_cents($j['outgoing']);if(in_array($j['origin'],['legacy','adjustment'],true))$legacy+=$v;else $new+=$v;}if($legacy!==lf_cents($a['opening'])||(!$a['student_id']&&$legacy+$new!==lf_cents($a['balance'])))throw new DomainException('Saldo dan jurnal hasil kerja tidak cocok.');}
     require_once __DIR__.'/legacy_operational_corrections.php';

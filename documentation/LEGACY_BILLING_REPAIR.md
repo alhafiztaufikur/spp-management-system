@@ -4,7 +4,7 @@ Perbaikan 20 Oktober 2026 untuk SD, SMP, dan SMA. Tidak mengulang migrasi, menya
 
 ## Perilaku aplikasi
 
-- Status tahun ajaran **Terbit** tidak lagi dianggap bukti bahwa seluruh tagihan DU sudah terbentuk. **Master Daftar Ulang → pilih tahun → Lengkapi Tagihan yang Belum Ada** hanya menambahkan tagihan yang belum tersedia berdasarkan penempatan dan bukti tarif. Pengulangan tidak menggandakan tagihan.
+- Status tahun ajaran **Terbit** tidak lagi dianggap bukti bahwa seluruh tagihan DU sudah terbentuk. **Master Daftar Ulang → pilih tahun → Simpan Tarif & Lengkapi Tagihan** hanya menambahkan tagihan yang belum tersedia berdasarkan penempatan dan bukti tarif. Pengulangan tidak menggandakan tagihan.
 - Master SPP membedakan tagihan baru, tagihan existing, serta periode sebelum peralihan/tercakup Legacy. Batas peralihan November 2026 dipertahankan; tidak mengubah kelas atau menaikkan siswa otomatis.
 - Tarif awal tetap Legacy. Perubahan master yang benar-benar disimpan sesudah perbaikan dicatat sebagai aturan tahun/tingkat dengan versi audit. Tagihan tanpa pembayaran mengikuti perubahan; cicilan native maupun Legacy mempertahankan snapshot. Aturan tahun juga berlaku ketika penempatan sasaran baru tersedia kemudian.
 - Potongan individual hanya dihitung sekali. Penggantian master DU mempertahankan nominal potongan pada snapshot. Pengeditan identitas siswa saja tidak mengganti dasar DU Legacy dengan master lama.

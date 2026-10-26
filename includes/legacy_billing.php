@@ -6,7 +6,7 @@ require_once __DIR__.'/legacy_migration_automation.php';
 require_once __DIR__.'/history_performance.php';
 require_once __DIR__.'/legacy_monthly_planner.php';
 require_once __DIR__.'/legacy_du_planner.php';
-const LB_RULE_VERSION = 3;
+const LB_RULE_VERSION = 4;
 // Only for arithmetic results already proven from exact source cents.
 function lb_result_cents(float|string $value): int {return lf_cents(number_format((float)$value,2,'.',''));}
 
@@ -127,7 +127,7 @@ function lb_refresh_manifests(mysqli $db,array $batchIds): void {
 /** Read the same source-backed position for synchronization and integrity checks. */
 function lb_obligation_position(mysqli $db,array $ob): ?array {
     $e=json_decode($ob['evidence'],true);
-    if(!is_array($e)||!in_array($e['rule']??null,[1,2,LB_RULE_VERSION],true))return null;
+    if(!is_array($e)||!in_array($e['rule']??null,[1,2,3,LB_RULE_VERSION],true))return null;
     $data=lb_cache($db);$student=$data['owner_students'][$ob['owner_id']]??null;
     if(!$student||($e['source_row_key']??'')!==($student['source_row_key']??null))throw new DomainException('Bukti kewajiban tidak sesuai arsip pemilik.');
     $s=$student;
@@ -136,8 +136,10 @@ function lb_obligation_position(mysqli $db,array $ob): ?array {
         $position=lb_psb_position($db,$s['NO_INDUK'],$s,($data['native_psb'][$s['unit_id'].'|'.$s['NO_INDUK']]??0)/100);
         $principal=lb_result_cents($position['total']);$credit=lb_result_cents($position['paid']);
     }elseif($ob['category']==='daftar_ulang'){
-        $p=lb_du_source($db,$s['NO_INDUK'],$ob['period']);if(!$p||!$p['known'])return null;
-        $bill=hp_one($db,"SELECT nominal_tagihan FROM tagihan_daftar_ulang WHERE no_induk=? AND tahun_ajaran_snapshot=? AND status='open'",[$s['NO_INDUK'],$ob['period']]);
+        $p=lb_du_source($db,$s['NO_INDUK'],$ob['period']);
+        $bill=hp_one($db,"SELECT nominal_tagihan,status FROM tagihan_daftar_ulang WHERE no_induk=? AND tahun_ajaran_snapshot=?",[$s['NO_INDUK'],$ob['period']]);
+        if(!$bill&&empty($p['known']))return null;
+        if($bill&&$bill['status']==='cancelled')return ['principal'=>0,'credit'=>0,'remaining'=>0];
         $principal=lb_result_cents($bill['nominal_tagihan']??$p['total']);$credit=lb_result_cents(lb_du_credit($db,$s['NO_INDUK'],$ob['period']))+($data['native_du'][$s['unit_id'].'|'.$s['NO_INDUK']][$ob['period']]??0);
     }elseif(in_array($ob['category'],['spp','komite'],true)){
         [$year,$month]=explode('-',$ob['period']);
@@ -188,7 +190,7 @@ function lb_reconcile(mysqli $db,int $actor,bool $apply=false): array {
 function lb_report_amounts(mysqli $db,string $nis,string $category,string $year,float $bill,float $paid): ?array {
     $s=lb_student($db,$nis);if(!$s)return null;
     if($category==='psb'){$position=lb_psb_position($db,$nis,$s,$paid);return $position['known']?$position:['known'=>false,'total'=>null,'paid'=>$paid,'remaining'=>null];}
-    elseif($category==='daftar_ulang'){$proof=lb_du_source($db,$nis,$year);if(!$proof['known']&&$bill<=0)return ['known'=>false,'total'=>null,'paid'=>$paid,'remaining'=>null];if(!$proof['known'])return null;$bill=$bill>0?$bill:$proof['total'];$paid+=lb_du_credit($db,$nis,$year);}
+    elseif($category==='daftar_ulang'){$proof=lb_du_source($db,$nis,$year);$issued=hp_one($db,"SELECT nominal_tagihan,status FROM tagihan_daftar_ulang WHERE no_induk=? AND tahun_ajaran_snapshot=?",[$nis,$year]);if(!$issued&&empty($proof['known']))return ['known'=>false,'total'=>null,'paid'=>$paid,'remaining'=>null];if($issued&&$issued['status']!=='open')return ['known'=>false,'total'=>null,'paid'=>$paid,'remaining'=>null];$bill=$issued?(float)$issued['nominal_tagihan']:(float)$proof['total'];$paid+=lb_du_credit($db,$nis,$year);}
     else return null;
     return ['known'=>true,'total'=>$bill,'paid'=>$paid,'remaining'=>max(0,$bill-$paid)];
 }
@@ -214,7 +216,7 @@ function lma_legacy_du_year_sql(string $alias='p'): string {
 
 function lb_du_year_sql(string $alias='p'): string {
     $legacy=lma_legacy_du_year_sql($alias);
-    $period="(SELECT MIN(mp.period) FROM JSON_TABLE(CAST($alias.items AS JSON),'$[*]' COLUMNS(category VARCHAR(100) PATH '$.category',version INT PATH '$.migration.version' NULL ON EMPTY,period VARCHAR(9) PATH '$.migration.period' NULL ON EMPTY)) mp WHERE mp.category='daftar_ulang' AND mp.version IN (1,2,3,4) AND mp.period REGEXP '^20[0-9]{2}/20[0-9]{2}$' AND CAST(RIGHT(mp.period,4) AS UNSIGNED)=CAST(LEFT(mp.period,4) AS UNSIGNED)+1)";
+    $period="(SELECT MIN(mp.period) FROM JSON_TABLE(CAST($alias.items AS JSON),'$[*]' COLUMNS(category VARCHAR(100) PATH '$.category',version INT PATH '$.migration.version' NULL ON EMPTY,period VARCHAR(9) PATH '$.migration.period' NULL ON EMPTY)) mp WHERE mp.category='daftar_ulang' AND mp.version IN (1,2,3,4,5) AND mp.period REGEXP '^20[0-9]{2}/20[0-9]{2}$' AND CAST(RIGHT(mp.period,4) AS UNSIGNED)=CAST(LEFT(mp.period,4) AS UNSIGNED)+1)";
     return "CASE WHEN JSON_CONTAINS_PATH($alias.items,'one','$[0].migration') THEN COALESCE($period,$legacy) ELSE $legacy END";
 }
 function lb_payment_month(string $period): string {

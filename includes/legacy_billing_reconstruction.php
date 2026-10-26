@@ -4,6 +4,7 @@ require_once __DIR__.'/spp_billing.php';
 require_once __DIR__.'/legacy_full_read.php';
 require_once __DIR__.'/legacy_fee_reconstruction.php';
 require_once __DIR__.'/legacy_du.php';
+require_once __DIR__.'/legacy_du_reconstruction.php';
 
 function lbr_audit(mysqli $db,int $actor,string $type,int $id,array $before,array $after,string $key): void {
     lf_query($db,'INSERT INTO legacy_op_audit(unit_id,actor_id,entity_type,entity_id,request_key,reason,before_data,after_data) VALUES(?,?,?,?,?,?,?,?)',[unit_active_id(),$actor,$type,$id,hash('sha256','lbr2|'.$key),'Penyelarasan bukti Legacy; tanpa perubahan penerimaan kas',lf_json($before),lf_json($after)]);
@@ -49,9 +50,20 @@ function lbr_placement(mysqli $db,array $s,array $position): ?array {
 
 /** Caller owns unit transaction. Preview executes the same algorithm in a rollback. */
 function lbr_reconcile(mysqli $db,int $actor): array {
+    require_once __DIR__.'/legacy_operational.php';
     $syncBefore=(int)($GLOBALS['lb_sync_changes'][$db->thread_id]??0);
     $summary=['rule'=>LMP_VERSION,'psb_aligned'=>0,'komite_recategorized'=>0,'monthly_created'=>0,'start_month_aligned'=>0,'obligations_created'=>0,'changes'=>0,'components'=>[],'exceptions'=>[]];
+    $summary['manifest_repairs']=0;
+    foreach(hp_rows($db,"SELECT id,manifest FROM legacy_full_batches WHERE state='completed'") as $batch){
+        $manifest=json_decode($batch['manifest'],true);$actual=lop_working_digest($db,$batch['id']);
+        if(hash_equals($manifest['working_digest']??'',$actual))continue;
+        require_once __DIR__.'/legacy_billing_digest.php';$prior=lop_prior_billing_digest($db,$batch['id']);
+        if(!$prior||!hash_equals($manifest['working_digest']??'',$prior['digest']))throw new DomainException('Fingerprint batch berbeda; rekonsiliasi tidak diterapkan.');
+        lbr_audit($db,$actor,'billing_digest',0,['digest'=>$manifest['working_digest']],['batch'=>$batch['id'],'digest'=>$actual,'derived_rows'=>$prior['derived_rows'],'reason'=>'Koreksi Master SPP lama tersimpan sah, pembaruan fingerprint tertunda.'],'digest|'.$batch['id'].'|'.$actual);
+        lb_refresh_manifests($db,[$batch['id']]);$summary['manifest_repairs']++;$summary['changes']++;
+    }
     $summary['fee_trace']=lfer_reconcile($db,$actor);$summary['changes']+=$summary['fee_trace']['changes'];
+    $summary['du_payments']=ldu_reconstruct_payments($db,$actor);$summary['changes']+=$summary['du_payments']['changes'];
     $batches=lbr_map_komite($db,$actor,true,$summary);$data=lb_cache($db,true);
     $bills=[];$obligations=[];$coverage=[];
     foreach(['spp'=>'tagihan_spp','komite'=>'tagihan_komite'] as $category=>$table)foreach(hp_rows($db,"SELECT no_induk,bulan,tahun FROM $table") as $b)$bills[$b['no_induk']][$category.'|'.$b['tahun'].'-'.str_pad($b['bulan'],2,'0',STR_PAD_LEFT)]=true;

@@ -261,6 +261,8 @@ function spp_master_correct_published_rates(mysqli $db, int $id, array $rates, s
     foreach ($changed as $level=>$new) { $s->bind_param('iid',$id,$level,$new);$s->execute(); }
     $s->close();spp_sync_active_placement_rates($db,$yearId,$rates);
     spp_write_audit($db,$id,null,'koreksi_tarif_terbit',['tarif'=>$oldRates],['tarif'=>$rates,'tagihan_diubah'=>$updated,'tagihan_dipertahankan'=>$locked],$updated);
+    lb_cache($db,true);
+    lb_refresh_manifests($db,lb_sync_owners($db,array_column(lb_cache($db)['students'],'id')));
     return ['rates_changed'=>count($changed),'bills_updated'=>$updated,'bills_locked'=>$locked];
 }
 

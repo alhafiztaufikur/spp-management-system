@@ -41,7 +41,7 @@ function other_fee_history_refs_sql(mysqli $db): string {
     }
     if(isset($tables['legacy_op_audit']))foreach(['before_data','after_data'] as $column){
         $master=other_fee_category_master_sql('j.category');
-        $parts[]="SELECT a.unit_id,$master FROM legacy_op_audit a JOIN JSON_TABLE(CAST(COALESCE(a.$column,JSON_OBJECT()) AS JSON),'$.items[*]' COLUMNS(category VARCHAR(100) PATH '$.category')) j WHERE a.entity_type IN ('payment','fee_trace','obligation_binding')";
+        $parts[]="SELECT a.unit_id,$master FROM legacy_op_audit a JOIN JSON_TABLE(CAST(COALESCE(a.$column,JSON_OBJECT()) AS JSON),'$.items[*]' COLUMNS(category VARCHAR(100) PATH '$.category')) j WHERE a.entity_type IN ('payment','fee_trace','obligation_binding','du_payment')";
     }
     foreach(['legacy_op_obligations','legacy_full_coverage'] as $table)if(isset($tables[$table])){
         $master=other_fee_category_master_sql('r.category');$parts[]="SELECT r.unit_id,$master FROM $table r";

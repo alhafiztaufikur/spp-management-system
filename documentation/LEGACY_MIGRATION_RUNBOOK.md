@@ -1,8 +1,8 @@
 # Prosedur migrasi Legacy
 
 Keputusan berlaku 24 Oktober 2026. Baca bersama `LEGACY_FULL_MIGRATION.md` dan
-`AGENTS.md`. Aturan workflow 11, operasional 15, otomasi 4, perencana bulanan 2,
-billing 3, perencana DU 1, dan pelacakan biaya lain 1 (pembaruan 26 Oktober 2026).
+`AGENTS.md`. Aturan workflow 12, operasional 16, otomasi 5, perencana bulanan 2,
+billing 4, perencana DU 2, dan pelacakan biaya lain 1 (pembaruan 26 Oktober 2026).
 Worker lama harus dihentikan dan dimulai ulang; konfirmasi/simulasi versi lama
 tidak boleh diterapkan. Metadata pembayaran otomasi versi 1–3 tetap dapat dibaca.
 
@@ -158,7 +158,7 @@ Audit `du_trace` menyimpan hubungan master/tagihan, ID/row_key sumber, kolom,
 periode dan nominal tiap rincian, hash sumber, tarif serta rekap yang cocok.
 Pembayaran Legacy tetap di penyimpanan Legacy. Kredit native + Legacy dipakai
 bersama pada kasir, ringkasan kewajiban, riwayat, Master DU dan laporan.
-Tombol existing **Lengkapi Tagihan yang Belum Ada** memakai engine yang sama.
+Tombol existing **Simpan Tarif & Lengkapi Tagihan** memakai engine yang sama.
 
 Wajib uji murni `tests/legacy_du_planner_test.php`, publikasi sumber baru melalui
 `tests/legacy_migration_automation_transactions_test.php --draft --publication --du-publication`
@@ -170,3 +170,16 @@ Uji sisa/cicilan, pembayaran ganda, pembatalan/koreksi, lintas unit, tahun
 tertutup, bukti parsial, dan pengulangan nol perubahan. Verifikasi halaman Master
 DU, riwayat/rincian transaksi, Input Pembayaran, laporan dan ekspornya sebelum
 menyatakan migrasi selesai. Backup/restore terverifikasi tetap wajib sebelum apply.
+
+### Regresi Master DU setelah migrasi
+
+Gunakan satu formulir Simpan Tarif & Lengkapi Tagihan untuk menyimpan tarif baru
+sekaligus melengkapi tagihan. Kelas kosong pada tahun Terbit boleh ditambahkan;
+tidak ada checkbox tunggakan atau kewajiban melengkapi seluruh kelas. Tarif admin
+adalah penetapan operasional baru yang diaudit, berbeda dari bukti Legacy. Jangan
+menerapkan nominal fixture/gambar pada target. Kelas 1/7/10 tetap ditelusuri dari
+header individual lengkap dan rincian DU eksplisit, tanpa menganggap PSB sebagai DU.
+Wajib jalankan `tests/du_master_service_test.php` dan browser DU pada salinan.
+Pemeriksaan digest lama mengenali hanya koreksi Master SPP yang teraudit dan
+cocok dengan rekonstruksi hash sebelum koreksi secara utuh. Runner mencatat
+`billing_digest` sebelum menyelaraskan manifest; perbedaan lain tetap ditolak.

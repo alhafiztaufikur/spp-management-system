@@ -53,7 +53,7 @@ function global_report_billing_print_matrix(array $students,array $components,in
     foreach($students as $index=>$student){
         $row=['no'=>$index+1,'unit'=>unit_label((int)$student['unit_id']),'nis'=>$student['nis'],'nis_diknas'=>$student['nis_diknas'],'nama'=>$student['nama'],'kelas'=>$student['kelas'],'total_tagihan'=>$student['total_tagihan']];
         $map=array_column($student['components'],null,'komponen_key');
-        foreach($components as $ci=>$component)$row['billing_'.$ci]=$map[$component['komponen_key']]['tagihan']??null;
+        foreach($components as $ci=>$component)$row['billing_'.$ci]=report_billing_component_value($map[$component['komponen_key']]??null);
         $rows[]=$row;
     }
     return ['columns'=>$columns,'identity_count'=>count($identity),'groups'=>$groups,'rows'=>$rows,'subtotals'=>[],'totals'=>[]];
@@ -88,7 +88,7 @@ function global_report_filter_text(mysqli $db,array $filters,string $template,ar
     if($itemMonthly)$parts[]='Periode tagihan: '.report_month_range_label(report_month_range((int)$filters['bulan_awal'],(int)$filters['tahun_awal'],(int)$filters['bulan_akhir'],(int)$filters['tahun_akhir']));
     if($itemOnce)$parts[]='Periode: Sekali saat masuk';
     if(!in_array($template,['status','spp-tahunan','saldo-tabungan','riwayat-tagihan','per-item'],true)||$itemDated)$parts[]='Periode: '.(!empty($filters['all_periods'])?'Semua periode':spp_date_label($filters['tanggal_awal']).' - '.spp_date_label($filters['tanggal_akhir']));
-    if($template==='riwayat-tagihan')$parts[]='Tagihan dibuat: '.(($filters['filter_tanggal_tagihan']??false)?spp_date_label($filters['tanggal_awal']).' - '.spp_date_label($filters['tanggal_akhir']):'Semua tanggal');
+    if($template==='riwayat-tagihan')$parts[]='Tagihan dibuat: '.(!empty($filters['filter_tanggal_tagihan'])&&($filters['tanggal_awal']??'')!==''?spp_date_label($filters['tanggal_awal']).' - '.spp_date_label($filters['tanggal_akhir']):'Semua tanggal');
     if(!empty($filters['include_undated'])&&($template!=='per-item'||$itemDated))$parts[]='Termasuk transaksi tanpa tanggal sesuai periode kewajiban';
     foreach($notes as $note)if(!in_array($note,$parts,true))$parts[]=$note;
     return implode(' | ',$parts);

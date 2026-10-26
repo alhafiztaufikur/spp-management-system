@@ -10,7 +10,14 @@ $actor=(int)$koneksi->query("SELECT id FROM admin WHERE role='super_admin' AND i
 $koneksi->begin_transaction();
 try{foreach([1,2,3] as $unit){unit_set_context($koneksi,$unit);
     $s=hp_one($koneksi,"SELECT f.*,s.NO_INDUK,s.master_kelas_id,s.KELAS FROM legacy_full_students f JOIN siswa s ON s.id=f.student_id AND s.unit_id=f.unit_id WHERE s.legacy_pending=0 AND EXISTS(SELECT 1 FROM legacy_op_payments p JOIN legacy_op_owners o ON o.id=p.owner_id AND o.unit_id=p.unit_id WHERE o.student_id=s.id AND p.source_period='10 2026' AND p.items LIKE '%spp%' AND p.cancelled=0) LIMIT 1");
-    if(!$s)throw new RuntimeException('Missing migrated coverage candidate.');$before=gv_row($s['NO_INDUK']);
+    if(!$s)throw new RuntimeException('Missing migrated coverage candidate.');
+    // Newer restored snapshots already have reconstructed October bills. This
+    // fixture specifically tests explicit coverage when no native bill exists.
+    $guard=(int)$koneksi->query('SELECT COALESCE(@legacy_full_apply,0)')->fetch_row()[0];
+    $koneksi->query('SET @legacy_full_apply=1');
+    try{gv_sql("DELETE FROM tagihan_spp WHERE no_induk=? AND bulan='10' AND tahun='2026' AND NOT EXISTS(SELECT 1 FROM spp_alokasi a WHERE a.tagihan_spp_id=tagihan_spp.id)",[$s['NO_INDUK']]);}
+    finally{$koneksi->query('SET @legacy_full_apply='.$guard);}
+    $before=gv_row($s['NO_INDUK']);
     $koneksi->query('SAVEPOINT coverage_case');
     gv_sql("INSERT INTO legacy_full_coverage(unit_id,batch_id,student_id,category,period,disposition,evidence) VALUES(?,?,?,'spp','2026-10','settled','QA proof')",[$unit,$s['batch_id'],$s['student_id']]);
     $r=gv_row($s['NO_INDUK']);gv_check($r['tagihan']===null&&$r['sisa']===0.0&&$r['status']==='Lunas'&&$r['terbayar']===$before['terbayar'],"Unit $unit explicit settlement retains payments without inventing principal");

@@ -1,5 +1,12 @@
 # Riwayat Perubahan AI SistemSPP
 
+## 2026-10-26 - Pelacakan pembayaran Legacy pada Laporan Global
+
+- Pisahkan bukti pembayaran historis dari nominal tanggal terpilih pada rekap Biaya Lain. Pencarian Aqila/Robotik menampilkan Rp450.000 pada periode yang sesuai dan Ada Pembayaran di Luar Periode pada tanggal lain, tanpa membuat pokok/sisa/lunas yang belum terbukti.
+- Satukan pembacaan biaya native, arsip Legacy dan Legacy operasional menurut unit/master efektif; pertahankan koreksi, pembatalan, slot dan kelas historis. Pembayaran lama tidak melunasi kembali tagihan saldo awal.
+- Lengkapi Riwayat Tagihan dengan bukti Biaya Lain tanpa tagihan native, termasuk sel komponen existing pada layar/PDF/Excel. Tidak menambah tombol, filter, kolom, menu, skema atau penerimaan baru.
+- Pengujian memakai restore terverifikasi pada MySQL terisolasi. Rincian perilaku, suite dan batas bukti: [audit pelacakan Global](GLOBAL_LEGACY_FEE_TRACKING_20261026.md).
+
 ## 2026-10-26 - Label struk dan ringkasan Komite Legacy
 
 - Satukan perhitungan posisi Komite untuk rincian, payload formulir dan pop-up: pembayaran native + kredit Legacy per unit/siswa/periode. Hilangkan tunggakan semu Raisa untuk 14 periode yang sebenarnya lunas; kewajiban nyata dan aturan pasangan SPP–Komite tetap berlaku.

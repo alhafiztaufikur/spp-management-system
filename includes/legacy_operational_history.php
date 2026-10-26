@@ -5,7 +5,7 @@ require_once __DIR__.'/history_performance.php';
 /** Completed publications already record every separated reference by immutable row key. */
 function lop_history_reference_keys(array $manifest): ?array {
     $checks=$manifest['automatic_checks']??[];$summary=$manifest['summary']??[];
-    if(($manifest['mode']??'')!=='operational'||!in_array($checks['rules_version']??null,[7,9,10,11,12,13,14,15],true))return null;
+    if(($manifest['mode']??'')!=='operational'||!in_array($checks['rules_version']??null,[7,9,10,11,12,13,14,15,16],true))return null;
     $keys=[];
     foreach(['references'=>'separate_references','accepted_history'=>'accepted_history'] as $list=>$count){
         if(!isset($checks[$list],$summary[$count])||!is_array($checks[$list])||count($checks[$list])!==(int)$summary[$count])return null;

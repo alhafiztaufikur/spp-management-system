@@ -2,6 +2,8 @@
 
 # Konteks Proyek SistemSPP
 
+> **Pelacakan pembayaran pada Global, 26 Oktober 2026:** rekap Biaya Lain membedakan nominal periode dan bukti historis, termasuk pencarian native/Legacy menurut unit serta master efektif. Riwayat Tagihan dan sel existing layar/PDF/Excel turut menunjukkan pembayaran Legacy tanpa tagihan native; pokok/sisa yang belum terbukti tetap null. Tidak ada kontrol/kolom baru, migrasi ulang atau perubahan data pengguna. [Perilaku dan pengujian](GLOBAL_LEGACY_FEE_TRACKING_20261026.md).
+
 > **Pelacakan biaya lain, 26 Oktober 2026:** GUI/runner menggunakan pemroses otomatis yang sama, dengan identitas unit–sumber–baris–slot, master tujuan dan bukti. Kode kosong/ambigu diterima tanpa pemetaan pengguna; struk tidak sah diarsipkan otomatis. Pembaca rincian/struk/ekspor memakai jejak tersebut; koreksi tetap dilindungi. Tidak ada penerapan/backfill/skema database pengguna atau filter/menu baru. [Perilaku, versi dan batas pengujian](LEGACY_FEE_TRACE_20261026.md).
 
 > **PSB dan SPP–Komite, 24 Oktober 2026:** perencana periode sumber dipakai oleh migrasi baru, rekonsiliasi existing dan penerbitan; PSB gross/potongan/pembayaran kumulatif dibaca konsisten. Cutover November tidak melarang penerbitan Oktober. Perbaikan diterapkan pada `db_spp_test2` setelah restore backup terverifikasi; apply ulang SD/SMP/SMA nol perubahan. Arsip, identitas, kas dan tabungan tetap; bukti belum cukup masuk peninjauan existing. [Hasil, pengujian, pengecualian dan panduan GUI](LEGACY_BILLING_REPAIR_20261024.md).

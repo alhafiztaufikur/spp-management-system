@@ -100,7 +100,7 @@ function report_billing_legacy_rows(mysqli $db,array $f,array $existing): array 
             }
         }
     }
-    return $rows;
+    return array_merge($rows,report_billing_fee_payment_rows($db,$f));
 }
 function report_history_component_status(mysqli $db,array $f,bool $transactionDates=false): array {
     $cash=$f;
@@ -112,11 +112,174 @@ function report_history_component_status(mysqli $db,array $f,bool $transactionDa
     $label=report_categories($db)[$f['kategori']]??'Pembayaran';
     return ['title'=>$transactionDates?'Rekap Pembayaran per Item: '.$label:$label,'subtitle'=>$transactionDates?'Tanggal transaksi: '.report_item_date_period_label($f):'Tahun ajaran '.$f['tahun_ajaran'],'columns'=>[['nis','NIS'],['nama','Nama Siswa'],['kelas','Kelas'],['periode','Periode'],['tagihan','Tagihan','money_optional'],['terbayar','Terbayar','money'],['sisa','Sisa','money_optional'],['status','Status','status']],'rows'=>report_filter_rows(array_values($rows),$f)];
 }
-function report_optional_positions(mysqli $db,string $category,string $year): array {
-    $out=[];$master=(int)substr($category,11);[$first,$last]=explode('/',$year);
-    foreach(hp_rows($db,"SELECT d.nominal_snapshot,b.NO_INDUK FROM bayar_biaya_lain d JOIN bayar b ON b.id=d.bayar_id AND b.unit_id=d.unit_id WHERE d.master_biaya_lain_id=? AND d.tagihan_biaya_lain_id IS NULL AND b.TGL_BYR>=? AND b.TGL_BYR<?",[$master,$first.'-07-01',$last.'-07-01']) as $r)$out[$r['NO_INDUK']]['paid']=($out[$r['NO_INDUK']]['paid']??0)+lf_cents($r['nominal_snapshot']);
-    foreach(report_legacy_periods($db)['payments'] as $nis=>$categories)foreach($categories[$category]??[] as $period=>$r){$p=report_source_period((string)$period);if(!$p||($p['year']??'')!==$year)continue;$out[$nis]['paid']=($out[$nis]['paid']??0)+$r['paid'];$out[$nis]['legacy']=true;}
+/** Receipt evidence only. An unallocated historical receipt never repays an opening bill. */
+function report_fee_payment_rows(mysqli $db): array {
+    static $cache=[];
+    $key=hp_connection_key($db).':'.report_query_unit_id();
+    $cacheRead=PHP_SAPI!=='cli'&&($_SERVER['REQUEST_METHOD']??'GET')==='GET';
+    if($cacheRead&&isset($cache[$key]))return $cache[$key];
+    $queries=["SELECT b.unit_id,s.id student_id,0 owner_id,b.NO_INDUK nis,s.NAMA nama,s.NO_induk_diknas nis_diknas,s.is_active student_active,
+        COALESCE(NULLIF(b.kelas_rombel_snapshot,''),b.KELAS) kelas,b.TGL_BYR source_date,
+        CONCAT(b.BULAN,' ',b.TAHUN) source_period,CONCAT('biaya_lain:',d.master_biaya_lain_id) category,
+        d.nama_biaya_snapshot label,CAST(d.nominal_snapshot AS DECIMAL(20,2)) amount,0 legacy,
+        b.sistem_pembayaran method,b.user_id source_operator
+        FROM bayar_biaya_lain d JOIN bayar b ON b.id=d.bayar_id AND b.unit_id=d.unit_id
+        JOIN siswa s ON s.NO_INDUK=b.NO_INDUK AND s.unit_id=b.unit_id
+        WHERE d.tagihan_biaya_lain_id IS NULL AND d.master_biaya_lain_id IS NOT NULL"];
+    if(lful_read_ready($db))$queries[]="SELECT p.unit_id,s.id student_id,0 owner_id,s.NO_INDUK nis,s.NAMA nama,s.NO_induk_diknas nis_diknas,s.is_active student_active,
+        p.class_snapshot kelas,p.source_date,p.source_period,i.category,i.label,i.amount,1 legacy,
+        'Legacy' method,p.source_operator
+        FROM legacy_full_payments p JOIN legacy_full_items i ON i.payment_id=p.id AND i.unit_id=p.unit_id
+        JOIN siswa s ON s.id=p.student_id AND s.unit_id=p.unit_id
+        JOIN legacy_full_batches b ON b.id=p.batch_id AND b.unit_id=p.unit_id
+        WHERE b.state='completed' AND i.category REGEXP '^biaya_lain:[1-9][0-9]*$'";
+    if(lop_ready($db))$queries[]="SELECT p.unit_id,o.student_id,o.id owner_id,COALESCE(s.NO_INDUK,CONCAT('rekening:',o.id)) nis,o.name nama,s.NO_induk_diknas nis_diknas,s.is_active student_active,
+        p.class_snapshot kelas,p.source_date,p.source_period,j.category,j.label,j.amount,1 legacy,
+        CASE WHEN p.method IN ('Tunai','VA','Qris') THEN p.method ELSE 'Legacy' END method,p.source_operator
+        FROM legacy_op_payments p JOIN legacy_op_owners o ON o.id=p.owner_id AND o.unit_id=p.unit_id
+        LEFT JOIN siswa s ON s.id=o.student_id AND s.unit_id=o.unit_id
+        JOIN legacy_full_batches b ON b.id=p.batch_id AND b.unit_id=p.unit_id
+        JOIN JSON_TABLE(CAST(p.items AS JSON),'$[*]' COLUMNS(category VARCHAR(100) PATH '$.category',label VARCHAR(255) PATH '$.label',amount DECIMAL(20,2) PATH '$.amount')) j
+        WHERE b.state='completed' AND p.cancelled=0 AND j.category REGEXP '^biaya_lain:[1-9][0-9]*$'";
+    $rows=[];
+    foreach($queries as $sql){
+        // Stream each slot once, aggregating only matching owner/category/class/date evidence.
+        $cursor=$db->query(hp_sql($db,$sql),MYSQLI_USE_RESULT);
+        while($r=$cursor->fetch_assoc()){
+            $amount=lf_cents($r['amount']);if($amount<=0)continue;
+            $identity=json_encode([$r['unit_id'],$r['nis'],$r['category'],$r['kelas'],$r['source_date'],$r['source_period'],$r['legacy'],$r['method'],$r['source_operator']],JSON_THROW_ON_ERROR);
+            if(!isset($rows[$identity])){$r['amount_cents']=0;$r['detail_count']=0;unset($r['amount']);$rows[$identity]=$r;}
+            $rows[$identity]['amount_cents']+=$amount;
+            $rows[$identity]['detail_count']++;
+        }
+        $cursor->free();
+    }
+    $rows=array_values($rows);if($cacheRead)$cache[$key]=$rows;return $rows;
+}
+
+/** Match cash dates for fees; an undated receipt requires its original period proof. */
+function report_fee_payment_in_period(array $payment,array $f): bool {
+    if(!empty($payment['source_date'])){
+        $date=substr($payment['source_date'],0,10);
+        return $date>=$f['tanggal_awal']&&$date<=$f['tanggal_akhir'];
+    }
+    return report_undated_matches($f,(string)($payment['source_period']??''));
+}
+
+function report_optional_positions(mysqli $db,string $category,string $year,?array $filters=null): array {
+    [$first,$last]=explode('/',$year);
+    $scope=$filters??['tanggal_awal'=>$first.'-07-01','tanggal_akhir'=>$last.'-06-30','include_undated'=>true];
+    $out=[];$operatorNames=[];
+    $operatorValues=$filters['_multi']['operator']??(($filters['operator']??'')!==''?[$filters['operator']]:['*']);
+    if(!filter_is_all($operatorValues))foreach(hp_rows($db,'SELECT id,username,nama FROM admin') as $actor)
+        if(in_array((string)$actor['id'],$operatorValues,true))foreach([$actor['id'],$actor['username'],$actor['nama']] as $name)$operatorNames[mb_strtolower((string)$name)]=true;
+    foreach(report_fee_payment_rows($db) as $r){
+        if($r['category']!==$category)continue;
+        if($filters!==null&&(!report_component_matches($r,$filters)||!report_component_class_matches($db,$filters,$r)))continue;
+        if($filters!==null){
+            $methods=$filters['_multi']['metode']??(($filters['metode']??'')!==''?[$filters['metode']]:['*']);
+            if($r['legacy']){
+                if(!report_component_method_matches($filters,$r['method'])||!lful_report_matches_operator($filters,(int)$r['unit_id'],$r['source_operator']))continue;
+            }elseif((!filter_is_all($methods)&&!in_array($r['method'],$methods,true))
+                ||(!filter_is_all($operatorValues)&&!isset($operatorNames[mb_strtolower((string)$r['source_operator'])])))continue;
+        }
+        $nis=$r['nis'];$out[$nis]??=['paid'=>0,'historical_paid'=>0,'legacy'=>false,'groups'=>[]];
+        $out[$nis]['historical_paid']+=$r['amount_cents'];
+        $out[$nis]['legacy']=$out[$nis]['legacy']||(bool)$r['legacy'];
+        $group=&$out[$nis]['groups'][$r['kelas']];
+        $group??=$r+['paid'=>0,'historical_paid'=>0];
+        $group['legacy']=$group['legacy']||(bool)$r['legacy'];
+        $group['historical_paid']+=$r['amount_cents'];
+        if(report_fee_payment_in_period($r,$scope)){$out[$nis]['paid']+=$r['amount_cents'];$group['paid']+=$r['amount_cents'];}
+        unset($group);
+    }
     return $out;
+}
+
+/** Fee status keeps each historical class, even when no native bill exists. */
+function report_fee_status_rows(mysqli $db,array $f,array $rows): array {
+    [$first,$last]=explode('/',$f['tahun_ajaran']);
+    $scope=array_replace($f,['tanggal_awal'=>$first.'-07-01','tanggal_akhir'=>$last.'-06-30','include_undated'=>true]);
+    $positions=report_optional_positions($db,$f['kategori'],$f['tahun_ajaran'],$scope);
+    $out=[];$assigned=[];
+    foreach($rows as $r){
+        $groups=$positions[$r['nis']]['groups']??[];
+        if(!$r['bill_id']&&$groups)continue;
+        $identity=$r['nis'].'|'.$r['kelas'];$p=$groups[$r['kelas']]??null;
+        $r['pembayaran_opsional']=0.0;
+        if($p&&!isset($assigned[$identity])&&$r['status']!=='Dibatalkan'){
+            $r['pembayaran_opsional']=$p['paid']/100.0;$assigned[$identity]=true;
+        }
+        $out[]=$r;
+    }
+    foreach($positions as $nis=>$entry)foreach($entry['groups'] as $class=>$p){
+        if(isset($assigned[$nis.'|'.$class]))continue;
+        $status=$p['paid']>0?'Ada Pembayaran':'Ada Pembayaran di Luar Periode';
+        $out[]=['nis'=>(string)$nis,'student_id'=>(int)$p['student_id'],'unit_id'=>(int)$p['unit_id'],
+            'nis_diknas'=>$p['nis_diknas']??'','nama'=>$p['nama'],'kelas'=>$class,'periode'=>'Satu kali per tagihan','bill_id'=>0,
+            'tagihan'=>$p['legacy']?null:0.0,'terbayar'=>0.0,'pembayaran_opsional'=>$p['paid']/100.0,
+            'sisa'=>$p['legacy']?null:0.0,'status'=>$status,'_status'=>$status,'_incomplete'=>(bool)$p['legacy']];
+    }
+    usort($out,static fn($a,$b)=>[$a['kelas'],$a['nama'],$a['nis'],!$a['bill_id'],$a['bill_id']]<=>[$b['kelas'],$b['nama'],$b['nis'],!$b['bill_id'],$b['bill_id']]);
+    return $out;
+}
+
+/** Fee amounts follow the selected dates; bill balances retain all valid allocations. */
+function report_fee_item_rows(mysqli $db,array $f,array $statusRows,array $components): array {
+    $positions=report_optional_positions($db,$f['kategori'],$f['tahun_ajaran'],$f);
+    $paidByBill=[];
+    foreach($components as $p)if($p['kategori_key']===$f['kategori']&&!empty($p['bill_id']))
+        $paidByBill[$p['bill_id']]=($paidByBill[$p['bill_id']]??0)+lb_result_cents($p['nominal']);
+    $rows=[];$assigned=[];$period=report_item_date_period_label($f);
+    foreach($statusRows as $r){
+        $nis=$r['nis'];$groups=$positions[$nis]['groups']??[];
+        if(!$r['bill_id']){
+            if($groups)continue; // Payment-only rows below retain the transaction's historical class.
+            $r['terbayar']=$r['pembayaran_opsional']=0.0;$r['periode']=$period;$rows[]=$r;continue;
+        }
+        $r['terbayar']=($paidByBill[$r['bill_id']]??0)/100.0;
+        $r['pembayaran_opsional']=0.0;$r['periode']=$period;
+        $group=$groups[$r['kelas']]??null;$identity=$nis.'|'.$r['kelas'];
+        if($group&&!isset($assigned[$identity])&&$r['status']!=='Dibatalkan'){
+            $r['pembayaran_opsional']=$group['paid']/100.0;$assigned[$identity]=true;
+        }
+        // Historical unallocated fees are displayed separately from the bill's paid/sisa.
+        $rows[]=$r;
+    }
+    foreach($positions as $nis=>$entry)foreach($entry['groups'] as $class=>$p){
+        if(isset($assigned[$nis.'|'.$class]))continue;
+        $status=$p['paid']>0?'Ada Pembayaran':'Ada Pembayaran di Luar Periode';
+        $rows[]=['nis'=>(string)$nis,'student_id'=>(int)$p['student_id'],'unit_id'=>(int)$p['unit_id'],
+            'nis_diknas'=>$p['nis_diknas']??'','nama'=>$p['nama'],'kelas'=>$class,'periode'=>$period,'bill_id'=>0,
+            'tagihan'=>$p['legacy']?null:0.0,'terbayar'=>0.0,'pembayaran_opsional'=>$p['paid']/100.0,
+            'sisa'=>$p['legacy']?null:0.0,'status'=>$status,'_status'=>$status,'_incomplete'=>(bool)$p['legacy']];
+    }
+    usort($rows,static fn($a,$b)=>[$a['kelas'],$a['nama'],$a['nis'],!$a['bill_id'],$a['bill_id']]<=>[$b['kelas'],$b['nama'],$b['nis'],!$b['bill_id'],$b['bill_id']]);
+    return $rows;
+}
+
+/** Preserve payment-only fee evidence alongside bills, without treating it as bill credit. */
+function report_billing_fee_payment_rows(mysqli $db,array $f): array {
+    $rows=[];$classes=[];foreach(class_all($db,false) as $class)$classes[class_label($class)]=$class;
+    foreach(report_fee_payment_rows($db) as $p){
+        if(!$p['legacy']||!$p['student_id'])continue;
+        if(($f['siswa_status']==='active'&&!(int)$p['student_active'])||($f['siswa_status']==='archived'&&(int)$p['student_active']))continue;
+        if(!report_row_matches_filters($p,$f)||!report_component_class_matches($db,$f,$p))continue;
+        $period=report_source_period((string)$p['source_period']);$periodKey=$period['key']??(string)$p['source_period'];
+        $identity=implode('|',[$p['unit_id'],$p['student_id'],$p['category'],$p['kelas'],$periodKey]);
+        $class=$classes[$p['kelas']]??null;
+        if(!isset($rows[$identity]))$rows[$identity]=[
+            'nis'=>$p['nis'],'student_id'=>(int)$p['student_id'],'unit_id'=>(int)$p['unit_id'],'nis_diknas'=>$p['nis_diknas']??'',
+            'nama'=>$p['nama'],'kelas'=>$p['kelas'],'master_kelas_id'=>(int)($class['id']??0),'tingkat'=>$class['tingkat']??$p['kelas'],
+            'komponen'=>$p['label'],'komponen_key'=>$p['category'],
+            'periode'=>$periodKey?:'Periode tidak tercatat','periode_code'=>$periodKey,'tahun_ajaran'=>$period['year']??'',
+            'tanggal_dibuat'=>null,'tagihan'=>null,'terbayar'=>0.0,'sisa'=>null,
+            'status'=>'Ada Pembayaran','_status'=>'Ada Pembayaran','_incomplete'=>true,'legacy_payment_only'=>true,'_paid_cents'=>0,
+        ];
+        $rows[$identity]['_paid_cents']+=$p['amount_cents'];
+    }
+    foreach($rows as &$r){$r['terbayar']=$r['_paid_cents']/100.0;unset($r['_paid_cents']);}unset($r);
+    return array_values($rows);
 }
 function report_legacy_years(mysqli $db): array {
     static $readCache=[];$cacheRead=PHP_SAPI!=='cli'&&($_SERVER['REQUEST_METHOD']??'')==='GET';
@@ -150,20 +313,22 @@ function report_legacy_periods(mysqli $db,?array $onlyPeriods=null): array {
     }
     $add=static function(array $p,array $items)use(&$out):void {
         if(empty($p['NO_INDUK']))return;
-        $period=report_source_period((string)$p['source_period']);if(!$period)return;
-        if($period['year']!=='')$out['years'][$period['year']]=true;
+        $period=report_source_period((string)$p['source_period']);
+        if($period&&$period['year']!=='')$out['years'][$period['year']]=true;
         foreach($items as $item){
-            $category=(string)$item['category'];$periodKey=$category==='daftar_ulang'?lb_payment_year(lma_item_period($item,(string)$p['source_period'])):$period['key'];
+            $category=lcs_component_view($item)['cash_category'];
+            $itemPeriod=report_source_period(lma_item_period($item,(string)$p['source_period']))??$period;
+            $periodKey=$category==='daftar_ulang'?lb_payment_year(lma_item_period($item,(string)$p['source_period'])):($itemPeriod['key']??'');
             if($category==='daftar_ulang'&&$periodKey!=='')$out['years'][$periodKey]=true;
-            if(in_array($category,['spp','komite'],true)&&$period['kind']!=='monthly')continue;
+            if(in_array($category,['spp','komite'],true)&&($itemPeriod['kind']??'')!=='monthly')continue;
             if($periodKey==='')continue;
             $cell=&$out['payments'][$p['NO_INDUK']][$category][$periodKey];
             $cell??=['paid'=>0,'class'=>(string)$p['class_snapshot']];$cell['paid']+=lf_cents($item['amount']);unset($cell);
         }
     };
     if(lful_read_ready($db)){
-        $cursor=$db->query(hp_sql($db,"SELECT s.NO_INDUK,p.source_period,p.class_snapshot,i.category,i.amount FROM legacy_full_payments p JOIN legacy_full_items i ON i.payment_id=p.id AND i.unit_id=p.unit_id JOIN siswa s ON s.id=p.student_id AND s.unit_id=p.unit_id JOIN legacy_full_batches b ON b.id=p.batch_id AND b.unit_id=p.unit_id WHERE b.state='completed'".$periodWhere('legacy_full_payments')),MYSQLI_USE_RESULT);
-        while($r=$cursor->fetch_assoc())$add($r,[['category'=>$r['category'],'amount'=>$r['amount']]]);$cursor->free();
+        $cursor=$db->query(hp_sql($db,"SELECT s.NO_INDUK,p.source_period,p.class_snapshot,i.category,i.source_column,i.amount FROM legacy_full_payments p JOIN legacy_full_items i ON i.payment_id=p.id AND i.unit_id=p.unit_id JOIN siswa s ON s.id=p.student_id AND s.unit_id=p.unit_id JOIN legacy_full_batches b ON b.id=p.batch_id AND b.unit_id=p.unit_id WHERE b.state='completed'".$periodWhere('legacy_full_payments')),MYSQLI_USE_RESULT);
+        while($r=$cursor->fetch_assoc())$add($r,[['category'=>$r['category'],'source_column'=>$r['source_column'],'amount'=>$r['amount']]]);$cursor->free();
     }
     if(lop_ready($db)){
         $cursor=$db->query(hp_sql($db,"SELECT s.NO_INDUK,p.source_period,p.class_snapshot,p.items FROM legacy_op_payments p JOIN legacy_op_owners o ON o.id=p.owner_id AND o.unit_id=p.unit_id JOIN siswa s ON s.id=o.student_id AND s.unit_id=o.unit_id JOIN legacy_full_batches b ON b.id=p.batch_id AND b.unit_id=p.unit_id WHERE b.state='completed' AND p.cancelled=0".$periodWhere('legacy_op_payments')),MYSQLI_USE_RESULT);

@@ -1,8 +1,8 @@
 <?php
 /** Pure source rules. Fee trace is automatic on both entry points, without source writes. */
 require_once __DIR__.'/legacy_fee_trace.php';
-const LMA_VERSION = 4;
-function lma_metadata_supported(mixed $version): bool {return in_array($version,[1,2,3,LMA_VERSION],true);}
+const LMA_VERSION = 5;
+function lma_metadata_supported(mixed $version): bool {return in_array($version,[1,2,3,4,LMA_VERSION],true);}
 function lma_enabled(array $cfg): bool { return lma_metadata_supported($cfg['automation_version']??0); }
 function lma_fee_manual_mapping(array $map): bool {
     return ($map['automatic_mapping']??null)===false||(!array_key_exists('automatic_mapping',$map)&&!empty($map['category'])&&!str_starts_with($map['category'],'histori:'));
@@ -90,7 +90,7 @@ function lma_context(array $records,int $unit,string $sourceKey=''): array {
         foreach(range(1,4) as $slot){
             try{$amount=lf_cents($v['JUMLAH'.$slot]??'0');}catch(DomainException $ignored){continue;}if($amount<=0)continue;
             $code=trim((string)($v['LAIN_LAIN'.$slot]??''));$names=$masters[$code]??[];$ctx=lma_fee_context($v);
-            $detail=$ctx+['row_key'=>$r['row_key'],'column'=>'JUMLAH'.$slot,'code'=>$code,'amount'=>$amount,'identity'=>lma_identity(legacy_source_identity($v)),'priority'=>lma_priority($v,$active),'note'=>trim((string)($v['KETERANGAN']??'')),'counterpart'=>lma_receipt_key($v,$slot),'is_pomg'=>legacy_source_is_pomg('JUMLAH'.$slot,$v)];
+            $detail=$ctx+['row_key'=>$r['row_key'],'column'=>'JUMLAH'.$slot,'code'=>$code,'amount'=>$amount,'identity'=>lma_identity(legacy_source_identity($v)),'priority'=>lma_priority($v,$active),'note'=>trim((string)($v['KETERANGAN']??'')),'counterpart'=>lma_receipt_key($v,$slot),'is_pomg'=>legacy_source_is_pomg('JUMLAH'.$slot,$v),'du_year'=>lma_year((string)($v['th_ajaran']??'')),'du_grade'=>trim((string)($v['kelas_du']??''))];
             if(count($names)===1&&trim((string)($v['rstatus']??''))===''){
                 $counterparts[$detail['counterpart']][$names[0]]=true;
                 $counterpartRows[$detail['counterpart']][$names[0]][]=$r['row_key'];
@@ -124,8 +124,11 @@ function lma_context(array $records,int $unit,string $sourceKey=''): array {
             if(count($support)===1&&count(reset($support))>=3){$name=(string)array_key_first($support);$state='inferred';$rule='amount_code_cohort_45_days';$supporting=array_values(reset($support));}
         }
         if($d['is_pomg']){$name='Komite (POMG)';$state='direct';$rule='source_pomg';$supporting=[$row];}
+        // The name identifies the component; year/grade must be explicit, never inferred from the cash date.
+        $explicitDu=$name!==null&&$state==='direct'&&preg_match('/^(?:uang\s+)?(?:daftar\s*ulang|du)(?:\s+(?:ta\s*)?20[0-9]{2}\s*\/\s*20[0-9]{2})?$/iu',trim($name))&&$d['du_year']!==''&&preg_match('/^(?:[1-9]|1[0-2])$/D',$d['du_grade']);
+        if($explicitDu){$rule='du_source_fee';$supporting[]=$row;}
         $sourceRows=array_values(array_unique($masterRows[$d['code']]??[]));sort($sourceRows,SORT_STRING);$supporting=array_values(array_unique($supporting));sort($supporting,SORT_STRING);
-        $decisions[$row][$column]=['name'=>$name,'status'=>$state,'rule'=>$rule,'source_code'=>$d['code'],'priority'=>$d['priority'],'category'=>$d['is_pomg']?'komite':null,
+        $decisions[$row][$column]=['name'=>$name,'status'=>$state,'rule'=>$rule,'source_code'=>$d['code'],'priority'=>$d['priority'],'category'=>$d['is_pomg']?'komite':($explicitDu?'daftar_ulang':null),
             'evidence'=>['source_master_rows'=>$sourceRows,'supporting_rows'=>$supporting,'candidate_names'=>$names]];
     }
     if($sourceKey===''){$keys=array_column($records,'row_key');sort($keys,SORT_STRING);$sourceKey=$sourceIds?'source:'.array_key_first($sourceIds):hash('sha256',lf_canonical($keys));}
@@ -180,10 +183,11 @@ function lma_payment(array $r,array $cfg,array $masters,array $context): ?array 
         if($item['column']==='U_SORGA'&&$item['category']==='komite')$existing+=['source_code'=>'U_SORGA','rule'=>'sorga_is_komite','komite_mapping_version'=>LCS_KOMITE_MAPPING_VERSION];
         $sourceCode=preg_match('/^JUMLAH([1-4])$/D',$item['column'],$slot)?trim((string)($r['raw']['LAIN_LAIN'.$slot[1]]??'')):($existing['source_code']??null);
         $d=$evidence[$item['column']]??['status'=>'direct','rule'=>$existing['rule']??'source_column','source_code'=>$sourceCode];
-        $period=$item['category']==='daftar_ulang'&&$du?lma_year((string)($r['raw']['th_ajaran']??'')):$p['period'];
+        $explicitYear=lma_year((string)($r['raw']['th_ajaran']??''));
+        $period=$item['category']==='daftar_ulang'&&$explicitYear!==''?$explicitYear:$p['period'];
         if($item['category']==='daftar_ulang'&&$du)$d=['status'=>'direct','rule'=>'du_recap_reconciled','source_code'=>null];
         $item['migration']=array_replace($existing,['version'=>LMA_VERSION,'period'=>$period,'source_row_key'=>$r['row_key'],'source_code'=>$d['source_code'],'status'=>$d['status'],'rule'=>$d['rule'],'priority'=>$d['priority']??lma_priority($r['raw'],$context['active']??[])]);
-        if($item['category']==='daftar_ulang')$item['migration']+=['du_trace_version'=>1,'source_record_id'=>lfet_source_id($r['raw']),'source_unit_id'=>$context['unit_id'],'source_key'=>$context['source_key'],'du_grade'=>trim((string)($r['raw']['kelas_du']??''))];
+        if($item['category']==='daftar_ulang')$item['migration']+=['du_trace_version'=>2,'source_record_id'=>lfet_source_id($r['raw']),'source_unit_id'=>$context['unit_id'],'source_key'=>$context['source_key'],'du_grade'=>trim((string)($r['raw']['kelas_du']??''))];
         if(lfet_is_detail($item))$item['migration']+=lfet_metadata($r,$context,$item['column'],$d,$item['category']);
     }unset($item);return $p;
 }

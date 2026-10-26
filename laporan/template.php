@@ -119,6 +119,7 @@ if($isPrincipalLetter){ require __DIR__.'/../includes/principal_letter_page.php'
           <td class="billing-matrix-component">
             <?php if($component): ?>
               <strong class="billing-matrix-amount"><?= report_money($component['tagihan']) ?></strong>
+              <?php if(!empty($component['legacy_payment_only'])): ?><small style="display:block">Dibayar <?= report_money($component['terbayar']) ?></small><small style="display:block">Sisa <?= report_money($component['sisa']) ?></small><?php endif; ?>
             <?php else: ?><span class="billing-matrix-empty" aria-label="Tidak ada tagihan">&mdash;</span><?php endif; ?>
           </td>
         <?php endforeach; ?>

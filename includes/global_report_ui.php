@@ -3,13 +3,13 @@
 /** One semantic cell vocabulary for single/multiple categories and print output. */
 function global_report_cell($value,string $type,array $row,string $key): string
 {
-    if(in_array($type,['money','money_optional'],true))return $value===null||$value===''?'—':report_e(report_money($value));
+    if(in_array($type,['money','money_optional'],true)&&!is_array($value))return $value===null||$value===''?'—':report_e(report_money($value));
     if($type==='datetime'){
         $parts=spp_date_parts($value,$row['time_precision']??null);
         return '<span class="report-date">'.report_e($parts['date']).'</span>'.($parts['time']==='—'?'':'<span class="report-time">'.report_e($parts['time']).'</span>');
     }
     if($type==='date')return report_e(spp_date_label($value));
-    if(is_array($value))return '<span class="matrix-main status-'.report_e($value['status']??'').'">'.report_e($value['text']??'').'</span>'.(($value['sub']??'')!==''?'<small class="matrix-detail">'.report_e($value['sub']).'</small>':'');
+    if(is_array($value))return '<span class="matrix-main status-'.report_e($value['status']??'').'">'.report_e($value['text']??'').'</span>'.(($value['sub']??'')!==''?'<small class="matrix-detail">'.nl2br(report_e($value['sub'])).'</small>':'');
     if($type==='nis'||$key==='nis'){
         $diknas=$row['diknas']??$row['nis_diknas']??$row['NO_induk_diknas']??'';
         return '<span class="badge-nis">'.report_e($value).'</span>'.($diknas!==''?'<small class="report-secondary-id">Diknas '.report_e($diknas).'</small>':'');
