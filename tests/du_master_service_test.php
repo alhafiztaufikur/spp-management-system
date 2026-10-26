@@ -17,9 +17,15 @@ foreach([1=>1,2=>7,3=>10] as $unit=>$grade){
         $existing=hp_rows($db,'SELECT * FROM tagihan_daftar_ulang ORDER BY id');
         $unknown=array_filter(ldu_plan($db)['positions'],fn($p)=>!$p['bill']&&!$p['proof']['known']&&$p['placement']&&(int)$p['placement']['kelas']===$grade);
         dms_check(count($unknown)>0,'Initial grade without source evidence remains unknown');
+        // Other suites may seed active native pupils as well as Legacy owners.
+        // Explicit current-year DU publication must serve both populations.
+        $native=hp_rows($db,"SELECT s.NO_INDUK FROM siswa s WHERE s.is_active=1 AND s.KELAS=?
+            AND NOT EXISTS(SELECT 1 FROM legacy_op_owners o WHERE o.student_id=s.id AND o.unit_id=s.unit_id)
+            AND NOT EXISTS(SELECT 1 FROM tagihan_daftar_ulang t WHERE t.no_induk=s.NO_INDUK AND t.unit_id=s.unit_id AND t.tahun_ajaran_id=?)",[(string)$grade,$year['id']]);
         [$first,$last]=unit_level_bounds();$amounts=array_fill_keys(range($first,$last),'');$amounts[$grade]='3.500.000';
         $r=du_master_save_and_complete($db,(int)$year['id'],$year['label'],$amounts,1);
-        dms_check($r['rates_saved']===1&&$r['created']===count($unknown),'One partial form saves missing published rate and issues all ready pupils');
+        dms_check($r['rates_saved']===1&&$r['created']===count($unknown)+count($native),'One partial form issues all ready Legacy and native pupils');
+        foreach($native as $student){$nativeBill=du_find_bill($db,$student['NO_INDUK'],10,2026);dms_check($nativeBill&&lb_result_cents($nativeBill['nominal_tagihan'])===350000000&&$nativeBill['sisa']===3500000.0,'New native pupil receives the same explicit current-year tariff');}
         $master=hp_one($db,'SELECT * FROM Daftar_ulang WHERE tahun_ajaran_id=? AND kelas=?',[$year['id'],(string)$grade]);
         dms_check(lf_cents($master['Jumlah'])===350000000&&isset(ldu_master_bases($db,(int)$year['id'])[(int)$master['id']]),'Admin tariff has explicit provenance');
         foreach($existing as $b)dms_check(hp_one($db,'SELECT * FROM tagihan_daftar_ulang WHERE id=?',[$b['id']])===$b,'Existing paid and unpaid snapshots preserved');

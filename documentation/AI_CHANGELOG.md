@@ -1,5 +1,11 @@
 # Riwayat Perubahan AI SistemSPP
 
+## 2026-10-26 - Penggabungan pembaruan rekan dan pelacakan Legacy
+
+- Pertahankan perubahan tanggal kas, identitas siswa, tarif SPP khusus, penerbitan langsung, pemilih DU dan tampilan Global dari tiga commit rekan bersama perbaikan Global/Master DU lokal.
+- Dua file bersama mempertahankan tarif khusus per periode, rekonstruksi DU dan penyegaran fingerprint Legacy. Pengujian gabungan memperhitungkan siswa native tambahan serta menunggu rincian lazy sebelum simulasi DOM.
+- Konfigurasi database mesin dipertahankan secara lokal. Hasil verifikasi dan batas pengujian: [catatan penggabungan](REPO_MERGE_20261026.md).
+
 ## 2026-10-26 - Pelacakan pembayaran Legacy pada Laporan Global
 
 - Pisahkan bukti pembayaran historis dari nominal tanggal terpilih pada rekap Biaya Lain. Pencarian Aqila/Robotik menampilkan Rp450.000 pada periode yang sesuai dan Ada Pembayaran di Luar Periode pada tanggal lain, tanpa membuat pokok/sisa/lunas yang belum terbukti.

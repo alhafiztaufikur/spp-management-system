@@ -403,7 +403,7 @@ $selectedPaymentMethod = $d['sistem_pembayaran'] ?? 'VA';
               </div>
               <datalist id="siswa-list">
                 <?php while ($s = $siswa_list->fetch_assoc()): ?>
-                <option value="<?= htmlspecialchars($s['NAMA']) ?>"
+                <option value="<?= htmlspecialchars($s['NAMA'].' · NIS '.$s['NO_INDUK']) ?>"
                   data-nis="<?= htmlspecialchars($s['NO_INDUK']) ?>" data-student-id="<?= (int)$s['id'] ?>"
                   data-diknas="<?= htmlspecialchars((string)($s['NO_induk_diknas'] ?? '')) ?>"
                   data-nama="<?= htmlspecialchars($s['NAMA']) ?>"

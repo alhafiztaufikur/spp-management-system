@@ -1,4 +1,11 @@
 /* Scoped presentation refinements; no transaction or report filtering rules. */
+/* Keep long class histories inside their column in every desktop unit view. */
+@media screen and (min-width:1024px){
+  #global-report-workspace[data-report-template="riwayat-tagihan"] .report-billing-matrix-table col:nth-child(4){width:160px!important}
+  #global-report-workspace[data-report-template="riwayat-tagihan"] .report-billing-matrix-table :is(th,td).billing-matrix-class{width:160px;min-width:160px;max-width:160px}
+  #global-report-workspace[data-report-template="riwayat-tagihan"] .billing-matrix-class .kelas-badge{display:inline-block;box-sizing:border-box;min-width:0;max-width:100%;padding:6px 8px;border-radius:10px;white-space:normal;overflow-wrap:anywhere;line-height:1.6;text-align:left}
+}
+
 .correction-date-refined .correction-form>label:not(.legacy-check-row){display:flex;flex-direction:column;align-items:stretch;justify-content:flex-start;gap:9px}
 .correction-date-refined .correction-form>label:not(.legacy-check-row)>input:not([type="hidden"]),.correction-date-refined .correction-form>label>select{height:48px;margin:0}
 .correction-date-refined .correction-form>label:not(.legacy-check-row)>small{font-size:11px;line-height:1.6;color:var(--text-muted)}
@@ -114,6 +121,25 @@
   html body.report-general-page[data-readable-workspace="finance"] .finance-results{grid-template-columns:minmax(0,1fr)}
 }
 @media(min-width:1024px) and (max-width:1200px){.report-general-page .finance-transactions .btn-tbl-print svg{display:none}}
+
+/* Desktop readability for the requested Global Report filters only. */
+@media screen and (min-width:1024px){
+  body#global-report-workspace:is([data-report-template="penerimaan"],[data-report-template="tabungan-siswa"],[data-report-template="setoran"],[data-report-template="kas-tabungan"]) .report-template-shell .report-template-filters .field-label{font-size:12px}
+  body#global-report-workspace:is([data-report-template="penerimaan"],[data-report-template="tabungan-siswa"],[data-report-template="setoran"],[data-report-template="kas-tabungan"]) .report-template-shell .report-template-filters .recap-filter-label{font-size:13px}
+  body#global-report-workspace:is([data-report-template="penerimaan"],[data-report-template="tabungan-siswa"],[data-report-template="setoran"],[data-report-template="kas-tabungan"]) .report-template-shell .report-template-filters :is(.field-input,.spp-select-trigger,.search-box input,.report-date-range-button,.report-date-range-value,.report-period-toggle,.report-filter-actions>.btn){font-size:14px}
+  body#global-report-workspace:is([data-report-template="penerimaan"],[data-report-template="tabungan-siswa"],[data-report-template="setoran"],[data-report-template="kas-tabungan"]) .report-date-range-popover label>span{font-size:12px}
+  body#global-report-workspace:is([data-report-template="penerimaan"],[data-report-template="tabungan-siswa"],[data-report-template="setoran"],[data-report-template="kas-tabungan"]) .report-date-range-popover :is(input:not(.id-date-native),.btn){font-size:14px}
+  body#global-report-workspace[data-report-template="kas-tabungan"] :is(.report-filter-actions>.btn,.report-date-range-popover .btn){font-size:14px!important}
+
+  body#global-report-workspace[data-report-template="setoran"] .report-date-range-popover{grid-template-columns:minmax(0,1fr)}
+  body#global-report-workspace[data-report-template="setoran"] .report-date-range-popover label{min-width:0}
+  body#global-report-workspace[data-report-template="setoran"] .report-date-range-popover .id-date-control>input:not(.id-date-native){box-sizing:border-box;min-width:0;padding-inline:12px}
+
+  body#global-report-workspace[data-report-template="per-item"] .report-month-range-field .field-label,
+  body#global-report-workspace[data-report-template="per-item"] .report-month-range-popover label>span{font-size:12px}
+  body#global-report-workspace[data-report-template="per-item"] :is(.report-month-range-button,.report-month-range-value),
+  body#global-report-workspace[data-report-template="per-item"] .report-month-range-popover :is(select,.spp-select-trigger,.btn){font-size:14px}
+}
 
 /* Presentation tabs are desktop-only; smaller workspaces keep the payment table. */
 @media(min-width:1100px){

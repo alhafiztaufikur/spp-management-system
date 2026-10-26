@@ -95,6 +95,17 @@ function lbr_reconcile(mysqli $db,int $actor): array {
             [$calendar,$month]=explode('-',$period);
             $covered=$category==='spp'&&!empty($placement['spp_covered_by_psb']);
             if($covered){$principal=0;$position['gross']=0;$position['discount']=0;}
+            elseif($category==='spp'&&sct_rule($db,(string)$s['NO_INDUK'],$month,$calendar)){
+                $oldPrincipal=$principal;$oldRemaining=$position['remaining'];
+                $custom=sct_period_rate($db,(string)$s['NO_INDUK'],$month,$calendar,[]);
+                $principal=(int)round($custom['net']*100);$position['gross']=$principal;$position['discount']=0;
+                $existing=hp_one($db,'SELECT nominal_tagihan,tarif_dasar_snapshot,potongan_nominal_snapshot FROM tagihan_spp WHERE no_induk=? AND bulan=? AND tahun=?',[$s['NO_INDUK'],$month,$calendar]);
+                if($existing){$principal=lb_result_cents($existing['nominal_tagihan']);$position['gross']=lb_result_cents($existing['tarif_dasar_snapshot']);$position['discount']=lb_result_cents($existing['potongan_nominal_snapshot']);}
+                $position['principal']=$principal;$position['remaining']=max(0,$principal-$position['paid']);
+                $position['evidence']['individual_tariff']=true;
+                $summary['components'][$category][$period]['principal_cents']+=$principal-$oldPrincipal;
+                $summary['components'][$category][$period]['remaining_cents']+=$position['remaining']-$oldRemaining;
+            }
             if(!isset($bills[$s['NO_INDUK']][$key])){
                 if($category==='spp'){
                     $master=$placement['master_id']?:spp_master_ensure_year($db,$position['year'],true)['id'];

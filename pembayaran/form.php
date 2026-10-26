@@ -144,7 +144,7 @@ unset($_SESSION['payment_draft']);
               <div class="payment-panel-kicker">Pengaturan Transaksi</div>
               <input type="hidden" name="payment_plan" value="monthly" />
               <div class="payment-settings-grid">
-                <div class="field-row payment-field-card">
+                <div class="field-row payment-field-card payment-date-card">
                   <label class="field-label" for="tgl-bayar">
                     <span class="payment-field-icon" aria-hidden="true">
                       <svg width="15" height="15" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.3" stroke-linecap="round" stroke-linejoin="round"><rect x="3" y="4" width="18" height="18" rx="2"/><line x1="16" y1="2" x2="16" y2="6"/><line x1="8" y1="2" x2="8" y2="6"/><line x1="3" y1="10" x2="21" y2="10"/></svg>
@@ -152,7 +152,7 @@ unset($_SESSION['payment_draft']);
                     Tanggal Bayar
                   </label>
                   <input class="field-input" type="date" id="tgl-bayar" name="tanggal_bayar"
-                    value="<?= date('Y-m-d') ?>" readonly aria-readonly="true" required />
+                    value="<?= htmlspecialchars($paymentDraft['tanggal_bayar'] ?? date('Y-m-d'), ENT_QUOTES, 'UTF-8') ?>" required />
                 </div>
                 <div class="field-row payment-field-card payment-period-card">
                   <label class="field-label" for="bulan-bayar" id="payment-period-label">
@@ -226,7 +226,7 @@ unset($_SESSION['payment_draft']);
               </div>
               <datalist id="siswa-list">
                 <?php while ($s = $siswa_list->fetch_assoc()): ?>
-                <option value="<?= htmlspecialchars($s['NAMA']) ?>"
+                <option value="<?= htmlspecialchars($s['NAMA'].' · NIS '.$s['NO_INDUK']) ?>"
                   data-nis="<?= htmlspecialchars($s['NO_INDUK']) ?>" data-student-id="<?= (int)$s['id'] ?>"
                   data-diknas="<?= htmlspecialchars((string)($s['NO_induk_diknas'] ?? '')) ?>"
                   data-nama="<?= htmlspecialchars($s['NAMA']) ?>"
