@@ -17,7 +17,9 @@ function lful_store(): PDO {
 function lful_draft(string $id): array {
     $job=legacy_job($id);if(($job['category']??'')!=='full')throw new DomainException('Bukan pekerjaan migrasi penuh.');
     $s=lful_store()->prepare('SELECT * FROM full_drafts WHERE job=?');$s->execute([$id]);$d=$s->fetch(PDO::FETCH_ASSOC);
-    if(!$d)throw new DomainException('Pemeriksaan sumber belum selesai.');foreach(['settings','simulation','confirmed'] as $k)$d[$k]=$d[$k]===null?null:json_decode($d[$k],true,512,JSON_THROW_ON_ERROR);$d['job_info']=$job;return $d;
+    if(!$d)throw new DomainException('Pemeriksaan sumber belum selesai.');foreach(['settings','simulation','confirmed'] as $k)$d[$k]=$d[$k]===null?null:json_decode($d[$k],true,512,JSON_THROW_ON_ERROR);$d['job_info']=$job;
+    $db=$GLOBALS['koneksi']??null;if($db instanceof mysqli&&lop_ready($db))$d['settings']['_exception_closures']=lec_saved($db,$id);
+    return $d;
 }
 function lful_empty(mysqli $db,int $unit,bool $lock=false): void {
     foreach(['siswa','bayar','bayar_du','tabungan','transaksi_m','transaksi_k','tagihan_spp','tagihan_komite','tagihan_daftar_ulang','tagihan_biaya_lain','siswa_tahun_ajaran'] as $table){

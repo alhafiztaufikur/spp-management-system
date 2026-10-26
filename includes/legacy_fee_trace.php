@@ -1,4 +1,5 @@
 <?php
+require_once __DIR__.'/legacy_exception_closure.php';
 /** Pure provenance helpers. A receipt remains one cash receipt, regardless of its slots. */
 const LEGACY_FEE_TRACE_VERSION = 1;
 
@@ -79,10 +80,10 @@ function lfet_item_reference(array $item): string {
 }
 /** Receipt/slot counts never become a second receipt amount. */
 function lfet_summary(array $payments,array $pending=[]): array {
-    $out=['rule'=>LEGACY_FEE_TRACE_VERSION,'details'=>0,'amount_cents'=>0,'direct'=>0,'inferred'=>0,'unresolved'=>0,'manual'=>0,'master_linked'=>0,'master_proposed'=>0,'trace_complete'=>0,'held_transactions'=>0];
+    $out=['rule'=>LEGACY_FEE_TRACE_VERSION,'details'=>0,'amount_cents'=>0,'direct'=>0,'inferred'=>0,'unresolved'=>0,'manual'=>0,'closed'=>0,'master_linked'=>0,'master_proposed'=>0,'trace_complete'=>0,'held_transactions'=>0];
     foreach($payments as $payment)foreach($payment['items'] as $item)if(lfet_is_detail($item)){
         $out['details']++;$out['amount_cents']+=lf_cents($item['amount']);$meta=$item['migration']??[];$status=$meta['status']??'unresolved';
-        $out[in_array($status,['direct','inferred','manual'],true)?$status:'unresolved']++;
+        $out[in_array($status,['direct','inferred','manual','closed'],true)?$status:'unresolved']++;
         if(str_starts_with($item['category'],'biaya_lain:'))$out['master_linked']++;
         elseif(str_starts_with($item['category'],'biaya_baru:'))$out['master_proposed']++;
         if(!empty($meta['detail_key'])&&isset($meta['source_unit_id'],$meta['source_key'],$meta['source_column']))$out['trace_complete']++;

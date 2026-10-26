@@ -18,6 +18,7 @@ function lfer_enrich_payment(array $payment,array $source,array $cfg,array $name
     $next=$payment['items'];
     foreach($next as &$item){
         if(!lfet_is_detail($item))continue;$column=$item['column'];$old=$item;
+        if(($old['migration']['status']??'')==='closed')continue;
         $key=lful_component_key('bayar',$column,$source['raw']);
         $manual=$corrected||!empty($old['obligation_id'])||lma_fee_manual_mapping($cfg['components'][$key]??[]);
         if(!$manual&&isset($byColumn[$column])){$item['category']=$byColumn[$column]['category'];$item['label']=$byColumn[$column]['label'];}

@@ -45,6 +45,8 @@ function lop_coverage_plan(array $coverage,array $payments,string $identity,stri
 }
 /** Pure planning: no master, student, bill or account is written by simulation. */
 function lop_prepare(array $records,array $cfg,int $unit,?string $sourceDate,array $masters=[],?array $automation=null): array {
+    $closures=$cfg['_exception_closures']??[];
+    if(!empty($closures['owners']))$records=array_values(array_filter($records,static fn($r)=>!isset($closures['owners'][lful_identity(legacy_source_identity($r['raw']))])));
     if($automation===null)[$cfg,$automation]=lma_configure($records,$cfg,$unit,array_map(static fn($id,$name)=>['id'=>$id,'nama'=>$name],array_keys($masters),array_values($masters)));
     if(lma_enabled($cfg))$cfg['_du_matches']=$automation['du']??[];
     [$records,$history,$references,$resolutions]=lop_resolved_source_rows($records,$cfg,$sourceDate);$automatic=[];
@@ -123,8 +125,8 @@ function lop_prepare(array $records,array $cfg,int $unit,?string $sourceDate,arr
     $summary['separate_references']=count($references);$summary['unidentified_records']=count(array_filter($references,fn($r)=>$r['kind']==='unidentified'));$summary['du_anomalies']=count(array_filter($references,fn($r)=>$r['kind']==='du_anomaly'));$summary['zero_references']=count(array_filter($references,fn($r)=>$r['kind']==='zero_journal'));
     $summary['normalized_balances']=count(array_filter($resolutions,fn($r)=>$r['kind']==='precision_balance'));$summary['source_balance_fixes']=count(array_filter($resolutions,fn($r)=>$r['kind']==='source_balance_fix'));$summary['promoted_accounts']=count(array_filter($resolutions,fn($r)=>$r['kind']==='promoted_account'));
     if(lma_enabled($cfg)){
-        $summary['automation_version']=LMA_VERSION;$summary['fee_direct']=$summary['fee_inferred']=$summary['fee_unresolved']=$summary['fee_unresolved_priority']=$summary['fee_unresolved_historical']=0;
-        foreach($payments as $p)foreach($p['items'] as $item)if(preg_match('/^JUMLAH[1-4]$/D',$item['column'])){$state=$item['migration']['status']??'unresolved';$summary['fee_'.($state==='inferred'?'inferred':($state==='direct'?'direct':'unresolved'))]++;if($state==='unresolved')$summary['fee_unresolved_'.(($item['migration']['priority']??'historical')==='priority'?'priority':'historical')]++;}
+        $summary['automation_version']=LMA_VERSION;$summary['fee_direct']=$summary['fee_inferred']=$summary['fee_manual']=$summary['fee_closed']=$summary['fee_unresolved']=$summary['fee_unresolved_priority']=$summary['fee_unresolved_historical']=0;
+        foreach($payments as $p)foreach($p['items'] as $item)if(preg_match('/^JUMLAH[1-4]$/D',$item['column'])){$state=$item['migration']['status']??'unresolved';$summary['fee_'.(in_array($state,['direct','inferred','manual','closed'],true)?$state:'unresolved')]++;if($state==='unresolved')$summary['fee_unresolved_'.(($item['migration']['priority']??'historical')==='priority'?'priority':'historical')]++;}
         $summary['du_reconciled']=count(array_filter($references,fn($r)=>$r['kind']==='du_reconciled'));$summary['du_unresolved']=count(array_filter($references,fn($r)=>$r['kind']==='du_unresolved'));
         $summary['primary_banks_retained']=count(array_filter($cfg['additional_savings']??[],fn($d)=>in_array($d['reason']??'',['keep_main','historical_snapshot'],true)));
         $summary['additional_bank_exceptions']=count(array_filter($cfg['additional_savings']??[],fn($d)=>!empty($d['additional_issues'])));
@@ -143,6 +145,7 @@ function lop_prepare(array $records,array $cfg,int $unit,?string $sourceDate,arr
     $summary['pending']=count($pending);$summary['review_tasks']=count(lop_pending_groups(['owners'=>$owners,'pending'=>$pending]));
     $summary['fee_trace']=lfet_summary($payments,$pending);
     $result=compact('owners','groups','payments','journals','pending','summary','history','automatic','references','resolutions','monthly');
+    foreach($payments as $p)foreach($p['items'] as $item)if(($item['migration']['status']??'')==='closed')$result['closed_fee_keys'][$item['migration']['detail_key']]=true;
     if(lma_enabled($cfg))$result['migration_evidence']=['banks'=>array_filter($cfg['additional_savings']??[],fn($d)=>in_array($d['reason']??'',['keep_main','historical_snapshot'],true))];
     return $result;
 }
@@ -207,6 +210,7 @@ function lop_check_result(mysqli $db,string $id): array {
     $source=lf_source_fingerprint($db,(int)$batch['unit_id'],(int)$batch['source_id']);if(!hash_equals($m['source_fingerprint'],$source['fingerprint']))throw new DomainException('Fingerprint arsip sumber berbeda.');
     if(!hash_equals($m['working_digest'],lop_working_digest($db,$id))){require_once __DIR__.'/legacy_billing_digest.php';$prior=lop_prior_billing_digest($db,$id);if(!$prior||!hash_equals($m['working_digest'],$prior['digest']))throw new DomainException('Fingerprint sumber atau hasil kerja berbeda.');$m['verified_prior_spp_sync']=$prior['derived_rows'];}
     foreach(hp_rows($db,'SELECT p.* FROM legacy_op_payments p WHERE batch_id=?',[$id]) as $p){$p['items']=json_decode($p['items'],true,512,JSON_THROW_ON_ERROR);lfet_validate_payment($p);}
+    lec_verify($db,$id,$m['exception_closures']??[]);
     foreach(hp_rows($db,'SELECT a.*,o.student_id,o.batch_id FROM legacy_op_accounts a JOIN legacy_op_owners o ON o.id=a.owner_id AND o.unit_id=a.unit_id WHERE o.batch_id=?',[$id]) as $a){$legacy=0;$new=0;foreach(hp_rows($db,'SELECT * FROM legacy_op_journals WHERE owner_id=? AND cancelled=0',[$a['owner_id']]) as $j){$v=lf_cents($j['incoming'])-lf_cents($j['outgoing']);if(in_array($j['origin'],['legacy','adjustment'],true))$legacy+=$v;else $new+=$v;}if($legacy!==lf_cents($a['opening'])||(!$a['student_id']&&$legacy+$new!==lf_cents($a['balance'])))throw new DomainException('Saldo dan jurnal hasil kerja tidak cocok.');}
     require_once __DIR__.'/legacy_operational_corrections.php';
     foreach(hp_rows($db,'SELECT ob.* FROM legacy_op_obligations ob JOIN legacy_op_owners o ON o.id=ob.owner_id AND o.unit_id=ob.unit_id WHERE o.batch_id=?',[$id]) as $ob){require_once __DIR__.'/legacy_billing.php';$position=lb_obligation_position($db,$ob);if($position){if($position['principal']!==lf_cents($ob['principal']))throw new DomainException('Pokok kewajiban belum sesuai bukti sumber.');$remaining=$position['remaining'];}else{$remaining=lf_cents($ob['principal'])-lop_obligation_paid($db,(int)$ob['id']);if($remaining<0)throw new DomainException('Kewajiban terbayar melebihi pokok.');}if(lf_cents($ob['remaining'])!==$remaining)throw new DomainException('Catatan sisa kewajiban belum sesuai dengan pembayaran.');if($ob['bill_id']){$bill=hp_one($db,'SELECT nominal_tagihan FROM tagihan_biaya_lain WHERE id=?',[$ob['bill_id']]);$native=hp_one($db,'SELECT COALESCE(SUM(nominal_snapshot),0) paid FROM bayar_biaya_lain WHERE tagihan_biaya_lain_id=?',[$ob['bill_id']]);if(!$bill||lf_cents((string)$bill['nominal_tagihan'])-lf_cents((string)$native['paid'])!==$remaining)throw new DomainException('Sisa kewajiban dan tagihan tidak cocok.');}}

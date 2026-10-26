@@ -189,6 +189,7 @@ function lma_payment(array $r,array $cfg,array $masters,array $context): ?array 
         $item['migration']=array_replace($existing,['version'=>LMA_VERSION,'period'=>$period,'source_row_key'=>$r['row_key'],'source_code'=>$d['source_code'],'status'=>$d['status'],'rule'=>$d['rule'],'priority'=>$d['priority']??lma_priority($r['raw'],$context['active']??[])]);
         if($item['category']==='daftar_ulang')$item['migration']+=['du_trace_version'=>2,'source_record_id'=>lfet_source_id($r['raw']),'source_unit_id'=>$context['unit_id'],'source_key'=>$context['source_key'],'du_grade'=>trim((string)($r['raw']['kelas_du']??''))];
         if(lfet_is_detail($item))$item['migration']+=lfet_metadata($r,$context,$item['column'],$d,$item['category']);
+        if(lfet_is_detail($item))$item=lec_item($item,$cfg['_exception_closures']??[]);
     }unset($item);return $p;
 }
 /** Additional evidence cannot silently replace a valid main account. */

@@ -16,6 +16,8 @@ require_once __DIR__.'/../includes/legacy_full.php';
 $db=$koneksi;$actual=lmr_target($db);if($actual['database_name']!==$database||(int)$actual['port']!==$port)throw new RuntimeException('Target koneksi berbeda dari CLI.');
 $duYear=$options['du-year']??ldu_target_year();if(!is_string($duYear)||$duYear!==ldu_target_year())throw new InvalidArgumentException('Tahun DU harus tahun ajaran berjalan; ulangi preview untuk tahun tersebut.');
 $actor=(int)$_SESSION['admin_id'];if(!lf_one($db,"SELECT id FROM admin WHERE id=? AND role='super_admin' AND is_active=1",[$actor]))throw new RuntimeException('Super Admin aktif diperlukan.');
+$closureSettings=isset($options['settings'])?json_decode(file_get_contents($options['settings']),true,512,JSON_THROW_ON_ERROR):[];
+$closureRequest=$closureSettings['exception_closure']??[];
 $report=['rules'=>['workflow'=>LFUL_RULES_VERSION,'operational'=>LOP_VERSION,'monthly'=>LMP_VERSION,'automation'=>LMA_VERSION,'fee_trace'=>LEGACY_FEE_TRACE_VERSION,'billing'=>LB_RULE_VERSION,'du'=>LDU_VERSION],'target'=>$actual,'mode'=>$mode,'du_year'=>$duYear,'stages'=>['target_backup','source_extraction','owner_classification','psb_du','du_planning','du_application','component_mapping','other_fee_trace','spp_komite','future_period_credit','savings','simulation','application','verification','verification_du'],'units'=>[]];
 // A source already archived on this target follows exactly the reconciliation engine.
 if(isset($options['source'])){
@@ -68,7 +70,9 @@ foreach($unit?[$unit]:[1,2,3] as $u){
         lf_rows($db,'SELECT id FROM siswa ORDER BY id FOR UPDATE');lf_rows($db,'SELECT id FROM legacy_full_batches ORDER BY id FOR UPDATE');
         // Preview also runs against old installed guards, but rolls back all data.
         $db->query('SET @legacy_full_apply=1');
-        $result=lbr_reconcile($db,$actor);$after=lmr_snapshot($db,$u);
+        $result=lbr_reconcile($db,$actor);
+        $result['exception_closure']=lec_reconcile($db,$actor,$closureRequest);$result['changes']+=$result['exception_closure']['changes'];
+        $after=lmr_snapshot($db,$u);
         if($before!==$after)throw new RuntimeException('Arsip, identitas, kas, atau tabungan berubah; unit dibatalkan.');
         foreach(lf_rows($db,"SELECT id FROM legacy_full_batches WHERE state='completed'") as $b)lop_check_result($db,$b['id']);
         $result['verification_totals']=lmr_monthly_totals($db);
