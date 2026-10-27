@@ -1,8 +1,8 @@
 # Prosedur migrasi Legacy
 
 Keputusan berlaku 24 Oktober 2026. Baca bersama `LEGACY_FULL_MIGRATION.md` dan
-`AGENTS.md`. Aturan workflow 12, operasional 16, otomasi 5, perencana bulanan 2,
-billing 4, perencana DU 2, dan pelacakan biaya lain 1 (pembaruan 26 Oktober 2026).
+`AGENTS.md`. Aturan workflow 13, operasional 17, otomasi 5, perencana bulanan 2,
+billing 5, perencana DU 3, dan pelacakan biaya lain 1 (pembaruan 27 Oktober 2026).
 Worker lama harus dihentikan dan dimulai ulang; konfirmasi/simulasi versi lama
 tidak boleh diterapkan. Metadata pembayaran otomasi versi 1–3 tetap dapat dibaca.
 
@@ -177,8 +177,11 @@ Gunakan satu formulir Simpan Tarif & Lengkapi Tagihan untuk menyimpan tarif baru
 sekaligus melengkapi tagihan. Kelas kosong pada tahun Terbit boleh ditambahkan;
 tidak ada checkbox tunggakan atau kewajiban melengkapi seluruh kelas. Tarif admin
 adalah penetapan operasional baru yang diaudit, berbeda dari bukti Legacy. Jangan
-menerapkan nominal fixture/gambar pada target. Kelas 1/7/10 tetap ditelusuri dari
-header individual lengkap dan rincian DU eksplisit, tanpa menganggap PSB sebagai DU.
+menerapkan nominal fixture/gambar pada target. Kebijakan klien 27 Oktober 2026
+menetapkan DU kelas 1/7/10 tercakup PSB, termasuk PSB dicicil. Status ini adalah
+dasar kebijakan baru yang diaudit, bukan bukti tarif atau pembayaran Legacy.
+DU tersendiri yang sudah ada menjadi konflik; jangan dibatalkan/dipindahkan otomatis.
+Lihat [kebijakan DU–PSB dan prosedur skema](DU_PSB_POLICY_20261027.md).
 Wajib jalankan `tests/du_master_service_test.php` dan browser DU pada salinan.
 Pemeriksaan digest lama mengenali hanya koreksi Master SPP yang teraudit dan
 cocok dengan rekonstruksi hash sebelum koreksi secara utuh. Runner mencatat

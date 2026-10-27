@@ -20,7 +20,7 @@ try{
     dui_check($evidence['du']['bill_id']===(int)$raisa['id']&&$evidence['du']['trace_count']>0,'Obligation trace links bill and receipts');
     $audit=hp_one($db,"SELECT after_data FROM legacy_op_audit WHERE entity_type='du_trace' AND entity_id=? ORDER BY id DESC LIMIT 1",[$ob['id']]);$trace=json_decode($audit['after_data'],true);
     dui_check(count($trace['traces'])===$evidence['du']['trace_count']&&$trace['tariff_row_keys']&&$trace['recap_row_keys'],'Tariff, matched recap and transaction source retained');
-    foreach($position['positions'] as $p)if($p['status']!=='unknown'){$b=du_find_bill_by_id($db,$p['bill_id']);dui_check(lb_result_cents($b['sisa'])===$p['remaining_cents'],'Every student position equals cashier');}
+    foreach($position['positions'] as $p)if(!in_array($p['status'],['unknown','covered_psb'],true)){$b=du_find_bill_by_id($db,$p['bill_id']);dui_check(lb_result_cents($b['sisa'])===$p['remaining_cents'],'Every student position equals cashier');}
     $billId=(int)$raisa['id'];lf_query($db,"UPDATE tagihan_daftar_ulang SET nominal_awal=5000000,nominal_tagihan=5000000 WHERE id=?",[$billId]);
     ldu_reconcile($db,1);dui_check(du_find_bill_by_id($db,$billId)['nominal_tagihan']===5000000.0,'Existing individual bill is preserved');
     $r=du_find_bill_by_id($db,$billId);dui_check($r['terbayar']===4310000.0&&$r['sisa']===690000.0,'Partial position combines legacy with corrected principal');
@@ -38,7 +38,7 @@ try{
     lop_correction_apply($db,1,2,'payment',(int)$payment['id'],(int)$payment['version'],$input,$preview['digest'],hash('sha256',random_bytes(24)),false);lb_cache($db,true);
     dui_check(du_find_bill_by_id($db,$billId)['sisa']>690000.0,'Authorized legacy cancellation removes its DU credit');ldu_verify($db);dui_check(true,'Cancellation keeps stored source trace verifiable');
     $db->query('ROLLBACK TO SAVEPOINT du_cancel');lb_cache($db,true);
-    $db->query('SAVEPOINT du_manual');$unproven=array_values(array_filter(ldu_plan($db)['positions'],fn($p)=>empty($p['proof']['known'])&&!$p['bill']&&$p['placement']))[0];$pl=$unproven['placement'];$db->query('SET @legacy_full_apply=1');
+    $db->query('SAVEPOINT du_manual');$unproven=array_values(array_filter(ldu_plan($db)['positions'],fn($p)=>$p['status']==='covered_psb'&&!$p['bill']&&$p['placement']))[0];$pl=$unproven['placement'];$db->query('SET @legacy_full_apply=1');
     lf_query($db,'INSERT INTO Daftar_ulang(tahun_ajaran_id,th_ajaran,kelas,Jumlah) VALUES(?,?,?,1000000)',[$pl['tahun_ajaran_id'],'2026/2027',$pl['kelas']]);$manualMaster=(int)$db->insert_id;
     lf_query($db,'INSERT INTO tagihan_daftar_ulang(tahun_ajaran_id,penempatan_id,master_daftar_ulang_id,no_induk,kelas_snapshot,tahun_ajaran_snapshot,nominal_awal,nominal_tagihan) VALUES(?,?,?,?,?,?,1000000,1000000)',[$pl['tahun_ajaran_id'],$pl['id'],$manualMaster,$unproven['nis'],$pl['kelas'],'2026/2027']);$manualBill=(int)$db->insert_id;$db->query('SET @legacy_full_apply=0');lb_cache($db,true);
     ldu_reconcile($db,1);dui_check(du_find_bill_by_id($db,$manualBill)['nominal_tagihan']===1000000.0,'Existing manual bill survives incomplete source tariff');ldu_verify($db);

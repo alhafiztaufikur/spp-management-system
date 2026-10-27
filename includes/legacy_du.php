@@ -63,7 +63,11 @@ function ldu_plan(mysqli $db,?string $year=null): array {
     $bases=ldu_master_bases($db,(int)($target['id']??0));
     foreach(hp_rows($db,'SELECT p.* FROM siswa_tahun_ajaran p JOIN tahun_ajaran y ON y.id=p.tahun_ajaran_id AND y.unit_id=p.unit_id WHERE y.label=?',[$year]) as $p)$placements[$p['unit_id'].'|'.$p['no_induk']]=$p;
     foreach(hp_rows($db,'SELECT * FROM tagihan_daftar_ulang WHERE tahun_ajaran_snapshot=?',[$year]) as $b)$bills[$b['unit_id'].'|'.$b['no_induk']]=$b;
+    $coverage=du_psb_states($db,$year);
     foreach($data['students'] as $key=>$s){$current=$live[$key]??null;if(!$current||!(int)$current['is_active']||$s['kind']!=='active')continue;
+        if(!empty($coverage[$key]['covered_psb'])){
+            $positions[$key]=['unit_id'=>(int)$s['unit_id'],'student_id'=>(int)$s['student_id'],'owner_id'=>(int)$s['id'],'nis'=>$s['NO_INDUK'],'source_identity'=>$s['source_identity'],'batch_id'=>$s['batch_id'],'source_id'=>(int)$s['source_id'],'year'=>$year,'status'=>'covered_psb','known'=>true,'principal_cents'=>null,'paid_cents'=>0,'remaining_cents'=>0,'legacy_paid_cents'=>0,'native_paid_cents'=>0,'proof'=>['known'=>true,'basis'=>'client_psb_policy','reason'=>$coverage[$key]['reason'],'grade'=>(int)$coverage[$key]['placement']['kelas'],'gross'=>null,'discount'=>null,'total'=>null,'source_row_key'=>$s['source_row_key']],'placement'=>$placements[$key]??null,'bill'=>null,'traces'=>[],'recap_row_keys'=>[],'reason'=>null,'can_create'=>false];continue;
+        }
         $proof=lb_du_source($db,$s['NO_INDUK'],$year);$placement=$placements[$key]??null;$bill=$bills[$key]??null;
         $master=$masters[(int)($placement['kelas']??0)]??null;
         if($master&&isset($bases[(int)$master['id']])&&$year===ldu_target_year())$proof=ldu_admin_proof($proof??['known'=>false],$s,$current,$master,$year);
@@ -80,6 +84,7 @@ function ldu_plan(mysqli $db,?string $year=null): array {
         elseif($bill&&$bill['status']!=='open')$reason='Tagihan dibatalkan pengguna; tidak diterbitkan kembali.';
         elseif(!$bill&&lb_du_override($db,$s['NO_INDUK'],$year)&&($proof['basis']??'')!=='system')$reason='Penetapan DU pengguna dipertahankan; tidak dibuat tagihan dari tarif sumber.';
         elseif(!$bill&&isset($otherDebts[(int)$s['student_id']]))$reason='Penagihan DU Legacy sudah tersedia; tagihan kedua tidak dibuat.';
+        if(!empty($coverage[$key]['conflict']))$reason=$coverage[$key]['reason'];
         $positions[$key]=$position+['unit_id'=>(int)$s['unit_id'],'student_id'=>(int)$s['student_id'],'owner_id'=>(int)$s['id'],'nis'=>$s['NO_INDUK'],'source_identity'=>$s['source_identity'],'batch_id'=>$s['batch_id'],'source_id'=>(int)$s['source_id'],'year'=>$year,'proof'=>$proof,'placement'=>$placement,'bill'=>$bill,'traces'=>$traces,'recap_row_keys'=>$recapRows,'reason'=>$reason,'can_create'=>$reason===null&&!$bill];
     }
     return ['rule'=>LDU_VERSION,'year'=>$year,'target'=>$target,'positions'=>$positions];
@@ -97,11 +102,14 @@ function du_publish_proven_legacy_year(mysqli $db,int $yearId,string $year,int $
 
 /** Caller owns transaction + verified backup gate. Changes only DU billing/evidence. */
 function ldu_reconcile(mysqli $db,int $actor,?string $year=null): array {
-    $year=$year??ldu_target_year();$plan=ldu_plan($db,$year);$out=['rule'=>LDU_VERSION,'year'=>$year,'changes'=>0,'masters_created'=>0,'bills_created'=>0,'existing'=>0,'unknown'=>0,'lunas'=>0,'belum_lunas'=>0,'principal_cents'=>0,'paid_cents'=>0,'remaining_cents'=>0,'exceptions'=>[]];
+    $year=$year??ldu_target_year();$out=['rule'=>LDU_VERSION,'year'=>$year,'changes'=>0,'masters_created'=>0,'bills_created'=>0,'existing'=>0,'unknown'=>0,'lunas'=>0,'belum_lunas'=>0,'principal_cents'=>0,'paid_cents'=>0,'remaining_cents'=>0,'exceptions'=>[]];
     if($year!==ldu_target_year())throw new DomainException('Penerbitan DU otomatis hanya untuk tahun ajaran berjalan.');
+    $coverage=du_psb_reconcile($db,$year,$actor);$out['covered_psb']=$coverage['covered_psb'];$out['conflicts']=$coverage['conflicts'];$out['changes']+=$coverage['changes'];
+    $plan=ldu_plan($db,$year);
     $batches=[];$valid=array_filter($plan['positions'],static fn($p)=>$p['can_create']);
     if($valid&&$plan['target']&&$plan['target']['status']==='draft'){$bases=array_unique(array_map(static fn($p)=>$p['proof']['basis'],$valid));$basis=count($bases)>1?'source_and_admin_students':(reset($bases)==='system'?'admin_tariff_students':'legacy_proven_students');du_publish_proven_legacy_year($db,(int)$plan['target']['id'],$year,$actor,$basis);$out['changes']++;}
     foreach($plan['positions'] as $p){
+        if($p['status']==='covered_psb')continue;
         if($p['reason']!==null){$out['unknown']++;$out['exceptions'][]=['student_id'=>$p['student_id'],'nis'=>$p['nis'],'year'=>$year,'reason'=>$p['reason']];}
         $bill=$p['bill'];$proof=$p['proof'];
         if($p['can_create']){
@@ -121,7 +129,7 @@ function ldu_reconcile(mysqli $db,int $actor,?string $year=null): array {
         $ob=hp_one($db,"SELECT * FROM legacy_op_obligations WHERE owner_id=? AND category='daftar_ulang' AND period=? FOR UPDATE",[$p['owner_id'],$year]);
         // Existing manually certified or legacy debt obligations are not rewritten.
         $old=$ob?json_decode($ob['evidence'],true):[];
-        if($ob&&(!is_array($old)||!in_array($old['rule']??0,[1,2,3,4],true)||!empty($ob['bill_id'])))continue;
+        if($ob&&(!is_array($old)||!in_array($old['rule']??0,[1,2,3,4,LB_RULE_VERSION],true)||!empty($ob['bill_id'])))continue;
         $evidence=$old+['rule'=>LB_RULE_VERSION,'basis'=>$proof['basis'],'source_row_key'=>$proof['source_row_key'],'gross'=>$proof['gross'],'discount'=>$proof['discount']];
         $evidence['du']=['rule'=>LDU_VERSION,'year'=>$year,'master_id'=>(int)$bill['master_daftar_ulang_id'],'bill_id'=>(int)$bill['id'],'placement_id'=>(int)$bill['penempatan_id'],'source_id'=>$p['source_id'],'source_row_key'=>$proof['source_row_key'],'trace_count'=>count($p['traces']),'trace_digest'=>hash('sha256',lf_json($p['traces']))];
         $next=lf_json($evidence);
@@ -131,15 +139,21 @@ function ldu_reconcile(mysqli $db,int $actor,?string $year=null): array {
         $out['changes']++;$batches[]=$p['batch_id'];ldu_audit($db,$actor,'du_trace',(int)$ob['id'],['evidence'=>$ob['evidence']],['evidence'=>$evidence,'traces'=>$p['traces'],'tariff_row_keys'=>$proof['tariff_row_keys']??[],'recap_row_keys'=>$p['recap_row_keys']],$p);
     }
     $wanted=[];foreach($out['exceptions'] as $e){$row=hash('sha256','du|'.$year.'|'.$e['student_id']);$wanted[$row]=true;$p=reset($plan['positions']);foreach($plan['positions'] as $candidate)if($candidate['student_id']===$e['student_id']){$p=$candidate;break;}
-        if(!hp_one($db,"SELECT id FROM legacy_op_pending WHERE batch_id=? AND row_key=? AND code='du_evidence'",[$p['batch_id'],$row])){lf_query($db,"INSERT INTO legacy_op_pending(unit_id,batch_id,source_identity,row_key,section,code,message,payload) VALUES(?,?,?,?,'billing','du_evidence',?,?)",[$p['unit_id'],$p['batch_id'],$p['source_identity'],$row,$e['reason'],lf_json($e)]);$out['changes']++;}
+        $pending=hp_one($db,"SELECT id,resolved,message,payload FROM legacy_op_pending WHERE batch_id=? AND row_key=? AND code='du_evidence'",[$p['batch_id'],$row]);
+        if(!$pending){lf_query($db,"INSERT INTO legacy_op_pending(unit_id,batch_id,source_identity,row_key,section,code,message,payload) VALUES(?,?,?,?,'billing','du_evidence',?,?)",[$p['unit_id'],$p['batch_id'],$p['source_identity'],$row,$e['reason'],lf_json($e)]);$out['changes']++;}
+        elseif($pending['resolved']||$pending['message']!==$e['reason']||lf_canonical(json_decode($pending['payload'],true))!==lf_canonical($e)){lf_query($db,'UPDATE legacy_op_pending SET resolved=0,message=?,payload=?,version=version+1 WHERE id=?',[$e['reason'],lf_json($e),$pending['id']]);$out['changes']++;}
     }
     foreach(hp_rows($db,"SELECT id,row_key FROM legacy_op_pending WHERE code='du_evidence' AND resolved=0 AND JSON_UNQUOTE(JSON_EXTRACT(payload,'$.year'))=?",[$year]) as $p)if(!isset($wanted[$p['row_key']])){lf_query($db,'UPDATE legacy_op_pending SET resolved=1,version=version+1 WHERE id=?',[$p['id']]);$out['changes']++;}
     lb_cache($db,true);$synced=lb_sync_owners($db,array_column($plan['positions'],'owner_id'));lb_refresh_manifests($db,array_unique(array_merge($synced,$batches,array_column($valid,'batch_id'))));
     return $out;
 }
 function ldu_verify(mysqli $db): array {
-    $plan=ldu_plan($db);$out=['rule'=>LDU_VERSION,'year'=>$plan['year'],'positions'=>[],'unknown'=>0,'lunas'=>0,'belum_lunas'=>0,'principal_cents'=>0,'paid_cents'=>0,'remaining_cents'=>0];
+    $plan=ldu_plan($db);$coverage=du_psb_states($db,$plan['year']);$out=['rule'=>LDU_VERSION,'year'=>$plan['year'],'positions'=>[],'unknown'=>0,'covered_psb'=>0,'conflicts'=>count(array_filter($coverage,fn($s)=>$s['conflict'])),'lunas'=>0,'belum_lunas'=>0,'principal_cents'=>0,'paid_cents'=>0,'remaining_cents'=>0];
     foreach($plan['positions'] as $p){
+        if($p['status']==='covered_psb'){
+            if(empty($p['placement']['du_covered_by_psb']))throw new DomainException('Cakupan PSB belum disimpan untuk siswa '.$p['nis']);
+            $out['covered_psb']++;$out['positions'][]=['unit_id'=>$p['unit_id'],'student_id'=>$p['student_id'],'nis'=>$p['nis'],'status'=>'covered_psb','principal_cents'=>null,'paid_cents'=>0,'remaining_cents'=>0];continue;
+        }
         if($p['can_create'])throw new DomainException('Tagihan DU yang terbukti belum dibentuk untuk siswa '.$p['nis']);
         if(!$p['bill']||$p['bill']['status']!=='open'){$out['unknown']++;$out['positions'][]=['unit_id'=>$p['unit_id'],'student_id'=>$p['student_id'],'nis'=>$p['nis'],'status'=>'unknown','reason'=>$p['reason']];continue;}
         $bill=du_find_bill_by_id($db,(int)$p['bill']['id']);
@@ -160,6 +174,7 @@ function ldu_verify(mysqli $db): array {
     $history=[];foreach(hp_rows($db,'SELECT * FROM '.rc_groups($db).' x WHERE th_ajaran=?',[$plan['year']]) as $r)$history[$r['unit_id'].'|'.$r['student_id']]=$r;
     $out['readers_verified']=0;
     foreach($out['positions'] as $p){$key=$p['unit_id'].'|'.$p['nis'];$r=$report[$key]??null;
+        if($p['status']==='covered_psb'){$g=$history[$p['unit_id'].'|'.$p['student_id']]??null;if(!$g||rc_tariff_evidence($db,$g)['status']!=='Tercakup PSB')throw new DomainException('Cakupan PSB tidak sama pada riwayat.');if(!$r||($r['_du_status']??'')!=='covered_psb'||$r['terbayar']!=0||$r['sisa']!=0)throw new DomainException('Cakupan PSB tidak sama pada laporan.');$out['readers_verified']++;continue;}
         if($p['status']==='unknown'){if(empty($plan['positions'][$key]['proof']['known'])&&$r&&($r['tagihan']!==null||$r['sisa']!==null))throw new DomainException('DU belum terbukti ditampilkan sebagai nominal diketahui pada laporan.');continue;}
         $g=$history[$p['unit_id'].'|'.$p['student_id']]??null;$e=$g?rc_tariff_evidence($db,$g):null;
         if(!$r||!$e||lb_result_cents($r['tagihan'])!==$p['principal_cents']||lb_result_cents($r['terbayar'])!==$p['paid_cents']||lb_result_cents($r['sisa'])!==$p['remaining_cents']||lb_result_cents($e['tariff'])!==$p['principal_cents']||lb_result_cents($e['remaining'])!==$p['remaining_cents'])throw new DomainException('DU berbeda antara transaksi, tagihan siswa, riwayat dan laporan.');

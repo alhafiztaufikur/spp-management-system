@@ -6,7 +6,7 @@ require_once __DIR__.'/legacy_migration_automation.php';
 require_once __DIR__.'/history_performance.php';
 require_once __DIR__.'/legacy_monthly_planner.php';
 require_once __DIR__.'/legacy_du_planner.php';
-const LB_RULE_VERSION = 4;
+const LB_RULE_VERSION = 5;
 // Only for arithmetic results already proven from exact source cents.
 function lb_result_cents(float|string $value): int {return lf_cents(number_format((float)$value,2,'.',''));}
 
@@ -20,7 +20,7 @@ function lb_cache(mysqli $db, bool $refresh=false): array {
     static $cache=[];$scope=(int)($GLOBALS['app_unit_id']??unit_active_id());$prefix=$db->thread_id.':';
     $nis=$GLOBALS['lb_read_student'][$db->thread_id]??null;$key=$prefix.$scope.($nis===null?'':':student:'.$nis);
     $studentWhere=$nis===null?'':" AND s.NO_INDUK='".$db->real_escape_string($nis)."'";
-    if($refresh)foreach(array_keys($cache) as $cachedKey)if(str_starts_with($cachedKey,$prefix))unset($cache[$cachedKey]);
+    if($refresh){if(function_exists('du_psb_invalidate'))du_psb_invalidate($db);foreach(array_keys($cache) as $cachedKey)if(str_starts_with($cachedKey,$prefix))unset($cache[$cachedKey]);}
     if(!$refresh&&isset($cache[$key]))return $cache[$key];
     // An all-unit report has already read this evidence under the connection's
     // authorized scope. Partition it by immutable owner/source IDs instead of
@@ -133,7 +133,7 @@ function lb_refresh_manifests(mysqli $db,array $batchIds): void {
 /** Read the same source-backed position for synchronization and integrity checks. */
 function lb_obligation_position(mysqli $db,array $ob): ?array {
     $e=json_decode($ob['evidence'],true);
-    if(!is_array($e)||!in_array($e['rule']??null,[1,2,3,LB_RULE_VERSION],true))return null;
+    if(!is_array($e)||!in_array($e['rule']??null,[1,2,3,4,LB_RULE_VERSION],true))return null;
     $data=lb_cache($db);$student=$data['owner_students'][$ob['owner_id']]??null;
     if(!$student||($e['source_row_key']??'')!==($student['source_row_key']??null))throw new DomainException('Bukti kewajiban tidak sesuai arsip pemilik.');
     $s=$student;
@@ -173,7 +173,9 @@ function lb_reconcile(mysqli $db,int $actor,bool $apply=false): array {
         $psb=lb_psb_source($db,$s['NO_INDUK']);$proofs=[];if($psb['known']){$summary['psb_ready']++;$proofs['psb|once']=$psb;}else $summary['unknown']++;
         $year=$s['migration_year'];$du=lb_du_source($db,$s['NO_INDUK'],$year);$active=hp_one($db,'SELECT is_active FROM siswa WHERE id=?',[$s['student_id']]);
         if($s['kind']==='active'&&!empty($active['is_active'])&&$year===du_current_academic_year()){
-            if($du['known']){$summary['du_ready']++;$proofs['daftar_ulang|'.$year]=$du;}else $summary['unknown']++;
+            $covered=function_exists('du_psb_state')&&!empty(du_psb_state($db,$s['NO_INDUK'],$year)['covered_psb']);
+            if($covered){$summary['du_covered_psb']=($summary['du_covered_psb']??0)+1;}
+            elseif($du['known']){$summary['du_ready']++;$proofs['daftar_ulang|'.$year]=$du;}else $summary['unknown']++;
         }
         foreach($data['paid'][$s['id']]['spp']??[] as $period=>$paidCents){
             if($period<($s['settings']['start_period']??''))continue;[$calendar,$month]=explode('-',$period);

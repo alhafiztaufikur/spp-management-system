@@ -137,6 +137,7 @@ function promotion_apply_student(mysqli $db,string $nis,int $targetClassId,array
     $s=$db->prepare("INSERT INTO siswa_tahun_ajaran(tahun_ajaran_id,no_induk,kelas,master_kelas_id,kelas_rombel_snapshot,spp_perbulan_snapshot,komite_snapshot,status) VALUES(?,?,?,?,?,?,?,'aktif')");
     $s->bind_param('issisdd',$yearId,$nis,$newLevel,$targetClassId,$label,$spp,$komite);$s->execute();$destination=(int)$db->insert_id;$s->close();
     komite_sync_placement($db,$destination);
+    if(du_psb_schema_ready($db))du_psb_reconcile($db,$ctx['target_year'],(int)$actor['id'],$destination);
     $result=['student'=>$student['NAMA'],'action'=>'naik','source_year'=>$ctx['source_year'],'target_year'=>$ctx['target_year'],'target'=>$label,'source_placement_id'=>$sourceId,'target_placement_id'=>$destination,'spp_status'=>$rateReady?'Sesuai master':'Belum disiapkan','spp'=>$spp];
     promotion_write_audit($db,$actor,$student,$source,$ctx,$result);return $result;
 }

@@ -9,7 +9,7 @@ require_once __DIR__.'/legacy_operational_checks.php';
 require_once __DIR__.'/legacy_operational_resolution.php';
 require_once __DIR__.'/legacy_migration_automation.php';
 require_once __DIR__.'/legacy_class_links.php';
-const LOP_VERSION=16;
+const LOP_VERSION=17;
 const LOP_ID_OFFSET=1000000000;
 function lop_date(mixed $value): ?string {if(is_string($value)&&preg_match('/^\d{4}-\d{2}-\d{2}T\d{2}:\d{2}$/D',$value))$value.=':00';return lful_date($value);}
 function lop_require(mysqli $db): void {if(!lop_ready($db))throw new DomainException('Pasang skema operasional Legacy melalui CLI.');}
@@ -141,7 +141,7 @@ function lop_prepare(array $records,array $cfg,int $unit,?string $sourceDate,arr
         foreach($planned['exceptions'] as $exception){$reviewed=false;foreach($owner['decision']['coverage']??[] as $decision)if(($decision['category']??'')===$exception['category']&&($decision['period']??'')===$exception['period']){$reviewed=true;break;}if($reviewed)continue;$monthlyExceptions++;$pending[]=lop_pending((string)$identity,hash('sha256','monthly|'.$identity.'|'.$exception['category'].'|'.$exception['period']),'obligations','monthly_evidence',$exception['reason'],$exception);}
     }
     $summary['monthly_rule']=LMP_VERSION;$summary['monthly_positions']=array_sum(array_map(static fn($p)=>count($p['positions']),$monthly));$summary['monthly_exceptions']=$monthlyExceptions;
-    require_once __DIR__.'/daftar_ulang.php';$summary['du_plan']=ldu_source_preview($records,$owners,$payments,$cfg['du_target_year']??du_current_academic_year());
+    require_once __DIR__.'/daftar_ulang.php';$summary['du_plan']=ldu_source_preview($records,$owners,$payments,$cfg['du_target_year']??du_current_academic_year(),$unit);
     $summary['pending']=count($pending);$summary['review_tasks']=count(lop_pending_groups(['owners'=>$owners,'pending'=>$pending]));
     $summary['fee_trace']=lfet_summary($payments,$pending);
     $result=compact('owners','groups','payments','journals','pending','summary','history','automatic','references','resolutions','monthly');
