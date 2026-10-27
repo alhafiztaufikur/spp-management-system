@@ -35,6 +35,7 @@ $ruleFiles[]=__DIR__.'/../includes/legacy_du_reconstruction.php';
 $ruleFiles[]=__DIR__.'/../includes/legacy_billing_digest.php';
 $ruleFiles[]=__DIR__.'/../includes/du_master_service.php';
 $ruleFiles[]=__DIR__.'/../includes/du_psb.php';
+$ruleFiles[]=__DIR__.'/../includes/du_advance.php';
 $ruleFiles[]=__DIR__.'/../includes/daftar_ulang.php';
 $ruleFiles[]=__DIR__.'/../includes/kelas.php';
 $ruleFiles[]=__DIR__.'/../includes/promotion.php';

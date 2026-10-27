@@ -51,7 +51,7 @@ wajib diperiksa.
   serta potongan harus terbukti. `bayar_du` sumber adalah bukti rekap, bukan kas kedua.
   Terbitkan tahun draf melalui fungsi resmi tanpa menunggu semua kelas lengkap.
   Data belum terbukti menjadi pengecualian otomatis, bukan nol/lunas atau tugas wajib pengguna.
-- Versi saat ini: workflow 13, operasional 17, otomasi 5, billing 5, DU 3.
+- Versi saat ini: workflow 14, operasional 18, otomasi 5, billing 6, DU 4.
   Metadata otomasi versi 1, 2, 3, dan 4 tetap terbaca; worker/simulasi lama wajib ditolak.
 
 Rincian DU: [pelacakan otomatis dan pengujian](documentation/LEGACY_DU_TRACE_20261026.md).
@@ -69,3 +69,16 @@ Rincian DU: [pelacakan otomatis dan pengujian](documentation/LEGACY_DU_TRACE_202
   tetap menerima tarif parsial; kenaikan kelas tidak membawa cakupan tahun lama;
   kredit, pembatalan/koreksi dan replay nol tetap terlindungi.
   Rincian: [kebijakan DU–PSB](documentation/DU_PSB_POLICY_20261027.md).
+
+- Penerbitan DU eksplisit melalui Master DU boleh untuk tahun berjalan dan tepat
+  satu tahun berikutnya. Tahun mendatang memakai penempatan tujuan bila tersedia,
+  atau proyeksi satu tingkat dari penempatan berjalan; kelas akhir/nonakademik
+  dan siswa tidak aktif tidak diproyeksikan. Tidak membuat penempatan, SPP/Komite.
+- Tagihan awal memiliki `penempatan_asal_id`, sementara `penempatan_id` boleh NULL.
+  Kenaikan resmi mengikat tagihan yang sama; uang, ID, koreksi dan histori dijaga.
+  Tagihan tetap terbaca saat pergantian kalender sebelum kenaikan.
+- Tagihan Mendatang dapat dibayar melalui dropdown DU existing, tidak dipilih
+  otomatis dan tidak dihitung sebagai tunggakan berjalan. Tahun/kelas kewajiban
+  pada struk, laporan dan ekspor berasal dari tagihan; tanggal kas tetap aktual.
+- Pemasangan skema melalui `scripts/migrate_du_advance_schema.php` dengan backup
+  terverifikasi; deployment tidak menerbitkan tagihan mendatang secara otomatis.

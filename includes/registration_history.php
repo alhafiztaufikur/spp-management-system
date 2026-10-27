@@ -68,7 +68,7 @@ function registration_active_sql(array $f, ?mysqli $db=null): array
     elseif ($f['q']!=='') {$where[]='(s.NAMA LIKE ? OR s.NO_INDUK LIKE ? OR s.NO_induk_diknas LIKE ?)';$like='%'.$f['q'].'%';array_push($params,$like,$like,$like);$types.='sss';}
     if (!filter_is_all($f['values']['kelas'])) {
         $clauses=[];foreach ($f['values']['kelas'] as $value) {
-            $rombel=str_starts_with($value,'rombel:');$clauses[]=($rombel?'s.master_kelas_id':'COALESCE(mk.tingkat,s.KELAS,tdu.kelas_snapshot)').'=?';
+            $rombel=str_starts_with($value,'rombel:');$clauses[]=($rombel?'sta.master_kelas_id':'tdu.kelas_snapshot').'=?';
             $params[]=substr($value,$rombel?7:8);$types.='s';
         }$where[]='('.implode(' OR ',$clauses).')';
     }
@@ -84,15 +84,16 @@ function registration_active_sql(array $f, ?mysqli $db=null): array
             WHERE od.tagihan_daftar_ulang_id=tdu.id AND od.unit_id=tdu.unit_id".$ownerWhere."),0) operator_paid";
     }
     $sql="SELECT tdu.unit_id,tdu.id tagihan_id,tdu.no_induk,ta.label th_ajaran,s.NAMA nama,s.NO_induk_diknas,
-        tdu.kelas_snapshot kelas,COALESCE(mk.tingkat,s.KELAS,tdu.kelas_snapshot) tingkat,s.master_kelas_id,
+        COALESCE(NULLIF(sta.kelas_rombel_snapshot,''),tdu.kelas_snapshot) kelas,tdu.kelas_snapshot tingkat,sta.master_kelas_id,
         tdu.nominal_tagihan total,COALESCE(SUM(bd.jumlah),0) paid,
         GREATEST(0,tdu.nominal_tagihan-COALESCE(SUM(bd.jumlah),0)) remaining $operatorPaid
         FROM tagihan_daftar_ulang tdu JOIN tahun_ajaran ta ON ta.id=tdu.tahun_ajaran_id
         JOIN siswa s ON s.NO_INDUK=tdu.no_induk AND s.unit_id=tdu.unit_id
-        LEFT JOIN master_kelas mk ON mk.id=s.master_kelas_id
+        LEFT JOIN siswa_tahun_ajaran sta ON sta.id=tdu.penempatan_id AND sta.unit_id=tdu.unit_id
+        LEFT JOIN master_kelas mk ON mk.id=sta.master_kelas_id
         LEFT JOIN bayar_du bd ON bd.tagihan_daftar_ulang_id=tdu.id AND bd.unit_id=tdu.unit_id
         WHERE ".implode(' AND ',$where)." GROUP BY tdu.unit_id,tdu.id,tdu.no_induk,ta.label,s.NAMA,s.NO_induk_diknas,
-        tdu.kelas_snapshot,mk.tingkat,s.KELAS,s.master_kelas_id,tdu.nominal_tagihan";
+        tdu.kelas_snapshot,sta.kelas_rombel_snapshot,sta.master_kelas_id,tdu.nominal_tagihan";
     if ($f['values']['status']===['lunas']) $sql.=' HAVING remaining<=0.001';
     if ($f['values']['status']===['cicilan']) $sql.=' HAVING remaining>0.001';
     return [$sql,$params,$types];

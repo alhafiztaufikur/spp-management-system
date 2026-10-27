@@ -117,7 +117,12 @@ $stmt->close();
 $activeByClass=array_fill($firstLevel,$lastLevel-$firstLevel+1,0);
 $result=$koneksi->query("SELECT KELAS,COUNT(*) total FROM siswa WHERE is_active=1 AND CAST(KELAS AS UNSIGNED) " . unit_level_between_sql() . " GROUP BY KELAS");
 while($row=$result->fetch_assoc()) $activeByClass[(int)$row['KELAS']]=(int)$row['total'];
-$activeTotal=array_sum($activeByClass);
+$projectionUnknown=0;
+if($selectedYear===du_next_year()||du_has_advance_bills($koneksi,$selectedYear)){
+    $activeByClass=array_fill($firstLevel,$lastLevel-$firstLevel+1,0);
+    foreach(du_target_roster($koneksi,$selectedYear) as $r){if($r['grade']!==null)$activeByClass[$r['grade']]++;else $projectionUnknown++;}
+}
+$activeTotal=array_sum($activeByClass)+$projectionUnknown;
 
 $stmt=$koneksi->prepare("SELECT COUNT(*) bills,COALESCE(SUM(tdu.nominal_tagihan),0) total,COALESCE(SUM(p.paid),0) paid
     FROM tagihan_daftar_ulang tdu
@@ -130,12 +135,12 @@ require_once __DIR__.'/includes/legacy_du.php';
 $duPlan=$selectedYear===ldu_target_year()?ldu_plan($koneksi,$selectedYear):['positions'=>[]];
 $duUnknown=count(array_filter($duPlan['positions'],static fn($p)=>!$p['known']||$p['reason']!==null));$duUnknownByClass=[];foreach($duPlan['positions'] as $p)if(!$p['known']||$p['reason']!==null){$level=(int)($p['placement']['kelas']??0);$duUnknownByClass[$level]=($duUnknownByClass[$level]??0)+1;}
 $masterBases=ldu_master_bases($koneksi,$yearId);
-$activeBillRows=hp_rows($koneksi,"SELECT s.KELAS,COUNT(DISTINCT s.id) n FROM siswa s JOIN tagihan_daftar_ulang t ON t.unit_id=s.unit_id AND t.no_induk=s.NO_INDUK WHERE s.is_active=1 AND t.tahun_ajaran_id=? AND t.status='open' GROUP BY s.KELAS",[$yearId]);
+$activeBillRows=hp_rows($koneksi,"SELECT t.kelas_snapshot KELAS,COUNT(DISTINCT s.id) n FROM siswa s JOIN tagihan_daftar_ulang t ON t.unit_id=s.unit_id AND t.no_induk=s.NO_INDUK WHERE s.is_active=1 AND t.tahun_ajaran_id=? AND t.status='open' GROUP BY t.kelas_snapshot",[$yearId]);
 foreach($activeBillRows as $r)$activeIssuedByClass[(int)$r['KELAS']]=(int)$r['n'];
 $coveredByClass=array_fill($firstLevel,$lastLevel-$firstLevel+1,0);$coverageConflicts=0;
 foreach(du_psb_states($koneksi,$selectedYear) as $state){if($state['covered_psb']&&!empty($state['placement']['is_active']))$coveredByClass[(int)$state['placement']['kelas']]++;if($state['conflict'])$coverageConflicts++;}
 $coveredTotal=array_sum($coveredByClass);$activeIssued=array_sum($activeIssuedByClass);$activeMissing=max(0,$activeTotal-$activeIssued-$coveredTotal);
-$canEdit=$year['status']!=='closed'&&$selectedYear===du_current_academic_year();
+$canEdit=$year['status']!=='closed'&&du_publishable_year($selectedYear)&&($selectedYear!==du_next_year()||du_advance_schema_ready($koneksi));
 $inputState=$_SESSION['du_rate_input']??null;unset($_SESSION['du_rate_input']);
 $priorDebt=$yearId?report_prior_debt_summary($koneksi,$selectedYear,report_active_regular_student_nis($koneksi)):['has_debt'=>false];
 ?>
@@ -156,7 +161,7 @@ $priorDebt=$yearId?report_prior_debt_summary($koneksi,$selectedYear,report_activ
 <?php if($flash): ?><div class="alert alert-<?= master_du_e($flash['type']) ?>" id="flash-msg"><?= master_du_e($flash['msg']) ?></div><?php endif; ?>
 <section class="main-card du-master-hero master-modern-shell">
   <div class="master-modern-hero">
-    <div><span class="recap-class-overline">Konfigurasi Tahun Ajaran</span><h1><?= master_du_e($selectedYear) ?></h1><p>Atur tarif dan lengkapi tagihan siswa dalam satu langkah.</p></div>
+    <div><span class="recap-class-overline">Konfigurasi Tahun Ajaran</span><h1><?= master_du_e($selectedYear) ?></h1><p>Atur tarif dan lengkapi tagihan siswa dalam satu langkah.</p><?php if($selectedYear>du_current_academic_year()): ?><p>Tagihan Mendatang memakai kelas tujuan dan dapat dicicil tanpa mengubah kelas aktif.</p><?php endif; ?></div>
     <div class="du-master-year-tools">
       <form method="get"><select class="field-input field-select" name="tahun" aria-label="Pilih tahun ajaran" onchange="this.form.submit()">
         <?php foreach($yearRows as $yr): ?><option value="<?= master_du_e($yr['label']) ?>" <?= $yr['label']===$selectedYear?'selected':'' ?>><?= master_du_e($yr['label']) ?></option><?php endforeach; ?>

@@ -15,21 +15,28 @@ function du_master_rate_cents(mixed $value,int $grade): ?int {
 
 /** Caller owns transaction: validation, rates, publication and evidence commit together. */
 function du_master_save_and_complete(mysqli $db,int $yearId,string $label,mixed $amounts,int $actor): array {
-    $year=hp_one($db,'SELECT * FROM tahun_ajaran WHERE id=? AND label=? FOR UPDATE',[$yearId,$label]);
+    $year=lf_one($db,'SELECT * FROM tahun_ajaran WHERE id=? AND label=? FOR UPDATE',[$yearId,$label]);
     if(!$year||$year['status']==='closed')throw new DomainException('Tahun ajaran tertutup atau tidak tersedia; tarif dan tagihan tidak diubah.');
-    if($label!==du_current_academic_year())throw new DomainException('Penerbitan DU ini hanya untuk tahun ajaran berjalan. Histori tahun lain tetap tersimpan.');
+    if(!du_publishable_year($label))throw new DomainException('Penerbitan DU hanya untuk tahun berjalan dan tepat satu tahun berikutnya.');
+    if($label===du_next_year()&&!du_advance_schema_ready($db))throw new DomainException('Skema DU perlu ditingkatkan sebelum penerbitan awal.');
     if(!is_array($amounts))throw new DomainException('Formulir tarif tidak valid.');
     [$first,$last]=unit_level_bounds();$validated=[];
     foreach($amounts as $grade=>$value){if(!ctype_digit((string)$grade)||(int)$grade<$first||(int)$grade>$last)throw new DomainException('Kelas tarif tidak sesuai unit aktif.');$cents=du_master_rate_cents($value,(int)$grade);if($cents!==null)$validated[(int)$grade]=$cents;}
     $saved=0;$aligned=0;
     foreach($validated as $grade=>$cents){
-        $master=hp_one($db,'SELECT * FROM Daftar_ulang WHERE tahun_ajaran_id=? AND kelas=? FOR UPDATE',[$yearId,(string)$grade]);
+        $master=lf_one($db,'SELECT * FROM Daftar_ulang WHERE tahun_ajaran_id=? AND kelas=? FOR UPDATE',[$yearId,(string)$grade]);
         if($master&&lf_cents($master['Jumlah'])===$cents)continue;
         $rateAligned=0;
         if(!$master){lf_query($db,'INSERT INTO Daftar_ulang(tahun_ajaran_id,th_ajaran,kelas,Jumlah) VALUES(?,?,?,?)',[$yearId,$label,(string)$grade,lf_money($cents)]);$id=(int)$db->insert_id;}
         else{$id=(int)$master['id'];$rateAligned=du_sync_open_bills_for_master_rate($db,$id,$label,(float)$master['Jumlah'],$cents/100);$aligned+=$rateAligned;lf_query($db,'UPDATE Daftar_ulang SET Jumlah=? WHERE id=?',[lf_money($cents),$id]);}
         du_write_audit($db,$yearId,$id,$master?'ubah_tarif':'buat_tarif',$master?['jumlah'=>$master['Jumlah']]:null,['kelas'=>(string)$grade,'jumlah'=>$cents/100,'basis'=>'system','policy'=>'new_bill_full_rate_unless_individual_discount_proven'],$rateAligned);
         lb_mark_du_master($db,$label,[$grade]);$saved++;
+    }
+    if($label===du_next_year()){
+        $publication=du_publish_advance($db,$yearId,$label,$actor);
+        $result=['rates_saved'=>$saved,'unpaid_bills_aligned'=>$aligned,'payments_reclassified'=>0]+$publication;
+        if($saved||$aligned||$publication['created']||$publication['linked'])du_write_audit($db,$yearId,null,'simpan_lengkapi',null,$result,$publication['created']);
+        return $result;
     }
     $coverage=du_psb_reconcile($db,$label,$actor);
     $tracking=ldu_reconstruct_payments($db,$actor);

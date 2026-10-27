@@ -22,6 +22,8 @@ function workflow_schema_apply(mysqli $db): void {
     if(!$db->query("SELECT 1 FROM information_schema.STATISTICS WHERE TABLE_SCHEMA=DATABASE() AND TABLE_NAME='bayar_data' AND INDEX_NAME='idx_bayar_history_year'")->num_rows)$db->query('ALTER TABLE bayar_data ADD KEY idx_bayar_history_year(unit_id,NO_INDUK,riwayat_tahun_ajaran,TGL_BYR,id)');
     foreach(['siswa','bayar','master_biaya_lain','siswa_tahun_ajaran'] as $view)$db->query("CREATE OR REPLACE VIEW `$view` AS SELECT * FROM `{$view}_data` WHERE current_unit_id()=0 OR unit_id=current_unit_id() WITH CASCADED CHECK OPTION");
     $db->query("CREATE TABLE IF NOT EXISTS workflow_migration_log(migration_key VARCHAR(64) PRIMARY KEY,completed_at DATETIME NOT NULL,account_before JSON NOT NULL) ENGINE=InnoDB");
+    require_once __DIR__.'/daftar_ulang.php';
+    du_advance_schema_apply($db);
     workflow_history_backfill($db);
 }
 

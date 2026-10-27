@@ -9,7 +9,7 @@ require_once __DIR__.'/legacy_operational_checks.php';
 require_once __DIR__.'/legacy_operational_resolution.php';
 require_once __DIR__.'/legacy_migration_automation.php';
 require_once __DIR__.'/legacy_class_links.php';
-const LOP_VERSION=17;
+const LOP_VERSION=18;
 const LOP_ID_OFFSET=1000000000;
 function lop_date(mixed $value): ?string {if(is_string($value)&&preg_match('/^\d{4}-\d{2}-\d{2}T\d{2}:\d{2}$/D',$value))$value.=':00';return lful_date($value);}
 function lop_require(mysqli $db): void {if(!lop_ready($db))throw new DomainException('Pasang skema operasional Legacy melalui CLI.');}

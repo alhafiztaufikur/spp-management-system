@@ -169,8 +169,15 @@ SELECT 'tagihan_komite_salah_relasi' AS pemeriksaan, (SELECT COUNT(*) FROM tagih
 UNION ALL
 SELECT 'tagihan_du_salah_relasi' AS pemeriksaan, (SELECT COUNT(*) FROM tagihan_daftar_ulang_data t
         LEFT JOIN siswa_tahun_ajaran_data p ON p.id=t.penempatan_id
-        WHERE p.id IS NULL OR p.no_induk<>t.no_induk
-          OR p.tahun_ajaran_id<>t.tahun_ajaran_id OR p.unit_id<>t.unit_id) AS jumlah_masalah
+        LEFT JOIN siswa_tahun_ajaran_data a ON a.id=t.penempatan_asal_id
+        LEFT JOIN tahun_ajaran_data ay ON ay.id=a.tahun_ajaran_id AND ay.unit_id=a.unit_id
+        LEFT JOIN tahun_ajaran_data ty ON ty.id=t.tahun_ajaran_id AND ty.unit_id=t.unit_id
+        WHERE ty.id IS NULL OR ty.label<>t.tahun_ajaran_snapshot OR COALESCE(
+        (p.id IS NOT NULL AND p.no_induk=t.no_induk AND p.unit_id=t.unit_id AND p.tahun_ajaran_id=t.tahun_ajaran_id)
+        OR (t.penempatan_id IS NULL AND a.id IS NOT NULL AND a.unit_id=t.unit_id AND a.no_induk=t.no_induk
+        AND ty.label=CONCAT(CAST(LEFT(ay.label,4) AS UNSIGNED)+1,'/',CAST(RIGHT(ay.label,4) AS UNSIGNED)+1)
+        AND CAST(t.kelas_snapshot AS UNSIGNED)=CAST(a.kelas AS UNSIGNED)+1
+        AND ((t.unit_id=1 AND a.kelas BETWEEN 1 AND 5) OR (t.unit_id=2 AND a.kelas BETWEEN 7 AND 8) OR (t.unit_id=3 AND a.kelas BETWEEN 10 AND 11))),0)=0) AS jumlah_masalah
 UNION ALL
 SELECT 'alokasi_spp_salah_relasi' AS pemeriksaan, (SELECT COUNT(*) FROM spp_alokasi_data a
         LEFT JOIN spp_alokasi_batch_data b ON b.id=a.batch_id

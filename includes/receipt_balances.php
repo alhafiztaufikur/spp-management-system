@@ -12,10 +12,13 @@ function payment_receipt_remaining(mysqli $db,array $payment): array {
         $year=$month>=1&&$month<=12&&$calendar>=2000?du_academic_year_label($month,$calendar):'';
     }
     $billId=(int)($payment['tagihan_daftar_ulang_id']??0);
-    if($year!==''&&!empty(du_psb_state($db,$nis,$year)['covered_psb'])){$lines[]=['DU tahun pertama',null,'Tercakup PSB'];return $lines;}
+    $explicitBill=$billId?du_find_bill_by_id($db,$billId):null;
+    if($explicitBill&&$explicitBill['no_induk']!==$nis)throw new RuntimeException('Tagihan DU pada struk tidak cocok dengan siswa.');
+    if($explicitBill&&$explicitBill['no_induk']===$nis)$year=$explicitBill['tahun_ajaran'];
+    if(!$explicitBill&&$year!==''&&!empty(du_psb_state($db,$nis,$year)['covered_psb'])){$lines[]=['DU tahun pertama',null,'Tercakup PSB'];return $lines;}
     $bill=$billId?du_find_bill_by_id($db,$billId):($year!==''?lf_one($db,'SELECT id FROM tagihan_daftar_ulang WHERE no_induk=? AND tahun_ajaran_snapshot=? AND status=\'open\'',[$nis,$year]):null);
     if($bill&&!isset($bill['sisa']))$bill=du_find_bill_by_id($db,(int)$bill['id']);
-    if($bill&&$bill['status']==='open')$lines[]=['Sisa DU',(float)$bill['sisa']];
+    if($bill&&$bill['status']==='open')$lines[]=['Sisa DU '.($bill['tahun_ajaran']??$year).' / Kelas '.($bill['kelas']??''),(float)$bill['sisa']];
     else {$proof=$year!==''?lb_du_source($db,$nis,$year):null;
         $remaining=$proof&&!empty($proof['known'])?max(0,$proof['total']-lb_du_credit($db,$nis,$year)-lb_native_du_cents($db,$nis,$year)/100):null;
         $lines[]=['Sisa DU',$remaining,'-'];

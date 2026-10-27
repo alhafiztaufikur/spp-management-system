@@ -201,6 +201,7 @@ function fk_audit_report(mysqli $db): array {
     $mismatched = [];
     $equivalentRuleSpellings = [];
     $unresolved = [];
+    $deferredUpgrades = [];
     foreach (fk_audit_expected() as $relation) {
         $child = fk_audit_resolve_table($relation['child'], $physicalTables);
         $parent = fk_audit_resolve_table($relation['parent'], $physicalTables);
@@ -210,6 +211,13 @@ function fk_audit_report(mysqli $db): array {
         }
         $relation['physical_child'] = $child;
         $relation['physical_parent'] = $parent;
+        // A verified pre-upgrade backup legitimately lacks this additive column.
+        // Once installed, its FK is checked exactly like every other relation.
+        if ($relation['column'] === 'penempatan_asal_id'
+            && !isset($columns[strtolower($child.'.penempatan_asal_id')])) {
+            $deferredUpgrades[] = $relation;
+            continue;
+        }
         $relation['unit_pair']=$parent==='siswa_data' && $relation['parent_column']==='NO_INDUK' && isset($columns['siswa_data.legacy_pending']);
         $key = strtolower($child . '.' . $relation['column'] . '>' . DB_NAME . '.'
             . $parent . '.' . $relation['parent_column']);
@@ -247,6 +255,7 @@ function fk_audit_report(mysqli $db): array {
         'mismatched' => $mismatched,
         'equivalent_rule_spellings' => $equivalentRuleSpellings,
         'unresolved' => $unresolved,
+        'deferred_upgrades' => $deferredUpgrades,
     ];
 }
 

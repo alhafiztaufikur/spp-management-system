@@ -71,7 +71,7 @@ try {
 
     $payload = du_selectable_bills_payload($koneksi);
     $studentBills = $payload[$nis] ?? [];
-    du_selector_assert(count($studentBills) === 2, 'Payload harus memuat tagihan tahun berjalan dan tunggakan lama, tetapi bukan masa depan.');
+    du_selector_assert(count($studentBills) === 3, 'Payload memuat tagihan berjalan, tunggakan lama, dan tagihan mendatang yang telah terbit.');
     $currentBill = array_values(array_filter($studentBills, fn($row) => $row['is_current']))[0] ?? null;
     $arrearBill = array_values(array_filter($studentBills, fn($row) => $row['is_arrear']))[0] ?? null;
     du_selector_assert($currentBill && abs((float)$currentBill['sisa']) < .001, 'Tagihan tahun berjalan yang lunas tidak dipertahankan sebagai pilihan awal.');
@@ -98,12 +98,14 @@ try {
     $editable = du_require_selectable_bill($koneksi, $billIds[$current], $nis, $paymentId, true);
     du_selector_assert(abs($editable['sisa'] - 1000000) < .001, 'Saldo edit tidak mengembalikan pembayaran lama sebelum validasi.');
 
+    $early=du_require_selectable_bill($koneksi,$billIds[$future],$nis);
+    du_selector_assert($early['tahun_ajaran']===$future,'Tagihan mendatang yang telah terbit dapat dibayar.');
+
     $missingBillId = (int)$koneksi->query('SELECT COALESCE(MAX(id),0)+1000000 FROM tagihan_daftar_ulang')->fetch_row()[0];
     foreach ([
         'missing' => fn() => du_require_selectable_bill($koneksi, 0, $nis),
         'not_found' => fn() => du_require_selectable_bill($koneksi, $missingBillId, $nis),
         'wrong_student' => fn() => du_require_selectable_bill($koneksi, $billIds[$previous], '0000000000'),
-        'future' => fn() => du_require_selectable_bill($koneksi, $billIds[$future], $nis),
     ] as $reason => $invalidCall) {
         $rejected = false;
         try { $invalidCall(); }

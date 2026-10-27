@@ -1,6 +1,7 @@
 <?php
 require_once __DIR__.'/legacy_billing.php';
 require_once __DIR__.'/du_psb.php';
+require_once __DIR__.'/du_advance.php';
 
 function du_academic_year_label(int $month, int $year): string {
     if ($month < 1 || $month > 12 || $year < 2000 || $year > 2200) {
@@ -49,14 +50,15 @@ class DaftarUlangSelectionException extends RuntimeException {
 function du_find_bill_by_id(mysqli $db, int $billId, int $excludePaymentId = 0, bool $forUpdate = false): ?array {
     if ($billId <= 0) return null;
 
-    $sql = "SELECT tdu.id,tdu.no_induk,tdu.kelas_snapshot AS kelas,
+    $origin=du_advance_schema_ready($db)?'tdu.penempatan_asal_id':'NULL';
+    $sql = "SELECT tdu.id,tdu.unit_id,tdu.no_induk,tdu.kelas_snapshot AS kelas,$origin AS penempatan_asal_id,
                    tdu.tahun_ajaran_snapshot AS tahun_ajaran,
                    tdu.nominal_awal,tdu.nominal_tagihan,tdu.status,
                    ta.id AS tahun_ajaran_id,ta.status AS tahun_status,
                    sta.id AS penempatan_id,sta.status AS penempatan_status
             FROM tagihan_daftar_ulang tdu
             JOIN tahun_ajaran ta ON ta.id=tdu.tahun_ajaran_id
-            JOIN siswa_tahun_ajaran sta ON sta.id=tdu.penempatan_id
+            LEFT JOIN siswa_tahun_ajaran sta ON sta.id=tdu.penempatan_id AND sta.unit_id=tdu.unit_id
             WHERE tdu.id=? LIMIT 1" . ($forUpdate ? ' FOR UPDATE' : '');
     $stmt = $db->prepare($sql);
     $stmt->bind_param('i', $billId);
@@ -79,7 +81,9 @@ function du_find_bill_by_id(mysqli $db, int $billId, int $excludePaymentId = 0, 
         $bill['terbayar'] = (float)$stmt->get_result()->fetch_assoc()['terbayar'];
     }
     $stmt->close();
-    $bill['legacy_paid']=lb_du_bill_credit($db,(string)$bill['no_induk'],(string)$bill['tahun_ajaran']);$bill['terbayar']+=$bill['legacy_paid'];$bill['billing_rule_version']=LB_RULE_VERSION;$bill['tariff_basis']=$bill['legacy_paid']>0?'legacy_snapshot':(lb_du_override($db,(string)$bill['no_induk'],(string)$bill['tahun_ajaran'])?'system':(lb_student($db,(string)$bill['no_induk'])?'legacy':'system'));
+    $bill['legacy_paid']=lb_du_bill_credit($db,(string)$bill['no_induk'],(string)$bill['tahun_ajaran']);
+    $bill['terbayar']+=$bill['legacy_paid'];$bill['billing_rule_version']=LB_RULE_VERSION;
+    $bill['tariff_basis']=!empty($bill['penempatan_asal_id'])?'system':($bill['legacy_paid']>0?'legacy_snapshot':(lb_du_override($db,(string)$bill['no_induk'],(string)$bill['tahun_ajaran'])?'system':(lb_student($db,(string)$bill['no_induk'])?'legacy':'system')));
     $bill['nominal_awal'] = (float)$bill['nominal_awal'];
     $bill['nominal_tagihan'] = (float)$bill['nominal_tagihan'];
     $bill['sisa'] = max(0, $bill['nominal_tagihan'] - $bill['terbayar']);
@@ -106,9 +110,8 @@ function du_require_selectable_bill(
     if ($bill['status'] !== 'open') {
         throw new DaftarUlangSelectionException('cancelled', 'Tagihan Daftar Ulang TA ' . $bill['tahun_ajaran'] . ' sudah dibatalkan. Pilih tagihan lain yang masih terbuka.');
     }
-    if (strcmp((string)$bill['tahun_ajaran'], du_current_academic_year()) > 0) {
-        throw new DaftarUlangSelectionException('future', 'Tagihan Daftar Ulang TA ' . $bill['tahun_ajaran'] . ' belum dapat dibayar. Pilih tahun ajaran yang sudah berjalan.');
-    }
+    if (strcmp((string)$bill['tahun_ajaran'],du_next_year())>0||($bill['tahun_ajaran']>du_current_academic_year()&&$bill['tahun_status']==='draft'))throw new DaftarUlangSelectionException('future','Tagihan DU belum diterbitkan untuk tahun yang dapat dibayar.');
+    if(!du_bill_relation_valid($db,$bill))throw new DaftarUlangSelectionException('conflict','Relasi atau kelas tagihan DU perlu diperiksa sebelum pembayaran.');
     if ($bill['sisa'] <= .001) {
         throw new DaftarUlangSelectionException('settled', 'Daftar Ulang TA ' . $bill['tahun_ajaran'] . ' sudah lunas. Pilih tagihan lain yang masih bersisa.');
     }
@@ -150,11 +153,11 @@ function du_selectable_bills_payload(mysqli $db, int $excludePaymentId = 0, int 
         FROM tagihan_daftar_ulang tdu
         JOIN tahun_ajaran ta ON ta.id=tdu.tahun_ajaran_id
         LEFT JOIN bayar_du bd ON bd.tagihan_daftar_ulang_id=tdu.id
-        WHERE tdu.status='open' AND tdu.tahun_ajaran_snapshot<=? $filter
+        WHERE tdu.status='open' AND tdu.tahun_ajaran_snapshot<=? AND (tdu.tahun_ajaran_snapshot<=? OR ta.status IN ('published','closed')) $filter
         GROUP BY tdu.id,tdu.no_induk,tdu.kelas_snapshot,tdu.tahun_ajaran_snapshot,
                  tdu.nominal_tagihan,tdu.status,ta.status
         ORDER BY tdu.tahun_ajaran_snapshot,tdu.id");
-    $stmt->bind_param('is', $excludePaymentId, $current);
+    $last=du_next_year();$stmt->bind_param('iss', $excludePaymentId, $last, $current);
     $stmt->execute();
     $result = $stmt->get_result();
     $payload = [];
@@ -163,7 +166,8 @@ function du_selectable_bills_payload(mysqli $db, int $excludePaymentId = 0, int 
         $paid = (float)$bill['terbayar']+lb_du_bill_credit($db,(string)$bill['no_induk'],(string)$bill['tahun_ajaran_snapshot']);
         $remaining = max(0, $total - $paid);
         $isCurrent = (string)$bill['tahun_ajaran_snapshot'] === $current;
-        if (!$isCurrent && $remaining <= .001 && (int)$bill['id'] !== $alwaysIncludeBillId) continue;
+        $isFuture=(string)$bill['tahun_ajaran_snapshot']>$current;
+        if (!$isCurrent && !$isFuture && $remaining <= .001 && (int)$bill['id'] !== $alwaysIncludeBillId) continue;
         $payload[(string)$bill['no_induk']][] = [
             'id' => (int)$bill['id'],
             'tahun_ajaran' => (string)$bill['tahun_ajaran_snapshot'],
@@ -173,7 +177,8 @@ function du_selectable_bills_payload(mysqli $db, int $excludePaymentId = 0, int 
             'sisa' => $remaining,
             'status' => (string)$bill['status'],
             'is_current' => $isCurrent,
-            'is_arrear' => !$isCurrent && $remaining > .001,
+            'is_future' => $isFuture,
+            'is_arrear' => (string)$bill['tahun_ajaran_snapshot']<$current && $remaining > .001,
         ];
     }
     $stmt->close();
@@ -191,7 +196,7 @@ function du_find_bill(mysqli $db, string $noInduk, int $month, int $year, bool $
                COALESCE(SUM(CASE WHEN bd.id IS NOT NULL THEN bd.jumlah ELSE 0 END), 0) AS terbayar
         FROM tagihan_daftar_ulang tdu
         JOIN tahun_ajaran ta ON ta.id = tdu.tahun_ajaran_id
-        JOIN siswa_tahun_ajaran sta ON sta.id = tdu.penempatan_id
+        LEFT JOIN siswa_tahun_ajaran sta ON sta.id = tdu.penempatan_id AND sta.unit_id=tdu.unit_id
         LEFT JOIN bayar_du bd ON bd.tagihan_daftar_ulang_id = tdu.id
         WHERE tdu.no_induk = ? AND ta.label = ?
         GROUP BY tdu.id, tdu.no_induk, tdu.kelas_snapshot, tdu.tahun_ajaran_snapshot,
@@ -417,6 +422,9 @@ function du_sync_open_bills_for_master_rate(
     $affected = 0;
     foreach ($bills as $bill) {
         if((float)$bill['paid']>0.001||lb_du_credit($db,(string)$bill['no_induk'],$yearLabel)>0.001)continue;
+        $issued=du_find_bill_by_id($db,(int)$bill['id'],0,true);
+        if(!$issued||$issued['terbayar']>.001||!du_bill_relation_valid($db,$issued))continue;
+        if(abs($issued['nominal_awal']-(float)$bill['nominal_awal'])>.001||abs($issued['nominal_tagihan']-(float)$bill['nominal_tagihan'])>.001)continue;
         $source=lb_student($db,(string)$bill['no_induk']);
         if((float)$bill['nominal_tagihan']<=.001||abs((float)$bill['nominal_awal']-$oldAmount)>.001||!empty($source['settings']['billing_v1']['du_individual'][$yearLabel]))continue;
         if (!$source && $isCurrentYear) {
@@ -465,6 +473,10 @@ function du_create_bill_for_placement(mysqli $db, int $placementId, bool $syncLe
     $row = $stmt->get_result()->fetch_assoc();
     $stmt->close();
     if (!$row || $row['placement_status'] !== 'aktif') return null;
+    if(du_advance_schema_ready($db)){
+        $advance=hp_one($db,'SELECT id FROM tagihan_daftar_ulang WHERE no_induk=? AND tahun_ajaran_id=? AND penempatan_asal_id IS NOT NULL',[$row['no_induk'],$row['tahun_ajaran_id']]);
+        if($advance){du_bind_advance_placement($db,$placementId);return (int)$advance['id'];}
+    }
     du_psb_invalidate($db);$psbState=du_psb_state($db,(string)$row['no_induk'],(string)$row['label']);
     if($psbState['covered_psb']){du_psb_reconcile($db,(string)$row['label'],(int)($_SESSION['admin_id']??0),$placementId);return null;}
     if($psbState['conflict']){
@@ -523,7 +535,7 @@ function du_publish_year_from_active_students(mysqli $db, int $yearId, string $l
         require_once __DIR__.'/legacy_du.php';$result=ldu_reconcile($db,(int)($_SESSION['admin_id']??0),$label);
         // Current live membership is evidence for native students, never historical membership.
         $regular=unit_level_in_sql();
-        lf_query($db,"INSERT INTO siswa_tahun_ajaran(tahun_ajaran_id,no_induk,kelas,master_kelas_id,kelas_rombel_snapshot,spp_perbulan_snapshot,komite_snapshot,status) SELECT ?,s.NO_INDUK,s.KELAS,s.master_kelas_id,CONCAT(s.KELAS,COALESCE(m.kode_rombel,'')),s.SPP_PERBULAN,s.POMG,'aktif' FROM siswa s LEFT JOIN master_kelas m ON m.id=s.master_kelas_id AND m.unit_id=s.unit_id WHERE s.is_active=1 AND s.KELAS IN $regular AND NOT EXISTS(SELECT 1 FROM siswa_tahun_ajaran p WHERE p.unit_id=s.unit_id AND p.no_induk=s.NO_INDUK AND p.tahun_ajaran_id=?) AND NOT EXISTS(SELECT 1 FROM legacy_op_owners o WHERE o.student_id=s.id AND o.unit_id=s.unit_id)",[$yearId,$yearId]);
+        lf_query($db,"INSERT INTO siswa_tahun_ajaran(tahun_ajaran_id,no_induk,kelas,master_kelas_id,kelas_rombel_snapshot,spp_perbulan_snapshot,komite_snapshot,status) SELECT ?,s.NO_INDUK,s.KELAS,s.master_kelas_id,CONCAT(s.KELAS,COALESCE(m.kode_rombel,'')),s.SPP_PERBULAN,s.POMG,'aktif' FROM siswa s LEFT JOIN master_kelas m ON m.id=s.master_kelas_id AND m.unit_id=s.unit_id WHERE s.is_active=1 AND s.KELAS IN $regular AND NOT EXISTS(SELECT 1 FROM siswa_tahun_ajaran p WHERE p.unit_id=s.unit_id AND p.no_induk=s.NO_INDUK  ) AND NOT EXISTS(SELECT 1 FROM legacy_op_owners o WHERE o.student_id=s.id AND o.unit_id=s.unit_id)",[$yearId]);
         // Explicit publication still serves native students added after migration.
         du_psb_invalidate($db);
         foreach(hp_rows($db,"SELECT p.id,p.no_induk FROM siswa_tahun_ajaran p JOIN siswa s ON s.NO_INDUK=p.no_induk AND s.unit_id=p.unit_id WHERE p.tahun_ajaran_id=? AND p.status='aktif' AND s.is_active=1 AND NOT EXISTS(SELECT 1 FROM legacy_op_owners o WHERE o.student_id=s.id AND o.unit_id=s.unit_id)",[$yearId]) as $p){
@@ -541,77 +553,7 @@ function du_publish_year_from_active_students(mysqli $db, int $yearId, string $l
         $GLOBALS['du_publish_result']=['created'=>$result['bills_created'],'unknown'=>$result['unknown'],'existing'=>$existing,'covered_psb'=>$result['covered_psb'],'conflicts'=>$result['conflicts']];
         return $result['bills_created'];
     }
-    $alreadyPublished=$year['status']==='published';
-    [$unitFirst,$unitLast]=unit_level_bounds();
-    $regularClasses=unit_level_in_sql();
-    $stmt = $db->prepare("SELECT COUNT(DISTINCT kelas) total FROM Daftar_ulang
-        WHERE tahun_ajaran_id=? AND kelas IN {$regularClasses} AND CAST(kelas AS UNSIGNED)>$unitFirst AND Jumlah>0");
-    $stmt->bind_param('i', $yearId); $stmt->execute();
-    $masterCount = (int)$stmt->get_result()->fetch_assoc()['total']; $stmt->close();
-    if ($masterCount < $unitLast-$unitFirst) throw new RuntimeException('Lengkapi nominal Daftar Ulang kelas lanjutan sebelum menerbitkan.');
-
-    $currentYear = du_current_academic_year();
-    if ($label === $currentYear) {
-        // Tahun pertama yang diketahui boleh dimulai dari kelas siswa saat ini.
-        $stmt = $db->prepare("INSERT INTO siswa_tahun_ajaran
-            (tahun_ajaran_id,no_induk,kelas,master_kelas_id,kelas_rombel_snapshot,spp_perbulan_snapshot,komite_snapshot,status)
-            SELECT ?,s.NO_INDUK,s.KELAS,s.master_kelas_id,
-                CASE WHEN mk.id IS NULL OR mk.is_placeholder=1
-                    THEN CONCAT('Kelas ',s.KELAS,' (Belum Ditentukan)')
-                    ELSE CONCAT(mk.tingkat,UPPER(mk.kode_rombel)) END,
-                s.SPP_PERBULAN,s.POMG,'aktif'
-            FROM siswa s LEFT JOIN master_kelas mk ON mk.id=s.master_kelas_id
-            WHERE s.is_active=1 AND s.KELAS IN {$regularClasses}
-              AND NOT EXISTS(SELECT 1 FROM siswa_tahun_ajaran prior WHERE prior.no_induk=s.NO_INDUK AND prior.unit_id=s.unit_id)");
-        $stmt->bind_param('i', $yearId);
-        $stmt->execute();
-        $stmt->close();
-    }
-    $stmt = $db->prepare('SELECT COUNT(*) total FROM tagihan_daftar_ulang WHERE tahun_ajaran_id=?');
-    $stmt->bind_param('i', $yearId); $stmt->execute();
-    $existingBills = (int)$stmt->get_result()->fetch_assoc()['total']; $stmt->close();
-    if ($existingBills > 0 && !$alreadyPublished) throw new RuntimeException('Tahun ajaran draf memiliki tagihan lama yang tidak konsisten. Periksa database sebelum menerbitkan ulang.');
-
-    if (strcmp($label, $currentYear) >= 0) {
-        $stmt = $db->prepare("SELECT COUNT(*) AS missing FROM siswa s
-            LEFT JOIN siswa_tahun_ajaran sta ON sta.no_induk=s.NO_INDUK AND sta.unit_id=s.unit_id AND sta.tahun_ajaran_id=?
-            WHERE s.is_active=1 AND s.KELAS IN {$regularClasses} AND sta.id IS NULL");
-        $stmt->bind_param('i', $yearId);
-        $stmt->execute();
-        $missing = (int)$stmt->get_result()->fetch_assoc()['missing'];
-        $stmt->close();
-        if ($missing > 0) throw new RuntimeException($missing . ' siswa belum memiliki riwayat kelas tahun ajaran ini. Selesaikan kenaikan kelas sebelum menerbitkan tagihan.');
-    }
-    $stmt = $db->prepare("SELECT COUNT(*) AS total FROM siswa_tahun_ajaran
-        WHERE tahun_ajaran_id=? AND kelas IN {$regularClasses}");
-    $stmt->bind_param('i', $yearId);
-    $stmt->execute();
-    $placementCount = (int)$stmt->get_result()->fetch_assoc()['total'];
-    $stmt->close();
-    if ($placementCount === 0) throw new RuntimeException('Belum ada riwayat kelas yang dapat diterbitkan pada tahun ajaran ini.');
-    require_once __DIR__ . '/komite_billing.php';
-    $stmtPlacement=$db->prepare("SELECT id FROM siswa_tahun_ajaran WHERE tahun_ajaran_id=? AND kelas IN {$regularClasses}");
-    $stmtPlacement->bind_param('i',$yearId);$stmtPlacement->execute();
-    foreach ($stmtPlacement->get_result()->fetch_all(MYSQLI_ASSOC) as $placement) if(!$alreadyPublished)komite_sync_placement($db,(int)$placement['id']);
-    $stmtPlacement->close();
-
-    // Publishing an academic year and filling its bills are separate operations.
-    // Reuse immutable placements; INSERT/unique constraints make retries harmless.
-    $created=0;$unknown=0;$covered=0;$conflicts=0;
-    $rows=lf_rows($db,"SELECT sta.id,sta.no_induk FROM siswa_tahun_ajaran sta JOIN siswa s ON s.NO_INDUK=sta.no_induk AND s.unit_id=sta.unit_id WHERE sta.tahun_ajaran_id=? AND sta.status='aktif' AND s.is_active=1 AND sta.kelas IN {$regularClasses}",[$yearId]);
-    foreach($rows as $placement){
-        if(lf_one($db,'SELECT id FROM tagihan_daftar_ulang WHERE tahun_ajaran_id=? AND no_induk=?',[$yearId,$placement['no_induk']]))continue;
-        $state=du_psb_state($db,(string)$placement['no_induk'],$label);
-        if($state['covered_psb']){$covered++;continue;}
-        if($state['conflict']){$conflicts++;continue;}
-        if(du_create_bill_for_placement($db,(int)$placement['id'],true,true))$created++;else $unknown++;
-    }
-    $coverage=du_psb_reconcile($db,$label,(int)($_SESSION['admin_id']??0));
-    $GLOBALS['du_publish_result']=['created'=>$created,'unknown'=>$unknown,'existing'=>$existingBills,'covered_psb'=>$coverage['covered_psb'],'conflicts'=>$coverage['conflicts']];
-
-    $stmt = $db->prepare("UPDATE tahun_ajaran SET status='published',published_at=NOW() WHERE id=? AND status='draft'");
-    $stmt->bind_param('i', $yearId); $stmt->execute();
-    if (!$alreadyPublished && $stmt->affected_rows !== 1) { $stmt->close(); throw new RuntimeException('Status tahun ajaran gagal diterbitkan.'); }
-    $stmt->close();
-    return $created;
+    if($label!==du_next_year())throw new DomainException('Penerbitan hanya untuk tahun berjalan dan tahun berikutnya.');
+    $result=du_publish_advance($db,$yearId,$label,(int)($_SESSION['admin_id']??0));
+    $GLOBALS['du_publish_result']=$result;return $result['created'];
 }

@@ -1,6 +1,6 @@
 <?php
 /** Pure source evidence. Cash receipts alone never determine a DU principal. */
-const LDU_VERSION=3;
+const LDU_VERSION=4;
 function ldu_source_proof(array $student,array $tariffs,string $year): array {
     $unknown=['known'=>false,'basis'=>'legacy','reason'=>'Tarif, kelas, periode, atau potongan DU belum dapat dibuktikan.'];
     $raw=$student['raw']??[];

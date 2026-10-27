@@ -43,7 +43,7 @@ function payment_history_model(mysqli $db,int $id,bool $deleted): array
     $caps=payment_capabilities($db,$p,$events,$deleted);
     $du=array_sum(array_column($details['bayar_du']??[],'jumlah'));
     $components=[['Uang PSB',(float)($p['U_PSB']??0)],['SPP',(float)($p['U_SPP']??0)],['Komite',(float)($p['U_KOMITE']??0)]];
-    foreach($details['bayar_du']??[] as $d) $components[]=['Daftar Ulang'.(!empty($d['th_ajaran'])?' · '.$d['th_ajaran']:''),(float)$d['jumlah']];
+    foreach($details['bayar_du']??[] as $d) $components[]=['Daftar Ulang'.(!empty($d['th_ajaran'])?' · '.$d['th_ajaran'].' / Kelas '.($d['kelas']??''):''),(float)$d['jumlah']];
     foreach($details['bayar_biaya_lain']??[] as $d) $components[]=[($d['nama_biaya_snapshot']??'')?:'Biaya Lain',(float)($d['nominal_snapshot']??$d['jumlah']??0)];
     if(empty($details['bayar_biaya_lain']) && (float)($p['U_LAIN']??0)-$du>0) $components[]=['Daftar Ulang / Biaya Lain (rincian tidak tercatat)',(float)$p['U_LAIN']-$du];
     if((float)($p['potong_spp']??0)!==0) $components[]=['Potongan SPP',-(float)$p['potong_spp']];

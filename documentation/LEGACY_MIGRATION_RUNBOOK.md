@@ -1,8 +1,8 @@
 # Prosedur migrasi Legacy
 
 Keputusan berlaku 24 Oktober 2026. Baca bersama `LEGACY_FULL_MIGRATION.md` dan
-`AGENTS.md`. Aturan workflow 13, operasional 17, otomasi 5, perencana bulanan 2,
-billing 5, perencana DU 3, dan pelacakan biaya lain 1 (pembaruan 27 Oktober 2026).
+`AGENTS.md`. Aturan workflow 14, operasional 18, otomasi 5, perencana bulanan 2,
+billing 6, perencana DU 4, dan pelacakan biaya lain 1 (pembaruan 27 Oktober 2026).
 Worker lama harus dihentikan dan dimulai ulang; konfirmasi/simulasi versi lama
 tidak boleh diterapkan. Metadata pembayaran otomasi versi 1–3 tetap dapat dibaca.
 

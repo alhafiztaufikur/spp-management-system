@@ -1051,8 +1051,8 @@ function refreshDaftarUlangSelector(opt) {
     className.textContent = 'Kelas ' + record.kelas;
     titleWrap.append(title, className);
     const badge = document.createElement('span');
-    badge.className = 'du-option-badge ' + (record.is_current ? 'is-current' : 'is-arrear');
-    badge.textContent = record.is_current ? 'Tahun Berjalan' : 'Tunggakan';
+    badge.className = 'du-option-badge ' + (record.is_current ? 'is-current' : (record.is_future ? 'is-future' : 'is-arrear'));
+    badge.textContent = record.is_current ? 'Tahun Berjalan' : (record.is_future ? 'Tagihan Mendatang' : 'Tunggakan');
     heading.append(titleWrap, badge);
 
     const values = document.createElement('span');
@@ -1140,7 +1140,8 @@ function refreshDaftarUlangMasterWarning(opt) {
   const remaining = parseNumber(bill?.sisa ?? Math.max(0, total - paid));
   const isSettled = !!bill && remaining <= 0.001;
   const isCoveredPsb = opt?.dataset.duCoveredPsb === '1' && !bill;
-  const isUnavailable = !!opt && !bill && !isCoveredPsb;
+  const hasFuture = daftarUlangRecords(opt).some(record => record.is_future);
+  const isUnavailable = !!opt && !bill && !isCoveredPsb && !hasFuture;
   const expectedTotal = document.getElementById('du-expected-total');
   const expectedPaid = document.getElementById('du-expected-paid');
   if (expectedTotal) expectedTotal.value = bill ? String(total) : '';
@@ -1151,9 +1152,9 @@ function refreshDaftarUlangMasterWarning(opt) {
     if (isSettled) status = total <= .001 ? 'Tidak perlu dibayar' : 'Lunas';
     else if (paid > 0) status = 'Cicilan';
     if (!opt || !periodKey) {
-      contextLabel.textContent = isCoveredPsb ? 'DU tahun pertama tercakup PSB. Cicilan mengikuti kewajiban PSB.' : (opt ? 'Belum ada tagihan Daftar Ulang yang dapat dipilih.' : 'Pilih siswa untuk melihat tagihan.');
+      contextLabel.textContent = isCoveredPsb ? 'DU tahun pertama tercakup PSB. Cicilan mengikuti kewajiban PSB.' : (hasFuture ? 'Pilih Tagihan Mendatang pada daftar tahun DU untuk membayar lebih awal.' : (opt ? 'Belum ada tagihan Daftar Ulang yang dapat dipilih.' : 'Pilih siswa untuk melihat tagihan.'));
     } else if (bill) {
-      contextLabel.textContent = 'TA ' + periodKey + ' · Kelas ' + bill.kelas + ' · ' + status
+      contextLabel.textContent = (bill.is_future ? 'Tagihan Mendatang / ' : '') + 'TA ' + periodKey + ' · Kelas ' + bill.kelas + ' · ' + status
         + (remaining > .001 ? ' · Sisa Rp ' + formatRupiah(remaining) : '');
     }
   }

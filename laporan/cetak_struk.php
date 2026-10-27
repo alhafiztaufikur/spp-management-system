@@ -119,7 +119,7 @@ $stmt = $koneksi->prepare("
         s.potong_du,
         s.tot_du,
         du.tagihan_daftar_ulang_id,
-        du.th_ajaran AS du_tahun_ajaran,
+        du.th_ajaran AS du_tahun_ajaran,du.kelas AS du_kelas,
         COALESCE(du.jumlah, 0) AS uang_du,
         COALESCE(tdu.nominal_tagihan, 0) AS du_nominal_tagihan,
         COALESCE(op.nama, NULLIF(b.user_id, '')) AS operator_name,
@@ -164,7 +164,7 @@ $stmt->close();
 $komiteReceipt=komite_receipt_summary($koneksi,$paymentId);
 $primaryLines = [
     ['Uang PSB', $payment['U_PSB']],
-    ['Uang Daftar Ulang', $payment['uang_du']],
+    ['Uang Daftar Ulang'.(!empty($payment['du_tahun_ajaran'])?' '.$payment['du_tahun_ajaran'].' / Kelas '.$payment['du_kelas']:''), $payment['uang_du']],
     ['Uang SPP', $payment['U_SPP']],
     ['Komite Sekolah',$payment['U_KOMITE']],
     ['Tabungan Wajib',0],

@@ -472,3 +472,10 @@ SELECT id, NO_INDUK, TGL_BYR, payment_link_version
 FROM bayar
 WHERE payment_link_version NOT IN (0, 1)
 ORDER BY id;
+
+-- Early DU invoices retain either their actual destination or projection basis.
+SELECT COLUMN_NAME,IS_NULLABLE FROM information_schema.COLUMNS
+WHERE TABLE_SCHEMA=DATABASE() AND TABLE_NAME='tagihan_daftar_ulang_data'
+AND COLUMN_NAME IN ('penempatan_id','penempatan_asal_id');
+SELECT TRIGGER_NAME FROM information_schema.TRIGGERS WHERE TRIGGER_SCHEMA=DATABASE()
+AND TRIGGER_NAME IN ('du_basis_insert','du_basis_update');

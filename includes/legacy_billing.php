@@ -6,7 +6,7 @@ require_once __DIR__.'/legacy_migration_automation.php';
 require_once __DIR__.'/history_performance.php';
 require_once __DIR__.'/legacy_monthly_planner.php';
 require_once __DIR__.'/legacy_du_planner.php';
-const LB_RULE_VERSION = 5;
+const LB_RULE_VERSION = 6;
 // Only for arithmetic results already proven from exact source cents.
 function lb_result_cents(float|string $value): int {return lf_cents(number_format((float)$value,2,'.',''));}
 
@@ -45,9 +45,12 @@ function lb_cache(mysqli $db, bool $refresh=false): array {
     $studentIds=implode(',',array_map('intval',array_column($out['students'],'student_id')))?:'0';
     $number=$nis===null?'':"'".$db->real_escape_string($nis)."'";
     $placements=[];foreach(hp_rows($db,'SELECT p.unit_id,p.no_induk,t.label,p.kelas FROM siswa_tahun_ajaran p JOIN tahun_ajaran t ON t.id=p.tahun_ajaran_id AND t.unit_id=p.unit_id'.($nis===null?'':" WHERE p.no_induk=$number")) as $p)$placements[$p['unit_id'].'|'.$p['no_induk']][$p['label']]=(int)$p['kelas'];
+    // An early DU invoice supplies the financial grade until promotion creates
+    // its academic destination. Other components still require their placement.
+    $duGrades=[];foreach(hp_rows($db,'SELECT unit_id,no_induk,tahun_ajaran_snapshot,kelas_snapshot FROM tagihan_daftar_ulang'.($nis===null?'':" WHERE no_induk=$number")) as $b)$duGrades[$b['unit_id'].'|'.$b['no_induk']][$b['tahun_ajaran_snapshot']]=(int)$b['kelas_snapshot'];
     foreach(hp_rows($db,"SELECT unit_id,entity_type,entity_id,after_data,id FROM legacy_op_audit WHERE entity_type IN ('billing_override','billing_rule')".($nis===null?'':" AND (entity_type='billing_rule' OR entity_id IN ($studentIds))")." ORDER BY id") as $audit){
         $decision=json_decode($audit['after_data'],true);
-        foreach($out['students'] as &$student){if((int)$student['unit_id']!==(int)$audit['unit_id'])continue;$matches=$audit['entity_type']==='billing_override'?(int)$student['student_id']===(int)$audit['entity_id']:in_array($placements[$student['unit_id'].'|'.$student['NO_INDUK']][$decision['year']]??-1,$decision['levels'],true);
+        foreach($out['students'] as &$student){if((int)$student['unit_id']!==(int)$audit['unit_id'])continue;$identity=$student['unit_id'].'|'.$student['NO_INDUK'];$grade=$placements[$identity][$decision['year']]??(($decision['kind']??'')==='du_master'?($duGrades[$identity][$decision['year']]??-1):-1);$matches=$audit['entity_type']==='billing_override'?(int)$student['student_id']===(int)$audit['entity_id']:in_array($grade,$decision['levels'],true);
             if($matches)$student['settings']['billing_v1'][$decision['kind']][$decision['year']]=['rule'=>$decision['rule'],'version'=>$audit['id']];
         }unset($student);
     }
@@ -133,7 +136,7 @@ function lb_refresh_manifests(mysqli $db,array $batchIds): void {
 /** Read the same source-backed position for synchronization and integrity checks. */
 function lb_obligation_position(mysqli $db,array $ob): ?array {
     $e=json_decode($ob['evidence'],true);
-    if(!is_array($e)||!in_array($e['rule']??null,[1,2,3,4,LB_RULE_VERSION],true))return null;
+    if(!is_array($e)||!in_array($e['rule']??null,[1,2,3,4,5,LB_RULE_VERSION],true))return null;
     $data=lb_cache($db);$student=$data['owner_students'][$ob['owner_id']]??null;
     if(!$student||($e['source_row_key']??'')!==($student['source_row_key']??null))throw new DomainException('Bukti kewajiban tidak sesuai arsip pemilik.');
     $s=$student;

@@ -76,8 +76,8 @@ function report_annual_evidence(mysqli $db,array $f): array {
         }
         if(!$known)$bill=null;
         $cancelled=($native['status']??'')==='cancelled';$status=$known?report_billing_status((float)$bill,$paid,$cancelled?'cancelled':'open'):($paid>.001?'Perlu Rekonsiliasi':'Belum Diketahui');
-        $label=$category==='psb'?class_label($s):($native['kelas_rombel_snapshot']??$placement['kelas_rombel_snapshot']??$credit['class']??'Tidak tercatat');
-        $row=['nis'=>$nis,'student_id'=>(int)$s['id'],'unit_id'=>(int)$s['unit_id'],'nis_diknas'=>$s['NO_induk_diknas']??'','nama'=>$s['NAMA'],'kelas'=>$label,'master_kelas_id'=>$category==='psb'?$s['master_kelas_id']:($native['master_kelas_id']??$placement['master_kelas_id']??0),'tingkat'=>$category==='psb'?$s['KELAS']:($placement['kelas']??$label),'periode'=>$category==='psb'?'Sekali saat masuk':$year,'tagihan'=>$bill,'terbayar'=>$paid,'sisa'=>$known?($cancelled?0.0:max(0,$bill-$paid)):null,'status'=>$status,'_status'=>$status,'_incomplete'=>!$known];
+        $label=$category==='psb'?class_label($s):(($placement['kelas_rombel_snapshot']??'')?:($native['kelas_snapshot']??$placement['kelas']??$credit['class']??'Tidak tercatat'));
+        $row=['nis'=>$nis,'student_id'=>(int)$s['id'],'unit_id'=>(int)$s['unit_id'],'nis_diknas'=>$s['NO_induk_diknas']??'','nama'=>$s['NAMA'],'kelas'=>$label,'master_kelas_id'=>$category==='psb'?$s['master_kelas_id']:($native['master_kelas_id']??$placement['master_kelas_id']??0),'tingkat'=>$category==='psb'?$s['KELAS']:($native['kelas_snapshot']??$placement['kelas']??$label),'periode'=>$category==='psb'?'Sekali saat masuk':$year,'tagihan'=>$bill,'terbayar'=>$paid,'sisa'=>$known?($cancelled?0.0:max(0,$bill-$paid)):null,'status'=>$status,'_status'=>$status,'_incomplete'=>!$known];
         if(!empty($duCoverage[$s['unit_id'].'|'.$nis]['covered_psb'])){$row['tagihan']=null;$row['terbayar']=0.0;$row['sisa']=0.0;$row['status']=$row['_status']='Tercakup PSB';$row['_du_status']='covered_psb';$row['_incomplete']=false;}
         $row['tanggal_dibuat']=$source?null:$s['created_at'];
         if(report_class_matches_row($f,$row))$rows[]=$row;

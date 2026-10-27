@@ -14,7 +14,7 @@ function payment_obligations(mysqli $db,string $nis): array {
     ];
     foreach($queries as $kind=>$sql){foreach(hp_rows($db,$sql,[$nis]) as $item){
         if($kind==='komite'){if((int)$item['tahun']*100+(int)$item['bulan']>=$cutoff)continue;$position=komite_bill_position($db,$item);$label='Komite '.spp_month_label($item['bulan']).' '.$item['tahun'];$append($label,$position['remaining'],['bulan'=>$item['bulan'],'tahun'=>$item['tahun'],'label'=>spp_month_label($item['bulan']).' '.$item['tahun']],'komite');}
-        elseif($kind==='du'){$bill=du_find_bill_by_id($db,(int)$item['id']);if($bill)$append('Daftar Ulang TA '.$item['label'],$bill['sisa'],null,$kind);}
+        elseif($kind==='du'){$bill=du_find_bill_by_id($db,(int)$item['id']);if($bill&&$bill['tahun_ajaran']<=du_current_academic_year())$append('Daftar Ulang TA '.$item['label'],$bill['sisa'],null,$kind);}
         else $append($item['label'],(float)$item['remaining'],null,$kind);
     }}
     foreach(spp_open_bills($db,$nis) as $bill)if((int)$bill['tahun']*100+(int)$bill['bulan']<$cutoff){$period=['bulan'=>$bill['bulan'],'tahun'=>$bill['tahun'],'label'=>spp_month_label($bill['bulan']).' '.$bill['tahun']];$append('SPP '.$period['label'],(float)$bill['remaining'],$period,'spp');}

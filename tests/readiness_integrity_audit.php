@@ -65,10 +65,7 @@ $checks = [
         LEFT JOIN siswa_tahun_ajaran p ON p.id=t.penempatan_id
         WHERE p.id IS NULL OR p.no_induk<>t.no_induk
           OR p.tahun_ajaran_id<>t.tahun_ajaran_id OR p.unit_id<>t.unit_id",
-    'tagihan_du_salah_relasi' => "SELECT COUNT(*) FROM tagihan_daftar_ulang t
-        LEFT JOIN siswa_tahun_ajaran p ON p.id=t.penempatan_id
-        WHERE p.id IS NULL OR p.no_induk<>t.no_induk
-          OR p.tahun_ajaran_id<>t.tahun_ajaran_id OR p.unit_id<>t.unit_id",
+    'tagihan_du_salah_relasi' => du_invalid_relation_sql($koneksi),
     'alokasi_spp_salah_relasi' => "SELECT COUNT(*) FROM spp_alokasi a
         LEFT JOIN spp_alokasi_batch b ON b.id=a.batch_id
         LEFT JOIN tagihan_spp t ON t.id=a.tagihan_spp_id

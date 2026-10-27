@@ -58,7 +58,7 @@ function du_psb_reconcile(mysqli $db,string $year,int $actor,?int $placementId=n
         if($placementId!==null&&(int)$state['placement']['id']!==$placementId)continue;
         if($state['conflict']){$out['conflicts']++;continue;}if(!$state['covered_psb'])continue;$out['covered_psb']++;$p=$state['placement'];
         if(!empty($p['du_covered_by_psb']))continue;
-        $locked=hp_one($db,'SELECT du_covered_by_psb FROM siswa_tahun_ajaran WHERE id=? FOR UPDATE',[$p['id']]);if(!$locked||$locked['du_covered_by_psb'])continue;
+        $locked=lf_one($db,'SELECT du_covered_by_psb FROM siswa_tahun_ajaran WHERE id=? FOR UPDATE',[$p['id']]);if(!$locked||$locked['du_covered_by_psb'])continue;
         lf_query($db,'UPDATE siswa_tahun_ajaran SET du_covered_by_psb=1 WHERE id=?',[$p['id']]);
         du_write_audit($db,(int)$p['tahun_ajaran_id'],null,'du_tercakup_psb',['placement_id'=>(int)$p['id'],'covered_psb'=>false],['placement_id'=>(int)$p['id'],'student_id'=>(int)$p['student_id'],'no_induk'=>$p['no_induk'],'unit_id'=>(int)$p['unit_id'],'kelas'=>$p['kelas'],'tahun_ajaran'=>$year,'covered_psb'=>true,'basis'=>'client_psb_policy','policy_version'=>DU_PSB_POLICY_VERSION,'actor'=>$actor,'reason'=>$state['reason']],1);
         $out['changes']++;

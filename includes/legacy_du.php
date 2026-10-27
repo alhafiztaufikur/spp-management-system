@@ -69,8 +69,10 @@ function ldu_plan(mysqli $db,?string $year=null): array {
             $positions[$key]=['unit_id'=>(int)$s['unit_id'],'student_id'=>(int)$s['student_id'],'owner_id'=>(int)$s['id'],'nis'=>$s['NO_INDUK'],'source_identity'=>$s['source_identity'],'batch_id'=>$s['batch_id'],'source_id'=>(int)$s['source_id'],'year'=>$year,'status'=>'covered_psb','known'=>true,'principal_cents'=>null,'paid_cents'=>0,'remaining_cents'=>0,'legacy_paid_cents'=>0,'native_paid_cents'=>0,'proof'=>['known'=>true,'basis'=>'client_psb_policy','reason'=>$coverage[$key]['reason'],'grade'=>(int)$coverage[$key]['placement']['kelas'],'gross'=>null,'discount'=>null,'total'=>null,'source_row_key'=>$s['source_row_key']],'placement'=>$placements[$key]??null,'bill'=>null,'traces'=>[],'recap_row_keys'=>[],'reason'=>null,'can_create'=>false];continue;
         }
         $proof=lb_du_source($db,$s['NO_INDUK'],$year);$placement=$placements[$key]??null;$bill=$bills[$key]??null;
-        $master=$masters[(int)($placement['kelas']??0)]??null;
+        $advance=$bill&&!empty($bill['penempatan_asal_id']);
+        $master=$masters[(int)($placement['kelas']??$bill['kelas_snapshot']??0)]??null;
         if($master&&isset($bases[(int)$master['id']])&&$year===ldu_target_year())$proof=ldu_admin_proof($proof??['known'=>false],$s,$current,$master,$year);
+        if($advance)$proof=['known'=>true,'basis'=>'system','gross'=>(float)$bill['nominal_awal'],'discount'=>(float)$bill['nominal_awal']-(float)$bill['nominal_tagihan'],'total'=>(float)$bill['nominal_tagihan'],'grade'=>(int)$bill['kelas_snapshot'],'year'=>$year,'source_row_key'=>$s['source_row_key'],'tariff_row_keys'=>[]];
         $traces=$items[$s['unit_id'].'|'.$s['id'].'|'.$year]??[];$legacy=0;foreach($traces as $trace)if(!$trace['cancelled'])$legacy+=$trace['amount_cents'];
         // Preserve old archive-mode receipts through the existing credit reader.
         if(!$traces)$legacy=lb_result_cents(lb_du_credit($db,$s['NO_INDUK'],$year));
@@ -79,7 +81,7 @@ function ldu_plan(mysqli $db,?string $year=null): array {
         $position=ldu_position($proof,$legacy,$native,$bill&&$bill['status']==='open'?lf_cents($bill['nominal_tagihan']):null);
         $reason=null;
         if(empty($proof['known']))$reason=$proof['reason'];
-        elseif(!$placement||$placement['status']!=='aktif'||(int)$placement['kelas']!==$proof['grade'])$reason='Penempatan aktif tahun DU belum cocok dengan bukti kelas sumber.';
+        elseif($advance?!du_bill_relation_valid($db,du_find_bill_by_id($db,(int)$bill['id'])):(!$placement||$placement['status']!=='aktif'||(int)$placement['kelas']!==$proof['grade']))$reason='Penempatan aktif tahun DU belum cocok dengan bukti kelas sumber.';
         elseif(($target['status']??'')==='closed')$reason='Tahun DU tertutup; tagihan existing dipertahankan.';
         elseif($bill&&$bill['status']!=='open')$reason='Tagihan dibatalkan pengguna; tidak diterbitkan kembali.';
         elseif(!$bill&&lb_du_override($db,$s['NO_INDUK'],$year)&&($proof['basis']??'')!=='system')$reason='Penetapan DU pengguna dipertahankan; tidak dibuat tagihan dari tarif sumber.';
@@ -126,12 +128,15 @@ function ldu_reconcile(mysqli $db,int $actor,?string $year=null): array {
         $out[$position['status']]++;foreach(['principal_cents','paid_cents','remaining_cents'] as $name)$out[$name]+=$position[$name];
         if(empty($proof['known']))continue; // Existing manual bill is preserved, not recertified from missing source evidence.
         if(($plan['target']['status']??'')==='closed')continue;
+        if(!empty($bill['penempatan_asal_id']))continue;
         $ob=hp_one($db,"SELECT * FROM legacy_op_obligations WHERE owner_id=? AND category='daftar_ulang' AND period=? FOR UPDATE",[$p['owner_id'],$year]);
         // Existing manually certified or legacy debt obligations are not rewritten.
         $old=$ob?json_decode($ob['evidence'],true):[];
-        if($ob&&(!is_array($old)||!in_array($old['rule']??0,[1,2,3,4,LB_RULE_VERSION],true)||!empty($ob['bill_id'])))continue;
+        if($ob&&(!is_array($old)||!in_array($old['rule']??0,[1,2,3,4,5,LB_RULE_VERSION],true)||!empty($ob['bill_id'])))continue;
         $evidence=$old+['rule'=>LB_RULE_VERSION,'basis'=>$proof['basis'],'source_row_key'=>$proof['source_row_key'],'gross'=>$proof['gross'],'discount'=>$proof['discount']];
-        $evidence['du']=['rule'=>LDU_VERSION,'year'=>$year,'master_id'=>(int)$bill['master_daftar_ulang_id'],'bill_id'=>(int)$bill['id'],'placement_id'=>(int)$bill['penempatan_id'],'source_id'=>$p['source_id'],'source_row_key'=>$proof['source_row_key'],'trace_count'=>count($p['traces']),'trace_digest'=>hash('sha256',lf_json($p['traces']))];
+        // Existing provenance keeps its recorded rule when the evidence is unchanged.
+        $traceRule=in_array($old['du']['rule']??0,[1,2,3,LDU_VERSION],true)?(int)$old['du']['rule']:LDU_VERSION;
+        $evidence['du']=['rule'=>$traceRule,'year'=>$year,'master_id'=>(int)$bill['master_daftar_ulang_id'],'bill_id'=>(int)$bill['id'],'placement_id'=>(int)$bill['penempatan_id'],'source_id'=>$p['source_id'],'source_row_key'=>$proof['source_row_key'],'trace_count'=>count($p['traces']),'trace_digest'=>hash('sha256',lf_json($p['traces']))];
         $next=lf_json($evidence);
         if(!$ob){lf_query($db,"INSERT INTO legacy_op_obligations(unit_id,owner_id,category,period,principal,remaining,evidence) VALUES(?,?,'daftar_ulang',?,?,?,?)",[$p['unit_id'],$p['owner_id'],$year,lf_money($position['principal_cents']),lf_money($position['remaining_cents']),$next]);$ob=['id'=>(int)$db->insert_id,'evidence'=>null];}
         elseif(lf_canonical($old)===lf_canonical($evidence))continue;
