@@ -3,12 +3,22 @@ html body[data-readable-workspace="master-registration"] .du-workspace {
   --du-ink: #101f28;
   --du-muted: #697588;
   --du-line: #e5ebef;
-  --du-green: #0a925c;
+  --du-accent: #0a925c;
+  --du-accent-soft: #dff2e7;
+  --du-icon-soft: #dff5e9;
+  --du-title: #05291c;
+  --du-kicker: #087c4e;
+  --du-hero-muted: #526071;
+  --du-control-line: #cbe8df;
+  --du-psb-line: #dcece4;
+  --du-progress: #25b58a;
+  --du-progress-light: #56cfaa;
+  --du-page-wash: #f7fcfa;
   --du-mint: #eff9f5;
   --du-surface: #fff;
   --du-hero-start: #f0faf6;
   --du-hero-end: #c7eddf;
-  background: linear-gradient(180deg, transparent 70px, #f7fcfa 680px, transparent 1000px);
+  background: linear-gradient(180deg, transparent 70px, var(--du-page-wash) 680px, transparent 1000px);
   color: var(--du-ink);
   font-family: 'Inter', sans-serif;
 }
@@ -23,29 +33,29 @@ html body[data-readable-workspace="master-registration"] .du-workspace .du-maste
   border: 0;
   border-radius: 13px;
   background: linear-gradient(108deg, var(--du-hero-start) 0%, var(--du-hero-start) 48%, var(--du-hero-end) 100%);
-  box-shadow: 0 8px 28px #16745006;
+  box-shadow: 0 8px 28px color-mix(in srgb, var(--du-accent) 2%, transparent);
 }
 .du-hero-copy { position: relative; z-index: 1; min-width: 0; }
 .du-workspace :is(h1,h2,h3,h4) { font-family: 'Inter', sans-serif; }
 html body[data-readable-workspace="master-registration"] .du-workspace .recap-class-overline {
-  color: #087c4e; font-size: 14px; font-weight: 750; letter-spacing: .09em; text-transform: uppercase;
+  color: var(--du-kicker); font-size: 14px; font-weight: 750; letter-spacing: .09em; text-transform: uppercase;
 }
 .du-workspace .du-hero-copy h1 {
   font-family: 'Inter', sans-serif; font-size: clamp(40px, 4.1vw, 58px); font-weight: 800;
-  letter-spacing: -2.3px; line-height: 1.12; color: #05291c; margin: 9px 0 12px;
+  letter-spacing: -2.3px; line-height: 1.12; color: var(--du-title); margin: 9px 0 12px;
 }
-.du-hero-copy>p { color: #526071; font-size: 18px; line-height: 1.6; margin: 0 0 20px; }
+.du-hero-copy>p { color: var(--du-hero-muted); font-size: 18px; line-height: 1.6; margin: 0 0 20px; }
 html body[data-readable-workspace="master-registration"] .du-workspace .du-master-year-tools {
   display: flex; flex-direction: row; flex-wrap: wrap; align-items: center; justify-content: flex-start;
   justify-self: start; width: 100%; min-width: 0; padding: 0; border: 0; gap: 12px 15px;
 }
 .du-workspace .du-master-year-tools form { margin: 0; width: auto; max-width: 100%; }
 .du-workspace .du-year-picker { position: relative; width: 216px !important; }
-.du-year-picker-icon { position: absolute; z-index: 2; left: 17px; top: 50%; transform: translateY(-50%); display: flex; color: #008446; pointer-events: none; }
+.du-year-picker-icon { position: absolute; z-index: 2; left: 17px; top: 50%; transform: translateY(-50%); display: flex; color: var(--du-accent); pointer-events: none; }
 .du-year-picker-icon svg { width: 20px; height: 20px; }
 html body[data-readable-workspace="master-registration"] .du-workspace .du-year-picker :is(.field-select,.spp-select-trigger) {
-  width: 100%; min-height: 48px !important; padding: 11px 14px 11px 53px; border: 1px solid #cbe8df;
-  border-radius: 10px; background-color: #ffffffdf; color: #172b2c; font-size: 16px; font-weight: 500; box-shadow: none;
+  width: 100%; min-height: 48px !important; padding: 11px 14px 11px 53px; border: 1px solid var(--du-control-line);
+  border-radius: 10px; background-color: var(--du-surface); color: var(--du-ink); font-size: 16px; font-weight: 500; box-shadow: none;
 }
 .du-workspace .du-year-picker .spp-select { width: 100%; }
 html body[data-readable-workspace="master-registration"] .du-workspace .du-year-picker .spp-select-caption { font-size: 16px; white-space: nowrap; overflow-wrap: normal; }
@@ -53,7 +63,7 @@ html body[data-readable-workspace="master-registration"] .du-workspace .du-year-
 .du-year-state-label { color: var(--du-muted); font-size: 12px; line-height: 1.5; }
 html body[data-readable-workspace="master-registration"] .du-workspace .du-master-year-tools .du-year-status {
   display: inline-flex; align-items: center; gap: 7px; padding: 5px 10px; border: 0; border-radius: 999px;
-  background: #dff2e7; color: #147449; font-size: 12px; font-weight: 600; line-height: 1.6;
+  background: var(--du-accent-soft); color: var(--du-accent); font-size: 12px; font-weight: 600; line-height: 1.6;
   white-space: nowrap; cursor: default;
 }
 .du-year-status-dot { flex: 0 0 6px; width: 6px; height: 6px; border-radius: 50%; background: currentColor; }
@@ -61,19 +71,19 @@ html body[data-readable-workspace="master-registration"] .du-workspace .du-year-
 html body[data-readable-workspace="master-registration"] .du-workspace .du-year-status.is-closed { background: #e7edeb; color: #52645c; }
 html body[data-readable-workspace="master-registration"] .du-workspace .du-master-year-tools .btn {
   min-height: 48px; padding: 11px 18px; display: inline-flex; align-items: center; gap: 13px;
-  border: 1px solid #c6e1db; border-radius: 10px; background: #ffffffb8; color: #1e3035; font-size: 13px; font-weight: 600; box-shadow: none;
+  border: 1px solid var(--du-control-line); border-radius: 10px; background: var(--du-surface); color: var(--du-ink); font-size: 13px; font-weight: 600; box-shadow: none;
 }
-.du-workspace .du-master-year-tools .btn:hover { background: #fff; border-color: #71b69c; }
+.du-workspace .du-master-year-tools .btn:hover { background: var(--du-surface); border-color: var(--du-accent); }
 .du-hero-art { position: absolute; z-index: 0; top: 0; right: 0; width: min(46%, 550px); height: 100%; pointer-events: none; border-radius: inherit; }
 
 html body[data-readable-workspace="master-registration"] .du-workspace .du-overview {
   display: grid; grid-template-columns: repeat(4, minmax(0, 1fr)); gap: 16px; margin: 0 28px 20px;
 }
 .du-workspace .du-overview .du-stat {
-  --stat-color: #07864f; --stat-soft: #e1f7ec;
+  --stat-color: var(--du-accent); --stat-soft: var(--du-icon-soft);
   position: relative; display: flex; align-items: flex-start; gap: 16px; min-width: 0; min-height: 123px;
   padding: 18px; border: 1px solid var(--du-line); border-radius: 12px; background: var(--du-surface);
-  box-shadow: 0 5px 16px #1c704004; overflow: hidden;
+  box-shadow: 0 5px 16px color-mix(in srgb, var(--du-accent) 2%, transparent); overflow: hidden;
 }
 .du-workspace .du-overview .du-stat-blue { --stat-color: #126eff; --stat-soft: #e8f1ff; }
 .du-workspace .du-overview .du-stat-purple { --stat-color: #7c35df; --stat-soft: #f1ebff; }
@@ -87,19 +97,19 @@ html body[data-readable-workspace="master-registration"] .du-workspace .du-overv
 .du-stat-link { position: absolute; z-index: 2; right: 17px; top: 19px; display: grid; place-items: center; width: 30px; height: 30px; color: var(--stat-color); background: var(--stat-soft); border-radius: 50%; }
 .du-stat-link svg { width: 20px; height: 20px; }
 .du-stat-link:hover { filter: brightness(.94); }
-.du-workspace a:focus-visible { outline: 3px solid var(--du-green); outline-offset: 4px; }
+.du-workspace a:focus-visible { outline: 3px solid var(--du-accent); outline-offset: 4px; }
 .du-stat-wave { position: absolute; right: 14px; bottom: 9px; width: 110px; height: 51px; color: var(--stat-color); opacity: .65; pointer-events: none; }
 
 html body[data-readable-workspace="master-registration"] .du-workspace .du-completeness {
   display: grid; grid-template-columns: minmax(0, 1.32fr) minmax(0, 1fr); align-items: center; gap: 28px;
   margin: 0 28px 24px; padding: 19px 24px; border: 1px solid var(--du-line); border-radius: 14px;
-  background: var(--du-surface); box-shadow: 0 6px 23px #16745004; scroll-margin-top: 90px;
+  background: var(--du-surface); box-shadow: 0 6px 23px color-mix(in srgb, var(--du-accent) 2%, transparent); scroll-margin-top: 90px;
 }
 .du-completeness-data { min-width: 0; }
 .du-completeness h2 { margin: 0 0 3px; font-size: 18px; line-height: 1.5; font-weight: 700; letter-spacing: -.45px; color: var(--du-ink); }
 .du-completeness-data>p { color: var(--du-muted); font-size: 13px; line-height: 1.6; margin: 0 0 10px; }
 .du-completeness-chart { display: flex; align-items: center; gap: 35px; }
-.du-donut { flex: 0 0 128px; height: 128px; padding: 16px; border-radius: 50%; background: conic-gradient(from -1deg, #25b58a 0%, #56cfaa var(--du-complete), #ffda91 var(--du-complete), #ffcc72 100%); }
+.du-donut { flex: 0 0 128px; height: 128px; padding: 16px; border-radius: 50%; background: conic-gradient(from -1deg, var(--du-progress) 0%, var(--du-progress-light) var(--du-complete), #ffda91 var(--du-complete), #ffcc72 100%); }
 .du-donut-empty { background: var(--du-line); }
 .du-donut>div { display: flex; flex-direction: column; align-items: center; justify-content: center; height: 100%; border-radius: 50%; background: var(--du-surface); color: var(--du-ink); }
 .du-donut strong { font-size: 26px; line-height: 1.1; letter-spacing: -1px; }
@@ -112,17 +122,17 @@ html body[data-readable-workspace="master-registration"] .du-workspace .du-compl
 .du-completeness-legend strong { font-size: 15px; font-weight: 650; }
 .du-completeness-legend>div>span:last-child { color: var(--du-muted); text-align: right; }
 .du-legend-dot { display: inline-block; width: 12px; height: 12px; flex: 0 0 12px; border-radius: 50%; }
-.du-legend-dot.is-complete { background: #32bd91; }
+.du-legend-dot.is-complete { background: var(--du-progress); }
 .du-legend-dot.is-pending { background: #ffcc72; }
 .du-completeness-bar { margin-top: 13px; height: 11px; border-radius: 12px; background: #e2e6ec; overflow: hidden; }
-.du-completeness-bar>span { display: block; height: 100%; border-radius: inherit; background: #0da170; }
+.du-completeness-bar>span { display: block; height: 100%; border-radius: inherit; background: var(--du-accent); }
 .du-completeness-insight { position: relative; background: var(--du-mint); border-radius: 14px; padding: 18px 22px; }
 .du-completeness-insight::before { content: ''; position: absolute; top: 3px; bottom: 0; left: -15px; width: 1px; background: var(--du-line); }
-.du-insight-icon { display: grid; place-items: center; width: 45px; height: 45px; border-radius: 50%; background: #dff5e9; color: #07824a; margin-bottom: 6px; }
+.du-insight-icon { display: grid; place-items: center; width: 45px; height: 45px; border-radius: 50%; background: var(--du-icon-soft); color: var(--du-accent); margin-bottom: 6px; }
 .du-insight-icon svg { width: 28px; height: 28px; }
 .du-completeness-insight h3 { margin: 0 0 5px; color: var(--du-ink); font-size: 16px; font-weight: 650; line-height: 1.5; }
 .du-completeness-insight p { color: var(--du-muted); font-size: 13px; line-height: 1.7; margin: 0; }
-.du-completeness-insight p strong { font-weight: 500; color: var(--du-green); }
+.du-completeness-insight p strong { font-weight: 500; color: var(--du-accent); }
 html body[data-readable-workspace="master-registration"] .du-workspace .du-completeness-insight small { display: block; color: var(--du-muted); font-size: 12px; margin-top: 4px; line-height: 1.6; }
 
 html body[data-readable-workspace="master-registration"] .du-workspace .master-modern-form { padding: 24px; border: 1px solid var(--du-line); border-radius: 14px; background: var(--du-surface); box-shadow: none; scroll-margin-top: 90px; }
@@ -140,41 +150,65 @@ html body[data-readable-workspace="master-registration"] .du-workspace .master-m
 .du-workspace .du-class-progress { margin-bottom: 12px; }
 .du-workspace .du-rate-card>small { margin-bottom: 12px; }
 .du-workspace .du-tariff-basis { font-size: 11px; white-space: normal; }
-.du-workspace .du-psb-card { border-color: #cde7dc; background: linear-gradient(150deg, var(--du-mint), var(--du-surface) 80%); }
+.du-workspace .du-psb-card { border-color: var(--du-control-line); background: linear-gradient(150deg, var(--du-mint), var(--du-surface) 80%); }
 .du-psb-heading { display: flex; align-items: flex-start; gap: 10px; margin-bottom: 17px; }
-.du-psb-heading>span { display: grid; place-items: center; flex: 0 0 34px; height: 34px; border-radius: 9px; background: #e0f3e9; color: #168957; }
+.du-psb-heading>span { display: grid; place-items: center; flex: 0 0 34px; height: 34px; border-radius: 9px; background: var(--du-icon-soft); color: var(--du-accent); }
 .du-psb-heading svg { width: 21px; height: 21px; }
 .du-psb-heading h4 { font-size: 14px; font-weight: 650; line-height: 1.5; color: var(--du-ink); margin: 0 0 4px; }
 .du-psb-heading p { font-size: 12px; line-height: 1.7; color: var(--du-muted); margin: 0; }
-.du-psb-counts { display: grid; grid-template-columns: 1fr 1.25fr; margin: 0 0 16px; padding: 13px 0; border-top: 1px solid #dcece4; border-bottom: 1px solid #dcece4; }
+.du-psb-counts { display: grid; grid-template-columns: 1fr 1.25fr; margin: 0 0 16px; padding: 13px 0; border-top: 1px solid var(--du-psb-line); border-bottom: 1px solid var(--du-psb-line); }
 .du-psb-counts>div { display: flex; flex-direction: column; justify-content: space-between; gap: 8px; padding-right: 12px; }
-.du-psb-counts>div+div { padding: 0 0 0 14px; border-left: 1px solid #dcece4; }
+.du-psb-counts>div+div { padding: 0 0 0 14px; border-left: 1px solid var(--du-psb-line); }
 .du-psb-counts dt { font-size: 12px; line-height: 1.6; color: var(--du-muted); }
 .du-psb-counts dd { margin: 0; font-size: 25px; line-height: 1.2; font-weight: 700; letter-spacing: -.6px; color: var(--du-ink); }
 .du-psb-counts dd span { font-size: 11px; font-weight: 400; letter-spacing: 0; color: var(--du-muted); }
 .du-psb-installments { display: flex; align-items: flex-start; gap: 8px; margin: auto 0 0; color: var(--du-muted); font-size: 12px; line-height: 1.7; }
-.du-psb-installments svg { flex: 0 0 16px; height: 16px; margin-top: 2px; color: #2b966b; }
+.du-psb-installments svg { flex: 0 0 16px; height: 16px; margin-top: 2px; color: var(--du-accent); }
 .du-psb-installments strong { display: block; color: var(--du-ink); font-size: 12px; font-weight: 600; }
 
 html[data-theme="dark"] body[data-readable-workspace="master-registration"] .du-workspace {
-  --du-ink: #edf5f1; --du-muted: #abbdb7; --du-line: #30443f; --du-green: #5cd6a8;
+  --du-ink: #edf5f1; --du-muted: #abbdb7; --du-line: #30443f; --du-accent: #5cd6a8;
+  --du-accent-soft: #254e3b; --du-icon-soft: #234c3c; --du-title: #ecfff5; --du-kicker: #83d7ae;
+  --du-hero-muted: #c0d8ce; --du-control-line: #335b48; --du-psb-line: #335b48;
   --du-mint: #1d3730; --du-surface: #192824; --du-hero-start: #1c3830; --du-hero-end: #265d49;
   background: none;
 }
-html[data-theme="dark"] .du-workspace .du-hero-copy h1 { color: #ecfff5; }
-html[data-theme="dark"] .du-workspace .du-hero-copy>p { color: #c0d8ce; }
-html[data-theme="dark"] body[data-readable-workspace="master-registration"] .du-workspace .recap-class-overline { color: #83d7ae; }
-html[data-theme="dark"] body[data-readable-workspace="master-registration"] .du-workspace .du-master-year-tools .du-year-status { background: #254e3b; color: #8ad9ad; }
 html[data-theme="dark"] body[data-readable-workspace="master-registration"] .du-workspace .du-year-status.is-draft { background: #4c3b21; color: #f1c47e; }
 html[data-theme="dark"] body[data-readable-workspace="master-registration"] .du-workspace .du-year-status.is-closed { background: #35463e; color: #c5d3cc; }
-html[data-theme="dark"] .du-workspace .du-stat { --stat-soft: #183f30; }
+html[data-theme="dark"] .du-workspace .du-stat { --stat-soft: var(--du-icon-soft); }
 html[data-theme="dark"] .du-workspace .du-stat-blue { --stat-color: #71aaff; --stat-soft: #21334e; }
 html[data-theme="dark"] .du-workspace .du-stat-purple { --stat-color: #b596fa; --stat-soft: #342b4c; }
 html[data-theme="dark"] .du-workspace .du-stat-orange { --stat-color: #ffbd70; --stat-soft: #4b3522; background: #30271f; border-color: #95612b; }
 html[data-theme="dark"] .du-workspace .du-stat-orange .du-stat-copy :is(span,strong) { color: #ffbd70; }
-html[data-theme="dark"] .du-workspace :is(.du-insight-icon,.du-psb-heading>span) { color: #6addaa; background: #234c3c; }
-html[data-theme="dark"] .du-workspace :is(.du-psb-card,.du-psb-counts,.du-psb-counts>div+div) { border-color: #335b48; }
-html[data-theme="dark"] .du-workspace .du-completeness-bar { background: #35463f; }
+html[data-theme="dark"] .du-workspace .du-completeness-bar { background: var(--du-line); }
+
+/* Reuse the active unit palette for all decorative accents, in either theme. */
+html[data-palette]:not([data-palette="sd"]) body[data-readable-workspace="master-registration"] .du-workspace {
+  --du-ink: var(--text-primary);
+  --du-muted: var(--text-muted);
+  --du-surface: var(--bg-card);
+  --du-accent: var(--accent);
+  --du-accent-soft: color-mix(in srgb, var(--du-surface) 88%, var(--accent) 12%);
+  --du-icon-soft: color-mix(in srgb, var(--du-surface) 85%, var(--accent) 15%);
+  --du-line: color-mix(in srgb, var(--du-surface) 88%, var(--accent) 12%);
+  --du-control-line: color-mix(in srgb, var(--du-surface) 76%, var(--accent) 24%);
+  --du-psb-line: var(--du-line);
+  --du-mint: color-mix(in srgb, var(--du-surface) 95%, var(--accent) 5%);
+  --du-title: color-mix(in srgb, var(--du-ink) 80%, var(--accent) 20%);
+  --du-kicker: var(--accent);
+  --du-hero-muted: var(--text-secondary);
+  --du-hero-start: color-mix(in srgb, var(--du-surface) 96%, var(--accent) 4%);
+  --du-hero-end: color-mix(in srgb, var(--du-surface) 76%, var(--accent) 24%);
+  --du-page-wash: color-mix(in srgb, var(--du-surface) 98%, var(--accent) 2%);
+  --du-progress: var(--accent);
+  --du-progress-light: var(--accent-light);
+  --du-art-base: rgb(var(--unit-rgb));
+  --du-art-light: color-mix(in srgb, white 78%, var(--du-art-base) 22%);
+  --du-art-mid: color-mix(in srgb, white 42%, var(--du-art-base) 58%);
+  --du-art-strong: var(--du-art-base);
+  --du-art-deep: color-mix(in srgb, black 35%, var(--du-art-base) 65%);
+  --du-art-paper: color-mix(in srgb, white 94%, var(--du-art-base) 6%);
+}
 
 @media (max-width: 1450px) {
   .du-hero-art { width: 40%; opacity: .9; }
