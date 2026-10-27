@@ -1,10 +1,12 @@
 <?php
 /** Financial fixtures are allowed only on a separately owned disposable server. */
+ob_start();
 if(PHP_SAPI!=='cli')exit(1);
 require_once __DIR__.'/../koneksi.php';
 require_once __DIR__.'/http_form_scope.php';
 spp_test_isolated_manifest($koneksi);
 spp_test_assert_http_clone(getenv('SPP_TEST_BASE_URL'),DB_NAME);
+$koneksi->query('SET @legacy_full_apply=1');
 require_once __DIR__.'/../includes/auth.php';
 require_once __DIR__.'/../includes/reports.php';
 require_once __DIR__.'/../includes/global_report_matrix.php';
@@ -24,7 +26,7 @@ $_SESSION=['admin_id'=>1,'admin_role'=>'super_admin','admin_unit_id'=>0,'active_
 $prefix='QFR'.bin2hex(random_bytes(3));$fixture=['prefix'=>$prefix,'units'=>[]];
 foreach([1,2,3] as $unit){
     unit_set_context($koneksi,$unit);
-    $class=$koneksi->query('SELECT id,tingkat FROM master_kelas WHERE is_active=1 AND is_placeholder=0 ORDER BY id LIMIT 1')->fetch_assoc();
+    $class=$koneksi->query('SELECT id,tingkat FROM master_kelas WHERE is_active=1 AND is_placeholder=0 AND tingkat>0 ORDER BY id LIMIT 1')->fetch_assoc();
     $classId=(int)$class['id'];$kelas=(string)$class['tingkat'];$name='Item Laporan '.$prefix;
     $q=$koneksi->prepare('INSERT INTO master_biaya_lain(nama,nominal,is_active) VALUES(?,100000,1)');$q->bind_param('s',$name);$q->execute();$master=(int)$koneksi->insert_id;$q->close();
     foreach(['A','B','C'] as $letter){$nis=$prefix.$letter;$nama='Siswa Laporan '.$prefix.' '.$letter;
@@ -38,27 +40,28 @@ foreach([1,2,3] as $unit){
     }
     $params=['template'=>'per-item','unit'=>(string)$unit,'kategori'=>'biaya_lain:'.$master,'tanggal_awal'=>'2026-10-16','tanggal_akhir'=>'2026-10-17','q'=>$prefix,'siswa_status'=>'active'];
     $report=fee_report_build($koneksi,$params);$rows=array_column($report['rows'],null,'nis');
-    fee_report_check(count($rows)===3,'All fixture students appear');
+    fee_report_check(count($report['rows'])===4,'All fixture students appear');
     $a=$rows[$prefix.'A'];$b=$rows[$prefix.'B'];$c=$rows[$prefix.'C'];
-    fee_report_check($a['pembayaran_opsional']===220000.0&&(float)$a['terbayar']===0.0&&(float)$a['sisa']===0.0&&$a['status']==='Ada Pembayaran','Optional receipt without a bill has an accurate status');
-    fee_report_check($b['pembayaran_opsional']===30000.0&&$b['terbayar']===50000.0&&$b['sisa']===150000.0&&$b['status']==='Cicilan','Optional does not reduce old debt');
-    fee_report_check($c['pembayaran_opsional']===0&&$c['status']==='Belum Bayar','Unpaid old bill retains status');
+    fee_report_check($a['terbayar']===220000.0&&$a['tagihan']===null&&$a['sisa']===null&&$a['status']==='Ada Pembayaran','Optional receipt without a bill has an accurate status');
+    fee_report_check($b['terbayar']===50000.0&&array_sum(array_column(array_filter($report['rows'],static fn($r)=>$r['nis']===$prefix.'B'),'terbayar'))===80000.0&&$b['sisa']===150000.0&&$b['status']==='Cicilan','Optional does not reduce old debt');
+    fee_report_check((float)$c['terbayar']===0.0&&$c['status']==='Belum Bayar','Unpaid old bill retains status');
     foreach(['ada_pembayaran',['ada_pembayaran'],['ada_pembayaran','belum_bayar']] as $status){
         $filtered=fee_report_build($koneksi,array_replace($params,['status'=>$status]));
-        fee_report_check(count($filtered['rows'])===(is_array($status)&&count($status)===2?3:2),'Scalar and multiple status filters include optional receipts');
+        fee_report_check(count($filtered['rows'])===(is_array($status)&&count($status)===2?4:3),'Scalar and multiple status filters include optional receipts');
     }
     $filtered=fee_report_build($koneksi,array_replace($params,['status'=>['tidak_ditagihkan']]));fee_report_check(count($filtered['rows'])===0,'Paid optional row is not unbilled');
     $filtered=fee_report_build($koneksi,array_replace($params,['status'=>['tunggakan']]));fee_report_check(count($filtered['rows'])===2,'Only legacy debts are arrears');
-    $singleDay=fee_report_build($koneksi,array_replace($params,['tanggal_awal'=>'2026-10-17']));$dayRows=array_column($singleDay['rows'],null,'nis');fee_report_check($dayRows[$prefix.'A']['pembayaran_opsional']===100000.0,'Transaction date applies to optional receipts');
+    $singleDay=fee_report_build($koneksi,array_replace($params,['tanggal_awal'=>'2026-10-17']));$dayRows=array_column($singleDay['rows'],null,'nis');fee_report_check($dayRows[$prefix.'A']['terbayar']===100000.0,'Transaction date applies to optional receipts');
     $multi=fee_report_build($koneksi,array_replace($params,['kategori'=>['biaya_lain:'.$master,'spp'],'status'=>['ada_pembayaran']]));
-    $optionalPart=array_values(array_filter($multi['sections'],static fn($part)=>in_array('pembayaran_opsional',array_column($part['columns'],0),true)))[0];
-    fee_report_check(array_sum(array_column($optionalPart['rows'],'pembayaran_opsional'))===250000.0,'Mixed categories preserve optional receipts');
-    $matrix=global_report_matrix($report,'per-item',$unit);fee_report_check(array_sum(array_column($matrix['rows'],'g0_pembayaran_opsional'))===250000.0,'Matrix copies each receipt exactly once');
+    $optionalPart=array_values(array_filter($multi['sections'],static fn($part)=>str_contains($part['title'],'Item Laporan')))[0];
+    fee_report_check(array_sum(array_column($optionalPart['rows'],'terbayar'))===300000.0,'Mixed categories preserve optional receipts');
+    $matrix=global_report_matrix($report,'per-item',$unit);fee_report_check(array_sum(array_column($matrix['rows'],'g0_terbayar'))===300000.0,'Matrix copies each receipt exactly once');
     $fixture['units'][$unit]=['master'=>$master,'params'=>$params];
 }
 // The same NIS in three units must remain three distinct rows in combined scope.
 $params=$fixture['units'][1]['params'];$params['unit']='all';$params['kategori']=array_map(static fn($u)=>'biaya_lain:'.$u['master'],$fixture['units']);$params['status']=['ada_pembayaran'];
-$combined=fee_report_build($koneksi,$params);fee_report_check(array_sum(array_column($combined['rows'],'pembayaran_opsional'))===750000.0,'Combined scope preserves unit isolation and totals');
+$combined=fee_report_build($koneksi,$params);fee_report_check(array_sum(array_column($combined['rows'],'terbayar'))===900000.0,'Combined scope preserves unit isolation and totals');
+$koneksi->query('SET @legacy_full_apply=0');
 unit_set_context($koneksi,0);$actor=$koneksi->query("SELECT id,nama,unit_id FROM admin WHERE is_active=1 AND role='super_admin' ORDER BY id LIMIT 1")->fetch_assoc();
 session_save_path(getenv('SPP_QA_SESSION_PATH'));$paths=database_access_paths(DB_NAME,(int)getenv('SPP_DB_PORT'));$generation=is_file($paths['generation'])?trim(file_get_contents($paths['generation'])):'0';
 foreach([0,1,2,3] as $unit){session_id('feereport'.bin2hex(random_bytes(12)));session_start();$_SESSION=['admin_id'=>$actor['id'],'admin_role'=>'super_admin','admin_nama'=>$actor['nama'],'admin_unit_id'=>$actor['unit_id'],'active_unit_id'=>$unit,'database_generation'=>$generation];$fixture['sessions'][$unit]=session_id();session_write_close();}

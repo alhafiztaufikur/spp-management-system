@@ -1,8 +1,8 @@
 # Prosedur migrasi Legacy
 
 Keputusan berlaku 24 Oktober 2026. Baca bersama `LEGACY_FULL_MIGRATION.md` dan
-`AGENTS.md`. Aturan workflow 14, operasional 18, otomasi 5, perencana bulanan 2,
-billing 6, perencana DU 4, dan pelacakan biaya lain 1 (pembaruan 27 Oktober 2026).
+`AGENTS.md`. Aturan workflow 15, operasional 19, otomasi 5, perencana bulanan 2,
+billing 7, perencana DU 4, dan pelacakan biaya lain 1 (pembaruan 27 Oktober 2026).
 Worker lama harus dihentikan dan dimulai ulang; konfirmasi/simulasi versi lama
 tidak boleh diterapkan. Metadata pembayaran otomasi versi 1–3 tetap dapat dibaca.
 
@@ -65,6 +65,17 @@ tidak boleh diterapkan. Metadata pembayaran otomasi versi 1–3 tetap dapat diba
     penerimaan, rekening dan jurnal harus mempunyai fingerprint yang sama.
 
 ## CLI
+
+Rekening tertahan yang belum pernah digunakan dapat disahkan secara eksplisit
+melalui `--components=savings --unit=... --batch=... --settings=PRIVATE_JSON`.
+Objek `savings_fix` memuat `unit_id`, `batch_id`, `identity`, `source_hash`,
+`batch_version`, `pending_version`, `amount` (string desimal), `evidence`, dan
+`confirmed=true`. Nominal wajib berasal dari pengesahan pengguna, bukan keputusan
+otomatis dari header. Gunakan preview, backup terverifikasi, apply, verify dan
+replay. Engine memakai proposal FIX dan penulisan jurnal GUI yang sama; setiap
+baris di luar rekening terpilih diperiksa tetap identik. Rekening yang sudah ada
+atau pernah digunakan harus melalui alur koreksi existing. Bukti pribadi tetap
+di luar webroot dan tidak dimasukkan ke Git.
 
 ```powershell
 php scripts/legacy_migration_runner.php --database=db_spp_test2 --port=3306 --mode=preview --output=C:/private/preview.json
@@ -186,3 +197,15 @@ Wajib jalankan `tests/du_master_service_test.php` dan browser DU pada salinan.
 Pemeriksaan digest lama mengenali hanya koreksi Master SPP yang teraudit dan
 cocok dengan rekonstruksi hash sebelum koreksi secara utuh. Runner mencatat
 `billing_digest` sebelum menyelaraskan manifest; perbedaan lain tetap ditolak.
+
+## Tagihan Biaya Lain per siswa, 27 Oktober 2026
+
+Ikuti [layanan tagihan dan kredit Biaya Lain](OTHER_FEE_BILLING_20261027.md).
+Installer CLI `sql/install_other_fee_billing.php` dipasang sebelum worker baru.
+Runner menerima `--components=other_fees` untuk preview/apply/verify tahap ini saja,
+agar penerapan tidak menyertakan perubahan komponen lain. Jalur publikasi sumber
+baru menggunakan engine yang sama.
+
+Master kode/nama membuktikan jenis biaya, bukan pokok atau kelunasan per siswa.
+Histori tanpa kewajiban terbukti masuk satu kolom Dibayar; tagihan dan sisa tetap
+null. Penerimaan sebelum tagihan pembukaan tidak mengurangi sisa itu kembali.

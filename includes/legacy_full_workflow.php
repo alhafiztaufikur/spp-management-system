@@ -1,6 +1,6 @@
 <?php
 /** Prepared suggestions are not attestations. Every accepted decision is versioned. */
-const LFUL_RULES_VERSION = 14;
+const LFUL_RULES_VERSION = 15;
 require_once __DIR__.'/legacy_source_review.php';
 function lful_next_period(mixed $cutoff): string {
     if(!is_string($cutoff)||$cutoff==='')return '';

@@ -529,7 +529,10 @@ function initStudentSearchInput(input) {
   box.appendChild(panel);
   if (input.dataset.studentFitViewport === '1') {
     window.addEventListener('resize', () => fitStudentSearchPanel(input));
-    window.addEventListener('scroll', () => fitStudentSearchPanel(input), true);
+    window.addEventListener('scroll', event => {
+      if (event.target instanceof Node && panel.contains(event.target)) return;
+      fitStudentSearchPanel(input);
+    }, true);
     window.visualViewport?.addEventListener('resize', () => fitStudentSearchPanel(input));
   }
 

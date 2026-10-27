@@ -132,7 +132,7 @@ function ldu_reconcile(mysqli $db,int $actor,?string $year=null): array {
         $ob=hp_one($db,"SELECT * FROM legacy_op_obligations WHERE owner_id=? AND category='daftar_ulang' AND period=? FOR UPDATE",[$p['owner_id'],$year]);
         // Existing manually certified or legacy debt obligations are not rewritten.
         $old=$ob?json_decode($ob['evidence'],true):[];
-        if($ob&&(!is_array($old)||!in_array($old['rule']??0,[1,2,3,4,5,LB_RULE_VERSION],true)||!empty($ob['bill_id'])))continue;
+        if($ob&&(!is_array($old)||!in_array($old['rule']??0,[1,2,3,4,5,6,LB_RULE_VERSION],true)||!empty($ob['bill_id'])))continue;
         $evidence=$old+['rule'=>LB_RULE_VERSION,'basis'=>$proof['basis'],'source_row_key'=>$proof['source_row_key'],'gross'=>$proof['gross'],'discount'=>$proof['discount']];
         // Existing provenance keeps its recorded rule when the evidence is unchanged.
         $traceRule=in_array($old['du']['rule']??0,[1,2,3,LDU_VERSION],true)?(int)$old['du']['rule']:LDU_VERSION;

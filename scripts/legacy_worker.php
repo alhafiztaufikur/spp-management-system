@@ -23,7 +23,7 @@ $heartbeat=static function()use($root,$runPowerShell,&$lastHealth,&$sqlReady){
     file_put_contents($root.'/heartbeat.json',json_encode(['time'=>time(),'pid'=>getmypid(),'database'=>DB_NAME,'sql_ready'=>$sqlReady,'categories'=>['students','finance','full'],'workflow_version'=>LFUL_RULES_VERSION,'source_reader_version'=>LEGACY_SOURCE_READER_VERSION,'operational_version'=>LOP_VERSION,'automation_version'=>LMA_VERSION,'monthly_version'=>LMP_VERSION,'fee_trace_version'=>LEGACY_FEE_TRACE_VERSION,'du_version'=>LDU_VERSION,'billing_version'=>LB_RULE_VERSION]));
 };
 $q=legacy_queue();
-$ruleFiles=[__FILE__,__DIR__.'/../includes/legacy_full.php',__DIR__.'/../includes/legacy_full_components.php',__DIR__.'/../includes/legacy_full_workflow.php',__DIR__.'/../includes/legacy_operational.php',__DIR__.'/../includes/legacy_operational_setup.php',__DIR__.'/../includes/legacy_operational_resolution.php',__DIR__.'/../includes/legacy_operational_bulk.php',__DIR__.'/../includes/legacy_migration_automation.php',__DIR__.'/../includes/legacy_monthly_planner.php',__DIR__.'/../includes/legacy_billing_reconstruction.php',__DIR__.'/../includes/legacy_fee_trace.php',__DIR__.'/../includes/legacy_fee_reconstruction.php'];
+$ruleFiles=[__FILE__,__DIR__.'/../includes/other_fee_billing.php',__DIR__.'/../includes/other_fee_reconciliation.php',__DIR__.'/../includes/other_fee_billing_schema.php',__DIR__.'/../includes/legacy_full.php',__DIR__.'/../includes/legacy_full_components.php',__DIR__.'/../includes/legacy_full_workflow.php',__DIR__.'/../includes/legacy_operational.php',__DIR__.'/../includes/legacy_operational_setup.php',__DIR__.'/../includes/legacy_operational_resolution.php',__DIR__.'/../includes/legacy_operational_bulk.php',__DIR__.'/../includes/legacy_migration_automation.php',__DIR__.'/../includes/legacy_monthly_planner.php',__DIR__.'/../includes/legacy_billing_reconstruction.php',__DIR__.'/../includes/legacy_fee_trace.php',__DIR__.'/../includes/legacy_fee_reconstruction.php'];
 $ruleFiles[]=__DIR__.'/../includes/legacy_billing.php';
 $ruleFiles[]=__DIR__.'/../includes/other_fee_usage.php';
 $ruleFiles[]=__DIR__.'/../includes/legacy_operational_corrections.php';
@@ -36,6 +36,7 @@ $ruleFiles[]=__DIR__.'/../includes/legacy_billing_digest.php';
 $ruleFiles[]=__DIR__.'/../includes/du_master_service.php';
 $ruleFiles[]=__DIR__.'/../includes/du_psb.php';
 $ruleFiles[]=__DIR__.'/../includes/du_advance.php';
+$ruleFiles[]=__DIR__.'/../includes/legacy_savings_resume.php';
 $ruleFiles[]=__DIR__.'/../includes/daftar_ulang.php';
 $ruleFiles[]=__DIR__.'/../includes/kelas.php';
 $ruleFiles[]=__DIR__.'/../includes/promotion.php';

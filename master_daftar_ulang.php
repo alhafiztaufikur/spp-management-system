@@ -155,30 +155,68 @@ $priorDebt=$yearId?report_prior_debt_summary($koneksi,$selectedYear,report_activ
 <link rel="stylesheet" href="assets/css/master_workspace.css?v=<?= filemtime(__DIR__.'/assets/css/master_workspace.css') ?>">
 <link rel="stylesheet" href="assets/css/workspace_readability.css?v=<?= filemtime(__DIR__.'/assets/css/workspace_readability.css') ?>">
 <script>(function(){var t=localStorage.getItem('spp_theme')||'light';document.documentElement.setAttribute('data-theme',t);})();</script>
-<link rel="stylesheet" href="assets/css/menu_refinements.css?v=<?= filemtime(__DIR__.'/assets/css/menu_refinements.css') ?>"></head><body data-readable-workspace="master-registration">
+<link rel="stylesheet" href="assets/css/menu_refinements.css?v=<?= filemtime(__DIR__.'/assets/css/menu_refinements.css') ?>">
+<link rel="stylesheet" href="assets/css/master_du.css?v=<?= filemtime(__DIR__.'/assets/css/master_du.css') ?>"></head><body data-readable-workspace="master-registration">
 <div class="bg-orbs"><div class="orb orb-1"></div><div class="orb orb-2"></div><div class="orb orb-3"></div></div><div class="layout"><?php include 'includes/sidebar.php'; ?><main class="main-content du-workspace">
 <div class="topbar"><button class="sidebar-toggle" onclick="toggleSidebar()" id="btn-sidebar-toggle" aria-label="Buka navigasi"><svg width="20" height="20" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><line x1="3" y1="12" x2="21" y2="12"/><line x1="3" y1="6" x2="21" y2="6"/><line x1="3" y1="18" x2="21" y2="18"/></svg></button><div class="topbar-title"><h2>Master Daftar Ulang</h2><span class="breadcrumb">SistemSPP / Tahun Ajaran / Daftar Ulang</span></div><div class="clock-badge" id="liveClock">--:--:--</div></div>
 <?php if($flash): ?><div class="alert alert-<?= master_du_e($flash['type']) ?>" id="flash-msg"><?= master_du_e($flash['msg']) ?></div><?php endif; ?>
-<section class="main-card du-master-hero master-modern-shell">
-  <div class="master-modern-hero">
-    <div><span class="recap-class-overline">Konfigurasi Tahun Ajaran</span><h1><?= master_du_e($selectedYear) ?></h1><p>Atur tarif dan lengkapi tagihan siswa dalam satu langkah.</p><?php if($selectedYear>du_current_academic_year()): ?><p>Tagihan Mendatang memakai kelas tujuan dan dapat dicicil tanpa mengubah kelas aktif.</p><?php endif; ?></div>
+<section class="main-card du-master-hero master-modern-shell" aria-labelledby="du-year-title">
+  <div class="du-hero-copy">
+    <span class="recap-class-overline">Konfigurasi Tahun Ajaran</span><h1 id="du-year-title"><?= master_du_e($selectedYear) ?></h1><p>Atur tarif dan lengkapi tagihan siswa dalam satu langkah.</p>
+<?php if($selectedYear>du_current_academic_year()): ?><p>Tagihan Mendatang memakai kelas tujuan dan dapat dicicil tanpa mengubah kelas aktif.</p><?php endif; ?>
     <div class="du-master-year-tools">
-      <form method="get"><select class="field-input field-select" name="tahun" aria-label="Pilih tahun ajaran" onchange="this.form.submit()">
+      <form method="get" class="du-year-picker"><span class="du-year-picker-icon"><?= master_workspace_icon('calendar') ?></span><select class="field-input field-select" name="tahun" aria-label="Pilih tahun ajaran" onchange="this.form.submit()">
         <?php foreach($yearRows as $yr): ?><option value="<?= master_du_e($yr['label']) ?>" <?= $yr['label']===$selectedYear?'selected':'' ?>><?= master_du_e($yr['label']) ?></option><?php endforeach; ?>
       </select></form>
-      <span class="recap-status <?= $year['status']==='draft'?'is-partial':($year['status']==='published'?'is-paid':'is-unpaid') ?>"><?= master_du_e(['draft'=>'Draf','published'=>'Terbit','closed'=>'Tertutup'][$year['status']]) ?></span>
-      <?php if($year['status']==='published'): ?><form method="post" onsubmit="return confirm('Tutup tahun ajaran? Tarif dan penerbitan akan dikunci; tunggakan tetap dapat dibayar.')"><input type="hidden" name="csrf_token" value="<?= master_du_e($_SESSION['csrf_master_du']) ?>"><input type="hidden" name="aksi" value="tutup"><input type="hidden" name="tahun_ajaran" value="<?= master_du_e($selectedYear) ?>"><button class="btn btn-ghost" type="submit">Tutup Tahun Ajaran</button></form><?php endif; ?>
-      <?php if($year['status']==='closed'): ?><form method="post" onsubmit="return confirm('Buka kembali tahun ajaran? Histori pembayaran tetap dipertahankan.')"><input type="hidden" name="csrf_token" value="<?= master_du_e($_SESSION['csrf_master_du']) ?>"><input type="hidden" name="aksi" value="buka"><input type="hidden" name="tahun_ajaran" value="<?= master_du_e($selectedYear) ?>"><button class="btn btn-ghost" type="submit">Buka Kembali</button></form><?php endif; ?>
+      <div class="du-year-state"><span class="du-year-state-label">Status:</span><span class="du-year-status is-<?= master_du_e($year['status']) ?>"><span class="du-year-status-dot" aria-hidden="true"></span><?= master_du_e(['draft'=>'Belum terbit','published'=>'Sudah terbit','closed'=>'Tertutup'][$year['status']]) ?></span></div>
+      <?php if($year['status']==='published'): ?><form method="post" onsubmit="return confirm('Tutup tahun ajaran? Tarif dan penerbitan akan dikunci; tunggakan tetap dapat dibayar.')"><input type="hidden" name="csrf_token" value="<?= master_du_e($_SESSION['csrf_master_du']) ?>"><input type="hidden" name="aksi" value="tutup"><input type="hidden" name="tahun_ajaran" value="<?= master_du_e($selectedYear) ?>"><button class="btn btn-ghost" type="submit"><?= master_workspace_icon('lock') ?>Tutup Tahun Ajaran</button></form><?php endif; ?>
+      <?php if($year['status']==='closed'): ?><form method="post" onsubmit="return confirm('Buka kembali tahun ajaran? Histori pembayaran tetap dipertahankan.')"><input type="hidden" name="csrf_token" value="<?= master_du_e($_SESSION['csrf_master_du']) ?>"><input type="hidden" name="aksi" value="buka"><input type="hidden" name="tahun_ajaran" value="<?= master_du_e($selectedYear) ?>"><button class="btn btn-ghost" type="submit"><?= master_workspace_icon('reset') ?>Buka Kembali</button></form><?php endif; ?>
     </div>
   </div>
+  <?php include __DIR__.'/includes/du_master_calendar.php'; ?>
 </section>
 <section class="du-overview" aria-label="Posisi tagihan siswa aktif">
-  <div><span>Siswa aktif</span><strong><?= $activeTotal ?></strong></div>
-  <div><span>Memiliki tagihan DU terpisah</span><strong><?= $activeIssued ?></strong></div>
-  <div><span>DU tercakup PSB</span><strong><?= $coveredTotal ?></strong></div>
-  <div class="du-overview-pending"><span>Perlu dilengkapi</span><strong><?= $activeMissing ?></strong></div>
+  <?php foreach([
+    ['label'=>'Siswa aktif','value'=>$activeTotal,'icon'=>'students','tone'=>'green'],
+    ['label'=>'Memiliki tagihan DU terpisah','value'=>$activeIssued,'icon'=>'document','tone'=>'blue'],
+    ['label'=>'DU tercakup PSB','value'=>$coveredTotal,'icon'=>'layers','tone'=>'purple'],
+    ['label'=>'Perlu dilengkapi','value'=>$activeMissing,'icon'=>'warning','tone'=>'orange'],
+  ] as $stat): ?>
+  <div class="du-stat du-stat-<?= $stat['tone'] ?>">
+    <span class="du-stat-icon"><?php if($stat['icon']==='warning'): ?><svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.8" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true"><path d="m10.3 4-8 14a2 2 0 0 0 1.7 3h16a2 2 0 0 0 1.7-3l-8-14a2 2 0 0 0-3.4 0Z"/><path d="M12 9v4M12 17h.01"/></svg><?php else: ?><?= master_workspace_icon($stat['icon']) ?><?php endif; ?></span>
+    <div class="du-stat-copy"><span><?= $stat['label'] ?></span><strong><?= $stat['value'] ?></strong></div>
+    <a class="du-stat-link" href="<?= $stat['tone']==='orange'?'#du-completeness':'#du-rate-section' ?>" aria-label="<?= master_du_e($stat['tone']==='orange'?'Lihat ringkasan kelengkapan':'Lihat penetapan daftar ulang: '.$stat['label']) ?>"><svg viewBox="0 0 20 20" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true"><path d="m8 6 4 4-4 4"/></svg></a>
+    <svg class="du-stat-wave" viewBox="0 0 120 55" fill="none" aria-hidden="true"><defs><linearGradient id="du-wave-<?= $stat['tone'] ?>" x1="0" y1="0" x2="0" y2="1"><stop stop-color="currentColor" stop-opacity=".28"/><stop offset="1" stop-color="currentColor" stop-opacity=".03"/></linearGradient></defs><path d="M0 54C15 37 21 33 38 36S58 31 72 17 101 6 120 23V55H0Z" fill="url(#du-wave-<?= $stat['tone'] ?>)"/><path d="M0 54C15 37 21 33 38 36S58 31 72 17 101 6 120 23" stroke="currentColor" stroke-opacity=".55"/></svg>
+  </div>
+  <?php endforeach; ?>
 </section>
-<section class="main-card master-modern-card master-modern-form">
+<?php
+// Presentation only: completeness uses the existing active-student counters, not payments.
+$duComplete = $activeTotal - $activeMissing;
+$duCompletePercent = $activeTotal > 0 ? (int)round($duComplete / $activeTotal * 100) : 0;
+$duMissingPercent = $activeTotal > 0 ? 100 - $duCompletePercent : 0;
+?>
+<section class="main-card du-completeness" id="du-completeness" aria-labelledby="du-completeness-title">
+  <div class="du-completeness-data">
+    <h2 id="du-completeness-title">Ringkasan Kelengkapan Daftar Ulang</h2>
+    <p>Berdasarkan data siswa aktif pada tahun ajaran <?= master_du_e($selectedYear) ?>.</p>
+    <div class="du-completeness-chart">
+      <div class="du-donut <?= !$activeTotal?'du-donut-empty':'' ?>" style="--du-complete:<?= $duCompletePercent ?>%" role="img" aria-label="<?= $duComplete ?> dari <?= $activeTotal ?> siswa memiliki penetapan daftar ulang lengkap, <?= $duCompletePercent ?> persen"><div><strong><?= $duCompletePercent ?><span>%</span></strong><span>Lengkap</span></div></div>
+      <div class="du-completeness-legend">
+        <div><span><i class="du-legend-dot is-complete"></i>Sudah lengkap</span><strong><?= $duComplete ?></strong><span><?= $duCompletePercent ?>%</span></div>
+        <div><span><i class="du-legend-dot is-pending"></i>Perlu dilengkapi</span><strong><?= $activeMissing ?></strong><span><?= $duMissingPercent ?>%</span></div>
+        <div class="du-completeness-bar" aria-hidden="true"><span style="width:<?= $duCompletePercent ?>%"></span></div>
+      </div>
+    </div>
+  </div>
+  <aside class="du-completeness-insight">
+    <span class="du-insight-icon"><svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.7" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true"><path d="M9 18h6M10 21h4M8.5 14a6 6 0 1 1 7 0c-.9.7-1.5 1.5-1.5 2.5h-4c0-1-.6-1.8-1.5-2.5ZM12 1v1M3 4l1 1M1 11h1M20 4l1-1M22 11h1"/></svg></span>
+    <h3><?= !$activeTotal?'Belum ada siswa aktif':($activeMissing===0?'Penetapan daftar ulang sudah lengkap':($duCompletePercent>=80?'Tingkat kelengkapan sudah baik!':'Lengkapi penetapan daftar ulang')) ?></h3>
+    <p><?php if(!$activeTotal): ?>Ringkasan akan tampil ketika tersedia data siswa aktif.<?php elseif($activeMissing): ?>Masih ada <strong><?= $activeMissing ?> siswa</strong> yang perlu dilengkapi penetapan daftar ulangnya. Tinjau tarif dan cakupan PSB pada formulir di bawah.<?php else: ?>Seluruh siswa aktif sudah memiliki tagihan DU terpisah atau tercakup dalam PSB.<?php endif; ?></p>
+    <small>Kelengkapan penetapan tidak menunjukkan status pelunasan.</small>
+  </aside>
+</section>
+<section class="main-card master-modern-card master-modern-form" id="du-rate-section">
   <div class="student-panel-heading"><span class="master-workspace-icon"><?= master_workspace_icon('coins') ?></span><div><h3>Tarif daftar ulang per kelas</h3><p>Isi tarif yang belum tersedia. Tagihan dan pembayaran yang sudah ada tetap dipertahankan.</p></div></div>
   <?php if(!empty($priorDebt['has_debt'])): ?><p class="du-info-note">Tunggakan tahun sebelumnya tetap tercatat dan dapat dibayar. Penerbitan tahun berjalan tetap dapat dilanjutkan.</p><?php endif; ?>
   <?php if($coverageConflicts): ?><p class="du-info-note"><?= $coverageConflicts ?> penetapan DU tersendiri bertentangan dengan cakupan PSB. Tagihan dan pembayaran tetap disimpan. Periksa melalui <a href="pembayaran/riwayat_daftar_ulang.php">Riwayat Daftar Ulang</a> untuk koreksi melalui alur yang tersedia.</p><?php endif; ?>
@@ -193,7 +231,13 @@ $priorDebt=$yearId?report_prior_debt_summary($koneksi,$selectedYear,report_activ
         if(($inputState['year']??'')===$selectedYear&&isset($inputState['amounts'][$c])&&is_scalar($inputState['amounts'][$c]))$value=mb_substr((string)$inputState['amounts'][$c],0,80);
       ?>
       <?php if($c===$firstLevel&&du_psb_schema_ready($koneksi)&&($selectedYear>=du_current_academic_year()||$coveredByClass[$c]>0)): ?>
-      <article class="du-rate-card" data-du-rate-card><div class="du-rate-card-heading"><div><h3>Kelas <?= $c ?></h3><small><?= $activeByClass[$c] ?> siswa aktif</small></div><span class="du-tariff-basis">Tercakup PSB</span></div><p><strong>DU tercakup dalam PSB</strong></p><p><?= $coveredByClass[$c] ?> siswa tercakup; <?= max(0,$activeByClass[$c]-$coveredByClass[$c]) ?> memiliki penetapan lain atau perlu ditinjau.</p><p>Cicilan tetap mengikuti kewajiban PSB.</p><input type="hidden" name="jumlah[<?= $c ?>]" value="0"></article>
+      <article class="du-rate-card du-psb-card" data-du-rate-card>
+        <div class="du-rate-card-heading"><div><h3>Kelas <?= $c ?></h3><small><?= $activeByClass[$c] ?> siswa aktif</small></div><span class="du-tariff-basis">Mengikuti PSB</span></div>
+        <div class="du-psb-heading"><span><?= master_workspace_icon('layers') ?></span><div><h4>DU tercakup dalam PSB</h4><p>Daftar ulang kelas awal termasuk dalam paket PSB.</p></div></div>
+        <dl class="du-psb-counts"><div><dt>Tercakup PSB</dt><dd><?= $coveredByClass[$c] ?><span> siswa</span></dd></div><div><dt>Penetapan lain / perlu ditinjau</dt><dd><?= max(0,$activeByClass[$c]-$coveredByClass[$c]) ?><span> siswa</span></dd></div></dl>
+        <p class="du-psb-installments"><?= master_workspace_icon('info') ?><span><strong>Tetap tercakup saat PSB dicicil</strong>Cicilan tetap mengikuti kewajiban PSB.</span></p>
+        <input type="hidden" name="jumlah[<?= $c ?>]" value="0">
+      </article>
       <?php continue; endif; ?>
       <article class="du-rate-card <?= $masters[$c]<=0?'du-rate-unset':'' ?>" data-du-rate-card>
         <div class="du-rate-card-heading"><div><h3>Kelas <?= $c ?></h3><small><?= $activeByClass[$c] ?> siswa aktif</small></div><span class="du-tariff-basis"><?= master_du_e($basis) ?></span></div>

@@ -19,6 +19,11 @@ function lful_draft(string $id): array {
     $s=lful_store()->prepare('SELECT * FROM full_drafts WHERE job=?');$s->execute([$id]);$d=$s->fetch(PDO::FETCH_ASSOC);
     if(!$d)throw new DomainException('Pemeriksaan sumber belum selesai.');foreach(['settings','simulation','confirmed'] as $k)$d[$k]=$d[$k]===null?null:json_decode($d[$k],true,512,JSON_THROW_ON_ERROR);$d['job_info']=$job;
     $db=$GLOBALS['koneksi']??null;if($db instanceof mysqli&&lop_ready($db))$d['settings']['_exception_closures']=lec_saved($db,$id);
+    // Explicit CLI FIX shares the same effective decision with GUI simulations.
+    if($db instanceof mysqli&&lop_ready($db)){
+        $saved=lf_one($db,'SELECT manifest FROM legacy_full_batches WHERE id=?',[$id]);$m=$saved?json_decode($saved['manifest'],true):[];
+        foreach($m['savings_fixes']??[] as $identity=>$proof)if(isset($m['mapping']['op_savings'][$identity]))$d['settings']['op_savings'][$identity]=$m['mapping']['op_savings'][$identity];
+    }
     return $d;
 }
 function lful_empty(mysqli $db,int $unit,bool $lock=false): void {

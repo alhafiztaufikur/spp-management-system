@@ -4,6 +4,8 @@ require_once __DIR__.'/legacy_operational_schema.php';
 /** Called inside the native payment transaction, after its details and activity exist. */
 function lop_native_payment_changed(mysqli $db, ?array $before, ?array $after): void
 {
+    require_once __DIR__.'/other_fee_billing.php';
+    ofb_native_changed($db,$before,$after);
     $billIds = [];
     foreach ([$before, $after] as $snapshot) {
         foreach ($snapshot['details']['bayar_biaya_lain'] ?? [] as $detail) {

@@ -25,7 +25,7 @@ tahun tertutup tidak diberi cakupan baru.
 Pengulangan penempatan PSB juga tidak membuka kembali tagihan DU kelas awal
 yang pernah dibatalkan melalui koreksi pendaftaran; tagihan itu tetap konflik.
 
-Aturan: workflow 13, operasional 17, otomasi 5, billing 5, DU 3, bulanan 2,
+Aturan gabungan: workflow 14, operasional 18, otomasi 5, billing 5, DU 3, bulanan 2,
 pelacakan biaya lain 1. Metadata otomasi 1–5 dan bukti billing lama tetap terbaca.
 Worker dan simulasi sebelumnya harus ditolak/dimulai ulang.
 

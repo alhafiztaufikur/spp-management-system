@@ -82,7 +82,7 @@ $manualCfg=$cfg;$manualKey=lful_component_key('bayar','JUMLAH1',$source['raw']);
 fee_check($manualPlan['payments'][0]['items'][0]['category']==='biaya_lain:777'&&$manualPlan['payments'][0]['items'][0]['migration']['status']==='manual','Optional explicit mapping remains available');
 $source2=fee_row('bayar',array_replace($source['raw'],['KELAS'=>'7A','LAIN_LAIN1'=>'057','JUMLAH2'=>'0','JUMLAH3'=>'0','JUMLAH4'=>'0']));$rows2=[fee_row('siswa',array_replace($student['raw'],['KELAS'=>'7A'])),fee_row('lain',['KODE'=>'057','NAMA'=>'Basket SMP']),$source2];
 $plan2=lop_prepare($rows2,fee_cfg($rows2,2),2,'2026-10-24',[202=>'Basket SMP']);fee_check($plan2['payments'][0]['items'][0]['category']==='biaya_lain:202','Same source code in SMP resolves to its own fee');
-fee_check(LOP_VERSION===18&&LFUL_RULES_VERSION===14&&LMA_VERSION===5,'New rule versions reject stale simulations/workers');
+fee_check(LOP_VERSION===19&&LFUL_RULES_VERSION===15&&LMA_VERSION===5,'New rule versions reject stale simulations/workers');
 fee_check(legacy_http_operational_upload('full',[]),'Ordinary full-upload form defaults to automatic engine');
 fee_check(legacy_http_operational_upload('full',['mode'=>'operational']),'Operational upload uses identical engine');
 $collisionPayment=fee_row('bayar',array_replace($source['raw'],['U_INFAQ'=>'1000','LAIN_LAIN1'=>'057','JUMLAH1'=>'2000','JUMLAH2'=>'0','JUMLAH3'=>'0','JUMLAH4'=>'0']));$collisionPayment['money_columns'][]='U_INFAQ';

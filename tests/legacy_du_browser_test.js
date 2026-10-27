@@ -12,7 +12,9 @@ assert.equal(new URL(base).hostname,'127.0.0.1');
   const identity=await (await c.request.get(base+'/tests/browser_clone_identity.php')).json();
   const manifest=JSON.parse(fs.readFileSync(process.env.SPP_TEST_ISOLATED_INSTANCE,'utf8').replace(/^\uFEFF/,''));
   check(identity.isolated_test&&identity.server_uuid===manifest.server_uuid&&identity.port!==3306,'Owned isolated database');
+  if(process.env.SPP_TEST_SESSION_ID){await c.addCookies([{name:'PHPSESSID',value:process.env.SPP_TEST_SESSION_ID,url:base}]);check((await c.request.get(base+'/dashboard.php')).status()===200,'Isolated actor session');}else{
   const login=await c.request.post(base+'/login.php',{form:{username:'superadmin',password:process.env.SPP_TEST_SUPERADMIN_PASSWORD},maxRedirects:0});check(login.status()===302,'Isolated login');
+  }
   await c.route('https://fonts.googleapis.com/**',r=>r.abort());await c.addInitScript(()=>window.print=()=>{});
   const p=await c.newPage(),errors=[];p.setDefaultTimeout(120000);p.on('pageerror',e=>errors.push(e.message));
   await p.goto(base+'/dashboard.php');
@@ -23,9 +25,9 @@ assert.equal(new URL(base).hostname,'127.0.0.1');
    const r=await p.goto(base+'/master_daftar_ulang.php?tahun=2026%2F2027',{timeout:120000});check(r.status()===200,'Master DU unit '+unit);
    const text=await p.locator('.du-save-footer').innerText();
    check(text.includes('Rp '+total),'Master totals use persisted bills unit '+unit);
-   check((await p.locator('.du-overview-pending strong').innerText())==='0','Covered pupils are excluded from missing bill count unit '+unit);
+   check((await p.locator('.du-stat-orange .du-stat-copy strong').innerText())==='0','Covered pupils are excluded from missing bill count unit '+unit);
    check(await p.getByRole('button',{name:'Simpan Tarif & Lengkapi Tagihan',exact:true}).count()===1,'Existing completion control unit '+unit);
-   const missingLevel={1:1,2:7,3:10}[unit];const missing=await p.locator('article.du-rate-card').filter({hasText:'Kelas '+missingLevel}).first().innerText();check(missing.includes('DU tercakup dalam PSB')&&missing.includes(unknown+' siswa tercakup'),'First-class policy card unit '+unit);check(await p.locator('#du-rate-'+missingLevel).count()===0,'No separate first-class tariff field unit '+unit);
+   const missingLevel={1:1,2:7,3:10}[unit];const missing=await p.locator('article.du-rate-card').filter({hasText:'Kelas '+missingLevel}).first().innerText();check(missing.includes('DU tercakup dalam PSB')&&missing.includes('Tercakup PSB')&&missing.includes(String(unknown)),'First-class policy card unit '+unit);check(await p.locator('#du-rate-'+missingLevel).count()===0,'No separate first-class tariff field unit '+unit);
    await p.screenshot({path:path.join(root,'master-du-'+unit+'.png'),fullPage:true,animations:'disabled'});
   }
   await c.request.post(base+'/unit_switch.php',{form:{unit_id:'2',csrf_token:csrf,next:'/dashboard.php'},maxRedirects:0});

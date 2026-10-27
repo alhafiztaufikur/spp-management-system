@@ -55,7 +55,7 @@ lengkap yang telah dipulihkan pada instance terisolasi, dengan checksum seluruh
 tabel dan snapshot terlindungi cocok. Script memakai kunci akses existing.
 Pembaca FK dan integritas tetap dapat memverifikasi backup sebelum kolom baru ada.
 
-Runtime: workflow 14, operasional 18, otomasi 5, billing 6, DU 4. Metadata lama
+Runtime: workflow 15, operasional 19, otomasi 5, billing 7, DU 4. Metadata lama
 tetap dibaca; simulasi/worker versi sebelumnya harus diperbarui. Rekonsiliasi
 Legacy tetap melalui runner resmi. Deployment tidak otomatis menerbitkan tarif
 atau tagihan tahun berikutnya.

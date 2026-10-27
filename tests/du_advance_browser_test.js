@@ -12,7 +12,9 @@ assert.ok(root&&!path.resolve(root).toLowerCase().startsWith(process.cwd().toLow
   const identity=await(await c.request.get(base+'/tests/browser_clone_identity.php')).json();
   const manifest=JSON.parse(fs.readFileSync(process.env.SPP_TEST_ISOLATED_INSTANCE,'utf8').replace(/^\uFEFF/,''));
   check(identity.isolated_test&&identity.server_uuid===manifest.server_uuid&&identity.port===3319,'Isolated HTTP identity');
+  if(process.env.SPP_TEST_SESSION_ID){await c.addCookies([{name:'PHPSESSID',value:process.env.SPP_TEST_SESSION_ID,url:base}]);check((await c.request.get(base+'/dashboard.php')).status()===200,'Isolated actor session');}else{
   check((await c.request.post(base+'/login.php',{form:{username:'superadmin',password:process.env.SPP_TEST_SUPERADMIN_PASSWORD},maxRedirects:0})).status()===302,'Login');
+  }
   const p=await c.newPage();p.setDefaultTimeout(120000);await c.addInitScript(()=>window.print=()=>{});
   await p.goto(base+'/dashboard.php');const csrf=await p.locator('form[action$="unit_switch.php"] input[name=csrf_token]').first().inputValue();
   await c.request.post(base+'/unit_switch.php',{form:{unit_id:'1',csrf_token:csrf,next:'/dashboard.php'},maxRedirects:0});

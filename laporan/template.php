@@ -57,7 +57,7 @@ if($isCashRecap){
 }
 function template_url(array $changes=[]):string { global $query; return 'template.php?'.filter_build_query(array_merge($query,$changes)); }
 function report_table_column_class(array $column): string {
-    return global_report_column_class($column);
+    return global_report_column_class($column).($column[0]==='kelas'?' report-col-class':'');
 }
 if($isPrincipalLetter){ require __DIR__.'/../includes/principal_letter_page.php'; exit; }
 ?>
@@ -135,7 +135,7 @@ if($isPrincipalLetter){ require __DIR__.'/../includes/principal_letter_page.php'
 <div class="table-container class-recap-scroll report-wide-table report-template-table-wrap">
   <?php $flatWidths=array_map(static fn($column)=>global_report_column_width($column),array_merge([['no','No','number']],$report['columns'])); ?>
   <table class="payment-table class-recap-table report-template-table<?= $useGlobalIdentitySticky ? '' : ' report-standard-scroll' ?>" style="width:100%;min-width:<?= array_sum($flatWidths) ?>px">
-    <colgroup><?php foreach($flatWidths as $width): ?><col style="width:<?= $width ?>px"><?php endforeach; ?></colgroup>
+    <colgroup><?php foreach($flatWidths as $columnIndex=>$width): ?><col<?= $columnIndex>0&&$report['columns'][$columnIndex-1][0]==='kelas'?' class="report-col-class"':'' ?> style="width:<?= $width ?>px"><?php endforeach; ?></colgroup>
     <thead><tr>
       <th scope="col" class="report-col-no <?= $useGlobalIdentitySticky ? 'report-identity-sticky report-identity-no' : '' ?>">No</th>
       <?php foreach($report['columns'] as $columnIndex=>$column):

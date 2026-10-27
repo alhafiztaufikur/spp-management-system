@@ -3,6 +3,7 @@ require_once __DIR__.'/legacy_billing.php';
 require_once __DIR__.'/spp_billing.php';
 require_once __DIR__.'/legacy_full_read.php';
 require_once __DIR__.'/legacy_fee_reconstruction.php';
+require_once __DIR__.'/other_fee_reconciliation.php';
 require_once __DIR__.'/legacy_du.php';
 require_once __DIR__.'/legacy_du_reconstruction.php';
 
@@ -143,6 +144,7 @@ function lbr_reconcile(mysqli $db,int $actor): array {
     foreach(hp_rows($db,"SELECT id,row_key FROM legacy_op_pending WHERE code='monthly_evidence' AND resolved=0") as $p)if(!isset($wantedPending[$p['row_key']])){lf_query($db,'UPDATE legacy_op_pending SET resolved=1 WHERE id=?',[$p['id']]);$summary['review_resolved']++;$summary['changes']++;}
     lb_cache($db,true);$summary['du']=ldu_reconcile($db,$actor);$summary['changes']+=$summary['du']['changes'];
     $summary['one_time']=lb_reconcile($db,$actor,true);$summary['obligations_aligned']=(int)($GLOBALS['lb_sync_changes'][$db->thread_id]??0)-$syncBefore;$summary['changes']+=$summary['one_time']['changes']+$summary['obligations_aligned'];
+    $summary['other_fee_billing']=ofb_reconcile($db,$actor);$summary['changes']+=$summary['other_fee_billing']['changes'];
     lb_refresh_manifests($db,$batches);
     foreach(array_unique($batches) as $id){
         $b=hp_one($db,'SELECT manifest FROM legacy_full_batches WHERE id=?',[$id]);$m=json_decode($b['manifest'],true);

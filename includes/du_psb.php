@@ -7,12 +7,15 @@ function du_psb_schema_ready(mysqli $db,bool $refresh=false): bool {
     static $cache=[];if($refresh)unset($cache[$db->thread_id]);
     return $cache[$db->thread_id]??=$db->query("SELECT COUNT(*) FROM information_schema.COLUMNS WHERE TABLE_SCHEMA=DATABASE() AND TABLE_NAME IN ('siswa_tahun_ajaran_data','siswa_tahun_ajaran') AND COLUMN_NAME='du_covered_by_psb'")->fetch_row()[0]==2;
 }
-function du_psb_schema_apply(mysqli $db): void {
+function du_psb_schema_apply(mysqli $db): int {
     if(PHP_SAPI!=='cli')throw new LogicException('Pemasangan skema DU melalui CLI.');
+    if(du_psb_schema_ready($db,true))return 0;
+    $changes=0;
     $has=(int)$db->query("SELECT COUNT(*) FROM information_schema.COLUMNS WHERE TABLE_SCHEMA=DATABASE() AND TABLE_NAME='siswa_tahun_ajaran_data' AND COLUMN_NAME='du_covered_by_psb'")->fetch_row()[0];
-    if(!$has)$db->query('ALTER TABLE siswa_tahun_ajaran_data ADD COLUMN du_covered_by_psb TINYINT(1) NOT NULL DEFAULT 0');
+    if(!$has){$db->query('ALTER TABLE siswa_tahun_ajaran_data ADD COLUMN du_covered_by_psb TINYINT(1) NOT NULL DEFAULT 0');$changes++;}
     $db->query('CREATE OR REPLACE VIEW siswa_tahun_ajaran AS SELECT * FROM siswa_tahun_ajaran_data WHERE current_unit_id()=0 OR unit_id=current_unit_id() WITH CASCADED CHECK OPTION');
     if(!du_psb_schema_ready($db,true))throw new RuntimeException('Skema cakupan DU belum lengkap.');
+    return $changes+1;
 }
 function du_psb_decision(array $p,string $year,bool $bill=false,bool $evidence=false): array {
     $out=['status'=>'normal','covered_psb'=>false,'conflict'=>false,'reason'=>''];

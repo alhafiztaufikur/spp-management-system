@@ -15,7 +15,7 @@ function payment_student_details(mysqli $db,string $nis,int $excludePaymentId=0)
     $stmt=$db->prepare("SELECT ta.label tahun_ajaran,sta.spp_perbulan_snapshot tarif,sta.spp_covered_by_psb covered_by_psb FROM siswa_tahun_ajaran sta JOIN tahun_ajaran ta ON ta.id=sta.tahun_ajaran_id AND ta.unit_id=sta.unit_id WHERE sta.no_induk=? AND sta.status='aktif' ORDER BY ta.label");
     $stmt->bind_param('s',$nis);$stmt->execute();$placements=$stmt->get_result()->fetch_all(MYSQLI_ASSOC);$stmt->close();
     $other=[];
-    foreach(other_fee_open_bills($db,$nis) as $bill){
+    foreach(other_fee_open_bills($db,$nis,$excludePaymentId) as $bill){
         if((float)$bill['sisa']<=.001)continue;
         $other[]=['id'=>(int)$bill['id'],'master_id'=>(int)$bill['master_biaya_lain_id'],'nama'=>$bill['nama'],'nominal'=>(float)$bill['nominal'],'paid'=>(float)$bill['terbayar'],'sisa'=>(float)$bill['sisa'],'optional'=>false];
     }

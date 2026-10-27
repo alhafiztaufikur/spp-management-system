@@ -80,11 +80,11 @@ function general_savings_balance(mysqli $db,string $search=''): float {
 }
 /** Apply only the same proven historical credit used by the payment form. */
 function general_unpaid_history(mysqli $db,array $rows,string $type,string $month,string $year,string $academic): array {
-    if(!in_array($type,['belum_spp','belum_du'],true))return $rows;
+    if(!in_array($type,['belum_spp','belum_du','belum_biaya_lain'],true))return $rows;
     $scope=(int)($GLOBALS['app_unit_id']??unit_active_id());$out=[];
     try{foreach($rows as $row){
         if((int)$GLOBALS['app_unit_id']!==(int)$row['unit_id'])unit_set_context($db,(int)$row['unit_id']);
-        $credit=$type==='belum_spp'?lb_spp_credit($db,$row['NO_INDUK'],$month,$year):lb_du_bill_credit($db,$row['NO_INDUK'],$academic);
+        if($type==='belum_biaya_lain'){require_once __DIR__.'/other_fee_billing.php';$credit=ofb_legacy_paid($db,(int)($row['other_bill_id']??0))/100.0;}else $credit=$type==='belum_spp'?lb_spp_credit($db,$row['NO_INDUK'],$month,$year):lb_du_bill_credit($db,$row['NO_INDUK'],$academic);
         $row['sudah_bayar']=(float)$row['sudah_bayar']+$credit;$row['sisa']=max(0,(float)$row['tagihan']-$row['sudah_bayar']);
         if($row['sisa']>0.001)$out[]=$row;
     }}finally{if((int)$GLOBALS['app_unit_id']!==$scope)unit_set_context($db,$scope);}return $out;

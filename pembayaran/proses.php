@@ -522,6 +522,7 @@ function collect_biaya_lain(mysqli $koneksi, string $noInduk, int $bayarId = 0):
                 'message'=>'Tagihan Biaya Lain berubah sejak halaman dibuka. Perbarui tagihan sebelum menyimpan.',
                 'target'=>'biaya-lain-list']);
         }
+        if(($bill['origin']??'')==='purchase'&&!$sameBillAsOldLine)throw new DomainException('Pilih master Biaya Lain untuk pembelian baru.');
         $masterTotal = (float)$bill['nominal_tagihan'];
         $paidBefore = other_fee_paid_for_bill($koneksi, $billId, $bayarId, true);
         if ($paidBefore > $masterTotal + 0.001) {
@@ -553,6 +554,7 @@ function collect_biaya_lain(mysqli $koneksi, string $noInduk, int $bayarId = 0):
 }
 
 function save_biaya_lain(mysqli $koneksi, int $bayarId, array $lines): void {
+    foreach($lines as &$line)if(empty($line['bill_id'])&&!empty($line['master_id'])&&!empty($line['purchase_eligible']))$line=ofb_purchase_line($koneksi,$bayarId,$line);unset($line);
     $stmtDelete = $koneksi->prepare('DELETE FROM bayar_biaya_lain WHERE bayar_id = ?');
     $stmtDelete->bind_param('i', $bayarId);
     $stmtDelete->execute();
