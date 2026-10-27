@@ -16,7 +16,7 @@ fb_check(!in_array('pembayaran_opsional',array_column($r['columns'],0),true)&&!s
 $db->begin_transaction();$db->query('SET @legacy_full_apply=1');
 try{
  foreach([1,2,3] as $unit){$_SESSION['active_unit_id']=$unit;unit_set_context($db,$unit);
-    $student=hp_one($db,'SELECT s.*,mk.kode_rombel,mk.tingkat FROM siswa s JOIN master_kelas mk ON mk.id=s.master_kelas_id WHERE s.is_active=1 AND s.legacy_pending=0 ORDER BY s.id LIMIT 1');$nis=$student['NO_INDUK'];$class=class_label($student);
+    $student=hp_one($db,'SELECT s.*,mk.kode_rombel,mk.tingkat FROM siswa s JOIN master_kelas mk ON mk.id=s.master_kelas_id WHERE s.is_active=1 AND s.legacy_pending=0 AND mk.is_active=1 AND mk.is_placeholder=0 AND mk.tingkat NOT IN (6,9,12) ORDER BY s.id LIMIT 1');$nis=$student['NO_INDUK'];$class=class_label($student);
     $master=fb_sql("INSERT INTO master_biaya_lain(nama,nominal,is_active,jenis_pembayaran) VALUES(?,100000,1,'berulang')",['QA bound fee '.bin2hex(random_bytes(5))]);
     $oldBill=fb_sql("INSERT INTO tagihan_biaya_lain(master_biaya_lain_id,no_induk,nama_snapshot,nominal_tagihan,kelas_rombel_snapshot) VALUES(?,?,'QA opening debt',50000,?)",[$master,$nis,$class]);
     $payment=fb_sql("INSERT INTO bayar(NO_INDUK,KELAS,master_kelas_id,kelas_rombel_snapshot,U_LAIN,TGL_BYR,BULAN,TAHUN,total_jumlah,sistem_pembayaran) VALUES(?,?,?,?,100000,'2026-10-20 09:00:00','10','2026',100000,'Tunai')",[$nis,$student['KELAS'],$student['master_kelas_id'],$class]);
@@ -25,6 +25,14 @@ try{
     fb_check(ofb_purchase_line($db,$payment,$line)['bill_id']===$purchase,'Unit '.$unit.' purchase retry reuses bill');
     fb_sql("INSERT INTO bayar_biaya_lain(bayar_id,master_biaya_lain_id,tagihan_biaya_lain_id,nama_biaya_snapshot,nominal_snapshot,tarif_referensi_snapshot) VALUES(?,?,?,'QA bound fee',100000,100000)",[$payment,$master,$purchase]);
     fb_check(other_fee_bill_find($db,$purchase,$nis)['sisa']===0.0,'Unit '.$unit.' purchase bill is paid');
+    // Paying after promotion must not move the bill or hide its linked credit.
+    $later=hp_one($db,'SELECT * FROM master_kelas WHERE is_active=1 AND is_placeholder=0 AND tingkat>? ORDER BY tingkat,id LIMIT 1',[$student['KELAS']]);
+    fb_sql('UPDATE bayar SET KELAS=?,master_kelas_id=?,kelas_rombel_snapshot=? WHERE id=?',[$later['tingkat'],$later['id'],class_label($later),$payment]);
+    foreach(['tingkat:'.$student['KELAS'],'rombel:'.$student['master_kelas_id'],['tingkat:'.$student['KELAS']]] as $classFilter){
+        $filtered=fb_report($master,$nis,['kelas'=>$classFilter]);$billRows=array_values(array_filter($filtered['rows'],static fn($r)=>(int)($r['bill_id']??0)===$purchase));
+        fb_check(count($billRows)===1&&(float)$billRows[0]['terbayar']===100000.0&&(float)$billRows[0]['sisa']===0.0,'Unit '.$unit.' linked payment follows obligation class filter '.json_encode($classFilter));
+    }
+    fb_sql('UPDATE bayar SET KELAS=?,master_kelas_id=?,kelas_rombel_snapshot=? WHERE id=?',[$student['KELAS'],$student['master_kelas_id'],$class,$payment]);
     fb_check(other_fee_paid_for_bill($db,$oldBill)===0.0,'Unit '.$unit.' old debt untouched');
     fb_check(ofb_paid($db,$purchase,$payment,true)===0.0,'Unit '.$unit.' editing excludes own allocation');
     $beforeCount=(int)hp_one($db,'SELECT COUNT(*) n FROM bayar')['n'];$beforeCash=hp_one($db,'SELECT SUM(total_jumlah) amount FROM bayar')['amount'];

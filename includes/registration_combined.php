@@ -13,7 +13,12 @@ function rc_source(mysqli $db,string $source='all'): string {
     }
     if($source!=='system'&&lop_ready($db)){$lines=ldu_receipt_lines_sql();$parts[]="SELECT p.unit_id,IF(o.student_id IS NULL,CONCAT('o:',o.id),CONCAT('s:',o.student_id)) owner_key,COALESCE(o.student_id,0) student_id,o.id owner_id,o.source_identity identity,o.name name,s.NO_induk_diknas,COALESCE(s.master_kelas_id,g.master_kelas_id) master_kelas_id,COALESCE((SELECT t.kelas_snapshot FROM tagihan_daftar_ulang t WHERE t.unit_id=p.unit_id AND t.no_induk=s.NO_INDUK AND t.tahun_ajaran_snapshot=dl.year LIMIT 1),p.class_snapshot) kelas,dl.year th_ajaran,0 native_bill,p.id legacy_id,0 native_total,0 native_paid,dl.amount legacy_paid FROM legacy_op_payments p JOIN ($lines) dl ON dl.payment_id=p.id AND dl.unit_id=p.unit_id JOIN legacy_op_owners o ON o.id=p.owner_id AND o.unit_id=p.unit_id LEFT JOIN siswa s ON s.id=o.student_id AND s.unit_id=o.unit_id LEFT JOIN legacy_op_groups g ON g.id=o.group_id AND g.unit_id=o.unit_id JOIN legacy_full_batches b ON b.id=p.batch_id AND b.unit_id=p.unit_id WHERE b.state='completed' AND p.cancelled=0";}
 
-    if(!$parts)return '(SELECT 0 unit_id,NULL owner_key,0 student_id,0 owner_id,\'\' identity,\'\' name,\'\' NO_induk_diknas,0 master_kelas_id,\'\' kelas,NULL th_ajaran,0 native_bill,0 legacy_id,0 native_total,0 native_paid,0 legacy_paid WHERE FALSE)';
+    $parts=array_map(static fn($part)=>"SELECT original.*,0 coverage_id FROM ($part) original",$parts);
+    if(du_psb_schema_ready($db)&&$source!=='legacy'){
+        $ids=[];foreach(hp_rows($db,'SELECT DISTINCT y.label FROM siswa_tahun_ajaran p JOIN tahun_ajaran y ON y.id=p.tahun_ajaran_id AND y.unit_id=p.unit_id WHERE p.du_covered_by_psb=1') as $y)foreach(du_psb_states($db,$y['label']) as $state)if($state['covered_psb']&&!empty($state['placement']['du_covered_by_psb']))$ids[]=(int)$state['placement']['id'];
+        if($ids)$parts[]="SELECT p.unit_id,CONCAT('s:',s.id) owner_key,s.id student_id,0 owner_id,s.NO_INDUK identity,s.NAMA name,s.NO_induk_diknas,p.master_kelas_id,p.kelas_rombel_snapshot kelas,y.label th_ajaran,0 native_bill,0 legacy_id,0 native_total,0 native_paid,0 legacy_paid,p.id coverage_id FROM siswa_tahun_ajaran p JOIN tahun_ajaran y ON y.id=p.tahun_ajaran_id AND y.unit_id=p.unit_id JOIN siswa s ON s.NO_INDUK=p.no_induk AND s.unit_id=p.unit_id WHERE p.id IN (".implode(',',$ids).')';
+    }
+    if(!$parts)return '(SELECT 0 unit_id,NULL owner_key,0 student_id,0 owner_id,\'\' identity,\'\' name,\'\' NO_induk_diknas,0 master_kelas_id,\'\' kelas,NULL th_ajaran,0 native_bill,0 legacy_id,0 native_total,0 native_paid,0 legacy_paid,0 coverage_id WHERE FALSE)';
     return hp_sql($db,'('.implode(' UNION ALL ',$parts).')');
 }
 function rc_verified_tariffs(mysqli $db): array {
@@ -31,8 +36,8 @@ function rc_verified_tariffs(mysqli $db): array {
 function rc_groups(mysqli $db,string $source='all'): string {
     // Source selects owner/year groups, never removes settlement credit from a bill.
     $lines=rc_source($db,'all');
-    $groups="SELECT unit_id,owner_key,MAX(student_id) student_id,MAX(owner_id) owner_id,MAX(identity) identity,MAX(name) name,MAX(NO_induk_diknas) NO_induk_diknas,MAX(master_kelas_id) master_kelas_id,IF(COUNT(DISTINCT NULLIF(TRIM(kelas),''))=1,TRIM(MAX(kelas)),NULL) kelas,th_ajaran,IF(MAX(native_bill)>0,MAX(native_bill),-1000000000-MIN(NULLIF(legacy_id,0))) id,SUM(native_total) native_total,SUM(native_paid) native_paid,SUM(legacy_paid) legacy_paid,COUNT(NULLIF(legacy_id,0)) legacy_count,COUNT(DISTINCT NULLIF(native_bill,0)) native_count FROM $lines x GROUP BY unit_id,owner_key,th_ajaran";
-    if($source!=='all')$groups="SELECT * FROM ($groups) source_groups WHERE ".($source==='system'?'native_count>0':'legacy_count>0');
+    $groups="SELECT unit_id,owner_key,MAX(student_id) student_id,MAX(owner_id) owner_id,MAX(identity) identity,MAX(name) name,MAX(NO_induk_diknas) NO_induk_diknas,MAX(master_kelas_id) master_kelas_id,IF(COUNT(DISTINCT NULLIF(TRIM(kelas),''))=1,TRIM(MAX(kelas)),NULL) kelas,th_ajaran,CASE WHEN MAX(native_bill)>0 THEN MAX(native_bill) WHEN MAX(coverage_id)>0 THEN -2000000000-MAX(coverage_id) ELSE -1000000000-MIN(NULLIF(legacy_id,0)) END id,SUM(native_total) native_total,SUM(native_paid) native_paid,SUM(legacy_paid) legacy_paid,COUNT(NULLIF(legacy_id,0)) legacy_count,COUNT(DISTINCT NULLIF(native_bill,0)) native_count,MAX(coverage_id) coverage_id FROM $lines x GROUP BY unit_id,owner_key,th_ajaran";
+    if($source!=='all')$groups="SELECT * FROM ($groups) source_groups WHERE ".($source==='system'?'(native_count>0 OR coverage_id>0)':'legacy_count>0');
     $proofRows=[];foreach(rc_verified_tariffs($db) as $proof){$year=$db->real_escape_string($proof['year']);$proofRows[]="SELECT ".$proof['owner']." owner_id,'$year' year,".$proof['level']." level,".lf_money($proof['principal'])." principal";}
     if(!$proofRows)return "(SELECT x.*,NULL historical_total FROM ($groups) x)";
     $proofSql=implode(' UNION ALL ',$proofRows);
@@ -50,13 +55,13 @@ function rc_page(mysqli $db,array $input): array {
 
     $classes=class_all($db,false);$classOptions=[];foreach(range(...unit_level_bounds()) as $level)$classOptions['tingkat:'.$level]='Kelas '.$level;foreach($classes as $c)$classOptions[(string)$c['id']]=class_label($c);
     $classInput=$input['class_id']??$input['kelas']??null;if(!isset($input['class_id'])&&is_scalar($classInput)&&ctype_digit((string)$classInput)&&isset($classOptions['tingkat:'.$classInput]))$classInput='tingkat:'.$classInput;if($classInput!==null){$convert=static fn($v)=>is_scalar($v)&&str_starts_with((string)$v,'rombel:')?substr((string)$v,7):$v;$classInput=is_array($classInput)?array_map($convert,$classInput):$convert($classInput);}
-    $statusOptions=['lunas'=>'Lunas','cicilan'=>'Belum lunas','unknown'=>'Status belum dapat ditentukan'];
+    $statusOptions=['lunas'=>'Lunas','cicilan'=>'Belum lunas','covered_psb'=>'Tercakup PSB','unknown'=>'Status belum dapat ditentukan'];
     $choose=static function(string $name,$raw,array $options):array{$values=filter_register($name,$raw,$options);foreach($values as $v)if($v!=='*'&&!array_key_exists($v,$options))throw new InvalidArgumentException('Pilihan '.$name.' tidak tersedia pada unit ini.');return $values;};
     $yearValues=$choose('year',$input['year']??$input['tahun_ajaran']??null,$yearOptions);$year=filter_scalar($yearValues);$where.=filter_sql_values($yearValues,"COALESCE(th_ajaran,'Tidak tercatat')");
     $classValues=$choose('class_id',$classInput,$classOptions);$class=(int)filter_scalar($classValues,'0');if(!filter_is_all($classValues)){$matches=[];foreach($classValues as $v){if(str_starts_with($v,'tingkat:'))$matches[]='master_kelas_id IN (SELECT id FROM master_kelas WHERE tingkat='.(int)substr($v,8).')';else $matches[]='master_kelas_id='.(int)$v;}$where.=' AND ('.implode(' OR ',$matches).')';}
     $student=max(0,(int)($input['student_id']??0));if($student){$where.=' AND student_id=?';$args[]=$student;}
     $statusValues=$choose('status_filter',$input['status_filter']??$input['status']??null,$statusOptions);$status=filter_scalar($statusValues,'all');
-    if(!filter_is_all($statusValues)){$matches=[];foreach($statusValues as $v)$matches[]=match($v){'unknown'=>'(native_count=0 AND legacy_count>0 AND historical_total IS NULL)','lunas'=>'((native_count>0 AND native_total<=native_paid+legacy_paid) OR (native_count=0 AND legacy_count>0 AND historical_total IS NOT NULL AND historical_total<=legacy_paid+native_paid))','cicilan'=>'((native_count>0 AND native_total>native_paid+legacy_paid) OR (native_count=0 AND legacy_count>0 AND historical_total IS NOT NULL AND historical_total>legacy_paid+native_paid))'};$where.=' AND ('.implode(' OR ',$matches).')';}
+    if(!filter_is_all($statusValues)){$matches=[];foreach($statusValues as $v)$matches[]=match($v){'covered_psb'=>'coverage_id>0','unknown'=>'(native_count=0 AND legacy_count>0 AND historical_total IS NULL)','lunas'=>'((native_count>0 AND native_total<=native_paid+legacy_paid) OR (native_count=0 AND legacy_count>0 AND historical_total IS NOT NULL AND historical_total<=legacy_paid+native_paid))','cicilan'=>'((native_count>0 AND native_total>native_paid+legacy_paid) OR (native_count=0 AND legacy_count>0 AND historical_total IS NOT NULL AND historical_total>legacy_paid+native_paid))'};$where.=' AND ('.implode(' OR ',$matches).')';}
     $operatorOptions=history_operator_options($db);$operators=history_operator_choices($input['operator']??null,$operatorOptions);
     if(!filter_is_all($operators)){
         $matches=[];
@@ -94,6 +99,7 @@ function rc_evidence_sources(mysqli $db,bool $refresh=false): array {
     return $cache[$key]=compact('owners','tariffs','obligations');
 }
 function rc_tariff_evidence(mysqli $db,array $g): array {
+    if(!empty($g['coverage_id']))return ['status'=>'Tercakup PSB','tariff'=>null,'remaining'=>0.0,'reason'=>'DU kelas awal tercakup PSB. Sisa pembayaran mengikuti kewajiban PSB; tidak ada penagihan DU terpisah.'];
     if(!empty($g['native_count']))return ['status'=>(float)$g['native_paid']+(float)$g['legacy_paid']>=(float)$g['native_total']?'Lunas':'Belum Lunas','tariff'=>(float)$g['native_total'],'remaining'=>max(0,(float)$g['native_total']-(float)$g['native_paid']-(float)$g['legacy_paid']),'reason'=>'Tagihan siswa terhubung ke pembayaran operasional dan Legacy pada tahun ajaran yang sama.'];
     if(!$g['legacy_count'])return ['status'=>$g['native_paid']>=$g['native_total']?'Lunas':'Belum Lunas','tariff'=>$g['native_total'],'remaining'=>max(0,$g['native_total']-$g['native_paid']),'reason'=>'Tagihan operasional terhubung.'];
     $reason=[];$tariffs=[];$tariffInvalid=false;$year=$g['th_ajaran'];$class=trim((string)$g['kelas']);

@@ -67,17 +67,17 @@ if(in_array('--draft',$argv,true)){
     // Exercise the real enqueue -> prepare -> bulk -> simulate -> confirm path; never enqueue apply.
     lful_empty($db,$unit);$rows=[];$add=static function(string $table,array $raw)use(&$rows):void{$rows[]=['table'=>$table,'raw'=>$raw,'reference_only'=>in_array($table,['lain','Daftar_ulang','du'],true)||str_starts_with($table,'tb_'),'student_ordinal'=>count($rows)+1,'money_columns'=>array_values(array_intersect(array_keys($raw),['U_SPP','U_KEGIATAN','U_LAIN','JUMLAH1','jumlah','Jumlah','SALDO','MASUK','KELUAR','SPP_PERBULAN','POMG']))];};
     $nis='212200001';$add('siswa',['NO_INDUK'=>$nis,'NAMA'=>'Pengujian Draf Otomatis','KELAS'=>'1A','SPP_PERBULAN'=>'530000','POMG'=>'15000']);$add('lain',['KODE'=>'0022','NAMA'=>'Buku Otomasi QA']);
-    if(in_array('--du-publication',$argv,true)){$rows[0]['raw']['KELAS']='1A';$rows[0]['raw']['DAFTAR_ULANG']='1000000';$rows[0]['raw']['potong_du']='0';$rows[0]['raw']['tot_du']='1000000';} // Complete individual header; no class tariff row.
-    foreach(['2026-04-15','2026-05-15'] as $date)$add('bayar',['NO_INDUK'=>$nis,'KELAS'=>'1A','U_SPP'=>'100000','U_KEGIATAN'=>'500000','LAIN_LAIN1'=>'0022','JUMLAH1'=>'7000','U_LAIN'=>'0','TGL_BYR'=>$date,'BULAN'=>substr($date,5,2),'TAHUN'=>'2026','th_ajaran'=>'2026/2027','kelas_du'=>in_array('--du-publication',$argv,true)?'1':'2']);
-    foreach([1,2] as $ignored)$add('bayar_du',['no_induk'=>$nis,'kelas'=>in_array('--du-publication',$argv,true)?'1':'2','th_ajaran'=>'2026/2027','jumlah'=>'1000000']);
-    $add('Daftar_ulang',['th_ajaran'=>'2026/2027','kelas'=>'2','Jumlah'=>'1100000']);
+    if(in_array('--du-publication',$argv,true)){$rows[0]['raw']['KELAS']='2A';$rows[0]['raw']['DAFTAR_ULANG']='1000000';$rows[0]['raw']['potong_du']='0';$rows[0]['raw']['tot_du']='1000000';} // Complete individual header; no class tariff row.
+    foreach(['2026-04-15','2026-05-15'] as $date)$add('bayar',['NO_INDUK'=>$nis,'KELAS'=>'1A','U_SPP'=>'100000','U_KEGIATAN'=>'500000','LAIN_LAIN1'=>'0022','JUMLAH1'=>'7000','U_LAIN'=>'0','TGL_BYR'=>$date,'BULAN'=>substr($date,5,2),'TAHUN'=>'2026','th_ajaran'=>'2026/2027','kelas_du'=>'2']);
+    foreach([1,2] as $ignored)$add('bayar_du',['no_induk'=>$nis,'kelas'=>'2','th_ajaran'=>'2026/2027','jumlah'=>'1000000']);
+    if(!in_array('--du-publication',$argv,true))$add('Daftar_ulang',['th_ajaran'=>'2026/2027','kelas'=>'2','Jumlah'=>'1100000']);
     $add('du',['th_ajaran'=>'2026/2027','kelas'=>'3','Jumlah'=>'1200000']);
     $add('tabungan',['NO_INDUK'=>$nis,'SALDO'=>'90000']);$add('transaksi_m',['NO_INDUK'=>$nis,'MASUK'=>'90000','TANGGAL'=>'2022-01-01']);$add('tb_total',['NO_INDUK'=>$nis,'SALDO'=>'22']);$add('tb_masuk',['NO_INDUK'=>$nis,'MASUK'=>'22','TANGGAL'=>'2023-07-12']);
     $temporary=tempnam(legacy_root(),'automation-');file_put_contents($temporary,'Owned automation draft test');$job=legacy_enqueue($temporary,'automation-qa.dat',$unit,$actor,'full');unlink($temporary);$id=$job['id'];$dir=legacy_root().'/'.$id;$counts=[];foreach($rows as $r)$counts[$r['table']]=($counts[$r['table']]??0)+1;
     file_put_contents($dir.'/finance.jsonl',implode("\n",array_map('lf_json',$rows))."\n");file_put_contents($dir.'/finance_manifest.json',lf_json(['profile'=>'legacy-finance-v1','unit'=>$unit,'backup_hash'=>$job['hash'],'source_date'=>'2026-10-17T08:00:00','counts'=>$counts,'rows_sha256'=>hash_file('sha256',$dir.'/finance.jsonl')]));file_put_contents($dir.'/operational-request.json','{"mode":"operational"}');
     lful_stage($db,$job);$d=lful_draft($id);lft_assert(lma_enabled($d['settings'])&&!empty($d['settings']['op_preserve_unproven_balances']),'Pekerjaan baru tidak mengaktifkan aturan baru dan perlindungan saldo belum terbukti');$year=spp_master_ensure_year($db,'2026/2027');$d=lful_save($db,$actor,$unit,$id,(int)$d['version'],['cutoff'=>'2026-10-19 11:00:00','year_id'=>(int)$year['tahun_ajaran_id']]);
     [$sourceRows,$manifest]=lf_extract_read($job,true,true);
-    foreach([2=>110000000,3=>120000000] as $grade=>$principal){
+    foreach((in_array('--du-publication',$argv,true)?[3=>120000000]:[2=>110000000,3=>120000000]) as $grade=>$principal){
         $preview=ldu_source_preview($sourceRows,['tariff-only'=>['ready'=>true,'kind'=>'active','student'=>true,'raw'=>['KELAS'=>$grade.'A','potong_du'=>'0'],'source_key'=>'tariff-only']],[],'2026/2027');
         lft_assert($preview['ready']===1&&$preview['principal_cents']===$principal,'Pembaca operasional menghilangkan tarif referensi DU dari preview.');
     }

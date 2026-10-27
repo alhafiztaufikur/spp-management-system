@@ -23,8 +23,8 @@ $proof1=ldu_source_proof($grade1,[],'2026/2027');dup_check($proof1['known']&&$pr
 $grade1['raw']['DAFTAR_ULANG']=null;$grade1['raw']['tot_du']='0';$grade1['raw']['PSB']='11270000';$grade1['raw']['PANGKAL_BAYAR']='11270000';dup_check(!ldu_source_proof($grade1,['2017/2018'=>['1'=>[['Jumlah'=>'1895000']]]],'2026/2027')['known'],'Old tariff and settled PSB never invent current DU');
 require_once __DIR__.'/../includes/du_master_service.php';require_once __DIR__.'/../includes/legacy_du_reconstruction.php';
 foreach(['','   '] as $blank)dup_check(du_master_rate_cents($blank,1)===null,'Blank rate is unchanged');
-foreach(['3.500.000'=>350000000,'3500000,25'=>350000025] as $text=>$money)dup_check(du_master_rate_cents($text,1)===$money,'Exact Indonesian amount');
-foreach(['0','-1','1e6','12.34',[], '999999999999999999999'] as $bad){$reject=false;try{du_master_rate_cents($bad,1);}catch(Throwable $e){$reject=true;}dup_check($reject,'Invalid rate rejected');}
+foreach(['3.500.000'=>350000000,'3500000,25'=>350000025] as $text=>$money)dup_check(du_master_rate_cents($text,8)===$money,'Exact Indonesian amount');
+foreach(['0','-1','1e6','12.34',[], '999999999999999999999'] as $bad){$reject=false;try{du_master_rate_cents($bad,8);}catch(Throwable $e){$reject=true;}dup_check($reject,'Invalid rate rejected');}
 $fixture=[['table'=>'lain','row_key'=>'fee','raw'=>['KODE'=>'0001','NAMA'=>'Daftar Ulang']],['table'=>'bayar','row_key'=>'receipt','raw'=>['id'=>'42','NO_INDUK'=>'001','KELAS'=>'PSB','BULAN'=>'Oktober','TAHUN'=>'2025','th_ajaran'=>'2026/2027','kelas_du'=>'1','LAIN_LAIN1'=>'0001','JUMLAH1'=>'3500000']]];
 $context=lma_context($fixture,1,str_repeat('a',64));dup_check(($context['fees']['receipt']['JUMLAH1']['category']??'')==='daftar_ulang','Explicit DU source master and obligation year classify slot automatically');
 $item=['column'=>'JUMLAH1','category'=>'biaya_lain:55','label'=>'Daftar Ulang','amount'=>'3500000','migration'=>['version'=>4]];$receipt=['items'=>[$item]];

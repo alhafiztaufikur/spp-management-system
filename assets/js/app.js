@@ -1032,7 +1032,7 @@ function refreshDaftarUlangSelector(opt) {
   if (records.length === 0) {
     const empty = document.createElement('div');
     empty.className = 'du-selector-empty';
-    empty.textContent = opt ? 'Belum ada tagihan Daftar Ulang yang dapat dipilih.' : 'Pilih siswa untuk melihat tagihan.';
+    empty.textContent = opt?.dataset.duCoveredPsb === '1' ? 'DU tahun pertama tercakup PSB.' : (opt ? 'Belum ada tagihan Daftar Ulang yang dapat dipilih.' : 'Pilih siswa untuk melihat tagihan.');
     menu.appendChild(empty);
   }
 
@@ -1142,7 +1142,8 @@ function refreshDaftarUlangMasterWarning(opt) {
   const paid = parseNumber(bill?.terbayar ?? bill?.paid ?? 0);
   const remaining = parseNumber(bill?.sisa ?? Math.max(0, total - paid));
   const isSettled = !!bill && remaining <= 0.001;
-  const isUnavailable = !!opt && !bill;
+  const isCoveredPsb = opt?.dataset.duCoveredPsb === '1' && !bill;
+  const isUnavailable = !!opt && !bill && !isCoveredPsb;
   const expectedTotal = document.getElementById('du-expected-total');
   const expectedPaid = document.getElementById('du-expected-paid');
   if (expectedTotal) expectedTotal.value = bill ? String(total) : '';
@@ -1153,7 +1154,7 @@ function refreshDaftarUlangMasterWarning(opt) {
     if (isSettled) status = total <= .001 ? 'Tidak perlu dibayar' : 'Lunas';
     else if (paid > 0) status = 'Cicilan';
     if (!opt || !periodKey) {
-      contextLabel.textContent = opt ? 'Belum ada tagihan Daftar Ulang yang dapat dipilih.' : 'Pilih siswa untuk melihat tagihan.';
+      contextLabel.textContent = isCoveredPsb ? 'DU tahun pertama tercakup PSB. Cicilan mengikuti kewajiban PSB.' : (opt ? 'Belum ada tagihan Daftar Ulang yang dapat dipilih.' : 'Pilih siswa untuk melihat tagihan.');
     } else if (bill) {
       contextLabel.textContent = 'TA ' + periodKey + ' · Kelas ' + bill.kelas + ' · ' + status
         + (remaining > .001 ? ' · Sisa Rp ' + formatRupiah(remaining) : '');
@@ -1162,7 +1163,7 @@ function refreshDaftarUlangMasterWarning(opt) {
 
   if (input) {
     const locked = !bill || total <= 0 || isSettled;
-    const lockedMessage = isSettled
+    const lockedMessage = isCoveredPsb ? 'DU tahun pertama tercakup PSB.' : isSettled
       ? 'Tagihan Daftar Ulang sudah lunas.'
       : 'Tidak ada tagihan Daftar Ulang yang dapat dibayar.';
     setPaymentInputAvailability(input, locked, lockedMessage, true);

@@ -8,6 +8,7 @@ function du_master_rate_cents(mixed $value,int $grade): ?int {
     $value=trim((string)$value);if($value==='')return null;
     if(!preg_match('/^(?:[0-9]+|[0-9]{1,3}(?:\.[0-9]{3})+)(?:,[0-9]{1,2})?$/D',$value))throw new DomainException('Isi nominal rupiah yang valid untuk kelas '.$grade.'.');
     $cents=lf_cents(str_replace(',','.',str_replace('.','',$value)));
+    if(du_psb_initial_grade(unit_active_id(),$grade)){if($cents===0)return null;throw new DomainException('DU kelas '.$grade.' tercakup PSB; tarif terpisah hanya untuk kelas lanjutan.');}
     if($cents<=0)throw new DomainException('Nominal kelas '.$grade.' harus lebih dari Rp0; kosongkan jika belum ditetapkan.');
     return $cents;
 }
@@ -30,10 +31,11 @@ function du_master_save_and_complete(mysqli $db,int $yearId,string $label,mixed 
         du_write_audit($db,$yearId,$id,$master?'ubah_tarif':'buat_tarif',$master?['jumlah'=>$master['Jumlah']]:null,['kelas'=>(string)$grade,'jumlah'=>$cents/100,'basis'=>'system','policy'=>'new_bill_full_rate_unless_individual_discount_proven'],$rateAligned);
         lb_mark_du_master($db,$label,[$grade]);$saved++;
     }
+    $coverage=du_psb_reconcile($db,$label,$actor);
     $tracking=ldu_reconstruct_payments($db,$actor);
     lb_cache($db,true);$created=du_publish_year_from_active_students($db,$yearId,$label);
-    $result=['rates_saved'=>$saved,'created'=>$created,'existing'=>max(0,(int)($GLOBALS['du_publish_result']['existing']??0)-$aligned),'unknown'=>(int)($GLOBALS['du_publish_result']['unknown']??0),'unpaid_bills_aligned'=>$aligned,'payments_reclassified'=>$tracking['receipts']];
-    if($saved||$created||$aligned)du_write_audit($db,$yearId,null,'simpan_lengkapi',null,$result,$created);
+    $result=['rates_saved'=>$saved,'created'=>$created,'existing'=>max(0,(int)($GLOBALS['du_publish_result']['existing']??0)-$aligned),'unknown'=>(int)($GLOBALS['du_publish_result']['unknown']??0),'unpaid_bills_aligned'=>$aligned,'payments_reclassified'=>$tracking['receipts'],'covered_psb'=>(int)($GLOBALS['du_publish_result']['covered_psb']??$coverage['covered_psb']),'conflicts'=>(int)($GLOBALS['du_publish_result']['conflicts']??$coverage['conflicts'])];
+    if($saved||$created||$aligned||$coverage['changes'])du_write_audit($db,$yearId,null,'simpan_lengkapi',null,$result,$created);
     if(lop_ready($db))lb_refresh_manifests($db,lb_sync_owners($db,array_column(lb_cache($db)['students'],'id')));
     return $result;
 }

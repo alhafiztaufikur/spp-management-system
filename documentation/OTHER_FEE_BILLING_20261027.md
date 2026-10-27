@@ -46,7 +46,7 @@ Bukti backup runner harus cocok dengan struktur/checksum saat itu. Gunakan
 ulang; hasilnya harus changes 0. Mode ini tidak merekonsiliasi komponen lain.
 Publikasi sumber baru tetap menjalankan seluruh tahap melalui engine yang sama.
 
-Workflow 13 dan operasional 17 menolak simulasi/worker lama. Metadata pembayaran
+Workflow 14 dan operasional 18 menolak simulasi/worker lama. Metadata pembayaran
 otomasi versi 1–5 tetap terbaca; tidak ada penulisan ulang metadata demi versi saja.
 
 ## Verifikasi

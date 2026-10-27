@@ -24,6 +24,7 @@ function payment_student_details(mysqli $db,string $nis,int $excludePaymentId=0)
         'sppBilling'=>spp_payment_payload($db,$excludePaymentId,$nis)[$nis]??['tagihan'=>[]],
         'komiteBilling'=>komite_payment_payload($db,$excludePaymentId,$nis)[$nis]??[],
         'duBills'=>du_selectable_bills_payload($db,$excludePaymentId,0,$nis)[$nis]??[],
+        'duCoveredPsb'=>du_psb_state($db,$nis,du_current_academic_year())['covered_psb']?'1':'0',
         'annualFees'=>annual_fee_payload_for_options($db,$excludePaymentId,$nis)[$nis]??[],
         'biayaLainBills'=>array_merge(other_fee_optional_choices($db),$other)];
 }

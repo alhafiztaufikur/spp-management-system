@@ -1,5 +1,9 @@
 # Pelacakan DU otomatis
 
+Kebijakan kelas awal dan versi aturan pada dokumen ini diperbarui oleh
+[keputusan DU–PSB 27 Oktober 2026](DU_PSB_POLICY_20261027.md).
+DU kelas 1/7/10 tercakup PSB; bukti DU tersendiri dipertahankan sebagai konflik.
+
 Aturan: workflow 12, operasional 16, otomasi 5, billing 4, perencana DU 2.
 Metadata pembayaran otomasi versi 1, 2, 3, dan 4 tetap terbaca.
 

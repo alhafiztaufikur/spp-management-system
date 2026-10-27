@@ -12,6 +12,7 @@ function payment_receipt_remaining(mysqli $db,array $payment): array {
         $year=$month>=1&&$month<=12&&$calendar>=2000?du_academic_year_label($month,$calendar):'';
     }
     $billId=(int)($payment['tagihan_daftar_ulang_id']??0);
+    if($year!==''&&!empty(du_psb_state($db,$nis,$year)['covered_psb'])){$lines[]=['DU tahun pertama',null,'Tercakup PSB'];return $lines;}
     $bill=$billId?du_find_bill_by_id($db,$billId):($year!==''?lf_one($db,'SELECT id FROM tagihan_daftar_ulang WHERE no_induk=? AND tahun_ajaran_snapshot=? AND status=\'open\'',[$nis,$year]):null);
     if($bill&&!isset($bill['sisa']))$bill=du_find_bill_by_id($db,(int)$bill['id']);
     if($bill&&$bill['status']==='open')$lines[]=['Sisa DU',(float)$bill['sisa']];

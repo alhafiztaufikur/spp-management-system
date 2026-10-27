@@ -15,6 +15,7 @@ function workflow_schema_apply(mysqli $db): void {
         ['master_biaya_lain_data','jenis_pembayaran',"ENUM('berulang','tidak_berulang') NOT NULL DEFAULT 'berulang'"],
         ['bayar_data','riwayat_tahun_ajaran','CHAR(9) NULL'],
         ['bayar_data','riwayat_kelas_snapshot','VARCHAR(30) NULL'],
+        ['siswa_tahun_ajaran_data','du_covered_by_psb','TINYINT(1) NOT NULL DEFAULT 0'],
     ] as [$table,$column,$definition])if(!workflow_column_exists($db,$table,$column))$db->query("ALTER TABLE `$table` ADD COLUMN `$column` $definition");
     $db->query("ALTER TABLE siswa_tahun_ajaran_data MODIFY status ENUM('aktif','pindah','lulus','dibatalkan') NOT NULL DEFAULT 'aktif'");
     if(!$db->query("SELECT 1 FROM information_schema.TABLE_CONSTRAINTS WHERE CONSTRAINT_SCHEMA=DATABASE() AND CONSTRAINT_NAME='chk_siswa_potongan_psb'")->num_rows)$db->query('ALTER TABLE siswa_data ADD CONSTRAINT chk_siswa_potongan_psb CHECK(potongan_psb_nominal>=0 AND potongan_psb_nominal<=PSB)');

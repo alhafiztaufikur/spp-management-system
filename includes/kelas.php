@@ -411,5 +411,6 @@ function class_sync_student_current_year(
             throw new RuntimeException('Verifikasi sinkronisasi tarif tahun ajaran gagal. Tidak ada perubahan yang disimpan.');
         }
     }
+    if($placementId>0&&du_psb_schema_ready($db))du_psb_reconcile($db,$academicLabel,(int)($_SESSION['admin_id']??0),$placementId);
     return $placementId > 0 ? $placementId : null;
 }

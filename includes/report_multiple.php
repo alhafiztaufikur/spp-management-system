@@ -11,7 +11,7 @@ function report_multiple_normalize(mysqli $db,array &$source):array{
         'kategori'=>[$categoryPicker?report_categories($db):['spp'=>'SPP'],($source['template']??'')==='penerimaan'?'semua':'spp','semua'],
         'kelas'=>[$classes,'',''], 'tahun_ajaran'=>[$years,du_current_academic_year(),array_key_first($years)??du_current_academic_year()],
         'bulan_awal'=>[report_months(),date('m'),date('m')],
-        'status'=>[array_fill_keys(['tidak_ditagihkan','belum_bayar','cicilan','lunas','rekonsiliasi','ada_pembayaran','tunggakan','dibatalkan'],''),'',''],
+        'status'=>[array_fill_keys(['tidak_ditagihkan','belum_bayar','cicilan','lunas','covered_psb','rekonsiliasi','ada_pembayaran','tunggakan','dibatalkan'],''),'',''],
         'siswa_status'=>[['active'=>'Aktif','archived'=>'Arsip/Lulus'],($source['template']??'')==='riwayat-tagihan'?'all':'active','all'],
         'metode'=>[['Tunai'=>'Tunai','VA'=>'VA','Qris'=>'QRIS','Legacy'=>'Histori Legacy'],'',''], 'mutasi'=>[['masuk'=>'Masuk','keluar'=>'Keluar'],'',''],
         'saldo_status'=>[['ada_saldo'=>'Ada Saldo','saldo_nol'=>'Saldo Nol'],'',''], 'operator'=>[$operators,'',''],

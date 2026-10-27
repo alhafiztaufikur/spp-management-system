@@ -61,7 +61,7 @@ function report_annual_evidence(mysqli $db,array $f): array {
     foreach(hp_rows($db,'SELECT p.*,y.label FROM siswa_tahun_ajaran p JOIN tahun_ajaran y ON y.id=p.tahun_ajaran_id AND y.unit_id=p.unit_id WHERE y.label=?',[$year]) as $p)if($p['status']!=='dibatalkan')$placements[$p['no_induk']]=$p;
     if($category==='daftar_ulang')foreach(hp_rows($db,'SELECT t.*,COALESCE(SUM(d.jumlah),0) paid FROM tagihan_daftar_ulang t LEFT JOIN bayar_du d ON d.tagihan_daftar_ulang_id=t.id AND d.unit_id=t.unit_id WHERE t.tahun_ajaran_snapshot=? GROUP BY t.id',[$year]) as $b)$bills[$b['no_induk']]=$b;
     $nativePsb=[];if($category==='psb')foreach(hp_rows($db,'SELECT NO_INDUK,SUM(U_PSB) paid FROM bayar GROUP BY NO_INDUK') as $p)$nativePsb[$p['NO_INDUK']]=(float)$p['paid'];
-    $rows=[];
+    $rows=[];$duCoverage=$category==='daftar_ulang'?du_psb_states($db,$year):[];
     foreach(hp_rows($db,'SELECT s.*,mk.tingkat,mk.kode_rombel,mk.is_placeholder,mk.jenis,mk.nama_custom,mk.legacy_kind,mk.graduation_year FROM siswa s LEFT JOIN master_kelas mk ON mk.id=s.master_kelas_id WHERE s.legacy_pending=0') as $s){
         if(($f['siswa_status']==='active'&&!(int)$s['is_active'])||($f['siswa_status']==='archived'&&(int)$s['is_active']))continue;
         $nis=$s['NO_INDUK'];$source=lb_student($db,$nis);$native=$bills[$nis]??null;$placement=$placements[$nis]??null;$credit=$legacy['payments'][$nis]['daftar_ulang'][$year]??null;
@@ -79,6 +79,7 @@ function report_annual_evidence(mysqli $db,array $f): array {
         $cancelled=($native['status']??'')==='cancelled';$status=$known?report_billing_status((float)$bill,$paid,$cancelled?'cancelled':'open'):($paid>.001?'Perlu Rekonsiliasi':'Belum Diketahui');
         $label=$category==='psb'?class_label($s):($native['kelas_rombel_snapshot']??$placement['kelas_rombel_snapshot']??$credit['class']??'Tidak tercatat');
         $row=['nis'=>$nis,'student_id'=>(int)$s['id'],'unit_id'=>(int)$s['unit_id'],'nis_diknas'=>$s['NO_induk_diknas']??'','nama'=>$s['NAMA'],'kelas'=>$label,'master_kelas_id'=>$category==='psb'?$s['master_kelas_id']:($native['master_kelas_id']??$placement['master_kelas_id']??0),'tingkat'=>$category==='psb'?$s['KELAS']:($placement['kelas']??$label),'periode'=>$category==='psb'?'Sekali saat masuk':$year,'tagihan'=>$bill,'terbayar'=>$paid,'sisa'=>$known?($cancelled?0.0:max(0,$bill-$paid)):null,'status'=>$status,'_status'=>$status,'_incomplete'=>!$known];
+        if(!empty($duCoverage[$s['unit_id'].'|'.$nis]['covered_psb'])){$row['tagihan']=null;$row['terbayar']=0.0;$row['sisa']=0.0;$row['status']=$row['_status']='Tercakup PSB';$row['_du_status']='covered_psb';$row['_incomplete']=false;}
         $row['tanggal_dibuat']=$source?null:$s['created_at'];
         if(report_class_matches_row($f,$row))$rows[]=$row;
     }
@@ -213,7 +214,7 @@ function report_fee_item_rows(mysqli $db,array $f,array $statusRows,array $compo
 function report_fee_unified_rows(mysqli $db,array $f,array $statusRows,array $scope,bool $item,array $components): array {
     $positions=report_optional_positions($db,$f['kategori'],$f['tahun_ajaran'],$scope);$paidByBill=[];
     if($item){foreach($components as $p)if($p['kategori_key']===$f['kategori']&&!empty($p['bill_id']))$paidByBill[$p['bill_id']]=($paidByBill[$p['bill_id']]??0)+ofb_cents((float)$p['nominal']);
-        foreach(report_fee_payment_rows($db) as $p)if(!empty($p['bill_id'])&&$p['category']===$f['kategori']&&report_fee_payment_in_period($p,$scope)&&report_component_matches($p,$f)&&report_component_class_matches($db,$f,$p)&&report_component_method_matches($f,$p['method'])&&lful_report_matches_operator($f,(int)$p['unit_id'],$p['source_operator']))$paidByBill[$p['bill_id']]=($paidByBill[$p['bill_id']]??0)+$p['amount_cents'];
+        foreach(report_fee_payment_rows($db) as $p)if(!empty($p['bill_id'])&&$p['category']===$f['kategori']&&report_fee_payment_in_period($p,$scope)&&report_component_matches($p,$f)&&report_component_method_matches($f,$p['method'])&&lful_report_matches_operator($f,(int)$p['unit_id'],$p['source_operator']))$paidByBill[$p['bill_id']]=($paidByBill[$p['bill_id']]??0)+$p['amount_cents'];
     }
     $out=[];
     foreach($statusRows as $r){

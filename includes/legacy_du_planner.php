@@ -1,6 +1,6 @@
 <?php
 /** Pure source evidence. Cash receipts alone never determine a DU principal. */
-const LDU_VERSION=2;
+const LDU_VERSION=3;
 function ldu_source_proof(array $student,array $tariffs,string $year): array {
     $unknown=['known'=>false,'basis'=>'legacy','reason'=>'Tarif, kelas, periode, atau potongan DU belum dapat dibuktikan.'];
     $raw=$student['raw']??[];
@@ -25,12 +25,15 @@ function ldu_position(array $proof,int $legacy,int $native,?int $principal=null)
     return ['known'=>$known,'principal_cents'=>$total,'legacy_paid_cents'=>$legacy,'native_paid_cents'=>$native,'paid_cents'=>$paid,'remaining_cents'=>$known?max(0,$total-$paid):null,
         'excess_cents'=>$known?max(0,$paid-$total):null,'status'=>$known?($paid>=$total?'lunas':'belum_lunas'):'unknown'];
 }
-function ldu_source_preview(array $records,array $owners,array $payments,string $year): array {
+function ldu_source_preview(array $records,array $owners,array $payments,string $year,int $unit=0): array {
+    $unit=$unit?:((int)($GLOBALS['app_unit_id']??(function_exists('unit_active_id')?unit_active_id():1)));
     $tariffs=[];foreach($records as $r)if(in_array($r['table'],['Daftar_ulang','du'],true)){$v=$r['raw'];$tariffs[trim((string)($v['th_ajaran']??''))][trim((string)($v['kelas']??''))][]=$v;}
     $paid=[];foreach($payments as $p)foreach($p['items'] as $i)if(($i['category']??'')==='daftar_ulang'&&lb_payment_year(lma_item_period($i,(string)$p['period']))===$year)$paid[$p['identity']]=($paid[$p['identity']]??0)+lf_cents($i['amount']);
-    $out=['rule'=>LDU_VERSION,'year'=>$year,'ready'=>0,'unknown'=>0,'principal_cents'=>0,'paid_cents'=>0,'remaining_cents'=>0];
+    $out=['rule'=>LDU_VERSION,'year'=>$year,'ready'=>0,'unknown'=>0,'covered_psb'=>0,'conflicts'=>0,'principal_cents'=>0,'paid_cents'=>0,'remaining_cents'=>0];
     foreach($owners as $identity=>$o)if($o['ready']&&$o['kind']==='active'&&$o['student']){
         $proof=ldu_source_proof(['raw'=>$o['raw'],'migration_year'=>$year,'source_row_key'=>$o['source_key']],$tariffs,$year);
+        if(function_exists('du_psb_initial_grade')&&$year>=du_current_academic_year()&&du_psb_initial_grade($unit,preg_replace('/[^0-9]/','',(string)($o['raw']['KELAS']??'')))&&empty($proof['known'])&&empty($paid[$identity])){$out['covered_psb']++;continue;}
+        if(function_exists('du_psb_initial_grade')&&$year>=du_current_academic_year()&&du_psb_initial_grade($unit,preg_replace('/[^0-9]/','',(string)($o['raw']['KELAS']??'')))){$out['conflicts']++;continue;}
         if(!$proof['known']){$out['unknown']++;continue;}$p=ldu_position($proof,$paid[$identity]??0,0);$out['ready']++;
         foreach(['principal_cents','paid_cents','remaining_cents'] as $key)$out[$key]+=$p[$key];
     }return $out;
