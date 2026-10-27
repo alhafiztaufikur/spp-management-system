@@ -1,0 +1,227 @@
+/* Master Daftar Ulang: presentation only, scoped to this workspace. */
+html body[data-readable-workspace="master-registration"] .du-workspace {
+  --du-ink: #101f28;
+  --du-muted: #697588;
+  --du-line: #e5ebef;
+  --du-green: #0a925c;
+  --du-mint: #eff9f5;
+  --du-surface: #fff;
+  --du-hero-start: #f0faf6;
+  --du-hero-end: #c7eddf;
+  background: linear-gradient(180deg, transparent 70px, #f7fcfa 680px, transparent 1000px);
+  color: var(--du-ink);
+  font-family: 'Inter', sans-serif;
+}
+html body[data-readable-workspace="master-registration"] .du-workspace .du-master-hero {
+  position: relative;
+  isolation: isolate;
+  display: flex;
+  align-items: center;
+  min-height: 250px;
+  padding: 27px;
+  margin: 24px 28px 20px;
+  border: 0;
+  border-radius: 13px;
+  background: linear-gradient(108deg, var(--du-hero-start) 0%, var(--du-hero-start) 48%, var(--du-hero-end) 100%);
+  box-shadow: 0 8px 28px #16745006;
+}
+.du-hero-copy { position: relative; z-index: 1; min-width: 0; }
+.du-workspace :is(h1,h2,h3,h4) { font-family: 'Inter', sans-serif; }
+html body[data-readable-workspace="master-registration"] .du-workspace .recap-class-overline {
+  color: #087c4e; font-size: 14px; font-weight: 750; letter-spacing: .09em; text-transform: uppercase;
+}
+.du-workspace .du-hero-copy h1 {
+  font-family: 'Inter', sans-serif; font-size: clamp(40px, 4.1vw, 58px); font-weight: 800;
+  letter-spacing: -2.3px; line-height: 1.12; color: #05291c; margin: 9px 0 12px;
+}
+.du-hero-copy>p { color: #526071; font-size: 18px; line-height: 1.6; margin: 0 0 20px; }
+html body[data-readable-workspace="master-registration"] .du-workspace .du-master-year-tools {
+  display: flex; flex-direction: row; flex-wrap: wrap; align-items: center; justify-content: flex-start;
+  justify-self: start; width: 100%; min-width: 0; padding: 0; border: 0; gap: 12px 15px;
+}
+.du-workspace .du-master-year-tools form { margin: 0; width: auto; max-width: 100%; }
+.du-workspace .du-year-picker { position: relative; width: 216px !important; }
+.du-year-picker-icon { position: absolute; z-index: 2; left: 17px; top: 50%; transform: translateY(-50%); display: flex; color: #008446; pointer-events: none; }
+.du-year-picker-icon svg { width: 20px; height: 20px; }
+html body[data-readable-workspace="master-registration"] .du-workspace .du-year-picker :is(.field-select,.spp-select-trigger) {
+  width: 100%; min-height: 48px !important; padding: 11px 14px 11px 53px; border: 1px solid #cbe8df;
+  border-radius: 10px; background-color: #ffffffdf; color: #172b2c; font-size: 16px; font-weight: 500; box-shadow: none;
+}
+.du-workspace .du-year-picker .spp-select { width: 100%; }
+html body[data-readable-workspace="master-registration"] .du-workspace .du-year-picker .spp-select-caption { font-size: 16px; white-space: nowrap; overflow-wrap: normal; }
+.du-year-state { display: flex; align-items: center; gap: 8px; flex: 0 0 auto; }
+.du-year-state-label { color: var(--du-muted); font-size: 12px; line-height: 1.5; }
+html body[data-readable-workspace="master-registration"] .du-workspace .du-master-year-tools .du-year-status {
+  display: inline-flex; align-items: center; gap: 7px; padding: 5px 10px; border: 0; border-radius: 999px;
+  background: #dff2e7; color: #147449; font-size: 12px; font-weight: 600; line-height: 1.6;
+  white-space: nowrap; cursor: default;
+}
+.du-year-status-dot { flex: 0 0 6px; width: 6px; height: 6px; border-radius: 50%; background: currentColor; }
+html body[data-readable-workspace="master-registration"] .du-workspace .du-year-status.is-draft { background: #fff1d9; color: #916014; }
+html body[data-readable-workspace="master-registration"] .du-workspace .du-year-status.is-closed { background: #e7edeb; color: #52645c; }
+html body[data-readable-workspace="master-registration"] .du-workspace .du-master-year-tools .btn {
+  min-height: 48px; padding: 11px 18px; display: inline-flex; align-items: center; gap: 13px;
+  border: 1px solid #c6e1db; border-radius: 10px; background: #ffffffb8; color: #1e3035; font-size: 13px; font-weight: 600; box-shadow: none;
+}
+.du-workspace .du-master-year-tools .btn:hover { background: #fff; border-color: #71b69c; }
+.du-hero-art { position: absolute; z-index: 0; top: 0; right: 0; width: min(46%, 550px); height: 100%; pointer-events: none; border-radius: inherit; }
+
+html body[data-readable-workspace="master-registration"] .du-workspace .du-overview {
+  display: grid; grid-template-columns: repeat(4, minmax(0, 1fr)); gap: 16px; margin: 0 28px 20px;
+}
+.du-workspace .du-overview .du-stat {
+  --stat-color: #07864f; --stat-soft: #e1f7ec;
+  position: relative; display: flex; align-items: flex-start; gap: 16px; min-width: 0; min-height: 123px;
+  padding: 18px; border: 1px solid var(--du-line); border-radius: 12px; background: var(--du-surface);
+  box-shadow: 0 5px 16px #1c704004; overflow: hidden;
+}
+.du-workspace .du-overview .du-stat-blue { --stat-color: #126eff; --stat-soft: #e8f1ff; }
+.du-workspace .du-overview .du-stat-purple { --stat-color: #7c35df; --stat-soft: #f1ebff; }
+.du-workspace .du-overview .du-stat-orange { --stat-color: #b45305; --stat-soft: #ffecd8; background: color-mix(in srgb, var(--du-surface), #fff0df 40%); border-color: #ffa322; }
+.du-workspace .du-stat-icon { display: grid; place-items: center; flex: 0 0 59px; height: 59px; border-radius: 50%; background: var(--stat-soft); color: var(--stat-color); }
+.du-stat-icon svg { width: 29px; height: 29px; }
+.du-workspace .du-stat-copy { z-index: 1; min-width: 0; padding-top: 2px; }
+.du-workspace .du-stat-copy>span { display: block; padding-right: 15px; color: var(--du-ink); font-size: 12px; line-height: 1.6; }
+.du-workspace .du-stat-copy strong { display: block; color: var(--du-ink); font-size: 39px; font-weight: 750; letter-spacing: -1.2px; line-height: 1.15; margin-top: 5px; font-variant-numeric: tabular-nums; }
+.du-workspace .du-stat-orange .du-stat-copy :is(span,strong) { color: #984706; }
+.du-stat-link { position: absolute; z-index: 2; right: 17px; top: 19px; display: grid; place-items: center; width: 30px; height: 30px; color: var(--stat-color); background: var(--stat-soft); border-radius: 50%; }
+.du-stat-link svg { width: 20px; height: 20px; }
+.du-stat-link:hover { filter: brightness(.94); }
+.du-workspace a:focus-visible { outline: 3px solid var(--du-green); outline-offset: 4px; }
+.du-stat-wave { position: absolute; right: 14px; bottom: 9px; width: 110px; height: 51px; color: var(--stat-color); opacity: .65; pointer-events: none; }
+
+html body[data-readable-workspace="master-registration"] .du-workspace .du-completeness {
+  display: grid; grid-template-columns: minmax(0, 1.32fr) minmax(0, 1fr); align-items: center; gap: 28px;
+  margin: 0 28px 24px; padding: 19px 24px; border: 1px solid var(--du-line); border-radius: 14px;
+  background: var(--du-surface); box-shadow: 0 6px 23px #16745004; scroll-margin-top: 90px;
+}
+.du-completeness-data { min-width: 0; }
+.du-completeness h2 { margin: 0 0 3px; font-size: 18px; line-height: 1.5; font-weight: 700; letter-spacing: -.45px; color: var(--du-ink); }
+.du-completeness-data>p { color: var(--du-muted); font-size: 13px; line-height: 1.6; margin: 0 0 10px; }
+.du-completeness-chart { display: flex; align-items: center; gap: 35px; }
+.du-donut { flex: 0 0 128px; height: 128px; padding: 16px; border-radius: 50%; background: conic-gradient(from -1deg, #25b58a 0%, #56cfaa var(--du-complete), #ffda91 var(--du-complete), #ffcc72 100%); }
+.du-donut-empty { background: var(--du-line); }
+.du-donut>div { display: flex; flex-direction: column; align-items: center; justify-content: center; height: 100%; border-radius: 50%; background: var(--du-surface); color: var(--du-ink); }
+.du-donut strong { font-size: 26px; line-height: 1.1; letter-spacing: -1px; }
+.du-donut strong span { font-size: 18px; }
+.du-donut>div>span { font-size: 12px; margin-top: 2px; }
+.du-completeness-legend { flex: 1; min-width: 0; }
+.du-completeness-legend>div:not(.du-completeness-bar) { display: grid; grid-template-columns: minmax(0, 1fr) 55px 50px; align-items: center; gap: 10px; padding: 9px 0; font-size: 13px; }
+.du-completeness-legend>div:first-child { border-bottom: 1px solid var(--du-line); }
+.du-completeness-legend>div>span:first-child { display: flex; gap: 12px; align-items: center; }
+.du-completeness-legend strong { font-size: 15px; font-weight: 650; }
+.du-completeness-legend>div>span:last-child { color: var(--du-muted); text-align: right; }
+.du-legend-dot { display: inline-block; width: 12px; height: 12px; flex: 0 0 12px; border-radius: 50%; }
+.du-legend-dot.is-complete { background: #32bd91; }
+.du-legend-dot.is-pending { background: #ffcc72; }
+.du-completeness-bar { margin-top: 13px; height: 11px; border-radius: 12px; background: #e2e6ec; overflow: hidden; }
+.du-completeness-bar>span { display: block; height: 100%; border-radius: inherit; background: #0da170; }
+.du-completeness-insight { position: relative; background: var(--du-mint); border-radius: 14px; padding: 18px 22px; }
+.du-completeness-insight::before { content: ''; position: absolute; top: 3px; bottom: 0; left: -15px; width: 1px; background: var(--du-line); }
+.du-insight-icon { display: grid; place-items: center; width: 45px; height: 45px; border-radius: 50%; background: #dff5e9; color: #07824a; margin-bottom: 6px; }
+.du-insight-icon svg { width: 28px; height: 28px; }
+.du-completeness-insight h3 { margin: 0 0 5px; color: var(--du-ink); font-size: 16px; font-weight: 650; line-height: 1.5; }
+.du-completeness-insight p { color: var(--du-muted); font-size: 13px; line-height: 1.7; margin: 0; }
+.du-completeness-insight p strong { font-weight: 500; color: var(--du-green); }
+html body[data-readable-workspace="master-registration"] .du-workspace .du-completeness-insight small { display: block; color: var(--du-muted); font-size: 12px; margin-top: 4px; line-height: 1.6; }
+
+html body[data-readable-workspace="master-registration"] .du-workspace .master-modern-form { padding: 24px; border: 1px solid var(--du-line); border-radius: 14px; background: var(--du-surface); box-shadow: none; scroll-margin-top: 90px; }
+.du-workspace .master-modern-form .student-panel-heading { margin-bottom: 0; }
+.du-workspace .master-modern-form .student-panel-heading h3 { color: var(--du-ink); }
+.du-workspace .master-modern-form .student-panel-heading p { color: var(--du-muted); }
+.du-workspace .du-save-action .btn { border-radius: 10px; }
+.du-workspace .du-rate-grid { align-items: stretch; }
+.du-workspace .du-rate-card { display: flex; flex-direction: column; border-color: var(--du-line); background: var(--du-surface); border-radius: 12px; padding: 20px; }
+.du-workspace .du-rate-unset { border-color: #efcf9f; }
+.du-workspace .du-rate-card-heading { margin-bottom: 20px; }
+.du-workspace .du-rate-card-heading h3 { color: var(--du-ink); }
+.du-workspace .du-rate-card-heading small { color: var(--du-muted); }
+.du-workspace .du-rate-estimate { margin-top: auto; padding-top: 15px; }
+.du-workspace .du-class-progress { margin-bottom: 12px; }
+.du-workspace .du-rate-card>small { margin-bottom: 12px; }
+.du-workspace .du-tariff-basis { font-size: 11px; white-space: normal; }
+.du-workspace .du-psb-card { border-color: #cde7dc; background: linear-gradient(150deg, var(--du-mint), var(--du-surface) 80%); }
+.du-psb-heading { display: flex; align-items: flex-start; gap: 10px; margin-bottom: 17px; }
+.du-psb-heading>span { display: grid; place-items: center; flex: 0 0 34px; height: 34px; border-radius: 9px; background: #e0f3e9; color: #168957; }
+.du-psb-heading svg { width: 21px; height: 21px; }
+.du-psb-heading h4 { font-size: 14px; font-weight: 650; line-height: 1.5; color: var(--du-ink); margin: 0 0 4px; }
+.du-psb-heading p { font-size: 12px; line-height: 1.7; color: var(--du-muted); margin: 0; }
+.du-psb-counts { display: grid; grid-template-columns: 1fr 1.25fr; margin: 0 0 16px; padding: 13px 0; border-top: 1px solid #dcece4; border-bottom: 1px solid #dcece4; }
+.du-psb-counts>div { display: flex; flex-direction: column; justify-content: space-between; gap: 8px; padding-right: 12px; }
+.du-psb-counts>div+div { padding: 0 0 0 14px; border-left: 1px solid #dcece4; }
+.du-psb-counts dt { font-size: 12px; line-height: 1.6; color: var(--du-muted); }
+.du-psb-counts dd { margin: 0; font-size: 25px; line-height: 1.2; font-weight: 700; letter-spacing: -.6px; color: var(--du-ink); }
+.du-psb-counts dd span { font-size: 11px; font-weight: 400; letter-spacing: 0; color: var(--du-muted); }
+.du-psb-installments { display: flex; align-items: flex-start; gap: 8px; margin: auto 0 0; color: var(--du-muted); font-size: 12px; line-height: 1.7; }
+.du-psb-installments svg { flex: 0 0 16px; height: 16px; margin-top: 2px; color: #2b966b; }
+.du-psb-installments strong { display: block; color: var(--du-ink); font-size: 12px; font-weight: 600; }
+
+html[data-theme="dark"] body[data-readable-workspace="master-registration"] .du-workspace {
+  --du-ink: #edf5f1; --du-muted: #abbdb7; --du-line: #30443f; --du-green: #5cd6a8;
+  --du-mint: #1d3730; --du-surface: #192824; --du-hero-start: #1c3830; --du-hero-end: #265d49;
+  background: none;
+}
+html[data-theme="dark"] .du-workspace .du-hero-copy h1 { color: #ecfff5; }
+html[data-theme="dark"] .du-workspace .du-hero-copy>p { color: #c0d8ce; }
+html[data-theme="dark"] body[data-readable-workspace="master-registration"] .du-workspace .recap-class-overline { color: #83d7ae; }
+html[data-theme="dark"] body[data-readable-workspace="master-registration"] .du-workspace .du-master-year-tools .du-year-status { background: #254e3b; color: #8ad9ad; }
+html[data-theme="dark"] body[data-readable-workspace="master-registration"] .du-workspace .du-year-status.is-draft { background: #4c3b21; color: #f1c47e; }
+html[data-theme="dark"] body[data-readable-workspace="master-registration"] .du-workspace .du-year-status.is-closed { background: #35463e; color: #c5d3cc; }
+html[data-theme="dark"] .du-workspace .du-stat { --stat-soft: #183f30; }
+html[data-theme="dark"] .du-workspace .du-stat-blue { --stat-color: #71aaff; --stat-soft: #21334e; }
+html[data-theme="dark"] .du-workspace .du-stat-purple { --stat-color: #b596fa; --stat-soft: #342b4c; }
+html[data-theme="dark"] .du-workspace .du-stat-orange { --stat-color: #ffbd70; --stat-soft: #4b3522; background: #30271f; border-color: #95612b; }
+html[data-theme="dark"] .du-workspace .du-stat-orange .du-stat-copy :is(span,strong) { color: #ffbd70; }
+html[data-theme="dark"] .du-workspace :is(.du-insight-icon,.du-psb-heading>span) { color: #6addaa; background: #234c3c; }
+html[data-theme="dark"] .du-workspace :is(.du-psb-card,.du-psb-counts,.du-psb-counts>div+div) { border-color: #335b48; }
+html[data-theme="dark"] .du-workspace .du-completeness-bar { background: #35463f; }
+
+@media (max-width: 1450px) {
+  .du-hero-art { width: 40%; opacity: .9; }
+  .du-workspace .du-overview .du-stat { gap: 12px; padding: 18px 14px; }
+  .du-workspace .du-stat-icon { flex-basis: 48px; height: 48px; }
+  .du-stat-icon svg { width: 25px; height: 25px; }
+  .du-workspace .du-stat-copy>span { font-size: 11px; padding-right: 12px; }
+  .du-stat-link { width: 25px; height: 25px; right: 10px; }
+  .du-completeness-chart { gap: 24px; }
+}
+@media (max-width: 1150px) {
+  .du-hero-art { width: 35%; opacity: .5; }
+  .du-hero-copy>p { font-size: 16px; }
+  html body[data-readable-workspace="master-registration"] .du-workspace .du-overview { grid-template-columns: repeat(2, minmax(0, 1fr)); }
+  html body[data-readable-workspace="master-registration"] .du-workspace .du-completeness { grid-template-columns: minmax(0, 1fr); gap: 22px; }
+  .du-completeness-insight::before { display: none; }
+  .du-workspace .du-stat-copy>span { font-size: 13px; }
+}
+@media (max-width: 650px) {
+  html body[data-readable-workspace="master-registration"] .du-workspace .du-master-hero { margin: 18px 12px 14px; padding: 23px 20px; min-height: 0; }
+  .du-workspace .du-hero-copy h1 { font-size: 41px; letter-spacing: -1.8px; }
+  html body[data-readable-workspace="master-registration"] .du-workspace .recap-class-overline { font-size: 11px; }
+  .du-hero-copy>p { font-size: 14px; margin-bottom: 18px; }
+  .du-hero-art { display: none; }
+  html body[data-readable-workspace="master-registration"] .du-workspace .du-master-year-tools { gap: 10px; }
+  .du-workspace .du-year-picker { width: 180px !important; }
+  html body[data-readable-workspace="master-registration"] .du-workspace .du-year-picker :is(.spp-select-trigger,.spp-select-caption) { font-size: 14px; }
+  html body[data-readable-workspace="master-registration"] .du-workspace .du-overview { gap: 10px; margin: 0 12px 14px; }
+  .du-workspace .du-overview .du-stat { padding: 14px 12px; gap: 10px; min-height: 123px; }
+  .du-workspace .du-stat-icon { flex-basis: 34px; height: 34px; }
+  .du-stat-icon svg { width: 20px; height: 20px; }
+  .du-workspace .du-stat-copy>span { font-size: 11px; padding-right: 0; }
+  .du-workspace .du-stat-copy { padding-top: 38px; margin-left: -44px; }
+  .du-workspace .du-stat-copy strong { font-size: 31px; }
+  .du-stat-wave { width: 65px; bottom: 8px; right: 0; opacity: .45; }
+  html body[data-readable-workspace="master-registration"] .du-workspace .du-completeness { margin: 0 12px 18px; padding: 18px; gap: 18px; }
+  .du-completeness h2 { font-size: 16px; }
+  .du-completeness-data>p { font-size: 12px; }
+  .du-completeness-chart { gap: 16px; }
+  .du-donut { flex-basis: 93px; height: 93px; padding: 12px; }
+  .du-donut strong { font-size: 23px; }
+  .du-donut strong span { font-size: 14px; }
+  .du-donut>div>span { font-size: 10px; }
+  .du-completeness-legend>div:not(.du-completeness-bar) { grid-template-columns: minmax(0, 1fr) 26px 30px; gap: 6px; font-size: 10px; }
+  .du-completeness-legend>div>span:first-child { gap: 6px; }
+  .du-legend-dot { flex-basis: 8px; width: 8px; height: 8px; }
+  .du-completeness-legend strong { font-size: 12px; }
+  .du-completeness-insight { padding: 16px; }
+  html body[data-readable-workspace="master-registration"] .du-workspace .master-modern-form { padding: 18px; margin: 0 12px 20px; }
+}
