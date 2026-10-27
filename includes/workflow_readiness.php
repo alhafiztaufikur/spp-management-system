@@ -7,6 +7,7 @@ function workflow_schema_ready(mysqli $db): bool {
       (TABLE_NAME IN ('bayar','bayar_data') AND COLUMN_NAME IN ('riwayat_tahun_ajaran','riwayat_kelas_snapshot')) OR
       (TABLE_NAME='admin' AND COLUMN_NAME='active_super_guard'))")->fetch_row()[0];
     if($n!==9)return false;
+    require_once __DIR__.'/other_fee_billing_schema.php';if(!ofb_schema_ready($db))return false;
     if(!$db->query("SELECT 1 FROM information_schema.TABLES WHERE TABLE_SCHEMA=DATABASE() AND TABLE_NAME='workflow_migration_log'")->num_rows)return false;
     return (int)$db->query("SELECT COUNT(*) FROM workflow_migration_log WHERE migration_key IN ('two_roles_20261017','rombel_payment_20261017')")->fetch_row()[0]===2 && workflow_legacy_schema_ready($db);
 }

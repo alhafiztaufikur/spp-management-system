@@ -153,7 +153,7 @@ function general_unpaid(mysqli $koneksi,string $report_type,string $filter_bulan
             SELECT *
             FROM (
                 SELECT s.id AS student_id,s.unit_id,s.NO_INDUK, s.NO_induk_diknas, s.NAMA,
-                       t.kelas_rombel_snapshot AS KELAS, t.nama_snapshot AS komponen,
+                       t.id AS other_bill_id,t.kelas_rombel_snapshot AS KELAS, t.nama_snapshot AS komponen,
                        t.nominal_tagihan AS tagihan,
                        COALESCE(SUM(d.nominal_snapshot), 0) AS sudah_bayar,
                        GREATEST(t.nominal_tagihan - COALESCE(SUM(d.nominal_snapshot), 0), 0) AS sisa

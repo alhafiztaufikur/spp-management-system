@@ -20,7 +20,7 @@ function gft_report(string $template='per-item',array $extra=[]): array {
     ],$extra)));
 }
 function gft_optional(array $report): int {
-    return array_sum(array_map(static fn($r)=>lb_result_cents($r['pembayaran_opsional']??0),$report['rows']));
+    return array_sum(array_map(static fn($r)=>empty($r['bill_id'])?lb_result_cents($r['terbayar']??0):0,$report['rows']));
 }
 function gft_items(array $items,int $id): void {
     global $db;lf_query($db,'UPDATE legacy_op_payments SET items=? WHERE id=?',[lf_json($items),$id]);
@@ -42,7 +42,7 @@ try {
     gft_check(gft_optional(gft_report('per-item',['tanggal_awal'=>'2026-10-02','tanggal_akhir'=>'2026-10-02']))===45000000,'Exact cash date includes the Legacy payment');
     $outside=gft_report('per-item',['tanggal_awal'=>'2026-10-26','tanggal_akhir'=>'2026-10-26']);
     gft_check(gft_optional($outside)===0&&$outside['rows'][0]['status']==='Ada Pembayaran di Luar Periode','Outside-date evidence survives without adding period cash');
-    gft_check(count(gft_report('per-item',['tanggal_awal'=>'2026-10-26','tanggal_akhir'=>'2026-10-26','status'=>['ada_pembayaran']])['rows'])===1,'Existing payment status checkbox also finds outside-period evidence');
+    gft_check(count(gft_report('per-item',['tanggal_awal'=>'2026-10-26','tanggal_akhir'=>'2026-10-26','status'=>['ada_pembayaran']])['rows'])===0,'Payment status requires positive payment inside the selected period');
     $history=gft_report('riwayat-tagihan');
     gft_check(array_sum(array_column($history['rows'],'terbayar'))===450000.0,'Billing history includes payment-only Legacy fees once');
     $currentClass=hp_one($db,'SELECT master_kelas_id FROM siswa WHERE id=?',[$owner['student_id']]);
@@ -59,7 +59,7 @@ try {
     gft_check(gft_optional(gft_report('status'))===45000000,'Status report and item report agree for the academic year');
     $receipt=gft_report('penerimaan');gft_check(lb_result_cents($receipt['rows'][0]['total_penerimaan'])===45000000,'Receipt recap counts the selected fee once');
     $matrix=global_report_matrix(gft_report(),'per-item',1);
-    gft_check(lb_result_cents($matrix['rows'][0]['g0_pembayaran_opsional'])===45000000,'Screen and export matrix retain the same amount');
+    gft_check(lb_result_cents($matrix['rows'][0]['g0_terbayar'])===45000000,'Screen and export matrix retain the same amount');
 
     $db->query('SAVEPOINT fee_cases');
     foreach([1,2,3,4,5] as $version){$changed=$items;$changed[$slot]['migration']['version']=$version;gft_items($changed,$id);gft_check(gft_optional(gft_report())===45000000,'Metadata version '.$version.' uses the effective category');}
@@ -112,14 +112,14 @@ try {
 
     $class=hp_one($db,'SELECT master_kelas_id FROM siswa WHERE id=?',[$owner['student_id']]);
     lf_query($db,"INSERT INTO tagihan_biaya_lain(master_biaya_lain_id,no_induk,nama_snapshot,nominal_tagihan,status,created_by,master_kelas_id,kelas_rombel_snapshot) VALUES(20,'252601095','Saldo awal Robotik',100000,'open',1,?,'2C')",[$class['master_kelas_id']]);$bill=(int)$db->insert_id;
-    $r=gft_report()['rows'][0];gft_check((float)$r['sisa']===100000.0&&$r['terbayar']===0.0&&$r['pembayaran_opsional']===450000.0,'Historical cash does not repay an opening bill a second time');
+    $rr=gft_report();$r=array_values(array_filter($rr['rows'],static fn($row)=>(int)$row['bill_id']===$bill))[0];gft_check((float)$r['sisa']===100000.0&&$r['terbayar']===0.0&&gft_optional($rr)===45000000,'Historical cash does not repay an opening bill a second time');
     lf_query($db,"INSERT INTO bayar(NO_INDUK,KELAS,master_kelas_id,kelas_rombel_snapshot,U_LAIN,TGL_BYR,BULAN,TAHUN,user_id,sistem_pembayaran,total_jumlah) VALUES('252601095','2',?,'2C',50000.25,'2026-10-01','10','2026','1','Tunai',50000.25)",[$class['master_kelas_id']]);$native=(int)$db->insert_id;
     lf_query($db,"INSERT INTO bayar_biaya_lain(bayar_id,master_biaya_lain_id,tagihan_biaya_lain_id,nama_biaya_snapshot,nominal_snapshot) VALUES(?,20,?,'Robotik',50000.25)",[$native,$bill]);
-    $r=gft_report()['rows'][0];gft_check($r['terbayar']===50000.25&&(float)$r['sisa']===49999.75,'Native bill allocations combine with separate Legacy receipt evidence');
-    $r=gft_report('per-item',['tanggal_awal'=>'2026-10-26','tanggal_akhir'=>'2026-10-26'])['rows'][0];
+    $r=array_values(array_filter(gft_report()['rows'],static fn($row)=>(int)$row['bill_id']===$bill))[0];gft_check($r['terbayar']===50000.25&&(float)$r['sisa']===49999.75,'Native bill allocations combine with separate Legacy receipt evidence');
+    $r=array_values(array_filter(gft_report('per-item',['tanggal_awal'=>'2026-10-26','tanggal_akhir'=>'2026-10-26'])['rows'],static fn($row)=>(int)$row['bill_id']===$bill))[0];
     gft_check($r['terbayar']===0.0&&(float)$r['sisa']===49999.75&&$r['status']==='Cicilan','A date filter never recreates already paid bill debt');
     lf_query($db,"UPDATE tagihan_biaya_lain SET status='cancelled' WHERE id=?",[$bill]);
-    $r=gft_report();gft_check(count($r['rows'])===2&&array_sum(array_column($r['rows'],'pembayaran_opsional'))===450000.0,'Bill cancellation preserves separate active receipt evidence');
+    $r=gft_report();gft_check(count($r['rows'])===2&&gft_optional($r)===45000000,'Bill cancellation preserves separate active receipt evidence');
     $db->query('ROLLBACK TO SAVEPOINT fee_cases');
     unit_set_context($db,0);$r=gft_report();
     gft_check(gft_optional($r)===45000000&&count($r['rows'])===1&&(int)$r['rows'][0]['unit_id']===1,'Combined units do not merge another unit into the student identity');

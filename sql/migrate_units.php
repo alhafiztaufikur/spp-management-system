@@ -193,6 +193,7 @@ require_once __DIR__."/../includes/legacy_full_schema.php";
 legacy_full_schema_apply($koneksi);
 require_once __DIR__.'/../includes/legacy_operational_schema.php';
 lop_schema_apply($koneksi);
+require_once __DIR__.'/../includes/other_fee_billing_schema.php';ofb_schema_apply($koneksi);
 
 require_once __DIR__.'/savings_authorization_schema.php';
 savings_authorization_schema_apply($koneksi);

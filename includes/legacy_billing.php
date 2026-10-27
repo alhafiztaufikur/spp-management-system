@@ -17,10 +17,10 @@ function lb_scope_student_read(mysqli $db,string $nis): void {
 }
 
 function lb_cache(mysqli $db, bool $refresh=false): array {
-    static $cache=[];$scope=(int)($GLOBALS['app_unit_id']??unit_active_id());$prefix=$db->thread_id.':';
+    static $cache=[];$scope=(int)($GLOBALS['app_unit_id']??unit_active_id());$compact=!empty($GLOBALS['lb_report_compact'][$db->thread_id]);$prefix=$db->thread_id.($compact?':report:':':');
     $nis=$GLOBALS['lb_read_student'][$db->thread_id]??null;$key=$prefix.$scope.($nis===null?'':':student:'.$nis);
     $studentWhere=$nis===null?'':" AND s.NO_INDUK='".$db->real_escape_string($nis)."'";
-    if($refresh)foreach(array_keys($cache) as $cachedKey)if(str_starts_with($cachedKey,$prefix))unset($cache[$cachedKey]);
+    if($refresh)foreach(array_keys($cache) as $cachedKey)if(str_starts_with($cachedKey,$db->thread_id.':'))unset($cache[$cachedKey]);
     if(!$refresh&&isset($cache[$key]))return $cache[$key];
     // An all-unit report has already read this evidence under the connection's
     // authorized scope. Partition it by immutable owner/source IDs instead of
@@ -63,7 +63,7 @@ function lb_cache(mysqli $db, bool $refresh=false): array {
         $out['owner_units'][(int)$p['owner_id']]=(int)$p['unit_id'];
         $items=json_decode($p['items'],true);$initial=$originals[$p['id']]['items']??$items;
         $monthlyPeriod=lb_payment_month((string)$p['source_period']);
-        if($monthlyPeriod!==''&&$monthlyPeriod>='2020-01'){
+        if(!$compact&&$monthlyPeriod!==''&&$monthlyPeriod>='2020-01'){
             // The monthly planner needs only component and amount. Keep full
             // receipt/trace metadata in its original storage and receipt reader.
             $monthlyItems=[];foreach($items as $item)if(in_array($item['category']??'',['spp','komite'],true))$monthlyItems[]=['category'=>$item['category'],'amount'=>$item['amount']];
@@ -80,7 +80,7 @@ function lb_cache(mysqli $db, bool $refresh=false): array {
         }else $out['paid'][$owner]['du'][$year]=($out['paid'][$owner]['du'][$year]??0)+$du;
     }$cursor->free();
     foreach($out['students'] as $student)$out['owner_students'][$student['id']]=$student;
-    foreach(['spp','komite'] as $category){
+    if(!$compact)foreach(['spp','komite'] as $category){
         $sql=$category==='spp'?"SELECT t.unit_id,t.no_induk,t.bulan,t.tahun,t.nominal_tagihan,t.status,COALESCE(SUM(CASE WHEN b.status='active' THEN a.nominal_dari_bayar ELSE 0 END),0) paid FROM tagihan_spp t LEFT JOIN spp_alokasi a ON a.tagihan_spp_id=t.id AND a.unit_id=t.unit_id LEFT JOIN spp_alokasi_batch b ON b.id=a.batch_id AND b.unit_id=a.unit_id":"SELECT t.unit_id,t.no_induk,t.bulan,t.tahun,t.nominal_tagihan,t.status,COALESCE(SUM(p.nominal),0) paid FROM tagihan_komite t LEFT JOIN bayar_komite p ON p.tagihan_komite_id=t.id AND p.unit_id=t.unit_id";
         foreach(hp_rows($db,$sql.($nis===null?'':" WHERE t.no_induk=$number").' GROUP BY t.id') as $bill)$out['native_monthly'][$bill['unit_id'].'|'.$bill['no_induk']][$category.'|'.$bill['tahun'].'-'.str_pad($bill['bulan'],2,'0',STR_PAD_LEFT)]=$bill;
     }

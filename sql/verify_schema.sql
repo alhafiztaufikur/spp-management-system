@@ -409,7 +409,7 @@ FROM (
   UNION ALL
   SELECT 'bayar_biaya_lain.tagihan_biaya_lain_id', EXISTS(SELECT 1 FROM information_schema.COLUMNS WHERE TABLE_SCHEMA=DATABASE() AND TABLE_NAME='bayar_biaya_lain' AND COLUMN_NAME='tagihan_biaya_lain_id')
   UNION ALL
-  SELECT 'uk_tagihan_biaya_lain_siswa_master', EXISTS(SELECT 1 FROM information_schema.STATISTICS WHERE TABLE_SCHEMA=DATABASE() AND TABLE_NAME='tagihan_biaya_lain' AND INDEX_NAME='uk_tagihan_biaya_lain_siswa_master' AND NON_UNIQUE=0)
+  SELECT 'uk_tagihan_biaya_lain_siswa_master', EXISTS(SELECT 1 FROM information_schema.STATISTICS WHERE TABLE_SCHEMA=DATABASE() AND TABLE_NAME='tagihan_biaya_lain' AND INDEX_NAME IN ('uk_tagihan_biaya_lain_siswa_master','ofb_occurrence') AND NON_UNIQUE=0)
   UNION ALL
   SELECT 'fk_bayar_biaya_lain_tagihan', EXISTS(SELECT 1 FROM information_schema.TABLE_CONSTRAINTS WHERE CONSTRAINT_SCHEMA=DATABASE() AND TABLE_NAME='bayar_biaya_lain' AND CONSTRAINT_NAME='fk_bayar_biaya_lain_tagihan' AND CONSTRAINT_TYPE='FOREIGN KEY')
   UNION ALL

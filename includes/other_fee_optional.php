@@ -31,7 +31,8 @@ function other_fee_optional_line(mysqli $db,string $choice,float $amount,string 
     if(!preg_match('/^master:([1-9][0-9]*)$/D',$choice,$m))throw new RuntimeException('Pilihan Biaya Lain tidak valid.');$id=(int)$m[1];
     if(!is_finite($amount)||$amount<=0)throw new RuntimeException('Nominal Biaya Lain harus berupa angka positif.');
     if(isset($seen[$choice]))throw new RuntimeException('Master yang sama hanya boleh satu baris per transaksi.');$seen[$choice]=true;
-    $same=$old&&$old['tagihan_biaya_lain_id']===null&&(int)$old['master_biaya_lain_id']===$id;
+    $purchase=$old&&!empty($old['tagihan_biaya_lain_id'])?hp_one($db,"SELECT origin FROM tagihan_biaya_lain WHERE id=?",[$old['tagihan_biaya_lain_id']]):null;
+    $same=$old&&($old['tagihan_biaya_lain_id']===null||($purchase['origin']??'')==='purchase')&&(int)$old['master_biaya_lain_id']===$id;
     $s=$db->prepare('SELECT nama,nominal,is_active,jenis_pembayaran FROM master_biaya_lain WHERE id=? FOR UPDATE');$s->bind_param('i',$id);$s->execute();$r=$s->get_result()->fetch_assoc();$s->close();
     require_once __DIR__.'/legacy_finance.php';if(lf_reserved_master($db,$id))throw new RuntimeException('Gunakan tagihan Tunggakan Legacy yang sudah disahkan.');
     if(!$r||((!(int)$r['is_active']||$r['jenis_pembayaran']!=='berulang')&&!$same))throw new RuntimeException('Master Biaya Lain tidak berulang, berubah, atau tidak aktif. Muat ulang formulir dan pilih tagihan yang diterbitkan.');
@@ -47,6 +48,7 @@ function other_fee_optional_line(mysqli $db,string $choice,float $amount,string 
         throw new RuntimeException($message);
     }
     $name=$same?$old['nama_biaya_snapshot']:($trusted?($_POST['_other_fee_names'][$choice]??$r['nama']):$r['nama']);
-    return ['bill_id'=>null,'master_id'=>$id,'nama'=>$name,'nominal'=>$amount,'keterangan'=>$note,
-        'tarif_referensi'=>$unchanged?($old['tarif_referensi_snapshot']??null):(float)$r['nominal']];
+    $unquotedHistory=$old&&$old['tagihan_biaya_lain_id']===null&&($old['tarif_referensi_snapshot']??null)===null;
+    return ['purchase_eligible'=>!$old||($old['tarif_referensi_snapshot']??null)!==null||($purchase['origin']??'')==='purchase','bill_id'=>null,'master_id'=>$id,'nama'=>$name,'nominal'=>$amount,'keterangan'=>$note,
+        'tarif_referensi'=>$unquotedHistory?null:($unchanged?($old['tarif_referensi_snapshot']??null):(float)$r['nominal'])];
 }

@@ -24,6 +24,7 @@
   }
   function position(panel, button, options = {}) {
     if (panel.hidden || !button.isConnected) return;
+    const scrollTop = panel.scrollTop, scrollLeft = panel.scrollLeft;
     const r = button.getBoundingClientRect(), v = viewport(), margin = 8, gap = 6;
     const width = Math.max(0, Math.min(Math.max(r.width, options.minWidth || 260), v.right-v.left-margin*2));
     const set = (key, value) => panel.style.setProperty(key, value, 'important');
@@ -46,6 +47,9 @@
     if (Math.abs(actual.left-left) > .25) set('left', (left+left-actual.left)+'px');
     if (Math.abs(actual.top-top) > .25) set('top', (top+top-actual.top)+'px');
     panel.dataset.sppPlacement = up ? 'top' : 'bottom';
+    // Measuring at a larger height can otherwise clamp a scrolled list to zero.
+    panel.scrollTop = scrollTop;
+    panel.scrollLeft = scrollLeft;
   }
   function hide(panel) {
     const record = mounted.get(panel);

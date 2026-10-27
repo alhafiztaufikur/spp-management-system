@@ -57,7 +57,7 @@ try{
         gre_check(isset($r['columns'],$r['rows'])&&!str_contains($r['subtitle'],'histori Legacy tanpa tanggal'),"Unit $unit $template category $category is readable");
         if($template==='penerimaan')gre_check(gre_sum($r['rows'],'total_penerimaan')===($source['categories'][$unit][$category]??0),"Unit $unit receipt category $category equals independent source cents");
         if($template==='per-item'&&str_starts_with($category,'histori:'))gre_check(gre_sum($r['rows'],'terbayar')===($source['categories'][$unit][$category]??0),"Unit $unit history-only item $category retains dated payments");
-        if($template==='per-item'&&str_starts_with($category,'biaya_lain:'))gre_check(gre_sum($r['rows'],'terbayar')+gre_sum($r['rows'],'pembayaran_opsional')===($source['categories'][$unit][$category]??0),"Unit $unit item $category retains allocated and unallocated dated payments");
+        if($template==='per-item'&&str_starts_with($category,'biaya_lain:'))gre_check(gre_sum($r['rows'],'terbayar')===($source['categories'][$unit][$category]??0),"Unit $unit item $category retains allocated and unallocated dated payments");
     }
  }
  unit_set_context($koneksi,0);

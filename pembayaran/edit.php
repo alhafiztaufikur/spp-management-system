@@ -214,6 +214,7 @@ $stmtBills = $koneksi->prepare("SELECT t.id,t.no_induk,t.master_biaya_lain_id,t.
     GROUP BY t.id ORDER BY t.nama_snapshot");
 $stmtBills->bind_param('ii',$id,$id); $stmtBills->execute();
 foreach($stmtBills->get_result()->fetch_all(MYSQLI_ASSOC) as $bill){
+    $bill['paid']=ofb_paid($koneksi,(int)$bill['id'],$id);
     $bill['id']=(int)$bill['id']; $bill['master_id']=(int)$bill['master_biaya_lain_id'];
     $bill['nominal']=(float)$bill['nominal']; $bill['paid']=(float)$bill['paid'];
     $bill['sisa']=max(0,$bill['nominal']-$bill['paid']);
@@ -230,6 +231,7 @@ $stmt_biaya_lain = $koneksi->prepare("
 $stmt_biaya_lain->bind_param('i', $id);
 $stmt_biaya_lain->execute();
 $biaya_lain_details = $stmt_biaya_lain->get_result()->fetch_all(MYSQLI_ASSOC);
+foreach($biaya_lain_details as &$feeDetail){if(!empty($feeDetail['tagihan_biaya_lain_id'])){ $feeBill=hp_one($koneksi,'SELECT origin FROM tagihan_biaya_lain WHERE id=?',[$feeDetail['tagihan_biaya_lain_id']]);if(($feeBill['origin']??'')==='purchase')$feeDetail['_purchase']=true; }}unset($feeDetail);
 $stmt_biaya_lain->close();
 if (isset($restoreDraft['biaya_lain_tagihan_id']) && is_array($restoreDraft['biaya_lain_tagihan_id'])) {
     $originalDetails = array_column($biaya_lain_details, null, 'id');
@@ -493,7 +495,7 @@ $selectedPaymentMethod = $d['sistem_pembayaran'] ?? 'VA';
           <div class="alert alert-warning biaya-lain-overpaid-alert" id="biaya-lain-overpaid-alert" hidden></div>
           <div class="lainlain-grid" id="biaya-lain-list">
             <?php foreach ($biaya_lain_details as $index => $detail):
-              $selectedBillId = (int)($detail['tagihan_biaya_lain_id'] ?? 0);
+              $selectedBillId = !empty($detail['_purchase'])?0:(int)($detail['tagihan_biaya_lain_id'] ?? 0);
               $optionalChoice=$detail['choice']??(!$selectedBillId&&!empty($detail['master_biaya_lain_id'])?'master:'.$detail['master_biaya_lain_id']:'');
               $currentNominal = (float)($detail['nominal_snapshot'] ?? 0);
               $selectedBill = null;

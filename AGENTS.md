@@ -22,7 +22,10 @@ wajib diperiksa.
 - Kode kosong/ambigu diterima otomatis sebagai Biaya Legacy belum teridentifikasi,
   tanpa menunggu pemetaan pengguna. Nominal tidak sah/total bertentangan diarsipkan
   otomatis per transaksi; data valid lainnya lanjut. Koreksi manual tetap opsional.
-- Riwayat biaya bukan tarif atau tagihan baru. Master baru dari bukti nama sumber
+- Histori pembayaran bukan bukti total kewajiban. Tagihan Biaya Lain historis hanya
+  dibentuk dari kewajiban per siswa yang terbukti melalui engine resmi; histori
+  tanpa bukti kewajiban tetap dibaca sebagai Dibayar dengan tagihan/sisa null.
+  Master baru dari bukti nama sumber
   tetap nonaktif dan tarif belum ditetapkan. Jangan menyalin penerimaan Legacy ke
   bayar/bayar_biaya_lain untuk membuatnya terlihat pada sistem baru.
 - Rekening tabungan saja tidak mendapat tagihan otomatis. Penetapan eksplisit lewat
@@ -51,7 +54,7 @@ wajib diperiksa.
   serta potongan harus terbukti. `bayar_du` sumber adalah bukti rekap, bukan kas kedua.
   Terbitkan tahun draf melalui fungsi resmi tanpa menunggu semua kelas lengkap.
   Data belum terbukti menjadi pengecualian otomatis, bukan nol/lunas atau tugas wajib pengguna.
-- Versi saat ini: workflow 12, operasional 16, otomasi 5, billing 4, DU 2.
+- Versi saat ini: workflow 13, operasional 17, otomasi 5, billing 4, DU 2.
   Metadata otomasi versi 1, 2, 3, dan 4 tetap terbaca; worker/simulasi lama wajib ditolak.
 
 Rincian DU: [pelacakan otomatis dan pengujian](documentation/LEGACY_DU_TRACE_20261026.md).
@@ -65,3 +68,8 @@ Rincian DU: [pelacakan otomatis dan pengujian](documentation/LEGACY_DU_TRACE_202
   tahun dan kelas kewajibannya, bukan tanggal kas. PSB lunas tidak membuktikan DU.
 - Regresi wajib: tarif kelas awal kosong pada tahun Terbit, input baru tersimpan
   sebelum penerbitan, kredit lama tetap berlaku, serta pengulangan nol perubahan.
+
+- Biaya Lain Berulang baru membuat tagihan per kejadian pembelian dalam transaksi
+  pembayaran yang sama. Kredit Legacy tetap di sumber asal; satu kolom Dibayar
+  tidak berarti semua penerimaan otomatis mengurangi tagihan. Lihat
+  [alur tagihan Biaya Lain](documentation/OTHER_FEE_BILLING_20261027.md).

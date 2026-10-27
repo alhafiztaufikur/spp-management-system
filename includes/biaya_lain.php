@@ -1,5 +1,6 @@
 <?php
 require_once __DIR__.'/other_fee_optional.php';
+require_once __DIR__.'/other_fee_billing.php';
 
 require_once __DIR__ . '/kelas.php';
 
@@ -24,7 +25,7 @@ function other_fee_publish(mysqli $db,int $masterId,string $target,array $ids,st
     if($target==='rombel')foreach($ids as $classId){$class=class_find($db,$classId);if(!$class||!(int)$class['is_active'])throw new RuntimeException('Rombel sasaran tidak aktif atau berbeda unit.');}
     $created=0;$skipped=0;$actor=(int)$_SESSION['admin_id'];
     foreach($students as $student){
-        $s=$db->prepare('SELECT id FROM tagihan_biaya_lain WHERE master_biaya_lain_id=? AND no_induk=? FOR UPDATE');$s->bind_param('is',$masterId,$student['NO_INDUK']);$s->execute();$exists=$s->get_result()->num_rows;$s->close();if($exists){$skipped++;continue;}
+        $s=$db->prepare('SELECT id FROM tagihan_biaya_lain WHERE master_biaya_lain_id=? AND no_induk=? AND occurrence_key=\'once\' FOR UPDATE');$s->bind_param('is',$masterId,$student['NO_INDUK']);$s->execute();$exists=$s->get_result()->num_rows;$s->close();if($exists){$skipped++;continue;}
         $label=class_label($student);$s=$db->prepare("INSERT INTO tagihan_biaya_lain(master_biaya_lain_id,no_induk,master_kelas_id,nama_snapshot,nominal_tagihan,kelas_rombel_snapshot,created_by) VALUES(?,?,?,?,?,?,?)");
         $s->bind_param('isisdsi',$masterId,$student['NO_INDUK'],$student['master_kelas_id'],$master['nama'],$master['nominal'],$label,$actor);$s->execute();$s->close();$created++;
     }
@@ -42,7 +43,7 @@ function other_fee_bill_find(mysqli $db, int $billId, string $noInduk, bool $for
         if (!$bill) return null;
         $bill['nominal_tagihan'] = (float)$bill['nominal_tagihan'];
         $bill['terbayar'] = other_fee_paid_for_bill($db, $billId, 0, true);
-        $bill['sisa'] = max(0, $bill['nominal_tagihan'] - $bill['terbayar']);
+        $bill['sisa'] = max(0.0, $bill['nominal_tagihan'] - $bill['terbayar']);
         return $bill;
     }
     $stmt = $db->prepare("SELECT t.*, COALESCE(SUM(d.nominal_snapshot), 0) AS terbayar
@@ -57,28 +58,18 @@ function other_fee_bill_find(mysqli $db, int $billId, string $noInduk, bool $for
     $stmt->close();
     if ($bill) {
         $bill['nominal_tagihan'] = (float)$bill['nominal_tagihan'];
-        $bill['terbayar'] = (float)$bill['terbayar'];
-        $bill['sisa'] = max(0, $bill['nominal_tagihan'] - $bill['terbayar']);
+        $bill['terbayar'] = ofb_paid($db,$billId);
+        $bill['sisa'] = max(0.0, $bill['nominal_tagihan'] - $bill['terbayar']);
     }
     return $bill;
 }
 
 /** Detail ditarik dengan current read agar dua kasir tidak melihat snapshot pembayaran lama. */
 function other_fee_paid_for_bill(mysqli $db, int $billId, int $excludePaymentId = 0, bool $forUpdate = false): float {
-    $sql = 'SELECT bayar_id, nominal_snapshot FROM bayar_biaya_lain WHERE tagihan_biaya_lain_id=?';
-    if ($forUpdate) $sql .= ' FOR UPDATE';
-    $stmt = $db->prepare($sql);
-    $stmt->bind_param('i', $billId);
-    $stmt->execute();
-    $paid = 0.0;
-    foreach ($stmt->get_result()->fetch_all(MYSQLI_ASSOC) as $line) {
-        if ((int)$line['bayar_id'] !== $excludePaymentId) $paid += (float)$line['nominal_snapshot'];
-    }
-    $stmt->close();
-    return $paid;
+    return ofb_paid($db,$billId,$excludePaymentId,$forUpdate);
 }
 
-function other_fee_open_bills(mysqli $db, string $noInduk): array {
+function other_fee_open_bills(mysqli $db, string $noInduk,int $excludePaymentId=0): array {
     $stmt = $db->prepare("SELECT t.id, t.master_biaya_lain_id, t.nama_snapshot AS nama,
                t.nominal_tagihan AS nominal, t.status,
                COALESCE(SUM(d.nominal_snapshot), 0) AS terbayar
@@ -93,8 +84,8 @@ function other_fee_open_bills(mysqli $db, string $noInduk): array {
     $stmt->close();
     foreach ($rows as &$row) {
         $row['nominal'] = (float)$row['nominal'];
-        $row['terbayar'] = (float)$row['terbayar'];
-        $row['sisa'] = max(0, $row['nominal'] - $row['terbayar']);
+        $row['terbayar'] = ofb_paid($db,(int)$row['id'],$excludePaymentId);
+        $row['sisa'] = max(0.0, $row['nominal'] - $row['terbayar']);
     }
     unset($row);
     return $rows;

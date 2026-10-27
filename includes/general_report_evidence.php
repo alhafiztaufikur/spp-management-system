@@ -30,10 +30,11 @@ function general_debt_coverage(mysqli $db,string $type,string $month,string $yea
     if(in_array($type,['belum_spp','belum_komite'],true))return general_monthly_positions($db,$type,$month,$year,$where,$params)['coverage'];
     $students=[];foreach(hp_rows($db,"SELECT s.id,s.unit_id FROM siswa s WHERE s.is_active=1 $where",$params) as $r)$students[$r['unit_id'].'|'.$r['id']]=true;
     if($type==='belum_du'){$sql="SELECT s.id student_id,t.unit_id,t.no_induk,t.status,t.nominal_tagihan,COALESCE(SUM(d.jumlah),0) paid FROM tagihan_daftar_ulang t JOIN siswa s ON s.NO_INDUK=t.no_induk AND s.unit_id=t.unit_id LEFT JOIN bayar_du d ON d.tagihan_daftar_ulang_id=t.id AND d.unit_id=t.unit_id WHERE t.tahun_ajaran_snapshot=? GROUP BY t.id";$args=[$academic];}
-    else{$sql="SELECT s.id student_id,t.unit_id,t.no_induk,t.status,t.nominal_tagihan,COALESCE(SUM(d.nominal_snapshot),0) paid FROM tagihan_biaya_lain t JOIN siswa s ON s.NO_INDUK=t.no_induk AND s.unit_id=t.unit_id LEFT JOIN bayar_biaya_lain d ON d.tagihan_biaya_lain_id=t.id AND d.unit_id=t.unit_id GROUP BY t.id";$args=[];}
+    else{$sql="SELECT t.id other_bill_id,s.id student_id,t.unit_id,t.no_induk,t.status,t.nominal_tagihan,COALESCE(SUM(d.nominal_snapshot),0) paid FROM tagihan_biaya_lain t JOIN siswa s ON s.NO_INDUK=t.no_induk AND s.unit_id=t.unit_id LEFT JOIN bayar_biaya_lain d ON d.tagihan_biaya_lain_id=t.id AND d.unit_id=t.unit_id GROUP BY t.id";$args=[];}
     $counts=[];$found=[];$scope=(int)$GLOBALS['app_unit_id'];
     try{foreach(hp_rows($db,$sql,$args) as $r){$key=$r['unit_id'].'|'.$r['student_id'];if(!isset($students[$key]))continue;$found[$key]=true;
         if($type==='belum_du'){if((int)$GLOBALS['app_unit_id']!==(int)$r['unit_id'])unit_set_context($db,(int)$r['unit_id']);$r['paid']+=lb_du_bill_credit($db,$r['no_induk'],$academic);}
+        if($type==='belum_biaya_lain')$r['paid']=ofb_paid($db,(int)$r['other_bill_id']);
         $state=$r['status']==='cancelled'?'dibatalkan':($r['status']==='waived'?'tidak_ditagihkan':((float)$r['paid']+.001>=(float)$r['nominal_tagihan']?'lunas':((float)$r['paid']>0?'cicilan':'belum_bayar')));
         $counts[$state]=($counts[$state]??0)+1;
     }}finally{if((int)$GLOBALS['app_unit_id']!==$scope)unit_set_context($db,$scope);}
