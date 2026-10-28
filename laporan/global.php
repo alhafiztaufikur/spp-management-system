@@ -5,6 +5,7 @@ require_once '../includes/auth.php';
 require_once '../includes/reports.php';
 requireRole(['admin','bendahara','kasir']);
 $reportUnitId=global_report_scope($koneksi,$_GET);
+require_once '../includes/read_session.php';read_session_release();
 $registry=report_registry();
 unset($registry['tunggakan-siswa']);
 ?>

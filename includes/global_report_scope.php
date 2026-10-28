@@ -39,7 +39,19 @@ function global_report_preserved_query(mysqli $db, array $query): array {
     $allowed=['template','tanggal_awal','tanggal_akhir','tahun_ajaran','bulan_awal','bulan_akhir','tahun','tahun_awal','tahun_akhir','mode','per_page','include_undated','all_periods'];
     $keep=array_intersect_key($query,array_flip($allowed));
     if (isset($keep['tahun_ajaran'])) {
-        $years=array_column(report_years($db),'label');
+        // A unit-navigation link needs membership for the requested years, not
+        // every historical year. Native years are always part of report_years.
+        // Only an unresolved historical selection needs the archive reader.
+        $requested=$keep['tahun_ajaran'];
+        if(is_array($requested)&&in_array('*',$requested,true)){$keep['tahun_ajaran']=['*'];return $keep;}
+        if(!is_array($requested)&&!is_string($requested)){unset($keep['tahun_ajaran']);return $keep;}
+        $wanted=is_array($requested)?array_values(array_filter($requested,'is_string')):[$requested];
+        $years=[];
+        if($wanted){
+            $quoted=implode(',',array_map(static fn($v)=>"'".$db->real_escape_string($v)."'",$wanted));
+            $years=array_column(report_scoped_query($db,'SELECT label FROM tahun_ajaran WHERE label IN ('.$quoted.')')->fetch_all(MYSQLI_ASSOC),'label');
+            if(array_diff($wanted,$years))$years=array_column(report_years($db),'label');
+        }
         if (is_array($keep['tahun_ajaran'])) {
             $values=in_array('*',$keep['tahun_ajaran'],true)?['*']:array_values(array_filter($keep['tahun_ajaran'],static fn($v)=>is_string($v)&&in_array($v,$years,true)));
             if ($values) $keep['tahun_ajaran']=$values;else unset($keep['tahun_ajaran']);

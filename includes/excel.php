@@ -47,7 +47,7 @@ function spp_excel_report_document(array $report,string $template,int $unit): ar
         $summary=$savings?($report['transaction_summary']??[]):array_map(static fn($r)=>['label'=>$r['metode'],'value'=>$r['nominal']],$report['method_summary']??[]);
         $sections[]=spp_excel_section($savings?'Jumlah Transaksi':'Metode Pembayaran',[spp_excel_column('label',$savings?'Jenis Transaksi':'Metode'),spp_excel_column('value',$savings?'Jumlah':'Nominal',$savings?'count':'money')],$summary,$totals,false);
     }elseif($template==='riwayat-tagihan'){
-        $groups=report_billing_history_group_students($report['rows']);$components=report_billing_history_component_columns($groups);
+        $groups=$report['_billing_groups']??report_billing_history_group_students($report['rows']);$components=report_billing_history_component_columns($groups);
         $columns=[spp_excel_column('no','No','number')];if($unit===0)$columns[]=spp_excel_column('unit','Unit');$columns=array_merge($columns,[spp_excel_column('nis','NIS'),spp_excel_column('nis_diknas','NIS Diknas'),spp_excel_column('nama','Nama Siswa'),spp_excel_column('kelas','Kelas')]);$rows=[];
         foreach($components as $i=>$column)$columns[]=spp_excel_column('component_'.$i,$column['komponen'],'money_optional');$columns[]=spp_excel_column('total_tagihan','Total Tagihan','money');
         foreach($groups as $i=>$student){$student['no']=$i+1;$student['unit']=unit_label($student['unit_id']);$map=array_column($student['components'],null,'komponen_key');foreach($components as $j=>$column)$student['component_'.$j]=report_billing_component_value($map[$column['komponen_key']]??null);$rows[]=$student;}

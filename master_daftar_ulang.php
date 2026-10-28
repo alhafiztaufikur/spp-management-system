@@ -94,6 +94,13 @@ if ($_SERVER['REQUEST_METHOD'] === 'POST') {
     master_du_redirect($selectedYear);
 }
 
+// This read model uses annual evidence; publication above retains the full engine.
+if(($_SERVER['REQUEST_METHOD']??'')==='GET'){
+    $GLOBALS['lb_report_compact'][$koneksi->thread_id]=true;
+    $GLOBALS['lb_read_projection'][$koneksi->thread_id]=true;
+}
+$inputState=$_SESSION['du_rate_input']??null;unset($_SESSION['du_rate_input']);
+require_once __DIR__.'/includes/read_session.php';read_session_release();
 $yearRowsRaw = $koneksi->query('SELECT * FROM tahun_ajaran ORDER BY label DESC')->fetch_all(MYSQLI_ASSOC);
 $yearRowsByLabel = [];
 foreach ($yearRowsRaw as $yearRow) $yearRowsByLabel[$yearRow['label']] = $yearRow;
@@ -141,7 +148,6 @@ $coveredByClass=array_fill($firstLevel,$lastLevel-$firstLevel+1,0);$coverageConf
 foreach(du_psb_states($koneksi,$selectedYear) as $state){if($state['covered_psb']&&!empty($state['placement']['is_active']))$coveredByClass[(int)$state['placement']['kelas']]++;if($state['conflict'])$coverageConflicts++;}
 $coveredTotal=array_sum($coveredByClass);$activeIssued=array_sum($activeIssuedByClass);$activeMissing=max(0,$activeTotal-$activeIssued-$coveredTotal);
 $canEdit=$year['status']!=='closed'&&du_publishable_year($selectedYear)&&($selectedYear!==du_next_year()||du_advance_schema_ready($koneksi));
-$inputState=$_SESSION['du_rate_input']??null;unset($_SESSION['du_rate_input']);
 $priorDebt=$yearId?report_prior_debt_summary($koneksi,$selectedYear,report_active_regular_student_nis($koneksi)):['has_debt'=>false];
 ?>
 <!DOCTYPE html>

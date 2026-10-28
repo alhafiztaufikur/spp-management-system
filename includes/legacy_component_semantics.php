@@ -5,7 +5,7 @@ function lcs_komite_enabled(array $config): bool {
     return ($config['komite_mapping_version']??0) === LCS_KOMITE_MAPPING_VERSION;
 }
 function lcs_sorga_history_key(): string {
-    return 'histori:'.substr(hash('sha256','bayar.U_SORGA'),0,32);
+    static $key=null;return $key??='histori:'.substr(hash('sha256','bayar.U_SORGA'),0,32);
 }
 function lcs_component_view(array $item): array {
     $category=(string)($item['category']??'');

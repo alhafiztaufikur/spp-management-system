@@ -2,6 +2,13 @@
 require_once __DIR__.'/other_fee_billing.php';
 /** Read-only report evidence. No placement, tariff, or historical bill is manufactured here. */
 function report_source_period(string $value): ?array {
+    static $periods=[];
+    $key=date_default_timezone_get().'|'.$value;
+    if(array_key_exists($key,$periods))return $periods[$key];
+    if(count($periods)>=4096)$periods=[];
+    return $periods[$key]=report_parse_source_period($value);
+}
+function report_parse_source_period(string $value): ?array {
     $value=trim($value);
     if(preg_match('~^(\d{4})/(\d{4})$~D',$value,$m)&&((int)$m[2]===(int)$m[1]+1))
         return ['key'=>$value,'year'=>$value,'start'=>$m[1].'-07-01','end'=>$m[2].'-06-30','kind'=>'annual'];
@@ -64,7 +71,8 @@ function report_annual_evidence(mysqli $db,array $f): array {
     $rows=[];$duCoverage=$category==='daftar_ulang'?du_psb_states($db,$year):[];
     foreach(hp_rows($db,'SELECT s.*,mk.tingkat,mk.kode_rombel,mk.is_placeholder,mk.jenis,mk.nama_custom,mk.legacy_kind,mk.graduation_year FROM siswa s LEFT JOIN master_kelas mk ON mk.id=s.master_kelas_id WHERE s.legacy_pending=0') as $s){
         if(($f['siswa_status']==='active'&&!(int)$s['is_active'])||($f['siswa_status']==='archived'&&(int)$s['is_active']))continue;
-        $nis=$s['NO_INDUK'];$source=lb_student($db,$nis);$native=$bills[$nis]??null;$placement=$placements[$nis]??null;$credit=$legacy['payments'][$nis]['daftar_ulang'][$year]??null;
+        $nis=$s['NO_INDUK'];if(!empty($f['_debt_only'])&&!empty($f['_debt_nis'])&&!isset($f['_debt_nis'][$nis]))continue;
+        $source=lb_student($db,$nis);$native=$bills[$nis]??null;$placement=$placements[$nis]??null;$credit=$legacy['payments'][$nis]['daftar_ulang'][$year]??null;
         if($category==='daftar_ulang'&&!$native&&!$placement&&!$credit&&(!$source||$source['migration_year']!==$year))continue;
         if($category==='psb'){
             $position=lb_psb_position($db,$nis,$s,$nativePsb[$nis]??0.0);
@@ -254,20 +262,43 @@ function report_billing_fee_payment_rows(mysqli $db,array $f): array {
     foreach($rows as &$r){$r['terbayar']=$r['_paid_cents']/100.0;unset($r['_paid_cents']);}unset($r);
     return array_values($rows);
 }
+function report_du_metadata_candidate_sql(string $alias):string {
+    require_once __DIR__.'/menu_performance.php';
+    return menu_performance_metadata_expression($alias);
+}
 function report_legacy_years(mysqli $db): array {
     static $readCache=[];$cacheRead=PHP_SAPI!=='cli'&&($_SERVER['REQUEST_METHOD']??'')==='GET';
     $cacheKey=$db->thread_id.':'.report_query_unit_id();
     if($cacheRead&&isset($readCache[$cacheKey]))return $readCache[$cacheKey];
     $years=[];
     foreach(['legacy_full_payments'=>lful_read_ready($db),'legacy_op_payments'=>lop_ready($db)] as $table=>$ready){if(!$ready)continue;
-        $extra=$table==='legacy_op_payments'?", CASE WHEN JSON_CONTAINS_PATH(p.items,'one','$[0].migration') THEN (".lb_du_year_sql('p').") ELSE NULL END migration_du_year":'';
-        foreach(hp_rows($db,"SELECT DISTINCT p.source_period$extra FROM $table p JOIN legacy_full_batches b ON b.id=p.batch_id AND b.unit_id=p.unit_id WHERE b.state='completed'".($table==='legacy_op_payments'?' AND p.cancelled=0':'')) as $p){$period=report_source_period((string)$p['source_period']);if($period&&$period['year']!=='')$years[$period['year']]=true;if(lma_year((string)($p['migration_du_year']??''))!=='')$years[$p['migration_du_year']]=true;}
+        $from=" FROM $table p JOIN legacy_full_batches b ON b.id=p.batch_id AND b.unit_id=p.unit_id WHERE b.state='completed'".($table==='legacy_op_payments'?' AND p.cancelled=0':'');
+        // Read the small set of source periods through the covering index first.
+        // Source-year fallback is already represented by these periods. Only DU
+        // receipts can add a different, metadata-backed obligation year.
+        $unparsed=[];
+        foreach(hp_rows($db,'SELECT DISTINCT p.source_period'.$from) as $p){$period=report_source_period((string)$p['source_period']);if($period&&$period['year']!=='')$years[$period['year']]=true;elseif($period===null)$unparsed[]="'".$db->real_escape_string((string)$p['source_period'])."'";}
+        $candidate=report_du_metadata_candidate_sql('p');
+        if($table==='legacy_op_payments')foreach(hp_rows($db,"SELECT DISTINCT migration_du_year FROM (
+            SELECT MIN(mp.period) migration_du_year FROM $table p
+            JOIN legacy_full_batches b ON b.id=p.batch_id AND b.unit_id=p.unit_id
+            JOIN JSON_TABLE(CAST(p.items AS JSON),'$[*]' COLUMNS(category VARCHAR(100) PATH '$.category',version INT PATH '$.migration.version' NULL ON EMPTY,period VARCHAR(9) PATH '$.migration.period' NULL ON EMPTY)) mp
+            WHERE b.state='completed' AND p.cancelled=0
+              AND ($candidate)=1
+              AND mp.category='daftar_ulang' AND mp.version IN (1,2,3,4,5)
+              AND mp.period REGEXP '^20[0-9]{2}/20[0-9]{2}$'
+              AND CAST(RIGHT(mp.period,4) AS UNSIGNED)=CAST(LEFT(mp.period,4) AS UNSIGNED)+1
+            GROUP BY p.unit_id,p.id) metadata_years") as $p)if(lma_year((string)($p['migration_du_year']??''))!=='')$years[$p['migration_du_year']]=true;
+        // Retain the original SQL fallback for unusual source periods outside
+        // the monthly reader's supported range; do not silently drop an option.
+        if($table==='legacy_op_payments'&&$unparsed)foreach(hp_rows($db,'SELECT DISTINCT '.lb_du_year_sql('p').' migration_du_year'.$from." AND JSON_CONTAINS_PATH(p.items,'one','$[0].migration') AND p.source_period IN (".implode(',',$unparsed).')') as $p)if(lma_year((string)($p['migration_du_year']??''))!=='')$years[$p['migration_du_year']]=true;
     }
     if($cacheRead)$readCache[$cacheKey]=$years;
     return $years;
 }
 /** Stream and aggregate once per request/scope; keep exact source cents and stable identities. */
 function report_legacy_periods(mysqli $db,?array $onlyPeriods=null): array {
+    $profileStarted=microtime(true);
     static $cache=[];
     $revision=lop_ready($db)?(int)hp_one($db,'SELECT COALESCE(MAX(id),0) n FROM legacy_op_audit')['n']:0;
     $key=$db->thread_id.':'.report_query_unit_id().':'.$revision.($onlyPeriods===null?'':':'.implode(',',$onlyPeriods));
@@ -307,6 +338,7 @@ function report_legacy_periods(mysqli $db,?array $onlyPeriods=null): array {
         $cursor=$db->query(hp_sql($db,"SELECT s.NO_INDUK,p.source_period,p.class_snapshot,p.items FROM legacy_op_payments p JOIN legacy_op_owners o ON o.id=p.owner_id AND o.unit_id=p.unit_id JOIN siswa s ON s.id=o.student_id AND s.unit_id=o.unit_id JOIN legacy_full_batches b ON b.id=p.batch_id AND b.unit_id=p.unit_id WHERE b.state='completed' AND p.cancelled=0".$periodWhere('legacy_op_payments')),MYSQLI_USE_RESULT);
         while($r=$cursor->fetch_assoc())$add($r,json_decode($r['items'],true,512,JSON_THROW_ON_ERROR));$cursor->free();
     }
+    if(getenv('SPP_REQUEST_METRICS')==='1')$GLOBALS['report_read_phases'][]=['phase'=>'legacy_periods','ms'=>(microtime(true)-$profileStarted)*1000];
     return $cache[$key]=$out;
 }
 function report_monthly_evidence(mysqli $db,string $category,array $months,array $f): array {
@@ -324,11 +356,15 @@ function report_monthly_evidence(mysqli $db,string $category,array $months,array
         if(!report_class_matches_row($f,$row)||!report_row_matches_filters($row,$f))return;
         $roster[$nis.'|'.$year.'|'.$row['kelas']]=$row;
     };
-    foreach(hp_rows($db,'SELECT p.*,y.label FROM siswa_tahun_ajaran p JOIN tahun_ajaran y ON y.id=p.tahun_ajaran_id AND y.unit_id=p.unit_id') as $p)
+    $yearWhere=$years?' WHERE y.label IN ('.implode(',',array_fill(0,count($years),'?')).')':' WHERE 0=1';
+    foreach(hp_rows($db,'SELECT p.*,y.label FROM siswa_tahun_ajaran p JOIN tahun_ajaran y ON y.id=p.tahun_ajaran_id AND y.unit_id=p.unit_id'.$yearWhere,$years) as $p)
         if(in_array($p['label'],$years,true)&&$p['status']!=='dibatalkan')$place((string)$p['no_induk'],$p['label'],(string)$p['kelas_rombel_snapshot'],(int)$p['master_kelas_id']);
+    // These rows were discarded immediately below. Restrict the grouped read
+    // before fetching/materializing other academic years into PHP memory.
+    $monthWhere=$months?' WHERE (CAST(CAST(t.tahun AS CHAR) AS SIGNED),CAST(CAST(t.bulan AS CHAR) AS SIGNED)) IN ('.implode(',',array_map(static fn($m)=>'('.(int)$m[1].','.(int)$m[0].')',$months)).')':' WHERE 0=1';
     $sql=$category==='komite'
-      ? "SELECT t.*,sta.master_kelas_id,COALESCE(SUM(p.nominal),0) paid FROM tagihan_komite t JOIN siswa_tahun_ajaran sta ON sta.id=t.penempatan_id AND sta.unit_id=t.unit_id LEFT JOIN bayar_komite p ON p.tagihan_komite_id=t.id AND p.unit_id=t.unit_id GROUP BY t.id"
-      : "SELECT t.*,COALESCE(SUM(CASE WHEN b.status='active' THEN a.nominal_dari_bayar ELSE 0 END),0) paid FROM tagihan_spp t LEFT JOIN spp_alokasi a ON a.tagihan_spp_id=t.id AND a.unit_id=t.unit_id LEFT JOIN spp_alokasi_batch b ON b.id=a.batch_id AND b.unit_id=a.unit_id GROUP BY t.id";
+      ? "SELECT t.*,sta.master_kelas_id,COALESCE(SUM(p.nominal),0) paid FROM tagihan_komite t JOIN siswa_tahun_ajaran sta ON sta.id=t.penempatan_id AND sta.unit_id=t.unit_id LEFT JOIN bayar_komite p ON p.tagihan_komite_id=t.id AND p.unit_id=t.unit_id$monthWhere GROUP BY t.id"
+      : "SELECT t.*,COALESCE(SUM(CASE WHEN b.status='active' THEN a.nominal_dari_bayar ELSE 0 END),0) paid FROM tagihan_spp t LEFT JOIN spp_alokasi a ON a.tagihan_spp_id=t.id AND a.unit_id=t.unit_id LEFT JOIN spp_alokasi_batch b ON b.id=a.batch_id AND b.unit_id=a.unit_id$monthWhere GROUP BY t.id";
     foreach(hp_rows($db,$sql) as $b){$period=sprintf('%04d-%02d',(int)$b['tahun'],(int)$b['bulan']);if(!in_array($period,$periods,true))continue;
         $nis=(string)$b['no_induk'];$cells[$nis][$period]=['bill'=>(float)$b['nominal_tagihan'],'paid'=>(float)$b['paid'],'status'=>$b['status'],'class'=>(string)$b['kelas_rombel_snapshot'],'native'=>true];
         $place($nis,lb_payment_year($period),(string)$b['kelas_rombel_snapshot'],(int)$b['master_kelas_id']);

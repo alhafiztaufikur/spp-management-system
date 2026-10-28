@@ -7,6 +7,7 @@ $globalScope=in_array($_GET['template']??'',global_report_templates(),true);
 $unitChoice=global_report_validate_choice($_GET['unit']??'');
 $reportUnitId=$globalScope?global_report_scope($koneksi,$_GET):unit_report_scope($koneksi,$unitChoice);
 $reportScopeQuery=$globalScope?global_report_unit_value($reportUnitId):($reportUnitId===0?'all':'active');
+require_once '../includes/read_session.php';read_session_release();
 $registry=report_registry(); $template=(string)($_GET['template']??'');
 if(!isset($registry[$template])){ header('Location: global.php'); exit; }
 $isPrincipalLetter=$template==='tunggakan-siswa';
@@ -22,13 +23,15 @@ $isSavingsCashRecap=$template==='kas-tabungan';
 $inlineStudentSearch=in_array($template,['status','saldo-tabungan','spp-tahunan','tabungan-siswa'],true);
 $templateFilterClass='report-filter-'.preg_replace('/[^a-z0-9_-]+/i','-',$template);
 $classes=report_classes($koneksi);$classLevels=array_map('strval',$reportUnitId===0?range(1,12):range(...unit_level_bounds($reportUnitId)));$missingRombel=false;
-try { $report=report_build($koneksi,$template,$filters); }
+require_once '../includes/report_history_page.php';
+$historyPage=null;
+try { if($template==='riwayat-tagihan')$historyPage=report_history_page_data($koneksi,$filters);$report=$historyPage['report']??report_build($koneksi,$template,$filters); }
 catch(Throwable $e){ $report=['title'=>$registry[$template]['label'],'subtitle'=>'Gagal memuat laporan','columns'=>[],'rows'=>[],'error'=>$e->getMessage()]; }
 if($missingRombel){$report['rows']=[];$report['error']='Belum ada rombel nyata. Admin perlu membuat Master Kelas/Rombel lalu memindahkan siswa dari placeholder Belum Ditentukan.';}
 $billingGroupedView=$template==='riwayat-tagihan';
-$billingDetailCount=$template==='riwayat-tagihan'?count($report['rows']):0;
+$billingDetailCount=$historyPage['detail_count']??($template==='riwayat-tagihan'?count($report['rows']):0);
 $matrix=global_report_matrix($report,$template,$reportUnitId);
-$displayRows=$matrix?$matrix['rows']:($billingGroupedView?report_billing_history_group_students($report['rows']):$report['rows']);
+$displayRows=$matrix?$matrix['rows']:($billingGroupedView?report_history_groups($report):$report['rows']);
 $billingColumns=$billingGroupedView?report_billing_history_component_columns($displayRows):[];
 $billingMatrixWidth=700+count($billingColumns)*154;
 $pagination=report_paginate($displayRows,$filters,false);
@@ -37,7 +40,7 @@ $moneyTotals=report_money_totals($report,$template);if($billingGroupedView)$mone
 $studentOptionWhere=" WHERE s.legacy_pending=0".match($filters['siswa_status']){'all'=>'','archived'=>' AND s.is_active=0',default=>' AND s.is_active=1'};
 $studentOptions=$koneksi->query("SELECT s.id AS student_id,s.NO_INDUK,s.unit_id,s.NO_induk_diknas,s.NAMA,s.KELAS,s.master_kelas_id,mk.tingkat AS master_tingkat,mk.kode_rombel,mk.is_placeholder FROM siswa s LEFT JOIN master_kelas mk ON mk.id=s.master_kelas_id$studentOptionWhere ORDER BY s.NAMA ASC")->fetch_all(MYSQLI_ASSOC);
 $studentSearchDisplay=$filters['q'];foreach($studentOptions as $studentOption){if($filters['q']!==''&&($filters['q']===$studentOption['NO_INDUK']||$filters['q']===(string)($studentOption['NO_induk_diknas']??''))){$studentSearchDisplay=$studentOption['NAMA'];break;}}
-$summaryCards=report_summaries($report['rows']);if(isset($report['student_count']))$summaryCards=['Siswa'=>$report['student_count']]+$summaryCards;$visibleRows=count($pagination['rows']);$totalRows=count($displayRows);$paginationUnit=$billingGroupedView?'siswa':'baris';$exportQuery=$query;$exportQuery['page']=1;unset($exportQuery['format'],$exportQuery['download'],$exportQuery['preview_action']);$firstShown=$totalRows>0?(($pagination['page']-1)*$pagination['per_page'])+1:0;$lastShown=$totalRows>0?min($totalRows,$pagination['page']*$pagination['per_page']):0;$resultRangeLabel=$totalRows<=0?'0 '.$paginationUnit:($visibleRows===$totalRows?'Semua '.number_format($totalRows).' '.$paginationUnit:number_format($firstShown).' s.d. '.number_format($lastShown).' dari '.number_format($totalRows).' '.$paginationUnit);if($billingGroupedView)$resultRangeLabel.=' · '.number_format($billingDetailCount).' rincian tagihan';
+$summaryCards=$historyPage['summary']??report_summaries($report['rows']);if(isset($report['student_count']))$summaryCards=['Siswa'=>$report['student_count']]+$summaryCards;$visibleRows=count($pagination['rows']);$totalRows=count($displayRows);$paginationUnit=$billingGroupedView?'siswa':'baris';$exportQuery=$query;$exportQuery['page']=1;unset($exportQuery['format'],$exportQuery['download'],$exportQuery['preview_action']);$firstShown=$totalRows>0?(($pagination['page']-1)*$pagination['per_page'])+1:0;$lastShown=$totalRows>0?min($totalRows,$pagination['page']*$pagination['per_page']):0;$resultRangeLabel=$totalRows<=0?'0 '.$paginationUnit:($visibleRows===$totalRows?'Semua '.number_format($totalRows).' '.$paginationUnit:number_format($firstShown).' s.d. '.number_format($lastShown).' dari '.number_format($totalRows).' '.$paginationUnit);if($billingGroupedView)$resultRangeLabel.=' · '.number_format($billingDetailCount).' rincian tagihan';
 if($isCashRecap){
     $componentSummary=$report['component_summary']??[];
     $componentRows=$report['component_rows']??$componentSummary;

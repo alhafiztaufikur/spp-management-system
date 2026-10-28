@@ -2,6 +2,7 @@
 /** Only confirmed jobs can replace the identity-checked application database. */
 if(PHP_SAPI!=='cli'){http_response_code(404);exit(1);}
 require_once __DIR__.'/../includes/database_restore.php';
+require_once __DIR__.'/../includes/menu_performance.php';
 require_once __DIR__.'/database_backup_worker.php';
 foreach($argv as $arg)if(str_starts_with($arg,'--config='))putenv('SPP_BACKUP_CONFIG='.substr($arg,9));
 function restore_compare(array $actual,array $expected): void {
@@ -103,7 +104,8 @@ try{
         $target=db_backup_source($c);
         $GLOBALS['koneksi']=$target;db_backup_actor((int)$row['actor']);unset($GLOBALS['koneksi']);
         $schema=db_backup_schema($target);
-        if($schema['signature']!==$expected['schema_signature'])throw new RuntimeException('Backup schema is not compatible with this application.');
+        $sourceSchema=json_decode(file_get_contents($dir.'/schema.json'),true,64,JSON_THROW_ON_ERROR);
+        if($schema['signature']!==$expected['schema_signature']&&!menu_performance_schema_compatible($schema,$sourceSchema))throw new RuntimeException('Backup schema is not compatible with this application.');
         if(!db_backup_disk_budget($schema['estimated_bytes'],(int)disk_free_space($c['storage_root'])))throw new RuntimeException('Insufficient restore verification space.');$target->close();
         $report=restore_verify($c,$dir);restore_compare($report,$expected);
         if(($report['active_super_admins']??0)<1)throw new RuntimeException('Backup does not retain an active Super Admin.');
@@ -121,7 +123,8 @@ try{
     if($destructive)throw new RuntimeException('An interrupted restore requires recovery from the safety backup.');
     $target=db_restore_target($c,$dir);db_restore_assert_privileges($target,$c['database']);
     $GLOBALS['koneksi']=$target;db_backup_actor((int)$row['actor']);unset($GLOBALS['koneksi']);
-    if(db_backup_schema($target)['signature']!==$expected['schema_signature'])throw new RuntimeException('Schema changed after validation.');
+    $currentSchema=db_backup_schema($target);$sourceSchema=json_decode(file_get_contents($dir.'/schema.json'),true,64,JSON_THROW_ON_ERROR);
+    if($currentSchema['signature']!==$expected['schema_signature']&&!menu_performance_schema_compatible($currentSchema,$sourceSchema))throw new RuntimeException('Schema changed after validation.');
     if(!empty($expected['object_counts']['events'])&&$target->query('SELECT @@global.event_scheduler')->fetch_row()[0]!=='OFF')throw new RuntimeException('Event scheduler must be disabled administratively before restoring events.');
     restore_no_active_import($target,$c,$dir);$target->close();
     db_restore_update($db,$id,'safety_backup','Membuat dan memverifikasi backup pengaman sebelum penggantian data.');
@@ -137,6 +140,12 @@ try{
     restore_import($c,$dir,$dir.'/dump.sql',$row['sql_sha256']);
     db_restore_update($db,$id,'auditing','Mencocokkan data hasil pemulihan, relasi, dan seluruh unit.');
     restore_audit_target($c,$dir,$expected);restore_test_failure($c,'restore_audit');
+    // Preserve the exact restore proof first, then restore additive read indexes.
+    // No row, financial fingerprint, or uploaded backup evidence is rewritten.
+    $performanceTarget=db_restore_target($c,$dir);
+    try{$performanceTarget->select_db($c['database']);$performanceIndexes=menu_performance_apply($performanceTarget);}
+    finally{$performanceTarget->close();}
+    db_backup_atomic_json($dir.'/performance-indexes.json',['applied'=>$performanceIndexes]);
     db_restore_update($db,$id,'completed','Pemulihan selesai dan data cocok dengan cadangan. Silakan masuk kembali.');
 }catch(Throwable $e){
     if(!$db||!$row||!$dir){fwrite(STDERR,'Restore initialization refused.'.PHP_EOL);exit(1);}

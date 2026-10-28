@@ -31,6 +31,11 @@ function hp_sql(mysqli $db, string $sql,bool $ordered=false): string {
         }
     }
     if(!$tables[$key])return $sql;
+    $pattern='/\b(FROM|JOIN)\s+`?([a-zA-Z_][a-zA-Z0-9_]*)`?(?:\s+(?:AS\s+)?((?!(?:WHERE|JOIN|LEFT|RIGHT|INNER|OUTER|CROSS|ON|GROUP|ORDER|HAVING|LIMIT|UNION|FOR|USE|FORCE|IGNORE)\b)[a-zA-Z_][a-zA-Z0-9_]*))?(?=\s|$|\))/i';
+    // Callers may already have projected a query. With no scoped view left,
+    // the callback below is an identity operation; avoid another scope query.
+    preg_match_all($pattern,$sql,$references);
+    if(!array_intersect($references[2],array_keys($tables[$key])))return $sql;
     // The original views use this same connection-owned scope. An explicit predicate
     // lets MySQL use composite indexes without evaluating the stored function per row.
     $unit=(int)$db->query('SELECT current_unit_id()')->fetch_row()[0];
@@ -45,7 +50,7 @@ function hp_sql(mysqli $db, string $sql,bool $ordered=false): string {
         $r=$db->query("SELECT TABLE_NAME,INDEX_NAME FROM information_schema.STATISTICS WHERE TABLE_SCHEMA=DATABASE() AND IS_VISIBLE='YES' GROUP BY TABLE_NAME,INDEX_NAME HAVING GROUP_CONCAT(COLUMN_NAME ORDER BY SEQ_IN_INDEX)='unit_id,id'");
         while($row=$r->fetch_row())if(preg_match('/^[a-zA-Z0-9_]+$/D',$row[1]))$identityIndexes[$key][$row[0]]=$row[1];
     }
-    return preg_replace_callback('/\b(FROM|JOIN)\s+`?([a-zA-Z_][a-zA-Z0-9_]*)`?(?:\s+(?:AS\s+)?((?!(?:WHERE|JOIN|LEFT|RIGHT|INNER|OUTER|CROSS|ON|GROUP|ORDER|HAVING|LIMIT|UNION|FOR|USE|FORCE|IGNORE)\b)[a-zA-Z_][a-zA-Z0-9_]*))?(?=\s|$|\))/i',static function($m)use($tables,$key,$unit,$ordered,$identityIndexes,$scope){
+    return preg_replace_callback($pattern,static function($m)use($tables,$key,$unit,$ordered,$identityIndexes,$scope){
         $name=$m[2];if(!isset($tables[$key][$name]))return $m[0];
         $base=$tables[$key][$name];
         $hint=$ordered&&$unit>0&&isset($identityIndexes[$key][$base])?' FORCE INDEX (`'.$identityIndexes[$key][$base].'`)':'';

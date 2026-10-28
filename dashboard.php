@@ -12,6 +12,7 @@ require_once 'includes/auth.php';
 requireRole(['admin', 'bendahara', 'kasir']);
 // Rekap gabungan hanya tersedia bagi Super Admin; unit operasional tetap tersimpan.
 $reportUnitId=unit_report_scope($koneksi,(string)($_GET['unit']??''));
+require_once 'includes/read_session.php';read_session_release();
 require_once 'includes/reports.php';
 $dashboardBackupAlerts = [];
 if (operational_role()) {
@@ -43,7 +44,7 @@ $setoranFilters = [
     'tahun_ajaran' => du_current_academic_year()
 ];
 
-$paymentComponents = report_payment_components($koneksi, $setoranFilters);
+$paymentComponents = report_payment_components($koneksi, $setoranFilters, false, true);
 $paymentComponents = array_values(array_filter($paymentComponents, static fn($row) => ($row['kategori_key'] ?? '') !== 'potongan' && empty($row['legacy'])));
 $totalPembayaran = array_sum(array_map(static fn($row) => (float)($row['nominal'] ?? 0), $paymentComponents));
 $jumlahTransaksi = count(array_unique(array_column($paymentComponents, 'id')));

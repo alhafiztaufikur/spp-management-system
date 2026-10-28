@@ -17,10 +17,11 @@ function lb_scope_student_read(mysqli $db,string $nis): void {
 }
 
 function lb_cache(mysqli $db, bool $refresh=false): array {
-    static $cache=[];$scope=(int)($GLOBALS['app_unit_id']??unit_active_id());$compact=!empty($GLOBALS['lb_report_compact'][$db->thread_id]);$prefix=$db->thread_id.($compact?':report:':':');
+    $profileStarted=microtime(true);
+    static $cache=[];$scope=(int)($GLOBALS['app_unit_id']??unit_active_id());$compact=!empty($GLOBALS['lb_report_compact'][$db->thread_id]);$readProjection=!empty($GLOBALS['lb_read_projection'][$db->thread_id]);$prefix=$db->thread_id.($compact?':report:':($readProjection?':read:':':'));
     $nis=$GLOBALS['lb_read_student'][$db->thread_id]??null;$key=$prefix.$scope.($nis===null?'':':student:'.$nis);
     $studentWhere=$nis===null?'':" AND s.NO_INDUK='".$db->real_escape_string($nis)."'";
-    if($refresh){if(function_exists('du_psb_invalidate'))du_psb_invalidate($db);foreach(array_keys($cache) as $cachedKey)if(str_starts_with($cachedKey,$db->thread_id.':'))unset($cache[$cachedKey]);}
+    if($refresh){$GLOBALS['lb_cache_generation'][$db->thread_id]=($GLOBALS['lb_cache_generation'][$db->thread_id]??0)+1;unset($GLOBALS['lb_monthly_plan_cache'][$db->thread_id]);if(function_exists('du_psb_invalidate'))du_psb_invalidate($db);foreach(array_keys($cache) as $cachedKey)if(str_starts_with($cachedKey,$db->thread_id.':'))unset($cache[$cachedKey]);}
     if(!$refresh&&isset($cache[$key]))return $cache[$key];
     // An all-unit report has already read this evidence under the connection's
     // authorized scope. Partition it by immutable owner/source IDs instead of
@@ -61,7 +62,12 @@ function lb_cache(mysqli $db, bool $refresh=false): array {
     foreach(hp_rows($db,'SELECT unit_id,NO_INDUK,SUM(U_PSB) psb FROM bayar'.($nis===null?'':" WHERE NO_INDUK=$number").' GROUP BY unit_id,NO_INDUK') as $r)$out['native_psb'][$r['unit_id'].'|'.$r['NO_INDUK']]=lb_amount($r['psb'])??0;
     foreach(hp_rows($db,'SELECT t.unit_id,t.no_induk,t.tahun_ajaran_snapshot,SUM(b.jumlah) paid FROM tagihan_daftar_ulang t JOIN bayar_du b ON b.tagihan_daftar_ulang_id=t.id AND b.unit_id=t.unit_id'.($nis===null?'':" WHERE t.no_induk=$number").' GROUP BY t.unit_id,t.no_induk,t.tahun_ajaran_snapshot') as $r)$out['native_du'][$r['unit_id'].'|'.$r['no_induk']][$r['tahun_ajaran_snapshot']]=lb_amount($r['paid'])??0;
     $originals=[];foreach(hp_rows($db,"SELECT entity_id,before_data FROM legacy_op_audit WHERE entity_type='payment'".($nis===null?'':" AND entity_id IN (SELECT id FROM legacy_op_payments WHERE owner_id IN ($owners))").' ORDER BY id') as $a)if(!isset($originals[$a['entity_id']]))$originals[$a['entity_id']]=json_decode($a['before_data'],true);
-    $cursor=$db->query(hp_sql($db,"SELECT p.*,JSON_OBJECT('U_SPP',JSON_EXTRACT(r.raw_data,'$.U_SPP'),'U_SORGA',JSON_EXTRACT(r.raw_data,'$.U_SORGA'),'potong_spp',JSON_EXTRACT(r.raw_data,'$.potong_spp')) raw_data FROM legacy_op_payments p JOIN legacy_full_batches b ON b.id=p.batch_id AND b.unit_id=p.unit_id LEFT JOIN legacy_finance_rows r ON r.source_id=b.source_id AND r.unit_id=b.unit_id AND r.row_key=p.row_key".($nis===null?'':" WHERE p.owner_id IN ($owners)")),MYSQLI_USE_RESULT);
+    // Annual/history readers never consume monthly raw tariff evidence. Avoid
+    // joining and extracting the payment archive when that evidence is unused.
+    $profilePayments=microtime(true);
+    $rawProjection=$compact?'NULL':"JSON_OBJECT('U_SPP',JSON_EXTRACT(r.raw_data,'$.U_SPP'),'U_SORGA',JSON_EXTRACT(r.raw_data,'$.U_SORGA'),'potong_spp',JSON_EXTRACT(r.raw_data,'$.potong_spp'))";
+    $rawJoin=$compact?'':' LEFT JOIN legacy_finance_rows r ON r.source_id=b.source_id AND r.unit_id=b.unit_id AND r.row_key=p.row_key';
+    $cursor=$db->query(hp_sql($db,"SELECT p.*,$rawProjection raw_data FROM legacy_op_payments p JOIN legacy_full_batches b ON b.id=p.batch_id AND b.unit_id=p.unit_id$rawJoin".($nis===null?'':" WHERE p.owner_id IN ($owners)")),MYSQLI_USE_RESULT);
     while($p=$cursor->fetch_assoc()){
         $out['owner_units'][(int)$p['owner_id']]=(int)$p['unit_id'];
         $items=json_decode($p['items'],true);$initial=$originals[$p['id']]['items']??$items;
@@ -82,11 +88,16 @@ function lb_cache(mysqli $db, bool $refresh=false): array {
             foreach($items as $item)if(($item['category']??'')==='daftar_ulang'){$itemYear=lb_payment_year(lma_item_period($item,(string)$p['source_period']));$out['paid'][$owner]['du'][$itemYear]=($out['paid'][$owner]['du'][$itemYear]??0)+lf_cents($item['amount']);}
         }else $out['paid'][$owner]['du'][$year]=($out['paid'][$owner]['du'][$year]??0)+$du;
     }$cursor->free();
+    if(getenv('SPP_REQUEST_METRICS')==='1')$GLOBALS['report_read_phases'][]=['phase'=>'billing_payments','scope'=>$scope,'compact'=>$compact,'ms'=>(microtime(true)-$profilePayments)*1000];
     foreach($out['students'] as $student)$out['owner_students'][$student['id']]=$student;
-    if(!$compact)foreach(['spp','komite'] as $category){
+    // Report/master readers query native bill/payment positions themselves.
+    // Keep the full native map for the reconciliation/verification engine;
+    // monthly source evidence remains available to both read profiles.
+    if(!$compact&&!$readProjection)foreach(['spp','komite'] as $category){
         $sql=$category==='spp'?"SELECT t.unit_id,t.no_induk,t.bulan,t.tahun,t.nominal_tagihan,t.status,COALESCE(SUM(CASE WHEN b.status='active' THEN a.nominal_dari_bayar ELSE 0 END),0) paid FROM tagihan_spp t LEFT JOIN spp_alokasi a ON a.tagihan_spp_id=t.id AND a.unit_id=t.unit_id LEFT JOIN spp_alokasi_batch b ON b.id=a.batch_id AND b.unit_id=a.unit_id":"SELECT t.unit_id,t.no_induk,t.bulan,t.tahun,t.nominal_tagihan,t.status,COALESCE(SUM(p.nominal),0) paid FROM tagihan_komite t LEFT JOIN bayar_komite p ON p.tagihan_komite_id=t.id AND p.unit_id=t.unit_id";
         foreach(hp_rows($db,$sql.($nis===null?'':" WHERE t.no_induk=$number").' GROUP BY t.id') as $bill)$out['native_monthly'][$bill['unit_id'].'|'.$bill['no_induk']][$category.'|'.$bill['tahun'].'-'.str_pad($bill['bulan'],2,'0',STR_PAD_LEFT)]=$bill;
     }
+    if(getenv('SPP_REQUEST_METRICS')==='1')$GLOBALS['report_read_phases'][]=['phase'=>'billing_cache','scope'=>$scope,'compact'=>$compact,'ms'=>(microtime(true)-$profileStarted)*1000];
     return $cache[$key]=$out;
 }
 function lb_psb_item(array $item): bool {return strtoupper((string)($item['column']??''))==='U_PANGKAL'||($item['category']??'')==='psb';}
@@ -212,6 +223,12 @@ function lb_mark_du_individual(mysqli $db,string $nis,string $year): void {
 
 /** Only an explicit payment period supplies an academic year; dates/NIS do not. */
 function lb_payment_year(string $period): string {
+    static $years=[];
+    if(isset($years[$period]))return $years[$period];
+    if(count($years)>=4096)$years=[];
+    return $years[$period]=lb_parse_payment_year($period);
+}
+function lb_parse_payment_year(string $period): string {
     $period=trim($period);
     if(preg_match('~^(\d{4})/(\d{4})$~D',$period,$m))return (int)$m[2]===(int)$m[1]+1?$period:'';
     $normalized=lb_payment_month($period);if($normalized!=='')$period=$normalized;
@@ -231,6 +248,12 @@ function lb_du_year_sql(string $alias='p'): string {
     return "CASE WHEN JSON_CONTAINS_PATH($alias.items,'one','$[0].migration') THEN COALESCE($period,$legacy) ELSE $legacy END";
 }
 function lb_payment_month(string $period): string {
+    static $months=[];
+    if(isset($months[$period]))return $months[$period];
+    if(count($months)>=4096)$months=[];
+    return $months[$period]=lb_parse_payment_month($period);
+}
+function lb_parse_payment_month(string $period): string {
     $names=['JANUARI'=>1,'FEBRUARI'=>2,'MARET'=>3,'APRIL'=>4,'MEI'=>5,'JUNI'=>6,'JULI'=>7,'AGUSTUS'=>8,'SEPTEMBER'=>9,'OKTOBER'=>10,'NOVEMBER'=>11,'NOPEMBER'=>11,'DESEMBER'=>12];
     if(preg_match('/^\s*([A-Za-z]+)\s+(\d{4})\s*$/D',$period,$m)&&isset($names[strtoupper($m[1])]))$period=sprintf('%04d-%02d',(int)$m[2],$names[strtoupper($m[1])]);
     $period=trim($period);if(preg_match('~^(\d{1,2}) (\d{4})$~D',$period,$m)){$month=(int)$m[1];$year=(int)$m[2];}elseif(preg_match('~^(\d{4})-(\d{2})$~D',$period,$m)){$year=(int)$m[1];$month=(int)$m[2];}else return '';
@@ -245,7 +268,11 @@ function lb_monthly_credit(mysqli $db,string $nis,string $category,string $month
 }
 
 function lb_monthly_plan(mysqli $db,string $nis): array {
-    $s=lb_student($db,$nis);return $s?lmp_plan($s,lb_cache($db)['monthly_payments'][$s['id']]??[]):['positions'=>[],'exceptions'=>[]];
+    $s=lb_student($db,$nis);if(!$s)return ['positions'=>[],'exceptions'=>[]];
+    // Repeated months/components use the same immutable request-local evidence.
+    // Share the pure plan only for that evidence generation and unit/profile.
+    $key=$db->thread_id.':'.($GLOBALS['lb_cache_generation'][$db->thread_id]??0).':'.(int)($GLOBALS['app_unit_id']??unit_active_id()).':'.(int)!empty($GLOBALS['lb_report_compact'][$db->thread_id]).':'.$nis;
+    return $GLOBALS['lb_monthly_plan_cache'][$db->thread_id][$key]??=lmp_plan($s,lb_cache($db)['monthly_payments'][$s['id']]??[]);
 }
 
 /** Used by forms and writes too; zero import defaults must not mask proven PSB. */

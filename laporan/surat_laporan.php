@@ -3,6 +3,7 @@ session_start();
 require_once __DIR__.'/../koneksi.php';
 require_once __DIR__.'/../includes/auth.php';
 requireRole(['admin','bendahara','kasir']);
+require_once __DIR__.'/../includes/read_session.php';read_session_release();
 ?>
 <!doctype html>
 <html lang="id" data-palette="<?= unit_palette_for_view() ?>">

@@ -33,15 +33,26 @@ function ldu_admin_proof(array $source,array $student,array $live,array $master,
 }
 
 /** One row per receipt and DU year; mixed-year slots never inherit MIN(year). */
-function ldu_receipt_lines_sql(): string {
+function ldu_receipt_lines_sql(bool $compactRead=false): string {
     $fallback=lma_legacy_du_year_sql('p');
     $year="CASE WHEN j.version IN (1,2,3,4,5) AND j.period REGEXP '^20[0-9]{2}/20[0-9]{2}$' AND CAST(RIGHT(j.period,4) AS UNSIGNED)=CAST(LEFT(j.period,4) AS UNSIGNED)+1 THEN j.period ELSE $fallback END";
-    return "SELECT p.id payment_id,p.unit_id,$year year,SUM(j.amount) amount FROM legacy_op_payments p JOIN JSON_TABLE(CAST(p.items AS JSON),'$[*]' COLUMNS(category VARCHAR(100) PATH '$.category',period VARCHAR(20) PATH '$.migration.period' NULL ON EMPTY,version INT PATH '$.migration.version' NULL ON EMPTY,amount DECIMAL(20,2) PATH '$.amount')) j WHERE j.category='daftar_ulang' GROUP BY p.unit_id,p.id,$year";
+    $from='legacy_op_payments';
+    if($compactRead){
+        require_once __DIR__.'/menu_performance.php';
+        $candidate=menu_performance_metadata_expression('c');
+        // Disjoint branches: retain every old-format receipt, and only skip
+        // modern receipts that cannot contain a DU line. The full/default
+        // transaction reader remains available to the reconciliation engine.
+        $from="(SELECT * FROM legacy_op_payments c WHERE ($candidate)=1 UNION ALL SELECT * FROM legacy_op_payments WHERE JSON_CONTAINS_PATH(items,'one','$[0].migration')=0)";
+    }
+    return "SELECT p.id payment_id,p.unit_id,$year year,SUM(j.amount) amount FROM $from p JOIN JSON_TABLE(CAST(p.items AS JSON),'$[*]' COLUMNS(category VARCHAR(100) PATH '$.category',period VARCHAR(20) PATH '$.migration.period' NULL ON EMPTY,version INT PATH '$.migration.version' NULL ON EMPTY,amount DECIMAL(20,2) PATH '$.amount')) j WHERE j.category='daftar_ulang' GROUP BY p.unit_id,p.id,$year";
 }
 
 /** Per-slot read model for both old/new metadata. Recaps remain archive evidence. */
-function ldu_payment_items(mysqli $db,?int $owner=null): array {
+function ldu_payment_items(mysqli $db,?int $owner=null,?array $owners=null): array {
+    if($owners===[])return [];
     $where=" WHERE (p.source_table='bayar_du' OR JSON_SEARCH(p.items,'one','daftar_ulang',NULL,'$[*].category') IS NOT NULL)".($owner===null?'':' AND p.owner_id=?');$args=$owner===null?[]:[$owner];$out=[];
+    if($owners!==null)$where.=' AND p.owner_id IN ('.implode(',',array_unique(array_map('intval',$owners))).')';
     foreach(hp_rows($db,"SELECT p.id,p.unit_id,p.batch_id,p.owner_id,p.row_key,p.source_table,p.source_period,p.source_date,p.cancelled,p.items,b.source_id,s.backup_hash,COALESCE(JSON_UNQUOTE(JSON_EXTRACT(r.raw_data,'$.id')),JSON_UNQUOTE(JSON_EXTRACT(r.raw_data,'$.ID'))) source_record_id FROM legacy_op_payments p JOIN legacy_full_batches b ON b.id=p.batch_id AND b.unit_id=p.unit_id JOIN legacy_finance_sources s ON s.id=b.source_id AND s.unit_id=b.unit_id LEFT JOIN legacy_finance_rows r ON r.unit_id=p.unit_id AND r.source_id=b.source_id AND r.row_key=p.row_key$where",$args) as $p){
         foreach(json_decode($p['items'],true,512,JSON_THROW_ON_ERROR) as $item){if(($item['category']??'')!=='daftar_ulang')continue;
             $year=lb_payment_year(lma_item_period($item,(string)$p['source_period']));$column=(string)($item['column']??$item['source_column']??'');
@@ -54,10 +65,13 @@ function ldu_payment_items(mysqli $db,?int $owner=null): array {
 
 /** Plan available from installed archive; reads do not publish years or create bills. */
 function ldu_plan(mysqli $db,?string $year=null): array {
-    $year=$year??ldu_target_year();$data=lb_cache($db);$positions=[];$items=ldu_payment_items($db);$live=[];$placements=[];$bills=[];$otherDebts=[];$recaps=[];
+    $profileStarted=microtime(true);
+    $year=$year??ldu_target_year();$data=lb_cache($db);$positions=[];$live=[];$placements=[];$bills=[];$otherDebts=[];$recaps=[];
     foreach(hp_rows($db,"SELECT source_id,source_nis,row_key,raw_data FROM legacy_finance_rows WHERE source_table='bayar_du' AND TRIM(JSON_UNQUOTE(JSON_EXTRACT(raw_data,'$.th_ajaran')))=?",[$year]) as $r){$v=json_decode($r['raw_data'],true);$amount=lb_amount($v['jumlah']??null);if($amount!==null)$recaps[$r['source_id'].'|'.trim((string)$r['source_nis'])][]=['row_key'=>$r['row_key'],'grade'=>(int)trim((string)($v['kelas']??'')),'amount_cents'=>$amount];}
     foreach(hp_rows($db,"SELECT d.student_id FROM legacy_debts d JOIN legacy_debt_masters m ON m.id=d.master_id AND m.unit_id=d.unit_id WHERE m.period=? AND m.component IN ('Daftar Ulang','DU')",[$year]) as $d)$otherDebts[(int)$d['student_id']]=true;
     foreach(hp_rows($db,'SELECT id,unit_id,NO_INDUK,is_active,KELAS,DAFTAR_ULANG,potong_du,tot_du FROM siswa') as $s)$live[$s['unit_id'].'|'.$s['NO_INDUK']]=$s;
+    $ownerIds=[];foreach($data['students'] as $key=>$student)if(!empty($live[$key]['is_active'])&&$student['kind']==='active')$ownerIds[]=(int)$student['id'];
+    $items=ldu_payment_items($db,null,$ownerIds);
     $target=hp_one($db,'SELECT * FROM tahun_ajaran WHERE label=?',[$year]);
     $masters=[];foreach(hp_rows($db,'SELECT * FROM Daftar_ulang WHERE tahun_ajaran_id=?',[$target['id']??0]) as $m)$masters[(int)$m['kelas']]=$m;
     $bases=ldu_master_bases($db,(int)($target['id']??0));
@@ -89,6 +103,7 @@ function ldu_plan(mysqli $db,?string $year=null): array {
         if(!empty($coverage[$key]['conflict']))$reason=$coverage[$key]['reason'];
         $positions[$key]=$position+['unit_id'=>(int)$s['unit_id'],'student_id'=>(int)$s['student_id'],'owner_id'=>(int)$s['id'],'nis'=>$s['NO_INDUK'],'source_identity'=>$s['source_identity'],'batch_id'=>$s['batch_id'],'source_id'=>(int)$s['source_id'],'year'=>$year,'proof'=>$proof,'placement'=>$placement,'bill'=>$bill,'traces'=>$traces,'recap_row_keys'=>$recapRows,'reason'=>$reason,'can_create'=>$reason===null&&!$bill];
     }
+    if(getenv('SPP_REQUEST_METRICS')==='1')$GLOBALS['report_read_phases'][]=['phase'=>'du_plan','ms'=>(microtime(true)-$profileStarted)*1000];
     return ['rule'=>LDU_VERSION,'year'=>$year,'target'=>$target,'positions'=>$positions];
 }
 

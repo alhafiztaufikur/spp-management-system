@@ -16,6 +16,7 @@ $reportUnitId=unit_report_scope($koneksi,(string)($_GET['unit']??''));
 
 $flash = $_SESSION['flash'] ?? null;
 unset($_SESSION['flash']);
+require_once '../includes/read_session.php';read_session_release();
 
 function general_page_money($value): string {
     $v=round((float)$value,2);return 'Rp ' . number_format($v,$v===floor($v)?0:2,',','.');

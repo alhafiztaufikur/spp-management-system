@@ -18,7 +18,7 @@ if($format==='pdf'){require_once __DIR__.'/../includes/pdf.php';require_pdf_libr
 require_once __DIR__.'/../includes/report_artifact.php';report_perf_mark('validate');
 if($globalScope)$koneksi->begin_transaction(MYSQLI_TRANS_START_READ_ONLY|MYSQLI_TRANS_START_WITH_CONSISTENT_SNAPSHOT);
 $filters=report_filters($koneksi,$_GET);report_perf_mark('filter');if($template==='riwayat-tagihan'&&!isset($_GET['siswa_status']))$filters['siswa_status']='all';if(!isset($_GET['kategori'])&&$template==='penerimaan')$filters['kategori']='semua';if($template==='tunggakan-siswa'){$filters['q']='';if(($_GET['mode']??'')==='all'){$filters['kelas']='';unset($filters['_multi']['kelas']);}}
-$report=report_build($koneksi,$template,$filters);if(!empty($report['notes']))$report['subtitle'].=' · '.implode(' · ',$report['notes']);if($globalScope)$koneksi->commit();report_perf_mark('query_model');require_once __DIR__.'/../includes/global_report_matrix.php';$matrix=$globalScope?global_report_matrix($report,$template,$reportUnitId):null;$generated=spp_date_label(new DateTimeImmutable('now'),true);$operator=(string)($_SESSION['admin_nama']??$_SESSION['admin_username']??'Pengguna');
+require_once __DIR__.'/../includes/report_history_page.php';$historyPage=$template==='riwayat-tagihan'?report_history_page_data($koneksi,$filters,true):null;$report=$historyPage['report']??report_build($koneksi,$template,$filters);if(!empty($report['notes']))$report['subtitle'].=' · '.implode(' · ',$report['notes']);if($globalScope)$koneksi->commit();report_perf_mark('query_model');require_once __DIR__.'/../includes/global_report_matrix.php';$matrix=$globalScope?global_report_matrix($report,$template,$reportUnitId):null;$generated=spp_date_label(new DateTimeImmutable('now'),true);$operator=(string)($_SESSION['admin_nama']??$_SESSION['admin_username']??'Pengguna');
 if($template==='tunggakan-siswa'&&$format==='excel'&&($_GET['view']??'')==='detail'){
     $classId=report_class_filter_rombel_id($filters);
     $selectedClass=null;
@@ -38,7 +38,7 @@ if($format==='excel'){
     if($globalScope)$doc['presentation']='global';
     $filterText=$globalScope?global_report_filter_text($koneksi,$filters,$template,$report['notes']??[]):spp_excel_filter_text($koneksi,$filters,$template);if($filterText!=='')$doc['subtitle']=$globalScope?$filterText:$doc['subtitle'].' | '.$filterText;
     $query=$_GET;$query['download']='1';$back=$_GET;unset($back['format'],$back['download']);
-    spp_excel_respond($doc,$excelDownload,$template.'-'.date('Ymd-His'),'export_global.php?'.filter_build_query($query),'template.php?'.filter_build_query($back),$matrix?count($matrix['rows']):($template==='riwayat-tagihan'?count(report_billing_history_group_students($report['rows'])):count($report['rows'])));
+    spp_excel_respond($doc,$excelDownload,$template.'-'.date('Ymd-His'),'export_global.php?'.filter_build_query($query),'template.php?'.filter_build_query($back),$matrix?count($matrix['rows']):($template==='riwayat-tagihan'?count(report_history_groups($report)):count($report['rows'])));
 }
 if($template==='tunggakan-siswa'&&in_array($format,['preview','print','pdf'],true)){
     require_once __DIR__.'/../includes/report_letters.php';
@@ -79,7 +79,7 @@ if($template==='tunggakan-siswa'&&in_array($format,['preview','print','pdf'],tru
     exit;
 }
 $isCashRecap=in_array($template,['setoran','kas-tabungan'],true);$isSavingsCashRecap=$template==='kas-tabungan';
-$billingGroups=$template==='riwayat-tagihan'?report_billing_history_group_students($report['rows']):[];
+$billingGroups=$template==='riwayat-tagihan'?report_history_groups($report):[];
 $billingColumns=$template==='riwayat-tagihan'?report_billing_history_component_columns($billingGroups):[];
 $billingColumnWidth=$billingColumns?57/count($billingColumns):0;
 $printMatrix=$matrix??($template==='riwayat-tagihan'?global_report_billing_print_matrix($billingGroups,$billingColumns,$reportUnitId):(!$isCashRecap?global_report_flat_print_matrix($report):null));

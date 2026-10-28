@@ -33,12 +33,15 @@ function du_psb_states(mysqli $db,string $year,bool $refresh=false,bool $include
     if($refresh)unset($GLOBALS['du_psb_states'][$key]);if(isset($GLOBALS['du_psb_states'][$key]))return $GLOBALS['du_psb_states'][$key];
     $placements=hp_rows($db,"SELECT p.*,y.label,y.status year_status,s.id student_id,s.NAMA,s.NO_induk_diknas,s.is_active,s.DAFTAR_ULANG,s.potong_du,s.tot_du FROM siswa_tahun_ajaran p JOIN tahun_ajaran y ON y.id=p.tahun_ajaran_id AND y.unit_id=p.unit_id JOIN siswa s ON s.NO_INDUK=p.no_induk AND s.unit_id=p.unit_id WHERE y.label=? AND ((p.unit_id=1 AND p.kelas='1') OR (p.unit_id=2 AND p.kelas='7') OR (p.unit_id=3 AND p.kelas='10')) AND (p.du_covered_by_psb=1 OR (y.label>=? AND y.status<>'closed' AND p.status='aktif' AND s.is_active=1))",[$year,max('2026/2027',du_current_academic_year())]);
     if(!$placements)return $GLOBALS['du_psb_states'][$key]=[];
+    // Only these first-grade students can affect this decision. Historical DU
+    // evidence for other grades must not force a scan of the whole archive.
+    $studentIds=implode(',',array_unique(array_map('intval',array_column($placements,'student_id'))));
     $data=lb_cache($db);$bills=[];$history=[];
     foreach(hp_rows($db,'SELECT unit_id,no_induk FROM tagihan_daftar_ulang WHERE tahun_ajaran_snapshot=?',[$year]) as $b)$bills[$b['unit_id'].'|'.$b['no_induk']]=true;
     if(lop_ready($db)){
         $period=lb_du_year_sql('p');
-        foreach(hp_rows($db,"SELECT DISTINCT o.unit_id,s.NO_INDUK FROM legacy_op_payments p JOIN legacy_op_owners o ON o.id=p.owner_id AND o.unit_id=p.unit_id JOIN siswa s ON s.id=o.student_id AND s.unit_id=o.unit_id WHERE (p.source_table='bayar_du' OR JSON_SEARCH(p.items,'one','daftar_ulang',NULL,'$[*].category') IS NOT NULL) AND ($period)=?",[$year]) as $r)$history[$r['unit_id'].'|'.$r['NO_INDUK']]=true;
-        foreach(hp_rows($db,"SELECT s.unit_id,s.NO_INDUK FROM legacy_debts d JOIN legacy_debt_masters m ON m.id=d.master_id AND m.unit_id=d.unit_id JOIN siswa s ON s.id=d.student_id AND s.unit_id=d.unit_id WHERE m.period=? AND m.component IN ('Daftar Ulang','DU')",[$year]) as $r)$history[$r['unit_id'].'|'.$r['NO_INDUK']]=true;
+        foreach(hp_rows($db,"SELECT DISTINCT o.unit_id,s.NO_INDUK FROM legacy_op_payments p JOIN legacy_op_owners o ON o.id=p.owner_id AND o.unit_id=p.unit_id JOIN siswa s ON s.id=o.student_id AND s.unit_id=o.unit_id WHERE s.id IN ($studentIds) AND (p.source_table='bayar_du' OR JSON_SEARCH(p.items,'one','daftar_ulang',NULL,'$[*].category') IS NOT NULL) AND ($period)=?",[$year]) as $r)$history[$r['unit_id'].'|'.$r['NO_INDUK']]=true;
+        foreach(hp_rows($db,"SELECT s.unit_id,s.NO_INDUK FROM legacy_debts d JOIN legacy_debt_masters m ON m.id=d.master_id AND m.unit_id=d.unit_id JOIN siswa s ON s.id=d.student_id AND s.unit_id=d.unit_id WHERE s.id IN ($studentIds) AND m.period=? AND m.component IN ('Daftar Ulang','DU')",[$year]) as $r)$history[$r['unit_id'].'|'.$r['NO_INDUK']]=true;
     }
     $out=[];
     foreach($placements as $p){

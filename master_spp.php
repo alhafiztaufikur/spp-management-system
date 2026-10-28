@@ -168,11 +168,13 @@ if($_SERVER['REQUEST_METHOD']==='POST'){
     mspp_redirect($selectedYear);
 }
 
-$master=mspp_read_year($koneksi,$selectedYear);$masterId=(int)$master['id'];$rates=spp_master_rates($koneksi,$masterId);[$firstLevel,$lastLevel]=unit_level_bounds();
-$ratesEditable=spp_master_rates_editable($master);$rateVersion=spp_master_rate_version($master,$rates);
+if(($_SERVER['REQUEST_METHOD']??'')==='GET')$GLOBALS['lb_read_projection'][$koneksi->thread_id]=true;
 if((string)($_GET['cancel_tarif']??'')==='1')unset($_SESSION['spp_rate_inputs'][unit_active_id().'|'.$selectedYear]);
 $publishDraft=$_SESSION['spp_publish_inputs'][unit_active_id().'|'.$selectedYear]??['students'=>[],'starts'=>[]];unset($_SESSION['spp_publish_inputs'][unit_active_id().'|'.$selectedYear]);
 $rateDraft=$_SESSION['spp_rate_inputs'][unit_active_id().'|'.$selectedYear]??null;unset($_SESSION['spp_rate_inputs'][unit_active_id().'|'.$selectedYear]);
+require_once __DIR__.'/includes/read_session.php';read_session_release();
+$master=mspp_read_year($koneksi,$selectedYear);$masterId=(int)$master['id'];$rates=spp_master_rates($koneksi,$masterId);[$firstLevel,$lastLevel]=unit_level_bounds();
+$ratesEditable=spp_master_rates_editable($master);$rateVersion=spp_master_rate_version($master,$rates);
 $rateEditing=$master['status']==='published'&&((string)($_GET['edit_tarif']??'')==='1'||($rateDraft['action']??'')==='ubah_tarif_terbit');
 $rateValues=$rateDraft&&in_array($rateDraft['action'],['simpan_tarif','ubah_tarif_terbit'],true)?$rateDraft['rates']:$rates;
 $years=[];$currentStart=(int)substr(du_current_academic_year(),0,4);for($offset=-2;$offset<=3;$offset++){$start=$currentStart+$offset;$label=$start.'/'.($start+1);$years[$label]=$label;}$res=$koneksi->query('SELECT label FROM tahun_ajaran ORDER BY label DESC');while($r=$res->fetch_assoc())$years[$r['label']]=$r['label'];krsort($years);
