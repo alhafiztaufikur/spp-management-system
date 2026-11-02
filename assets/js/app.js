@@ -877,9 +877,10 @@ function selectedPaymentMonthLabel() {
 function refreshSppPeriodLabel() {
   const label = document.getElementById('spp-component-label');
   if (!label) return;
-  if (window.sppPublishedBilling) { label.textContent = '🎓 Uang SPP'; return; }
+  const name=document.body.classList.contains('payment-content-plain')?'Uang SPP':'🎓 Uang SPP';
+  if (window.sppPublishedBilling) { label.textContent = name; return; }
   const monthLabel = selectedPaymentMonthLabel();
-  label.textContent = '🎓 Uang SPP' + (monthLabel ? ' (' + monthLabel + ')' : '');
+  label.textContent = name + (monthLabel ? ' (' + monthLabel + ')' : '');
 }
 
 function setDaftarUlangContext(kelas, tahunAjaran) {
@@ -1014,7 +1015,7 @@ function refreshDaftarUlangSelector(opt) {
   if (warningIcon) {
     const message = arrears.length + ' tahun ajaran masih memiliki tunggakan Daftar Ulang';
     warningIcon.hidden = arrears.length === 0;
-    warningIcon.textContent = arrears.length ? '!' : '';
+    warningIcon.textContent = arrears.length ? (document.body.classList.contains('payment-content-plain')?'Tunggakan DU':'!') : '';
     warningIcon.setAttribute('aria-label', arrears.length ? message : '');
     warningIcon.title = arrears.length ? message : '';
   }

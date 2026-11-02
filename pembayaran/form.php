@@ -86,8 +86,8 @@ unset($_SESSION['payment_draft']);
 <link rel="stylesheet" href="../assets/css/rombel_payment_refinement.css?v=<?= filemtime(__DIR__.'/../assets/css/rombel_payment_refinement.css') ?>">
 <link rel="stylesheet" href="../assets/css/payment_ui_polish.css?v=<?= filemtime(__DIR__ . '/../assets/css/payment_ui_polish.css') ?>">
 <link rel="stylesheet" href="../assets/css/history_rombel_refinement.css?v=<?= filemtime(__DIR__.'/../assets/css/history_rombel_refinement.css') ?>">
-<link rel="stylesheet" href="../assets/css/payment_workspace_refinement.css?v=<?= filemtime(__DIR__.'/../assets/css/payment_workspace_refinement.css') ?>"></head>
-<body class="ui-time-polish">
+<link rel="stylesheet" href="../assets/css/payment_workspace_refinement.css?v=<?= filemtime(__DIR__.'/../assets/css/payment_workspace_refinement.css') ?>"><link rel="stylesheet" href="../assets/css/payment_content_plain.css?v=<?= filemtime(__DIR__ . '/../assets/css/payment_content_plain.css') ?>"></head>
+<body class="payment-content-plain ui-time-polish">
 
   <div class="bg-orbs">
     <div class="orb orb-1"></div><div class="orb orb-2"></div><div class="orb orb-3"></div>
@@ -112,13 +112,6 @@ unset($_SESSION['payment_draft']);
 
       <?php if ($flash && ($flash['scope'] ?? '') !== 'spp'): ?>
       <div class="alert alert-<?= $flash['type'] ?>" id="flash-msg">
-        <svg width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round">
-          <?php if ($flash['type'] === 'success'): ?>
-            <polyline points="20 6 9 17 4 12"/>
-          <?php else: ?>
-            <circle cx="12" cy="12" r="10"/><line x1="12" y1="8" x2="12" y2="12"/><line x1="12" y1="16" x2="12.01" y2="16"/>
-          <?php endif; ?>
-        </svg>
         <?= htmlspecialchars($flash['msg']) ?>
       </div>
       <?php endif; ?>
@@ -127,7 +120,6 @@ unset($_SESSION['payment_draft']);
       <div class="main-card" id="payment-interactive-card">
         <div class="card-title-row">
           <div class="card-title">
-            <svg width="18" height="18" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><rect x="2" y="5" width="20" height="14" rx="2"/><line x1="2" y1="10" x2="22" y2="10"/></svg>
             Input Pembayaran Siswa
           </div>
         </div>
@@ -146,9 +138,6 @@ unset($_SESSION['payment_draft']);
               <div class="payment-settings-grid">
                 <div class="field-row payment-field-card payment-date-card">
                   <label class="field-label" for="tgl-bayar">
-                    <span class="payment-field-icon" aria-hidden="true">
-                      <svg width="15" height="15" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.3" stroke-linecap="round" stroke-linejoin="round"><rect x="3" y="4" width="18" height="18" rx="2"/><line x1="16" y1="2" x2="16" y2="6"/><line x1="8" y1="2" x2="8" y2="6"/><line x1="3" y1="10" x2="21" y2="10"/></svg>
-                    </span>
                     Tanggal Bayar
                   </label>
                   <input class="field-input" type="date" id="tgl-bayar" name="tanggal_bayar"
@@ -156,9 +145,6 @@ unset($_SESSION['payment_draft']);
                 </div>
                 <div class="field-row payment-field-card payment-period-card">
                   <label class="field-label" for="bulan-bayar" id="payment-period-label">
-                    <span class="payment-field-icon" aria-hidden="true">
-                      <svg width="15" height="15" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.3" stroke-linecap="round" stroke-linejoin="round"><path d="M8 2v4"/><path d="M16 2v4"/><rect x="3" y="4" width="18" height="18" rx="2"/><path d="M3 10h18"/></svg>
-                    </span>
                     Bulan Tagihan SPP &amp; Komite
                   </label>
                   <div class="field-group-inline payment-period-inputs">
@@ -189,9 +175,6 @@ unset($_SESSION['payment_draft']);
                 </div>
                 <div class="field-row payment-field-card">
                   <label class="field-label" for="sistem-pembayaran">
-                    <span class="payment-field-icon" aria-hidden="true">
-                      <svg width="15" height="15" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.3" stroke-linecap="round" stroke-linejoin="round"><rect x="2" y="5" width="20" height="14" rx="2"/><line x1="2" y1="10" x2="22" y2="10"/></svg>
-                    </span>
                     Sistem Pembayaran
                   </label>
                   <select class="field-input field-select" id="sistem-pembayaran" name="sistem_pembayaran" required>
@@ -221,7 +204,6 @@ unset($_SESSION['payment_draft']);
             <div class="field-row full-span">
               <label class="field-label" for="siswa-search">Cari Siswa (Nama / NIS / NIS Diknas)</label>
               <div class="search-box">
-                <svg width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.5" stroke-linecap="round" stroke-linejoin="round"><circle cx="11" cy="11" r="8"/><line x1="21" y1="21" x2="16.65" y2="16.65"/></svg>
                 <input type="text" id="siswa-search" list="siswa-list" placeholder="Ketik nama, NIS, atau NIS Diknas..." oninput="pilihSiswaDatalist(this)" autocomplete="off" />
               </div>
               <datalist id="siswa-list">
@@ -273,16 +255,16 @@ unset($_SESSION['payment_draft']);
               <tbody>
                 <?php
                 $komponen = [
-                  ['psb', '🎒 Uang PSB', 'uang_psb'],
-                  ['spp', '🎓 Uang SPP Diterima', 'uang_spp'],
-                  ['komite', '🏫 Uang Komite', 'uang_komite'],
-                  ['du', '📚 Daftar Ulang', 'uang_du']
+                  ['psb', 'Uang PSB', 'uang_psb'],
+                  ['spp', 'Uang SPP Diterima', 'uang_spp'],
+                  ['komite', 'Uang Komite', 'uang_komite'],
+                  ['du', 'Daftar Ulang', 'uang_du']
                 ];
                 foreach ($komponen as $i => $k):
                   [$key, $label, $name] = $k;
                 ?>
                 <tr class="<?= $i % 2 === 0 ? 'row-highlight' : '' ?>">
-                  <td><?php if($key==='du'): ?><div class="du-bill-selector"><button type="button" class="du-selector-trigger" id="du-selector-trigger" aria-haspopup="listbox" aria-controls="du-selector-menu" aria-expanded="false"><span class="du-trigger-label"><?= $label ?></span><span class="du-arrear-warning" id="du-arrear-warning" role="img" hidden></span><span class="du-chevron" aria-hidden="true"><svg viewBox="0 0 16 16" focusable="false"><path d="M3.5 6 8 10 12.5 6"/></svg></span></button><div class="du-selector-menu" id="du-selector-menu" role="listbox" aria-label="Pilih tagihan Daftar Ulang" tabindex="-1" hidden></div></div><?php else: ?><span class="comp-label"<?= $key === 'spp' ? ' id="spp-component-label"' : '' ?>><?= $label ?></span><?php endif; ?><?php if($key==='spp'): ?><small class="du-inline-context du-context-label" id="spp-context-label">Pilih bulan tagihan.</small><?php endif; ?><?php if($key==='komite'): ?><small class="du-inline-context du-context-label" id="komite-context-label">Lunas penuh per bulan.</small><?php endif; ?><?php if(in_array($key,['psb'],true)): ?><small class="du-inline-context du-context-label" id="<?=$key?>-context-label">Pilih siswa untuk melihat tagihan.</small><?php endif; ?><?php if($key==='du'): ?><small class="du-inline-context du-context-label" id="du-context-label">Pilih siswa untuk melihat tagihan.</small><small class="du-inline-context du-master-warning" id="du-master-warning" hidden></small><?php endif; ?></td>
+                  <td><?php if($key==='du'): ?><div class="du-bill-selector"><button type="button" class="du-selector-trigger" id="du-selector-trigger" aria-haspopup="listbox" aria-controls="du-selector-menu" aria-expanded="false"><span class="du-trigger-label"><?= $label ?></span><span class="du-arrear-warning" id="du-arrear-warning" role="img" hidden></span></button><div class="du-selector-menu" id="du-selector-menu" role="listbox" aria-label="Pilih tagihan Daftar Ulang" tabindex="-1" hidden></div></div><?php else: ?><span class="comp-label"<?= $key === 'spp' ? ' id="spp-component-label"' : '' ?>><?= $label ?></span><?php endif; ?><?php if($key==='spp'): ?><small class="du-inline-context du-context-label" id="spp-context-label">Pilih bulan tagihan.</small><?php endif; ?><?php if($key==='komite'): ?><small class="du-inline-context du-context-label" id="komite-context-label">Lunas penuh per bulan.</small><?php endif; ?><?php if(in_array($key,['psb'],true)): ?><small class="du-inline-context du-context-label" id="<?=$key?>-context-label">Pilih siswa untuk melihat tagihan.</small><?php endif; ?><?php if($key==='du'): ?><small class="du-inline-context du-context-label" id="du-context-label">Pilih siswa untuk melihat tagihan.</small><small class="du-inline-context du-master-warning" id="du-master-warning" hidden></small><?php endif; ?></td>
                   <td data-label="Total Tagihan"><input class="tbl-input tbl-system" type="text" value="0" id="<?=$key?>-total" readonly tabindex="-1" aria-readonly="true" /></td>
                   <td data-label="Sudah Terbayar"><input class="tbl-input tbl-system" type="text" value="0" id="<?=$key?>-bayar" readonly tabindex="-1" aria-readonly="true" /></td>
                   <td data-label="Sisa"><input class="tbl-input tbl-system tbl-system-sisa" type="text" value="0" id="<?=$key?>-sisa" readonly tabindex="-1" aria-readonly="true" /></td>
@@ -318,13 +300,10 @@ unset($_SESSION['payment_draft']);
               <label class="ll-field"><span class="ll-field-label">Sisa</span><input class="field-input biaya-lain-sisa" type="text" value="0" placeholder="Sisa" readonly aria-label="Sisa biaya lain" /></label>
               <label class="ll-field"><span class="ll-field-label">Bayar</span><input class="field-input biaya-lain-nominal" type="text" value="0" placeholder="Input bayar" name="biaya_lain_nominal[]" aria-label="Input bayar biaya lain" /></label>
               <label class="ll-field ll-field-note"><span class="ll-field-label">Keterangan</span><input class="field-input biaya-lain-keterangan" type="text" placeholder="Keterangan opsional..." name="biaya_lain_keterangan[]" maxlength="255" /></label>
-              <button class="btn-icon-danger btn-remove-biaya-lain" type="button" title="Hapus baris" aria-label="Hapus baris">
-                <svg width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><polyline points="3 6 5 6 21 6"/><path d="M19 6l-1 14H6L5 6"/><path d="M10 11v6M14 11v6"/></svg>
-              </button>
+              <button class="btn-icon-danger btn-remove-biaya-lain" type="button" title="Hapus baris" aria-label="Hapus baris">Hapus</button>
             </div>
           </div>
           <button class="btn btn-ghost btn-add-biaya-lain" id="btn-add-biaya-lain" type="button">
-            <svg width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.5"><line x1="12" y1="5" x2="12" y2="19"/><line x1="5" y1="12" x2="19" y2="12"/></svg>
             Tambah Biaya Lain
           </button>
           <template id="biaya-lain-row-template">
@@ -342,9 +321,7 @@ unset($_SESSION['payment_draft']);
               <label class="ll-field"><span class="ll-field-label">Sisa</span><input class="field-input biaya-lain-sisa" type="text" value="0" placeholder="Sisa" readonly aria-label="Sisa biaya lain" /></label>
               <label class="ll-field"><span class="ll-field-label">Bayar</span><input class="field-input biaya-lain-nominal" type="text" value="0" placeholder="Input bayar" name="biaya_lain_nominal[]" aria-label="Input bayar biaya lain" /></label>
               <label class="ll-field ll-field-note"><span class="ll-field-label">Keterangan</span><input class="field-input biaya-lain-keterangan" type="text" placeholder="Keterangan opsional..." name="biaya_lain_keterangan[]" maxlength="255" /></label>
-              <button class="btn-icon-danger btn-remove-biaya-lain" type="button" title="Hapus baris" aria-label="Hapus baris">
-                <svg width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><polyline points="3 6 5 6 21 6"/><path d="M19 6l-1 14H6L5 6"/><path d="M10 11v6M14 11v6"/></svg>
-              </button>
+              <button class="btn-icon-danger btn-remove-biaya-lain" type="button" title="Hapus baris" aria-label="Hapus baris">Hapus</button>
             </div>
           </template>
 
@@ -357,19 +334,15 @@ unset($_SESSION['payment_draft']);
           <!-- Action Buttons -->
           <div class="action-bar">
             <button type="submit" class="btn btn-primary" id="btn-input">
-              <svg width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.5" stroke-linecap="round" stroke-linejoin="round"><path d="M19 21H5a2 2 0 0 1-2-2V5a2 2 0 0 1 2-2h11l5 5v14a2 2 0 0 1-2 2z"/><polyline points="17 21 17 13 7 13 7 21"/><polyline points="7 3 7 8 15 8"/></svg>
               <span id="payment-submit-label">Simpan</span>
             </button>
             <button type="reset" class="btn btn-ghost" id="btn-reset" onclick="resetForm()">
-              <svg width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.5" stroke-linecap="round" stroke-linejoin="round"><polyline points="1 4 1 10 7 10"/><path d="M3.51 15a9 9 0 1 0 .49-3.59"/></svg>
               Reset
             </button>
             <a href="../pembayaran/lihat.php" class="btn btn-warning" id="btn-lihat">
-              <svg width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.5" stroke-linecap="round" stroke-linejoin="round"><path d="M1 12s4-8 11-8 11 8 11 8-4 8-11 8-11-8-11-8z"/><circle cx="12" cy="12" r="3"/></svg>
               Lihat Data
             </a>
             <a href="../dashboard.php" class="btn btn-ghost" id="btn-keluar">
-              <svg width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.5" stroke-linecap="round" stroke-linejoin="round"><path d="M9 21H5a2 2 0 0 1-2-2V5a2 2 0 0 1 2-2h4"/><polyline points="16 17 21 12 16 7"/><line x1="21" y1="12" x2="9" y2="12"/></svg>
               Keluar
             </a>
           </div>

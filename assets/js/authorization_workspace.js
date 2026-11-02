@@ -71,7 +71,7 @@
     const copy=approve?(deletion?'Pembayaran akan dihapus setelah persetujuan. Seluruh jurnal aktivitas tetap tersimpan.':'Usulan perubahan akan diterapkan pada pembayaran. Pembuat awal transaksi tetap tercatat.'):action==='reject'?'Pengajuan akan ditolak. Pembayaran tetap utuh dan keputusan tersimpan dalam riwayat.':'Pengajuan akan dibatalkan. Pembayaran tetap utuh dan riwayat pengajuan tersimpan.';
     dialog.dataset.danger=String(deletion||action==='reject');dialog.querySelector('#auth-confirm-title').textContent=title;
     dialog.querySelector('#auth-confirm-copy').textContent=copy;dialog.querySelector('[data-confirm-reference]').textContent=[form.dataset.authReference,form.dataset.authStudent].filter(Boolean).join(' / ');
-    dialog.querySelector('[data-confirm-icon]').innerHTML='<svg viewBox="0 0 24 24" width="28" height="28" fill="none" stroke="currentColor" stroke-width="1.8"><path d="'+(deletion?'M4 7h16M9 7V4h6v3M6 7l1 13h10l1-13M10 10v7M14 10v7':'m5 12 4 4L19 6')+'"/></svg>';
+    const confirmationIcon=dialog.querySelector('[data-confirm-icon]');confirmationIcon.style.display=deletion?'none':'';confirmationIcon.innerHTML=deletion?'':'<svg viewBox="0 0 24 24" width="28" height="28" fill="none" stroke="currentColor" stroke-width="1.8"><path d="m5 12 4 4L19 6"/></svg>';
     accept.textContent=approve?(deletion?'Setujui dan Hapus':'Setujui dan Terapkan'):action==='reject'?'Tolak Pengajuan':'Batalkan Pengajuan';
     accept.className='btn '+(deletion||action==='reject'?'btn-danger':'btn-primary');dialog.showModal();dialog.querySelector('[data-confirm-cancel]').focus();
   });nav();

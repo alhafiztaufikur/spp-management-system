@@ -48,7 +48,7 @@ function initIndonesianDateInputs() {
     visible.addEventListener('change',()=>{visible.dataset.typedDate=visible.value;push();});
     native.addEventListener('change',sync);
     if(!native.readOnly){
-      const button=document.createElement('button');button.type='button';button.className='id-date-picker';button.textContent='▦';button.setAttribute('aria-label','Buka kalender');
+      const button=document.createElement('button');button.type='button';button.className='id-date-picker';button.textContent=document.body.classList.contains('payment-content-plain')?'Kalender':'▦';button.setAttribute('aria-label','Buka kalender');
       wrapper.append(button);button.disabled=native.disabled;
       button.addEventListener('click',()=>{try{native.showPicker();}catch(_){native.focus();}});
     }

@@ -1,10 +1,12 @@
 (() => {
   'use strict';
   const root=document.getElementById('student-history');if(!root)return;
+  const textControls=document.body.classList.contains('payment-content-plain');
+  if(textControls)document.getElementById('sh-detail-close').textContent='Tutup';
   const $=id=>document.getElementById(id),body=$('payment-history-body'),dialog=$('sh-detail');
   let rows=[],sort='tanggal',direction=-1,method='',component='',detailController=null,detailGeneration=0,menuTrigger=null;
   const icons={detail:'<circle cx="12" cy="12" r="9"/><path d="M12 11v6M12 7v1"/>',print:'<path d="M6 9V3h12v6M6 18H3V9h18v9h-3M6 14h12v7H6zM17 12h1"/>'};
-  const icon=key=>'<svg viewBox="0 0 24 24" aria-hidden="true">'+(icons[key]||icons.detail)+'</svg>';
+  const icon=key=>textControls?'':'<svg viewBox="0 0 24 24" aria-hidden="true">'+(icons[key]||icons.detail)+'</svg>';
   const normalized=value=>String(value??'').toLocaleLowerCase('id-ID');
   const methodName=value=>normalized(value)==='qris'?'Qris':normalized(value)==='tunai'?'Tunai':normalized(value)==='va'?'VA':String(value||'Tidak tercatat');
   const menu=document.createElement('div');menu.className='sh-menu';menu.hidden=true;menu.setAttribute('role','menu');document.body.append(menu);
@@ -24,7 +26,7 @@
       day.textContent=r.tanggal_date||r.tanggal||'Tanggal tidak tercatat';clock.textContent=r.tanggal_time||'';
       date.append(day,clock);tr.append(date,cell(r.periode),cell(r.komponen));
       const td=cell(''),badge=document.createElement('span'),name=methodName(r.metode);badge.className='history-method sh-method-'+normalized(name);badge.textContent=name==='Qris'?'QRIS':name;td.append(badge);tr.append(td,cell(r.operator),cell(r.total,'history-total'));
-      const actions=cell('','sh-row-actions'),button=document.createElement('button');button.type='button';button.className='sh-more';button.textContent='\u22ee';button.setAttribute('aria-label','Tindakan transaksi '+r.id);button.setAttribute('aria-haspopup','menu');button.setAttribute('aria-expanded','false');button.addEventListener('click',()=>openMenu(button,r));button.addEventListener('keydown',e=>{if(e.key==='ArrowDown'){e.preventDefault();openMenu(button,r);}});actions.append(button);tr.append(actions);fragment.append(tr);
+      const actions=cell('','sh-row-actions'),button=document.createElement('button');button.type='button';button.className='sh-more';button.textContent=textControls?'Tindakan':'\u22ee';button.setAttribute('aria-label','Tindakan transaksi '+r.id);button.setAttribute('aria-haspopup','menu');button.setAttribute('aria-expanded','false');button.addEventListener('click',()=>openMenu(button,r));button.addEventListener('keydown',e=>{if(e.key==='ArrowDown'){e.preventDefault();openMenu(button,r);}});actions.append(button);tr.append(actions);fragment.append(tr);
     }
     if(!filtered.length){const tr=document.createElement('tr'),td=cell(rows.length?'Tidak ada transaksi yang sesuai filter.':'Belum ada transaksi pembayaran untuk siswa ini.','sh-empty');td.colSpan=7;tr.append(td);fragment.append(tr);}
     body.replaceChildren(fragment);$('sh-count').textContent='Menampilkan '+filtered.length+' dari '+rows.length+' transaksi';

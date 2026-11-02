@@ -176,14 +176,14 @@ function authorization_request_summary(array $request): array
       <?php if ($schemaError): ?><div class="alert alert-error"><?= htmlspecialchars($schemaError) ?></div><?php endif; ?>
 
       <section class="authorization-hero">
-        <div class="auth-hero-copy"><span class="auth-hero-icon"><?= authorization_icon('history') ?></span><div><h1><?= $historyView?'Riwayat Perubahan Transaksi':'Antrean Otorisasi Transaksi' ?></h1><p><?= $historyView?'Lihat pengajuan, keputusan, dan perubahan langsung. Riwayat tetap tersedia setelah transaksi dihapus.':'Pantau pengajuan edit dan hapus. Hanya Super Admin yang dapat menyetujui atau menolak.' ?></p></div></div>
-        <div class="authorization-hero-count"><?= authorization_icon('chart') ?><div><span><?= $historyView?'Total riwayat':'Total antrean' ?></span><strong><?= number_format($total) ?></strong><small><?= $historyView?'transaksi':'pengajuan' ?> sesuai filter</small></div></div>
+        <div class="auth-hero-copy"><div><h1><?= $historyView?'Riwayat Perubahan Transaksi':'Antrean Otorisasi Transaksi' ?></h1></div></div>
+        <div class="authorization-hero-count"><div><span><?= $historyView?'Total riwayat':'Total antrean' ?></span><strong><?= number_format($total) ?></strong></div></div>
       </section>
 
       <nav class="auth-menu-switch" aria-label="Menu asal transaksi">
         <?php foreach(['pembayaran'=>['receipt','SPP, PSB, Komite, dan Biaya Lain'],'daftar_ulang'=>['student','Cicilan dan pelunasan Daftar Ulang'],'tabungan'=>['chart','Setoran dan penarikan tabungan']] as $value=>[$menuIcon,$description]): ?>
         <a class="auth-menu-card" href="?<?= authorization_escape(http_build_query(['menu'=>$value,'view'=>$historyView?'history':'queue'])) ?>" <?= $menu===$value?'aria-current="page"':'' ?>>
-          <span class="auth-menu-icon"><?= authorization_icon($menuIcon) ?></span><span><strong><?= authorization_escape(authorization_menu_label($value)) ?></strong><small><?= authorization_escape($description) ?></small></span><?= authorization_icon('right') ?>
+          <span class="auth-menu-copy"><strong><?= authorization_escape(authorization_menu_label($value)) ?></strong><small><?= authorization_escape($description) ?></small></span>
         </a>
         <?php endforeach; ?>
       </nav>
@@ -204,8 +204,8 @@ function authorization_request_summary(array $request): array
             <?php endforeach; ?>
           </select></label>
           <label class="field-row authorization-search-field"><span class="field-label">Cari transaksi atau siswa</span><input class="field-input" name="q" value="<?= htmlspecialchars($search) ?>" placeholder="Nomor transaksi, NIS, atau nama siswa" /></label>
-          <div class="authorization-filter-actions"><button class="btn btn-primary" type="submit"><?= authorization_icon('search') ?> Tampilkan</button>
-          <a class="btn btn-ghost authorization-reset-button" href="otorisasi_transaksi.php?menu=<?= authorization_escape($menu) ?>&amp;view=<?= $historyView?'history':'queue' ?>"><svg viewBox="0 0 24 24" width="16" height="16" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true"><path d="M3 12a9 9 0 1 0 3-6.7"/><path d="M3 3v5h5"/></svg><span>Reset</span></a></div>
+          <div class="authorization-filter-actions"><button class="btn btn-primary" type="submit">Tampilkan</button>
+          <a class="btn btn-ghost authorization-reset-button" href="otorisasi_transaksi.php?menu=<?= authorization_escape($menu) ?>&amp;view=<?= $historyView?'history':'queue' ?>"><span>Reset</span></a></div>
         </form>
       </section>
 
@@ -231,7 +231,7 @@ function authorization_request_summary(array $request): array
       ?>
       <div class="auth-workspace" data-auth-workspace data-export-account="<?= $currentId ?>" data-export-scope="<?= unit_active_id() ?>" data-export-filter="<?= authorization_escape(json_encode(['menu'=>$menu,'source'=>$source,'kind'=>$kindChoices,'status'=>$statusChoices,'q'=>$search])) ?>" data-view="<?= $historyView?'history':'queue' ?>">
         <section class="auth-list-panel main-card">
-          <header class="auth-panel-heading"><h3><?= authorization_icon('history') ?> <?= $historyView?'Daftar Riwayat Perubahan Transaksi':'Daftar Pengajuan Otorisasi' ?></h3><span class="auth-count"><?= number_format($total) ?> <?= $historyView?'transaksi':'pengajuan' ?></span></header>
+          <header class="auth-panel-heading"><h3><?= $historyView?'Daftar Riwayat Perubahan Transaksi':'Daftar Pengajuan Otorisasi' ?></h3><span class="auth-count"><?= number_format($total) ?> <?= $historyView?'transaksi':'pengajuan' ?></span></header>
           <?php if($historyView): ?>
           <?php if(unit_is_super()): ?>
           <form class="auth-export-tools" action="otorisasi_export_pdf.php" method="post" data-export-form>
@@ -249,8 +249,8 @@ function authorization_request_summary(array $request): array
           <?php foreach($items as $index=>$item): [$status,$tone,$icon]=authorization_badge($item['action']);
               $query=['menu'=>$menu,'source'=>$source,'selected_source'=>$item['source'],'view'=>$historyView?'history':'queue','kind'=>$kind,'status'=>$statusFilter,'q'=>$search,'page'=>$page,'selected'=>$item['id'],'selected_unit'=>$item['unit_id']]; ?>
               <?php if($historyView && unit_is_super()): ?><div class="auth-record-row"><label class="auth-export-check"><input type="checkbox" data-export-choice data-source="<?= $item['source'] ?>" data-id="<?= $item['id'] ?>" data-unit="<?= $item['unit_id'] ?>" aria-label="Pilih <?= authorization_escape($item['reference'].' '.$item['student']) ?> untuk PDF"></label><?php endif; ?>
-              <a class="auth-record <?= $selected===$index?'is-selected':'' ?>" href="?<?= authorization_escape(filter_build_query($query)) ?>" data-auth-record data-index="<?= $index ?>" data-source="<?= $item['source'] ?>" data-id="<?= $item['id'] ?>" data-unit="<?= $item['unit_id'] ?>" <?= $selected===$index?'aria-current="true"':'' ?>>
-                <span class="auth-action-icon auth-tone-<?= $tone ?>"><?= authorization_icon($icon) ?></span>
+              <a class="auth-record <?= $icon==='delete'?'auth-record-text-action':'' ?> <?= $selected===$index?'is-selected':'' ?>" href="?<?= authorization_escape(filter_build_query($query)) ?>" data-auth-record data-index="<?= $index ?>" data-source="<?= $item['source'] ?>" data-id="<?= $item['id'] ?>" data-unit="<?= $item['unit_id'] ?>" <?= $selected===$index?'aria-current="true"':'' ?>>
+                <?php if($icon!=='delete'): ?><span class="auth-action-icon auth-tone-<?= $tone ?>"><?= authorization_icon($icon) ?></span><?php endif; ?>
                 <div class="auth-record-identity"><span class="auth-menu-badge"><?= authorization_escape(authorization_menu_label($item['menu'])) ?></span><strong><?= authorization_escape($item['reference']) ?></strong><span><?= authorization_escape($item['student']) ?></span><small>NIS <?= authorization_escape($item['nis']) ?><?= unit_active_id()===0?' ? '.authorization_escape(unit_label($item['unit_id'])):'' ?></small></div>
                 <div class="auth-record-action"><strong><?= authorization_escape($item['label']) ?></strong><small><?= $item['authorization_id']?'Pengajuan #'.(int)$item['authorization_id']:'Perubahan langsung' ?></small></div>
                 <span class="auth-status auth-tone-<?= $tone ?>"><?= authorization_escape($status) ?></span>
@@ -260,7 +260,7 @@ function authorization_request_summary(array $request): array
           <?php endforeach; ?></div>
         </section>
         <section class="auth-detail-panel main-card" aria-label="Detail transaksi terpilih">
-          <header class="auth-panel-heading"><h3><?= authorization_icon('history') ?> <?= $historyView?'Detail Riwayat Aktivitas':'Detail Pengajuan' ?></h3><div class="auth-detail-nav"><button class="btn btn-ghost btn-sm" type="button" data-auth-prev aria-label="Transaksi sebelumnya" disabled><?= authorization_icon('left') ?></button><button class="btn btn-ghost btn-sm" type="button" data-auth-next aria-label="Transaksi berikutnya" disabled><?= authorization_icon('right') ?></button></div></header>
+          <header class="auth-panel-heading"><h3><?= $historyView?'Detail Riwayat Aktivitas':'Detail Pengajuan' ?></h3><div class="auth-detail-nav"><button class="btn btn-ghost btn-sm" type="button" data-auth-prev aria-label="Transaksi sebelumnya" disabled><?= authorization_icon('left') ?></button><button class="btn btn-ghost btn-sm" type="button" data-auth-next aria-label="Transaksi berikutnya" disabled><?= authorization_icon('right') ?></button></div></header>
           <div class="auth-detail-body" data-auth-detail aria-live="polite"><?php if($detail): authorization_render_detail($detail);else: ?><div class="auth-empty"><?= authorization_escape($detailError??'Pilih transaksi pada daftar untuk melihat detail.') ?></div><?php endif; ?></div>
         </section>
       </div>
