@@ -172,7 +172,7 @@ function authorization_request_summary(array $request): array
       </div>
 
       <div class="auth-page-content">
-      <?php if ($flash): ?><div class="alert alert-<?= htmlspecialchars($flash['type']) ?>"><?= htmlspecialchars($flash['msg']) ?></div><?php endif; ?>
+      <?php if ($flash): ?><div data-operation-result class="alert alert-<?= htmlspecialchars($flash['type']) ?>"><?= htmlspecialchars($flash['msg']) ?></div><?php endif; ?>
       <?php if ($schemaError): ?><div class="alert alert-error"><?= htmlspecialchars($schemaError) ?></div><?php endif; ?>
 
       <section class="authorization-hero">

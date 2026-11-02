@@ -141,8 +141,8 @@
       });
     } else if (previousActive) {
       const completed = (summary.jobs || []).find(job => job.id === previousActive);
-      if (completed?.state === 'verified') feedback('Backup selesai dan sudah terverifikasi.', 'success');
-      else if (completed?.state === 'failed') feedback(completed.message || 'Backup gagal. Periksa riwayat untuk mencoba kembali.');
+      if (completed?.state === 'verified') {feedback('Backup selesai dan sudah terverifikasi.', 'success');window.showOperationResult?.({type:'success',message:'Backup selesai dan sudah terverifikasi.',source:byId('backup-create')});}
+      else if (completed?.state === 'failed') {const message=completed.message || 'Backup gagal. Periksa riwayat untuk mencoba kembali.';feedback(message);window.showOperationResult?.({type:'error',message,source:byId('backup-create')});}
     }
     previousActive = active?.id || null;
     renderHistory(Array.isArray(summary.jobs) ? summary.jobs : []);
@@ -188,6 +188,7 @@
       render(summary);
     } catch (error) {
       feedback(error instanceof SyntaxError || error instanceof TypeError || error.name === 'AbortError' ? 'Koneksi terputus. Periksa status sebelum mencoba kembali; permintaan yang sama tidak digandakan.' : error.message);
+      window.showOperationResult?.({type:'error',message:byId('backup-feedback').textContent,source:byId('backup-create')});
     } finally {
       submitting = false;
       byId('backup-create').removeAttribute('aria-busy');
@@ -215,9 +216,11 @@
         settingsSaving = false;
         render(result.summary);
         settingsFeedback('Pengaturan backup harian berhasil disimpan.', true);
+        window.showOperationResult?.({type:'success',message:'Pengaturan backup harian berhasil disimpan.',source:byId('backup-settings-save')});
       } catch (error) {
         settingsFeedback(error instanceof SyntaxError || error instanceof TypeError || error.name === 'AbortError'
           ? 'Koneksi terputus. Muat ulang halaman untuk memeriksa apakah pengaturan sudah tersimpan.' : error.message);
+        window.showOperationResult?.({type:'error',message:byId('backup-settings-feedback').textContent,source:byId('backup-settings-save')});
       } finally {
         settingsSaving = false;
         byId('backup-settings-save').removeAttribute('aria-busy');

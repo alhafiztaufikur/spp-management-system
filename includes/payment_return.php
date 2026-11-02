@@ -17,10 +17,16 @@ function payment_return_create(int $paymentId, int $unitId, array $query, string
 
 function payment_return_entry($token, int $paymentId): ?array
 {
+    return payment_return_entry_for_unit($token,$paymentId,unit_active_id());
+}
+
+/** An expired tab may retain its draft only in its server-recorded original unit. */
+function payment_return_entry_for_unit($token, int $paymentId, int $unitId): ?array
+{
     if (!is_string($token) || !preg_match('/^[a-f0-9]{48}$/D', $token)) return null;
     $entry = $_SESSION['payment_returns'][$token] ?? null;
     return $entry && $entry['expires'] >= time() && $entry['actor'] === (int)($_SESSION['admin_id'] ?? 0)
-        && $entry['scope'] === unit_active_id() && $entry['unit'] === unit_active_id()
+        && in_array($unitId,[1,2,3],true) && $entry['scope'] === $unitId && $entry['unit'] === $unitId
         && $entry['payment'] === $paymentId ? $entry : null;
 }
 
@@ -37,11 +43,12 @@ function payment_return_edit_url($token, int $id): string
     return 'edit.php?' . http_build_query(['id'=>$id, 'return_context'=>is_string($token) ? $token : '']);
 }
 
-function payment_edit_draft_save(int $id, $token): void
+function payment_edit_draft_save(int $id, $token, ?int $unitId=null): void
 {
-    if (!payment_return_entry($token, $id)) return;
+    if (!payment_return_entry_for_unit($token, $id, $unitId??unit_active_id())) return;
     $draft = $_POST;
-    unset($draft['csrf_token'], $draft['aksi'], $draft['id']);
+    unset($draft['csrf_token'], $draft['aksi'], $draft['id'], $draft['_operational_unit'], $draft['return_context'], $draft['request_key']);
+    foreach(array_keys($draft) as $name)if(str_starts_with((string)$name,'csrf_'))unset($draft[$name]);
     if (!is_string($draft['activity_request_key'] ?? null) || !preg_match('/^[a-f0-9]{32}$/D', $draft['activity_request_key'])) unset($draft['activity_request_key']);
     $_SESSION['payment_returns'][$token]['draft'] = $draft;
 }
@@ -49,11 +56,11 @@ function payment_edit_draft_save(int $id, $token): void
 /** Restore only submitted form controls, escaping all user text before rendering. */
 function payment_edit_restore_markup(string $html, array $draft): string
 {
-    $excluded=['aksi','id','csrf_token','return_context'];
+    $excluded=['aksi','id','csrf_token','return_context','_operational_unit','request_key'];
     $find=static function(string $attrs)use($draft,$excluded){
         if(!preg_match('/\bname="([^"]+)"/',$attrs,$m))return null;
         $name=html_entity_decode($m[1],ENT_QUOTES,'UTF-8');
-        return !in_array($name,$excluded,true)&&isset($draft[$name])&&is_scalar($draft[$name])?(string)$draft[$name]:null;
+        return !in_array($name,$excluded,true)&&!str_starts_with($name,'csrf_')&&isset($draft[$name])&&is_scalar($draft[$name])?(string)$draft[$name]:null;
     };
     $html=preg_replace_callback('/<input\b([^>]*)>/i',static function($m)use($find){
         $value=$find($m[1]);if($value===null||preg_match('/\btype="(?:checkbox|radio|file|submit|button)"/i',$m[1]))return $m[0];

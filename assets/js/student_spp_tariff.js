@@ -116,7 +116,8 @@ document.addEventListener('DOMContentLoaded', () => {
       let toast=document.getElementById('sct-toast');if(!toast){toast=document.createElement('div');toast.id='sct-toast';toast.className='sct-toast';toast.setAttribute('role','status');document.body.append(toast);}
       toast.textContent='Tarif diterapkan: '+result.result.updated+' diperbarui; '+result.result.created+' diterbitkan; '+result.result.locked+' dipertahankan.'+(result.result.ineligible?' '+result.result.ineligible+' periode tidak memenuhi syarat.':'');toast.hidden=false;
       window.setTimeout(()=>toast.hidden=true,6500);dialog.close();
-    }catch(error){feedback.textContent=error.message;feedback.hidden=false;}
+      if(window.showOperationResult?.({type:'success',message:toast.textContent,source:rowFor(current.student_id)?.querySelector('button')}))toast.hidden=true;
+    }catch(error){feedback.textContent=error.message;feedback.hidden=false;window.showOperationResult?.({type:'error',message:error.message,source:amount});}
     finally{busy=false;form.removeAttribute('aria-busy');form.querySelectorAll('button').forEach(button=>button.disabled=false);render();}
   });
 });

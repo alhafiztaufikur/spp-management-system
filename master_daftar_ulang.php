@@ -52,6 +52,7 @@ if ($_SERVER['REQUEST_METHOD'] === 'POST') {
     $token = (string)($_POST['csrf_token'] ?? '');
     if (!hash_equals($_SESSION['csrf_master_du'], $token)) {
         $_SESSION['flash'] = ['type' => 'error', 'msg' => 'Permintaan tidak valid atau sesi telah kedaluwarsa.'];
+        $_SESSION['du_rate_input']=['year'=>$selectedYear,'amounts'=>is_array($_POST['jumlah']??null)?$_POST['jumlah']:[]];
         master_du_redirect($selectedYear);
     }
     $action = (string)($_POST['aksi'] ?? '');
@@ -68,7 +69,13 @@ if ($_SERVER['REQUEST_METHOD'] === 'POST') {
 
         if(in_array($action,['simpan_lengkapi','simpan_dan_terbitkan','simpan_tarif','terbitkan'],true)){
             $result=du_master_save_and_complete($koneksi,$yearId,$selectedYear,$_POST['jumlah']??[],(int)$_SESSION['admin_id']);
-            $_SESSION['flash']=['type'=>($result['unknown']||$result['conflicts'])?'warning':'success','msg'=>$result['rates_saved'].' tarif disimpan; '.$result['created'].' tagihan baru; '.$result['existing'].' tagihan existing dipertahankan; '.$result['covered_psb'].' siswa tercakup PSB; '.$result['conflicts'].' konflik DU tersendiri; '.$result['unpaid_bills_aligned'].' tagihan belum dibayar disesuaikan; '.$result['unknown'].' siswa belum dapat diterbitkan.'];
+            $details=[];
+            foreach(['rates_saved'=>'Tarif disimpan','created'=>'Tagihan baru','existing'=>'Tagihan existing dipertahankan','covered_psb'=>'Siswa tercakup PSB','conflicts'=>'Konflik DU tersendiri','unpaid_bills_aligned'=>'Tagihan belum dibayar disesuaikan','unknown'=>'Siswa belum dapat diterbitkan'] as $key=>$label){
+                $details[]=['label'=>$label,'value'=>(int)$result[$key]];
+            }
+            $_SESSION['flash']=['type'=>($result['unknown']||$result['conflicts'])?'warning':'success',
+                'msg'=>'Proses tarif dan kelengkapan tagihan tahun ajaran '.$selectedYear.' selesai.',
+                'details'=>$details];
         } elseif ($action === 'tutup') {
             if ($year['status'] !== 'published') throw new RuntimeException('Hanya tahun ajaran terbit yang dapat ditutup.');
             $stmt = $koneksi->prepare("UPDATE tahun_ajaran SET status='closed',closed_at=NOW() WHERE id=?");
@@ -124,29 +131,26 @@ $stmt->close();
 $activeByClass=array_fill($firstLevel,$lastLevel-$firstLevel+1,0);
 $result=$koneksi->query("SELECT KELAS,COUNT(*) total FROM siswa WHERE is_active=1 AND CAST(KELAS AS UNSIGNED) " . unit_level_between_sql() . " GROUP BY KELAS");
 while($row=$result->fetch_assoc()) $activeByClass[(int)$row['KELAS']]=(int)$row['total'];
-$projectionUnknown=0;
 if($selectedYear===du_next_year()||du_has_advance_bills($koneksi,$selectedYear)){
     $activeByClass=array_fill($firstLevel,$lastLevel-$firstLevel+1,0);
-    foreach(du_target_roster($koneksi,$selectedYear) as $r){if($r['grade']!==null)$activeByClass[$r['grade']]++;else $projectionUnknown++;}
+    foreach(du_target_roster($koneksi,$selectedYear) as $r){if($r['grade']!==null)$activeByClass[$r['grade']]++;}
 }
-$activeTotal=array_sum($activeByClass)+$projectionUnknown;
 
-$stmt=$koneksi->prepare("SELECT COUNT(*) bills,COALESCE(SUM(tdu.nominal_tagihan),0) total,COALESCE(SUM(p.paid),0) paid
-    FROM tagihan_daftar_ulang tdu
-    LEFT JOIN (SELECT tagihan_daftar_ulang_id,SUM(jumlah) paid FROM bayar_du GROUP BY tagihan_daftar_ulang_id) p ON p.tagihan_daftar_ulang_id=tdu.id
-    WHERE tdu.tahun_ajaran_id=? AND tdu.status='open'");
-$stmt->bind_param('i',$yearId); $stmt->execute(); $billSummary=$stmt->get_result()->fetch_assoc(); $stmt->close();
+$billSummary=['total'=>0.0];
 $issuedByClass=array_fill($firstLevel,$lastLevel-$firstLevel+1,0.0);$issuedCountByClass=array_fill($firstLevel,$lastLevel-$firstLevel+1,0);$activeIssuedByClass=array_fill($firstLevel,$lastLevel-$firstLevel+1,0);
-foreach(lf_rows($koneksi,"SELECT no_induk,kelas_snapshot,nominal_tagihan FROM tagihan_daftar_ulang WHERE tahun_ajaran_id=? AND status='open'",[$yearId]) as $b){$billSummary['paid']+=lb_du_bill_credit($koneksi,$b['no_induk'],$selectedYear);$issuedByClass[(int)$b['kelas_snapshot']]+=(float)$b['nominal_tagihan'];$issuedCountByClass[(int)$b['kelas_snapshot']]++;}
+foreach(lf_rows($koneksi,"SELECT kelas_snapshot,COUNT(*) bills,SUM(nominal_tagihan) total FROM tagihan_daftar_ulang WHERE tahun_ajaran_id=? AND status='open' GROUP BY kelas_snapshot",[$yearId]) as $b){$grade=(int)$b['kelas_snapshot'];$issuedByClass[$grade]=($issuedByClass[$grade]??0)+(float)$b['total'];$issuedCountByClass[$grade]=($issuedCountByClass[$grade]??0)+(int)$b['bills'];$billSummary['total']+=(float)$b['total'];}
 require_once __DIR__.'/includes/legacy_du.php';
-$duPlan=$selectedYear===ldu_target_year()?ldu_plan($koneksi,$selectedYear):['positions'=>[]];
-$duUnknown=count(array_filter($duPlan['positions'],static fn($p)=>!$p['known']||$p['reason']!==null));$duUnknownByClass=[];foreach($duPlan['positions'] as $p)if(!$p['known']||$p['reason']!==null){$level=(int)($p['placement']['kelas']??0);$duUnknownByClass[$level]=($duUnknownByClass[$level]??0)+1;}
+// Unknown obligations only affect a priced class with no issued bills. Existing
+// bills already supply the displayed total; unset rates always display a dash.
+$needsUnknownCheck=false;
+foreach($masters as $grade=>$amount){if($amount>0&&empty($issuedCountByClass[$grade])){$needsUnknownCheck=true;break;}}
+$duPlan=$needsUnknownCheck&&$selectedYear===ldu_target_year()?ldu_plan($koneksi,$selectedYear):['positions'=>[]];
+$duUnknownByClass=[];foreach($duPlan['positions'] as $p)if(!$p['known']||$p['reason']!==null){$level=(int)($p['placement']['kelas']??0);$duUnknownByClass[$level]=($duUnknownByClass[$level]??0)+1;}
 $masterBases=ldu_master_bases($koneksi,$yearId);
 $activeBillRows=hp_rows($koneksi,"SELECT t.kelas_snapshot KELAS,COUNT(DISTINCT s.id) n FROM siswa s JOIN tagihan_daftar_ulang t ON t.unit_id=s.unit_id AND t.no_induk=s.NO_INDUK WHERE s.is_active=1 AND t.tahun_ajaran_id=? AND t.status='open' GROUP BY t.kelas_snapshot",[$yearId]);
 foreach($activeBillRows as $r)$activeIssuedByClass[(int)$r['KELAS']]=(int)$r['n'];
 $coveredByClass=array_fill($firstLevel,$lastLevel-$firstLevel+1,0);$coverageConflicts=0;
 foreach(du_psb_states($koneksi,$selectedYear) as $state){if($state['covered_psb']&&!empty($state['placement']['is_active']))$coveredByClass[(int)$state['placement']['kelas']]++;if($state['conflict'])$coverageConflicts++;}
-$coveredTotal=array_sum($coveredByClass);$activeIssued=array_sum($activeIssuedByClass);$activeMissing=max(0,$activeTotal-$activeIssued-$coveredTotal);
 $canEdit=$year['status']!=='closed'&&du_publishable_year($selectedYear)&&($selectedYear!==du_next_year()||du_advance_schema_ready($koneksi));
 $priorDebt=$yearId?report_prior_debt_summary($koneksi,$selectedYear,report_active_regular_student_nis($koneksi)):['has_debt'=>false];
 ?>
@@ -165,7 +169,10 @@ $priorDebt=$yearId?report_prior_debt_summary($koneksi,$selectedYear,report_activ
 <link rel="stylesheet" href="assets/css/master_du.css?v=<?= filemtime(__DIR__.'/assets/css/master_du.css') ?>"></head><body data-readable-workspace="master-registration">
 <div class="bg-orbs"><div class="orb orb-1"></div><div class="orb orb-2"></div><div class="orb orb-3"></div></div><div class="layout"><?php include 'includes/sidebar.php'; ?><main class="main-content du-workspace">
 <div class="topbar"><button class="sidebar-toggle" onclick="toggleSidebar()" id="btn-sidebar-toggle" aria-label="Buka navigasi"><svg width="20" height="20" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><line x1="3" y1="12" x2="21" y2="12"/><line x1="3" y1="6" x2="21" y2="6"/><line x1="3" y1="18" x2="21" y2="18"/></svg></button><div class="topbar-title"><h2>Master Daftar Ulang</h2><span class="breadcrumb">SistemSPP / Tahun Ajaran / Daftar Ulang</span></div><div class="clock-badge" id="liveClock">--:--:--</div></div>
-<?php if($flash): ?><div class="alert alert-<?= master_du_e($flash['type']) ?>" id="flash-msg"><?= master_du_e($flash['msg']) ?></div><?php endif; ?>
+<?php if($flash): ?><div class="alert alert-<?= master_du_e($flash['type']) ?>" id="flash-msg" data-operation-focus="#du-rate-submit" data-operation-message="<?= master_du_e($flash['msg']) ?>" data-operation-details="<?= master_du_e(json_encode($flash['details']??[],JSON_UNESCAPED_UNICODE|JSON_THROW_ON_ERROR)) ?>">
+  <?= master_du_e($flash['msg']) ?>
+  <?php if(!empty($flash['details'])): ?><dl><?php foreach($flash['details'] as $detail): ?><div><dt><?= master_du_e($detail['label']) ?></dt><dd><?= (int)$detail['value'] ?></dd></div><?php endforeach; ?></dl><?php endif; ?>
+</div><?php endif; ?>
 <section class="main-card du-master-hero master-modern-shell" aria-labelledby="du-year-title">
   <div class="du-hero-copy">
     <span class="recap-class-overline">Konfigurasi Tahun Ajaran</span><h1 id="du-year-title"><?= master_du_e($selectedYear) ?></h1><p>Atur tarif dan lengkapi tagihan siswa dalam satu langkah.</p>
@@ -179,48 +186,6 @@ $priorDebt=$yearId?report_prior_debt_summary($koneksi,$selectedYear,report_activ
       <?php if($year['status']==='closed'): ?><form method="post" onsubmit="return confirm('Buka kembali tahun ajaran? Histori pembayaran tetap dipertahankan.')"><input type="hidden" name="csrf_token" value="<?= master_du_e($_SESSION['csrf_master_du']) ?>"><input type="hidden" name="aksi" value="buka"><input type="hidden" name="tahun_ajaran" value="<?= master_du_e($selectedYear) ?>"><button class="btn btn-ghost" type="submit"><?= master_workspace_icon('reset') ?>Buka Kembali</button></form><?php endif; ?>
     </div>
   </div>
-  <?php include __DIR__.'/includes/du_master_calendar.php'; ?>
-</section>
-<section class="du-overview" aria-label="Posisi tagihan siswa aktif">
-  <?php foreach([
-    ['label'=>'Siswa aktif','value'=>$activeTotal,'icon'=>'students','tone'=>'green'],
-    ['label'=>'Memiliki tagihan DU terpisah','value'=>$activeIssued,'icon'=>'document','tone'=>'blue'],
-    ['label'=>'DU tercakup PSB','value'=>$coveredTotal,'icon'=>'layers','tone'=>'purple'],
-    ['label'=>'Perlu dilengkapi','value'=>$activeMissing,'icon'=>'warning','tone'=>'orange'],
-  ] as $stat): ?>
-  <div class="du-stat du-stat-<?= $stat['tone'] ?>">
-    <span class="du-stat-icon"><?php if($stat['icon']==='warning'): ?><svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.8" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true"><path d="m10.3 4-8 14a2 2 0 0 0 1.7 3h16a2 2 0 0 0 1.7-3l-8-14a2 2 0 0 0-3.4 0Z"/><path d="M12 9v4M12 17h.01"/></svg><?php else: ?><?= master_workspace_icon($stat['icon']) ?><?php endif; ?></span>
-    <div class="du-stat-copy"><span><?= $stat['label'] ?></span><strong><?= $stat['value'] ?></strong></div>
-    <a class="du-stat-link" href="<?= $stat['tone']==='orange'?'#du-completeness':'#du-rate-section' ?>" aria-label="<?= master_du_e($stat['tone']==='orange'?'Lihat ringkasan kelengkapan':'Lihat penetapan daftar ulang: '.$stat['label']) ?>"><svg viewBox="0 0 20 20" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true"><path d="m8 6 4 4-4 4"/></svg></a>
-    <svg class="du-stat-wave" viewBox="0 0 120 55" fill="none" aria-hidden="true"><defs><linearGradient id="du-wave-<?= $stat['tone'] ?>" x1="0" y1="0" x2="0" y2="1"><stop stop-color="currentColor" stop-opacity=".28"/><stop offset="1" stop-color="currentColor" stop-opacity=".03"/></linearGradient></defs><path d="M0 54C15 37 21 33 38 36S58 31 72 17 101 6 120 23V55H0Z" fill="url(#du-wave-<?= $stat['tone'] ?>)"/><path d="M0 54C15 37 21 33 38 36S58 31 72 17 101 6 120 23" stroke="currentColor" stroke-opacity=".55"/></svg>
-  </div>
-  <?php endforeach; ?>
-</section>
-<?php
-// Presentation only: completeness uses the existing active-student counters, not payments.
-$duComplete = $activeTotal - $activeMissing;
-$duCompletePercent = $activeTotal > 0 ? (int)round($duComplete / $activeTotal * 100) : 0;
-$duMissingPercent = $activeTotal > 0 ? 100 - $duCompletePercent : 0;
-?>
-<section class="main-card du-completeness" id="du-completeness" aria-labelledby="du-completeness-title">
-  <div class="du-completeness-data">
-    <h2 id="du-completeness-title">Ringkasan Kelengkapan Daftar Ulang</h2>
-    <p>Berdasarkan data siswa aktif pada tahun ajaran <?= master_du_e($selectedYear) ?>.</p>
-    <div class="du-completeness-chart">
-      <div class="du-donut <?= !$activeTotal?'du-donut-empty':'' ?>" style="--du-complete:<?= $duCompletePercent ?>%" role="img" aria-label="<?= $duComplete ?> dari <?= $activeTotal ?> siswa memiliki penetapan daftar ulang lengkap, <?= $duCompletePercent ?> persen"><div><strong><?= $duCompletePercent ?><span>%</span></strong><span>Lengkap</span></div></div>
-      <div class="du-completeness-legend">
-        <div><span><i class="du-legend-dot is-complete"></i>Sudah lengkap</span><strong><?= $duComplete ?></strong><span><?= $duCompletePercent ?>%</span></div>
-        <div><span><i class="du-legend-dot is-pending"></i>Perlu dilengkapi</span><strong><?= $activeMissing ?></strong><span><?= $duMissingPercent ?>%</span></div>
-        <div class="du-completeness-bar" aria-hidden="true"><span style="width:<?= $duCompletePercent ?>%"></span></div>
-      </div>
-    </div>
-  </div>
-  <aside class="du-completeness-insight">
-    <span class="du-insight-icon"><svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.7" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true"><path d="M9 18h6M10 21h4M8.5 14a6 6 0 1 1 7 0c-.9.7-1.5 1.5-1.5 2.5h-4c0-1-.6-1.8-1.5-2.5ZM12 1v1M3 4l1 1M1 11h1M20 4l1-1M22 11h1"/></svg></span>
-    <h3><?= !$activeTotal?'Belum ada siswa aktif':($activeMissing===0?'Penetapan daftar ulang sudah lengkap':($duCompletePercent>=80?'Tingkat kelengkapan sudah baik!':'Lengkapi penetapan daftar ulang')) ?></h3>
-    <p><?php if(!$activeTotal): ?>Ringkasan akan tampil ketika tersedia data siswa aktif.<?php elseif($activeMissing): ?>Masih ada <strong><?= $activeMissing ?> siswa</strong> yang perlu dilengkapi penetapan daftar ulangnya. Tinjau tarif dan cakupan PSB pada formulir di bawah.<?php else: ?>Seluruh siswa aktif sudah memiliki tagihan DU terpisah atau tercakup dalam PSB.<?php endif; ?></p>
-    <small>Kelengkapan penetapan tidak menunjukkan status pelunasan.</small>
-  </aside>
 </section>
 <section class="main-card master-modern-card master-modern-form" id="du-rate-section">
   <div class="student-panel-heading"><span class="master-workspace-icon"><?= master_workspace_icon('coins') ?></span><div><h3>Tarif daftar ulang per kelas</h3><p>Isi tarif yang belum tersedia. Tagihan dan pembayaran yang sudah ada tetap dipertahankan.</p></div></div>
@@ -257,9 +222,9 @@ $duMissingPercent = $activeTotal > 0 ? 100 - $duCompletePercent : 0;
     </div>
     <p class="du-info-note">Tarif yang Anda tetapkan menjadi dasar tagihan baru. Pembayaran Legacy tetap diperhitungkan. Tarif kelas yang dikosongkan tidak diubah.</p>
     <div class="du-save-footer">
-      <div><span>Total Tagihan DU Terpisah</span><strong data-du-issued-total>Rp <?= number_format((float)$billSummary['total'],0,',','.') ?></strong><small><?= $coveredTotal ?> siswa tercakup PSB; <?= $activeMissing ?> siswa perlu dilengkapi.</small></div>
+      <div><span>Total Tagihan DU Terpisah</span><strong data-du-issued-total>Rp <?= number_format((float)$billSummary['total'],0,',','.') ?></strong></div>
       <div class="du-save-action">
-        <?php if($canEdit): ?><button class="btn btn-primary" type="submit"><?= master_workspace_icon('save') ?>Simpan Tarif &amp; Lengkapi Tagihan</button><small>Menyimpan tarif dan membuat tagihan yang belum ada.</small><small data-du-unsaved hidden role="status">Ada perubahan tarif yang belum disimpan.</small><?php else: ?><span class="recap-status is-unpaid"><?= $year['status']==='closed'?'Tarif dan penerbitan terkunci':'Histori tahun lain tetap tersimpan; penerbitan untuk tahun berjalan.' ?></span><?php endif; ?>
+        <?php if($canEdit): ?><button class="btn btn-primary" type="submit" id="du-rate-submit"><?= master_workspace_icon('save') ?>Simpan Tarif &amp; Lengkapi Tagihan</button><small>Menyimpan tarif dan membuat tagihan yang belum ada.</small><small data-du-unsaved hidden role="status">Ada perubahan tarif yang belum disimpan.</small><?php else: ?><span class="recap-status is-unpaid"><?= $year['status']==='closed'?'Tarif dan penerbitan terkunci':'Histori tahun lain tetap tersimpan; penerbitan untuk tahun berjalan.' ?></span><?php endif; ?>
       </div>
     </div>
   </form>

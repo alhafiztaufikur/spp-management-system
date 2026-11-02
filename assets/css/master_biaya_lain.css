@@ -1,22 +1,18 @@
 /* Presentation only; scoped to Master Biaya Lain. */
 .fee-workspace-content{display:grid;gap:18px;margin:24px 28px 32px;min-width:0;}
 .fee-workspace .main-card{margin:0;padding:24px;min-width:0;box-sizing:border-box;box-shadow:0 6px 24px rgba(0,0,0,.035);border-radius:18px;}
-.fee-workspace .fee-hero{position:relative;display:grid;grid-template-columns:minmax(0,2fr) minmax(240px,1fr);align-items:center;gap:24px;padding:28px 32px;background:linear-gradient(120deg,var(--bg-card),var(--accent-glow));isolation:isolate;overflow:hidden;}
-.fee-hero::before{content:"";position:absolute;width:460px;height:460px;right:5%;top:-340px;border:60px solid var(--accent-glow);border-radius:50%;z-index:-1;}
+.fee-workspace .fee-hero{position:relative;display:grid;grid-template-columns:minmax(0,1fr);align-items:center;gap:24px;padding:28px 32px;background:linear-gradient(120deg,var(--bg-card),var(--accent-glow));isolation:isolate;overflow:hidden;}
 .fee-hero-copy{min-width:0;}
 .fee-hero .recap-class-overline{font-size:11px;font-weight:800;letter-spacing:.08em;color:var(--accent);}
 .fee-hero h1{font-size:clamp(27px,2.5vw,36px);line-height:1.2;letter-spacing:-1px;margin:8px 0 10px;}
 .fee-hero p{max-width:680px;margin:0;color:var(--text-secondary);font-size:13px;line-height:1.7;}
-.fee-hero-stats{display:grid;grid-template-columns:repeat(3,minmax(0,1fr));gap:12px;margin-top:20px;}
+.fee-hero-stats{display:grid;grid-template-columns:repeat(2,minmax(0,1fr));gap:12px;margin-top:20px;}
 .fee-stat{display:flex;align-items:center;gap:12px;padding:15px;border:1px solid var(--border);border-radius:13px;background:var(--bg-card);min-width:0;}
 .fee-stat>div{min-width:0;}
 .fee-stat>div>span{display:block;font-size:10px;line-height:1.5;font-weight:700;text-transform:uppercase;color:var(--text-secondary);}
 .fee-stat strong{display:block;margin-top:4px;font-size:23px;line-height:1.2;color:var(--accent);}
 .fee-icon{display:inline-flex;align-items:center;justify-content:center;flex:none;width:46px;height:46px;border-radius:12px;background:var(--accent-glow);color:var(--accent);}
 .fee-icon svg{width:24px;height:24px;stroke-width:1.8;}
-.fee-hero-art{color:var(--accent);max-width:340px;width:100%;justify-self:center;}
-.fee-hero-art>svg{display:block;width:100%;height:auto;}
-.fee-art-paper{fill:var(--bg-card);}
 .fee-panel-grid{display:grid;grid-template-columns:minmax(0,.96fr) minmax(0,1.04fr);gap:18px;align-items:stretch;}
 .fee-workspace .fee-panel{padding:24px;display:flex;flex-direction:column;}
 .fee-panel #form-master-biaya,.fee-panel #form-terbit-biaya{display:flex;flex-direction:column;flex:1;}
@@ -96,7 +92,7 @@
 .fee-workspace #form-terbit-biaya .publish-student-empty{background:var(--bg-card);border-color:var(--border);font-size:12px;font-weight:500;padding:18px;}
 @media(max-width:1400px){.fee-workspace #form-terbit-biaya .publish-student-card{grid-template-columns:18px minmax(0,1fr) auto;grid-template-areas:"check main badge";gap:9px;}.fee-recipient-avatar{display:none;}}
 @media(max-width:600px){.fee-workspace #form-terbit-biaya .report-filter-grid,.fee-workspace #form-terbit-biaya .fee-preview-grid{grid-template-columns:minmax(0,1fr);}.fee-workspace #form-terbit-biaya .publish-students-field{padding:12px;}.fee-recipient-heading{flex-wrap:wrap;gap:8px;}.fee-workspace #form-terbit-biaya .publish-student-card{grid-template-columns:18px minmax(0,1fr);grid-template-areas:"check main" ". badge";gap:5px 9px;padding:10px;}.fee-workspace #form-terbit-biaya .publish-student-card .kelas-badge{justify-self:start;}.fee-workspace #form-terbit-biaya .publish-student-actions .btn{flex:1;}}
-@media(max-width:1400px){.fee-workspace .fee-hero{grid-template-columns:minmax(0,2.3fr) minmax(180px,1fr);padding:26px;gap:18px;}.fee-workspace .fee-panel{padding:22px;}.fee-stat{gap:9px;padding:13px;}.fee-stat .fee-icon{width:35px;height:35px;}.fee-workspace .fee-preview-grid .report-summary-card{flex-direction:column;}}
+@media(max-width:1400px){.fee-workspace .fee-hero{grid-template-columns:minmax(0,1fr);padding:26px;gap:18px;}.fee-workspace .fee-panel{padding:22px;}.fee-stat{gap:9px;padding:13px;}.fee-stat .fee-icon{width:35px;height:35px;}.fee-workspace .fee-preview-grid .report-summary-card{flex-direction:column;}}
 @media(max-width:1100px){.fee-workspace .fee-hero{grid-template-columns:1fr;}.fee-hero-art{display:none;}.fee-panel-grid{grid-template-columns:1fr;}.fee-workspace .fee-preview-grid .report-summary-card{flex-direction:row;}}
 @media(max-width:600px){.fee-workspace-content{margin:18px 12px 24px;gap:14px;}.fee-workspace .fee-hero,.fee-workspace .fee-panel,.fee-workspace .fee-list-panel{padding:18px;}.fee-hero-stats{gap:8px;}.fee-stat{flex-direction:column;align-items:flex-start;padding:10px;gap:8px;}.fee-stat>div>span{font-size:9px;}.fee-stat strong{font-size:21px;}.fee-workspace .report-filter-grid,.fee-workspace .fee-preview-grid{grid-template-columns:1fr;}.fee-workspace .fee-panel-heading{gap:11px;}.fee-panel-heading .fee-icon{width:40px;height:40px;}.fee-panel-heading h2{font-size:15px;}.fee-panel .action-bar .btn{width:100%;flex:auto;}.fee-workspace .fee-list-panel .aksi-col{min-width:0;}}
 /* Keep the search glyph in the flex row, clear of the input text. */

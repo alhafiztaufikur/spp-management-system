@@ -130,7 +130,7 @@ function backup_ui_picker(string $prefix, string $label): void { ?>
       <div id="backup-alerts" class="dbt-backup-alerts" aria-live="polite">
         <?php foreach ($backupSummary['alerts'] ?? [] as $alert): if(!empty($backupSummary['configured'])&&empty($backupSummary['service_registered'])&&str_starts_with($alert,'Backup otomatis belum aktif.'))continue; ?><div class="dbt-warning"><?= backup_ui_escape($alert) ?></div><?php endforeach; ?>
       </div>
-      <div id="backup-feedback" class="dbt-feedback<?= $backupFlash ? ' is-' . (($backupFlash['type'] ?? '') === 'success' ? 'success' : 'error') : '' ?>" role="status" aria-live="polite"<?= !$backupFlash ? ' hidden' : '' ?>><?= backup_ui_escape($backupFlash['message'] ?? '') ?></div>
+      <div <?= $backupFlash?'data-operation-result="'.(($backupFlash['type']??'')==='success'?'info':'error').'"':'' ?> id="backup-feedback" class="dbt-feedback<?= $backupFlash ? ' is-' . (($backupFlash['type'] ?? '') === 'success' ? 'success' : 'error') : '' ?>" role="status" aria-live="polite"<?= !$backupFlash ? ' hidden' : '' ?>><?= backup_ui_escape($backupFlash['message'] ?? '') ?></div>
       <div class="dbt-metrics">
         <?php foreach ([
           ['clock', 'Jadwal Berikutnya', backup_ui_date($backupSummary['next_schedule'] ?? null), 'Backup harian pukul '.$backupClock.' WIB', 'backup-next'],

@@ -10661,11 +10661,11 @@ a.btn {
 .letter-list-head p { max-width: 700px; margin: 0; color: var(--text-secondary); font-size: 14px; line-height: 1.5; }
 .letter-total { display: grid; gap: 2px; flex: 0 0 auto; min-width: 174px; padding: 12px 17px; border: 1px solid var(--border); border-left: 3px solid var(--accent); border-radius: 9px; background: var(--bg-surface); color: var(--text-secondary); font-size: 12px; }
 .letter-total strong { color: var(--accent); font-size: 27px; line-height: 1.1; }
-.letter-filters { display: grid; grid-template-columns: minmax(150px,1fr) minmax(150px,.8fr) minmax(220px,1.45fr) auto; gap: 12px; align-items: end; padding: 18px 28px 22px; border-top: 1px solid var(--border); }
+.letter-filters { display: grid; grid-template-columns: repeat(3,minmax(0,1fr)) auto; gap: 12px; align-items: end; padding: 18px 28px 22px; border-top: 1px solid var(--border); }
 .letter-filters .field-row { min-width: 0; margin: 0; }
 .letter-filters .field-label { display: block; margin-bottom: 7px; color: var(--text-secondary); font-size: 11px; font-weight: 800; letter-spacing: .04em; text-transform: uppercase; }
-.letter-filters .field-input { box-sizing: border-box; width: 100%; min-width: 0; height: 44px; }
-.letter-filters .btn { min-height: 44px; white-space: nowrap; }
+.letter-filters .field-input { box-sizing: border-box; width: 100%; min-width: 0; height: 48px; }
+.letter-filters .btn { min-height: 48px; white-space: nowrap; }
 .letter-actions { display: flex; justify-content: space-between; align-items: center; gap: 16px; flex-wrap: wrap; padding: 16px 28px; border-top: 1px solid var(--border); border-bottom: 1px solid var(--border); background: var(--bg-surface); }
 .letter-action-copy { display: grid; gap: 3px; min-width: 230px; color: var(--text-primary); }
 .letter-action-copy span { max-width: 480px; color: var(--text-muted); font-size: 12px; line-height: 1.4; }

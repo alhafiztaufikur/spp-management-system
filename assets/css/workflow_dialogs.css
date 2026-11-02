@@ -3,3 +3,11 @@
 .payment-history-scope{display:flex;align-items:center;gap:12px;margin-top:12px;font-size:12px}.payment-history-scope select{max-width:440px}.fee-publish-form{display:grid;gap:14px}.fee-publish-form select[multiple]{height:170px}.fee-publish-form [hidden]{display:none!important}@media(max-width:600px){.workflow-dialog{padding:20px}.workflow-dialog-actions .btn{flex:1}.payment-history-scope{align-items:stretch;flex-direction:column}}
 
 .workflow-dialog-actions .btn{font-size:16px}
+.workflow-dialog-operation{padding:0;width:min(660px,calc(100vw - 48px));max-height:calc(100dvh - 48px);border-radius:22px;border-color:var(--border,#c5e7d1)}
+.workflow-dialog-operation::backdrop{background:rgba(25,48,39,.45);backdrop-filter:blur(5px)}
+.workflow-dialog-operation h2{margin:0;padding:24px 26px;background:var(--green-bg,#e8f6ed);color:var(--green,#137a42);border-bottom:1px solid var(--border,#c5e7d1);font-size:26px;line-height:1.35;overflow-wrap:anywhere}
+.workflow-dialog-operation p{margin:0;padding:20px 26px 12px;white-space:pre-line}
+.workflow-dialog-operation ul{margin:0 26px 20px;padding:12px 16px 12px 36px;border:1px solid var(--border,#d8e9df);border-radius:12px;max-height:36vh;overflow:auto}
+.workflow-dialog-operation .workflow-dialog-actions{margin:0;padding:18px 26px 24px}
+.workflow-dialog-operation .btn{min-height:44px;min-width:110px;border-radius:24px}
+html[data-theme="dark"] .workflow-dialog-operation h2{background:#1d382b;color:#7bd5a0}

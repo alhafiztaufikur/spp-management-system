@@ -1,10 +1,12 @@
 (() => {
   'use strict';
-  const style=document.createElement('link');style.rel='stylesheet';style.href=new URL('../css/workflow_dialogs.css',document.currentScript.src);document.head.append(style);
+  const scriptUrl=new URL(document.currentScript.src),styleUrl=new URL('../css/workflow_dialogs.css',scriptUrl);styleUrl.search=scriptUrl.search;
+  const style=document.createElement('link');style.rel='stylesheet';style.href=styleUrl;document.head.append(style);
   let current=null;
   window.workflowConfirm=(settings,source=document.activeElement)=>new Promise(resolve=>{
     current?.close();
     const dialog=document.createElement('dialog');dialog.className='workflow-dialog';dialog.dataset.danger=settings.danger?'true':'false';
+    if(settings.appearance==='operation')dialog.classList.add('workflow-dialog-operation');
     const heading=document.createElement('h2');heading.id='workflow-dialog-title';heading.textContent=settings.title;dialog.setAttribute('aria-labelledby',heading.id);
     const text=document.createElement('p');text.textContent=settings.message||'';
     const list=document.createElement('ul');(settings.rows||[]).forEach(value=>{const item=document.createElement('li');item.textContent=value;list.append(item);});

@@ -11,11 +11,11 @@ async function choose(page, index) {
   await page.waitForFunction(i => document.querySelectorAll('.parent-recipient')[i].getAttribute('aria-pressed') === 'true'
     && document.getElementById('parent-message').contentEditable === 'true', index);
 }
-async function applyAll(page) {
-  await page.locator('#parent-copy').click();
-  await page.locator('#copy-select-all').check();
-  await page.locator('#copy-apply').click();
-  await page.locator('#parent-copy-dialog').waitFor({state:'hidden'});
+async function appliedPreview(page) {
+  await page.waitForURL('**&preview=1');
+  assert.equal(await page.locator('#parent-pdf-frame').count(),1);
+  await page.getByRole('link',{name:'Kembali ke penyusunan',exact:true}).click();
+  await page.locator('#parent-message').waitFor();
 }
 (async () => {
   const browser = await chromium.launch({channel:'chrome',headless:true});
@@ -30,25 +30,37 @@ async function applyAll(page) {
     for (const scope of [1,2,3,0]) {
       await page.goto(base+'/dashboard.php');
       await Promise.all([page.waitForNavigation(),page.locator('#sidebar-unit-select').selectOption(String(scope))]);
+      await page.setViewportSize({width:1440,height:1000});
+      await page.goto(base+'/laporan/surat_orang_tua.php');
+      assert.equal(await page.getByText('Cetak Kelas/Rombel',{exact:false}).count(),0);
+      assert.equal(await page.getByText('Pilih siswa di tabel atau cetak menurut rombel.',{exact:false}).count(),0);
+      await page.locator('.letter-filters .spp-select-trigger').first().waitFor();
+      const fields=await page.locator('.letter-filters .spp-select-trigger,.letter-filters #letter-q').evaluateAll(nodes=>nodes.map(e=>{const r=e.getBoundingClientRect();return {width:r.width,height:r.height,top:r.top};}));
+      assert.equal(fields.length,3);
+      for(const field of fields){assert.ok(Math.abs(field.width-fields[0].width)<2);assert.ok(Math.abs(field.height-fields[0].height)<2);assert.ok(Math.abs(field.top-fields[0].top)<2);}
       const keys = scope ? fixture.keys[scope] : [fixture.keys[1][0],fixture.keys[2][0],fixture.keys[3][0],fixture.keys[1][1]];
       await page.goto(base+'/laporan/surat_orang_tua_susun.php?mode=selected&students='+encodeURIComponent(keys.join(',')));
       assert.equal(await page.locator('.parent-recipient').count(),4);
       const draft = JSON.parse(await page.locator('#parent-draft-data').textContent());
       const editor = page.locator('#parent-message');
-      assert.equal(await page.locator('.parent-tips,.parent-summary-note,.parent-placement-note,#copy-overwrite,#copy-confirm').count(),0);
+      assert.equal(await page.locator('.parent-tips,.parent-summary,.parent-placement-note,#copy-overwrite,#copy-confirm,#parent-save').count(),0);
+      assert.equal(await page.locator('.parent-editor #parent-preview').count(),1);
+      assert.equal(await page.locator('#copy-apply').innerText(),'Terapkan Pesan & Pratinjau');
+      assert.ok(await page.locator('.parent-back-list').evaluate(e=>!!(e.compareDocumentPosition(document.querySelector('.parent-letter-card'))&Node.DOCUMENT_POSITION_FOLLOWING)));
+      assert.equal(await page.locator('#parent-copy').isDisabled(),true);
       await choose(page,1);await editor.fill('Pesan lama khusus.');
       await choose(page,0);const common='Pengingat bersama '+scope+' & orang tua.';await editor.fill(common);
       await editor.focus();await page.keyboard.press('Control+a');await page.getByRole('button',{name:'Tebal',exact:true}).click();
       await page.locator('#parent-copy').click();await page.locator('#copy-recipient-search').fill('NO_MATCH');
       await page.locator('#copy-select-all').check();assert.equal(await page.locator('#copy-selected-count').innerText(),'3 penerima dipilih');
-      await page.locator('#copy-apply').click();await page.locator('#parent-copy-dialog').waitFor({state:'hidden'});
+      await page.locator('#copy-apply').click();await appliedPreview(page);
       for (let i=0;i<4;i++) { await choose(page,i);assert.equal(await editor.innerText(),common);assert.ok(await editor.locator('strong,b').count()); }
       await page.reload();
       const saved = JSON.parse(await page.locator('#parent-draft-data').textContent());
       assert.ok(Object.values(saved.messages).every(message=>message.html.includes('Pengingat bersama')));
       await choose(page,2);await editor.fill('Pesan mandiri siswa ketiga.');await choose(page,0);
       await page.locator('#parent-copy').click();await page.locator('.parent-copy-target input').first().check();
-      await page.locator('#copy-apply').click();await page.locator('#parent-copy-dialog').waitFor({state:'hidden'});
+      await page.locator('#copy-apply').click();await appliedPreview(page);
       await choose(page,2);assert.equal(await editor.innerText(),'Pesan mandiri siswa ketiga.');
       await choose(page,1);assert.equal(await editor.innerText(),common);
       // Apply failures retain the dialog and can be retried without reverting saved text.
@@ -63,7 +75,7 @@ async function applyAll(page) {
       await page.locator('#parent-copy').click();await page.locator('#copy-select-all').check();await page.locator('#copy-apply').click();
       await page.waitForFunction(()=>document.getElementById('copy-result').textContent.includes('Uji gagal menerapkan'));
       assert.equal(await page.locator('#copy-apply').isDisabled(),false);
-      await page.locator('#copy-apply').click();await page.locator('#parent-copy-dialog').waitFor({state:'hidden'});
+      await page.locator('#copy-apply').click();await appliedPreview(page);
       await page.unroute('**/surat_orang_tua_draf.php');await choose(page,0);
       // Hold an autosave response while the source is edited again, then apply its newest version.
       let release,started;const gate=new Promise(resolve=>release=resolve), began=new Promise(resolve=>started=resolve);let intercepted=false;
@@ -76,7 +88,7 @@ async function applyAll(page) {
       const latest='Versi terbaru '+scope+'.';await editor.fill(latest);
       await page.locator('#parent-copy').click();await page.locator('#copy-select-all').check();await page.locator('#copy-apply').click();
       assert.equal(await editor.getAttribute('contenteditable'),'false');release();
-      await page.locator('#parent-copy-dialog').waitFor({state:'hidden'});await page.unroute('**/surat_orang_tua_draf.php');
+      await appliedPreview(page);await page.unroute('**/surat_orang_tua_draf.php');
       for(let i=0;i<4;i++){await choose(page,i);assert.equal(await editor.innerText(),latest);}
       await page.reload();const final=JSON.parse(await page.locator('#parent-draft-data').textContent());
       assert.equal(Object.keys(final.messages).length,4);assert.ok(Object.values(final.messages).every(message=>message.html.includes(latest)));
@@ -93,6 +105,35 @@ async function applyAll(page) {
       await page.locator('#parent-preview').click();await page.waitForURL('**&preview=1');
       const pdf=await page.request.get(base+'/laporan/surat_orang_tua_pdf.php?draft='+draft.token);
       assert.equal(pdf.status(),200);assert.equal((await pdf.body()).subarray(0,4).toString(),'%PDF');
+      // One recipient has no copy UI, and preview saves the latest message itself.
+      await page.goto(base+'/laporan/surat_orang_tua_susun.php?mode=single&student_key='+encodeURIComponent(keys[0]));
+      assert.equal(await page.locator('.parent-recipient').count(),1);
+      assert.equal(await page.locator('.parent-summary,#parent-save,.parent-copy-action,#parent-copy-dialog').count(),0);
+      assert.equal(await page.locator('.parent-editor #parent-preview').count(),1);
+      if(scope===1){
+        await editor.fill('a'.repeat(2001));await page.locator('#parent-preview').click();
+        await page.waitForFunction(()=>document.getElementById('parent-save-status').textContent.includes('maksimal 2.000'));
+        assert.equal(new URL(page.url()).searchParams.has('preview'),false);
+        assert.equal(await editor.getAttribute('contenteditable'),'true');
+        await editor.fill('');await page.locator('#parent-preview').click();await page.waitForURL('**&preview=1');
+        await page.getByRole('link',{name:'Kembali ke penyusunan',exact:true}).click();
+        // Failed autosave and preview leave text available for retry without a Save Draft button.
+        await page.route('**/surat_orang_tua_draf.php',route=>route.fulfill({status:503,contentType:'application/json',body:JSON.stringify({ok:false,message:'Uji simpan gagal'})}));
+        await editor.fill('Pesan satu siswa tetap utuh.');await page.locator('#parent-preview').click();
+        await page.waitForFunction(()=>document.getElementById('parent-save-status').textContent.includes('Uji simpan gagal'));
+        assert.equal(await editor.innerText(),'Pesan satu siswa tetap utuh.');
+        assert.equal(await page.locator('#parent-preview').isDisabled(),false);
+        assert.equal(new URL(page.url()).searchParams.has('preview'),false);
+        await page.unroute('**/surat_orang_tua_draf.php');
+      }else await editor.fill('Pesan satu siswa '+scope+'.');
+      for(const width of [1440,768,390])for(const theme of ['light','dark']){
+        await page.setViewportSize({width,height:1000});await page.evaluate(t=>document.documentElement.dataset.theme=t,theme);
+        assert.equal(await page.evaluate(()=>document.documentElement.scrollWidth>innerWidth+2),false);
+        if(process.env.SPP_UI_OUTPUT)await page.screenshot({path:process.env.SPP_UI_OUTPUT+'/single-'+scope+'-'+width+'-'+theme+'.png',fullPage:true,animations:'disabled'});
+      }
+      await page.locator('#parent-preview').click();await page.waitForURL('**&preview=1');
+      await page.getByRole('link',{name:'Kembali ke penyusunan',exact:true}).click();
+      assert.match(await editor.innerText(),/^Pesan satu siswa/);
       console.log('PASS: scope '+scope+' all/partial overwrite, independent edit, reload, rich text, retry, pending autosave, input guards, responsive themes and PDF');
     }
     assert.deepEqual(errors,[]);

@@ -7,7 +7,7 @@ const f=JSON.parse(fs.readFileSync(path.join(root,'tariff-fixture.json'),'utf8')
 assert.match(base,/^http:\/\/127\.0\.0\.1:\d+$/);let checks=0;
 const eq=(a,b,label)=>{assert.deepEqual(a,b,label);checks++;};
 const state=()=>JSON.parse(execFileSync('php',[path.join(__dirname,'student_spp_tariff_fixture.php'),'state'],{encoding:'utf8',env:process.env}));
-async function apply(page){const [response]=await Promise.all([page.waitForResponse(r=>r.url().endsWith('/master_spp.php')&&r.request().method()==='POST'),page.locator('#sct-save').click()]);const data=await response.json();eq(data.ok,true,data.message||'Application succeeds');await page.waitForFunction(()=>!document.getElementById('student-tariff-dialog').open);return data;}
+async function apply(page){const [response]=await Promise.all([page.waitForResponse(r=>r.url().endsWith('/master_spp.php')&&r.request().method()==='POST'),page.locator('#sct-save').click()]);const data=await response.json();eq(data.ok,true,data.message||'Application succeeds');await page.waitForFunction(()=>!document.getElementById('student-tariff-dialog').open);const result=page.locator('#operation-feedback-dialog');await result.waitFor({state:'visible'});eq(await result.getAttribute('data-type'),'success','Server result appears as a success popup');await result.getByRole('button',{name:'Mengerti',exact:true}).click();return data;}
 (async()=>{const browser=await chromium.launch({channel:'chrome',headless:true}),errors=[];
 try{
  for(const unit of [1,2,3]){

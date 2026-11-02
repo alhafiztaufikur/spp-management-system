@@ -126,19 +126,22 @@ document.addEventListener('DOMContentLoaded', function () {
       document.getElementById('psb-select-visible').addEventListener('click', () => { records.filter(row => !row.hidden).forEach(row => { checkboxFor(row).checked = true; }); refreshSelection(); });
       document.getElementById('psb-select-all').addEventListener('click', () => { records.forEach(row => { checkboxFor(row).checked = true; }); refreshSelection(); });
       document.getElementById('psb-clear').addEventListener('click', () => { records.forEach(row => { checkboxFor(row).checked = false; }); refreshSelection(); });
-      form.addEventListener('submit', event => {
+      form.addEventListener('submit', async event => {
+        event.preventDefault();
         const rows = selected();
         if (!rows.length || form.dataset.submitting === '1') { event.preventDefault(); return; }
         const destinations = rows.map(row => {
           const target = row.querySelector('[data-psb-target]');
           return row.querySelector('strong').textContent + ' (' + checkboxFor(row).value + '): ' + (target.value ? target.selectedOptions[0].textContent : 'Belum dipilih');
         });
-        let message = 'Tempatkan ' + rows.length + ' siswa PSB pada TA ' + form.dataset.targetYear + '?\n\n' + destinations.join('\n');
+        let message = 'Tempatkan ' + rows.length + ' siswa PSB pada TA ' + form.dataset.targetYear + '?';
         const missing = rows.filter(row => !row.querySelector('[data-psb-target]').value).length;
         if (missing) message += '\n\n' + missing + ' siswa tanpa rombel tujuan akan dilewati.';
-        if (!window.confirm(message)) { event.preventDefault(); return; }
         form.dataset.submitting = '1';
+        const accepted=await window.workflowConfirm({title:'Konfirmasi Penempatan PSB',message,rows:destinations,action:'Tempatkan Siswa',appearance:'operation'},event.submitter);
+        if(!accepted){delete form.dataset.submitting;refreshSelection();return;}
         document.getElementById('psb-submit').disabled = true;
+        HTMLFormElement.prototype.submit.call(form);
       });
       refreshSelection();
     }

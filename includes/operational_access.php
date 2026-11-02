@@ -22,11 +22,30 @@ function operational_request_guard(): void {
             echo json_encode(['error'=>$message], JSON_UNESCAPED_UNICODE);
         } else {
             if (str_ends_with($_SERVER['SCRIPT_NAME'] ?? '', '/pembayaran/proses.php')) {
-                require_once __DIR__.'/payment_form_feedback.php';
                 $draftUnit=is_string($unit)&&in_array($unit,['1','2','3'],true)?(int)$unit:unit_active_id();
-                if(in_array($draftUnit,[1,2,3],true))$_SESSION['payment_drafts_by_unit'][$draftUnit]=payment_capture_draft($_POST);
+                $isEdit=($_POST['aksi']??'')==='update';
+                $back='form.php';$label='Kembali ke Input Pembayaran';
+                $draftSaved=false;
+                if($isEdit){
+                    require_once __DIR__.'/payment_return.php';
+                    $paymentId=(int)($_POST['id']??0);$context=$_POST['return_context']??null;
+                    // Resolve only a context belonging to this actor/payment, never a supplied URL.
+                    $entry=null;
+                    foreach([1,2,3] as $originalUnit){
+                        $entry=payment_return_entry_for_unit($context,$paymentId,$originalUnit);
+                        if($entry)break;
+                    }
+                    if($entry&&($unit===null||$unit===(string)$entry['unit'])){
+                        payment_edit_draft_save($paymentId,$context,$entry['unit']);$draftSaved=true;
+                        $back=payment_return_edit_url($context,$paymentId);$label='Kembali ke Edit Pembayaran';
+                    }else{$back='lihat.php';$label='Kembali ke Riwayat Pembayaran';}
+                }elseif(($_POST['aksi']??'')==='input'){
+                    require_once __DIR__.'/payment_form_feedback.php';
+                    if(in_array($draftUnit,[1,2,3],true)){$_SESSION['payment_drafts_by_unit'][$draftUnit]=payment_capture_draft($_POST);$draftSaved=true;}
+                }else{$back='lihat.php';$label='Kembali ke Riwayat Pembayaran';}
+                $recovery=$draftSaved?'Isian disimpan untuk unit asal. Pilih kembali unit tersebut, lalu periksa formulir sebelum menyimpan.':'Buka kembali transaksi dari riwayat pada unit asal, lalu periksa formulir sebelum menyimpan.';
                 header('Content-Type: text/html; charset=utf-8');
-                echo '<!doctype html><html lang="id" data-theme="light"><head><meta charset="utf-8"><meta name="viewport" content="width=device-width,initial-scale=1"><title>Periksa unit pembayaran</title><link rel="stylesheet" href="../assets/css/style.css"></head><body><main class="main-card" style="max-width:680px;margin:8vh auto;padding:24px"><h1>Pembayaran belum disimpan</h1><p>'.htmlspecialchars($message,ENT_QUOTES,'UTF-8').'</p><p>Isian disimpan untuk unit asal. Pilih kembali unit tersebut, lalu periksa formulir sebelum menyimpan.</p><a class="btn btn-primary" href="form.php">Kembali ke Input Pembayaran</a></main></body></html>';
+                echo '<!doctype html><html lang="id" data-theme="light"><head><meta charset="utf-8"><meta name="viewport" content="width=device-width,initial-scale=1"><title>Periksa unit pembayaran</title><link rel="stylesheet" href="../assets/css/style.css"></head><body><main class="main-card" style="max-width:680px;margin:8vh auto;padding:24px"><h1>Pembayaran belum disimpan</h1><p>'.htmlspecialchars($message,ENT_QUOTES,'UTF-8').'</p><p>'.htmlspecialchars($recovery,ENT_QUOTES,'UTF-8').'</p><a class="btn btn-primary" href="'.htmlspecialchars($back,ENT_QUOTES,'UTF-8').'">'.$label.'</a></main></body></html>';
             } else {header('Content-Type: text/plain; charset=utf-8');echo $message;}
         }
         exit;

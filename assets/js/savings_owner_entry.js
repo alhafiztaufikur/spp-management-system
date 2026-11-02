@@ -21,6 +21,22 @@
     return BigInt(whole)*100n+BigInt(fraction.padEnd(2,'0'));
   }
   const money=raw=>'Rp '+formatted(raw,true).replace(/,00$/,'');
+  function paintBalance(){
+    if(!amount)return;
+    let typed=amount.value;
+    if(amount.dataset.pendingDot&&!typed.includes(',')){
+      const last=typed.lastIndexOf('.'),fraction=typed.slice(last+1);
+      if(last>=0&&fraction.length<=2)typed=typed.slice(0,last).replace(/\./g,'')+(fraction?','+fraction:'');
+    }
+    const value=amount.dataset.invalidFormat==='1'?null:cents(typed);
+    const balance=cents(formatted(form.dataset.balance,true));
+    const exceeds=form.dataset.kind==='keluar'&&value!==null&&balance!==null&&value>balance;
+    amount.classList.toggle('savings-invalid',exceeds);
+    form.closest('.sw-entry-panel')?.querySelector('.sw-balance-box')?.classList.toggle('is-overdrawn',exceeds);
+    const help=document.getElementById('savings-entry-amount-help');
+    if(help){help.classList.toggle('is-error',exceeds);help.textContent=exceeds?'Nominal penarikan melebihi saldo tersedia.':'Contoh: 100.000';help.setAttribute('aria-live','polite');}
+    amount.setAttribute('aria-invalid',String(exceeds||amount.dataset.invalidFormat==='1'));
+  }
   function finishTypedAmount(){
     if(!amount?.dataset.pendingDot)return;
     delete amount.dataset.pendingDot;
@@ -80,6 +96,11 @@
       }
     });
     amount.addEventListener('blur',finishTypedAmount);
+    // Run after the formatter so grouped amounts and decimal fractions compare exactly.
+    amount.addEventListener('input',paintBalance);
+    amount.addEventListener('blur',paintBalance);
+    amount.addEventListener('paste',()=>queueMicrotask(paintBalance));
+    paintBalance();
     form.addEventListener('submit',event=>{
       finishTypedAmount();
       const value=amount.dataset.invalidFormat==='1'?null:cents(amount.value),balance=cents(formatted(form.dataset.balance,true));
@@ -92,13 +113,9 @@
       if(!event.persisted)return;
       const query=new URLSearchParams();
       for(const key of ['student_id','owner_id'])if(form.elements[key]?.value)query.set(key,form.elements[key].value);
-      try{const response=await fetch('get_saldo.php?'+query,{cache:'no-store',headers:{Accept:'application/json'}});const data=await response.json();if(response.ok&&Number.isFinite(Number(data.raw_saldo)))form.dataset.balance=Math.max(0,Number(data.raw_saldo)).toFixed(2);}catch(_){/* The server checks the authoritative balance on submit. */}
+      try{const response=await fetch('get_saldo.php?'+query,{cache:'no-store',headers:{Accept:'application/json'}});const data=await response.json();if(response.ok&&Number.isFinite(Number(data.raw_saldo))){form.dataset.balance=Math.max(0,Number(data.raw_saldo)).toFixed(2);const display=form.closest('.sw-entry-panel')?.querySelector('.sw-balance-box strong');if(display)display.textContent=money(form.dataset.balance);paintBalance();}}catch(_){/* The server checks the authoritative balance on submit. */}
     });
   }
-  const feedback=document.querySelector('.savings-entry-feedback[data-error="1"]');
-  if(feedback){
-    const message=feedback.textContent.trim();
-    warn(/saldo.*(cukup|kurang|kosong)|melebihi saldo|saldo.*minus/i.test(message)?'Saldo tidak mencukupi':'Tabungan belum tersimpan',message,!!amount&&/saldo/i.test(message));
-    feedback.hidden=true;
-  }
+  // Server results use the shared operation popup; the dialog above remains
+  // responsible for pre-submit validation only.
 })();

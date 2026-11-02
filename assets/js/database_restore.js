@@ -46,6 +46,9 @@
       document.title=(success ? 'Pemulihan selesai' : 'Backup pengaman dipulihkan')+' | SistemSPP';
       if(notifiedTerminal!==job.id && previousState && typeof dialog.showModal==='function' && !dialog.open)dialog.showModal();
       notifiedTerminal=job.id;
+    }else if(notifiedTerminal!==job.id&&previousState){
+      notifiedTerminal=job.id;
+      window.showOperationResult?.({type:job.state==='failed'?'error':'warning',title:byId('restore-result-title').textContent,message:byId('restore-result-message').textContent,source:byId('restore-review')});
     }
   };
   const render = () => {
@@ -120,7 +123,7 @@
     try {
       const result = await request('upload',{sql:file});job = result.job;capability = {id:job.id,token:result.token};
       poll();
-    } catch (error) {renderProgress('failed');feedback(error.name === 'AbortError' ? 'Unggahan belum merespons. Buka Lihat Progres Pemulihan untuk memeriksa pekerjaan yang sudah diterima.' : error.message);}
+    } catch (error) {renderProgress('failed');feedback(error.name === 'AbortError' ? 'Unggahan belum merespons. Buka Lihat Progres Pemulihan untuk memeriksa pekerjaan yang sudah diterima.' : error.message);window.showOperationResult?.({type:'error',message:byId('restore-job-status').textContent,source:byId('restore-review')});}
     finally {busy = false;render();if (!job) {byId('restore-review').disabled = !file;byId('restore-review').dataset.busy = 'false';}}
   });
   ['restore-understood','restore-confirmation'].forEach(id => byId(id).addEventListener('input',render));
@@ -128,12 +131,12 @@
     if (busy || byId('restore-apply').disabled) return;
     busy = true;render();document.dispatchEvent(new CustomEvent('database-restore-active',{detail:true}));
     try {const result = await request('apply',{understood:'1',confirmation:byId('restore-confirmation').value});job = result.job;}
-    catch (error) {feedback(error.message);}
+    catch (error) {feedback(error.message);window.showOperationResult?.({type:'error',message:error.message,source:byId('restore-apply')});}
     finally {busy = false;render();poll();}
   });
   byId('restore-resume').addEventListener('click',async () => {
     if (busy) return;busy = true;render();
-    try {await request('resume');poll();} catch (error) {feedback(error.message);}finally {busy = false;render();}
+    try {await request('resume');poll();} catch (error) {feedback(error.message);window.showOperationResult?.({type:'error',message:error.message,source:byId('restore-resume')});}finally {busy = false;render();}
   });
   if (capability) {poll();if (!dialog?.showModal) byId('restore-dialog')?.removeAttribute('hidden');}
 })();

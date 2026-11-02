@@ -99,7 +99,8 @@ if (in_array($aksi, ['update', 'hapus'], true) && !$authorizationRequest) {
     $token = (string)($_POST['csrf_token'] ?? '');
     if ($_SERVER['REQUEST_METHOD'] !== 'POST' || empty($_SESSION['csrf_payment']) || !hash_equals($_SESSION['csrf_payment'], $token)) {
         $_SESSION['flash'] = ['type' => 'error', 'msg' => 'Permintaan perubahan transaksi tidak valid atau sesi telah kedaluwarsa.'];
-        header('Location: ' . $returnUrl);
+        if($aksi==='update')payment_edit_draft_save($returnPaymentId,$returnContext);
+        header('Location: ' . ($aksi==='update'?payment_return_edit_url($returnContext,$returnPaymentId):$returnUrl));
         exit;
     }
     try { payment_assert_owner($koneksi,(int)($_POST['id']??0),(int)$_SESSION['admin_id']); }

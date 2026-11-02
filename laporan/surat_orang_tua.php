@@ -17,7 +17,6 @@ $students=report_student_debt_groups($koneksi,$filters,'',[],$today);
 $allFilters=$filters;$allFilters['kelas']='';unset($allFilters['_multi']['kelas']);$allFilters['q']='';
 $alreadyAllClasses=$filters['kelas']===''&&filter_is_all($filters['_multi']['kelas']??['*'])&&$filters['q']==='';
 $allStudents=($alreadyAllClasses||$allFilters===$filters)?$students:report_student_debt_groups($koneksi,$allFilters,'',[],$today);
-$classStudents=($filters['kelas']!==''||!filter_is_all($filters['_multi']['kelas']??['*']))?$students:[];
 $classes=report_classes($koneksi);
 $total=array_sum(array_map(static fn($student)=>(float)$student['total_tunggakan'],$students));
 ?>
@@ -30,14 +29,9 @@ $total=array_sum(array_map(static fn($student)=>(float)$student['total_tunggakan
 <section class="main-card letter-list-card"><div class="letter-list-head"><div class="letter-list-heading"><span class="recap-class-overline">SURAT KE ORANG TUA</span><h1>Pilih siswa yang akan dikirimi surat</h1><p>Menampilkan tunggakan sampai <?= report_e(report_date_label($today)) ?>. Siswa yang sudah lunas tidak masuk daftar.</p></div><div class="letter-total"><span>Siswa dengan tunggakan</span><strong><?= number_format(count($students)) ?></strong><span>Total <?= report_e(report_money($total)) ?></span></div></div>
 <form method="get" class="letter-filters"><div class="field-row"><label class="field-label" for="letter-class">Kelas/Rombel</label><select class="field-input field-select" id="letter-class" name="kelas" data-filter-multiple><option value="">Semua Rombel</option><?php foreach(range(...unit_level_bounds()) as $level): ?><option value="tingkat:<?= $level ?>" <?= $filters['kelas']==='tingkat:'.$level?'selected':'' ?>>Semua Kelas <?= $level ?></option><?php endforeach; ?><?php foreach($classes as $class): ?><option value="rombel:<?= (int)$class['id'] ?>" <?= $filters['kelas']==='rombel:'.(int)$class['id']?'selected':'' ?>><?= report_e($class['label']) ?></option><?php endforeach; ?></select></div><div class="field-row"><label class="field-label" for="letter-status">Status Siswa</label><select class="field-input field-select" id="letter-status" name="siswa_status" data-filter-multiple><?php foreach(['active'=>'Aktif','archived'=>'Arsip/Lulus','all'=>'Semua'] as $key=>$label): ?><option value="<?= $key ?>" <?= $filters['siswa_status']===$key?'selected':'' ?>><?= $label ?></option><?php endforeach; ?></select></div><div class="field-row letter-search"><label class="field-label" for="letter-q">Cari siswa</label><input class="field-input" id="letter-q" name="q" value="<?= report_e($filters['q']) ?>" placeholder="Nama, NIS, atau NIS Diknas"></div><button class="btn btn-primary" type="submit">Tampilkan siswa</button></form>
 <div class="letter-actions" aria-label="Pilihan cetak surat">
-  <div class="letter-action-copy"><strong><?= number_format(count($students)) ?> surat sesuai filter</strong><span>Pilih siswa di tabel atau cetak menurut rombel. Sesuaikan pesan tiap siswa sebelum pratinjau. Setiap siswa mulai di lembar baru.</span></div>
+  <div class="letter-action-copy"><strong><?= number_format(count($students)) ?> surat sesuai filter</strong></div>
   <div class="letter-action-buttons">
     <button type="button" class="btn btn-ghost" id="print-selected" disabled>Cetak Dipilih (0)</button>
-    <?php if(($filters['kelas']===''&&filter_is_all($filters['_multi']['kelas']??['*']))): ?>
-      <button type="button" class="btn btn-ghost" disabled title="Pilih kelas atau rombel dahulu">Cetak Kelas/Rombel</button>
-    <?php else: ?>
-      <a class="btn btn-ghost <?= !$classStudents?'is-disabled':'' ?>" target="_blank" rel="noopener" <?= $classStudents?'':'aria-disabled="true" tabindex="-1"' ?> href="surat_orang_tua_susun.php?<?= filter_build_query(['mode'=>'class','kelas'=>$filters['kelas'],'q'=>$filters['q'],'siswa_status'=>$filters['siswa_status']]) ?>">Cetak Kelas/Rombel (<?= count($classStudents) ?>)</a>
-    <?php endif; ?>
     <a class="btn btn-primary <?= !$allStudents?'is-disabled':'' ?>" target="_blank" rel="noopener" <?= $allStudents?'':'aria-disabled="true" tabindex="-1"' ?> href="surat_orang_tua_susun.php?<?= filter_build_query(['mode'=>'all','siswa_status'=>$filters['siswa_status']]) ?>">Cetak Semua Rombel (<?= count($allStudents) ?>)</a>
   </div>
 </div>

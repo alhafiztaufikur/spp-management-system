@@ -16,6 +16,7 @@ fs.mkdirSync(artifacts,{recursive:true});
   try{
     const context=await browser.newContext({viewport:{width:1440,height:1000}});
     const page=await context.newPage(),errors=[];
+    const acknowledgeResult=async type=>{const result=page.locator('#operation-feedback-dialog');await result.waitFor({state:'visible'});assert.equal(await result.getAttribute('data-type'),type);await result.getByRole('button',{name:'Mengerti',exact:true}).click();};
     page.on('pageerror',error=>errors.push(error.message));
     const identity=await(await page.request.get(new URL('/tests/browser_clone_identity.php',base).href)).json();
     assert.equal(identity.isolated_test,true);assert.equal(identity.server_uuid,manifest.server_uuid);assert.equal(identity.port,manifest.port);
@@ -33,6 +34,7 @@ fs.mkdirSync(artifacts,{recursive:true});
     try{await page.waitForFunction(()=>document.querySelector('#backup-settings-feedback').textContent.includes('berhasil disimpan'));}
     catch(error){console.error({posts,errors,details:await form.evaluate(node=>({hidden:node.hidden,feedback:document.querySelector('#backup-settings-feedback').textContent,controls:[...node.querySelectorAll('input:not([type=hidden]),button')].map(n=>({name:n.name,disabled:n.disabled,value:n.value,valid:n.validity?.valid,message:n.validationMessage}))}))});throw error;}
     assert.equal(posts,1,'Double submit duplicated save');
+    await acknowledgeResult('success');
     assert.match(await page.locator('#backup-schedule-badge').textContent(),/22\.10 WIB/);
     await page.reload();assert.equal(await clock.inputValue(),'22:10');assert.equal(await days.inputValue(),'365');
     const oldVersion=await form.locator('[name=version]').inputValue();
@@ -45,6 +47,7 @@ fs.mkdirSync(artifacts,{recursive:true});
     assert.equal(await clock.inputValue(),'00:05','Polling overwrote unsaved time');
     assert.equal(await form.locator('[name=version]').inputValue(),oldVersion,'Polling silently accepted another version');
     await button.click();await page.waitForFunction(()=>document.querySelector('#backup-settings-feedback').textContent.includes('Muat ulang'));
+    await acknowledgeResult('error');
     await page.reload();assert.equal(await clock.inputValue(),'23:59');assert.equal(await days.inputValue(),'1');
     await days.fill('366');assert.equal(await days.evaluate(node=>node.validity.rangeOverflow),true);
     await days.fill('0');assert.equal(await days.evaluate(node=>node.validity.rangeUnderflow),true);
@@ -52,7 +55,9 @@ fs.mkdirSync(artifacts,{recursive:true});
     await page.route('**/backup_api.php',route=>route.request().method()==='POST'?route.abort('connectionreset'):route.continue(),{times:1});
     await button.click();await page.waitForFunction(()=>document.querySelector('#backup-settings-feedback').textContent.includes('Koneksi terputus'));
     assert.equal(await clock.inputValue(),'01:30');
+    await acknowledgeResult('error');
     await button.click();await page.waitForFunction(()=>document.querySelector('#backup-settings-feedback').textContent.includes('berhasil disimpan'));
+    await acknowledgeResult('success');
     const actual=await(await page.request.get(new URL('/backup_api.php?action=status',base).href)).json();
     assert.equal(actual.settings.daily_time,'01:30');assert.equal(actual.settings.retention_days,90);
     const expired={id:'fe'.repeat(16),name:'Cadangan lama.sql',type:'scheduled',state:'expired',created_at:new Date().toISOString(),bytes:100,actor_name:'Sistem',message:'Cadangan otomatis kedaluwarsa.'};

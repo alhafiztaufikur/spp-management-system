@@ -52,6 +52,11 @@ if (transaction_authorization_pending_for_payments($koneksi, [$id])) {
     header('Location: ' . $returnUrl);
     exit;
 }
+// Old direct edit links also need a server-bound context for safe draft recovery.
+if (!$returnEntry) {
+    $returnContext = payment_return_create($id, unit_active_id(), [], 'lihat.php');
+    $returnUrl = payment_return_url($returnContext, $id);
+}
 
 // Ambil Daftar Ulang yang secara eksplisit milik pembayaran ini.
 $stmt_du = $koneksi->prepare("SELECT tagihan_daftar_ulang_id, jumlah, kelas, th_ajaran FROM bayar_du WHERE bayar_id = ? LIMIT 1");
@@ -329,6 +334,7 @@ $selectedPaymentMethod = $d['sistem_pembayaran'] ?? 'VA';
         </div>
 
         <form method="POST" action="../pembayaran/proses.php" id="form-bayar">
+          <input type="hidden" name="_operational_unit" value="<?= unit_active_id() ?>" />
           <input type="hidden" name="aksi" value="update" />
           <input type="hidden" name="return_context" value="<?= htmlspecialchars($returnContext, ENT_QUOTES, 'UTF-8') ?>" />
           <input type="hidden" name="id" value="<?= $d['id'] ?>" />

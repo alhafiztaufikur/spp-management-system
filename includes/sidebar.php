@@ -168,6 +168,8 @@ document.addEventListener('DOMContentLoaded', function () {
 </script>
 <?php endif; ?>
 <!-- Early theme init to prevent flash -->
+<link rel="stylesheet" href="<?= $root ?>assets/css/operation_feedback.css?v=<?= filemtime(__DIR__.'/../assets/css/operation_feedback.css') ?>">
+<script defer src="<?= $root ?>assets/js/operation_feedback.js?v=<?= filemtime(__DIR__.'/../assets/js/operation_feedback.js') ?>"></script>
 <link rel="stylesheet" href="<?= $root ?>assets/css/dropdowns.css?v=<?= filemtime(__DIR__.'/../assets/css/dropdowns.css') ?>">
 <link rel="stylesheet" href="<?= $root ?>assets/css/sidebar_palette.css?v=<?= filemtime(__DIR__.'/../assets/css/sidebar_palette.css') ?>">
 <script defer src="<?= $root ?>assets/js/dropdowns.js?v=<?= filemtime(__DIR__.'/../assets/js/dropdowns.js') ?>"></script>

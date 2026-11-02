@@ -7,6 +7,8 @@
   const changes=new Map(),versions=new Map(),dialog=document.getElementById('parent-copy-dialog');
   const list=document.getElementById('copy-recipient-list'),all=document.getElementById('copy-select-all');
   const apply=document.getElementById('copy-apply'),targets=new Set();
+  const copy=document.getElementById('parent-copy');
+  const previewUrl='surat_orang_tua_susun.php?draft='+encodeURIComponent(data.token)+'&preview=1';
   let current='',timer,chain=Promise.resolve(),busy=false,copyBusy=false,range=null,chooseVersion=0;
   const escape=text=>text.replace(/[&<>"']/g,c=>({'&':'&amp;','<':'&lt;','>':'&gt;','"':'&quot;',"'":'&#39;'}[c]));
   function plain(message){if(typeof message==='string')return message;return htmlText(message?.html||'');}
@@ -31,7 +33,7 @@
     editor.dataset.empty=String(length===0);
     document.getElementById('parent-message-count').textContent=length.toLocaleString('id-ID')+' / 2.000 karakter';
     editor.setAttribute('aria-invalid',String(!valid));
-    document.getElementById('parent-copy').disabled=busy||!valid||!plain(value())||recipients.length<2;
+    if(copy)copy.disabled=busy||!valid||!plain(value())||recipients.length<2;
     return valid;
   }
   function capture(){
@@ -42,7 +44,7 @@
     }
     count();
   }
-  const report=error=>{status.textContent=error.message+' Tekan Simpan Draf untuk mencoba lagi.';};
+  const report=error=>{status.textContent=error.message+' Klik Pratinjau Surat untuk mencoba menyimpan kembali.';};
   function enqueue(task){const work=chain.catch(()=>{}).then(task);chain=work;return work;}
   async function request(payload){
     const response=await fetch('surat_orang_tua_draf.php',{method:'POST',headers:{'Content-Type':'application/json','X-CSRF-Token':data.csrf},body:JSON.stringify({draft:data.token,...payload})});
@@ -67,10 +69,6 @@
   function showRecipient(button){
     current=button.dataset.key;buttons.forEach(b=>b.setAttribute('aria-pressed',String(b===button)));
     editor.innerHTML=html(messages[current]||'');range=null;
-    const recipient=recipients.find(r=>r.key===current);
-    document.getElementById('recipient-name').textContent=recipient.name;
-    document.getElementById('recipient-identity').textContent=recipient.unit+' · '+recipient.nis+' · '+recipient.class;
-    for(const [id,field] of [['summary-nis','nis'],['summary-diknas','diknas'],['summary-class','class'],['summary-unit','unit']])document.getElementById(id).textContent=recipient[field]||'Tidak tercatat';
     count();
   }
   buttons.forEach(button=>button.addEventListener('click',async()=>{
@@ -99,9 +97,9 @@
     buttons.forEach(b=>{b.hidden=!b.textContent.toLocaleLowerCase('id').includes(q);if(!b.hidden)visible++;});
     document.getElementById('parent-recipient-count').textContent='Menampilkan '+visible+' dari '+buttons.length+' penerima';
   });
-  function lock(locked){busy=locked;editor.contentEditable=String(!locked);buttons.forEach(b=>b.disabled=locked);document.querySelectorAll('[data-format],#parent-save,#parent-preview').forEach(b=>b.disabled=locked);count();}
-  document.getElementById('parent-save').addEventListener('click',async()=>{lock(true);try{await save();}catch(error){report(error);}finally{lock(false);}});
-  document.getElementById('parent-preview').addEventListener('click',async()=>{if(busy)return;lock(true);try{await save();location.href='surat_orang_tua_susun.php?draft='+encodeURIComponent(data.token)+'&preview=1';}catch(error){report(error);lock(false);}});
+  function lock(locked){busy=locked;editor.contentEditable=String(!locked);buttons.forEach(b=>b.disabled=locked);document.querySelectorAll('[data-format],#parent-preview').forEach(b=>b.disabled=locked);count();}
+  document.getElementById('parent-preview').addEventListener('click',async()=>{if(busy)return;lock(true);try{await save();location.href=previewUrl;}catch(error){report(error);lock(false);}});
+  if(dialog&&copy){
   function copyState(){
     const others=recipients.filter(r=>r.key!==current);
     all.checked=others.length>0&&others.every(r=>targets.has(r.key));all.indeterminate=targets.size>0&&!all.checked;
@@ -111,7 +109,7 @@
     list.querySelectorAll('input').forEach(check=>check.checked=targets.has(check.value));
   }
   function closeCopy(){if(copyBusy)return;dialog.close();document.getElementById('parent-copy').focus();}
-  document.getElementById('parent-copy').addEventListener('click',()=>{
+  copy.addEventListener('click',()=>{
     capture();if(!count()||!plain(value()))return;
     targets.clear();
     document.getElementById('copy-result').textContent='';document.getElementById('copy-recipient-search').value='';
@@ -143,10 +141,13 @@
       Object.entries(result.messages).forEach(([key,message])=>{messages[key]=message;changes.delete(key);versions.set(key,(versions.get(key)||0)+1);markRecipient(key);});
       editor.innerHTML=html(messages[current]||'');range=null;
       status.textContent='Pesan diterapkan ke '+result.updated+' penerima.';
-      copyBusy=false;dialog.close();document.getElementById('parent-copy').focus();
-    }catch(error){document.getElementById('copy-result').textContent=error.message+' Coba Terapkan Pesan kembali.';}
-    finally{copyBusy=false;lock(false);dialog.querySelectorAll('input,[data-copy-close]').forEach(e=>e.disabled=false);copyState();}
+      location.href=previewUrl;
+    }catch(error){
+      document.getElementById('copy-result').textContent=error.message+' Coba Terapkan Pesan & Pratinjau kembali.';
+      copyBusy=false;lock(false);dialog.querySelectorAll('input,[data-copy-close]').forEach(e=>e.disabled=false);copyState();
+    }
   });
+  }
   window.addEventListener('beforeunload',event=>{if(changes.size){event.preventDefault();event.returnValue='';}});
   if(buttons.length)showRecipient(buttons[0]);
 })();

@@ -33,7 +33,7 @@ const post=(context,values)=>context.request.post(base+'/master_spp.php',{data:n
    const oldValues=await page.locator('#student-tariff-form').evaluate(f=>Object.fromEntries(new FormData(f)));
    eq((await page.locator('#sct-preview-body tr').filter({hasText:'November'}).innerText()).includes('600.000,5'),true,'Custom amount appears in preview');
    await Promise.all([page.waitForResponse(r=>r.url().endsWith('/master_spp.php')&&r.request().method()==='POST'),page.locator('#sct-save').click()]);
-   await page.waitForFunction(()=>!document.getElementById('student-tariff-dialog').open);
+   await page.waitForFunction(()=>!document.getElementById('student-tariff-dialog').open);await page.locator('#operation-feedback-dialog[open]').getByRole('button',{name:'Mengerti',exact:true}).click();
    eq(await page.locator('#spp-student-search').inputValue(),'QA Tarif Khusus','Search survives save');
    eq(await row.locator('input[type=checkbox]').isChecked(),true,'Student selection survives save');
    const updatedYearVersion=await page.locator('#spp-publish-form [name=expected_rate_version]').inputValue();
@@ -48,11 +48,11 @@ const post=(context,values)=>context.request.post(base+'/master_spp.php',{data:n
    eq(Number(saved.potongan_nominal_snapshot),0,'Custom final rate not discounted twice');
    const stale=await post(context,oldValues);eq(stale.status(),422,'Stale form rejected');
    await open();await page.locator('#student-tariff-form [name=start_period]').selectOption('2189-01');await page.locator('#student-tariff-form [name=nominal_akhir]').fill('0');
-   await page.locator('#sct-save').click();await page.waitForFunction(()=>!document.getElementById('student-tariff-dialog').open);
+   await page.locator('#sct-save').click();await page.waitForFunction(()=>!document.getElementById('student-tariff-dialog').open);await page.locator('#operation-feedback-dialog[open]').getByRole('button',{name:'Mengerti',exact:true}).click();
    eq(state()[unit].custom.find(b=>b.bulan==='01'&&b.tahun==='2189').status,'waived','Zero is a waiver through UI');
    await open();await page.locator('#student-tariff-form [name=start_period]').selectOption('2189-03');await page.locator('#sct-reset').click();
    eq(await page.locator('#student-tariff-form [name=nominal_akhir]').getAttribute('readonly'),'','Reset previews the default rate');
-   await page.locator('#sct-save').click();await page.waitForFunction(()=>!document.getElementById('student-tariff-dialog').open);
+   await page.locator('#sct-save').click();await page.waitForFunction(()=>!document.getElementById('student-tariff-dialog').open);await page.locator('#operation-feedback-dialog[open]').getByRole('button',{name:'Mengerti',exact:true}).click();
    const bills=state()[unit].custom;eq(Number(bills.find(b=>b.bulan==='03'&&b.tahun==='2189').nominal_tagihan),fixture.units[unit].custom.base-25000,'Partial reset restores base/discount');
    eq(Number(bills.find(b=>b.bulan==='02'&&b.tahun==='2189').nominal_tagihan),0,'Partial reset preserves previous custom month');
    eq(bills.find(b=>b.bulan==='12'&&b.tahun==='2188').status,'cancelled','Cancelled bill retained');

@@ -185,7 +185,8 @@ $masterRows=array_values(array_filter($masterRows,static fn($m)=>$masterTab==='h
 $activeMasters = $koneksi->query("SELECT * FROM master_biaya_lain WHERE is_active=1 AND jenis_pembayaran='tidak_berulang' ORDER BY nama")->fetch_all(MYSQLI_ASSOC);
 $activeMasters=array_values(array_filter($activeMasters,static fn($master)=>!lf_reserved_master($koneksi,(int)$master['id'])));
 $activeClasses = array_values(array_filter(class_all($koneksi,true),static fn($c)=>in_array(class_kind($c),['reguler','psb'],true)));
-$activeStudents = $koneksi->query("SELECT s.id,s.NO_INDUK,s.NO_induk_diknas,s.NAMA,s.KELAS,s.master_kelas_id,mk.tingkat,mk.kode_rombel,mk.is_placeholder FROM siswa s LEFT JOIN master_kelas mk ON mk.id=s.master_kelas_id WHERE s.is_active=1 AND s.legacy_pending=0 AND s.KELAS NOT IN ('CUSTOM','OUT') ORDER BY s.NAMA")->fetch_all(MYSQLI_ASSOC);
+// The publishing form still needs its roster; the removed statistic does not.
+$activeStudents=$koneksi->query("SELECT id,NO_INDUK,NAMA,master_kelas_id FROM siswa WHERE is_active=1 AND legacy_pending=0 AND KELAS NOT IN ('CUSTOM','OUT') ORDER BY NAMA")->fetch_all(MYSQLI_ASSOC);
 require_once __DIR__ . '/includes/master_workspace_ui.php';
 ?>
 <!DOCTYPE html>
@@ -229,27 +230,7 @@ require_once __DIR__ . '/includes/master_workspace_ui.php';
             <div class="fee-hero-stats">
               <div class="fee-stat"><span class="fee-icon"><?= master_workspace_icon('document') ?></span><div><span>Biaya Aktif</span><strong><?= number_format(count($activeMasters)) ?></strong></div></div>
               <div class="fee-stat"><span class="fee-icon"><?= master_workspace_icon('students') ?></span><div><span>Rombel Aktif</span><strong><?= number_format(count($activeClasses)) ?></strong></div></div>
-              <div class="fee-stat"><span class="fee-icon"><?= master_workspace_icon('student') ?></span><div><span>Siswa Aktif</span><strong><?= number_format(count($activeStudents)) ?></strong></div></div>
             </div>
-          </div>
-          <div class="fee-hero-art" aria-hidden="true">
-            <svg viewBox="0 0 340 220" fill="none" xmlns="http://www.w3.org/2000/svg">
-              <circle cx="190" cy="116" r="94" fill="currentColor" opacity=".06"/>
-              <path d="M27 192h291" stroke="currentColor" stroke-width="2" opacity=".2"/>
-              <rect x="81" y="30" width="151" height="158" rx="14" class="fee-art-paper" stroke="currentColor" stroke-opacity=".25" stroke-width="2"/>
-              <rect x="125" y="20" width="62" height="22" rx="7" fill="currentColor" opacity=".2"/>
-              <path d="M107 64h97" stroke="currentColor" stroke-width="7" stroke-linecap="round" opacity=".65"/>
-              <g stroke="currentColor" stroke-width="2.5" stroke-linecap="round" stroke-linejoin="round">
-                <rect x="102" y="88" width="18" height="18" rx="4"/><path d="m107 97 3 3 6-7M134 97h67"/>
-                <rect x="102" y="121" width="18" height="18" rx="4"/><path d="m107 130 3 3 6-7M134 130h53"/>
-                <rect x="102" y="154" width="18" height="18" rx="4"/><path d="m107 163 3 3 6-7M134 163h65"/>
-              </g>
-              <rect x="221" y="105" width="81" height="87" rx="12" class="fee-art-paper" stroke="currentColor" stroke-width="2"/>
-              <rect x="235" y="119" width="53" height="17" rx="4" fill="currentColor" opacity=".18"/>
-              <path d="M239 150h6m15 0h6m15 0h3m-45 16h6m15 0h6m15 0h3" stroke="currentColor" stroke-width="6" stroke-linecap="round" opacity=".7"/>
-              <circle cx="63" cy="171" r="26" class="fee-art-paper" stroke="currentColor" stroke-width="2"/>
-              <path d="M58 161v20m0-20h6a6 6 0 0 1 0 12h-6m6 0 7 8" stroke="currentColor" stroke-width="2.5" stroke-linecap="round" stroke-linejoin="round"/>
-            </svg>
           </div>
       </section>
 

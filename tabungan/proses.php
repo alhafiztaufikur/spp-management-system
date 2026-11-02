@@ -10,6 +10,7 @@ require_once '../includes/financial_request.php';
 require_once '../includes/savings_notes.php';
 require_once '../includes/savings_authorization.php';
 require_once '../includes/transaction_entry_date.php';
+require_once '../includes/savings_entry_return.php';
 requireRole(['admin', 'kasir']);
 
 if ($_SERVER['REQUEST_METHOD'] !== 'POST') {
@@ -24,11 +25,12 @@ $nominal = preg_match('/^[0-9]+(?:[.,][0-9]{1,2})?$/D',$rawNominal)?(float)str_r
 $keterangan = is_string($_POST['keterangan']??'')?trim($_POST['keterangan']??''):'';
 $user_id   = (string)($_SESSION['admin_id'] ?? '');
 $requestKey = (string)($_POST['request_key'] ?? '');
-$fallback = $aksi === 'keluar' ? 'keluar.php' : 'masuk.php';
+$entryContext=savings_entry_context($_POST,'entry_');
+$entryReturn=savings_entry_return_url(is_string($aksi)?$aksi:'',$_POST,$entryContext);
 
 if (empty($_SESSION['csrf_savings']) || !hash_equals($_SESSION['csrf_savings'], (string)($_POST['csrf_token'] ?? ''))) {
     $_SESSION['flash'] = ['type'=>'error', 'msg'=>'Permintaan tabungan tidak valid atau sesi telah kedaluwarsa. Muat ulang formulir.'];
-    header('Location: ' . $fallback);
+    header('Location: ' . $entryReturn);
     exit;
 }
 
@@ -46,25 +48,25 @@ try{
         if(!is_string($requestTime))throw new DomainException('Waktu formulir tidak valid. Muat ulang formulir.');
         $stamp=transaction_entry_timestamp($_POST['tanggal']??null,$requestTime);
         $saved=lop_bank_new($koneksi,(int)$_SESSION['admin_id'],unit_active_id(),(int)$target['owner_id'],['amount'=>number_format($nominal,2,'.',''),'direction'=>$aksi==='masuk'?'in':'out','date'=>$stamp,'note'=>$keterangan],hash('sha256','entry:'.$requestKey));
-        unset($_SESSION['savings_entry_draft']);$jid=-1000000000-$saved['id'];$_SESSION['savings_print_prompt']=['jenis'=>$aksi,'id'=>$jid,'unit_id'=>unit_active_id()];$_SESSION['flash']=['type'=>'success','msg'=>'Transaksi tabungan berhasil disimpan.'];
-        header('Location: riwayat.php?'.http_build_query(['owner_id'=>$target['owner_id'],'all_periods'=>'1','jenis'=>$aksi,'id'=>$jid,'after_save'=>'1']));exit;
+        $_SESSION['savings_entry_draft']=['tanggal'=>substr($stamp,0,10)];unset($_SESSION['savings_print_prompt']);$_SESSION['flash']=['type'=>'success','msg'=>'Transaksi tabungan berhasil disimpan.'];
+        header('Location: '.savings_entry_return_url($aksi,['owner_id'=>$target['owner_id']],$entryContext));exit;
     }
-}catch(Throwable $ex){$_SESSION['flash']=['type'=>'error','msg'=>$ex->getMessage()];header('Location: '.$fallback.'?'.http_build_query(array_intersect_key($_POST,array_flip(['student_id','owner_id']))));exit;}
+}catch(Throwable $ex){$_SESSION['flash']=['type'=>'error','msg'=>$ex->getMessage()];header('Location: '.$entryReturn);exit;}
 
 // Validasi dasar
 if (!$no_induk || !is_finite($nominal) || $nominal <= 0 || !in_array($aksi, ['masuk', 'keluar'], true)) {
     $_SESSION['flash'] = ['type' => 'error', 'msg' => 'Data tidak valid! Pastikan siswa dipilih dan nominal diisi.'];
-    header('Location: ' . ($aksi === 'keluar' ? 'keluar.php' : 'masuk.php').'?'.http_build_query(array_intersect_key($_POST,array_flip(['student_id','owner_id']))));
+    header('Location: ' . $entryReturn);
     exit;
 }
 if (mb_strlen($keterangan, 'UTF-8') > 255) {
     $_SESSION['flash'] = ['type' => 'error', 'msg' => 'Keterangan maksimal 255 karakter.'];
-    header('Location: ' . $fallback);
+    header('Location: ' . $entryReturn);
     exit;
 }
 if (!savings_notes_ready($koneksi)) {
     $_SESSION['flash'] = ['type' => 'error', 'msg' => 'Penyimpanan keterangan tabungan belum tersedia. Hubungi administrator sistem.'];
-    header('Location: ' . $fallback);
+    header('Location: ' . $entryReturn);
     exit;
 }
 
@@ -124,15 +126,15 @@ try {
     financial_request_complete($koneksi, $requestKey, $journalId);
     $koneksi->commit();
 
-    unset($_SESSION['savings_entry_draft']);
-    $_SESSION['savings_print_prompt'] = ['jenis'=>$aksi, 'id'=>$journalId, 'unit_id'=>unit_active_id()];
+    $_SESSION['savings_entry_draft']=['tanggal'=>substr($tanggal_dt,0,10)];
+    unset($_SESSION['savings_print_prompt']);
 
     $label = $aksi === 'masuk' ? 'masuk' : 'keluar';
     $_SESSION['flash'] = [
         'type' => 'success',
         'msg'  => 'Tabungan ' . $label . ' Rp ' . number_format($nominal, 0, ',', '.') . ' berhasil disimpan!'
     ];
-    header('Location: riwayat.php?' . http_build_query(['jenis'=>$aksi, 'id'=>$journalId,'student_id'=>$target['student_id'],'after_save'=>'1']));
+    header('Location: '.savings_entry_return_url($aksi,['student_id'=>$target['student_id']],$entryContext));
     exit;
 
 } catch (Throwable $e) {
@@ -144,6 +146,6 @@ try {
     $_SESSION['flash'] = ['type' => 'error', 'msg' => $e instanceof mysqli_sql_exception
         ? 'Tabungan gagal disimpan. Periksa data dan hubungi administrator jika masalah berulang.'
         : $e->getMessage()];
-    header('Location: ' . ($aksi === 'keluar' ? 'keluar.php' : 'masuk.php').'?'.http_build_query(array_intersect_key($_POST,array_flip(['student_id','owner_id']))));
+    header('Location: ' . $entryReturn);
     exit;
 }
