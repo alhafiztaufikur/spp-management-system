@@ -5,7 +5,6 @@ require_once __DIR__.'/migrated_history.php';
 require_once __DIR__.'/legacy_du.php';
 /** Read-only DU grouping; historical payments never settle an unrelated native bill. */
 function rc_source(mysqli $db,string $source='all'): string {
-    $duLines=ldu_receipt_lines_sql(true);
     $parts=[];
     if($source!=='legacy'){
         $f=['q'=>'','student_id'=>0,'values'=>['kelas'=>['*'],'tahun_ajaran'=>['*'],'status'=>['*'],'operator'=>['*']]];[$native]=registration_active_sql($f,$db);
@@ -22,14 +21,18 @@ function rc_source(mysqli $db,string $source='all'): string {
     return hp_sql($db,'('.implode(' UNION ALL ',$parts).')');
 }
 function rc_verified_tariffs(mysqli $db): array {
-    $e=rc_evidence_sources($db);$proofs=[];
+    $e=rc_evidence_sources($db);$proofs=[];$tariffIndex=[];
+    // Decode each source/year/grade tariff once, rather than for every owner.
+    foreach($e['tariffs'] as $source=>$tariffs)foreach($tariffs as $t){
+        $year=trim((string)($t['th_ajaran']??''));$level=trim((string)($t['kelas']??''));
+        if(!preg_match('/^(?:[1-9]|1[0-2])$/D',$level))continue;
+        try{$tariffIndex[$source][$year][$level][lf_cents($t['Jumlah']??$t['jumlah']??null)]=true;}
+        catch(Throwable $error){$tariffIndex[$source][$year][$level]['invalid']=true;}
+    }
     foreach($e['obligations'] as $key=>$ob){
         if(count($ob)!==1||trim($ob[0]['evidence'])==='')continue;
         [$owner,$year]=explode('|',$key,2);if(!preg_match('/^[12][0-9]{3}\/[12][0-9]{3}$/D',$year))continue;
-        $values=[];foreach($e['tariffs'][$e['owners'][$owner]??0]??[] as $t){
-            if(trim((string)($t['th_ajaran']??''))!==$year)continue;$level=trim((string)($t['kelas']??''));if(!preg_match('/^(?:[1-9]|1[0-2])$/D',$level))continue;
-            try{$values[$level][lf_cents($t['Jumlah']??$t['jumlah']??null)]=true;}catch(Throwable $error){$values[$level]['invalid']=true;}
-        }
+        $values=$tariffIndex[$e['owners'][$owner]??0][$year]??[];
         foreach($values as $level=>$fees)if(count($fees)===1&&!isset($fees['invalid']))$proofs[]=['owner'=>(int)$owner,'year'=>$year,'level'=>(int)$level,'principal'=>lf_cents($ob[0]['principal'])];
     }return $proofs;
 }
@@ -38,9 +41,10 @@ function rc_groups(mysqli $db,string $source='all'): string {
     $lines=rc_source($db,'all');
     $groups="SELECT unit_id,owner_key,MAX(student_id) student_id,MAX(owner_id) owner_id,MAX(identity) identity,MAX(name) name,MAX(NO_induk_diknas) NO_induk_diknas,MAX(master_kelas_id) master_kelas_id,IF(COUNT(DISTINCT NULLIF(TRIM(kelas),''))=1,TRIM(MAX(kelas)),NULL) kelas,th_ajaran,CASE WHEN MAX(native_bill)>0 THEN MAX(native_bill) WHEN MAX(coverage_id)>0 THEN -2000000000-MAX(coverage_id) ELSE -1000000000-MIN(NULLIF(legacy_id,0)) END id,SUM(native_total) native_total,SUM(native_paid) native_paid,SUM(legacy_paid) legacy_paid,COUNT(NULLIF(legacy_id,0)) legacy_count,COUNT(DISTINCT NULLIF(native_bill,0)) native_count,MAX(coverage_id) coverage_id FROM $lines x GROUP BY unit_id,owner_key,th_ajaran";
     if($source!=='all')$groups="SELECT * FROM ($groups) source_groups WHERE ".($source==='system'?'(native_count>0 OR coverage_id>0)':'legacy_count>0');
-    $proofRows=[];foreach(rc_verified_tariffs($db) as $proof){$year=$db->real_escape_string($proof['year']);$proofRows[]="SELECT ".$proof['owner']." owner_id,'$year' year,".$proof['level']." level,".lf_money($proof['principal'])." principal";}
+    $proofRows=[];foreach(rc_verified_tariffs($db) as $proof)$proofRows[]=['owner_id'=>$proof['owner'],'year'=>$proof['year'],'level'=>$proof['level'],'principal'=>lf_money($proof['principal'])];
     if(!$proofRows)return "(SELECT x.*,NULL historical_total FROM ($groups) x)";
-    $proofSql=implode(' UNION ALL ',$proofRows);
+    $json="CONVERT(UNHEX('".bin2hex(json_encode($proofRows,JSON_THROW_ON_ERROR))."') USING utf8mb4)";
+    $proofSql="SELECT DISTINCT * FROM JSON_TABLE($json,'$[*]' COLUMNS(owner_id BIGINT PATH '$.owner_id',year VARCHAR(9) PATH '$.year',level INT PATH '$.level',principal DECIMAL(20,2) PATH '$.principal')) proof_values";
     return "(SELECT x.*,CASE WHEN TRIM(x.kelas) REGEXP CONCAT('^',proof.level,'[A-Za-z]?$') AND ((x.unit_id=1 AND proof.level BETWEEN 1 AND 6) OR (x.unit_id=2 AND proof.level BETWEEN 7 AND 9) OR (x.unit_id=3 AND proof.level BETWEEN 10 AND 12)) THEN proof.principal ELSE NULL END historical_total FROM ($groups) x LEFT JOIN ($proofSql) proof ON proof.owner_id=x.owner_id AND proof.year=x.th_ajaran AND proof.level=CAST(TRIM(x.kelas) AS UNSIGNED))";
 }
 function rc_page(mysqli $db,array $input): array {
@@ -115,10 +119,18 @@ function rc_tariff_evidence(mysqli $db,array $g): array {
     return ['status'=>'Status belum dapat ditentukan','tariff'=>null,'remaining'=>null,'source_tariff'=>count($tariffs)===1?array_key_first($tariffs)/100:null,'reason'=>implode(' ',array_unique($reason))];
 }
 function rc_receipts(mysqli $db,array $g,string $source='all'): array {
-    $duLines=ldu_receipt_lines_sql(true);$time=payment_time_projection($db);
     $out=[];if($source!=='legacy'&&$g['student_id'])foreach(hp_rows($db,'SELECT b.id,b.unit_id,b.TGL_BYR,b.total_jumlah,SUM(d.jumlah) du_amount FROM bayar_du d JOIN bayar b ON b.id=d.bayar_id AND b.unit_id=d.unit_id JOIN siswa s ON s.NO_INDUK=b.NO_INDUK AND s.unit_id=b.unit_id WHERE s.id=? AND d.th_ajaran<=>? AND b.unit_id=? GROUP BY b.id,b.unit_id,b.TGL_BYR,b.total_jumlah',[$g['student_id'],$g['th_ajaran'],$g['unit_id']]) as $r)$out[]=$r;
     $ownerColumn=$g['student_id']?'o.student_id':'o.id';$ownerId=(int)($g['student_id']?:$g['owner_id']);
-    if($source!=='system'&&lop_ready($db)){$lines=ldu_receipt_lines_sql(true);foreach(hp_rows($db,"SELECT -(1000000000+p.id) id,p.unit_id,".$time['value']." TGL_BYR,".$time['precision']." time_precision,p.total total_jumlah,dl.amount du_amount FROM legacy_op_payments p JOIN ($lines) dl ON dl.payment_id=p.id AND dl.unit_id=p.unit_id JOIN legacy_op_owners o ON o.id=p.owner_id AND o.unit_id=p.unit_id JOIN legacy_full_batches b ON b.id=p.batch_id AND b.unit_id=p.unit_id ".$time['join']." WHERE $ownerColumn=? AND p.unit_id=? AND dl.year<=>? AND p.cancelled=0 ORDER BY TGL_BYR,p.id",[$ownerId,$g['unit_id'],$g['th_ajaran']]) as $r)$out[]=$r;}
+    if($source!=='system'&&lop_ready($db)){
+        $owners=array_column(hp_rows($db,"SELECT o.id FROM legacy_op_owners o WHERE $ownerColumn=? AND o.unit_id=?",[$ownerId,$g['unit_id']]),'id');
+        if($owners){
+            $target='(SELECT * FROM legacy_op_payments WHERE unit_id='.(int)$g['unit_id'].' AND owner_id IN ('.implode(',',array_map('intval',$owners)).'))';
+            $lines=str_replace('FROM legacy_op_payments p','FROM '.$target.' p',ldu_receipt_lines_sql());
+            $legacy=hp_rows($db,"SELECT -(1000000000+p.id) id,p.unit_id,p.source_date,p.row_key,b.source_id,p.source_date TGL_BYR,p.total total_jumlah,dl.amount du_amount FROM $target p JOIN ($lines) dl ON dl.payment_id=p.id AND dl.unit_id=p.unit_id JOIN legacy_op_owners o ON o.id=p.owner_id AND o.unit_id=p.unit_id JOIN legacy_full_batches b ON b.id=p.batch_id AND b.unit_id=p.unit_id WHERE $ownerColumn=? AND p.unit_id=? AND dl.year<=>? AND p.cancelled=0",[$ownerId,$g['unit_id'],$g['th_ajaran']]);
+            foreach($legacy as &$r){$time=payment_time_record($db,$r);$r['TGL_BYR']=$time['payment_datetime'];$r['time_precision']=$time['time_precision'];unset($r['source_date'],$r['row_key'],$r['source_id']);}unset($r);
+            usort($legacy,static fn($a,$b)=>($a['TGL_BYR']<=>$b['TGL_BYR'])?:($b['id']<=>$a['id']));array_push($out,...$legacy);
+        }
+    }
 
     return $out;
 }

@@ -109,6 +109,9 @@
         if (mounted.get(panel) !== record) return;
         const r = button.getBoundingClientRect(), v = viewport();
         if (!button.isConnected || !button.getClientRects().length || r.bottom <= v.top || r.top >= v.bottom || r.right <= v.left || r.left >= v.right || button.closest('dialog:not([open])')) { dismiss(record); return; }
+        // A history filter scrolled behind its sticky header no longer owns a visible anchor.
+        const header = button.closest('.payment-history-page .ph-filter-card')?.closest('.main-content')?.querySelector('.topbar');
+        if (header && r.top < header.getBoundingClientRect().bottom) { dismiss(record); return; }
         if (panel.hidden) { hide(panel); return; }
         const signature = [r.left,r.top,r.width,r.height,v.left,v.top,v.right,v.bottom,panel.scrollHeight].join('|');
         if (signature !== previous) { position(panel, button, record.options); previous = signature; }

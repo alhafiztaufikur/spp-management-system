@@ -2969,7 +2969,8 @@ function initReportDateRangePickers() {
       picker.closest('.report-filter-card')?.classList.toggle('is-date-picker-open', willOpen);
       button.setAttribute('aria-expanded', willOpen ? 'true' : 'false');
       if (willOpen) {
-        window.sppFloatingPanels?.show(popover,button,{minWidth:320,onClose:()=>closeReportDateRangePicker(picker)});
+        const minWidth = (document.body.classList.contains('report-general-page') || document.body.matches('#global-report-workspace[data-report-template="penerimaan"]')) && matchMedia('(min-width:1024px)').matches ? 460 : 320;
+        window.sppFloatingPanels?.show(popover,button,{minWidth,onClose:()=>closeReportDateRangePicker(picker)});
         syncInputsFromHidden();
         setTimeout(() => {if(!popover.hidden)startInput.focus({preventScroll:true});}, 0);
       }
@@ -3376,3 +3377,50 @@ document.addEventListener('DOMContentLoaded',()=>{
     }
   },true);
 });
+
+/* Adapt dedicated list pagers without changing their URLs, handlers or mobile layout. */
+(() => {
+  const selectors='.sc-pagination,.workflow-pages,.legacy-directory-pagination,.legacy-ledger-pagination,nav.legacy-actions,nav.lf-section-head,.letter-pages,[data-participants-pages]';
+  function enhance(){
+    document.querySelectorAll(selectors).forEach(shell=>{
+      if(shell.closest('.pagination-mobile'))return;
+      const controls=[...shell.querySelectorAll('a,button,span')].filter(el=>!el.querySelector('a,button')&&!el.closest('.desktop-page'));
+      let prev=shell.querySelector('.desktop-page.is-prev'),next=shell.querySelector('.desktop-page.is-next');
+      controls.forEach(el=>{
+        const label=el.textContent.trim();
+        const dir=/^(Sebelumnya|\u2039|\u00ab)$/.test(label)?'prev':/^(Berikutnya|Selanjutnya|\u203a|\u00bb)$/.test(label)?'next':null;
+        if(!dir)return;
+        el.classList.add('desktop-page','is-'+dir);
+        el.dataset.desktopLabel=label;
+        const icon=document.createElementNS('http://www.w3.org/2000/svg','svg');icon.setAttribute('viewBox','0 0 24 24');icon.setAttribute('aria-hidden','true');
+        const path=document.createElementNS(icon.namespaceURI,'path');path.setAttribute('d',dir==='prev'?'m14 6-6 6 6 6':'m10 6 6 6-6 6');icon.append(path);
+        const text=document.createElement('span');text.textContent=dir==='prev'?'Sebelumnya':'Selanjutnya';
+        el.replaceChildren(...(dir==='prev'?[icon,text]:[text,icon]));
+        if(dir==='prev')prev=el;else next=el;
+      });
+      if(!prev&&!next){
+        if(shell.matches('.sc-pagination,.workflow-pages,.legacy-directory-pagination,.legacy-ledger-pagination,.letter-pages,[data-participants-pages]'))shell.classList.add('desktop-pagination-empty');
+        return;
+      }
+      shell.classList.remove('desktop-pagination-empty');shell.classList.add('desktop-pagination-shell');
+      const parent=(prev||next).parentElement;parent.classList.add('desktop-pager','desktop-pager-adapted');
+      function missing(dir){
+        const el=document.createElement('span');el.className='desktop-page is-'+dir+' is-disabled desktop-only-placeholder';el.setAttribute('aria-disabled','true');
+        const icon=document.createElementNS('http://www.w3.org/2000/svg','svg');icon.setAttribute('viewBox','0 0 24 24');icon.setAttribute('aria-hidden','true');const path=document.createElementNS(icon.namespaceURI,'path');path.setAttribute('d',dir==='prev'?'m14 6-6 6 6 6':'m10 6 6 6-6 6');icon.append(path);
+        const label=document.createElement('span');label.textContent=dir==='prev'?'Sebelumnya':'Selanjutnya';el.append(...(dir==='prev'?[icon,label]:[label,icon]));return el;
+      }
+      if(!prev){prev=missing('prev');parent.prepend(prev);}if(!next){next=missing('next');parent.append(next);}
+      [...parent.children].forEach(el=>{if(el!==prev&&el!==next)el.classList.add('desktop-pagination-extra');});
+      [...shell.children].forEach(el=>{if(el!==parent&&!el.contains(parent)&&el!==prev&&el!==next)el.classList.add('desktop-pagination-extra');});
+      const disabled=el=>el.disabled||el.getAttribute('aria-disabled')==='true'||el.classList.contains('is-disabled');
+      shell.classList.toggle('desktop-pagination-empty',disabled(prev)&&disabled(next));
+    });
+  }
+  document.addEventListener('DOMContentLoaded',()=>{
+    enhance();let queued=false;
+    new MutationObserver(records=>{
+      if(queued||!records.some(r=>r.target.nodeType===1&&r.target.closest(selectors)))return;
+      queued=true;requestAnimationFrame(()=>{queued=false;enhance();});
+    }).observe(document.body,{childList:true,subtree:true,attributes:true,attributeFilter:['disabled']});
+  });
+})();

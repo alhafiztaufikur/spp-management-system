@@ -188,7 +188,7 @@ $exportQuery = filter_build_query([
   <link rel="stylesheet" href="../assets/css/finance_workspace.css?v=<?= filemtime(__DIR__.'/../assets/css/finance_workspace.css') ?>">
   <link rel="stylesheet" href="../assets/css/payment_details.css?v=<?= filemtime(__DIR__.'/../assets/css/payment_details.css') ?>">
   <link rel="stylesheet" href="../assets/css/workspace_readability.css?v=<?= filemtime(__DIR__.'/../assets/css/workspace_readability.css') ?>">
-<link rel="stylesheet" href="../assets/css/menu_refinements.css?v=<?= filemtime(__DIR__.'/../assets/css/menu_refinements.css') ?>"><link rel="stylesheet" href="../assets/css/desktop_transaction_refinements.css?v=<?= filemtime(__DIR__.'/../assets/css/desktop_transaction_refinements.css') ?>"></head>
+<link rel="stylesheet" href="../assets/css/menu_refinements.css?v=<?= filemtime(__DIR__.'/../assets/css/menu_refinements.css') ?>"><link rel="stylesheet" href="../assets/css/desktop_transaction_refinements.css?v=<?= filemtime(__DIR__.'/../assets/css/desktop_transaction_refinements.css') ?>"><link rel="stylesheet" href="../assets/css/desktop_readability.css?v=<?= filemtime(__DIR__.'/../assets/css/desktop_readability.css') ?>"></head>
 <body class="report-general-page" data-readable-workspace="finance">
 <div class="bg-orbs"><div class="orb orb-1"></div><div class="orb orb-2"></div><div class="orb orb-3"></div></div>
 

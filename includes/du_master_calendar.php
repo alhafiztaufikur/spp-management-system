@@ -22,7 +22,7 @@
     <g fill="var(--du-art-deep, #145e48)" opacity=".4"><ellipse cx="40" cy="16" rx="10" ry="6"/><ellipse cx="130" cy="16" rx="10" ry="6"/></g>
     <rect x="32" y="-17" width="17" height="41" rx="8.5" fill="url(#du-art-ring)"/>
     <rect x="122" y="-17" width="17" height="41" rx="8.5" fill="url(#du-art-ring)"/>
-    <text x="93" y="78" text-anchor="middle" font-family="Inter, sans-serif" font-size="17" font-weight="600" fill="var(--du-art-deep, #165c47)"><?= master_du_e($selectedYear) ?></text>
+    <text x="93" y="78" text-anchor="middle" font-family="Segoe UI, Arial, sans-serif" font-size="17" font-weight="600" fill="var(--du-art-deep, #165c47)"><?= master_du_e($selectedYear) ?></text>
     <g fill="var(--du-art-light, #cce9dd)"><rect x="24" y="96" width="25" height="25" rx="5"/><rect x="60" y="96" width="25" height="25" rx="5"/><rect x="96" y="96" width="25" height="25" rx="5"/><rect x="132" y="96" width="25" height="25" rx="5"/><rect x="24" y="133" width="25" height="25" rx="5"/><rect x="60" y="133" width="25" height="25" rx="5"/><rect x="132" y="133" width="25" height="25" rx="5"/></g>
     <rect x="96" y="133" width="25" height="25" rx="5" fill="url(#du-art-cover)"/>
   </g>

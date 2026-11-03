@@ -21,6 +21,7 @@ function receipt_money_words(float $amount): string {
 /** Presentation only: callers supply the original receipt values and wording. */
 function receipt_print_document(array $receipts, string $title, string $toolbar, bool $pdf = false, array $options = []): void {
     $e=static fn($value)=>htmlspecialchars((string)$value,ENT_QUOTES|ENT_SUBSTITUTE,'UTF-8');
+    // Dompdf needs percentages for fixed table columns; preserve the 5/36/3/23 mm proportions.
     $money=static fn($value,bool $zero=false)=>!$zero&&abs((float)$value)<.005?'':number_format((float)$value,abs((float)$value-round((float)$value))>.00001?2:0,',','.');
     ?>
     <!doctype html><html lang="id"><head><meta charset="utf-8"><meta name="viewport" content="width=device-width,initial-scale=1">
@@ -48,7 +49,7 @@ function receipt_print_document(array $receipts, string $title, string $toolbar,
       </td></tr><tr class="receipt-column-labels"><th><?= $savings?'Data Tabungan:':'Data Pembayaran:' ?></th><th><?= $savings?'Ringkasan Saldo:':'Sisa Pembayaran:' ?></th></tr></thead>
       <tbody>
       <?php for($i=0;$i<$count;$i++): ?><tr class="receipt-line">
-        <td><?php if(isset($receipt['primary'][$i])): [$label,$amount]=$receipt['primary'][$i]; ?><table class="payments"><tr><td class="number"><?= $i+1 ?>.</td><td><?= $e($label) ?></td><td class="receipt-colon">:</td><td class="amount"><?= $e($money($amount)) ?></td></tr></table><?php endif; ?></td>
+        <td><?php if(isset($receipt['primary'][$i])): [$label,$amount]=$receipt['primary'][$i]; $primaryAmount=$money($amount); ?><table class="payments<?= $savings?'':' receipt-primary-payment' ?>"><tr><td class="number"<?= $pdf&&!$savings?' style="width:7.462687%"':'' ?>><?= $i+1 ?>.</td><td class="receipt-payment-label"<?= $pdf&&!$savings?' style="width:53.731343%"':'' ?>><?= $e($label) ?></td><td class="receipt-colon"<?= $pdf&&!$savings?' style="width:4.477612%!important"':'' ?>>:</td><td class="amount"<?= $pdf&&!$savings?' style="width:34.328358%"':'' ?>><?php if(!$savings&&strlen($primaryAmount)>10): ?><span class="receipt-amount-text" style="<?= $pdf?'font-size':'--receipt-amount-size' ?>:<?= round(105/strlen($primaryAmount),2) ?>pt"><?= $e($primaryAmount) ?></span><?php else: ?><?= $e($primaryAmount) ?><?php endif; ?></td></tr></table><?php endif; ?></td>
         <td><?php if(isset($right[$i]['heading'])): ?><strong class="section-label"><?= $e($right[$i]['heading']) ?></strong><?php elseif(isset($right[$i]['line'])): [$label,$amount]=$right[$i]['line']; ?><table class="payments"><tr><td><?= !empty($right[$i]['remaining'])?'<strong>'.$e($label).'</strong>':$e($label) ?></td><?php if(!empty($right[$i]['remaining'])&&!$savings): ?><td class="receipt-colon">:</td><?php endif; ?><td class="amount"><?= $amount===null?(!empty($right[$i]['remaining'])?$e($right[$i]['line'][2]??($label==='Sisa DU'?'-':'Belum dapat ditentukan')):''):$e($money($amount,!empty($right[$i]['remaining']))) ?></td></tr></table><?php endif; ?></td>
       </tr><?php endfor; ?>
       <?php if($savings): ?><tr class="receipt-line"><td colspan="2" style="padding-top:2mm"><strong>Keterangan:</strong> <?= nl2br($e($receipt['note']?:'—')) ?></td></tr><?php endif; ?>
@@ -64,13 +65,21 @@ function receipt_print_document(array $receipts, string $title, string $toolbar,
     <?php
 }
 
+/** Keep the original serif metrics aligned with the browser's half-page receipt. */
+function receipt_pdf_options(): \Dompdf\Options {
+    require_once __DIR__.'/pdf.php';require_pdf_library();
+    $options=new \Dompdf\Options();
+    $options->setIsRemoteEnabled(false);
+    $options->setDefaultMediaType('print');
+    $options->setFontHeightRatio(1.0);
+    return $options;
+}
+
 /** Same source document for browser preview, native PDF and image download. */
 function receipt_http_output(array $receipts,string $title,string $toolbar): void {
     $output=$_GET['output']??'preview';if(!is_string($output)||!in_array($output,['preview','pdf'],true)){http_response_code(400);exit('Format keluaran tidak valid.');}
     $params=$_GET;$params['output']='pdf';$url='?'.http_build_query($params);
     if($output==='preview'){receipt_print_document($receipts,$title,$toolbar,false,['pdf_url'=>$url]);return;}
     require_once __DIR__.'/pdf.php';require_pdf_library();ob_start();receipt_print_document($receipts,$title,$toolbar,true);$html=ob_get_clean();
-    // DejaVu's default 1.1 metric multiplier enlarges every nested table row.
-    // Use native font metrics so normal five-component slips fit the same paper as preview.
-    $options=new \Dompdf\Options();$options->setIsRemoteEnabled(false);$options->setDefaultMediaType('print');$options->setFontHeightRatio(1.0);$pdf=new \Dompdf\Dompdf($options);$pdf->loadHtml($html,'UTF-8');$pdf->setPaper([0,0,612,396]);$pdf->render();$pdf->stream('slip-pembayaran.pdf',['Attachment'=>false]);
+    $pdf=new \Dompdf\Dompdf(receipt_pdf_options());$pdf->loadHtml($html,'UTF-8');$pdf->setPaper([0,0,612,396]);$pdf->render();$pdf->stream('slip-pembayaran.pdf',['Attachment'=>false]);
 }

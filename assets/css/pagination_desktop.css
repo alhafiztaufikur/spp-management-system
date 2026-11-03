@@ -1,0 +1,27 @@
+/* One desktop pagination treatment, independent of a unit's palette. */
+.desktop-pager{display:none}
+@media(min-width:1024px){
+ body .pagination-mobile{display:none!important}
+ body .desktop-pager{display:flex;justify-content:flex-end;align-items:center;gap:8px;margin:12px 0;clear:both}
+ body .desktop-pager .desktop-page{box-sizing:border-box;display:inline-flex!important;align-items:center;justify-content:center;gap:8px;flex:0 0 auto;width:120px;height:38px;min-height:38px;padding:0 12px;border:1px solid #e8eeeb!important;border-radius:10px!important;background:#fff!important;color:#40564a!important;box-shadow:none!important;font:700 13px/1 "Segoe UI",Arial,sans-serif!important;text-decoration:none!important;white-space:nowrap;cursor:pointer;transition:background .15s}
+ body .desktop-pager .desktop-page.is-next{background:#168b57!important;border-color:#168b57!important;color:#fff!important}
+ body .desktop-pager .desktop-page>svg[aria-hidden]{display:block!important;width:14px;height:14px;fill:none;stroke:currentColor;stroke-width:2;stroke-linecap:round;stroke-linejoin:round;flex:none}
+ body .desktop-pager .desktop-page.is-disabled,body .desktop-pager .desktop-page:disabled{background:#fafcfb!important;border-color:#f0f3f1!important;color:#c5ceca!important;opacity:1!important;cursor:default;pointer-events:none}
+ body .desktop-pager a.desktop-page:hover,body .desktop-pager button.desktop-page:not(:disabled):hover{filter:brightness(.97)}
+ body .desktop-pager .desktop-page:focus-visible{outline:3px solid #92cdb0;outline-offset:3px}
+ body .desktop-pagination-source{display:none!important}
+ body .desktop-pager[hidden]{display:none!important}
+ .ph-list-panel>.desktop-pager{padding:0 14px}
+ html body#global-report-workspace .report-template-shell>.desktop-pager{box-sizing:border-box;margin:0;padding:16px 24px 20px}
+}
+
+.desktop-only-placeholder{display:none}
+@media(min-width:1024px){
+ body .desktop-pagination-extra,body .desktop-pagination-empty{display:none!important}
+ body .desktop-pagination-shell .desktop-pager{margin-left:auto}
+ body .desktop-pager-adapted .desktop-only-placeholder{display:inline-flex!important}
+ body .desktop-pagination-shell .desktop-pager-adapted{display:flex!important}
+ body [data-participants-count]{display:none!important}
+}
+
+@media print{.desktop-pager{display:none!important}}

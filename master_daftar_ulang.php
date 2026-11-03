@@ -188,7 +188,7 @@ $priorDebt=$yearId?report_prior_debt_summary($koneksi,$selectedYear,report_activ
   </div>
 </section>
 <section class="main-card master-modern-card master-modern-form" id="du-rate-section">
-  <div class="student-panel-heading"><span class="master-workspace-icon"><?= master_workspace_icon('coins') ?></span><div><h3>Tarif daftar ulang per kelas</h3><p>Isi tarif yang belum tersedia. Tagihan dan pembayaran yang sudah ada tetap dipertahankan.</p></div></div>
+  <div class="student-panel-heading"><div><h3>Tarif daftar ulang per kelas</h3><p>Isi tarif yang belum tersedia. Tagihan dan pembayaran yang sudah ada tetap dipertahankan.</p></div></div>
   <?php if(!empty($priorDebt['has_debt'])): ?><p class="du-info-note">Tunggakan tahun sebelumnya tetap tercatat dan dapat dibayar. Penerbitan tahun berjalan tetap dapat dilanjutkan.</p><?php endif; ?>
   <?php if($coverageConflicts): ?><p class="du-info-note"><?= $coverageConflicts ?> penetapan DU tersendiri bertentangan dengan cakupan PSB. Tagihan dan pembayaran tetap disimpan. Periksa melalui <a href="pembayaran/riwayat_daftar_ulang.php">Riwayat Daftar Ulang</a> untuk koreksi melalui alur yang tersedia.</p><?php endif; ?>
   <form method="post" id="du-rate-form">

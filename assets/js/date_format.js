@@ -48,7 +48,8 @@ function initIndonesianDateInputs() {
     visible.addEventListener('change',()=>{visible.dataset.typedDate=visible.value;push();});
     native.addEventListener('change',sync);
     if(!native.readOnly){
-      const button=document.createElement('button');button.type='button';button.className='id-date-picker';button.textContent=document.body.classList.contains('payment-content-plain')?'Kalender':'▦';button.setAttribute('aria-label','Buka kalender');
+      const button=document.createElement('button');button.type='button';button.className='id-date-picker';button.setAttribute('aria-label','Buka kalender');
+      button.innerHTML='<svg class="spp-calendar-icon payment-control-icon" width="18" height="18" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true"><rect x="3" y="5" width="18" height="16" rx="2"/><path d="M16 3v4M8 3v4M3 11h18"/></svg>';
       wrapper.append(button);button.disabled=native.disabled;
       button.addEventListener('click',()=>{try{native.showPicker();}catch(_){native.focus();}});
     }

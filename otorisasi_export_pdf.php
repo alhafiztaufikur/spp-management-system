@@ -80,7 +80,7 @@ require_once __DIR__.'/includes/pdf.php';require_pdf_library();
 $artifact=report_artifact_get(['route'=>'authorization','unit'=>$scope,'query'=>$query,'selection'=>$selection],['models'=>$models,'operator'=>$_SESSION['admin_nama']??'Tidak tercatat','school'=>unit_school_name($scope)],'pdf',static function()use($html){
     $options=new \Dompdf\Options();$options->setIsRemoteEnabled(false);$options->setChroot(__DIR__);
     $pdf=new \Dompdf\Dompdf($options);$pdf->loadHtml($html,'UTF-8');$pdf->setPaper('A4','landscape');$pdf->render();
-    $pdf->getCanvas()->page_text(705,571,'Halaman {PAGE_NUM} / {PAGE_COUNT}',$pdf->getFontMetrics()->getFont('DejaVu Sans'),8,[.3,.4,.45]);
+    $pdf->getCanvas()->page_text(705,571,'Halaman {PAGE_NUM} / {PAGE_COUNT}',$pdf->getFontMetrics()->getFont(spp_pdf_font_family()),8,[.3,.4,.45]);
     report_perf_mark('pdf');return $pdf->output();
 });
 report_artifact_stream($artifact,'riwayat-otorisasi.pdf','pdf',($_GET['output']??'pdf')!=='inline');

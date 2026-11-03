@@ -1,0 +1,39 @@
+/* Loaded only by the two cash recap documents. Mobile screen styles stay intact. */
+@media print,screen and (min-width:701px){
+  .title{background:transparent!important;border:0!important;padding:0;margin:0 0 4mm}
+  .title>p{font-size:10.5pt;font-weight:700;line-height:1.35;margin:0 0 2mm}
+  .title h2{margin:0 0 2mm}
+  .kop p{font-size:10pt;line-height:1.4;margin:2mm 0 0}
+  .report-component-table{table-layout:fixed}
+  .report-component-table thead th:first-child{width:8%}
+  .report-component-table thead th:nth-child(2){width:59%}
+  .report-component-table thead th:last-child{width:33%}
+  .report-component-table td{overflow-wrap:break-word}
+  .report-component-table .report-number{white-space:nowrap}
+  .cash-recap-closing{page-break-inside:avoid;break-inside:avoid}
+  .cash-recap-closing>h3{page-break-after:avoid;break-after:avoid}
+  .cash-recap-closing .report-cash-summary-table{table-layout:fixed}
+  .cash-recap-closing .report-cash-summary-table thead th:first-child{width:64%}
+  .cash-recap-closing .report-cash-summary-table thead th:last-child{width:36%}
+  .cash-recap-closing .total-table{width:100%!important;max-width:none!important;margin:3mm 0 0;table-layout:fixed}
+  .cash-recap-closing .total-table th{width:64%;text-align:left}
+  .cash-recap-closing .total-table td{width:36%}
+  .cash-recap-closing .total-table caption{display:none}
+  .cash-recap-closing .signatures{margin-top:6mm;page-break-inside:avoid}
+}
+@media screen and (min-width:701px){
+  .kop p{font-size:14px}
+  .title>p{font-size:15px}
+}
+@media print{
+  body{padding:0;font-size:9.5pt;line-height:1.3}
+  .kop{margin-bottom:4mm}
+  .title h2{font-size:14pt}
+  .title div,.meta td{font-size:8.5pt;line-height:1.35}
+  .meta{margin-bottom:3mm}
+  h3{margin:3mm 0 2mm;page-break-after:avoid}
+  .data th,.data td{font-size:9.5pt;line-height:1.3;padding:5pt 6pt}
+  .data tr{page-break-inside:avoid}
+  .cash-recap-closing .signatures td{font-size:9pt;height:24mm;line-height:1.3}
+  .footer{font-size:7.5pt;white-space:normal;line-height:1.2}
+}

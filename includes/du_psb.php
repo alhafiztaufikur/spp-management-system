@@ -36,7 +36,7 @@ function du_psb_states(mysqli $db,string $year,bool $refresh=false,bool $include
     // Only these first-grade students can affect this decision. Historical DU
     // evidence for other grades must not force a scan of the whole archive.
     $studentIds=implode(',',array_unique(array_map('intval',array_column($placements,'student_id'))));
-    $data=lb_cache($db);$bills=[];$history=[];
+    $data=lb_cache($db,false,array_column($placements,'no_induk'));$bills=[];$history=[];
     foreach(hp_rows($db,'SELECT unit_id,no_induk FROM tagihan_daftar_ulang WHERE tahun_ajaran_snapshot=?',[$year]) as $b)$bills[$b['unit_id'].'|'.$b['no_induk']]=true;
     if(lop_ready($db)){
         $period=lb_du_year_sql('p');

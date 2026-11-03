@@ -65,10 +65,10 @@ document.addEventListener('DOMContentLoaded', function () {
   if (!panel || !controls) return;
   const key = 'spp_master_kelas_view';
   function show(view) {
-    if (!['groups', 'cards', 'table'].includes(view)) view = 'groups';
+    if (!['groups', 'table'].includes(view)) view = 'groups';
     panel.dataset.rombelView = view;
     panel.querySelectorAll('[data-level-group]').forEach(group => {
-      if (view !== 'groups') group.open = true;
+      group.open = view === 'table';
     });
     controls.querySelectorAll('[data-class-view]').forEach(button => {
       button.setAttribute('aria-pressed', String(button.dataset.classView === view));

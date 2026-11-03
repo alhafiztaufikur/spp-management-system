@@ -9,7 +9,7 @@
   justify-content: center;
   min-height: 100vh;
   padding: 24px;
-  font-family: 'Inter', sans-serif;
+  font-family: var(--font-body);
   position: relative;
   overflow: hidden;
 
@@ -119,7 +119,7 @@
 }
 .brand-name-left {
   font-size: 15px;
-  font-weight: 800;
+  font-weight: 700;
   color: #fff;
   letter-spacing: -0.3px;
 }
@@ -169,7 +169,7 @@
 
 .left-tagline h1 {
   font-size: 20px;
-  font-weight: 900;
+  font-weight: 700;
   color: #fff;
   line-height: 1.25;
   letter-spacing: -0.4px;
@@ -316,7 +316,7 @@
   align-items: center;
   gap: 6px;
   cursor: pointer;
-  font-family: 'Inter', sans-serif;
+  font-family: var(--font-body);
   font-size: 11.5px;
   font-weight: 500;
   color: var(--text-secondary);
@@ -354,14 +354,14 @@
 }
 .right-brand-mobile .brand-name {
   font-size: 16px;
-  font-weight: 800;
+  font-weight: 700;
 }
 
 /* â”€â”€ Greeting â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€ */
 .right-greeting { margin-bottom: 22px; }
 .right-greeting h2 {
   font-size: 22px;
-  font-weight: 800;
+  font-weight: 700;
   color: #f1f5f9;
   letter-spacing: -0.4px;
   margin-bottom: 5px;
@@ -425,7 +425,7 @@
   border-radius: 8px;
   padding: 12px 42px;
   color: var(--text-primary);
-  font-family: 'Inter', sans-serif;
+  font-family: var(--font-body);
   font-size: 14px;
   outline: none;
   transition: all var(--transition);
@@ -513,7 +513,7 @@
   color: #1d1b20;
   border: none;
   border-radius: 100px;
-  font-family: 'Outfit', sans-serif;
+  font-family: var(--font-body);
   font-size: 14.5px;
   font-weight: 700;
   cursor: pointer;
@@ -807,7 +807,7 @@
   display: block;
 }
 .left-school-card strong {
-  font-family: 'Outfit', sans-serif;
+  font-family: var(--font-body);
   font-size: 15px;
 }
 .left-school-card span {

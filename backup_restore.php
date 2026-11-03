@@ -120,13 +120,13 @@ function backup_ui_picker(string $prefix, string $label): void { ?>
   </div>
   <div class="db-tools-page">
     <nav class="dbt-breadcrumb" aria-label="Lokasi halaman">Pengaturan <span aria-hidden="true">›</span> Backup &amp; Restore Database</nav>
-    <header class="dbt-heading"><span class="dbt-icon"><?= backup_ui_icon('database') ?></span><div><h1>Backup &amp; Restore Database</h1><p>Cadangan harian dan pengelolaan data SistemSPP.</p></div><span class="dbt-badge" id="backup-schedule-badge">Setiap hari · <?= backup_ui_escape($backupClock) ?> WIB</span></header>
+    <header class="dbt-heading"><div><h1>Backup &amp; Restore Database</h1><p>Cadangan harian dan pengelolaan data SistemSPP.</p></div><span class="dbt-badge" id="backup-schedule-badge">Setiap hari · <?= backup_ui_escape($backupClock) ?> WIB</span></header>
     <div class="dbt-tabs" role="tablist" aria-label="Mode pengelolaan database">
       <a class="dbt-button" role="tab" id="tab-backup" aria-controls="panel-backup" aria-selected="<?= $legacyTab?'false':'true' ?>" href="?tab=backup">Backup &amp; Restore</a>
       <a class="dbt-button" role="tab" id="tab-legacy" aria-controls="panel-legacy" aria-selected="<?= $legacyTab?'true':'false' ?>" href="?tab=legacy">Import Legacy</a>
     </div>
     <section id="panel-backup" role="tabpanel" aria-labelledby="tab-backup" <?= $legacyTab?'hidden':'' ?>>
-      <div class="dbt-notice"><?= backup_ui_icon('info') ?><div><strong>Seluruh Database SistemSPP</strong><p>Cadangan mencakup SD, SMP, dan SMA. Cadangan manual tetap disimpan; penyimpanan cadangan otomatis mengikuti pengaturan di bawah.</p></div></div>
+      <div class="dbt-notice"><div><strong>Seluruh Database SistemSPP</strong><p>Cadangan mencakup SD, SMP, dan SMA. Cadangan manual tetap disimpan; penyimpanan cadangan otomatis mengikuti pengaturan di bawah.</p></div></div>
       <div id="backup-alerts" class="dbt-backup-alerts" aria-live="polite">
         <?php foreach ($backupSummary['alerts'] ?? [] as $alert): if(!empty($backupSummary['configured'])&&empty($backupSummary['service_registered'])&&str_starts_with($alert,'Backup otomatis belum aktif.'))continue; ?><div class="dbt-warning"><?= backup_ui_escape($alert) ?></div><?php endforeach; ?>
       </div>
@@ -138,11 +138,11 @@ function backup_ui_picker(string $prefix, string $label): void { ?>
           ['database', 'Ukuran Database', $databaseSize ?? 'Belum tersedia', $databaseConnected ? 'Database aktif' : 'Koneksi tidak tersedia', 'backup-db-size'],
           ['file', 'Cadangan Terverifikasi', number_format((int)($backupSummary['count'] ?? 0), 0, ',', '.'), backup_ui_bytes($backupSummary['total_bytes'] ?? 0) . ' ukuran terverifikasi', 'backup-count'],
         ] as [$icon, $title, $value, $description, $id]): ?>
-        <article class="dbt-metric"><span class="dbt-icon"><?= backup_ui_icon($icon) ?></span><div><h2><?= $title ?></h2><strong id="<?= $id ?>"><?= backup_ui_escape($value) ?></strong><p<?= $id === 'backup-count' ? ' id="backup-total-size"' : ($id === 'backup-next' ? ' id="backup-schedule-description"' : '') ?>><?= backup_ui_escape($description) ?></p></div></article>
+        <article class="dbt-metric"><div><h2><?= $title ?></h2><strong id="<?= $id ?>"><?= backup_ui_escape($value) ?></strong><p<?= $id === 'backup-count' ? ' id="backup-total-size"' : ($id === 'backup-next' ? ' id="backup-schedule-description"' : '') ?>><?= backup_ui_escape($description) ?></p></div></article>
         <?php endforeach; ?>
       </div>
       <section class="dbt-card dbt-settings" aria-labelledby="backup-settings-title">
-        <header class="dbt-card-heading"><span class="dbt-icon"><?= backup_ui_icon('clock') ?></span><div><h2 id="backup-settings-title">Pengaturan Backup Harian</h2></div></header>
+        <header class="dbt-card-heading"><div><h2 id="backup-settings-title">Pengaturan Backup Harian</h2></div></header>
         <div id="backup-scheduler-status" class="backup-scheduler-status"<?= empty($backupSummary['configured'])?' hidden':'' ?>>
           <div class="backup-scheduler-summary"><strong id="backup-scheduler-label"><?= !empty($backupSummary['ready'])?'Backup otomatis aktif':(!empty($backupSummary['service_registered'])?'Jadwal terpasang; menunggu layanan':'Backup otomatis belum aktif') ?></strong><span id="backup-scheduler-note"><?= !empty($backupSummary['service_registered'])?'Jadwal mengikuti jam yang tersimpan.':'Backup manual tetap tersedia.' ?></span></div>
           <details id="backup-scheduler-help"<?= !empty($backupSummary['service_registered'])?' hidden':'' ?>><summary>Cara mengaktifkan</summary><p>Buka <strong>PowerShell sebagai Administrator</strong> dengan akun Windows pemilik aplikasi, lalu jalankan perintah ini satu kali:</p>
@@ -166,7 +166,7 @@ function backup_ui_picker(string $prefix, string $label): void { ?>
       </section>
       <div class="dbt-actions">
         <article class="dbt-card">
-          <header class="dbt-card-heading"><span class="dbt-icon"><?= backup_ui_icon('download') ?></span><div><h2>Buat Backup Database</h2><p>Cadangan disimpan secara lokal dan diuji sebelum tersedia untuk diunduh.</p></div></header>
+          <header class="dbt-card-heading"><div><h2>Buat Backup Database</h2><p>Cadangan disimpan secara lokal dan diuji sebelum tersedia untuk diunduh.</p></div></header>
           <dl class="dbt-definition"><div><dt>Cakupan</dt><dd>SD, SMP, dan SMA</dd></div><div><dt>Format</dt><dd>SQL (.sql)</dd></div><div><dt>Ruang tersedia</dt><dd id="backup-free-space"><?= backup_ui_bytes($backupSummary['free_bytes'] ?? null) ?></dd></div></dl>
           <form action="backup_api.php" method="post" id="database-backup-form" data-backup-create="true">
             <input type="hidden" name="action" value="create">
@@ -183,7 +183,7 @@ function backup_ui_picker(string $prefix, string $label): void { ?>
           </div>
         </article>
         <article class="dbt-card">
-          <header class="dbt-card-heading"><span class="dbt-icon"><?= backup_ui_icon('database') ?></span><div><h2>Restore Database</h2><p>Periksa cadangan, lalu konfirmasi pemulihan seluruh database.</p></div></header>
+          <header class="dbt-card-heading"><div><h2>Restore Database</h2><p>Periksa cadangan, lalu konfirmasi pemulihan seluruh database.</p></div></header>
           <div class="dbt-warning"><strong>Pemulihan akan menggantikan seluruh data database saat ini.</strong><p>Pemilihan file di tahap ini tidak menjalankan pemulihan.</p></div>
           <?php backup_ui_picker('restore', 'Pilih file SQL untuk pratinjau pemulihan'); ?>
           <button type="button" class="dbt-button dbt-button-outline" id="restore-review" disabled>Periksa File &amp; Tinjau Pemulihan</button>
@@ -192,7 +192,7 @@ function backup_ui_picker(string $prefix, string $label): void { ?>
         </article>
       </div>
       <section class="dbt-card dbt-history" aria-labelledby="history-title">
-        <header class="dbt-history-heading"><div class="dbt-card-heading"><span class="dbt-icon"><?= backup_ui_icon('clock') ?></span><div><h2 id="history-title">Riwayat Backup</h2><p id="backup-history-count"><?= number_format(count($backupJobs),0,',','.') ?> cadangan ditampilkan</p></div></div><form action="backup_restore.php" method="get" class="dbt-history-controls" id="backup-history-filters"><input type="search" name="q" aria-label="Cari backup" placeholder="Cari nama atau pembuat" value="<?= backup_ui_escape($backupSearch) ?>" maxlength="200"><select name="type" aria-label="Filter tipe backup"><option value="">Semua tipe</option><?php foreach ($backupTypes as $value=>$label): ?><option value="<?= $value ?>"<?= $backupType === $value ? ' selected' : '' ?>><?= $label ?></option><?php endforeach; ?></select><button type="submit" class="dbt-button dbt-button-outline">Cari</button><?php if ($backupSearch !== '' || $backupType !== ''): ?><a href="backup_restore.php" class="dbt-text-button">Reset</a><?php endif; ?></form></header>
+        <header class="dbt-history-heading"><div class="dbt-card-heading"><div><h2 id="history-title">Riwayat Backup</h2><p id="backup-history-count"><?= number_format(count($backupJobs),0,',','.') ?> cadangan ditampilkan</p></div></div><form action="backup_restore.php" method="get" class="dbt-history-controls" id="backup-history-filters"><input type="search" name="q" aria-label="Cari backup" placeholder="Cari nama atau pembuat" value="<?= backup_ui_escape($backupSearch) ?>" maxlength="200"><select name="type" aria-label="Filter tipe backup"><option value="">Semua tipe</option><?php foreach ($backupTypes as $value=>$label): ?><option value="<?= $value ?>"<?= $backupType === $value ? ' selected' : '' ?>><?= $label ?></option><?php endforeach; ?></select><button type="submit" class="dbt-button dbt-button-outline">Cari</button><?php if ($backupSearch !== '' || $backupType !== ''): ?><a href="backup_restore.php" class="dbt-text-button">Reset</a><?php endif; ?></form></header>
         <div class="dbt-table-scroll"><table><thead><tr><?php foreach (['Nama Backup','Tipe','Tanggal','Ukuran','Pembuat','Status','Aksi'] as $column): ?><th scope="col"><?= $column ?></th><?php endforeach; ?></tr></thead><tbody id="backup-history-body">
         <?php if (!$backupJobs): ?><tr><td colspan="7" class="dbt-empty"><div class="dbt-empty-content"><?= backup_ui_icon('file') ?><strong><?= $backupSearch !== '' || $backupType !== '' ? 'Tidak ada cadangan yang cocok' : 'Belum ada cadangan' ?></strong><p><?= $backupSearch !== '' || $backupType !== '' ? 'Ubah pencarian atau filter tipe.' : 'Cadangan akan tampil di sini setelah pencadangan dimulai.' ?></p></div></td></tr><?php endif; ?>
         <?php foreach ($backupJobs as $job): ?><tr>

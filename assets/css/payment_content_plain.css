@@ -18,9 +18,31 @@
 .payment-content-plain .ph-student-period{margin-left:auto}
 .payment-content-plain .du-arrear-warning:not([hidden]){display:inline;flex:0 1 auto;width:auto;height:auto;border:0;border-radius:0;background:none;line-height:1.4}
 .payment-content-plain input[type="date"]::-webkit-calendar-picker-indicator{opacity:0}
-.payment-content-plain .id-date-picker{width:auto;min-width:66px;font-size:11px;padding-inline:5px}
+.payment-content-plain .id-date-picker{width:44px;min-width:44px;padding:0;display:grid;place-items:center}
 .payment-content-plain .payment-date-card #tgl-bayar-display{padding-right:76px}
+.payment-content-plain.payment-input-controls .main-content svg.payment-control-icon,
+.payment-content-plain.payment-input-controls .du-chevron svg,
+.payment-content-plain.payment-input-controls .spp-select:has(>#payment-history-scope) .spp-select-chevron{display:block!important}
+.payment-content-plain.payment-input-controls .du-chevron{display:inline-flex!important}
+.payment-content-plain.payment-input-controls #form-bayar .search-box input{padding-left:0}
+.payment-content-plain.payment-input-controls .id-date-picker{width:26px;min-width:26px;padding:0;display:grid;place-items:center}
+.payment-content-plain.payment-input-controls .payment-date-card #tgl-bayar-display{padding-right:34px}
+.payment-content-plain.payment-input-controls .sh-more{width:28px;min-width:28px;padding:0;font-size:22px}
+.payment-content-plain .main-content svg.payment-search-icon,
+.payment-content-plain.payment-history-controls .main-content svg.payment-control-icon{display:block!important}
+.payment-content-plain .search-box:has(.payment-search-icon){min-width:0;width:100%}
+.payment-content-plain .search-box:has(.payment-search-icon) input{padding-left:0}
+.payment-content-plain.payment-history-controls .id-date-picker{display:grid;place-items:center;width:44px;min-width:44px;padding:0}
+.payment-history-controls .report-date-range-popover .id-date-control>input:not(.id-date-native){padding-inline:8px}
 @media(min-width:1024px){
+  .payment-content-plain.payment-input-controls .main-content .spp-select-chevron{display:block!important}
+  .payment-input-controls .payment-year-select{padding-right:38px}
+  .payment-input-controls .payment-year-picker::after{content:'';position:absolute;right:14px;bottom:19px;width:8px;height:8px;border-right:2px solid currentColor;border-bottom:2px solid currentColor;transform:rotate(45deg);pointer-events:none;color:var(--text-muted)}
+  .payment-input-controls .payment-year-picker.is-open::after{transform:translateY(4px) rotate(225deg)}
+  .payment-input-controls .payment-period-inputs{padding-top:4px}
+  .payment-input-controls .payment-year-picker .payment-year-caption{position:static;display:block;margin:0 0 8px;text-align:left}
+  .payment-input-controls .payment-settings-grid{grid-template-columns:minmax(150px,.9fr) minmax(250px,1.35fr) minmax(180px,.95fr)}
+  .payment-input-controls label[for="sistem-pembayaran"]{white-space:nowrap}
   .payment-content-plain .biaya-lain-row{grid-template-columns:28px repeat(4,minmax(0,1fr)) 58px}
   .payment-content-plain.payment-history-page:not(.registration-history-page):not(.unified-registration) .ph-record{grid-template-columns:26px minmax(110px,1.3fr) auto minmax(90px,.8fr) minmax(100px,.8fr) auto}
   .payment-content-plain.payment-history-page:not(.registration-history-page):not(.unified-registration) .ph-record>*{grid-column:auto;grid-row:auto}
@@ -57,3 +79,7 @@
   .payment-content-plain.registration-history-page .du-record-period{grid-column:2/4;grid-row:2}
   .payment-content-plain.registration-history-page .du-record-amounts{grid-column:2/4;grid-row:3}
 }
+
+/* Keep the interactive filter affordances visible without restoring heading artwork. */
+.payment-content-plain.payment-history-page .main-content .spp-select-chevron,
+.payment-content-plain .id-date-picker svg{display:block!important}

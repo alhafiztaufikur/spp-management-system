@@ -269,7 +269,7 @@ require_once __DIR__.'/includes/master_workspace_ui.php';
     <?php if ($flash): ?><div class="alert alert-<?= htmlspecialchars($flash['type']) ?>" id="flash-msg"><?= htmlspecialchars($flash['msg']) ?></div><?php endif; ?>
 
     <div class="class-workspace-content">
-    <header class="class-page-heading"><div><span class="breadcrumb">SistemSPP / Data Master</span><h1>Master Kelas/Rombel</h1><p>Kelola rombel dan proses perpindahan siswa untuk setiap tahun ajaran.</p></div><nav class="class-mode-tabs" aria-label="Bagian Master Kelas"><a href="#kelola-rombel" data-class-tab="manage"><?= master_workspace_icon('layers') ?>Kelola Rombel</a><a href="#naik-kelas" data-class-tab="promotion"><?= master_workspace_icon('student') ?>Naik Kelas</a></nav></header>
+    <header class="class-page-heading"><div><span class="breadcrumb">SistemSPP / Data Master</span><h1>Master Kelas/Rombel</h1><p>Kelola rombel dan proses perpindahan siswa untuk setiap tahun ajaran.</p></div><nav class="class-mode-tabs" aria-label="Bagian Master Kelas"><a href="#kelola-rombel" data-class-tab="manage">Kelola Rombel</a><a href="#naik-kelas" data-class-tab="promotion">Naik Kelas</a></nav></header>
       <nav class="class-quick-filters" aria-label="Filter cepat rombel">
         <a href="<?= htmlspecialchars($classQuickUrl(['*'],['*'])) ?>" <?= filter_is_all($classLevels)&&filter_is_all($classStatuses)?'aria-current="true"':'' ?>>Semua</a>
         <?php foreach (['aktif'=>'Aktif','nonaktif'=>'Nonaktif'] as $status=>$caption): ?><a href="<?= htmlspecialchars($classQuickUrl(null,[$status])) ?>" <?= $classStatuses===[$status]?'aria-current="true"':'' ?>><?= $caption ?></a><?php endforeach; ?>
@@ -277,39 +277,39 @@ require_once __DIR__.'/includes/master_workspace_ui.php';
         <?php foreach (range($unitMinLevel,$unitMaxLevel) as $grade): ?><a href="<?= htmlspecialchars($classQuickUrl([(string)$grade])) ?>" <?= $classLevels===[(string)$grade]?'aria-current="true"':'' ?>>Kelas <?= $grade ?></a><?php endforeach; ?>
       </nav>
     <section class="class-summary-grid" aria-label="Ringkasan kelas dan rombel">
-      <div class="class-stat"><span class="class-workspace-icon"><?= master_workspace_icon('layers') ?></span><div><span>Total Rombel</span><strong><?= number_format(count($classes)) ?></strong><small>Seluruh rombel yang terdaftar.</small></div></div>
-      <div class="class-stat"><span class="class-workspace-icon"><?= master_workspace_icon('students') ?></span><div><span>Siswa Aktif</span><strong><?= number_format(array_sum(array_map(fn($row)=>in_array(class_kind($row),['reguler','psb'],true)?(int)$row['siswa_count']:0, $classes))) ?></strong><small>Total siswa aktif dalam rombel.</small></div></div>
-      <div class="class-stat"><span class="class-workspace-icon"><?= master_workspace_icon('calendar') ?></span><div><span>Histori</span><strong><?= number_format(array_sum(array_map(fn($row)=>(int)$row['history_count'], $classes))) ?></strong><small>Seluruh catatan penempatan siswa.</small></div></div>
-      <div class="class-stat"><span class="class-workspace-icon"><?= master_workspace_icon('document') ?></span><div><span>Rombel Aktif / Nonaktif</span><strong><span><?= number_format(count(array_filter($classes, static fn($row)=>(int)$row['is_active']===1))) ?></span><span class="class-stat-divider"> / </span><span><?= number_format(count(array_filter($classes, static fn($row)=>(int)$row['is_active']===0))) ?></span></strong><small>Termasuk placeholder yang dikelola sistem.</small></div></div>
-      <?php if (!unit_all_readonly()): ?><div class="class-create-actions"><a class="class-add-shortcut" href="#class-rombel-form" data-open-class-form><span class="class-shortcut-icon" aria-hidden="true"><?= master_workspace_icon('plus') ?></span><div><strong>Tambah Rombel</strong><small>Buat rombel baru untuk kelas pada unit ini.</small></div><span aria-hidden="true">&#8594;</span></a><a class="btn btn-primary" href="master_kelas.php?special_new=1#special-classes"><?= master_workspace_icon('plus') ?> Tambah Kelas Khusus</a></div><?php endif; ?>
+      <div class="class-stat"><div><span>Total Rombel</span><strong><?= number_format(count($classes)) ?></strong><small>Seluruh rombel yang terdaftar.</small></div></div>
+      <div class="class-stat"><div><span>Siswa Aktif</span><strong><?= number_format(array_sum(array_map(fn($row)=>in_array(class_kind($row),['reguler','psb'],true)?(int)$row['siswa_count']:0, $classes))) ?></strong><small>Total siswa aktif dalam rombel.</small></div></div>
+      <div class="class-stat"><div><span>Histori</span><strong><?= number_format(array_sum(array_map(fn($row)=>(int)$row['history_count'], $classes))) ?></strong><small>Seluruh catatan penempatan siswa.</small></div></div>
+      <div class="class-stat"><div><span>Rombel Aktif / Nonaktif</span><strong><span><?= number_format(count(array_filter($classes, static fn($row)=>(int)$row['is_active']===1))) ?></span><span class="class-stat-divider"> / </span><span><?= number_format(count(array_filter($classes, static fn($row)=>(int)$row['is_active']===0))) ?></span></strong><small>Termasuk placeholder yang dikelola sistem.</small></div></div>
+      <?php if (!unit_all_readonly()): ?><div class="class-create-actions"><a class="class-add-shortcut" href="#class-rombel-form" data-open-class-form><div><strong>Tambah Rombel</strong><small>Buat rombel baru untuk kelas pada unit ini.</small></div><span aria-hidden="true">&#8594;</span></a><a class="btn btn-primary" href="master_kelas.php?special_new=1#special-classes"> Tambah Kelas Khusus</a></div><?php endif; ?>
     </section>
 
     <section id="kelola-rombel" data-class-panel="manage" aria-label="Kelola rombel">
     <?php if (!unit_all_readonly()): ?>
     <details class="main-card master-modern-card master-modern-form class-add-panel" id="class-rombel-form" open><summary class="class-form-summary"><?= $editClass ? 'Edit Rombel' : 'Tambah Rombel' ?></summary><div class="class-form-content"><?php if ($classEditError): ?><div class="alert alert-warning"><?= htmlspecialchars($classEditError) ?></div><?php endif; ?>
-      <div class="card-title-row"><span class="class-workspace-icon"><?= master_workspace_icon('plus') ?></span><div><div class="card-title"><?= $editClass ? 'Edit Rombel' : 'Tambah Rombel' ?></div><p class="payment-auto-note">Tingkat unit ini <?= $unitMinLevel ?>–<?= $unitMaxLevel ?>. Kode rombel membentuk label seperti <?= $unitMinLevel ?>A atau <?= $unitMinLevel ?>B.</p></div></div>
+      <div class="card-title-row"><div><div class="card-title"><?= $editClass ? 'Edit Rombel' : 'Tambah Rombel' ?></div><p class="payment-auto-note">Tingkat unit ini <?= $unitMinLevel ?>–<?= $unitMaxLevel ?>. Kode rombel membentuk label seperti <?= $unitMinLevel ?>A atau <?= $unitMinLevel ?>B.</p></div></div>
       <form method="post" class="report-filter-grid">
         <input type="hidden" name="csrf_token" value="<?= htmlspecialchars($_SESSION['csrf_master_kelas']) ?>">
         <input type="hidden" name="aksi" value="<?= $editClass ? 'update' : 'tambah' ?>"><input type="hidden" name="id" value="<?= (int)($editClass['id'] ?? 0) ?>">
         <div class="field-row"><label class="field-label">Tingkat</label><select class="field-input field-select" name="tingkat" required><?php for($i=$unitMinLevel;$i<=$unitMaxLevel;$i++): ?><option value="<?= $i ?>" <?= (int)($editClass['tingkat'] ?? $unitMinLevel)===$i?'selected':'' ?>>Kelas <?= $i ?></option><?php endfor; ?></select></div>
         <div class="field-row"><label class="field-label">Kode Rombel</label><input class="field-input" name="kode_rombel" maxlength="10" required placeholder="Contoh: A" value="<?= htmlspecialchars((string)($editClass['kode_rombel'] ?? '')) ?>" <?= $editClass && (int)$editClass['is_placeholder']===1?'disabled':'' ?>></div>
-        <div class="report-filter-actions"><button class="btn btn-primary" type="submit" <?= $editClass && (int)$editClass['is_placeholder']===1?'disabled':'' ?>><?= master_workspace_icon($editClass?'save':'plus') ?><?= $editClass?'Simpan Perubahan':'Tambah Rombel' ?></button><?php if($editClass): ?><a class="btn btn-ghost" href="master_kelas.php">Batal</a><?php endif; ?></div>
+        <div class="report-filter-actions"><button class="btn btn-primary" type="submit" <?= $editClass && (int)$editClass['is_placeholder']===1?'disabled':'' ?>><?= $editClass?'Simpan Perubahan':'Tambah Rombel' ?></button><?php if($editClass): ?><a class="btn btn-ghost" href="master_kelas.php">Batal</a><?php endif; ?></div>
       </form>
     </div></details>
     <?php endif; ?>
       <div class="class-manage-grid">
     <section class="main-card master-modern-card master-modern-list class-list-panel" data-rombel-view="groups">
-      <div class="card-title-row class-list-heading"><span class="class-workspace-icon"><?= master_workspace_icon('layers') ?></span><div><div class="card-title">Daftar Rombel per Kelas</div></div><span class="class-group-total"><?= number_format($classTotalRows) ?> rombel hasil filter</span></div>
-      <div class="class-view-switch" hidden role="group" aria-label="Tampilan daftar rombel"><button type="button" data-class-view="groups" aria-pressed="true">Per Kelas</button><button type="button" data-class-view="cards" aria-pressed="false">Kartu</button><button type="button" data-class-view="table" aria-pressed="false">Tabel</button></div>
+      <div class="card-title-row class-list-heading"><div><div class="card-title">Daftar Rombel per Kelas</div></div><span class="class-group-total"><?= number_format($classTotalRows) ?> rombel hasil filter</span></div>
+      <div class="class-view-switch" hidden role="group" aria-label="Tampilan daftar rombel"><button type="button" data-class-view="groups" aria-pressed="true">Per Kelas</button><button type="button" data-class-view="table" aria-pressed="false">Tabel</button></div>
       <div class="class-level-groups">
       <?php if (!$classGroups): ?><div class="empty-state"><p>Rombel tidak ditemukan</p><span>Ubah pencarian atau filter yang dipilih.</span></div><?php endif; ?>
       <?php foreach ($classGroups as $grade=>$group): ?>
-        <details class="class-level-group" data-level-group <?= $grade===$firstVisibleGroup?'open':'' ?>>
-          <summary><span class="class-rombel-icon" aria-hidden="true"><?= master_workspace_icon('layers') ?></span><strong><?= is_int($grade)?'Kelas '.$grade:($grade==='psb'?'PSB':ucfirst($grade)) ?></strong><span class="class-group-count"><?= number_format($group['count']) ?> rombel</span><span class="class-group-students"><?= number_format($group['students']) ?> siswa aktif</span><svg class="class-group-chevron" aria-hidden="true" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><path d="m6 9 6 6 6-6"/></svg></summary>
+        <details class="class-level-group" data-level-group >
+          <summary><strong><?= is_int($grade)?'Kelas '.$grade:($grade==='psb'?'PSB':ucfirst($grade)) ?></strong><span class="class-group-count"><?= number_format($group['count']) ?> rombel</span><span class="class-group-students"><?= number_format($group['students']) ?> siswa aktif</span><svg class="class-group-chevron" aria-hidden="true" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><path d="m6 9 6 6 6-6"/></svg></summary>
           <?php if ($group['rows']): ?>
           <div class="table-container" tabindex="0" aria-label="Rombel <?= is_int($grade)?'Kelas '.$grade:($grade==='psb'?'PSB':ucfirst($grade)) ?>"><table class="payment-table responsive-table rombel-data-table"><thead><tr><th>No</th><th>Label</th><th>Tingkat</th><th>Status</th><th>Siswa Aktif</th><th>Histori</th><th>Aksi</th></tr></thead><tbody>
           <?php foreach ($group['rows'] as $i=>$class): $label=class_label($class); ?>
-        <tr data-class-id="<?= (int)$class['id'] ?>"><td data-label="No"><?= $i+1 ?></td><td data-label="Label"><span class="class-rombel-icon" aria-hidden="true"><?= master_workspace_icon('students') ?></span><strong><?= unit_record_badge($class) ?><?= htmlspecialchars($label) ?></strong></td><td data-label="Tingkat"><span class="kelas-badge"><?= class_kind($class)==='reguler'?'Kelas '.(int)$class['tingkat']:ucfirst(class_kind($class)) ?></span></td><td data-label="Status"><span class="master-status <?= (int)$class['is_active']===1?'is-active':'is-inactive' ?>"><?= (int)$class['is_placeholder']===1?'Placeholder':((int)$class['is_active']===1?'Aktif':'Nonaktif') ?></span></td><td data-label="Siswa Aktif" class="text-center"><span class="class-card-caption">Siswa Aktif</span><?= number_format((int)$class['siswa_count']) ?></td><td data-label="Histori" class="text-center"><span class="class-card-caption">Histori</span><?= number_format((int)$class['history_count']) ?></td><td data-label="Aksi" class="aksi-col">
+        <tr data-class-id="<?= (int)$class['id'] ?>"><td data-label="No"><?= $i+1 ?></td><td data-label="Label"><strong><?= unit_record_badge($class) ?><?= htmlspecialchars($label) ?></strong></td><td data-label="Tingkat"><span class="kelas-badge"><?= class_kind($class)==='reguler'?'Kelas '.(int)$class['tingkat']:ucfirst(class_kind($class)) ?></span></td><td data-label="Status"><span class="master-status <?= (int)$class['is_active']===1?'is-active':'is-inactive' ?>"><?= (int)$class['is_placeholder']===1?'Placeholder':((int)$class['is_active']===1?'Aktif':'Nonaktif') ?></span></td><td data-label="Siswa Aktif" class="text-center"><span class="class-card-caption">Siswa Aktif</span><?= number_format((int)$class['siswa_count']) ?></td><td data-label="Histori" class="text-center"><span class="class-card-caption">Histori</span><?= number_format((int)$class['history_count']) ?></td><td data-label="Aksi" class="aksi-col">
         <?php if(!unit_all_readonly() && (int)$class['is_placeholder']!==1 && in_array(class_kind($class),['reguler','custom'],true)): ?><a class="btn-tbl btn-tbl-edit" href="master_kelas.php?edit=<?= (int)$class['id'] ?>">Edit</a><form method="post" style="display:inline"><input type="hidden" name="csrf_token" value="<?= htmlspecialchars($_SESSION['csrf_master_kelas']) ?>"><input type="hidden" name="aksi" value="toggle"><input type="hidden" name="id" value="<?= (int)$class['id'] ?>"><input type="hidden" name="target_active" value="<?= (int)$class['is_active']===1?'0':'1' ?>"><button class="btn-tbl btn-tbl-toggle <?= (int)$class['is_active']===1?'is-deactivate':'is-activate' ?>" type="submit"><?= (int)$class['is_active']===1?'Nonaktifkan':'Aktifkan' ?></button></form><?php elseif (!unit_all_readonly() && class_kind($class)==='psb' && !(int)$class['is_active']): ?><form method="post"><input type="hidden" name="csrf_token" value="<?= htmlspecialchars($_SESSION['csrf_master_kelas']) ?>"><input type="hidden" name="aksi" value="toggle"><input type="hidden" name="id" value="<?= (int)$class['id'] ?>"><input type="hidden" name="target_active" value="1"><button class="btn-tbl btn-tbl-toggle is-activate" type="submit">Aktifkan PSB</button></form><?php else: ?><span class="payment-auto-note"><?= !unit_all_readonly()?'Dikelola sistem':'Pilih satu unit untuk mengubah rombel' ?></span><?php endif; ?>
         </td></tr>
           <?php endforeach; ?>
@@ -325,19 +325,19 @@ require_once __DIR__.'/includes/master_workspace_ui.php';
           <form method="post" onsubmit="return confirm('Aktifkan kembali seluruh rombel reguler? Data siswa dan histori tidak diubah.')">
             <input type="hidden" name="csrf_token" value="<?= htmlspecialchars($_SESSION['csrf_master_kelas']) ?>">
             <input type="hidden" name="aksi" value="aktifkan_semua_rombel">
-            <button class="btn btn-primary" type="submit"><?= master_workspace_icon('check') ?><span>Aktifkan Semua Rombel</span></button>
+            <button class="btn btn-primary" type="submit"><span>Aktifkan Semua Rombel</span></button>
           </form>
           <form method="post" onsubmit="return confirm('Nonaktifkan seluruh rombel reguler tanpa siswa aktif pada unit ini? PSB, placeholder, dan histori tetap aman.')">
             <input type="hidden" name="csrf_token" value="<?= htmlspecialchars($_SESSION['csrf_master_kelas']) ?>">
             <input type="hidden" name="aksi" value="nonaktifkan_kosong">
-            <button class="btn btn-warning" type="submit"><?= master_workspace_icon('lock') ?><span>Nonaktifkan Rombel Kosong</span></button>
+            <button class="btn btn-warning" type="submit"><span>Nonaktifkan Rombel Kosong</span></button>
           </form>
         </div>
       </div>
       <?php endif; ?>
     </section>
     <aside class="main-card class-filter-panel">
-      <div class="class-panel-heading"><span class="class-workspace-icon"><svg width="22" height="22" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.8"><path d="M3 4h18l-7 8v7l-4 2v-9L3 4Z"/></svg></span><div><h2>Filter &amp; Pencarian</h2></div></div>
+      <div class="class-panel-heading"><div><h2>Filter &amp; Pencarian</h2></div></div>
       <form method="get" class="master-class-filter-bar">
         <div class="field-row"><label class="field-label" for="class-filter-search">Cari Rombel</label>
         <div class="search-box"><svg width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.5" stroke-linecap="round" stroke-linejoin="round"><circle cx="11" cy="11" r="8"/><line x1="21" y1="21" x2="16.65" y2="16.65"/></svg><input type="search" name="q_kelas" id="class-filter-search" value="<?= htmlspecialchars($classSearch) ?>" placeholder="Cari label atau kode rombel..."></div>
@@ -350,7 +350,6 @@ require_once __DIR__.'/includes/master_workspace_ui.php';
         </div>
         <button class="btn btn-primary" type="submit">Terapkan Filter</button><a class="btn btn-ghost" href="master_kelas.php">Reset Filter</a>
       </form>
-      <div class="master-class-summary"><div><span>Hasil Filter</span><strong><?= number_format($classTotalRows) ?></strong></div><div><span>Rombel Aktif</span><strong><?= number_format($classActiveCount) ?></strong></div><div><span>Rombel Nonaktif</span><strong><?= number_format($classInactiveCount) ?></strong></div></div>
     </aside>
       </div>
     <?php require __DIR__.'/includes/special_classes_view.php'; ?>
@@ -358,14 +357,14 @@ require_once __DIR__.'/includes/master_workspace_ui.php';
     </section>
     <section id="naik-kelas" data-class-panel="promotion" aria-label="Proses tahun ajaran">
     <section class="main-card master-modern-card class-context-panel">
-      <div class="card-title-row"><span class="class-workspace-icon"><?= master_workspace_icon('reset') ?></span><div><div class="card-title">Proses Tahun Ajaran</div><p class="payment-auto-note">Pilih tahun dan tingkat asal. Setiap tingkat dapat diproses tanpa menunggu tingkat lain selesai.</p></div></div>
+      <div class="card-title-row"><div><div class="card-title">Proses Tahun Ajaran</div><p class="payment-auto-note">Pilih tahun dan tingkat asal. Setiap tingkat dapat diproses tanpa menunggu tingkat lain selesai.</p></div></div>
       <?php if($promotionContextError): ?><div class="alert alert-warning"><?= htmlspecialchars($promotionContextError) ?></div><?php endif; ?>
       <?php if(!unit_all_readonly()): ?>
       <form method="get" id="promotion-context-form" data-custom="<?= $customPromotion?'1':'0' ?>" class="report-filter-grid" data-last-level="<?= $unitMaxLevel ?>">
         <div class="field-row"><label class="field-label" for="promotion-mode">Sistem Kenaikan</label><select class="field-input field-select" id="promotion-mode" name="promotion_mode"><option value="regular" <?= !$customPromotion?'selected':'' ?>>Reguler satu tingkat</option><option value="custom" <?= $customPromotion?'selected':'' ?>>Custom pilih tingkat/rombel</option></select></div><div class="field-row"><label class="field-label" for="promotion-source-year"><?= $monitorPsb?'Tahun Penempatan':'Tahun Ajaran Asal' ?></label><select id="promotion-source-year" name="source_year_id" class="field-input field-select" <?= $monitorPsb?'disabled':'required' ?>><?php if ($monitorPsb): ?><option value="<?= $sourceYearId ?>"><?= htmlspecialchars($psbYear) ?></option><?php else: ?><option value="">Pilih tahun asal</option><?php foreach($promotionYears as $year): ?><option value="<?= (int)$year['id'] ?>" <?= $sourceYearId===(int)$year['id']?'selected':'' ?>><?= htmlspecialchars($year['label']) ?></option><?php endforeach; endif; ?></select></div>
         <div class="field-row"><label class="field-label" for="promotion-source-level">Tingkat Asal</label><select id="promotion-source-level" name="source_level" class="field-input field-select" required><option value="">Pilih tingkat</option><option value="psb" <?= $monitorPsb?'selected':'' ?>>PSB</option><?php foreach(range($unitMinLevel,$unitMaxLevel) as $grade): ?><option value="<?= $grade ?>" <?= $currentPromotionLevel===$grade?'selected':'' ?>>Kelas <?= $grade ?><?= $grade===$unitMaxLevel?' (Kelulusan)':'' ?></option><?php endforeach; ?></select></div>
         <div class="field-row"><span class="field-label" id="promotion-target-label"><?= $monitorPsb?(unit_all_readonly()?'Mode Tampilan':'Kelas Tujuan'):((!$customPromotion && $currentPromotionLevel===$unitMaxLevel)?'Tahun Kelulusan':'Tahun Ajaran Tujuan') ?></span><strong id="promotion-target-year"><?= $monitorPsb?(unit_all_readonly()?'Pemantauan PSB':'Kelas '.$unitMinLevel):htmlspecialchars(((!$customPromotion && $currentPromotionLevel===$unitMaxLevel)?$sourceYear:$nextAcademicYear)?:'Pilih tahun asal') ?></strong><small><?= $monitorPsb?(unit_all_readonly()?'Pilih satu unit untuk menempatkan siswa PSB.':'Penempatan awal pada tahun ajaran '.$psbYear.'.'):((!$customPromotion && $currentPromotionLevel===$unitMaxLevel)?'Kelulusan memakai tahun asal, tanpa membuat penempatan tahun berikutnya.':'Tepat satu tahun berikutnya; tahun mendatang belum boleh menjadi asal.') ?></small></div>
-        <div class="report-filter-actions"><button class="btn btn-primary" type="submit"><?= master_workspace_icon('send') ?>Tampilkan Peserta</button></div>
+        <div class="report-filter-actions"><button class="btn btn-primary" type="submit">Tampilkan Peserta</button></div>
       <input type="hidden" name="show_participants" value="1">
       </form>
       <p class="promotion-context-pending" id="promotion-context-pending" role="status" tabindex="-1" hidden>Pilihan belum diterapkan. Klik Tampilkan Peserta untuk memuat daftar yang sesuai sebelum memproses siswa.</p>
@@ -389,7 +388,7 @@ require_once __DIR__.'/includes/master_workspace_ui.php';
         <?php endif; ?>
         <?php if ($monitorPsb && !unit_all_readonly()): ?>
         <section class="main-card class-psb-monitor">
-          <div class="class-panel-heading"><span class="class-workspace-icon"><?= master_workspace_icon('students') ?></span><div><h2>Tempatkan Siswa PSB</h2><p>Kelas <?= $unitMinLevel ?> pada tahun ajaran <?= htmlspecialchars($psbYear) ?>. Pilih rombel untuk setiap siswa.</p></div></div>
+          <div class="class-panel-heading"><div><h2>Tempatkan Siswa PSB</h2><p>Kelas <?= $unitMinLevel ?> pada tahun ajaran <?= htmlspecialchars($psbYear) ?>. Pilih rombel untuk setiap siswa.</p></div></div>
           <?php if (!$psbTargets): ?><div class="alert alert-warning">Belum ada rombel aktif pada kelas <?= $unitMinLevel ?>. Aktifkan atau tambahkan rombel terlebih dahulu.</div><?php endif; ?>
           <form method="post" id="psb-placement-form" data-target-year="<?= htmlspecialchars($psbYear) ?>">
             <input type="hidden" name="csrf_token" value="<?= htmlspecialchars($_SESSION['csrf_master_kelas']) ?>"><input type="hidden" name="aksi" value="tempatkan_psb"><input type="hidden" name="source_level" value="psb"><input type="hidden" name="target_tahun_ajaran" value="<?= htmlspecialchars($psbYear) ?>">
@@ -411,14 +410,14 @@ require_once __DIR__.'/includes/master_workspace_ui.php';
         </section>
         <?php elseif ($monitorPsb): ?>
         <section class="main-card class-psb-monitor">
-          <div class="class-panel-heading"><span class="class-workspace-icon"><?= master_workspace_icon('students') ?></span><div><h2>Pemantauan Siswa PSB</h2><p>Daftar calon siswa aktif. PSB tidak diproses melalui kenaikan kelas.</p></div></div>
+          <div class="class-panel-heading"><div><h2>Pemantauan Siswa PSB</h2><p>Daftar calon siswa aktif. PSB tidak diproses melalui kenaikan kelas.</p></div></div>
           <label class="field-label" for="psb-monitor-search">Cari Siswa PSB</label>
           <div class="search-box"><svg width="18" height="18" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><circle cx="11" cy="11" r="7"/><path d="m20 20-4-4"/></svg><input type="search" id="psb-monitor-search" placeholder="Cari nama, NIS, atau NIS Diknas..." autocomplete="off"></div>
           <p class="class-psb-count" id="psb-monitor-count" role="status"><?= count($psbStudents) ?> siswa PSB aktif</p>
           <div class="class-psb-list" tabindex="0" aria-label="Daftar siswa PSB">
             <?php foreach ($psbStudents as $index=>$student): ?>
             <article class="class-psb-row" data-psb-id="<?= (int)$student['id'] ?>" data-psb-unit="<?= (int)$student['unit_id'] ?>" data-psb-search="<?= htmlspecialchars(mb_strtolower($student['NAMA'].' '.$student['NO_INDUK'].' '.$student['NO_induk_diknas'],'UTF-8')) ?>">
-              <span class="class-psb-number"><?= $index+1 ?></span><span class="class-rombel-icon" aria-hidden="true"><?= master_workspace_icon('student') ?></span>
+              <span class="class-psb-number"><?= $index+1 ?></span>
               <div><strong><?= htmlspecialchars($student['NAMA']) ?></strong><small>NIS <?= htmlspecialchars($student['NO_INDUK']) ?> · NIS Diknas <?= htmlspecialchars($student['NO_induk_diknas'] ?: 'Tidak tercatat') ?></small><?= unit_record_badge($student) ?></div><span class="kelas-badge">PSB</span>
             </article>
             <?php endforeach; ?>
@@ -436,15 +435,15 @@ require_once __DIR__.'/includes/master_workspace_ui.php';
           <input type="hidden" name="promotion_q" id="promotion-search-submit" value="<?= htmlspecialchars($promotionQuery) ?>">
 
           <aside class="main-card class-source-panel">
-            <div class="class-panel-heading"><span class="class-workspace-icon"><?= master_workspace_icon('layers') ?></span><div><h2>Rombel Asal</h2><p>Peserta tersedia pada tingkat dan tahun yang dipilih.</p></div></div>
+            <div class="class-panel-heading"><div><h2>Rombel Asal</h2></div></div>
             <div class="field-row"><label class="field-label" for="promotion-source-filter">Rombel Asal</label><select class="field-input field-select" id="promotion-source-filter" name="source_rombel_filter" data-filter-multiple data-filter-persist data-all-label="Semua rombel"><option value="">Semua rombel</option><?php foreach($promotionSourceRombels as $sourceKey => $source): ?><option value="<?= htmlspecialchars($sourceKey) ?>" <?= $promotionDefaultSourceKey === (string)$sourceKey ? 'selected' : '' ?>><?= htmlspecialchars($source['label']) ?> (<?= number_format($source['count']) ?>)</option><?php endforeach; ?></select></div>
             <ul class="class-context-list" aria-label="Rombel sumber dan jumlah peserta">
-              <?php foreach ($promotionSourceRombels as $source): ?><li><span class="class-rombel-icon" aria-hidden="true"><?= master_workspace_icon('students') ?></span><div><strong><?= htmlspecialchars($source['label']) ?></strong><small>Kelas <?= (int)$currentPromotionLevel ?></small></div><span class="class-source-count"><strong><?= number_format($source['count']) ?></strong><small>siswa</small></span></li><?php endforeach; ?>
+              <?php foreach ($promotionSourceRombels as $source): ?><li><div><strong><?= htmlspecialchars($source['label']) ?></strong><small>Kelas <?= (int)$currentPromotionLevel ?></small></div><span class="class-source-count"><strong><?= number_format($source['count']) ?></strong><small>siswa</small></span></li><?php endforeach; ?>
               <?php if (!$promotionSourceRombels): ?><li class="class-context-empty">Belum ada rombel sumber dengan peserta tersedia.</li><?php endif; ?>
             </ul>
           </aside>
           <section class="main-card class-roster-panel">
-            <div class="class-panel-heading"><span class="class-workspace-icon"><?= master_workspace_icon('students') ?></span><div><h2>Peserta Tahun Ajaran</h2><p>Pilih siswa untuk kenaikan kelas atau kelulusan sesuai tingkat asal.</p></div></div>
+            <div class="class-panel-heading"><div><h2>Peserta Tahun Ajaran</h2></div></div>
           <div class="promotion-filter-bar">
             <div class="field-row promotion-search-field"><label class="field-label" for="promotion-batch-search">Cari Siswa</label><div class="search-box"><svg width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.5" stroke-linecap="round" stroke-linejoin="round"><circle cx="11" cy="11" r="8"/><line x1="21" y1="21" x2="16.65" y2="16.65"/></svg><input type="search" id="promotion-batch-search" value="<?= htmlspecialchars($promotionQuery) ?>" placeholder="Ketik nama, NIS, atau NIS Diknas..." autocomplete="off"></div></div>
           </div>
@@ -478,7 +477,7 @@ require_once __DIR__.'/includes/master_workspace_ui.php';
 
           </section>
           <aside class="main-card class-destination-panel">
-            <div class="class-panel-heading"><span class="class-workspace-icon"><?= master_workspace_icon('calendar') ?></span><div><h2><?= (!$customPromotion && $currentPromotionLevel === $unitMaxLevel) ? 'Kelulusan' : 'Tujuan dan Ringkasan' ?></h2><p><?= (!$customPromotion && $currentPromotionLevel === $unitMaxLevel) ? 'Siswa diproses pada tahun ajaran asal.' : 'Atur rombel tujuan pada setiap baris siswa.' ?></p></div></div>
+            <div class="class-panel-heading"><div><h2><?= (!$customPromotion && $currentPromotionLevel === $unitMaxLevel) ? 'Kelulusan' : 'Tujuan dan Ringkasan' ?></h2><?php if(!$customPromotion && $currentPromotionLevel === $unitMaxLevel): ?><p>Siswa diproses pada tahun ajaran asal.</p><?php endif; ?></div></div>
           <div class="promotion-stage-overview">
             <div><span>Tingkat Asal</span><strong><?= (!$customPromotion && $currentPromotionLevel === $unitMaxLevel) ? 'Kelulusan Kelas '.$unitMaxLevel : 'Kenaikan Kelas ' . (int)$currentPromotionLevel ?></strong></div>
             <div><span>Siswa Tersisa</span><strong><?= number_format(count($promotionStudents)) ?> siswa</strong></div>
@@ -488,16 +487,16 @@ require_once __DIR__.'/includes/master_workspace_ui.php';
             <?php if ($customPromotion || $currentPromotionLevel < $unitMaxLevel): ?>
             <h3 class="class-context-caption">Rombel Tujuan Tersedia</h3>
             <ul class="class-context-list class-target-list" aria-label="Rombel tujuan tersedia">
-              <?php foreach ($promotionTargets as $target): ?><li><span class="class-rombel-icon" aria-hidden="true"><?= master_workspace_icon('layers') ?></span><div><strong><?= htmlspecialchars($target['label']) ?></strong><small>Kelas <?= (int)$target['tingkat'] ?></small></div></li><?php endforeach; ?>
+              <?php foreach ($promotionTargets as $target): ?><li><div><strong><?= htmlspecialchars($target['label']) ?></strong><small>Kelas <?= (int)$target['tingkat'] ?></small></div></li><?php endforeach; ?>
               <?php if (!$promotionTargets): ?><li class="class-context-empty">Belum ada rombel aktif pada tingkat tujuan.</li><?php endif; ?>
             </ul>
             <?php endif; ?>
-          <div class="promotion-submit-bar"><div><strong id="promotion-submit-summary">Belum ada siswa dipilih</strong><span><?= (!$customPromotion && $currentPromotionLevel === $unitMaxLevel) ? 'Siswa terpilih masuk Alumni'.promotion_alumni_year($sourceYear).'.' : 'Rombel tujuan dapat diatur berbeda untuk setiap siswa.' ?></span></div><button class="btn btn-primary" id="promotion-submit-button" type="submit" disabled><?= (!$customPromotion && $currentPromotionLevel === $unitMaxLevel) ? 'Luluskan' : 'Naikkan' ?> 0 Siswa</button></div>
+          <div class="promotion-submit-bar"><div><strong id="promotion-submit-summary">Belum ada siswa dipilih</strong><?php if(!$customPromotion && $currentPromotionLevel === $unitMaxLevel): ?><span>Siswa terpilih masuk Alumni<?= promotion_alumni_year($sourceYear) ?>.</span><?php endif; ?></div><button class="btn btn-primary" id="promotion-submit-button" type="submit" disabled><?= (!$customPromotion && $currentPromotionLevel === $unitMaxLevel) ? 'Luluskan' : 'Naikkan' ?> 0 Siswa</button></div>
           </aside>
         </form>
         <?php else: ?>
         <section class="main-card class-roster-panel class-roster-empty">
-          <div class="class-panel-heading"><span class="class-workspace-icon"><?= master_workspace_icon('students') ?></span><div><h2>Peserta Tahun Ajaran</h2><p>Pilih siswa untuk kenaikan kelas atau kelulusan sesuai tingkat asal.</p></div></div>
+          <div class="class-panel-heading"><div><h2>Peserta Tahun Ajaran</h2></div></div>
           <div class="alert alert-info" style="margin:0">Pilih tahun dan tingkat asal untuk melihat peserta. Jika sudah dipilih, tidak ada peserta yang memenuhi syarat; siswa yang sudah diproses, PSB, Legacy, atau arsip tidak diproses kembali.</div>
         </section>
         <?php endif; ?>

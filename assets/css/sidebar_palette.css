@@ -57,7 +57,7 @@ html[data-theme][data-palette] .sidebar .brand-logo-wrap {
 .sidebar-brand-copy {min-width:0;flex:1;}
 html[data-theme][data-palette] .sidebar .brand-name {
   display:block;color:var(--brand-ink);-webkit-text-fill-color:var(--brand-ink);
-  font-size:1.125rem;line-height:1.25;letter-spacing:-.025em;font-weight:800;
+  font-size:1.125rem;line-height:1.25;letter-spacing:-.025em;font-weight:700;
 }
 html[data-theme][data-palette] .sidebar .brand-sub {
   margin-top:.25rem;color:var(--brand-muted);font-size:.6875rem;line-height:1.4;font-weight:500;white-space:nowrap;

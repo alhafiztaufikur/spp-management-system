@@ -1,6 +1,6 @@
 <?php /** Included by the authenticated, unit-scoped master page. */ ?>
 <section class="main-card master-modern-card fee-panel fee-optional-guide" style="margin-top:0">
-  <div class="card-title-row fee-panel-heading"><span class="fee-icon"><?= master_workspace_icon('document') ?></span><div><h2>Terbitkan Biaya Tidak Berulang</h2></div></div>
+  <div class="card-title-row fee-panel-heading"><div><h2>Terbitkan Biaya Tidak Berulang</h2></div></div>
   <p>Berulang tersedia langsung di Input Pembayaran. Tidak Berulang diterbitkan sekali per siswa dan dapat dicicil; penerbitan ulang melewati siswa yang sudah memiliki tagihan.</p>
   <form method="post" class="fee-publish-form" id="fee-publish-form">
     <input type="hidden" name="csrf_token" value="<?= htmlspecialchars($_SESSION['csrf_master_biaya_lain']) ?>"><input type="hidden" name="aksi" value="terbitkan_tagihan"><input type="hidden" name="expected_master" id="fee-publish-version">

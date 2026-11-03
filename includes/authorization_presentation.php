@@ -1,4 +1,5 @@
 <?php
+require_once __DIR__.'/date_format.php';
 require_once __DIR__.'/authorization_history.php';
 require_once __DIR__.'/transaction_authorization.php';
 require_once __DIR__.'/authorization_sources.php';
@@ -8,6 +9,7 @@ function authorization_role_label(string $role): string {
     return ['super_admin'=>'Super Admin','admin'=>'Admin','kasir'=>'Kasir','bendahara'=>'Bendahara','legacy_source'=>'Operator sumber Legacy'][$role] ?? 'Tidak tercatat';
 }
 function authorization_icon(string $name): string {
+    if ($name === 'calendar') return spp_calendar_icon();
     $paths = [
         'close'=>'<path d="m6 6 12 12M18 6 6 18"/>',
         'lock'=>'<rect x="5" y="10" width="14" height="11" rx="2"/><path d="M8 10V7a4 4 0 0 1 8 0v3M12 14v3"/>',
@@ -18,7 +20,6 @@ function authorization_icon(string $name): string {
         'edit'=>'<path d="m16 3 5 5-12 12H4v-5L16 3ZM14 5l5 5M3 22h18"/>',
         'delete'=>'<path d="M3 6h18M9 6V3h6v3M5 6l1 15h12l1-15M10 10v7M14 10v7"/>',
         'user'=>'<circle cx="12" cy="8" r="4"/><path d="M5 21v-3a7 7 0 0 1 14 0v3H5Z"/>',
-        'calendar'=>'<rect x="3" y="5" width="18" height="16" rx="2"/><path d="M16 3v4M8 3v4M3 11h18M8 15h2M14 15h2"/>',
         'chart'=>'<path d="M5 20V12M12 20V4M19 20V8"/>',
         'left'=>'<path d="m14 6-6 6 6 6M8 12h13"/>',
         'right'=>'<path d="m10 6 6 6-6 6M3 12h13"/>',
@@ -96,8 +97,8 @@ function authorization_render_detail(array $model): void {
     if(($model["source"]??"pembayaran")!=="pembayaran"){authorization_render_savings($model);return;}
     $e=$model['latest']; [$status,$tone,$icon]=authorization_badge($e['action']); $request=$model['request'];
     ?>
-    <div class="auth-detail-summary"><?php if($icon!=='delete'): ?><span class="auth-action-icon auth-tone-<?= $tone ?>"><?= authorization_icon($icon) ?></span><?php endif; ?><div><strong><?= authorization_escape($model['reference']) ?></strong> <span class="auth-status auth-tone-<?= $tone ?>"><?= authorization_escape($status) ?></span><p><?= authorization_escape($model['student']) ?></p><small>NIS <?= authorization_escape($model['nis']) ?> · <?= authorization_escape($model['unit']) ?></small></div></div>
-    <div class="auth-detail-grid"><div><small>Jenis perubahan</small><strong><?= authorization_escape($e['label']) ?></strong><span><?= $e['authorization_id']?'Pengajuan #'.(int)$e['authorization_id']:'Perubahan langsung' ?></span></div><div><small><?= $request?'Pemohon':'Operator' ?></small><strong><?= authorization_escape($e['name']) ?></strong><span><?= authorization_escape(authorization_role_label($e['role'])) ?></span></div><div><small><?= $request?'Waktu pengajuan':'Waktu perubahan' ?></small><span><?= authorization_escape($e['time']) ?></span></div><div><small><?= $request?'Status pengajuan':'Aktivitas terakhir' ?></small><span class="auth-status auth-tone-<?= $tone ?>"><?= authorization_escape($status) ?></span></div></div>
+    <div class="auth-detail-summary"><?php if($icon!=='delete'): ?><span class="auth-action-icon auth-tone-<?= $tone ?>"><?= authorization_icon($icon) ?></span><?php endif; ?><div><strong><?= authorization_escape($model['reference']) ?></strong> <span class="auth-status auth-tone-<?= $tone ?><?= $e['action']==='deleted'?' is-deleted':'' ?>"><?= authorization_escape($status) ?></span><p><?= authorization_escape($model['student']) ?></p><small>NIS <?= authorization_escape($model['nis']) ?> · <?= authorization_escape($model['unit']) ?></small></div></div>
+    <div class="auth-detail-grid"><div><small>Jenis perubahan</small><strong><?= authorization_escape($e['label']) ?></strong><span><?= $e['authorization_id']?'Pengajuan #'.(int)$e['authorization_id']:'Perubahan langsung' ?></span></div><div><small><?= $request?'Pemohon':'Operator' ?></small><strong><?= authorization_escape($e['name']) ?></strong><span><?= authorization_escape(authorization_role_label($e['role'])) ?></span></div><div><small><?= $request?'Waktu pengajuan':'Waktu perubahan' ?></small><span><?= authorization_escape($e['time']) ?></span></div><div><small><?= $request?'Status pengajuan':'Aktivitas terakhir' ?></small><span class="auth-status auth-tone-<?= $tone ?><?= $e['action']==='deleted'?' is-deleted':'' ?>"><?= authorization_escape($status) ?></span></div></div>
     <?php if($request): $before=json_decode($request['before_snapshot'],true); $payload=transaction_authorization_decode_payload($request);
         $changes=$request['action']==='hapus'?[['label'=>'Status transaksi','before'=>'Aktif','after'=>'Diusulkan dihapus']]:payment_activity_changes($before,authorization_proposed_snapshot($before,$payload)); ?>
     <h4>Usulan perubahan</h4><p class="auth-muted">Usulan belum berarti perubahan telah diterapkan.</p>

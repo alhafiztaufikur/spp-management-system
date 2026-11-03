@@ -10,6 +10,8 @@ require_once __DIR__.'/savings_operator.php';
 require_once __DIR__.'/global_report_scope.php';
 require_once __DIR__.'/legacy_full_read.php';
 require_once __DIR__.'/global_report_evidence.php';
+require_once __DIR__.'/report_psb.php';
+require_once __DIR__.'/billing_history_presentation.php';
 
 /** Read-only queries use the verified unit projection so composite indexes remain usable. */
 function report_scoped_query(mysqli $db,string $sql,int $mode=MYSQLI_STORE_RESULT): mysqli_result|bool {return $db->query(hp_sql($db,$sql),$mode);}
@@ -37,6 +39,7 @@ function report_sql_ci_eq(string $left, string $right): string {
 }
 function report_registry(): array {
     return [
+        'psb' => ['label'=>'Pembayaran PSB','description'=>'Ringkasan total kewajiban PSB, jumlah yang sudah terbayar, dan sisa per siswa.','icon'=>'PSB','orientation'=>'portrait'],
         'status' => ['label'=>'Laporan Status Pembayaran','description'=>'Membantu admin melihat siapa yang sudah lunas, masih cicilan, atau belum membayar pada kewajiban yang dipilih.','icon'=>'OK','orientation'=>'portrait'],
         'penerimaan' => ['label'=>'Rekap Penerimaan Harian','description'=>'Menampilkan nominal pembayaran yang diterima kasir per siswa dan per komponen pada tanggal yang dipilih.','icon'=>'RP','orientation'=>'landscape'],
         'spp-tahunan' => ['label'=>'Rekap SPP Tahun Ajaran per Kelas','description'=>'Memudahkan pengecekan SPP Juli sampai Juni untuk melihat bulan yang sudah lunas dan yang masih tertunggak.','icon'=>'SPP','orientation'=>'landscape'],
@@ -72,6 +75,9 @@ function report_billing_date_matches(string $createdAt,array $filters):bool {
     return $date!==''&&$date>=$filters['tanggal_awal']&&$date<=$filters['tanggal_akhir'];
 }
 function report_filters(mysqli $db, array $source,bool $registerChoices=true): array {
+    $source=billing_history_defaults($source);
+    $billingYears=($source['template']??'')==='riwayat-tagihan'?billing_history_years($db,$source):[];
+    if(($source['template']??'')==='psb')$source['kategori']='psb';
     // Internal scalar summaries do not render filter controls. Public callers
     // keep normalization/registration and its full option validation unchanged.
     if(!$registerChoices&&array_filter($source,'is_array'))throw new LogicException('Internal summary filters must be scalar.');
@@ -100,7 +106,7 @@ function report_filters(mysqli $db, array $source,bool $registerChoices=true): a
     $selectedId=max(0,(int)($source['student_id']??0));$selected=null;
     if($selectedId){$stmt=$db->prepare('SELECT id,unit_id,NO_INDUK FROM siswa WHERE id=?');$stmt->bind_param('i',$selectedId);$stmt->execute();$selected=$stmt->get_result()->fetch_assoc();$stmt->close();}
     return [
-        '_template'=>(string)($source['template']??''),'_multi'=>$multiple,'include_undated'=>($source['include_undated']??'')==='1','owner_id'=>max(0,(int)($source['owner_id']??0)),'all_periods'=>($source['all_periods']??'')==='1','student_id'=>$selectedId,'student_unit'=>(int)($selected['unit_id']??0),'student_nis'=>$selected['NO_INDUK']??null,
+        '_billing_as_of'=>($source['template']??'')==='riwayat-tagihan'?report_letter_today():'','_billing_years'=>$billingYears,'_template'=>(string)($source['template']??''),'_multi'=>$multiple,'include_undated'=>($source['include_undated']??'')==='1','owner_id'=>max(0,(int)($source['owner_id']??0)),'all_periods'=>($source['all_periods']??'')==='1','student_id'=>$selectedId,'student_unit'=>(int)($selected['unit_id']??0),'student_nis'=>$selected['NO_INDUK']??null,
         'tanggal_awal'=>$start,'tanggal_akhir'=>$end,
         'filter_tanggal_tagihan'=>($source['template']??'')==='riwayat-tagihan',
         'tahun_ajaran'=>$academicYear,
@@ -622,7 +628,7 @@ function report_savings_balance_data(mysqli $db,array $f):array{
     return ['title'=>'Rekap Saldo Tabungan','subtitle'=>'Saldo siswa dan rekening khusus yang telah disahkan','columns'=>[['nis','Identitas','nis'],['nama','Nama Pemilik'],['kelas','Kelas / Kelompok','kelas'],['saldo_saat_ini','Saldo Saat Ini','money']],'rows'=>$rows];
 }
 function report_billing_categories(mysqli $db):array{
-    $categories=['spp'=>'SPP','psb'=>'Uang PSB','komite'=>'Uang Komite','daftar_ulang'=>'Daftar Ulang'];
+    $categories=['psb'=>'PSB','daftar_ulang'=>'Daftar Ulang','spp'=>'SPP','komite'=>'Komite'];
     foreach(report_scoped_query($db,'SELECT id,nama FROM master_biaya_lain ORDER BY nama')->fetch_all(MYSQLI_ASSOC) as $item)$categories['biaya_lain:'.(int)$item['id']]=$item['nama'];return $categories;
 }
 function report_billing_history_component_order(string $key): int {
@@ -796,6 +802,7 @@ function report_billing_history_data(mysqli $db,array $f):array{
                 if(($f['_debt_as_of_year']??null)!==null&&$rowStart!==null&&$rowStart>$f['_debt_as_of_year'])return;
             }
         }
+        if(!empty($f['_billing_as_of'])&&in_array($row['komponen_key']??'',['spp','komite'],true)&&($row['periode_code']??'')>substr($f['_billing_as_of'],0,7))return;
         if(!report_billing_date_matches((string)($row['tanggal_dibuat']??''),$f))return;
         if(isset($f['_multi']['komponen_tagihan'])&&!filter_is_all($f['_multi']['komponen_tagihan'])&&!in_array($row['komponen_key'],$f['_multi']['komponen_tagihan'],true))return;
         if($f['komponen_tagihan']!==''&&$row['komponen_key']!==$f['komponen_tagihan'])return;
@@ -1162,6 +1169,7 @@ function report_build(mysqli $db,string $template,array $filters):array{
     try{return report_build_scoped($db,$template,$filters);}finally{$GLOBALS['lb_report_compact'][$db->thread_id]=$prior;$GLOBALS['lb_read_projection'][$db->thread_id]=$priorProjection;}
 }
 function report_build_scoped(mysqli $db,string $template,array $filters):array{
+    if($template==='psb'){$filters['kategori']='psb';unset($filters['_multi']['kategori']);}
     if(in_array($template,global_report_templates(),true))$filters['_global_report']=true;
     if($template==='tabungan-siswa')$filters['_savings_operator']=true;
     $multiple=report_multiple_sections($db,$template,$filters);if($multiple!==null)return $multiple;
@@ -1194,7 +1202,7 @@ function report_build_scoped(mysqli $db,string $template,array $filters):array{
         $combined=report_evidence_notes($combined,$template,$filters);return $combined;
     }
 
-    $report=match($template){'status'=>report_status_data($db,$filters),'penerimaan'=>report_receipt_data($db,$filters),'spp-tahunan'=>report_spp_year_data($db,$filters),'per-item'=>report_item_data($db,$filters),'tabungan-siswa'=>report_savings_student_data($db,$filters),'saldo-tabungan'=>report_savings_balance_data($db,$filters),'riwayat-tagihan'=>report_billing_history_data($db,$filters),'tunggakan-siswa'=>report_principal_debt_data($db,$filters),'setoran'=>report_settlement_data($db,$filters),'kas-tabungan'=>report_savings_cash_data($db,$filters),default=>throw new InvalidArgumentException('Template laporan tidak dikenali.')};
+    $report=match($template){'psb'=>report_psb_data($db,$filters),'status'=>report_status_data($db,$filters),'penerimaan'=>report_receipt_data($db,$filters),'spp-tahunan'=>report_spp_year_data($db,$filters),'per-item'=>report_item_data($db,$filters),'tabungan-siswa'=>report_savings_student_data($db,$filters),'saldo-tabungan'=>report_savings_balance_data($db,$filters),'riwayat-tagihan'=>report_billing_history_data($db,$filters),'tunggakan-siswa'=>report_principal_debt_data($db,$filters),'setoran'=>report_settlement_data($db,$filters),'kas-tabungan'=>report_savings_cash_data($db,$filters),default=>throw new InvalidArgumentException('Template laporan tidak dikenali.')};
     $report=report_evidence_notes($report,$template,$filters);
     return $report;
 }
@@ -1231,6 +1239,7 @@ function report_money_totals(array $report, string $template=''): array {
             $sum+=(float)$row[$key];$found=true;
         }
         $totalLabel=strcasecmp((string)$label,'Total')===0?'Total Penerimaan':(preg_match('/^Total\b/i',(string)$label)?(string)$label:'Total '.$label);
+        if($template==='psb')$totalLabel=(string)$label;
         if($found)$totals[]=['label'=>$totalLabel,'value'=>$sum,'key'=>$key];
     }
     if($template==='tabungan-siswa'){

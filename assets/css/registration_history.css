@@ -36,3 +36,8 @@
 @media(max-width:1450px){.registration-history-page .layout .du-filter-form{grid-template-columns:repeat(3,minmax(0,1fr))}.registration-history-page .du-filter-form .ph-filter-intro{grid-column:1/-1}}
 @media(max-width:1100px){.registration-history-page .layout .du-filter-form{grid-template-columns:repeat(2,minmax(0,1fr))}}
 @media(max-width:600px){.registration-history-page .layout .du-filter-form{grid-template-columns:minmax(0,1fr)}.du-summary,.du-summary.is-archive{grid-template-columns:repeat(2,minmax(0,1fr))}.du-summary>div{padding:13px}.du-summary strong{font-size:16px}.registration-history-page .du-record{grid-template-columns:24px minmax(0,1fr) auto;padding:12px;gap:9px}.du-record .ph-record-icon{display:none}.registration-history-page .du-record>.ph-status{grid-column:3;grid-row:1;align-self:start}.du-record-identity{grid-column:2;grid-row:1}.du-record-period{grid-column:2/4;flex-direction:row;align-items:center}.du-record-amounts{grid-column:2/4;gap:12px}.du-record-amounts strong{font-size:11px}.du-delete-dialog{padding:20px;max-width:calc(100% - 24px)}.du-installment{padding:11px}.ph-components dd{white-space:normal;text-align:right;overflow-wrap:anywhere}}
+@media(min-width:1024px){
+ html body .ph-hero>.du-history-tabs{display:flex;flex-wrap:nowrap;gap:4px;padding:6px;border-radius:14px}
+ html body .ph-hero>.du-history-tabs a{box-sizing:border-box;display:flex;align-items:center;justify-content:center;min-height:44px;padding:10px 16px;border-radius:10px;font-size:14px!important;font-weight:700;white-space:nowrap}
+ html body .ph-hero>.du-history-tabs a[aria-current="page"]{background:#168b57;color:#fff}
+}

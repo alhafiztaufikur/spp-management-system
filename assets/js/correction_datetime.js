@@ -24,7 +24,7 @@ document.addEventListener('DOMContentLoaded', () => {
     day.dataset.correctionDay='';day.setAttribute('aria-label','Tanggal (DD/MM/YYYY)');
     const clock=make('input',{type:'text',inputMode:'numeric',placeholder:'HH:MM:SS',required:clockRequired,autocomplete:'off'});
     clock.dataset.correctionClock='';clock.setAttribute('aria-label','Jam WIB, format 24 jam');
-    const toggle=make('button',{type:'button',className:'correction-calendar-toggle',title:'Pilih tanggal',innerHTML:'<svg width="18" height="18" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.8" aria-hidden="true"><rect x="3" y="5" width="18" height="16" rx="3"/><path d="M7 3v4m10-4v4M3 11h18"/></svg>'});
+    const toggle=make('button',{type:'button',className:'correction-calendar-toggle',title:'Pilih tanggal',innerHTML:'<svg class="spp-calendar-icon payment-control-icon" width="18" height="18" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true"><rect x="3" y="5" width="18" height="16" rx="2"/><path d="M16 3v4M8 3v4M3 11h18"/></svg>'});
     toggle.setAttribute('aria-label','Pilih tanggal');toggle.setAttribute('aria-expanded','false');toggle.setAttribute('aria-controls',id+'-calendar');
     dateBox.append(day,toggle);clockBox.append(clock,make('span',{textContent:'WIB',className:'correction-clock-zone'}));widget.append(dateBox,clockBox);source.after(widget);
     if(label)label.htmlFor=id;

@@ -1,0 +1,77 @@
+/* Presentation shared by the desktop arrears report and its print document. */
+.billing-rombel{margin:20px 0;min-width:0}
+.billing-rombel>h3{margin:0 0 10px;font-size:16px;break-after:avoid;page-break-after:avoid}
+.billing-rombel-scroll{max-width:100%;overflow:auto}
+.billing-rombel table{border-collapse:collapse;width:100%;table-layout:auto;min-width:1080px}
+.billing-rombel th,.billing-rombel td{padding:10px 8px;border:1px solid #d3dfda;font-size:13px;vertical-align:top}
+.billing-rombel th{font-weight:700}
+.billing-rombel .money{text-align:right;white-space:nowrap}
+.billing-rombel .billing-description{min-width:220px;white-space:normal;line-height:1.5}
+.billing-rombel table td,.billing-rombel table th{position:static!important;left:auto!important}
+.billing-rombel table .billing-row-no,.billing-rombel table .billing-row-nis{text-align:center;vertical-align:middle}
+.billing-rombel .billing-row-name,.billing-rombel .billing-description{text-align:left}
+.billing-rombel tfoot{font-weight:700}
+.billing-grand-total{padding:12px 0;margin:12px 0;border-top:2px solid #a9bdb2;font-size:14px}
+.billing-empty{margin:0;padding:24px;font-size:14px;line-height:1.5}
+.billing-rombel table .billing-print-context{text-align:left!important;text-transform:none!important;background:#fff!important;color:#17231d!important;border:0;font-size:11pt;font-weight:700;padding:8pt 0}
+.billing-rombel table thead .billing-context-row,
+#global-report-workspace .billing-rombel table.report-billing-matrix-table thead .billing-context-row>.billing-print-context{background:#fff!important;color:#17231d!important;border:0!important;box-shadow:none!important}
+.billing-plain-title{background:transparent!important;border:0!important;padding:0!important}
+.billing-history-document .kop p{font-size:14px!important}
+@media screen and (min-width:1024px){
+ body[data-report-template="riwayat-tagihan"] .billing-rombel>h3{padding:0 24px 4px}
+ body[data-report-template="riwayat-tagihan"] .billing-grand-total{padding:16px 24px;margin:12px 0}
+ body[data-report-template="riwayat-tagihan"] .report-template-shell>.desktop-pager{padding:0 24px 20px;margin:12px 0 0}
+ html body[data-report-template="riwayat-tagihan"] .report-template-shell .report-global-filter-form>.report-inline-search-row{display:grid;grid-template-columns:minmax(0,1fr) minmax(0,2fr);grid-column:1/-1!important;gap:12px;align-items:end}
+ .billing-rombel table{min-width:1180px}
+ .billing-rombel table tbody td{vertical-align:middle}
+ /* Keep this report's flowing columns independent of the generic sticky matrix. */
+ #global-report-workspace .billing-rombel table{table-layout:auto!important}
+ #global-report-workspace .billing-rombel table.report-billing-matrix-table :is(th,td){position:static!important;left:auto!important}
+ .billing-rombel col.billing-col-no{width:48px}
+ .billing-rombel col.billing-col-nis{width:120px}
+ .billing-rombel col.billing-col-name{width:180px}
+ .billing-rombel col.billing-col-component{width:110px}
+ .billing-rombel col.billing-col-total{width:140px}
+ .billing-rombel col.billing-col-description{width:252px}
+ .billing-rombel table .billing-row-no{min-width:48px}
+ .billing-rombel table .billing-row-nis{min-width:120px;white-space:nowrap}
+ .billing-rombel table .billing-row-name{min-width:180px;white-space:normal;overflow-wrap:anywhere}
+ .billing-rombel table .billing-component{min-width:110px}
+ .billing-rombel table .billing-total{min-width:140px}
+ .billing-rombel table .billing-description{min-width:252px;overflow-wrap:anywhere}
+ .report-template-shell .billing-rombel .report-billing-matrix-table tbody td{display:table-cell;height:auto;padding:10px 8px;font-size:13px;line-height:1.45;vertical-align:middle}
+ .billing-rombel .billing-matrix-amount{font-size:13px;line-height:1.45}
+}
+@media screen and (max-width:1023px){
+ body[data-report-template="riwayat-tagihan"] .report-inline-search-row{display:contents!important}
+ body[data-report-template="riwayat-tagihan"] .report-inline-search-row>.report-student-field{grid-column:1/-1!important}
+}
+@media print{
+ .billing-history-document .billing-rombel~.billing-rombel{break-before:page;page-break-before:always}
+ .billing-rombel-scroll{overflow:visible}
+ .billing-rombel table{min-width:0!important;table-layout:auto;width:100%}
+ .billing-rombel th,.billing-rombel td,.billing-rombel .billing-matrix-amount{font-size:9pt!important;line-height:1.3}
+ .billing-rombel th,.billing-rombel td{padding:4pt 3pt!important;vertical-align:middle}
+ .billing-rombel table .billing-print-context{font-size:10pt!important;padding:8pt 0!important}
+ .billing-rombel .billing-row-no{width:3%}
+ .billing-rombel .billing-row-nis{width:10%;white-space:nowrap}
+ .billing-rombel .billing-row-name{width:17%;white-space:normal}
+ .billing-rombel .billing-description{min-width:0;width:24%;white-space:normal}
+ .billing-rombel h3{font-size:10pt!important}
+ .billing-rombel tr{page-break-inside:avoid}
+ .billing-rombel tbody tr:last-child{page-break-after:avoid}
+ .billing-rombel table thead{display:table-header-group;page-break-after:avoid}
+ .billing-rombel tfoot{display:table-row-group}
+ .billing-grand-total{font-size:10pt}
+ .billing-empty{font-size:10pt;padding:12pt 0}
+ .billing-history-document .kop p{font-size:10pt!important}
+}
+@media(min-width:1024px){
+ .billing-rombel table :is(th,td).billing-total,.billing-rombel table :is(th,td).billing-total-column{padding-right:12px!important}
+ .billing-rombel table :is(th,td).billing-description,.billing-rombel table :is(th,td).billing-description-column{padding-left:12px!important;text-align:left!important}
+}
+@media print{
+ .billing-rombel table :is(th,td).billing-total,.billing-rombel table :is(th,td).billing-total-column{padding-right:6pt!important}
+ .billing-rombel table :is(th,td).billing-description,.billing-rombel table :is(th,td).billing-description-column{padding-left:6pt!important}
+}

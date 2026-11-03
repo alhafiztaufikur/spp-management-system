@@ -13,7 +13,8 @@ function general_section_page_html(array $section,array $query):string {
     ob_start(); ?>
     <section class="report-section-page" id="report-section-<?= $type ?>" data-report-section="<?= $type ?>" data-page="<?= $page ?>" data-filter-key="<?= general_filter_key($query) ?>">
     <div class="report-section-content"><?= general_section_html($section,$section['offset']) ?></div>
-    <div class="du-pagination-footer"><p class="du-pagination-info">Menampilkan <strong><?= $count?($page-1)*$per+1:0 ?>&ndash;<?= min($count,$page*$per) ?></strong> dari <strong><?= number_format($count) ?></strong> baris</p>
+    <?php echo pagination_controls($page,$pages,static function($target)use($query,$type){$next=$query;$next['section_page'][$type]=$target;return 'index.php?'.http_build_query($next);},'Halaman '.$section['title'],['data-section-page'=>static fn($target)=>$target]); ?>
+    <div class="du-pagination-footer pagination-mobile"><p class="du-pagination-info">Menampilkan <strong><?= $count?($page-1)*$per+1:0 ?>&ndash;<?= min($count,$page*$per) ?></strong> dari <strong><?= number_format($count) ?></strong> baris</p>
     <?php if($pages>1): ?><nav class="du-pagination" aria-label="Halaman <?= $e($section['title']) ?>"><?php
     [$first,$last]=page_window($page,$pages);$links=['Sebelumnya'=>$page-1];for($i=$first;$i<=$last;$i++)$links[(string)$i]=$i;$links['Berikutnya']=$page+1;
     foreach($links as $label=>$target){

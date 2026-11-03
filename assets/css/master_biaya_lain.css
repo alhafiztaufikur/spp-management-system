@@ -3,7 +3,7 @@
 .fee-workspace .main-card{margin:0;padding:24px;min-width:0;box-sizing:border-box;box-shadow:0 6px 24px rgba(0,0,0,.035);border-radius:18px;}
 .fee-workspace .fee-hero{position:relative;display:grid;grid-template-columns:minmax(0,1fr);align-items:center;gap:24px;padding:28px 32px;background:linear-gradient(120deg,var(--bg-card),var(--accent-glow));isolation:isolate;overflow:hidden;}
 .fee-hero-copy{min-width:0;}
-.fee-hero .recap-class-overline{font-size:11px;font-weight:800;letter-spacing:.08em;color:var(--accent);}
+.fee-hero .recap-class-overline{font-size:11px;font-weight:700;letter-spacing:.08em;color:var(--accent);}
 .fee-hero h1{font-size:clamp(27px,2.5vw,36px);line-height:1.2;letter-spacing:-1px;margin:8px 0 10px;}
 .fee-hero p{max-width:680px;margin:0;color:var(--text-secondary);font-size:13px;line-height:1.7;}
 .fee-hero-stats{display:grid;grid-template-columns:repeat(2,minmax(0,1fr));gap:12px;margin-top:20px;}
@@ -19,7 +19,7 @@
 .fee-workspace .fee-panel-heading{display:flex;align-items:center;justify-content:flex-start;gap:14px;padding-bottom:20px;margin:0 0 20px;border-bottom:1px solid var(--border);}
 .fee-panel-heading>div{min-width:0;}
 .fee-panel-heading .fee-icon{width:50px;height:50px;}
-.fee-panel-heading h2{margin:0 0 5px;font-size:16px;line-height:1.4;font-weight:800;}
+.fee-panel-heading h2{margin:0 0 5px;font-size:16px;line-height:1.4;font-weight:700;}
 .fee-panel-heading p{margin:0;font-size:11px;line-height:1.7;color:var(--text-muted);}
 .fee-workspace .master-fee-form{grid-template-columns:1fr;gap:17px;}
 .fee-workspace .field-row{min-width:0;margin:0;}
@@ -81,7 +81,7 @@
 .fee-workspace #form-terbit-biaya .publish-student-card:hover{background:var(--bg-surface);border-color:var(--accent);}
 .fee-workspace #form-terbit-biaya .publish-student-card.is-selected{background:var(--accent-glow);border-color:var(--accent);}
 .fee-workspace #form-terbit-biaya .publish-student-card:focus-within{outline:2px solid var(--accent);outline-offset:-2px;}
-.fee-recipient-avatar{grid-area:avatar;display:grid;place-items:center;width:34px;height:34px;border-radius:50%;background:var(--accent-glow);color:var(--accent);font-size:11px;font-weight:750;}
+.fee-recipient-avatar{grid-area:avatar;display:grid;place-items:center;width:34px;height:34px;border-radius:50%;background:var(--accent-glow);color:var(--accent);font-size:11px;font-weight:700;}
 .fee-workspace #form-terbit-biaya .publish-student-check{margin:0;width:18px;height:18px;accent-color:var(--accent);}
 .fee-workspace #form-terbit-biaya .publish-student-main{gap:2px;}
 .fee-workspace #form-terbit-biaya .publish-student-main strong{font-size:12px;font-weight:700;white-space:normal;overflow-wrap:anywhere;line-height:1.4;}

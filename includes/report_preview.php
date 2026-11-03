@@ -59,7 +59,7 @@ function render_report_export_preview(string $documentHtml, array $options): voi
         :root{color-scheme:light;--green:#0f8f52;--green-dark:#0b5a3d;--line:#d7e7de;--muted:#65776e;--canvas:#edf5f0}
         *{box-sizing:border-box}
         html,body{min-height:100%;margin:0;overflow-x:hidden}
-        body{font-family:Inter,"Segoe UI",Arial,sans-serif;background:var(--canvas);color:#17251e}
+        body{font-family:Segoe UI,Arial,sans-serif;background:var(--canvas);color:#17251e}
         button,a{font:inherit}
         .preview-toolbar{position:sticky;top:0;z-index:20;display:flex;align-items:center;justify-content:space-between;gap:20px;padding:14px 22px;background:rgba(255,255,255,.98);border-bottom:1px solid var(--line);box-shadow:0 8px 24px rgba(28,75,51,.08)}
         .preview-heading{display:flex;align-items:center;gap:13px;min-width:0}
@@ -113,7 +113,7 @@ function render_report_export_preview(string $documentHtml, array $options): voi
             <div class="preview-heading-copy">
                 <span class="preview-eyebrow">Preview <?= report_preview_escape($fileType) ?></span>
                 <h1><?= report_preview_escape($title) ?></h1>
-                <p><?= report_preview_escape($subtitle) ?></p>
+                <?php if(empty($options['hide_creation_metadata'])): ?><p><?= report_preview_escape($subtitle) ?></p><?php endif; ?>
             </div>
         </div>
         <div class="preview-actions">
@@ -132,7 +132,7 @@ function render_report_export_preview(string $documentHtml, array $options): voi
     <div class="preview-meta" aria-label="Informasi dokumen">
         <span><?= report_preview_escape($documentLabel) ?></span>
         <span data-preview-count><?= number_format($rowCount) ?> data</span>
-        <span data-preview-generated>Dibuat <?= report_preview_escape($generated) ?></span>
+        <?php if(empty($options['hide_creation_metadata'])): ?><span data-preview-generated>Dibuat <?= report_preview_escape($generated) ?></span><?php endif; ?>
     </div>
     <?php if($pdfActions): ?><p class="preview-status" role="status" aria-live="polite"><span data-preview-status>Pratinjau siap. Menyiapkan file PDF…</span> <button type="button" class="preview-button" data-preview-retry hidden>Coba Lagi</button></p><?php endif; ?>
     <?php if(!$styled): ?><div class="preview-help"><svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><circle cx="12" cy="12" r="10"/><path d="M12 16v-4"/><path d="M12 8h.01"/></svg><span>Periksa isi laporan berikut sebelum mengunduh<?= $showPrint ? ' atau mencetak' : '' ?>.</span></div>

@@ -1,4 +1,5 @@
 <?php
+require_once __DIR__.'/date_format.php';
 require_once __DIR__.'/account_letter_ui.php';
 require_once __DIR__.'/legacy_full_read.php';
 require_once __DIR__.'/migrated_history.php';
@@ -11,7 +12,8 @@ function savings_activity_labels(): array {
         'approved'=>'Pengajuan disetujui','rejected'=>'Pengajuan ditolak','cancelled'=>'Pengajuan dibatalkan','failed'=>'Otorisasi gagal'];
 }
 function savings_icon(string $name): string {
-    $paths=['up'=>'M12 20V4m-6 6 6-6 6 6','down'=>'M12 4v16m-6-6 6 6 6-6','wallet'=>'M3 6h17v15H3V6Zm0 0V3h14v3M16 11h5v5h-5v-5','calendar'=>'M4 5h16v16H4V5ZM8 3v4M16 3v4M4 10h16','check'=>'m5 12 4 4 10-10'];
+    if ($name === 'calendar') return spp_calendar_icon();
+    $paths=['up'=>'M12 20V4m-6 6 6-6 6 6','down'=>'M12 4v16m-6-6 6 6 6-6','wallet'=>'M3 6h17v15H3V6Zm0 0V3h14v3M16 11h5v5h-5v-5','check'=>'m5 12 4 4 10-10'];
     if (!isset($paths[$name])) return account_letter_icon($name);
     return '<svg width="20" height="20" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.8" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true"><path d="'.$paths[$name].'"/></svg>';
 }
@@ -89,7 +91,7 @@ function savings_detail_html(array $row): string {
     $alumniLabel='';if(!empty($row['current_class_id'])&&isset($GLOBALS['koneksi'])){$class=class_find($GLOBALS['koneksi'],(int)$row['current_class_id']);if($class&&class_is_alumni($class))$alumniLabel=preg_replace('/^Alumni(20[0-9]{2})$/i','Alumni $1',class_label($class));}
     $incoming=$row['jenis']==='masuk';
     ob_start(); ?>
-    <header class="sw-card-head"><div><?= savings_icon('document') ?><div><h3>Detail Transaksi</h3><small>Informasi lengkap transaksi tabungan.</small></div></div><span class="sw-status <?= $incoming?'is-in':'is-out' ?>"><?= savings_icon($incoming?'up':'down') ?> <?= ($row['origin']??'')==='adjustment'?'Penyesuaian Saldo Migrasi':'Tabungan '.($incoming?'Masuk':'Keluar') ?></span></header>
+    <header class="sw-card-head"><div><div><h3>Detail Transaksi</h3><small>Informasi lengkap transaksi tabungan.</small></div></div><span class="sw-status <?= $incoming?'is-in':'is-out' ?>"><?= savings_icon($incoming?'up':'down') ?> <?= ($row['origin']??'')==='adjustment'?'Penyesuaian Saldo Migrasi':'Tabungan '.($incoming?'Masuk':'Keluar') ?></span></header>
     <div class="sw-detail-body">
       <div class="sw-identity"><div><small>Nomor Induk</small><strong class="sw-accent"><?= savings_e($row['NO_INDUK']) ?></strong></div><div><small><?= empty($row['student_id'])?'Pemilik rekening':'Nama Siswa' ?></small><strong><?= savings_e($row['NAMA']??'Tidak tercatat') ?></strong><?php if($alumniLabel): ?><span class="savings-alumni-badge"><?= savings_e($alumniLabel) ?></span><?php endif; ?></div><div><small>NIS Diknas</small><span><?= savings_e($row['NO_induk_diknas']??'—') ?></span></div><div><small>Kelas / Unit</small><span class="sw-class"><?= savings_e($row['kelas_label']??$row['KELAS']??'—') ?> · <?= savings_e(unit_label((int)$row['unit_id'])) ?></span></div></div>
       <dl class="sw-detail-grid"><div><dt><?= savings_icon('calendar') ?>Tanggal Transaksi</dt><dd><?= savings_e(spp_date_label($row['TANGGAL'],true,$row['time_precision']??null)) ?></dd></div><div><dt><?= savings_icon('user') ?>Operator</dt><dd><?= savings_e($row['operator_name']) ?><?php if($row['operator_username']): ?><small>@<?= savings_e($row['operator_username']) ?> · <?= savings_e($row['operator_role']) ?></small><?php endif; ?></dd></div><div><dt><?= savings_icon('up') ?>Jumlah Masuk</dt><dd class="sw-accent"><?= savings_money($row['nominal']) ?></dd></div><div><dt><?= savings_icon('down') ?>Jumlah Keluar</dt><dd class="sw-out"><?= savings_money($row['keluar']) ?></dd></div><div><dt><?= savings_icon('document') ?>Referensi Transaksi</dt><dd><?= savings_e($row['reference']) ?></dd></div><div><dt><?= savings_icon('check') ?>Status</dt><dd><?= !empty($row['deleted'])?'Arsip (dihapus)':'Tersimpan' ?></dd></div></dl>

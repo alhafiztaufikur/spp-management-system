@@ -1,6 +1,6 @@
 <?php
 /** Bound Dompdf's HTML/frame tree while retaining one PDF and the existing HTML styles. */
-function global_report_render_pdf_fragments(iterable $documents,string $orientation): string {
+function global_report_render_pdf_fragments(iterable $documents,string $orientation,bool $cleanFooter=false): string {
     $canvas=null;$fontMetrics=null;
     foreach($documents as $document){
         $options=new \Dompdf\Options();$options->set('isRemoteEnabled',false);$options->set('isHtml5ParserEnabled',true);$options->setDefaultMediaType('print');$options->setChroot(realpath(__DIR__.'/..'));
@@ -13,11 +13,22 @@ function global_report_render_pdf_fragments(iterable $documents,string $orientat
     }
     if($canvas===null)throw new RuntimeException('Laporan tidak memiliki halaman.');
     // CSS counters restart with each HTML tree; number the completed document once.
-    $canvas->page_text($canvas->get_width()-85,$canvas->get_height()-23,'Halaman {PAGE_NUM}',$fontMetrics->getFont('Helvetica'),8,[.4,.4,.4]);
+    if($cleanFooter)global_report_pdf_page_numbers($canvas);
+    else $canvas->page_text($canvas->get_width()-85,$canvas->get_height()-23,'Halaman {PAGE_NUM}',$fontMetrics->getFont('Helvetica'),8,[.4,.4,.4]);
     return $canvas->output();
+}
+/** Place the rule and number together so their positions cannot drift apart. */
+function global_report_pdf_page_numbers($canvas):void {
+    $canvas->page_script(static function($pageNumber,$pageCount,$pageCanvas,$metrics){
+        $right=$pageCanvas->get_width()-28.35;$bottom=$pageCanvas->get_height();
+        $label='Halaman '.$pageNumber;$font=$metrics->getFont('Helvetica');
+        $pageCanvas->line(28.35,$bottom-34,$right,$bottom-34,[.67,.67,.67],.5);
+        $pageCanvas->text($right-$metrics->getTextWidth($label,$font,8),$bottom-26,$label,$font,8,[.4,.4,.4]);
+    });
 }
 /** Global Reports only. Widths are presentation metadata, never financial calculations. */
 function global_report_column_width(array $column, bool $print = false, array $rows = []): float {
+    if(!$print&&isset($column['width']))return (float)$column['width'];
     $key = $column['source'] ?? $column[0];
     $type = $column[2] ?? 'text';
     $identity = $print
@@ -39,6 +50,7 @@ function global_report_column_width(array $column, bool $print = false, array $r
 }
 
 function global_report_print_orientation(array $matrix): string {
+    if(($matrix['orientation']??'')==='portrait')return 'portrait';
     $width=0;
     foreach($matrix['columns'] as $column)$width+=global_report_column_width($column,true,$matrix['rows'])+10;
     return $width<=538 ? 'portrait' : 'landscape';
@@ -68,6 +80,7 @@ function global_report_filter_text(mysqli $db,array $filters,string $template,ar
     }
     $labels=['kategori'=>'Kategori','komponen_tagihan'=>'Komponen','kelas'=>'Kelas','tahun_ajaran'=>'Tahun ajaran','bulan_awal'=>'Bulan tagihan','status'=>'Status pembayaran','siswa_status'=>'Status siswa','metode'=>'Metode','mutasi'=>'Mutasi','saldo_status'=>'Saldo','operator'=>'Operator','q'=>'Pencarian'];
     $fields=['kelas','siswa_status','q'];
+    if($template==='psb')$fields[]='status';
     if(in_array($template,['status','per-item','penerimaan'],true))$fields=array_merge(['kategori'],$fields);
     if(in_array($template,['status','spp-tahunan'],true)||$itemAnnual)$fields[]='tahun_ajaran';
     if($template==='status')$fields=array_merge($fields,['bulan_awal','status']);
@@ -87,7 +100,8 @@ function global_report_filter_text(mysqli $db,array $filters,string $template,ar
     }
     if($itemMonthly)$parts[]='Periode tagihan: '.report_month_range_label(report_month_range((int)$filters['bulan_awal'],(int)$filters['tahun_awal'],(int)$filters['bulan_akhir'],(int)$filters['tahun_akhir']));
     if($itemOnce)$parts[]='Periode: Sekali saat masuk';
-    if(!in_array($template,['status','spp-tahunan','saldo-tabungan','riwayat-tagihan','per-item'],true)||$itemDated)$parts[]='Periode: '.(!empty($filters['all_periods'])?'Semua periode':spp_date_label($filters['tanggal_awal']).' - '.spp_date_label($filters['tanggal_akhir']));
+    if($template==='psb')$parts[]='Periode: Sekali saat masuk · Pembayaran kumulatif';
+    if(!in_array($template,['psb','status','spp-tahunan','saldo-tabungan','riwayat-tagihan','per-item'],true)||$itemDated)$parts[]='Periode: '.(!empty($filters['all_periods'])?'Semua periode':spp_date_label($filters['tanggal_awal']).' - '.spp_date_label($filters['tanggal_akhir']));
     if($template==='riwayat-tagihan')$parts[]='Tagihan dibuat: '.(!empty($filters['filter_tanggal_tagihan'])&&($filters['tanggal_awal']??'')!==''?spp_date_label($filters['tanggal_awal']).' - '.spp_date_label($filters['tanggal_akhir']):'Semua tanggal');
     if(!empty($filters['include_undated'])&&($template!=='per-item'||$itemDated))$parts[]='Termasuk transaksi tanpa tanggal sesuai periode kewajiban';
     foreach($notes as $note)if(!in_array($note,$parts,true))$parts[]=$note;

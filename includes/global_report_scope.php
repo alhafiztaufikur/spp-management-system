@@ -1,7 +1,7 @@
 <?php
 /** Read scope for the Global catalogue only; never changes the operational session. */
 function global_report_templates(): array {
-    return ['status','penerimaan','spp-tahunan','per-item','tabungan-siswa','saldo-tabungan','riwayat-tagihan','setoran','kas-tabungan'];
+    return ['psb','status','penerimaan','spp-tahunan','per-item','tabungan-siswa','saldo-tabungan','riwayat-tagihan','setoran','kas-tabungan'];
 }
 
 function report_query_unit_id(): int { return (int)($GLOBALS['app_unit_id']??unit_active_id()); }

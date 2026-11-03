@@ -1,0 +1,37 @@
+<?php
+require_once __DIR__.'/../includes/reports.php';
+require_once __DIR__.'/../includes/excel.php';
+require_once __DIR__.'/../includes/global_report_print.php';
+require_once __DIR__.'/../includes/registration_history_nav.php';
+function four_assert(bool $ok,string $message):void{if(!$ok)throw new RuntimeException($message);}
+$input=['q'=>'Nama & Siswa','year'=>['2026/2027'],'class_id'=>['12','tingkat:4'],'status_filter'=>['covered_psb'],'operator'=>['3'],'per_page'=>25,'selected'=>-12,'selected_unit'=>1,'page'=>9,'source'=>'system'];
+$deleted=registration_history_tab_query($input,'deleted',['2026/2027'=>'2026/2027']);
+four_assert($deleted['kelas']===['rombel:12','tingkat:4']&&$deleted['tahun_ajaran']===['2026/2027'],'Archive filter aliases preserve class/year');
+four_assert($deleted['page']===1&&!isset($deleted['selected'],$deleted['source'],$deleted['status']),'Navigation clears source-specific selection/status');
+four_assert($deleted['q']===$input['q']&&$deleted['operator']===['3'],'Search/operator remain scoped');
+$active=registration_history_tab_query($deleted,'active',[]);$legacy=registration_history_tab_query($input,'legacy',[]);
+four_assert($active['source']==='all'&&$active['class_id']===['12','tingkat:4']&&$legacy['source']==='legacy','Sources are explicit and archive aliases round-trip');
+$all=registration_history_tab_query(['class_id'=>'0','year'=>'all'],'deleted',[]);four_assert($all['kelas']===['*']&&$all['tahun_ajaran']===['*'],'Legacy all-value aliases remain valid');
+$nav=registration_history_navigation($input,'legacy',[]);four_assert(substr_count($nav,'aria-current="page"')===1&&substr_count($nav,'<a ' )===3,'Exactly one of three tabs is active');
+$items=[['unit_id'=>1,'nis'=>'001','nama'=>'Siswa','kelas'=>'4A','tingkat'=>4,'master_kelas_id'=>1,'komponen_key'=>'daftar_ulang','komponen'=>'Daftar Ulang','tahun_ajaran'=>'2026/2027','periode_code'=>'2026/2027','sisa'=>125000.25,'status'=>'Belum Bayar']];
+$view=billing_history_project($items,['_billing_years'=>['2026/2027'],'_multi'=>['komponen_tagihan'=>['psb','daftar_ulang','spp','komite']]],[],1);$before=serialize($view);
+four_assert(str_contains(billing_history_table($view),'>D.ULANG</th>')&&str_contains(billing_history_print_table($view),'>D.ULANG</th>'),'Only billing headers use the abbreviation');
+four_assert($view['rows'][0]['keterangan']==='Daftar Ulang'&&$view['columns']['daftar_ulang']==='Daftar Ulang','Notes and source labels stay intact');
+$doc=spp_excel_report_document(['title'=>'Riwayat Tagihan','_billing_view'=>$view],'riwayat-tagihan',1);$doc['presentation']='global';
+four_assert(!str_contains(spp_excel_preview_html($doc),'Dibuat:')&&!str_contains(spp_excel_preview_html($doc),'<p class="excel-meta">'),'Billing preview omits top metadata');
+$book=spp_excel_workbook($doc);$sheet=$book->getActiveSheet();
+foreach([6,7] as $r)four_assert($sheet->getCell('A'.$r)->getValue()===null&&(float)$sheet->getRowDimension($r)->getRowHeight()===0.0,'Billing workbook omits metadata and its space');
+four_assert($sheet->getCell('E10')->getValue()==='D.ULANG','Billing workbook header');$book->disconnectWorksheets();
+four_assert(serialize($view)===$before,'Presentation never mutates the billing projection');
+$columns=[spp_excel_column('no','No','number'),spp_excel_column('nis','NIS'),spp_excel_column('amount','Daftar Ulang','money_optional')];$rows=[['no'=>1,'nis'=>'000123','amount'=>-125000.25],['no'=>2,'nis'=>'000124','amount'=>null]];
+$doc=spp_excel_document('Rekap Penerimaan Harian','Unit/status/periode',1,[['name'=>'Laporan','sections'=>[spp_excel_section('Penerimaan',$columns,$rows,[],true)],'signatures'=>false]]);$doc['presentation']='global';$original=serialize($rows);$doc=global_report_clean_excel_document($doc,'penerimaan');
+four_assert($doc['hide_context']&&!$doc['currency_prefix']&&$doc['subtitle']==='','Receipt export options are isolated');
+four_assert($doc['sheets'][0]['sections'][0]['columns'][2]['label']==='Daftar Ulang','Other report DU header remains full');
+$book=spp_excel_workbook($doc);$sheet=$book->getActiveSheet();four_assert($sheet->getCell('C11')->getValue()===-125000.25&&$sheet->getCell('C11')->getDataType()==='n','Receipt money remains signed numeric');
+four_assert(!str_contains($sheet->getStyle('C11')->getNumberFormat()->getFormatCode(),'Rp')&&str_contains($sheet->getStyle('C11')->getNumberFormat()->getFormatCode(),'0.00'),'Currency-free Excel preserves decimals');
+four_assert($sheet->getCell('C12')->getValue()==='—'&&$sheet->getCell('B11')->getValue()==='000123','Unknown amounts and text identities remain intact');
+four_assert($sheet->getCell('A6')->getValue()===null&&str_contains($sheet->getCell('A7')->getValue(),'Dibuat:')&&$sheet->getStyle('A3')->getFont()->getSize()===10.0,'Receipt context hidden, creation metadata and enlarged address retained');
+$book->disconnectWorksheets();four_assert(serialize($doc['sheets'][0]['sections'][0]['rows'])===$original,'Receipt rows unchanged');
+four_assert(global_report_print_money(-125000.25,false)==='-125.000,25'&&global_report_print_money(0,false)==='0','Print preserves zero, sign and decimal precision');
+four_assert(global_report_print_text(null,['x','Nilai','money_optional'],[],false)==='—','Receipt unknown remains unknown');
+echo "PASS DU navigation/filter conversion, billing-only labels/metadata, and receipt typed values/formatting.\n";

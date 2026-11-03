@@ -1,14 +1,15 @@
 <?php
+require_once __DIR__.'/date_format.php';
 require_once __DIR__.'/account_letter_ui.php';
 
 function finance_icon(string $name): string {
+    if ($name === 'calendar') return spp_calendar_icon();
     $paths = [
         'chart'=>'<path d="M4 20V11M10 20V4M16 20V8M22 20V2"/>',
         'card'=>'<rect x="3" y="5" width="18" height="14" rx="2"/><path d="M3 10h18M7 15h3"/>',
         'in'=>'<path d="M12 21V3m-6 6 6-6 6 6M4 17v4h16v-4"/>',
         'out'=>'<path d="M12 3v18m-6-6 6 6 6-6M4 7V3h16v4"/>',
         'clock'=>'<circle cx="12" cy="12" r="9"/><path d="M12 7v5l3 2"/>',
-        'calendar'=>'<rect x="3" y="4" width="18" height="17" rx="2"/><path d="M8 2v4M16 2v4M3 10h18"/>',
         'list'=>'<path d="M8 6h13M8 12h13M8 18h13M3 6h.01M3 12h.01M3 18h.01"/>',
         'pie'=>'<path d="M12 3v9h9M9 3.5a9 9 0 1 0 11.5 11.5"/>',
     ];

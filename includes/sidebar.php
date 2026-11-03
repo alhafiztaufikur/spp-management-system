@@ -170,6 +170,8 @@ document.addEventListener('DOMContentLoaded', function () {
 <!-- Early theme init to prevent flash -->
 <link rel="stylesheet" href="<?= $root ?>assets/css/operation_feedback.css?v=<?= filemtime(__DIR__.'/../assets/css/operation_feedback.css') ?>">
 <script defer src="<?= $root ?>assets/js/operation_feedback.js?v=<?= filemtime(__DIR__.'/../assets/js/operation_feedback.js') ?>"></script>
+<link rel="stylesheet" href="<?= $root ?>assets/css/pagination_desktop.css?v=<?= filemtime(__DIR__.'/../assets/css/pagination_desktop.css') ?>">
+<?php if(($_GET['template']??'')==='riwayat-tagihan'): ?><link rel="stylesheet" href="<?= $root ?>assets/css/billing_history_report.css?v=<?= filemtime(__DIR__.'/../assets/css/billing_history_report.css') ?>"><?php endif; ?>
 <link rel="stylesheet" href="<?= $root ?>assets/css/dropdowns.css?v=<?= filemtime(__DIR__.'/../assets/css/dropdowns.css') ?>">
 <link rel="stylesheet" href="<?= $root ?>assets/css/sidebar_palette.css?v=<?= filemtime(__DIR__.'/../assets/css/sidebar_palette.css') ?>">
 <script defer src="<?= $root ?>assets/js/dropdowns.js?v=<?= filemtime(__DIR__.'/../assets/js/dropdowns.js') ?>"></script>
@@ -193,7 +195,7 @@ document.addEventListener('DOMContentLoaded', function () {
       <input type="hidden" name="csrf_token" value="<?= htmlspecialchars($_SESSION['csrf_unit_switch'],ENT_QUOTES,'UTF-8') ?>">
       <input type="hidden" name="next" value="<?= htmlspecialchars($_SERVER['REQUEST_URI'] ?? '/dashboard.php',ENT_QUOTES,'UTF-8') ?>">
       <span class="sidebar-unit-kicker"><span aria-hidden="true"></span> <?= htmlspecialchars(strtoupper($roleLabel),ENT_QUOTES,'UTF-8') ?></span>
-      <label for="sidebar-unit-select" class="sidebar-unit-heading"><span class="sidebar-unit-heading-icon" aria-hidden="true"><svg width="22" height="22" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.8" stroke-linecap="round" stroke-linejoin="round"><path d="m3 10 9-7 9 7M5 9v12h14V9M9 21v-7h6v7M10 8h4"/></svg></span>Unit operasional</label>
+      <label for="sidebar-unit-select" class="sidebar-unit-heading">Unit operasional</label>
       <span class="sidebar-unit-select-wrap">
         <select id="sidebar-unit-select" name="unit_id" data-native-select onchange="clearAuthorizationPrintSelection();this.form.submit()">
           <?php if ($transactionUnitOnly && $activeUnit === 0): ?><option value="" selected disabled>Pilih unit</option><?php endif; ?>
@@ -239,20 +241,6 @@ document.addEventListener('DOMContentLoaded', function () {
         if (unitForm.dataset.submitting === '1') { delete unitForm.dataset.submitting; location.reload(); }
       });
     }
-    var bar = document.querySelector('.topbar');
-    if (!bar || bar.querySelector('.topbar-unit')) return;
-    var badge = document.createElement('span');
-    badge.className = 'topbar-unit';
-    var label = document.createElement('span');
-    label.className = 'topbar-unit-label';
-    label.textContent = <?= json_encode(isset($reportUnitId) && (int)$reportUnitId === 0 ? 'Rekap' : 'Unit operasional', JSON_HEX_TAG|JSON_HEX_AMP) ?>;
-    var value = document.createElement('strong');
-    value.className = 'topbar-unit-value';
-    value.textContent = <?= json_encode($transactionUnitOnly && $activeUnit === 0 ? 'Belum dipilih' : (isset($reportUnitId) && (int)$reportUnitId === 0 ? 'Semua Unit' : unit_label($activeUnit)), JSON_HEX_TAG|JSON_HEX_AMP) ?>;
-    badge.setAttribute('aria-label', label.textContent + ': ' + value.textContent);
-    badge.append(label, value);
-    var clock = bar.querySelector('.clock-badge');
-    bar.insertBefore(badge, clock);
   });
   </script>
   <?php endif; ?>

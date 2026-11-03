@@ -27,3 +27,8 @@ function spp_date_parts($value,?string $precision=null):array {
 }
 
 
+
+/** Shared presentation glyph; does not alter date storage or picker behavior. */
+function spp_calendar_icon(): string {
+    return '<svg class="spp-calendar-icon payment-control-icon" width="18" height="18" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true"><rect x="3" y="5" width="18" height="16" rx="2"/><path d="M16 3v4M8 3v4M3 11h18"/></svg>';
+}

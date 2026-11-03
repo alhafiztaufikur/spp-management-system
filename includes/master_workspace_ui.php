@@ -1,10 +1,11 @@
 <?php
+require_once __DIR__.'/date_format.php';
 /** Small presentation helpers; no queries or form processing. */
 function master_workspace_icon(string $name): string {
+    if ($name === 'calendar') return spp_calendar_icon();
     $paths = [
         'students' => '<circle cx="9" cy="7" r="3"/><path d="M3 21v-3a5 5 0 0 1 10 0v3M17 4a3 3 0 0 1 0 6M17 14a5 5 0 0 1 4 5v2"/>',
         'student' => '<circle cx="12" cy="7" r="4"/><path d="M5 21v-2a7 7 0 0 1 14 0v2"/>',
-        'calendar' => '<rect x="3" y="5" width="18" height="16" rx="2"/><path d="M7 3v4M17 3v4M3 11h18M8 15h2M14 15h2M8 18h2"/>',
         'hourglass' => '<path d="M6 3h12M6 21h12M7 3v4c0 3 10 7 10 10v4M17 3v4c0 3-10 7-10 10v4M9 6h6M9 18h6"/>',
         'document' => '<path d="M14 3H5v18h14V8l-5-5ZM14 3v5h5M8 12h8M8 16h6"/>',
         'document-add' => '<path d="M14 3H5v18h7M14 3v5h5v4M8 12h4M17 14v7M13.5 17.5h7"/>',

@@ -1,0 +1,5 @@
+/* Same font stack as the Mutiara payroll reference; no external font requests.
+   Component emphasis is limited to 700 to match the reference's lighter headings. */
+:root{--font-body:"Segoe UI",Arial,sans-serif;--font-heading:var(--font-body)}
+html,body,button,input,select,textarea,option,optgroup,code,pre,kbd,samp{font-family:var(--font-body)}
+h1,h2,h3,h4,h5,h6{font-family:var(--font-heading)}

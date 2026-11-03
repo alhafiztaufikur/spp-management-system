@@ -228,8 +228,8 @@ require_once __DIR__ . '/includes/master_workspace_ui.php';
             <h1>Master Biaya Lain</h1>
             <p>Kelola biaya tambahan di luar SPP. Berulang dibayar langsung; Tidak Berulang diterbitkan sekali per siswa.</p>
             <div class="fee-hero-stats">
-              <div class="fee-stat"><span class="fee-icon"><?= master_workspace_icon('document') ?></span><div><span>Biaya Aktif</span><strong><?= number_format(count($activeMasters)) ?></strong></div></div>
-              <div class="fee-stat"><span class="fee-icon"><?= master_workspace_icon('students') ?></span><div><span>Rombel Aktif</span><strong><?= number_format(count($activeClasses)) ?></strong></div></div>
+              <div class="fee-stat"><div><span>Biaya Aktif</span><strong><?= number_format(count($activeMasters)) ?></strong></div></div>
+              <div class="fee-stat"><div><span>Rombel Aktif</span><strong><?= number_format(count($activeClasses)) ?></strong></div></div>
             </div>
           </div>
       </section>
@@ -237,7 +237,6 @@ require_once __DIR__ . '/includes/master_workspace_ui.php';
       <div class="fee-panel-grid">
       <div class="main-card master-modern-card master-modern-form fee-panel">
         <div class="card-title-row fee-panel-heading">
-          <span class="fee-icon"><?= master_workspace_icon($editData ? 'document' : 'document-add') ?></span>
           <div><h2><?= $editData ? 'Edit Master Biaya' : 'Tambah Master Biaya' ?></h2><?php if($editData): ?><p>Perbarui jenis biaya; transaksi lama tetap memakai tarif sebelumnya.</p><?php endif; ?></div>
         </div>
         <form method="POST" action="master_biaya_lain.php" id="form-master-biaya">
@@ -275,7 +274,7 @@ require_once __DIR__ . '/includes/master_workspace_ui.php';
       </div>
 
       <div class="main-card master-modern-card master-modern-list fee-list-panel" id="daftar-master-biaya" style="margin-top:0">
-        <div class="card-title-row fee-panel-heading"><span class="fee-icon"><?= master_workspace_icon('document') ?></span><div><h2>Daftar Master Biaya (<?= count($masterRows) ?>)</h2></div></div>
+        <div class="card-title-row fee-panel-heading"><div><h2>Daftar Master Biaya (<?= count($masterRows) ?>)</h2></div></div>
         <nav class="fee-master-tabs" aria-label="Bagian master biaya"><?php foreach(['aktif'=>'Aktif','nonaktif'=>'Nonaktif','hapus'=>'Bisa Dihapus'] as $tab=>$label): ?><a href="master_biaya_lain.php?master_tab=<?= $tab ?>#daftar-master-biaya" <?= $masterTab===$tab?'aria-current="page"':'' ?>><?= $label ?><span class="badge-count"><?= $masterCounts[$tab] ?></span></a><?php endforeach; ?></nav>
         <div class="table-container">
           <table class="payment-table responsive-table">

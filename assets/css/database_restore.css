@@ -44,7 +44,7 @@
   .restore-stage-list li { font-size:10px; }
 }
 @media(prefers-reduced-motion:reduce) { .restore-progress-panel progress::-webkit-progress-value { transition:none; } }
-.restore-status-page{--text-primary:#19372b;--text-secondary:#586d63;--border:#cddfd5;--bg-surface:#f1f7f3;--bg-card:#fff;--accent:#168748;--button-ink:#fff;box-sizing:border-box;margin:0;min-height:100vh;background:var(--bg-surface);color:var(--text-primary);font:15px/1.55 Arial,sans-serif}
+.restore-status-page{--text-primary:#19372b;--text-secondary:#586d63;--border:#cddfd5;--bg-surface:#f1f7f3;--bg-card:#fff;--accent:#168748;--button-ink:#fff;box-sizing:border-box;margin:0;min-height:100vh;background:var(--bg-surface);color:var(--text-primary);font:15px/1.55 var(--font-body,"Segoe UI",Arial,sans-serif)}
 .restore-status-page *{box-sizing:border-box}
 .restore-status-page .restore-status-topbar{display:flex;align-items:center;justify-content:space-between;gap:16px;padding:14px max(20px,calc((100vw - 880px)/2));border-bottom:1px solid var(--border);background:var(--bg-card)}
 .restore-brand{display:flex;align-items:center;gap:10px;color:var(--text-primary);font-weight:700;font-size:18px;text-decoration:none}
@@ -62,7 +62,7 @@
 .restore-status-page .restore-stage-list li::before{width:27px;height:27px;font-size:12px;margin-bottom:8px}
 .restore-status-page .restore-progress-panel #restore-unavailable{font-size:13px;color:var(--text-secondary)}
 .restore-status-actions{display:flex;align-items:center;justify-content:flex-end;flex-wrap:wrap;gap:10px;padding-top:20px;margin-top:20px;border-top:1px solid var(--border)}
-.restore-action{display:inline-flex;align-items:center;justify-content:center;min-height:44px;padding:10px 16px;border:1px solid var(--accent);border-radius:9px;background:var(--accent);color:var(--button-ink,#fff);font:600 13px/1.45 Arial,sans-serif;text-align:center;text-decoration:none;cursor:pointer}
+.restore-action{display:inline-flex;align-items:center;justify-content:center;min-height:44px;padding:10px 16px;border:1px solid var(--accent);border-radius:9px;background:var(--accent);color:var(--button-ink,#fff);font:600 13px/1.45 var(--font-body,"Segoe UI",Arial,sans-serif);text-align:center;text-decoration:none;cursor:pointer}
 .restore-action.secondary{border-color:var(--border);background:var(--bg-card);color:var(--text-primary)}
 .restore-action:disabled{opacity:.55;cursor:not-allowed}
 .restore-status-page :is(a,button,input):focus-visible{outline:2px solid var(--accent);outline-offset:3px}

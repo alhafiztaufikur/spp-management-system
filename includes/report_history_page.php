@@ -21,6 +21,7 @@ function report_history_monthly_row(array $r,string $category):array {
         'periode'=>(report_months()[substr($period,5,2)]??substr($period,5,2)).' '.substr($period,0,4),
         'periode_code'=>$period,'tahun_ajaran'=>$r['tahun_ajaran'],'tanggal_dibuat'=>$r['tanggal_dibuat'],
         'tagihan'=>(float)$r['tagihan'],'terbayar'=>(float)$r['terbayar'],'sisa'=>(float)$r['sisa'],
+        '_outstanding_periods'=>array_values(array_filter(json_decode($r['outstanding_periods']??'[]',true)??[])),
         'status'=>$status,'_read_count'=>(int)$r['read_count'],'_read_fractional'=>(bool)$r['read_fractional'],
     ];
 }
@@ -31,13 +32,14 @@ function report_history_monthly_rollup(mysqli $db,string $sql,string $category,a
     }
     $json=json_encode($credits,JSON_THROW_ON_ERROR);
     $paid='(q.terbayar+COALESCE(c.paid,0)/100)';
-    $where='';
+    $where=empty($filters['_billing_as_of'])?'':' WHERE q.tahun*100+q.bulan<='.(int)str_replace('-','',substr($filters['_billing_as_of'],0,7));
     if(!empty($filters['filter_tanggal_tagihan'])&&$filters['tanggal_awal']!==''){
-        $where=" WHERE LEFT(q.tanggal_dibuat,10)>='".$db->real_escape_string($filters['tanggal_awal'])."' AND LEFT(q.tanggal_dibuat,10)<='".$db->real_escape_string($filters['tanggal_akhir'])."'";
+        $where.=($where===''?' WHERE ':' AND ')." LEFT(q.tanggal_dibuat,10)>='".$db->real_escape_string($filters['tanggal_awal'])."' AND LEFT(q.tanggal_dibuat,10)<='".$db->real_escape_string($filters['tanggal_akhir'])."'";
     }
     $query="SELECT /*+ SET_VAR(join_buffer_size=33554432) SET_VAR(tmp_table_size=67108864) */
         MIN(q.nis) nis,ANY_VALUE(q.nis_diknas) nis_diknas,ANY_VALUE(q.nama) nama,MIN(q.kelas) kelas,q.master_kelas_id,q.tingkat,MIN(q.tahun_ajaran) tahun_ajaran,
         MIN(q.tahun*100+q.bulan) first_period,
+        JSON_ARRAYAGG(CASE WHEN q.bill_status NOT IN ('cancelled','covered_psb','waived') AND q.tagihan>$paid THEN CONCAT(q.tahun,'-',LPAD(q.bulan,2,'0')) ELSE NULL END) outstanding_periods,
         q.tagihan read_bill,$paid read_paid,q.bill_status read_bill_status,
         MAX(MOD(q.tagihan,1)<>0 OR MOD(q.terbayar,1)<>0 OR MOD(COALESCE(c.paid,0),100)<>0) read_fractional,
         MIN(q.tanggal_dibuat) tanggal_dibuat,SUM(q.tagihan) tagihan,SUM($paid) terbayar,
@@ -166,7 +168,7 @@ function report_history_rollup_data(mysqli $db,array $filters,bool $export):?arr
 function report_history_page_data(mysqli $db,array $filters,bool $export=false,bool $force=false): ?array {
     if(isset($GLOBALS['report_history_sink'][$db->thread_id]))return null;
     // Sectioned reports keep their existing independent ordering and totals.
-    foreach($filters['_multi']??[] as $values)if(count($values)>1&&!filter_is_all($values))return null;
+    foreach($filters['_multi']??[] as $key=>$values)if($key!=='komponen_tagihan'&&count($values)>1&&!filter_is_all($values))return null;
     if(!$force){
         if(($filters['student_id']??0)>0)return null;
         $unit=report_query_unit_id();$where=$unit?' WHERE unit_id='.(int)$unit:'';

@@ -247,8 +247,6 @@ try {
   <title>Role Management | SistemSPP</title>
   <link rel="icon" type="image/png" href="assets/img/favicon.png?v=2" />
   <meta name="description" content="Super Admin mengelola akun petugas SD, SMP, dan SMA." />
-  <link rel="preconnect" href="https://fonts.googleapis.com" />
-  <link href="https://fonts.googleapis.com/css2?family=Inter:wght@300;400;500;600;700;800&display=swap" rel="stylesheet" />
   <link rel="stylesheet" href="assets/css/style.css?v=unitpalette4&amp;mtime=<?= filemtime(__DIR__ . '/assets/css/style.css') ?>" />
   <link rel="stylesheet" href="assets/css/date_controls.css?v=unitpalette4&amp;mtime=<?= filemtime(__DIR__ . '/assets/css/date_controls.css') ?>" />
   <link rel="stylesheet" href="assets/css/account_workspace.css?v=<?= filemtime(__DIR__.'/assets/css/account_workspace.css') ?>" />
@@ -289,11 +287,10 @@ try {
       <div class="main-card account-create-card">
         <div class="card-title-row">
           <div class="card-title">
-            <?= account_letter_icon('add') ?>
-            <span>Buat Akun Petugas<small>Tambah Administrator dengan akses SD, SMP, dan SMA.</small></span>
+            <span>Buat Akun Petugas</span>
           </div>
         </div>
-        <div class="account-create-notice"><?= account_letter_icon('document') ?><span><strong>Hanya Super Admin yang dapat membuat akun.</strong></span></div>
+        <div class="account-create-notice"><span><strong>Hanya Super Admin yang dapat membuat akun.</strong></span></div>
 
         <form method="POST" action="<?= htmlspecialchars($accountReturn) ?>" id="form-tambah-akun">
           <input type="hidden" name="csrf_token" value="<?= htmlspecialchars($csrfToken) ?>" />
@@ -347,7 +344,6 @@ try {
       <div class="main-card account-list-card" style="margin-top:0">
         <div class="card-title-row">
           <div class="card-title">
-            <?= account_letter_icon('users') ?>
             <span>Daftar Akun (<?= count($accountRows) ?> akun)</span>
           </div>
 

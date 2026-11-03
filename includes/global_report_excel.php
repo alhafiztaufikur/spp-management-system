@@ -44,6 +44,7 @@ function global_report_excel_identity_count(array $section): int {
 }
 
 function global_report_excel_finish($sheet,array $doc,array $definition,int $n): void {
+    if(!empty($doc['global_clean'])){require_once __DIR__.'/global_report_print.php';global_report_clean_excel_finish($sheet,$doc,$definition,$n);return;}
     $letter=static fn($c)=>\PhpOffice\PhpSpreadsheet\Cell\Coordinate::stringFromColumnIndex($c);
     $detail=null;foreach($definition['sections'] as $section)if($section['detail']){$detail=$section;break;}
     $identity=$detail?global_report_excel_identity_count($detail):$n;
@@ -72,12 +73,21 @@ function global_report_excel_finish($sheet,array $doc,array $definition,int $n):
 }
 
 function global_report_excel_preview(array $doc): string {
+    if(!empty($doc['global_clean'])){require_once __DIR__.'/global_report_print.php';return global_report_clean_excel_preview($doc);}
     require_once __DIR__.'/global_report_matrix.php';
     [$accent,$dark,$pale]=spp_excel_palette($doc['unit']);$accent=[1=>'165C44',2=>'203E80',3=>'832A35',0=>'513080'][$doc['unit']];
     $logo=dirname(__DIR__).'/assets/img/school-logo.png';$image=is_file($logo)?'data:image/png;base64,'.base64_encode(file_get_contents($logo)):'';
+    if(isset($doc['_billing_view'])){
+        ob_start(); ?>
+        <!doctype html><html lang="id"><meta charset="utf-8"><style>
+        body{padding:24px;margin:0;font:14px "Segoe UI",Arial,sans-serif;color:#17231d}.excel-head{display:flex;gap:18px;align-items:center}.excel-head img{width:58px}.excel-head h1{font-size:20px;margin:0}.excel-head p{font-size:14px}.excel-title{text-align:center;font-size:22px;margin-top:24px}.excel-meta{text-align:center}.billing-rombel th{background:#165c44;color:#fff}
+        <?= file_get_contents(dirname(__DIR__).'/assets/css/billing_history_report.css') ?>
+        </style><body class="billing-history-document"><div class="excel-head"><img src="<?= $image ?>" alt="Logo sekolah"><div><h1><?= report_e($doc['school']) ?></h1><p>Perum Bekasi Griya Asri II, Tambun Selatan | Telp. 021-88363466</p></div></div><h1 class="excel-title"><?= report_e($doc['title']) ?></h1><?= billing_history_table($doc['_billing_view'],null,true) ?></body></html>
+        <?php return ob_get_clean();
+    }
     ob_start(); ?>
     <!doctype html><html lang="id"><meta charset="utf-8"><style>
-    body{margin:0;padding:24px;font:14px Arial,sans-serif;color:#17231d;--bg-surface:#fff;--text-primary:#17231d;--text-secondary:#53616e;--matrix-stripe:#<?= $pale ?>;--unit-table-head-bg:#<?= $accent ?>;--accent:#<?= $accent ?>}
+    body{margin:0;padding:24px;font:14px Segoe UI,Arial,sans-serif;color:#17231d;--bg-surface:#fff;--text-primary:#17231d;--text-secondary:#53616e;--matrix-stripe:#<?= $pale ?>;--unit-table-head-bg:#<?= $accent ?>;--accent:#<?= $accent ?>}
     *{box-sizing:border-box}.excel-head{display:flex;gap:18px;align-items:center;margin-bottom:18px}.excel-head img{width:56px;height:56px;object-fit:contain}.excel-head h1{font-size:20px;margin:0 0 6px}.excel-head p{font-size:12px;margin:0}.excel-title{background:#<?= $accent ?>;color:#fff;padding:15px;font-size:20px;margin:0}.excel-meta{background:#<?= $pale ?>;padding:12px 15px;line-height:1.6;font-size:13px}.excel-section{margin-top:22px}.excel-section h2{font-size:18px}.excel-total{display:flex;gap:18px;flex-wrap:wrap;padding:14px 0}.excel-total span{padding:10px;background:#<?= $pale ?>}.sign{display:flex;justify-content:space-around;text-align:center;padding:25px 0}.sign p{margin-top:55px}
     <?= file_get_contents(dirname(__DIR__).'/assets/css/global_report_matrix.css') ?>
     </style><body id="global-report-workspace" class="global-report-matrix-workspace"><div class="excel-head"><img src="<?= $image ?>" alt="Logo sekolah"><div><h1><?= report_e($doc['school']) ?></h1><p>Perum Bekasi Griya Asri II, Tambun Selatan | Telp. 021-88363466</p></div></div><h1 class="excel-title"><?= report_e($doc['title']) ?></h1><div class="excel-meta">Unit: <?= report_e($doc['unit_label']) ?> | <?= report_e($doc['subtitle']) ?><br>Dibuat: <?= report_e($doc['generated']) ?> | Petugas: <?= report_e($doc['operator']) ?></div>

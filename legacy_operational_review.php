@@ -1,4 +1,6 @@
 <?php
+require_once __DIR__.'/includes/pagination.php';
+ob_start('pagination_legacy_markup');
 session_start();require_once __DIR__.'/koneksi.php';require_once __DIR__.'/includes/legacy_import_http.php';require_once __DIR__.'/includes/legacy_finance_http.php';
 try{lf_http_bootstrap($koneksi);}catch(DomainException $e){http_response_code(403);exit('Akun Super Admin aktif diperlukan.');}$unit=unit_active_id();$id=$_GET['id']??$_POST['id']??'';$error='';$notice='';$confirmation=null;$draft=null;$plan=null;
 if(!is_string($id)){http_response_code(400);exit('ID tidak valid.');}

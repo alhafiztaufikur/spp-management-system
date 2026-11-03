@@ -2,8 +2,10 @@
 /** Presentation only: keep each source row and value intact; never allocate payments here. */
 require_once __DIR__.'/global_report_ui.php';
 require_once __DIR__.'/global_report_layout.php';
+require_once __DIR__.'/report_psb.php';
 
 function global_report_matrix(array $report,string $template,int $unit):?array {
+    if($template==='psb')return report_psb_matrix($report,$unit);
     if(!in_array($template,['status','penerimaan','per-item','spp-tahunan'],true))return null;
     $parts=$report['sections']??[$report];
     if($template==='per-item'){
@@ -121,14 +123,14 @@ function global_report_matrix_html(array $matrix,?array $rows=null,int $start=0,
     <?php return ob_get_clean();
 }
 
-/** Excel uses the same mapped cells; the national identifier gets its own typed text column. */
+/** Excel uses the same mapped cells; reports other than PSB also show the national identifier. */
 function global_report_matrix_excel(array $matrix,array $report,string $template,int $unit):array {
-    require_once __DIR__.'/excel.php';$columns=[];
+    require_once __DIR__.'/excel.php';$columns=[];$includeDiknas=$template!=='psb';
     $widths=['no'=>6,'unit'=>10,'nis'=>16,'nis_diknas'=>18,'nama'=>26,'kelas'=>10];
-    foreach($matrix['columns'] as $column){$definition=spp_excel_column($column[0],$column[1],$column[2]??'text');$definition['width']=$widths[$column[0]]??22;$columns[]=$definition;if($column[0]==='nis'){$definition=spp_excel_column('nis_diknas','NIS Diknas');$definition['width']=18;$columns[]=$definition;}}
+    foreach($matrix['columns'] as $column){$definition=spp_excel_column($column[0],$column[1],$column[2]??'text');$definition['width']=$widths[$column[0]]??22;$columns[]=$definition;if($includeDiknas&&$column[0]==='nis'){$definition=spp_excel_column('nis_diknas','NIS Diknas');$definition['width']=18;$columns[]=$definition;}}
     $section=spp_excel_section($report['title'],$columns,$matrix['rows'],$matrix['totals']);
     $section['flat_header']=$matrix['flat_header']??false;
-    $section['header_groups']=[];$section['identity_count']=$matrix['identity_count']+1;$section['column_totals']=$matrix['subtotals'];
+    $section['header_groups']=[];$section['identity_count']=$matrix['identity_count']+($includeDiknas?1:0);$section['column_totals']=$matrix['subtotals'];
     foreach($matrix['groups'] as $group)$section['header_groups'][]=['label'=>$group['label'].($group['subtitle']!==''?' | '.$group['subtitle']:''),'keys'=>array_column($group['columns'],0)];
     $doc=spp_excel_document($report['title'],$report['subtitle'],$unit,[['name'=>'Laporan','sections'=>[$section],'signatures'=>false]]);
     $doc['presentation']='global';

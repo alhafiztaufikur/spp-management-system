@@ -1,7 +1,7 @@
 <nav class="payment-history-tabs" aria-label="Status tabungan"><a class="btn btn-ghost" href="?<?= savings_e(http_build_query(array_merge($historyPaginationQuery,['view'=>'active','page'=>1]))) ?>">Transaksi Aktif</a><a class="btn btn-ghost" href="?<?= savings_e(http_build_query(array_merge($historyPaginationQuery,['view'=>'archive','page'=>1]))) ?>">Arsip Dihapus</a></nav>
 <?php if($archiveView): ?><p class="sw-note">Arsip adalah bukti audit. Nominal arsip tidak dihitung dalam mutasi aktif maupun saldo.</p><?php endif; ?>
 <div class="sw-history-layout">
-<section class="sw-card sw-history-list"><header class="sw-card-head"><div><?= savings_icon('document') ?><div><h3>Daftar Transaksi</h3><small>Menampilkan <?= $firstShown ?>–<?= $lastShown ?> dari <?= $totalHistoryRows ?> transaksi.</small></div></div><span class="sw-status is-in"><?= $totalHistoryRows ?> transaksi</span></header>
+<section class="sw-card sw-history-list"><header class="sw-card-head"><div><div><h3>Daftar Transaksi</h3><small>Menampilkan <?= $firstShown ?>–<?= $lastShown ?> dari <?= $totalHistoryRows ?> transaksi.</small></div></div><span class="sw-status is-in"><?= $totalHistoryRows ?> transaksi</span></header>
 <div class="sw-transactions"><?php if(!$rows): ?><p class="sw-empty">Belum ada transaksi tabungan pada periode ini.</p><?php endif; ?>
 <?php foreach($rows as $i=>$r): $selected=$selectedTransaction && $r['id']===$selectedTransaction['id'] && $r['jenis']===$selectedTransaction['jenis'];$link='riwayat.php?'.http_build_query(array_merge($historyPaginationQuery,['page'=>$page,'jenis'=>$r['jenis'],'id'=>$r['id']])); ?>
 <article class="sw-transaction <?= $selected?'is-active':'' ?>" data-kind="<?= $r['jenis'] ?>" data-id="<?= (int)$r['id'] ?>">

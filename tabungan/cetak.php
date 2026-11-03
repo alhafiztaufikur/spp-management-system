@@ -83,7 +83,6 @@ function print_book_escape($value): string
       <div class="savings-print-workspace">
         <section class="main-card savings-print-selection" aria-labelledby="savings-print-selection-title">
           <div class="savings-print-card-heading"><span class="savings-print-step">01</span><div><span class="savings-print-kicker">PILIH SISWA</span><h2 id="savings-print-selection-title">Cari pemilik buku</h2></div></div>
-          <p class="savings-print-card-copy">Cari berdasarkan nama, NIS, atau NIS Diknas. Pilih siswa dari daftar yang muncul.</p>
 
           <div class="savings-print-fields">
             <div class="field-row">
@@ -114,7 +113,6 @@ function print_book_escape($value): string
         <section class="main-card savings-print-detail" aria-labelledby="savings-print-detail-title" aria-live="polite">
           <div class="savings-print-card-heading"><span class="savings-print-step">02</span><div><span class="savings-print-kicker">PRATINJAU BUKU</span><h2 id="savings-print-detail-title">Periksa sebelum mencetak</h2></div></div>
           <div class="savings-print-student-summary" id="savings-print-summary">
-            <div class="savings-print-student-icon" aria-hidden="true"><svg width="30" height="30" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.6"><path d="M4 19.5A2.5 2.5 0 0 1 6.5 17H20"/><path d="M4 4.5A2.5 2.5 0 0 1 6.5 2H20v20H6.5A2.5 2.5 0 0 1 4 19.5z"/><path d="M9 8h6M9 12h6"/></svg></div>
             <div><span class="savings-print-summary-label">BUKU UNTUK</span><strong id="savings-print-name">Pilih siswa terlebih dahulu</strong><small id="savings-print-nis">Data buku akan tampil di sini.</small></div>
           </div>
           <div class="savings-print-details-grid">

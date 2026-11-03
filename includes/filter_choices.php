@@ -4,7 +4,7 @@ function filter_choice_error(string $field): void {
     $message='Pilihan filter '.$field.' tidak valid. Pilih minimal satu opsi yang tersedia pada unit ini.';
     if(PHP_SAPI==='cli')throw new InvalidArgumentException($message);
     http_response_code(400);header('Content-Type: text/html; charset=UTF-8');
-    echo '<!doctype html><meta charset="utf-8"><main style="font:16px Arial;max-width:650px;margin:8vh auto;padding:24px"><h1>Periksa filter</h1><p>'.htmlspecialchars($message,ENT_QUOTES,'UTF-8').'</p><button onclick="history.back()">Kembali</button></main>';exit;
+    echo '<!doctype html><meta charset="utf-8"><main style="font:16px Segoe UI,Arial,sans-serif;max-width:650px;margin:8vh auto;padding:24px"><h1>Periksa filter</h1><p>'.htmlspecialchars($message,ENT_QUOTES,'UTF-8').'</p><button onclick="history.back()">Kembali</button></main>';exit;
 }
 function filter_choices($input,array $allowed,string $default='',array $allAliases=['','all','semua','0']): array {
     $allowed=array_map('strval',array_keys($allowed));

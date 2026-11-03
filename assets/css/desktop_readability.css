@@ -1,0 +1,65 @@
+/* Desktop readability only; print documents and mobile layouts keep their own rules. */
+@media screen and (min-width:1024px){
+  .payment-input-controls .payment-input-top{grid-template-columns:minmax(0,1fr)}
+  .payment-input-controls .payment-settings-group{padding:18px}
+  .payment-input-controls .payment-settings-grid{grid-template-columns:minmax(150px,.9fr) minmax(280px,1.4fr) minmax(180px,.95fr);gap:12px}
+  .payment-input-controls .payment-period-inputs{grid-template-columns:minmax(140px,1fr) 90px!important}
+  .payment-input-controls .payment-period-inputs .spp-select-trigger{padding-inline:12px}
+  .payment-input-controls .payment-period-inputs .spp-select-caption{white-space:nowrap;text-overflow:clip}
+
+  .unified-registration .ph-filter-form .search-box{display:flex;align-items:center;gap:10px;min-width:0;padding-inline:14px;background:var(--bg-elevated)}
+  .unified-registration .ph-filter-form .search-box:focus-within{border-color:var(--text-muted);box-shadow:0 0 0 1px var(--text-muted);outline:none}
+  .unified-registration .ph-filter-form .search-box input{flex:1;width:0;min-width:0;height:46px;padding:0;border:0!important;outline:none!important;box-shadow:none!important;background:transparent}
+  .unified-registration .student-search-panel{background:var(--bg-elevated);border-color:var(--border-hover)}
+  .unified-registration .student-search-option:is(:hover,:focus,.is-active){background:var(--bg-surface);color:var(--text-primary);outline:1px solid var(--text-muted);outline-offset:-1px}
+  .unified-registration .student-search-class{background:var(--bg-surface);color:var(--text-secondary);border-color:var(--border)}
+
+  .unified-savings .sw-entry-layout{gap:28px}
+  .unified-savings .sw-entry-layout :is(.sw-student-panel,.sw-entry-panel){padding:30px}
+  .unified-savings .sw-entry-layout .field-row{font-size:15px;line-height:1.6}
+  .unified-savings .sw-entry-layout .field-input{font-size:16px;min-height:52px;line-height:1.5}
+  .unified-savings .sw-entry-layout .spp-select-trigger{font-size:16px;min-height:52px!important;height:52px!important;max-height:none!important}
+  .unified-savings .sw-entry-layout .sw-student-panel>h2,.unified-savings .sw-entry-head h1{font-size:27px;line-height:1.35}
+  .unified-savings .sw-entry-layout .sw-entry-panel>h2{font-size:24px}
+  .unified-savings .sw-entry-layout .sw-student-option :is(strong,b){font-size:16px;line-height:1.6}
+  .unified-savings .sw-entry-layout .sw-student-option small{font-size:13px;line-height:1.65}
+  .unified-savings .sw-entry-layout :is(.sw-entry-panel>p,.sw-student-panel>p){font-size:14px;line-height:1.7}
+  .unified-savings .sw-entry-layout .sw-balance-box small{font-size:14px}
+  .unified-savings .sw-entry-layout .sw-balance-box strong{font-size:32px;line-height:1.4;overflow-wrap:anywhere}
+  .unified-savings .sw-entry-layout .savings-entry-amount-help{font-size:13px}
+  .unified-savings .sw-entry-layout textarea.field-input{min-height:110px}
+  .unified-savings .sw-entry-layout .btn{font-size:15px;min-height:48px}
+  .unified-savings .spp-dropdown-panel{font-size:15px}
+
+  .report-general-page .report-date-range-popover{min-width:460px!important;width:460px!important;max-width:calc(100vw - 32px)!important;grid-template-columns:repeat(2,minmax(0,1fr));overflow:visible!important}
+  .report-general-page .report-date-range-popover .id-date-control{min-width:0}
+  .report-general-page .report-date-range-popover .id-date-control>input:not(.id-date-native){min-width:128px;font-size:14px;padding-inline:10px;letter-spacing:0;font-variant-numeric:tabular-nums}
+  .report-general-page .report-date-range-popover .id-date-picker{flex:0 0 44px;min-width:44px}
+
+  .global-catalog-page .report-catalog-v2{width:100%;max-width:1040px;padding:24px 22px 36px}
+  .global-catalog-page .report-catalog-intro{padding:20px 22px}
+  .global-catalog-page .global-unit-selector{max-width:440px;margin:16px 0}
+  .global-catalog-page .global-unit-choice{min-height:42px;font-size:13px;padding:8px 10px}
+  .global-catalog-page .report-catalog-overview strong{font-size:22px}
+  .global-catalog-page .report-catalog-intro h1{font-size:24px}
+  .global-catalog-page .report-catalog-grid{grid-template-columns:repeat(3,minmax(0,1fr));gap:14px}
+  .global-catalog-page .report-template-card{padding:14px;min-height:180px}
+  .global-catalog-page .report-template-copy h3{font-size:15px;line-height:1.4}
+  .global-catalog-page .report-template-copy p{display:block;overflow:visible;-webkit-line-clamp:unset;font-size:13px;line-height:1.55}
+  .global-catalog-page .report-template-link{font-size:13px}
+  .global-catalog-page .report-template-icon{width:34px;height:34px;font-size:14px}
+}
+@media screen and (min-width:1024px) and (max-width:1199px){
+  .payment-input-controls .payment-settings-grid{grid-template-columns:repeat(2,minmax(0,1fr))}
+  .payment-input-controls .payment-period-card{grid-column:1/-1;grid-row:2}
+}
+
+@media screen and (min-width:1340px){
+  .payment-input-controls .payment-input-top{grid-template-columns:minmax(680px,1.02fr) minmax(260px,.98fr)}
+}
+@media(min-width:1024px){
+ body#global-report-workspace[data-report-template="penerimaan"] .report-date-range-popover{box-sizing:border-box;min-width:460px!important;width:460px!important;max-width:calc(100vw - 32px)!important;grid-template-columns:repeat(2,minmax(0,1fr));overflow:visible!important}
+ body#global-report-workspace[data-report-template="penerimaan"] .report-date-range-popover .id-date-control{min-width:0}
+ body#global-report-workspace[data-report-template="penerimaan"] .report-date-range-popover .id-date-control>input:not(.id-date-native){box-sizing:border-box;flex:1 1 0;min-width:128px;padding-inline:10px;font-size:14px;letter-spacing:0;font-variant-numeric:tabular-nums}
+ body#global-report-workspace[data-report-template="penerimaan"] .report-date-range-popover .id-date-picker{flex:0 0 44px;min-width:44px}
+}

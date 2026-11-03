@@ -9,10 +9,10 @@ function savings_book_pdf(array $book,array $settings,bool $guide=false): \Dompd
     $pages=savings_book_positioned($book,$settings);$layout=$settings['layout'];
     $options=new \Dompdf\Options();$options->setIsRemoteEnabled(false);
     $pdf=new \Dompdf\Dompdf($options);
-    $pdf->loadHtml('<html><head><style>@page{margin:0}body{margin:0}.sheet{page-break-after:always}.sheet:last-child{page-break-after:auto}</style></head><body>'.str_repeat('<div class="sheet">&nbsp;</div>',count($pages)).'</body></html>');
+    $pdf->loadHtml('<html><head><style>@page{margin:0}body{margin:0;font-family:"Segoe UI","DejaVu Sans",sans-serif}.sheet{page-break-after:always}.sheet:last-child{page-break-after:auto}</style></head><body>'.str_repeat('<div class="sheet">&nbsp;</div>',count($pages)).'</body></html>');
     $pdf->setPaper([0,0,148*72/25.4,210*72/25.4]);$pdf->render();
     $pdf->getCanvas()->page_script(static function($number,$count,$canvas,$fonts)use($pages,$layout,$guide,$settings){
-        $mm=72/25.4;$font=$fonts->getFont('DejaVu Sans','bold');$black=[0,0,0];
+        $mm=72/25.4;$font=$fonts->getFont(spp_pdf_font_family(),'bold');$black=[0,0,0];
         $widths=array_map(static fn($key)=>$layout[$key],['w_no','w_date','w_in','w_out','w_balance','w_sign']);$width=array_sum($widths);
         $text=static function(float $x,float $y,float $width,string $value,float $size=8.5,bool $right=false)use($canvas,$fonts,$font,$mm,$black){
             while($size>6.5&&$fonts->getTextWidth($value,$font,$size)>($width-1.6)*$mm)$size-=.25;

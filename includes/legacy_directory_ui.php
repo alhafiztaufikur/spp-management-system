@@ -1,4 +1,5 @@
 <?php
+require_once __DIR__.'/pagination.php';
 /** Read-only directory controls shared by the Legacy workspaces. */
 require_once __DIR__.'/legacy_ui.php';
 
@@ -23,7 +24,8 @@ function legacy_directory_context(array $input): array {
 
 function legacy_directory_pager(string $path,array $query,int $page,int $total,string $pageKey='page',string $anchor=''): void {
     $pages=max(1,(int)ceil($total/25));
-    echo '<nav class="legacy-directory-pagination" aria-label="Halaman daftar"><span>Halaman '.number_format($page,0,',','.').' dari '.number_format($pages,0,',','.').' · 25 per halaman</span><div>';
+    echo pagination_controls($page,$pages,static fn($target)=>legacy_ui_url($path,array_replace($query,[$pageKey=>$target])).$anchor);
+    echo '<nav class="pagination-mobile legacy-directory-pagination" aria-label="Halaman daftar"><span>Halaman '.number_format($page,0,',','.').' dari '.number_format($pages,0,',','.').' · 25 per halaman</span><div>';
     foreach([-1=>'Sebelumnya',1=>'Berikutnya'] as $delta=>$label){$next=$page+$delta;if($next<1||$next>$pages)continue;echo '<a class="btn btn-ghost dbt-button dbt-button-outline" href="'.legacy_ui_e(legacy_ui_url($path,array_replace($query,[$pageKey=>$next])).$anchor).'">'.legacy_ui_e($label).'</a>';}
     echo '</div></nav>';
 }

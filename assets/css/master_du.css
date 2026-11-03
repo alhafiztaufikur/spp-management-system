@@ -20,7 +20,7 @@ html body[data-readable-workspace="master-registration"] .du-workspace {
   --du-hero-end: #c7eddf;
   background: linear-gradient(180deg, transparent 70px, var(--du-page-wash) 680px, transparent 1000px);
   color: var(--du-ink);
-  font-family: 'Inter', sans-serif;
+  font-family: var(--font-body);
 }
 html body[data-readable-workspace="master-registration"] .du-workspace .du-master-hero {
   position: relative;
@@ -36,12 +36,12 @@ html body[data-readable-workspace="master-registration"] .du-workspace .du-maste
   box-shadow: 0 8px 28px color-mix(in srgb, var(--du-accent) 2%, transparent);
 }
 .du-hero-copy { position: relative; z-index: 1; min-width: 0; width: 100%; }
-.du-workspace :is(h1,h2,h3,h4) { font-family: 'Inter', sans-serif; }
+.du-workspace :is(h1,h2,h3,h4) { font-family: var(--font-body); }
 html body[data-readable-workspace="master-registration"] .du-workspace .recap-class-overline {
-  color: var(--du-kicker); font-size: 14px; font-weight: 750; letter-spacing: .09em; text-transform: uppercase;
+  color: var(--du-kicker); font-size: 14px; font-weight: 700; letter-spacing: .09em; text-transform: uppercase;
 }
 .du-workspace .du-hero-copy h1 {
-  font-family: 'Inter', sans-serif; font-size: clamp(40px, 4.1vw, 58px); font-weight: 800;
+  font-family: var(--font-body); font-size: clamp(40px, 4.1vw, 58px); font-weight: 700;
   letter-spacing: -2.3px; line-height: 1.12; color: var(--du-title); margin: 9px 0 12px;
 }
 .du-hero-copy>p { color: var(--du-hero-muted); font-size: 18px; line-height: 1.6; margin: 0 0 20px; }

@@ -27,6 +27,6 @@ function workflow_require_ready(mysqli $db): void {
     if(str_contains($_SERVER['HTTP_ACCEPT']??'','application/json')||basename($_SERVER['SCRIPT_NAME']??'')==='health.php'){
         header('Content-Type: application/json; charset=utf-8');echo json_encode(['ok'=>false,'code'=>'schema_update_required','message'=>$message],JSON_UNESCAPED_UNICODE);
     }else{
-        header('Content-Type: text/html; charset=utf-8');echo '<!doctype html><html lang="id"><head><meta charset="utf-8"><meta name="viewport" content="width=device-width,initial-scale=1"><title>Sistem sedang diperbarui</title><style>body{margin:0;background:#eef6f1;color:#18382c;font:16px/1.7 Arial,sans-serif}main{max-width:620px;margin:12vh auto;padding:30px;background:#fff;border:1px solid #cde3d5;border-radius:18px}h1{font-size:24px;margin:0 0 12px}</style></head><body><main><h1>Sistem sedang diperbarui</h1><p>'.$message.'</p></main></body></html>';
+        header('Content-Type: text/html; charset=utf-8');echo '<!doctype html><html lang="id"><head><meta charset="utf-8"><meta name="viewport" content="width=device-width,initial-scale=1"><title>Sistem sedang diperbarui</title><style>body{margin:0;background:#eef6f1;color:#18382c;font:16px/1.7 Segoe UI,Arial,sans-serif}main{max-width:620px;margin:12vh auto;padding:30px;background:#fff;border:1px solid #cde3d5;border-radius:18px}h1{font-size:24px;margin:0 0 12px}</style></head><body><main><h1>Sistem sedang diperbarui</h1><p>'.$message.'</p></main></body></html>';
     }exit;
 }

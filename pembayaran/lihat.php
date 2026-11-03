@@ -53,6 +53,11 @@ function payment_was_updated($createdAt, $updatedAt): bool {
 }
 
 // Filter
+if(isset($_GET['search_plain'])){
+    if(!is_scalar($_GET['search_plain'])){http_response_code(400);exit('Pencarian tidak valid.');}
+    if((string)$_GET['search_plain']!==(string)($_GET['search']??''))unset($_GET['student_id']);
+    $_GET['search']=(string)$_GET['search_plain'];unset($_GET['search_plain']);
+}
 $search     = trim($_GET['search'] ?? '');
 $dateParam = static function (string $key): string {
     $value = trim((string)($_GET[$key] ?? ''));
@@ -120,12 +125,13 @@ $periodLabel = $filter_tanggal_awal === $filter_tanggal_akhir
     : spp_date_label($filter_tanggal_awal) . ' - ' . spp_date_label($filter_tanggal_akhir);
 if(($_GET['undated']??'')==='1')$periodLabel='Histori tanpa tanggal';
 elseif(($_GET['all_periods']??'')==='1')$periodLabel='Semua periode';
-$studentOptions = $koneksi->query("SELECT s.id AS student_id,s.NO_INDUK,s.unit_id,s.NO_induk_diknas,s.NAMA,s.KELAS FROM siswa s WHERE s.is_active=1 ORDER BY s.NAMA")->fetch_all(MYSQLI_ASSOC);
 $originBack=null;
 if($selectedRow){$originBack=mh_return_url($_GET['back_context']??null,(int)$selectedRow['unit_id'],'receipt',(int)$selectedRow['id']);if(!$originBack&&!empty($selectedRow['student_id']))$originBack=mh_return_url($_GET['back_context']??null,(int)$selectedRow['unit_id'],'student',(int)$selectedRow['student_id']);}
 $studentSearchDisplay = $search;
-$displayMatches=array_values(array_filter($studentOptions,static fn($o)=>(int)($_GET['student_id']??0)>0 ? (int)$o['student_id']===(int)$_GET['student_id'] : ($search!==''&&($search===$o['NO_INDUK']||$search===(string)($o['NO_induk_diknas']??'')))));
-if(count($displayMatches)===1)$studentSearchDisplay=$displayMatches[0]['NAMA'];
+if((int)($_GET['student_id']??0)>0){
+    $display=hp_one($koneksi,'SELECT NAMA FROM siswa WHERE id=?',[(int)$_GET['student_id']]);
+    if($display)$studentSearchDisplay=$display['NAMA'];
+}
 filter_output_start();
 ?>
 <!DOCTYPE html>
@@ -146,7 +152,7 @@ filter_output_start();
 <link rel="stylesheet" href="../assets/css/payment_ui_polish.css?v=<?= filemtime(__DIR__ . '/../assets/css/payment_ui_polish.css') ?>">
 <link rel="stylesheet" href="../assets/css/history_rombel_refinement.css?v=<?= filemtime(__DIR__.'/../assets/css/history_rombel_refinement.css') ?>">
 <link rel="stylesheet" href="../assets/css/payment_workspace_refinement.css?v=<?= filemtime(__DIR__.'/../assets/css/payment_workspace_refinement.css') ?>"><link rel="stylesheet" href="../assets/css/payment_content_plain.css?v=<?= filemtime(__DIR__ . '/../assets/css/payment_content_plain.css') ?>"></head>
-<body class="payment-content-plain ui-time-polish payment-history-page" data-readable-workspace="payment-history">
+<body class="payment-content-plain payment-history-controls ui-time-polish payment-history-page" data-readable-workspace="payment-history">
 
   <div class="bg-orbs">
     <div class="orb orb-1"></div><div class="orb orb-2"></div><div class="orb orb-3"></div>
@@ -202,7 +208,7 @@ filter_output_start();
               <input type="hidden" name="tanggal_awal" value="<?= htmlspecialchars($filter_tanggal_awal) ?>">
               <input type="hidden" name="tanggal_akhir" value="<?= htmlspecialchars($filter_tanggal_akhir) ?>">
               <button type="button" class="report-date-range-button" aria-expanded="false">
-                <span class="report-date-range-value"><?= htmlspecialchars($periodLabel) ?></span>
+                <?= spp_calendar_icon() ?><span class="report-date-range-value"><?= htmlspecialchars($periodLabel) ?></span>
               </button>
               <div class="report-date-range-popover" hidden>
                 <label><span>Mulai</span><input type="date" value="<?= htmlspecialchars($filter_tanggal_awal) ?>" data-range-start></label>
@@ -214,14 +220,11 @@ filter_output_start();
           <div class="field-row ph-search-field">
             <label class="field-label" for="search-lihat">Cari Nama / NIS / Identitas Sumber</label>
             <div class="search-box">
-              <input type="text" id="search-lihat" data-student-search data-student-list="payment-history-siswa-list" data-student-select-callback="selectReportStudentSearchOption" data-student-query-target="payment-history-student-query" placeholder="Ketik nama, NIS, atau NIS Diknas..." value="<?= htmlspecialchars($studentSearchDisplay) ?>" autocomplete="off">
+              <svg class="payment-search-icon" width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.5" aria-hidden="true"><circle cx="11" cy="11" r="8"/><path d="m17 17 4 4"/></svg>
+              <input type="text" id="search-lihat" name="search_plain" data-history-search="payments" data-history-unit="<?= unit_active_id() ?>" data-history-query="#payment-history-student-query" placeholder="Ketik nama, NIS, atau NIS Diknas..." value="<?= htmlspecialchars($studentSearchDisplay) ?>" autocomplete="off">
               <input type="hidden" id="payment-history-student-query" name="search" value="<?= htmlspecialchars($search) ?>">
             </div>
-            <datalist id="payment-history-siswa-list">
-              <?php foreach ($studentOptions as $studentOption): ?>
-              <option value="<?= htmlspecialchars($studentOption['NAMA']) ?>" data-student-id="<?= (int)($studentOption['student_id']??0) ?>" data-unit-id="<?= (int)($studentOption['unit_id']??0) ?>" data-nis="<?= htmlspecialchars($studentOption['NO_INDUK']) ?>" data-diknas="<?= htmlspecialchars((string)($studentOption['NO_induk_diknas'] ?? '')) ?>" data-nama="<?= htmlspecialchars($studentOption['NAMA']) ?>" data-kelas="<?= htmlspecialchars((unit_all_readonly()?unit_label((int)$studentOption['unit_id']).' · ':'').$studentOption['KELAS']) ?>"></option>
-              <?php endforeach; ?>
-            </datalist>
+
           </div>
           <?php history_operator_field($operatorOptions,'payment-history-operator'); history_class_field($rombelFilter,'payment-history-rombel'); ?>
           <div class="field-row"><label class="field-label">Data per halaman</label><select class="field-input field-select filter-sel" name="per_page" aria-label="Jumlah pembayaran per halaman">
@@ -245,7 +248,7 @@ filter_output_start();
         </form><?php if(!$isArchive&&$history['outside']>0): ?><p class="ph-period-summary"><?= number_format($history['outside'],0,',','.') ?> transaksi lain berada di luar periode ini. Pilih <strong>Semua Periode</strong> untuk menelusurinya, termasuk histori tanpa tanggal.</p><?php endif; ?></section>
       <?php if(!$isArchive): ?><div class="ph-export-actions"><a class="btn btn-ghost" href="export_history.php?<?= authorization_escape(http_build_query(array_replace($_GET,['format'=>'xlsx']))) ?>">Excel - Semua Hasil Filter</a><a class="btn btn-ghost" href="export_history.php?<?= authorization_escape(http_build_query(array_replace($_GET,['format'=>'pdf']))) ?>" target="_blank" rel="noopener">Cetak Halaman Ini</a></div><?php endif; ?>
       <div class="ph-workspace" data-payment-workspace data-view="<?= $isArchive?'deleted':'active' ?>">
-      <section class="ph-list-panel"><?php if($feeMaster): ?><p class="ph-period-summary">Transaksi biaya: <strong><?= authorization_escape($feeMaster['nama']) ?></strong>. Total Bayar tetap menunjukkan seluruh isi struk.</p><?php endif; ?><header class="ph-panel-heading"><div><h3> Daftar Transaksi</h3><p>Menampilkan <?= $firstShown ?>&ndash;<?= $lastShown ?> dari <?= number_format($totalPayments) ?> transaksi<?= $isArchive?' dihapus':'' ?>.</p></div><div class="ph-list-nav"><small><?= $firstShown ?>&ndash;<?= $lastShown ?> dari <?= number_format($totalPayments) ?></small><?php foreach(['Sebelumnya'=>$page-1,'Berikutnya'=>$page+1] as $label=>$target): ?><a class="btn btn-ghost btn-sm <?= $target<1||$target>$totalPages?'is-disabled':'' ?>" aria-label="Halaman <?= strtolower($label) ?>" <?= $target<1||$target>$totalPages?'aria-disabled="true" tabindex="-1"':'' ?> href="<?= $target>=1&&$target<=$totalPages?'lihat.php?'.htmlspecialchars(http_build_query(array_merge($_GET,['page'=>$target,'selected'=>null]))):'#' ?>"><?= $label ?></a><?php endforeach; ?></div></header>
+      <section class="ph-list-panel"><?php if($feeMaster): ?><p class="ph-period-summary">Transaksi biaya: <strong><?= authorization_escape($feeMaster['nama']) ?></strong>. Total Bayar tetap menunjukkan seluruh isi struk.</p><?php endif; ?><header class="ph-panel-heading"><div><h3> Daftar Transaksi</h3></div></header>
       <div class="ph-record-list">
       <?php foreach($paymentRows as $i=>$row): $id=(int)$row['id'];$href='lihat.php?'.http_build_query(array_merge($_GET,['selected'=>$id]));$rowCaps=$id<0?['can_print'=>true]:payment_capabilities($koneksi,$row,$activityGroups[$id]??[],$isArchive,[]); ?><article class="ph-record-card">
       <a href="<?= authorization_escape($href) ?>" class="ph-record <?= $id===$selectedId?'is-selected':'' ?> <?= $isArchive?'is-deleted':'' ?>" data-payment-record data-id="<?= $id ?>" data-unit="<?= (int)$row['unit_id'] ?>" <?= $id===$selectedId?'aria-current="true"':'' ?>><span class="ph-record-number"><?= $offset+$i+1 ?></span><div class="ph-record-identity"><strong><?= authorization_escape($row['NO_INDUK']) ?></strong><span><?= authorization_escape($row['NAMA']) ?></span><small><?= ($row['owner_type']??'student')==='account'?'Pemilik rekening non-siswa':'Siswa / Diknas '.authorization_escape($row['NO_induk_diknas']?:'Tidak tercatat') ?></small><?= unit_record_badge($row) ?></div><span class="kelas-badge">Kelas <?= authorization_escape(payment_history_class($row['kelas_transaksi'])) ?></span><div class="ph-record-period"><small>Periode</small><span> <?= authorization_escape(payment_history_period($row)) ?></span><small class="ph-time-note"><?= authorization_escape(payment_time_parts($row)['date']) ?><br><?= authorization_escape(payment_time_parts($row)['time']) ?></small></div><div class="ph-record-total"><small>Total Bayar</small><strong><?= payment_history_money($row['total_jumlah']) ?></strong><?php if($feeMaster): ?><small><?= authorization_escape($feeMaster['nama']) ?>: <?= payment_history_money($row['fee_amount']) ?></small><?php endif; ?></div><span class="ph-status <?= $isArchive?'is-deleted':'' ?>"><?= $isArchive?'Dihapus':($id<0?'Legacy':'SistemSPP') ?></span></a>
@@ -255,7 +258,7 @@ filter_output_start();
       </div>
       <?php render_pagination('lihat.php',$paymentPaginationQuery,$page,$totalPages,$totalPayments,$perPage,'transaksi'); ?>
       </section>
-      <section class="ph-detail-panel" data-payment-detail-panel><header class="ph-panel-heading"><div><h3> Detail Transaksi</h3><p>Informasi lengkap transaksi pembayaran siswa.</p></div><div class="ph-detail-nav"><button type="button" class="btn btn-ghost btn-sm" data-payment-prev aria-label="Transaksi sebelumnya">Sebelumnya</button><button type="button" class="btn btn-ghost btn-sm" data-payment-next aria-label="Transaksi berikutnya">Berikutnya</button><button type="button" class="btn btn-ghost btn-sm" data-payment-close aria-label="Tutup detail">Tutup</button></div></header><div class="ph-detail-body" data-payment-detail aria-live="polite"><?php if($selectedModel): payment_history_render($selectedModel,array_merge($_GET,['selected'=>$selectedId])); else: ?><p class="ph-empty"><?= authorization_escape($detailError??'Pilih transaksi pada daftar untuk melihat detail.') ?></p><?php endif; ?></div></section>
+      <section class="ph-detail-panel" data-payment-detail-panel><header class="ph-panel-heading"><div><h3> Detail Transaksi</h3></div><div class="ph-detail-nav"><button type="button" class="btn btn-ghost btn-sm" data-payment-prev aria-label="Transaksi sebelumnya">Sebelumnya</button><button type="button" class="btn btn-ghost btn-sm" data-payment-next aria-label="Transaksi berikutnya">Berikutnya</button><button type="button" class="btn btn-ghost btn-sm" data-payment-close aria-label="Tutup detail">Tutup</button></div></header><div class="ph-detail-body" data-payment-detail aria-live="polite"><?php if($selectedModel): payment_history_render($selectedModel,array_merge($_GET,['selected'=>$selectedId])); else: ?><p class="ph-empty"><?= authorization_escape($detailError??'Pilih transaksi pada daftar untuk melihat detail.') ?></p><?php endif; ?></div></section>
       </div></div>
     </main>
   </div>
@@ -333,6 +336,7 @@ filter_output_start();
     });
   </script>
   <?php endif; ?>
+<script src="../assets/js/history_search.js?v=<?= filemtime(__DIR__.'/../assets/js/history_search.js') ?>"></script>
 </body>
 </html>
 

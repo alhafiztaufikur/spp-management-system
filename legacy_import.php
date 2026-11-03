@@ -1,4 +1,6 @@
 <?php
+require_once __DIR__.'/includes/pagination.php';
+ob_start('pagination_legacy_markup');
 session_start();require_once __DIR__.'/koneksi.php';require_once __DIR__.'/includes/legacy_import_http.php';require_once __DIR__.'/includes/legacy_finance_http.php';
 $error='';$job=null;$rows=['rows'=>[],'total'=>0,'page'=>1];$preview=null;$health=[];
 try{legacy_http_actor($koneksi,'students');}catch(DomainException $e){http_response_code(403);exit(legacy_ui_e($e->getMessage()));}

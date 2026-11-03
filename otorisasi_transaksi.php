@@ -1,4 +1,5 @@
 <?php
+require_once __DIR__.'/includes/pagination.php';
 session_start();
 if (!isset($_SESSION['admin_id'])) { header('Location: login.php'); exit; }
 
@@ -203,7 +204,7 @@ function authorization_request_summary(array $request): array
               <option value="<?= $value ?>" <?= $statusFilter===$value?'selected':'' ?>><?= $label ?></option>
             <?php endforeach; ?>
           </select></label>
-          <label class="field-row authorization-search-field"><span class="field-label">Cari transaksi atau siswa</span><input class="field-input" name="q" value="<?= htmlspecialchars($search) ?>" placeholder="Nomor transaksi, NIS, atau nama siswa" /></label>
+          <label class="field-row authorization-search-field"><span class="field-label">Cari transaksi atau siswa</span><span class="search-box"><?= authorization_icon('search') ?><input class="field-input" name="q" value="<?= htmlspecialchars($search) ?>" placeholder="Nomor transaksi, NIS, atau nama siswa" /></span></label>
           <div class="authorization-filter-actions"><button class="btn btn-primary" type="submit">Tampilkan</button>
           <a class="btn btn-ghost authorization-reset-button" href="otorisasi_transaksi.php?menu=<?= authorization_escape($menu) ?>&amp;view=<?= $historyView?'history':'queue' ?>"><span>Reset</span></a></div>
         </form>
@@ -253,7 +254,7 @@ function authorization_request_summary(array $request): array
                 <?php if($icon!=='delete'): ?><span class="auth-action-icon auth-tone-<?= $tone ?>"><?= authorization_icon($icon) ?></span><?php endif; ?>
                 <div class="auth-record-identity"><span class="auth-menu-badge"><?= authorization_escape(authorization_menu_label($item['menu'])) ?></span><strong><?= authorization_escape($item['reference']) ?></strong><span><?= authorization_escape($item['student']) ?></span><small>NIS <?= authorization_escape($item['nis']) ?><?= unit_active_id()===0?' ? '.authorization_escape(unit_label($item['unit_id'])):'' ?></small></div>
                 <div class="auth-record-action"><strong><?= authorization_escape($item['label']) ?></strong><small><?= $item['authorization_id']?'Pengajuan #'.(int)$item['authorization_id']:'Perubahan langsung' ?></small></div>
-                <span class="auth-status auth-tone-<?= $tone ?>"><?= authorization_escape($status) ?></span>
+                <span class="auth-status auth-tone-<?= $tone ?><?= $item['action']==='deleted'?' is-deleted':'' ?>"><?= authorization_escape($status) ?></span>
                 <div class="auth-record-actor"><?= authorization_icon('user') ?><div><strong><?= authorization_escape($item['name']) ?></strong><small><?= authorization_escape(authorization_role_label($item['role'])) ?></small></div></div>
                 <div class="auth-record-time"><?= authorization_icon('calendar') ?><div><strong><?= authorization_escape(spp_date_label($item['time'])) ?></strong><small><?= authorization_escape(date('H:i:s',strtotime($item['time']))) ?> WIB</small></div></div>
               </a><?php if($historyView && unit_is_super()): ?></div><?php endif; ?>
@@ -264,7 +265,8 @@ function authorization_request_summary(array $request): array
           <div class="auth-detail-body" data-auth-detail aria-live="polite"><?php if($detail): authorization_render_detail($detail);else: ?><div class="auth-empty"><?= authorization_escape($detailError??'Pilih transaksi pada daftar untuk melihat detail.') ?></div><?php endif; ?></div>
         </section>
       </div>
-      <div class="workflow-pages"><span><?= number_format($total) ?> <?= $historyView?'transaksi':'permintaan' ?> &middot; Halaman <?= $page ?> dari <?= $pages ?></span><div>
+      <?php echo pagination_controls($page,$pages,static fn($target)=>'?'.filter_build_query(['menu'=>$menu,'source'=>$source,'view'=>$historyView?'history':'queue','status'=>$statusFilter,'kind'=>$kind,'q'=>$search,'page'=>$target])); ?>
+      <div class="workflow-pages pagination-mobile"><span><?= number_format($total) ?> <?= $historyView?'transaksi':'permintaan' ?> &middot; Halaman <?= $page ?> dari <?= $pages ?></span><div>
       <?php foreach(['Sebelumnya'=>$page-1,'Berikutnya'=>$page+1] as $label=>$target): if($target>=1&&$target<=$pages): ?><a class="btn btn-ghost btn-sm" href="?<?= htmlspecialchars(filter_build_query(['menu'=>$menu,'source'=>$source,'view'=>$historyView?'history':'queue','status'=>$statusFilter,'kind'=>$kind,'q'=>$search,'page'=>$target])) ?>"><?= $label ?></a><?php endif; endforeach; ?></div></div>
       </div>
     </main>

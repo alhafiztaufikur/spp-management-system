@@ -19,7 +19,7 @@ $coveredDu=$receipt;$coveredDu['remaining']=[['Sisa PSB',9000000],['DU tahun per
 foreach($cases as $name=>$receipts){
     if(str_contains($name,'unknown-du')){ob_start();receipt_print_document($receipts,'Struk Uji','Struk siap dicetak',true);$unknownHtml=ob_get_clean();if(str_contains($unknownHtml,'Belum dapat ditentukan')||substr_count($unknownHtml,'class="amount">-</td>')!==count($receipts))throw new RuntimeException('Unknown DU must remain a dash on every receipt.');}
     ob_start();receipt_print_document($receipts,'Struk Uji','Struk siap dicetak',true);$html=ob_get_clean();if(str_contains($html,'Sisa Komite'))throw new RuntimeException('Komite remaining must not appear on the slip.');if($name==='no-nis'&&(!str_contains($html,'ADMIN')||str_contains($html,'NIS Diknas')))throw new RuntimeException('Signer capitalization or missing NIS rendering.');file_put_contents($dir.'/receipt-'.$name.'.html',$html);
-    $options=new \Dompdf\Options();$options->setDefaultMediaType('print');$options->setIsRemoteEnabled(false);$options->setFontHeightRatio(1.0);
+    $options=receipt_pdf_options();
     $pdf=new \Dompdf\Dompdf($options);$pdf->loadHtml($html,'UTF-8');$pdf->setPaper([0,0,612,396]);$pdf->render();$pages=$pdf->getCanvas()->get_page_count();
     if($name==='normal'&&$pages!==1||$name==='annual'&&$pages!==12||$name==='long'&&$pages<2)throw new RuntimeException('Unexpected page count: '.$name.' '.$pages);
     file_put_contents($dir.'/receipt-'.$name.'.pdf',$pdf->output());echo 'PASS receipt '.$name.': '.$pages.' pages'.PHP_EOL;
