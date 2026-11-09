@@ -1,5 +1,9 @@
 # Tarif khusus SPP per siswa dan ringkasan transaksi master biaya
 
+Pembaruan 9 November 2026: [tarif SPP–Komite saat PSB](PSB_SPP_ADMISSION_20261109.md)
+menambahkan penerbitan melalui Master Siswa dan dasar rencana masuk sebelum
+penempatan. Tarif dasar kelas 1/7/10 tidak lagi diinput melalui Master SPP.
+
 ## Pemakaian
 
 Pada **Master Penerbitan SPP → Pilih Siswa**, klik ikon pensil di samping

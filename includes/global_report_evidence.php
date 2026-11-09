@@ -363,7 +363,7 @@ function report_monthly_evidence(mysqli $db,string $category,array $months,array
     // before fetching/materializing other academic years into PHP memory.
     $monthWhere=$months?' WHERE (CAST(CAST(t.tahun AS CHAR) AS SIGNED),CAST(CAST(t.bulan AS CHAR) AS SIGNED)) IN ('.implode(',',array_map(static fn($m)=>'('.(int)$m[1].','.(int)$m[0].')',$months)).')':' WHERE 0=1';
     $sql=$category==='komite'
-      ? "SELECT t.*,sta.master_kelas_id,COALESCE(SUM(p.nominal),0) paid FROM tagihan_komite t JOIN siswa_tahun_ajaran sta ON sta.id=t.penempatan_id AND sta.unit_id=t.unit_id LEFT JOIN bayar_komite p ON p.tagihan_komite_id=t.id AND p.unit_id=t.unit_id$monthWhere GROUP BY t.id"
+      ? "SELECT t.*,sta.master_kelas_id,COALESCE(SUM(p.nominal),0) paid FROM tagihan_komite t LEFT JOIN siswa_tahun_ajaran sta ON sta.id=t.penempatan_id AND sta.unit_id=t.unit_id LEFT JOIN bayar_komite p ON p.tagihan_komite_id=t.id AND p.unit_id=t.unit_id$monthWhere GROUP BY t.id,sta.master_kelas_id"
       : "SELECT t.*,COALESCE(SUM(CASE WHEN b.status='active' THEN a.nominal_dari_bayar ELSE 0 END),0) paid FROM tagihan_spp t LEFT JOIN spp_alokasi a ON a.tagihan_spp_id=t.id AND a.unit_id=t.unit_id LEFT JOIN spp_alokasi_batch b ON b.id=a.batch_id AND b.unit_id=a.unit_id$monthWhere GROUP BY t.id";
     foreach(hp_rows($db,$sql) as $b){$period=sprintf('%04d-%02d',(int)$b['tahun'],(int)$b['bulan']);if(!in_array($period,$periods,true))continue;
         $nis=(string)$b['no_induk'];$cells[$nis][$period]=['bill'=>(float)$b['nominal_tagihan'],'paid'=>(float)$b['paid'],'status'=>$b['status'],'class'=>(string)$b['kelas_rombel_snapshot'],'native'=>true];

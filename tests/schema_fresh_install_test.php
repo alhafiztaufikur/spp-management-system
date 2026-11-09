@@ -76,6 +76,14 @@ try {
     }
     require_once __DIR__.'/../includes/legacy_schema.php';
     if(!legacy_schema_ready($koneksi))throw new RuntimeException('Fresh install missing Legacy/unit identity schema');
+    require_once __DIR__.'/../includes/psb_spp_schema.php';
+    require_once __DIR__.'/../includes/spp_student_tariff.php';
+    if(!pspp_ready($koneksi)||!sct_ready($koneksi)||!du_advance_schema_ready($koneksi))throw new RuntimeException('Fresh install missing admission tariff or DU schema');
+    if(pspp_schema_apply($koneksi)!==0)throw new RuntimeException('Fresh admission schema replay changed objects');
+    // Bootstrap preserves an existing Super Admin; the schema carries no credentials.
+    $fixtureHash=password_hash(bin2hex(random_bytes(24)),PASSWORD_DEFAULT);
+    $statement=$koneksi->prepare("INSERT INTO admin(username,password,nama,role,is_active) VALUES('superadmin',?,'QA Fresh Super Admin','super_admin',1)");
+    $statement->bind_param('s',$fixtureHash);$statement->execute();$statement->close();
     // The documented workflow runs account bootstrap in a new CLI process.
     $process = proc_open([PHP_BINARY, __DIR__ . '/../sql/bootstrap_unit_accounts.php', $credentialsFile],
         [['pipe', 'r'], ['pipe', 'w'], ['pipe', 'w']], $pipes, dirname(__DIR__), null,
@@ -87,9 +95,10 @@ try {
     if (proc_close($process) !== 0) {
         throw new RuntimeException('Bootstrap akun clone gagal: ' . trim($bootstrapError ?: $bootstrapOutput));
     }
-    // One Super Admin and five accounts per unit; unit admins are no longer created.
-    if ((int)$koneksi->query('SELECT COUNT(*) FROM admin')->fetch_row()[0] !== 16
-        || (int)$koneksi->query("SELECT COUNT(*) FROM admin WHERE role='admin' AND is_active=1")->fetch_row()[0] !== 0
+    // Current policy: one preserved Super Admin and four global Administrators.
+    if ((int)$koneksi->query('SELECT COUNT(*) FROM admin')->fetch_row()[0] !== 5
+        || (int)$koneksi->query("SELECT COUNT(*) FROM admin WHERE role='admin' AND is_active=1 AND unit_id IS NULL")->fetch_row()[0] !== 4
+        || $koneksi->query("SELECT password FROM admin WHERE username='superadmin'")->fetch_row()[0]!==$fixtureHash
         || !is_file($credentialsFile) || filesize($credentialsFile) === 0) {
         throw new RuntimeException('Bootstrap akun clone tidak lengkap.');
     }

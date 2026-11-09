@@ -340,20 +340,7 @@ function class_sync_student_current_year(
         $preserveClass = $hasPayment;
     }
 
-    $stmt = $db->prepare('SELECT asal_psb FROM siswa WHERE NO_INDUK=? LIMIT 1 FOR UPDATE');
-    $stmt->bind_param('s', $noInduk); $stmt->execute();
-    $origin = $stmt->get_result()->fetch_assoc(); $stmt->close();
-    $isGradeOne = (int)$class['tingkat'] === 1;
-    $alreadyCovered = false;
-    if ((int)($origin['asal_psb'] ?? 0) === 1) {
-        $stmt = $db->prepare('SELECT EXISTS(SELECT 1 FROM siswa_tahun_ajaran WHERE no_induk=? AND spp_covered_by_psb=1) covered');
-        $stmt->bind_param('s', $noInduk); $stmt->execute();
-        $alreadyCovered = (int)($stmt->get_result()->fetch_assoc()['covered'] ?? 0) === 1; $stmt->close();
-    }
-    $coveredByPsb = (int)(
-        (int)($existing['spp_covered_by_psb'] ?? 0) === 1
-        || ((int)($origin['asal_psb'] ?? 0) === 1 && $isGradeOne && !$alreadyCovered)
-    );
+    $coveredByPsb = (int)((int)($existing['spp_covered_by_psb'] ?? 0) === 1);
 
     $sppPaid = $existing ? class_component_paid_in_academic_year($db, $noInduk, $academicLabel, 'spp') : 0.0;
     $komitePaid = $existing ? max(
@@ -392,6 +379,8 @@ function class_sync_student_current_year(
         $syncResult['unchanged'][] = 'spp';
     }
     if ($placementId > 0 && $status === 'aktif') {
+        require_once __DIR__.'/psb_spp.php';
+        pspp_bind_placement($db,$placementId);
         komite_sync_placement($db, $placementId);
         $rateResult=komite_sync_student_rate($db,$noInduk,$komite,$placementId);
         $syncResult[$rateResult['updated']>0?'synced':'unchanged'][]='komite';

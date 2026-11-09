@@ -15,6 +15,7 @@ function spp_rate_confirmation_screen(array $post, array $oldRates, array $newRa
     $year=(string)$post['tahun_ajaran'];$summary=unit_label(unit_active_id()).' · '.$year;
     if (($post['aksi']??'')==='terbitkan') $summary.=' · '.count($post['selected_students']??[]).' siswa';
     foreach ($newRates as $level=>$value) {
+        [$first]=unit_level_bounds();if((int)$level===$first)continue;
         if ($kind==='ubah_tarif_terbit' && abs($value-($oldRates[$level]??0))<.001) continue;
         $summary.="\nKelas ".$level.': '.($kind==='ubah_tarif_terbit'?'Rp '.number_format($oldRates[$level]??0,0,',','.').' → ':'').'Rp '.number_format($value,0,',','.');
     }

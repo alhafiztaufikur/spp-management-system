@@ -1695,6 +1695,16 @@ async function requestSppStatus(options = {}) {
     sppStatusState.pending = false;
     sppStatusState.payload = payload;
     completedPayload=payload;
+    const admissionPeriod=payload.payment_details?.admissionPlan?.oldest_period;
+    if(admissionPeriod&&!window.sppEditPaymentId&&!window.paymentDraft&&!window.sppRestoringDraft&&!window.sppManualPeriod&&selectedStudentOption()?.dataset.admissionDefaultApplied!=='1'){
+      selectedStudentOption().dataset.admissionDefaultApplied='1';
+      const month=document.getElementById('bulan-bayar'),year=document.getElementById('tahun-bayar');
+      if(month&&year&&(month.value!==admissionPeriod.bulan||year.value!==admissionPeriod.tahun)){
+        month.value=admissionPeriod.bulan;year.value=admissionPeriod.tahun;
+        applySppStatusPayload(payload);refreshSelectedStudentPaymentDetails();window.syncSppDropdowns?.();
+        return await requestSppStatus({force:true,interactive:false});
+      }
+    }
     applySppStatusPayload(payload);
     if (interactive && sppEditDependencyBlocks(payload.edit_dependency)) {
       showSppWarning(payload.edit_dependency, sourceElement, force);
@@ -1948,24 +1958,22 @@ function refreshSelectedStudentPaymentDetails() {
 function parseNumber(val) {
   if (typeof val === 'number') return val;
   if (!val) return 0;
-  const clean = val.toString().replace(/\./g, '');
+  const raw=val.toString();
+  const clean=raw.includes(',')?raw.replace(/\./g,'').replace(',','.'):(/^[0-9]+\.[0-9]{1,2}$/.test(raw)?raw:raw.replace(/\./g,''));
   return parseFloat(clean) || 0;
 }
 
 // Helper to format number to rupiah string with dots
 function formatRupiahString(val) {
   if (val === null || val === undefined || val === '') return '0';
-  const clean = val.toString().replace(/\D/g, '');
-  if (!clean) return '0';
-  return parseInt(clean, 10).toLocaleString('id-ID');
+  return parseNumber(val).toLocaleString('id-ID',{maximumFractionDigits:2});
 }
 
 function formatNumericInput(input) {
   let cursorPosition = input.selectionStart;
   const originalLength = input.value.length;
-  const cleanVal = input.value.replace(/\D/g, '');
-
-  input.value = cleanVal === '' ? '0' : parseInt(cleanVal, 10).toLocaleString('id-ID');
+  const parts=input.value.replace(/[^0-9,]/g,'').split(',');
+  input.value=Number(parts[0]||0).toLocaleString('id-ID')+(parts.length>1?','+parts.slice(1).join('').slice(0,2):'');
 
   const newLength = input.value.length;
   cursorPosition = cursorPosition + (newLength - originalLength);
@@ -2141,7 +2149,8 @@ document.addEventListener('DOMContentLoaded', function () {
   }
 
   document.querySelectorAll('#bulan-bayar, #tahun-bayar').forEach(el => {
-    const handlePeriodChange = () => {
+    const handlePeriodChange = event => {
+      if(sppStatusUiReady&&!window.sppRestoringDraft)window.sppManualPeriod=true;
       if (window.sppPublishedBilling) clearPaymentAmountsOnContextChange(false);
       refreshSelectedStudentPaymentDetails();
       scheduleSppStatusCheck(sppStatusUiReady, el);
@@ -2449,6 +2458,7 @@ async function restorePaymentDraft() {
     }
   } catch (_) { /* storage unavailable */ }
   if (!draft || !document.getElementById('form-bayar')) return;
+  window.sppRestoringDraft=true;
   const setValue = (id, value) => { const input=document.getElementById(id); if (input && value !== undefined) input.value=String(value); };
   setValue('tgl-bayar', draft.tanggal_bayar);
   if (draft.tanggal_bayar !== undefined) document.getElementById('tgl-bayar')?.dispatchEvent(new Event('change', {bubbles:true}));
@@ -2474,6 +2484,7 @@ async function restorePaymentDraft() {
   window.paymentDraftOtherFees = draft;
   restorePaymentDraftOtherFees();
   updateTotal();
+  window.sppRestoringDraft=false;
 }
 
 function capturePaymentDraftInBrowser() {

@@ -4,6 +4,15 @@ require_once __DIR__.'/biaya_lain.php';
 
 /** The same option payloads as the payment form, bounded to one resolved student. */
 function payment_student_details(mysqli $db,string $nis,int $excludePaymentId=0): array {
+    require_once __DIR__.'/psb_spp.php';
+    $student=hp_one($db,'SELECT id,KELAS FROM siswa WHERE NO_INDUK=?',[$nis]);
+    $admission=$student?pspp_find($db,(int)$student['id']):null;$admissionPeriod=null;
+    if($admission&&in_array((string)$student['KELAS'],['0','PSB'],true)){
+        $unpaid=[];
+        foreach(spp_open_bills($db,$nis) as $bill)if((int)($bill['rencana_masuk_id']??0)===(int)$admission['id'])$unpaid[]=['bulan'=>$bill['bulan'],'tahun'=>$bill['tahun']];
+        foreach(komite_payment_payload($db,$excludePaymentId,$nis)[$nis]??[] as $key=>$bill)if((float)$bill['total']-(float)$bill['paid']>.001){[$month,$year]=explode('-',$key);if(komite_academic_year($month,$year)===$admission['label'])$unpaid[]=['bulan'=>$month,'tahun'=>$year];}
+        usort($unpaid,static fn($a,$b)=>[$a['tahun'],$a['bulan']]<=>[$b['tahun'],$b['bulan']]);$admissionPeriod=$unpaid[0]??null;
+    }
     $psb=one_time_fee_status($db,$nis,$excludePaymentId)['psb'];
     $periods=['spp'=>[],'komite'=>[]];
     $stmt=$db->prepare('SELECT BULAN,TAHUN,SUM(U_SPP) spp,SUM(U_KOMITE) komite FROM bayar WHERE NO_INDUK=? AND id<>? GROUP BY BULAN,TAHUN');
@@ -19,7 +28,7 @@ function payment_student_details(mysqli $db,string $nis,int $excludePaymentId=0)
         if((float)$bill['sisa']<=.001)continue;
         $other[]=['id'=>(int)$bill['id'],'master_id'=>(int)$bill['master_biaya_lain_id'],'nama'=>$bill['nama'],'nominal'=>(float)$bill['nominal'],'paid'=>(float)$bill['terbayar'],'sisa'=>(float)$bill['sisa'],'optional'=>false];
     }
-    return ['psbKnown'=>$psb['known']?'1':'0','totalPsb'=>$psb['total'],'paidPsb'=>$psb['paid'],
+    return ['admissionPlan'=>$admission?['id'=>(int)$admission['id'],'year'=>$admission['label'],'grade'=>(int)$admission['tingkat'],'oldest_period'=>$admissionPeriod]:null,'psbKnown'=>$psb['known']?'1':'0','totalPsb'=>$psb['total'],'paidPsb'=>$psb['paid'],
         'paidSppPeriods'=>$periods['spp'],'paidKomitePeriods'=>$periods['komite'],'sppPlacements'=>$placements,
         'sppBilling'=>spp_payment_payload($db,$excludePaymentId,$nis)[$nis]??['tagihan'=>[]],
         'komiteBilling'=>komite_payment_payload($db,$excludePaymentId,$nis)[$nis]??[],

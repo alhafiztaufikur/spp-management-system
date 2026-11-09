@@ -181,8 +181,9 @@ function demo_students(mysqli $db, int $unitId, array $profile, string $asOfText
 }
 
 function demo_payments(mysqli $db, string $code, array $regular, array $psb, array $feeIds, array $profile, string $asOfText): void {
-    $operator = 'kasir1.'.strtolower($code);
-    if (!demo_one($db,"SELECT id FROM admin WHERE username=? AND role='kasir' AND is_active=1",[$operator])) throw new RuntimeException("Akun {$operator} belum tersedia.");
+    $account=demo_one($db,"SELECT username FROM admin WHERE role IN ('admin','super_admin') AND is_active=1 ORDER BY role='admin' DESC,id LIMIT 1");
+    if(!$account)throw new RuntimeException('Akun operasional demo belum tersedia.');
+    $operator=(string)$account['username'];
     $sequence = 0;
     $add = static function(string $kind, int $number, array $student, array $amounts, array $extra=[]) use ($db,$code,$operator,$asOfText,&$sequence,$feeIds): void {
         $sequence++;
@@ -255,7 +256,9 @@ function demo_savings(mysqli $db, int $unitId, string $asOfText): void {
         return;
     }
     $code=unit_label($unitId);
-    $operator=$unitId===1?'kasir1':'kasir1.'.strtolower($code);
+    $account=demo_one($db,"SELECT username FROM admin WHERE role IN ('admin','super_admin') AND is_active=1 ORDER BY role='admin' DESC,id LIMIT 1");
+    if(!$account)throw new RuntimeException('Akun operasional demo belum tersedia.');
+    $operator=(string)$account['username'];
     $students=demo_query($db,"SELECT NO_INDUK FROM siswa WHERE NAMA LIKE ? AND KELAS <> 'PSB' ORDER BY NO_INDUK LIMIT 6",['Siswa Demo %'])->fetch_all(MYSQLI_ASSOC);
     if (count($students)!==6) throw new RuntimeException("Butuh enam siswa demo {$code} untuk tabungan.");
     foreach ($students as $index=>$row) {

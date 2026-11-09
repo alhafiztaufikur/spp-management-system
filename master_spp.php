@@ -18,7 +18,7 @@ function mspp_redirect(string $year): void { header('Location: master_spp.php?ta
 function mspp_read_year(mysqli $db, string $label): array {
     $stmt = $db->prepare('SELECT mst.id,mst.status,mst.published_at,mst.closed_at,ta.id tahun_ajaran_id,ta.label,
         COALESCE((SELECT MAX(a.id) FROM spp_audit_log a WHERE a.master_spp_tahun_id=mst.id),0) audit_version,
-        EXISTS(SELECT 1 FROM tagihan_spp ts WHERE ts.master_spp_tahun_id=mst.id) AS has_bills
+        EXISTS(SELECT 1 FROM tagihan_spp ts WHERE ts.master_spp_tahun_id=mst.id AND ts.rencana_masuk_id IS NULL) AS has_bills
         FROM tahun_ajaran ta LEFT JOIN master_spp_tahun mst ON mst.tahun_ajaran_id=ta.id
         WHERE ta.label=? LIMIT 1');
     $stmt->bind_param('s', $label); $stmt->execute();
@@ -64,7 +64,7 @@ if($_SERVER['REQUEST_METHOD']==='POST'){
             if($action==='terbitkan'&&$master['status']==='closed')throw new RuntimeException('Tahun SPP sudah ditutup.');
             if($action!=='terbitkan'){
                 $amounts=$_POST['jumlah']??[];if(!is_array($amounts))throw new RuntimeException('Tarif tidak valid.');
-                [$first,$last]=unit_level_bounds();foreach(range($first,$last) as $level){$raw=$amounts[$level]??0;if(!is_scalar($raw))throw new RuntimeException('Tarif tidak valid.');$newRates[$level]=student_amount($raw);if($newRates[$level]<=0)throw new RuntimeException('Lengkapi tarif positif kelas '.$level.'.');}
+                [$first,$last]=unit_level_bounds();foreach(range($first+1,$last) as $level){$raw=$amounts[$level]??0;if(!is_scalar($raw))throw new RuntimeException('Tarif tidak valid.');$newRates[$level]=student_amount($raw);if($newRates[$level]<=0)throw new RuntimeException('Lengkapi tarif positif kelas '.$level.'.');}
             }else{foreach($oldRates as $level=>$amount)if($amount<=0)throw new RuntimeException('Lengkapi tarif dasar kelas '.$level.' sebelum menerbitkan.');}
             spp_assert_rate_version($_POST['expected_rate_version'],$master,$oldRates);
             $confirmation=$action==='terbitkan'?'confirm_spp_publish':'confirm_rate_change';
@@ -184,11 +184,22 @@ $stmt=$koneksi->prepare("SELECT sta.no_induk,s.id student_id,sta.id placement_id
  LEFT JOIN tagihan_spp ts ON ts.penempatan_id=sta.id WHERE sta.status<>'dibatalkan' AND ta.label=? AND CAST(sta.kelas AS UNSIGNED) " . unit_level_between_sql() . "
  GROUP BY sta.id,s.id,s.NAMA,s.NO_induk_diknas,s.potongan_spp_nominal,s.is_active ORDER BY sta.kelas,sta.kelas_rombel_snapshot,s.NAMA");
 $stmt->bind_param('s',$selectedYear);$stmt->execute();$students=$stmt->get_result()->fetch_all(MYSQLI_ASSOC);$stmt->close();
+require_once __DIR__.'/includes/psb_spp.php';
+foreach(hp_rows($koneksi,'SELECT r.student_id FROM psb_spp_plans r JOIN tahun_ajaran y ON y.id=r.tahun_ajaran_id AND y.unit_id=r.unit_id WHERE y.label=? AND r.penempatan_id IS NULL',[$selectedYear]) as $pending){
+    $student=sct_admission_student($koneksi,(int)$pending['student_id'],(int)$master['tahun_ajaran_id']);
+    if(!$student)continue;
+    $counts=hp_one($koneksi,"SELECT COUNT(*) bill_count,SUM(status='open') open_count,SUM(status='covered_psb') covered_count,SUM(status='waived') waived_count,SUM(status='cancelled') cancelled_count FROM tagihan_spp WHERE rencana_masuk_id=?",[$student['rencana_masuk_id']]);
+    $students[]=$student+$counts+['komite_mulai_bulan'=>'07','NO_induk_diknas'=>''];
+}
 $studentTariffs=[];$studentTariffReady=sct_ready($koneksi)&&$masterId>0;
 if($studentTariffReady){
     require_once __DIR__.'/includes/legacy_full_read.php';$tariffBills=sct_bill_map($koneksi,$masterId);
     $tariffCoverage=lful_monthly_coverage_snapshot($koneksi,array_map('strval',array_column($students,'no_induk')),'spp',array_map(static fn($p)=>$p['tahun'].'-'.$p['bulan'],spp_academic_periods($selectedYear)));
-    foreach($students as $student)$studentTariffs[(int)$student['student_id']]=sct_context($koneksi,$master,$student,$rates,$tariffBills,$tariffCoverage);
+    foreach($students as $student){
+        $admission=sct_admission_student($koneksi,(int)$student['student_id'],(int)$master['tahun_ajaran_id']);
+        if($admission)$student['admission_rate']=$admission['admission_rate'];
+        $studentTariffs[(int)$student['student_id']]=sct_context($koneksi,$master,$student,$rates,$tariffBills,$tariffCoverage);
+    }
 }
 $rombelChoices=[];foreach($students as $student)$rombelChoices[(string)$student['kelas_rombel_snapshot']]=(string)$student['kelas_rombel_snapshot'];
 filter_register('rombel_filter',$_GET['rombel_filter']??null,$rombelChoices);filter_output_start();
@@ -264,7 +275,7 @@ $yearStart = (int)substr($selectedYear, 0, 4);
           <form method="post" id="spp-rate-form" data-status="<?= mspp_e($master['status']) ?>" data-editing="<?= $rateEditing?'true':'false' ?>">
             <input type="hidden" name="csrf_token" value="<?= mspp_e($_SESSION['csrf_master_spp']) ?>"><input type="hidden" name="aksi" value="<?= $master['status']==='published'?'ubah_tarif_terbit':'simpan_tarif' ?>"><input type="hidden" name="expected_rate_version" value="<?= mspp_e($rateVersion) ?>"><input type="hidden" name="confirm_rate_change" value="0"><input type="hidden" name="tahun_ajaran" value="<?= mspp_e($selectedYear) ?>">
             <div class="spp-rate-grid">
-              <?php for ($i = $firstLevel; $i <= $lastLevel; $i++): ?>
+              <?php for ($i = $firstLevel+1; $i <= $lastLevel; $i++): ?>
               <label class="field-row spp-grade-rate"><span class="spp-grade-roman" aria-hidden="true"><?= master_workspace_roman($i) ?></span><span class="field-label">Kelas <?= $i ?></span><input class="field-input rupiah-input" name="jumlah[<?= $i ?>]" inputmode="numeric" data-original="<?= mspp_e($rates[$i]) ?>" data-level="<?= $i ?>" value="<?= $rateValues[$i] > 0 ? mspp_money($rateValues[$i]) : '' ?>" placeholder="Rp 0" required <?= (!$ratesEditable&&!$rateEditing) ? 'disabled' : '' ?>></label>
               <?php endfor; ?>
             </div>
@@ -292,7 +303,7 @@ $yearStart = (int)substr($selectedYear, 0, 4);
             <div class="spp-students-table-wrap">
               <div class="promotion-student-list" id="spp-student-list" tabindex="0" aria-label="Daftar siswa untuk penerbitan SPP">
               <div class="spp-students-table-head" aria-hidden="true"><span></span><span>Nama Siswa</span><span>NIS</span><span>Rombel</span><span>Kelas</span><span>Tarif Efektif</span><span>Mulai Tagihan</span><span>Status</span></div>
-              <?php foreach ($students as $idx => $s): $level=(int)$s['kelas'];$net=spp_net_tariff(lop_tariff($koneksi,(string)$s['no_induk'],$selectedYear)??(float)$rates[$level],(float)$s['potongan_spp_nominal']);$search=strtolower($s['NAMA'].' '.$s['no_induk'].' '.$s['kelas_rombel_snapshot']);$initials='';foreach(array_slice(preg_split('/\s+/u',trim((string)$s['NAMA'])),0,2) as $part)$initials.=mb_substr($part,0,1,'UTF-8'); ?>
+              <?php foreach ($students as $idx => $s): $level=(int)$s['kelas'];$net=spp_net_tariff(lop_tariff($koneksi,(string)$s['no_induk'],$selectedYear)??(float)$rates[$level],(float)$s['potongan_spp_nominal']);foreach($studentTariffs[(int)$s['student_id']]['periods']??[] as $tariffPeriod)if($tariffPeriod['month']===($publishDraft['starts'][$s['no_induk']]??$s['komite_mulai_bulan'])){$net['net']=$tariffPeriod['rate'];break;}$search=strtolower($s['NAMA'].' '.$s['no_induk'].' '.$s['kelas_rombel_snapshot']);$initials='';foreach(array_slice(preg_split('/\s+/u',trim((string)$s['NAMA'])),0,2) as $part)$initials.=mb_substr($part,0,1,'UTF-8'); ?>
                 <article class="promotion-student-row spp-publish-row" data-student-id="<?= (int)$s['student_id'] ?>" data-search="<?= mspp_e($search) ?>" data-rombel="<?= mspp_e($s['kelas_rombel_snapshot']) ?>">
                   <label class="promotion-student-check"><input type="checkbox" name="selected_students[]" value="<?= mspp_e($s['no_induk']) ?>" <?= in_array((string)$s['no_induk'],$publishDraft['students'],true)?'checked':'' ?> aria-label="Pilih <?= mspp_e($s['NAMA']) ?>"><span></span></label>
                   <div class="promotion-student-identity"><span class="spp-student-avatar" aria-hidden="true"><?= mspp_e(mb_strtoupper($initials,'UTF-8')) ?></span><div><strong><?= mspp_e($s['NAMA']) ?></strong><small>Potongan Rp <?= mspp_money($s['potongan_spp_nominal']) ?></small><?php if (!(int)$s['is_active']): ?><small>Siswa diarsipkan</small><?php endif; ?></div></div>
@@ -327,7 +338,7 @@ $yearStart = (int)substr($selectedYear, 0, 4);
         </section>
       </section>
       <aside class="spp-aside" aria-label="Informasi tarif dan status tahun">
-        <section class="main-card master-modern-card spp-side-card"><div class="spp-side-heading"><div><h2>Tarif Dasar per Tingkat</h2></div></div><dl class="spp-rate-list"><?php for ($i=$firstLevel;$i<=$lastLevel;$i++): ?><div><dt>Kelas <?= $i ?></dt><dd>Rp <?= mspp_money($rates[$i]) ?></dd></div><?php endfor; ?></dl><a href="#spp-rate-panel" class="spp-side-link" data-spp-tab="rates">Lihat Pengaturan Tarif <span aria-hidden="true">&rarr;</span></a></section>
+        <section class="main-card master-modern-card spp-side-card"><div class="spp-side-heading"><div><h2>Tarif Dasar per Tingkat</h2></div></div><dl class="spp-rate-list"><?php for ($i=$firstLevel+1;$i<=$lastLevel;$i++): ?><div><dt>Kelas <?= $i ?></dt><dd>Rp <?= mspp_money($rates[$i]) ?></dd></div><?php endfor; ?></dl><a href="#spp-rate-panel" class="spp-side-link" data-spp-tab="rates">Lihat Pengaturan Tarif <span aria-hidden="true">&rarr;</span></a></section>
         <section class="main-card master-modern-card spp-side-card spp-status-card"><div class="spp-side-heading"><div><h2>Status Tahun SPP</h2><p>Menutup tahun menghentikan penerbitan tambahan. Tunggakan yang sudah terbit tetap bisa dilunasi.</p></div></div>
           <div class="spp-status-note"><div><strong><?= $master['status'] === 'closed' ? 'Tahun ajaran ini sudah ditutup' : ($master['status'] === 'published' ? 'Tahun ajaran ini sedang terbuka' : 'Tahun ajaran ini masih draft') ?></strong><small><?= $master['status'] === 'closed' ? 'Buka kembali untuk melanjutkan penerbitan atau koreksi tarif.' : ($ratesEditable ? 'Tarif dapat diubah sebelum penerbitan pertama.' : 'Gunakan Edit Tarif untuk mengoreksi tagihan yang belum dibayar.') ?></small></div></div>
           <div class="action-bar">
@@ -358,7 +369,7 @@ $yearStart = (int)substr($selectedYear, 0, 4);
 <?php endif; ?>
 <script src="assets/js/date_format.js?v=<?= filemtime(__DIR__ . '/assets/js/date_format.js') ?>"></script>
 <script src="assets/js/app.js?v=<?= filemtime(__DIR__ . '/assets/js/app.js') ?>"></script>
-<script id="spp-rate-confirmation-data" type="application/json"><?= json_encode(['year'=>$selectedYear,'unit'=>unit_label(unit_active_id()),'rates'=>$rates,'copy'=>array_combine(['simpan_tarif','ubah_tarif_terbit','terbitkan'],array_map('spp_rate_confirmation_copy',['simpan_tarif','ubah_tarif_terbit','terbitkan']))],JSON_HEX_TAG|JSON_HEX_AMP|JSON_HEX_APOS|JSON_HEX_QUOT|JSON_UNESCAPED_UNICODE) ?></script>
+<script id="spp-rate-confirmation-data" type="application/json"><?= json_encode(['year'=>$selectedYear,'unit'=>unit_label(unit_active_id()),'rates'=>array_diff_key($rates,[$firstLevel=>true]),'copy'=>array_combine(['simpan_tarif','ubah_tarif_terbit','terbitkan'],array_map('spp_rate_confirmation_copy',['simpan_tarif','ubah_tarif_terbit','terbitkan']))],JSON_HEX_TAG|JSON_HEX_AMP|JSON_HEX_APOS|JSON_HEX_QUOT|JSON_UNESCAPED_UNICODE) ?></script>
 <script src="assets/js/spp_rate_confirmation.js?v=<?= filemtime(__DIR__.'/assets/js/spp_rate_confirmation.js') ?>"></script>
 <script src="assets/js/master_spp.js?v=<?= filemtime(__DIR__ . '/assets/js/master_spp.js') ?>"></script>
 </body></html>

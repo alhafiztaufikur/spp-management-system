@@ -75,10 +75,12 @@ function komite_sync_student_rate(mysqli $db, string $noInduk, float $rate, int 
     $placement = $stmt->get_result()->fetch_assoc(); $stmt->close();
     if (!$placement) throw new RuntimeException('Penempatan aktif siswa untuk perubahan tarif Komite tidak ditemukan.');
     $changed=0;
+    $update=$db->prepare('UPDATE tagihan_komite SET nominal_tagihan=? WHERE id=? AND nominal_tagihan<>?');
     foreach(lf_rows($db,"SELECT tk.id,tk.bulan,tk.tahun FROM tagihan_komite tk WHERE tk.penempatan_id=? AND tk.no_induk=? AND tk.status='open' AND NOT EXISTS(SELECT 1 FROM bayar_komite bk WHERE bk.tagihan_komite_id=tk.id)",[$placementId,$noInduk]) as $bill){
         if(lb_monthly_credit($db,$noInduk,'komite',$bill['bulan'],$bill['tahun'])>.001)continue;
-        lf_query($db,'UPDATE tagihan_komite SET nominal_tagihan=? WHERE id=?',[$rate,$bill['id']]);$changed+=$db->affected_rows;
+        $update->bind_param('did',$rate,$bill['id'],$rate);$update->execute();$changed+=$update->affected_rows;
     }
+    $update->close();
     $stmt = $db->prepare("UPDATE siswa_tahun_ajaran SET komite_snapshot=? WHERE id=? AND no_induk=? AND status='aktif'");
     $stmt->bind_param('dis', $rate, $placementId, $noInduk); $stmt->execute(); $stmt->close();
     return ['updated'=>$changed];

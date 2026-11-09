@@ -62,7 +62,10 @@ try {
         // SPP totals and outstanding debt.
         $master = $koneksi->query("SELECT id FROM master_spp_tahun WHERE tahun_ajaran_id=$yearId LIMIT 1")->fetch_assoc();
         unbilled_assert((bool)$master, "Master SPP unit $unit tidak tersedia.");
-        $issued = spp_publish_students($koneksi, (int)$master['id'], [$placedNis]);
+        $_SESSION['admin_id']=1;$_SESSION['admin_role']='super_admin';
+        $studentId=(int)hp_one($koneksi,'SELECT id FROM siswa WHERE NO_INDUK=?',[$placedNis])['id'];
+        $tariffContext=sct_context_for_student($koneksi,(int)$master['id'],$studentId);
+        $issued=sct_save($koneksi,(int)$master['id'],$studentId,'2026-07','250000','Fixture laporan siswa kelas awal',$tariffContext['version']);
         unbilled_assert($issued['created']===12, "Tagihan SPP unit $unit gagal diterbitkan.");
         $stmt = $koneksi->prepare("UPDATE siswa SET is_active=0 WHERE NO_INDUK=?");
         $stmt->bind_param('s',$placedNis);$stmt->execute();$stmt->close();

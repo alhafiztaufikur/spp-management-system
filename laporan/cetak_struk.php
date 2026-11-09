@@ -32,7 +32,7 @@ function receipt_e($value): string {
 function receipt_money($value, bool $showZero = false): string {
     $amount = (float)$value;
     if (!$showZero && abs($amount) < 0.005) return '';
-    return number_format($amount, 0, ',', '.');
+    return number_format($amount, $amount===floor($amount)?0:2, ',', '.');
 }
 
 function receipt_month($value): string {

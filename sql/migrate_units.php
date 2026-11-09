@@ -197,3 +197,8 @@ require_once __DIR__.'/../includes/other_fee_billing_schema.php';ofb_schema_appl
 
 require_once __DIR__.'/savings_authorization_schema.php';
 savings_authorization_schema_apply($koneksi);
+
+require_once __DIR__.'/../includes/spp_student_tariff_schema.php';sct_schema_apply($koneksi);
+require_once __DIR__.'/../includes/daftar_ulang.php';du_advance_schema_apply($koneksi);
+du_psb_schema_apply($koneksi);
+require_once __DIR__.'/../includes/psb_spp_schema.php';pspp_schema_apply($koneksi);

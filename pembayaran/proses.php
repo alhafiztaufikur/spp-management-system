@@ -380,6 +380,10 @@ function validate_component_remaining(
 
     $sppInput = (float)($components['spp'] ?? 0);
     $isPsb = (int)($student['tingkat'] ?? 0) === 0 || strtoupper((string)($student['kode_rombel'] ?? '')) === 'PSB';
+    if($isPsb&&($sppInput>.001||(float)($components['komite']??0)>.001)){
+        require_once __DIR__.'/../includes/psb_spp.php';
+        pspp_assert_period($db,$noInduk,$bulan,$tahun);
+    }
     $annualInputTotal = 0.0;
     foreach (annual_fee_components() as $component => $cfg) {
         $annualInputTotal += (float)($components[$component] ?? 0);

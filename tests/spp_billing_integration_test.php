@@ -7,12 +7,13 @@ if (PHP_SAPI !== 'cli'
 }
 
 require_once __DIR__.'/../koneksi.php';require_once __DIR__.'/../includes/spp_billing.php';require_once __DIR__.'/../includes/kelas.php';
+$_SESSION=['admin_id'=>1,'admin_role'=>'super_admin','active_unit_id'=>1];unit_set_context($koneksi,1);
 function spp_it_assert(bool $ok,string $message):void{if(!$ok)throw new RuntimeException($message);}
 if(!spp_billing_schema_ready($koneksi))throw new RuntimeException('Schema SPP baru belum tersedia.');
 $nis=(string)random_int(9300000000,9399999999);$label='2196/2197';
 $koneksi->begin_transaction();
 try{
-  $class=$koneksi->query("SELECT id,tingkat,kode_rombel,is_placeholder FROM master_kelas WHERE tingkat BETWEEN 1 AND 6 ORDER BY tingkat,id LIMIT 1")->fetch_assoc();if(!$class)throw new RuntimeException('Master kelas uji tidak tersedia.');$level=(string)$class['tingkat'];$classId=(int)$class['id'];$classLabel=class_label($class);
+  $class=$koneksi->query("SELECT id,tingkat,kode_rombel,is_placeholder FROM master_kelas WHERE tingkat BETWEEN 2 AND 6 ORDER BY tingkat,id LIMIT 1")->fetch_assoc();if(!$class)throw new RuntimeException('Master kelas uji tidak tersedia.');$level=(string)$class['tingkat'];$classId=(int)$class['id'];$classLabel=class_label($class);
   $name='UJI SPP '.$nis;$stmt=$koneksi->prepare('INSERT INTO siswa(NO_INDUK,NAMA,KELAS,master_kelas_id,SPP_PERBULAN,potongan_spp_nominal,is_active) VALUES(?,?,?,?,250000,0,1)');$stmt->bind_param('sssi',$nis,$name,$level,$classId);$stmt->execute();$stmt->close();
   $master=spp_master_ensure_year($koneksi,$label,true);$masterId=(int)$master['id'];$yearId=(int)$master['tahun_ajaran_id'];$status='aktif';$stmt=$koneksi->prepare('INSERT INTO siswa_tahun_ajaran(tahun_ajaran_id,no_induk,kelas,master_kelas_id,kelas_rombel_snapshot,spp_perbulan_snapshot,status) VALUES(?,?,?,?,?,250000,?)');$stmt->bind_param('ississ',$yearId,$nis,$level,$classId,$classLabel,$status);$stmt->execute();$placementId=(int)$koneksi->insert_id;$stmt->close();
   spp_master_save_rates($koneksi,$masterId,[1=>250000,2=>250000,3=>250000,4=>250000,5=>250000,6=>250000]);

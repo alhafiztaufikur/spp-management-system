@@ -6,7 +6,11 @@
         "sql/migrate_units.php",
         "includes/legacy_operational_schema.php",
         "includes/workflow_update_schema.php",
-        "includes/rombel_update_schema.php"
+        "includes/rombel_update_schema.php",
+        "includes/spp_student_tariff_schema.php",
+        "includes/psb_spp_schema.php",
+        "includes/du_psb.php",
+        "includes/du_advance.php"
     ],
     "checks": [
         {

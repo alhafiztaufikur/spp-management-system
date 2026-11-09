@@ -29,12 +29,13 @@ function sct_constraint_inspect(mysqli $db,bool $preflight=false): array {
         }
         foreach($columns as $n=>$column){
             $child=$cols['spp_tarif_siswa_data'][$column]??null;$target=$cols[$parent][$refs[$n]]??null;
-            if(!$child||!$target||$child['COLUMN_TYPE']!==$target['COLUMN_TYPE']||$child['IS_NULLABLE']!=='NO')$out['conflicts'][]=$name.': tipe/nullability kolom tidak sesuai';
+            $planBasis=$column==='penempatan_id'&&isset($cols['spp_tarif_siswa_data']['rencana_masuk_id']);
+            if(!$child||!$target||$child['COLUMN_TYPE']!==$target['COLUMN_TYPE']||$child['IS_NULLABLE']!==($planBasis?'YES':'NO'))$out['conflicts'][]=$name.': tipe/nullability kolom tidak sesuai';
         }
         if(!$found)$out['missing'][$name]='ALTER TABLE spp_tarif_siswa_data ADD CONSTRAINT `'.$name.'` FOREIGN KEY (`'.implode('`,`',$columns).'`) REFERENCES `'.$parent.'` (`'.implode('`,`',$refs).'`) ON UPDATE RESTRICT ON DELETE RESTRICT';
         if($preflight&&!$out['conflicts']){
             $joins=[];foreach($columns as $n=>$column)$joins[]='p.`'.$refs[$n].'`=c.`'.$column.'`';
-            $count=(int)$db->query('SELECT COUNT(*) FROM spp_tarif_siswa_data c LEFT JOIN `'.$parent.'` p ON '.implode(' AND ',$joins).' WHERE p.`'.$refs[0].'` IS NULL')->fetch_row()[0];
+            $count=(int)$db->query('SELECT COUNT(*) FROM spp_tarif_siswa_data c LEFT JOIN `'.$parent.'` p ON '.implode(' AND ',$joins).' WHERE c.`'.$columns[0].'` IS NOT NULL AND p.`'.$refs[0].'` IS NULL')->fetch_row()[0];
             if($count)$out['invalid'][$name]=['orphan_rows'=>$count];
         }
     }
