@@ -56,9 +56,9 @@ function sct_bill_map(mysqli $db,int $masterId,bool $lock=false,?string $nis=nul
 function sct_context(mysqli $db,array $master,array $student,array $rates,array $bills,?array $coverage=null): array {
     require_once __DIR__.'/legacy_full_read.php';
     $nis=(string)$student['no_induk'];$year=(string)$master['label'];
-    $base=$student['admission_rate']??lop_tariff($db,$nis,$year)??(float)($rates[(int)$student['kelas']]??0);
+    $base=$student['admission_rate']??(!empty($student['penempatan_asal_id'])?(float)($rates[(int)$student['kelas']]??0):(lop_tariff($db,$nis,$year)??(float)($rates[(int)$student['kelas']]??0)));
     $fallback=spp_net_tariff($base,isset($student['admission_rate'])?0.0:(float)$student['potongan_spp_nominal']);$source=[];
-    if(!isset($student['admission_rate'])&&!lb_spp_override($db,$nis,$year))foreach(lb_monthly_plan($db,$nis)['positions'] as $p){
+    if(!isset($student['admission_rate'])&&empty($student['penempatan_asal_id'])&&!lb_spp_override($db,$nis,$year))foreach(lb_monthly_plan($db,$nis)['positions'] as $p){
         if($p['category']==='spp'&&$p['year']===$year&&strcasecmp($p['class'],$student['kelas_rombel_snapshot'])===0)$source[$p['period']]=$p;
     }
     $calendar=spp_academic_periods($year);
@@ -101,20 +101,19 @@ function sct_context_for_student(mysqli $db,int $masterId,int $studentId): array
     $yearId=(int)$master['tahun_ajaran_id'];$s->bind_param('ii',$studentId,$yearId);$s->execute();$student=$s->get_result()->fetch_assoc();$s->close();
     $admission=sct_admission_student($db,$studentId,$yearId);
     if($admission)$student=$student?array_merge($student,['admission_rate'=>$admission['admission_rate'],'rencana_masuk_id'=>$admission['rencana_masuk_id']]):$admission;
+    if(!$student){require_once __DIR__.'/spp_advance.php';$student=spa_roster($db,$master['label'])[$studentId]??null;}
     if(!$student)throw new DomainException('Penempatan siswa tidak ditemukan.');
+    $student['penempatan_asal_id']=$student['penempatan_asal_id']??hp_one($db,'SELECT penempatan_asal_id FROM tagihan_spp WHERE no_induk=? AND tahun_ajaran_id=? AND penempatan_asal_id IS NOT NULL LIMIT 1',[$student['no_induk'],$yearId])['penempatan_asal_id']??null;
     return sct_context($db,$master,$student,spp_master_rates($db,$masterId),sct_bill_map($db,$masterId,false,(string)$student['no_induk']));
 }
 
 /** Same roster and native/Legacy paid definitions as the master page's summary cards. */
 function sct_year_summary(mysqli $db,int $masterId,string $year): array {
-    $s=$db->prepare("SELECT s.is_active,COUNT(t.id) bill_count FROM siswa_tahun_ajaran p JOIN tahun_ajaran y ON y.id=p.tahun_ajaran_id JOIN siswa s ON s.NO_INDUK=p.no_induk AND s.unit_id=p.unit_id LEFT JOIN tagihan_spp t ON t.penempatan_id=p.id WHERE p.status<>'dibatalkan' AND y.label=? AND CAST(p.kelas AS UNSIGNED) ".unit_level_between_sql()." GROUP BY p.id,s.is_active");
-    $s->bind_param('s',$year);$s->execute();$rows=$s->get_result()->fetch_all(MYSQLI_ASSOC);$s->close();$active=0;$published=0;
-    foreach($rows as $r)if((int)$r['is_active']===1){$active++;if((int)$r['bill_count']>0)$published++;}
-    require_once __DIR__.'/psb_spp.php';
-    if(pspp_ready($db))foreach(hp_rows($db,'SELECT s.is_active,EXISTS(SELECT 1 FROM tagihan_spp t WHERE t.rencana_masuk_id=r.id) published FROM psb_spp_plans r JOIN tahun_ajaran y ON y.id=r.tahun_ajaran_id AND y.unit_id=r.unit_id JOIN siswa s ON s.id=r.student_id AND s.unit_id=r.unit_id WHERE y.label=? AND r.penempatan_id IS NULL',[$year]) as $r)if((int)$r['is_active']===1){$active++;if($r['published'])$published++;}
     $s=$db->prepare("SELECT t.no_induk,t.bulan,t.tahun,t.nominal_tagihan,t.status,COALESCE(SUM(CASE WHEN b.status='active' THEN a.nominal_dari_bayar ELSE 0 END),0) paid FROM tagihan_spp t LEFT JOIN spp_alokasi a ON a.tagihan_spp_id=t.id LEFT JOIN spp_alokasi_batch b ON b.id=a.batch_id WHERE t.master_spp_tahun_id=? GROUP BY t.id");
     $s->bind_param('i',$masterId);$s->execute();$bills=$s->get_result()->fetch_all(MYSQLI_ASSOC);$s->close();$unpaid=0;
     foreach($bills as $bill)if($bill['status']==='open'&&(float)$bill['paid']+lb_spp_credit($db,$bill['no_induk'],$bill['bulan'],$bill['tahun'])+.001<(float)$bill['nominal_tagihan'])$unpaid++;
+    require_once __DIR__.'/spp_advance.php';$active=0;$published=0;
+    foreach(spa_roster($db,$year) as $row)if((int)$row['is_active']===1){$active++;if($row['billing_complete'])$published++;}
     $pending=$active-$published;
     return ['active'=>$active,'published'=>$published,'pending'=>$pending,'published_percent'=>$active?(int)round(100*$published/$active):0,'pending_percent'=>$active?(int)round(100*$pending/$active):0,'bills'=>count($bills),'unpaid_bills'=>$unpaid,'status'=>spp_master_state($db,$masterId)['status']];
 }
@@ -136,7 +135,9 @@ function sct_save(mysqli $db,int $masterId,int $studentId,string $start,?string 
     $yearId=(int)$master['tahun_ajaran_id'];$s->bind_param('ii',$studentId,$yearId);$s->execute();$student=$s->get_result()->fetch_assoc();$s->close();
     $admission=sct_admission_student($db,$studentId,$yearId);
     if($admission)$student=$student?array_merge($student,['admission_rate'=>$admission['admission_rate'],'rencana_masuk_id'=>$admission['rencana_masuk_id']]):$admission;
+    if(!$student){require_once __DIR__.'/spp_advance.php';$student=spa_roster($db,$master['label'])[$studentId]??null;}
     if(!$student)throw new DomainException('Penempatan siswa tidak sesuai tahun ajaran ini.');
+    $student['penempatan_asal_id']=$student['penempatan_asal_id']??hp_one($db,'SELECT penempatan_asal_id FROM tagihan_spp WHERE no_induk=? AND tahun_ajaran_id=? AND penempatan_asal_id IS NOT NULL LIMIT 1',[$student['no_induk'],$yearId])['penempatan_asal_id']??null;
     if($amount===null&&$admission)$amount=(string)$admission['admission_rate'];
     sct_invalidate($db);lb_cache($db,true);$rates=spp_master_rates($db,$masterId,true);$bills=sct_bill_map($db,$masterId,true,$nis);$context=sct_context($db,$master,$student,$rates,$bills);
     if(!hash_equals($context['version'],$expected))throw new DomainException('Tarif atau pembayaran siswa sudah berubah. Muat ulang dan periksa pratinjau kembali.');
@@ -144,7 +145,7 @@ function sct_save(mysqli $db,int $masterId,int $studentId,string $start,?string 
     if($offset===false)throw new DomainException('Bulan mulai tidak sesuai tahun ajaran yang dipilih.');
     $range=array_slice($context['periods'],$offset);$rules=sct_rules($db)[$nis]??[];$changes=0;
     foreach($range as $p){if($p['locked'])continue;$old=$rules[$p['period']]??null;if($amount===null?$old!==null:(!$old||(float)$old['nominal_akhir']!==(float)$amount))$changes++;}
-    $write=$amount===null?$db->prepare('DELETE FROM spp_tarif_siswa WHERE student_id=? AND period=?'):$db->prepare('INSERT INTO spp_tarif_siswa(student_id,penempatan_id,rencana_masuk_id,tahun_ajaran_id,period,nominal_akhir,reason,actor_id) VALUES(?,?,?,?,?,?,?,?) ON DUPLICATE KEY UPDATE nominal_akhir=VALUES(nominal_akhir),reason=VALUES(reason),actor_id=VALUES(actor_id),revision=revision+1');
+    $write=$amount===null?$db->prepare('DELETE FROM spp_tarif_siswa WHERE student_id=? AND period=?'):$db->prepare('INSERT INTO spp_tarif_siswa(student_id,penempatan_id,rencana_masuk_id,penempatan_asal_id,tahun_ajaran_id,period,nominal_akhir,reason,actor_id) VALUES(?,?,?,?,?,?,?,?,?) ON DUPLICATE KEY UPDATE nominal_akhir=VALUES(nominal_akhir),reason=VALUES(reason),actor_id=VALUES(actor_id),revision=revision+1');
     $update=$db->prepare('UPDATE tagihan_spp SET tarif_dasar_snapshot=?,potongan_nominal_ditetapkan_snapshot=?,potongan_nominal_snapshot=?,nominal_tagihan=?,status=? WHERE id=?');
     $updated=0;$locked=0;$ineligible=0;$after=[];$outcomes=[];$publish=[];
     foreach($range as $p){
@@ -152,7 +153,7 @@ function sct_save(mysqli $db,int $masterId,int $studentId,string $start,?string 
         $key=$p['period'];$old=$rules[$key]??null;$changed=$amount===null?$old!==null:(!$old||(float)$old['nominal_akhir']!==(float)$amount);
         if($changed){
             if($amount===null)$write->bind_param('is',$studentId,$key);
-            else {$placementId=$student['placement_id']!==null?(int)$student['placement_id']:null;$planId=$student['rencana_masuk_id']??null;$write->bind_param('iiiisssi',$studentId,$placementId,$planId,$yearId,$key,$amount,$reason,$actor);}
+            else {$placementId=$student['placement_id']!==null?(int)$student['placement_id']:null;$planId=$student['rencana_masuk_id']??null;$originId=$student['penempatan_asal_id']??null;$write->bind_param('iiiiisssi',$studentId,$placementId,$planId,$originId,$yearId,$key,$amount,$reason,$actor);}
             $write->execute();
         }
         if(!$p['bill_id']){
@@ -180,6 +181,7 @@ function sct_save(mysqli $db,int $masterId,int $studentId,string $start,?string 
         }unset($outcome);
         if($created)$db->query("UPDATE master_spp_tahun SET status='published',published_at=COALESCE(published_at,NOW()) WHERE id=".(int)$masterId." AND status='draft'");
     }
+    require_once __DIR__.'/spp_advance.php';if(spa_ready($db))spa_pair_individual_bills($db,$nis,$yearId);
     if($changes||$updated||$created)spp_write_audit($db,$masterId,$nis,$amount===null?'reset_tarif_siswa':'simpan_tarif_siswa',
         ['periods'=>$range],['student_id'=>$studentId,'start'=>$start,'nominal_akhir'=>$amount,'reason'=>$reason,'bills'=>$after,'outcomes'=>$outcomes,'rules_changed'=>$changes,'created'=>$created,'locked'=>$locked,'ineligible'=>$ineligible],$updated+$created);
     return ['updated'=>$updated,'created'=>$created,'locked'=>$locked,'ineligible'=>$ineligible,'rules'=>$changes];

@@ -83,6 +83,7 @@ function komite_sync_student_rate(mysqli $db, string $noInduk, float $rate, int 
     $update->close();
     $stmt = $db->prepare("UPDATE siswa_tahun_ajaran SET komite_snapshot=? WHERE id=? AND no_induk=? AND status='aktif'");
     $stmt->bind_param('dis', $rate, $placementId, $noInduk); $stmt->execute(); $stmt->close();
+    require_once __DIR__.'/spp_advance.php';$changed+=spa_sync_komite_rate($db,$noInduk,$rate);
     return ['updated'=>$changed];
 }
 

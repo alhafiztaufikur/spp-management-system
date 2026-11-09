@@ -158,19 +158,26 @@ SELECT 'total_header_tidak_cocok' AS pemeriksaan, (SELECT COUNT(*) FROM bayar_da
 UNION ALL
 SELECT 'tagihan_spp_salah_relasi' AS pemeriksaan, (SELECT COUNT(*) FROM tagihan_spp_data t
         LEFT JOIN siswa_tahun_ajaran_data p ON p.id=t.penempatan_id
+        LEFT JOIN siswa_tahun_ajaran_data a ON a.id=t.penempatan_asal_id AND a.unit_id=t.unit_id
+        LEFT JOIN tahun_ajaran_data ay ON ay.id=a.tahun_ajaran_id AND ay.unit_id=a.unit_id
         LEFT JOIN tahun_ajaran_data y ON y.id=t.tahun_ajaran_id
         LEFT JOIN psb_spp_plans_data r ON r.id=t.rencana_masuk_id AND r.unit_id=t.unit_id
         LEFT JOIN siswa_data s ON s.id=r.student_id AND s.unit_id=r.unit_id
         WHERE y.id IS NULL OR y.unit_id<>t.unit_id OR NOT (
           COALESCE(p.id IS NOT NULL AND p.no_induk=t.no_induk AND p.tahun_ajaran_id=t.tahun_ajaran_id AND p.unit_id=t.unit_id,0)
-          OR COALESCE(t.penempatan_id IS NULL AND r.tahun_ajaran_id=t.tahun_ajaran_id AND s.NO_INDUK=t.no_induk AND r.tingkat=t.tingkat_snapshot,0))) AS jumlah_masalah
+          OR COALESCE(t.penempatan_id IS NULL AND r.tahun_ajaran_id=t.tahun_ajaran_id AND s.NO_INDUK=t.no_induk AND r.tingkat=t.tingkat_snapshot,0)
+          OR COALESCE(t.penempatan_id IS NULL AND a.no_induk=t.no_induk AND t.tingkat_snapshot=CAST(a.kelas AS UNSIGNED)+1 AND y.label=CONCAT(CAST(LEFT(ay.label,4) AS UNSIGNED)+1,'/',CAST(LEFT(ay.label,4) AS UNSIGNED)+2),0))) AS jumlah_masalah
 UNION ALL
 SELECT 'tagihan_komite_salah_relasi' AS pemeriksaan, (SELECT COUNT(*) FROM tagihan_komite_data t
         LEFT JOIN siswa_tahun_ajaran_data p ON p.id=t.penempatan_id
+        LEFT JOIN siswa_tahun_ajaran_data a ON a.id=t.penempatan_asal_id AND a.unit_id=t.unit_id
+        LEFT JOIN tahun_ajaran_data ay ON ay.id=a.tahun_ajaran_id AND ay.unit_id=a.unit_id
+        LEFT JOIN tahun_ajaran_data y ON y.id=t.tahun_ajaran_id AND y.unit_id=t.unit_id
         LEFT JOIN psb_spp_plans_data r ON r.id=t.rencana_masuk_id AND r.unit_id=t.unit_id
         LEFT JOIN siswa_data s ON s.id=r.student_id AND s.unit_id=r.unit_id
         WHERE NOT (COALESCE(p.id IS NOT NULL AND p.no_induk=t.no_induk AND p.tahun_ajaran_id=t.tahun_ajaran_id AND p.unit_id=t.unit_id,0)
-          OR COALESCE(t.penempatan_id IS NULL AND r.tahun_ajaran_id=t.tahun_ajaran_id AND s.NO_INDUK=t.no_induk,0))) AS jumlah_masalah
+          OR COALESCE(t.penempatan_id IS NULL AND r.tahun_ajaran_id=t.tahun_ajaran_id AND s.NO_INDUK=t.no_induk,0)
+          OR COALESCE(t.penempatan_id IS NULL AND a.no_induk=t.no_induk AND y.label=CONCAT(CAST(LEFT(ay.label,4) AS UNSIGNED)+1,'/',CAST(LEFT(ay.label,4) AS UNSIGNED)+2),0))) AS jumlah_masalah
 UNION ALL
 SELECT 'tagihan_du_salah_relasi' AS pemeriksaan, (SELECT COUNT(*) FROM tagihan_daftar_ulang_data t
         LEFT JOIN siswa_tahun_ajaran_data p ON p.id=t.penempatan_id

@@ -9,6 +9,7 @@
         "includes/rombel_update_schema.php",
         "includes/spp_student_tariff_schema.php",
         "includes/psb_spp_schema.php",
+        "includes/spp_advance_schema.php",
         "includes/du_psb.php",
         "includes/du_advance.php"
     ],

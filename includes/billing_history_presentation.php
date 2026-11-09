@@ -1,4 +1,9 @@
 <?php
+/** Future receipts remain visible; unpaid future months never inflate the arrears matrix. */
+function billing_history_period_visible(array $row,array $filters): bool {
+    if(empty($filters['_billing_as_of'])||!in_array($row['komponen_key']??'',['spp','komite'],true)||($row['periode_code']??'')<=substr($filters['_billing_as_of'],0,7))return true;
+    return empty($filters['_debt_only'])&&(float)($row['terbayar']??0)>.001&&array_key_exists('sisa',$row)&&($row['sisa']===null||(float)$row['sisa']<=.001);
+}
 function billing_history_column_label(string $key,string $label):string{return $key==='daftar_ulang'?'D.ULANG':$label;}
 /** Read-only projection for the arrears report. Original bill/credit models stay intact. */
 function billing_history_defaults(array $source): array {
@@ -46,7 +51,7 @@ function billing_history_project(array $items,array $filters,array $placements,i
     $groups=[];
     foreach($items as $row){
         $unit=(int)($row['unit_id']??$scope);$nis=(string)$row['nis'];$key=$unit.'|'.$nis;$component=(string)$row['komponen_key'];
-        if(!empty($filters['_billing_as_of'])&&in_array($component,['spp','komite'],true)&&($row['periode_code']??'')>substr($filters['_billing_as_of'],0,7))continue;
+        if(!billing_history_period_visible($row,$filters))continue;
         $year=trim((string)($row['tahun_ajaran']??''));$class=trim((string)($row['kelas_asli']??$row['kelas']??''));$level=(int)($row['tingkat']??0);$rombel=(int)($row['master_kelas_id']??0);
         if($component==='psb'){
             $p=$placements[$key]??null;
@@ -60,6 +65,7 @@ function billing_history_project(array $items,array $filters,array $placements,i
         $columns[$component]??=(string)$row['komponen'];
         $groups[$groupKey]??=['key'=>$groupKey,'section_key'=>$sectionKey,'unit_id'=>$unit,'year'=>$year,'kelas'=>$class,'tingkat'=>$level,'nis'=>$nis,'nis_diknas'=>$row['nis_diknas']??'','nama'=>$row['nama'],'amounts'=>[],'total'=>[],'notes'=>[]];
         $g=&$groups[$groupKey];$g['amounts'][$component]??=[];
+        if(!empty($row['_advance_paid'])||(!empty($filters['_billing_as_of'])&&in_array($component,['spp','komite'],true)&&($row['periode_code']??'')>substr($filters['_billing_as_of'],0,7)&&(float)($row['terbayar']??0)>.001))$g['advance_paid']=true;
         $remaining=array_key_exists('sisa',$row)&&$row['sisa']!==null?(float)$row['sisa']:null;
         if(in_array($row['status']??'',['Dibatalkan','Potongan Penuh','Tercakup Uang PSB','Tercakup PSB'],true)){
             $remaining=0.0;$g['settled_states'][(string)$row['status']]=true;
@@ -99,7 +105,7 @@ function billing_history_project(array $items,array $filters,array $placements,i
             }
             if(!empty($n['unknown']))$notes[]=$label.' (belum diketahui)';
         }
-        $g['keterangan']=$notes?implode(' + ',$notes):(!empty($g['ordinary_items'])?'Lunas':implode(' + ',array_keys($g['settled_states']??['Lunas'=>true])));
+        $g['keterangan']=$notes?implode(' + ',$notes):(!empty($g['advance_paid'])?'Pembayaran di muka':(!empty($g['ordinary_items'])?'Lunas':implode(' + ',array_keys($g['settled_states']??['Lunas'=>true]))));
         $section=&$sections[$g['section_key']];$section??=['key'=>$g['section_key'],'unit_id'=>$g['unit_id'],'year'=>$g['year'],'kelas'=>$g['kelas'],'rows'=>[],'amounts'=>[],'total'=>[]];$g['no']=count($section['rows'])+1;$section['rows'][]=$g;
         foreach($g['amounts'] as $key=>$amount){
             foreach([&$section['amounts'],&$grand['amounts']] as &$target){$target[$key]??=['value'=>0.0,'known'=>0,'unknown'=>false];$target[$key]['value']+=$amount['value'];$target[$key]['known']+=$amount['known'];$target[$key]['unknown']=$target[$key]['unknown']||$amount['unknown'];}unset($target);

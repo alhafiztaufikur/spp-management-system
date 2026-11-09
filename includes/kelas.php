@@ -381,6 +381,7 @@ function class_sync_student_current_year(
     if ($placementId > 0 && $status === 'aktif') {
         require_once __DIR__.'/psb_spp.php';
         pspp_bind_placement($db,$placementId);
+        require_once __DIR__.'/spp_advance.php';spa_bind_placement($db,$placementId);
         komite_sync_placement($db, $placementId);
         $rateResult=komite_sync_student_rate($db,$noInduk,$komite,$placementId);
         $syncResult[$rateResult['updated']>0?'synced':'unchanged'][]='komite';
@@ -401,6 +402,7 @@ function class_sync_student_current_year(
         }
     }
     if($placementId>0)du_bind_advance_placement($db,$placementId);
+    if($placementId>0){require_once __DIR__.'/spp_advance.php';spa_sync_student($db,$noInduk);}
     if($placementId>0&&du_psb_schema_ready($db))du_psb_reconcile($db,$academicLabel,(int)($_SESSION['admin_id']??0),$placementId);
     return $placementId > 0 ? $placementId : null;
 }

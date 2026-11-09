@@ -47,7 +47,7 @@ document.addEventListener('DOMContentLoaded', () => {
         rate.dataset.status='published';rate.dataset.editing='false';rate.elements.aksi.value='ubah_tarif_terbit';
         rate.querySelectorAll('[data-level]').forEach(input=>{input.value=Number(input.dataset.original).toLocaleString('id-ID');input.disabled=true;});
         rate.querySelector('[data-level]')?.dispatchEvent(new Event('input',{bubbles:true}));
-        const save=rate.querySelector('#spp-rate-save span');if(save)save.textContent='Simpan Perubahan Tarif';
+        const save=rate.querySelector('#spp-rate-save span');if(save)save.textContent=rate.dataset.advance==='true'?'Simpan Tarif & Lengkapi Tagihan':'Simpan Perubahan Tarif';
       }
       const title=document.querySelector('.spp-year-explanation strong');if(title)title.textContent='Tahun SPP sudah diterbitkan';
       const note=document.querySelector('.spp-status-note strong'),hint=document.querySelector('.spp-status-note small');

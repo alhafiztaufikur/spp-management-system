@@ -144,3 +144,8 @@ artefak privat dipertahankan.
 
 Regresi pemilih bersama lolos pada Chrome dan Edge (termasuk fallback panel).
 Firefox tidak tersedia pada lingkungan uji; tidak ada klaim pengujian Firefox.
+# Pembaruan 10 November 2026
+
+SPP–Komite tahun berikutnya sebelum kenaikan rombel menggunakan tarif tahun tujuan
+dan tarif individual per periode yang sama. Lihat
+[alur, pemasangan dan verifikasi](SPP_ADVANCE_20261110.md).

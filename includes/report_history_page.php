@@ -22,6 +22,7 @@ function report_history_monthly_row(array $r,string $category):array {
         'periode_code'=>$period,'tahun_ajaran'=>$r['tahun_ajaran'],'tanggal_dibuat'=>$r['tanggal_dibuat'],
         'tagihan'=>(float)$r['tagihan'],'terbayar'=>(float)$r['terbayar'],'sisa'=>(float)$r['sisa'],
         '_outstanding_periods'=>array_values(array_filter(json_decode($r['outstanding_periods']??'[]',true)??[])),
+        '_advance_paid'=>!empty($r['advance_paid']),
         'status'=>$status,'_read_count'=>(int)$r['read_count'],'_read_fractional'=>(bool)$r['read_fractional'],
     ];
 }
@@ -32,13 +33,16 @@ function report_history_monthly_rollup(mysqli $db,string $sql,string $category,a
     }
     $json=json_encode($credits,JSON_THROW_ON_ERROR);
     $paid='(q.terbayar+COALESCE(c.paid,0)/100)';
-    $where=empty($filters['_billing_as_of'])?'':' WHERE q.tahun*100+q.bulan<='.(int)str_replace('-','',substr($filters['_billing_as_of'],0,7));
+    $cutoff=empty($filters['_billing_as_of'])?null:(int)str_replace('-','',substr($filters['_billing_as_of'],0,7));
+    $futurePaid=$cutoff===null?'0':"(q.tahun*100+q.bulan>$cutoff AND $paid>0.001 AND $paid+0.001>=q.tagihan)";
+    $where=$cutoff===null?'':" WHERE (q.tahun*100+q.bulan<=$cutoff".(empty($filters['_debt_only'])?" OR $futurePaid":'').')';
     if(!empty($filters['filter_tanggal_tagihan'])&&$filters['tanggal_awal']!==''){
         $where.=($where===''?' WHERE ':' AND ')." LEFT(q.tanggal_dibuat,10)>='".$db->real_escape_string($filters['tanggal_awal'])."' AND LEFT(q.tanggal_dibuat,10)<='".$db->real_escape_string($filters['tanggal_akhir'])."'";
     }
     $query="SELECT /*+ SET_VAR(join_buffer_size=33554432) SET_VAR(tmp_table_size=67108864) */
         MIN(q.nis) nis,ANY_VALUE(q.nis_diknas) nis_diknas,ANY_VALUE(q.nama) nama,MIN(q.kelas) kelas,q.master_kelas_id,q.tingkat,MIN(q.tahun_ajaran) tahun_ajaran,
         MIN(q.tahun*100+q.bulan) first_period,
+        MAX(CASE WHEN $futurePaid THEN 1 ELSE 0 END) advance_paid,
         JSON_ARRAYAGG(CASE WHEN q.bill_status NOT IN ('cancelled','covered_psb','waived') AND q.tagihan>$paid THEN CONCAT(q.tahun,'-',LPAD(q.bulan,2,'0')) ELSE NULL END) outstanding_periods,
         q.tagihan read_bill,$paid read_paid,q.bill_status read_bill_status,
         MAX(MOD(q.tagihan,1)<>0 OR MOD(q.terbayar,1)<>0 OR MOD(COALESCE(c.paid,0),100)<>0) read_fractional,

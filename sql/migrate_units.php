@@ -202,3 +202,4 @@ require_once __DIR__.'/../includes/spp_student_tariff_schema.php';sct_schema_app
 require_once __DIR__.'/../includes/daftar_ulang.php';du_advance_schema_apply($koneksi);
 du_psb_schema_apply($koneksi);
 require_once __DIR__.'/../includes/psb_spp_schema.php';pspp_schema_apply($koneksi);
+require_once __DIR__.'/../includes/spp_advance_schema.php';spa_schema_apply($koneksi);

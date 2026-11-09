@@ -1,6 +1,7 @@
 <?php
 /** Shared copy and a no-JavaScript confirmation screen; never writes database state. */
-function spp_rate_confirmation_copy(string $action): array {
+function spp_rate_confirmation_copy(string $action,bool $advance=false): array {
+    if($advance&&in_array($action,['simpan_tarif','ubah_tarif_terbit'],true))return ['Periksa tarif tahun berikutnya','Tarif akan disimpan dan tagihan SPP–Komite seluruh siswa yang memenuhi syarat akan dilengkapi. Pembayaran tetap wajib berurutan; pembayaran dan kredit yang sudah tercatat dipertahankan.','Simpan Tarif & Lengkapi Tagihan'];
     return match ($action) {
         'simpan_tarif'=>['Periksa tarif SPP','Pastikan nominal setiap kelas sudah sesuai. Tarif ini akan digunakan saat tagihan SPP diterbitkan.','Simpan Tarif'],
         'ubah_tarif_terbit'=>['Simpan perubahan tarif SPP?','Perubahan berlaku pada tagihan SPP yang belum pernah dibayar. Tagihan yang sudah menerima pembayaran tetap menggunakan nominal sebelumnya. Potongan khusus siswa tetap diperhitungkan.','Simpan Perubahan Tarif'],
@@ -10,7 +11,7 @@ function spp_rate_confirmation_copy(string $action): array {
 }
 
 function spp_rate_confirmation_screen(array $post, array $oldRates, array $newRates, string $kind): void {
-    [$title,$message,$button]=spp_rate_confirmation_copy($kind);
+    [$title,$message,$button]=spp_rate_confirmation_copy($kind,($post['tahun_ajaran']??'')===du_next_year());
     $e=static fn($v)=>htmlspecialchars((string)$v,ENT_QUOTES,'UTF-8');
     $year=(string)$post['tahun_ajaran'];$summary=unit_label(unit_active_id()).' · '.$year;
     if (($post['aksi']??'')==='terbitkan') $summary.=' · '.count($post['selected_students']??[]).' siswa';

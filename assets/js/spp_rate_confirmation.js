@@ -12,7 +12,8 @@ document.addEventListener('DOMContentLoaded', () => {
     const editing=rate.dataset.editing==='true',dirty=inputs.some(input=>number(input.value)!==Number(input.dataset.original));
     inputs.forEach(input=>input.disabled=!editing);
     edit.hidden=editing&&dirty;edit.setAttribute('aria-disabled',String(editing));edit.tabIndex=editing?-1:0;
-    save.hidden=!editing||!dirty;save.disabled=!dirty;cancel.hidden=!editing;
+    const mayComplete=rate.dataset.advance==='true';
+    save.hidden=!editing||(!dirty&&!mayComplete);save.disabled=!dirty&&!mayComplete;cancel.hidden=!editing;
     const note=document.getElementById('spp-rate-note');
     if(note){note.textContent=editing&&dirty?'Perubahan belum disimpan.':'';note.hidden=!(editing&&dirty);}
   }

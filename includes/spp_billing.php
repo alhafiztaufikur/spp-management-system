@@ -242,10 +242,13 @@ function spp_master_correct_published_rates(mysqli $db, int $id, array $rates, s
         if (!is_finite($new) || $new<=0 || $new>9999999999999.99) throw new RuntimeException('Tarif dasar kelas '.$level.' harus berupa nominal positif.');
         if (abs($new-$oldRates[$level])>.001) $changed[$level]=$new;
     }
-    if (!$changed) throw new RuntimeException('Belum ada perubahan tarif.');
+    if (!$changed) {
+        if($master['label']===du_next_year())return ['rates_changed'=>0,'bills_updated'=>0,'bills_locked'=>0];
+        throw new RuntimeException('Belum ada perubahan tarif.');
+    }
     $yearId=(int)$master['tahun_ajaran_id'];
     lb_mark_spp_master($db,(string)$master['label'],array_keys($changed));
-    $s=$db->prepare('SELECT s.NO_INDUK FROM siswa s JOIN siswa_tahun_ajaran sta ON sta.no_induk=s.NO_INDUK AND sta.unit_id=s.unit_id WHERE sta.tahun_ajaran_id=? ORDER BY s.id');
+    $s=$db->prepare('SELECT s.NO_INDUK FROM siswa s WHERE EXISTS(SELECT 1 FROM tagihan_spp t WHERE t.no_induk=s.NO_INDUK AND t.unit_id=s.unit_id AND t.tahun_ajaran_id=?) ORDER BY s.id');
     $s->bind_param('i',$yearId);$s->execute();$students=$s->get_result()->fetch_all(MYSQLI_ASSOC);$s->close();
     // Use the cashier's exact lookup shape. A join can lock a different NIS index
     // before the primary record, causing a cycle with payment foreign-key checks.
@@ -332,11 +335,13 @@ function spp_publish_placement_periods(mysqli $db,int $masterYearId,array $maste
     if(!in_array($start,array_column($periods,'bulan'),true))throw new RuntimeException('Bulan mulai tagihan tidak valid.');
     $planId=$placement['rencana_masuk_id']??null;
     $planColumn=$planId?',rencana_masuk_id':'';$planValue=$planId?','.(int)$planId:'';
+    if(!empty($placement['penempatan_asal_id'])){$planColumn.=',penempatan_asal_id';$planValue.=','.(int)$placement['penempatan_asal_id'];}
     $insert=$db->prepare("INSERT IGNORE INTO tagihan_spp(master_spp_tahun_id,tahun_ajaran_id,penempatan_id,no_induk,tingkat_snapshot,master_kelas_id,kelas_rombel_snapshot,bulan,tahun,tarif_dasar_snapshot,potongan_nominal_ditetapkan_snapshot,potongan_nominal_snapshot,nominal_tagihan,status$planColumn)
       VALUES(?,?,?,?,?,?,?,?,?,?,?,?,?,?$planValue)");
-    $level=(int)$placement['kelas'];$base=lop_tariff($db,(string)$placement['no_induk'],(string)$master['label'])??(float)$rates[$level];$discount=(float)$placement['potongan_spp_nominal'];
+    $level=(int)$placement['kelas'];$advance=!empty($placement['penempatan_asal_id']);
+    $base=$advance?(float)($rates[$level]??0):(lop_tariff($db,(string)$placement['no_induk'],(string)$master['label'])??(float)($rates[$level]??0));$discount=(float)$placement['potongan_spp_nominal'];
     $net=spp_net_tariff($base,$discount);$covered=(int)$placement['spp_covered_by_psb']===1;
-    $sourcePlan=lb_spp_override($db,$nis,(string)$master['label'])?[]:lb_monthly_plan($db,$nis)['positions'];
+    $sourcePlan=$advance||lb_spp_override($db,$nis,(string)$master['label'])?[]:lb_monthly_plan($db,$nis)['positions'];
     $startIndex=0;
     foreach($periods as $idx=>$period) if($period['bulan']===$start){$startIndex=$idx;break;}
     foreach($periods as $idx=>$period){
@@ -352,6 +357,7 @@ function spp_publish_placement_periods(mysqli $db,int $masterYearId,array $maste
             $billBase=$custom['base'];$billDiscount=0.0;$declaredDiscount=0.0;$billNet=$custom['net'];$status=$billNet<=.001?'waived':'open';
         }
         [$firstLevel]=unit_level_bounds();
+        if($advance&&$base<=.001&&!sct_rule($db,$nis,$period['bulan'],$period['tahun']))throw new DomainException('Tarif SPP kelas tujuan belum ditetapkan untuk '.$nis.'.');
         if($level===$firstLevel&&!$covered&&$base<=.001&&!sct_rule($db,$nis,$period['bulan'],$period['tahun'])&&!isset($sourcePlan['spp|'.$period['tahun'].'-'.$period['bulan']]))throw new DomainException('Tarif SPP kelas awal belum ditetapkan untuk '.$nis.'. Simpan tarif melalui Master Siswa.');
         $placementId=$placement['id']!==null?(int)$placement['id']:null;$classId=(int)($placement['master_kelas_id']??0);$classIdParam=$classId?:null;
         $classLabel=(string)$placement['kelas_rombel_snapshot'];$month=$period['bulan'];$year=$period['tahun'];
@@ -370,6 +376,10 @@ function spp_publish_students(mysqli $db, int $masterYearId, array $students, ar
     $stmt=$db->prepare('SELECT mst.status,ta.id tahun_ajaran_id,ta.label FROM master_spp_tahun mst JOIN tahun_ajaran ta ON ta.id=mst.tahun_ajaran_id WHERE mst.id=? FOR UPDATE');
     $stmt->bind_param('i',$masterYearId);$stmt->execute();$master=$stmt->get_result()->fetch_assoc();$stmt->close();
     if(!$master || $master['status']==='closed') throw new RuntimeException('Tahun SPP sudah ditutup atau tidak tersedia.');
+    if($master['label']===du_next_year()){
+        require_once __DIR__.'/spp_advance.php';$result=spa_complete_year($db,$masterYearId,$students);
+        return $result+['legacy_covered'=>0,'before_transition'=>0,'ineligible'=>[]];
+    }
     $rates=spp_master_rates($db,$masterYearId);
     $selected=[]; foreach($students as $nis){$nis=trim((string)$nis);if($nis!=='')$selected[$nis]=true;}
     if(!$selected) throw new RuntimeException('Pilih minimal satu siswa untuk penerbitan SPP.');
