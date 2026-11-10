@@ -10,10 +10,13 @@
         "includes/spp_student_tariff_schema.php",
         "includes/psb_spp_schema.php",
         "includes/spp_advance_schema.php",
+        "includes/student_out_schema.php",
         "includes/du_psb.php",
         "includes/du_advance.php"
     ],
     "checks": [
+        {"table_name":"student_out_periods_data","name":"ck_out_month","clause":"((dayofmonth(`first_free_month`) = 1) and ((`resume_month` is null) or (dayofmonth(`resume_month`) = 1)))"},
+        {"table_name":"student_out_periods_data","name":"ck_out_return","clause":"(((`returned_at` is null) and (`resume_month` is null)) or ((`returned_at` >= `departed_at`) and (`resume_month` is not null)))"},
         {
             "table_name": "bayar_data",
             "name": "chk_bayar_psb",
@@ -246,6 +249,11 @@
         }
     ],
     "foreign_keys": [
+        {"table_name":"student_out_periods_data","name":"fk_out_student","columns":["student_id"],"parent":"siswa_data","parent_columns":["id"],"delete":"NO ACTION","update":"NO ACTION"},
+        {"table_name":"student_out_periods_data","name":"fk_out_unit","columns":["unit_id"],"parent":"unit_sekolah","parent_columns":["id"],"delete":"NO ACTION","update":"NO ACTION"},
+        {"table_name":"tagihan_spp_data","name":"fk_out_tagihan_spp","columns":["out_period_id"],"parent":"student_out_periods_data","parent_columns":["id"],"delete":"NO ACTION","update":"NO ACTION"},
+        {"table_name":"tagihan_komite_data","name":"fk_out_tagihan_komite","columns":["out_period_id"],"parent":"student_out_periods_data","parent_columns":["id"],"delete":"NO ACTION","update":"NO ACTION"},
+        {"table_name":"tagihan_daftar_ulang_data","name":"fk_out_tagihan_daftar_ulang","columns":["out_period_id"],"parent":"student_out_periods_data","parent_columns":["id"],"delete":"NO ACTION","update":"NO ACTION"},
         {
             "table_name": "admin",
             "name": "fk_admin_unit",

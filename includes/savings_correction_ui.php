@@ -1,6 +1,7 @@
 <?php
 require_once __DIR__.'/savings_authorization.php';
 function savings_correction_controls(mysqli $db,array $row):void {
+    require_once __DIR__.'/student_out.php';$studentOut=!empty(sout_student($db,(string)$row['NO_INDUK'],false,(int)$row['unit_id'])['is_out']);
     $editAmount=(float)($row['jenis']==='masuk'?$row['nominal']:$row['keluar']);
     if(empty($_SESSION['csrf_savings']))$_SESSION['csrf_savings']=bin2hex(random_bytes(32));
     if(!savings_authorization_ready($db)){if(operational_role())echo '<p class="sw-note">Otorisasi tabungan menunggu penerapan migrasi database oleh pengelola.</p>';return;}
@@ -19,7 +20,7 @@ function savings_correction_controls(mysqli $db,array $row):void {
     <?php endif;
     ?><div class="sw-transaction-actions"><?php
     if(!empty($row['deleted']))echo '<p class="sw-lock">Transaksi dihapus. Arsip audit tidak dihitung dalam saldo.</p>';
-    elseif(operational_role()&&!unit_all_readonly()&&($request['status']??'')!=='pending'){
+    elseif(!$studentOut&&operational_role()&&!unit_all_readonly()&&($request['status']??'')!=='pending'){
         $super=operational_role(); ?>
         <button type="button" class="btn btn-ghost" data-savings-open="edit"><?= savings_icon('edit') ?><?= $super?'Edit':'Ajukan Edit' ?></button><dialog class="sw-confirm-dialog sw-editor-dialog" data-savings-editor="edit" aria-label="Koreksi transaksi tabungan"><div class="sw-editor-stage"><header class="sw-confirm-heading"><h3><?= $super?'Edit Transaksi':'Ajukan Edit' ?></h3></header>
         <form method="post" action="koreksi.php" class="sw-correction-form" data-savings-confirm data-student="<?= savings_e($row['NAMA']) ?>" data-reference="<?= savings_e($row['reference']) ?>" data-original-amount="<?= $editAmount ?>" data-original-date="<?= savings_e($row['TANGGAL']) ?>" data-original-note="<?= savings_e($row['keterangan']??'') ?>">

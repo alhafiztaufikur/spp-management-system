@@ -1,5 +1,6 @@
 <?php
 session_start();
+require_once __DIR__.'/../includes/student_out.php';
 if (!isset($_SESSION['admin_id'])) { header('Location: ../login.php'); exit; }
 require_once '../koneksi.php';
 require_once '../includes/auth.php';
@@ -268,6 +269,8 @@ if ($_SERVER['REQUEST_METHOD'] === 'POST') {
                 $stmtClass = $koneksi->prepare('UPDATE siswa SET master_kelas_id = ? WHERE id = ?');
                 $stmtClass->bind_param('ii', $classId, $id); $stmtClass->execute(); $stmtClass->close();
                 $tariffSync = null;
+                $outResult = sout_transition($koneksi,$id,$oldStudent,$targetKind,(int)$_SESSION['admin_id']);
+                $active=$outResult['is_active'];
                 $placementId = class_sync_student_current_year($koneksi, $noInduk, $classId, $spp, $pomg, $active===1, $tariffSync);
                 $admissionResult=$admissionRate!==null?pspp_save($koneksi,$id,$admissionRate,sct_amount($_POST['pomg']),$admissionYear):['changed'=>0];
                 $startChanged=$placementId?komite_set_start_month($koneksi,$placementId,$komiteStartMonth):false;
@@ -298,6 +301,8 @@ if ($_SERVER['REQUEST_METHOD'] === 'POST') {
                 $stmtClass = $koneksi->prepare('UPDATE siswa SET master_kelas_id = ? WHERE id = ?');
                 $stmtClass->bind_param('ii', $classId, $id); $stmtClass->execute(); $stmtClass->close();
                 $tariffSync = null;
+                $outResult = sout_transition($koneksi,$id,$oldStudent,$targetKind,(int)$_SESSION['admin_id']);
+                $active=$outResult['is_active'];
                 $placementId = class_sync_student_current_year($koneksi, $noInduk, $classId, $spp, $pomg, $active === 1, $tariffSync);
                 $admissionCurrent=pspp_find($koneksi,$id,true);
                 $admissionResult=$admissionRate!==null?pspp_save($koneksi,$id,$admissionRate,sct_amount($_POST['pomg']),$admissionYear,pspp_version($koneksi,$admissionCurrent),$admissionUpdateSpp,$admissionUpdateKomite):['changed'=>0];

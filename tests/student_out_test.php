@@ -1,0 +1,76 @@
+<?php
+require __DIR__.'/http_form_scope.php';spp_test_assert_database_target();
+require __DIR__.'/../koneksi.php';spp_test_assert_database_target($koneksi);
+require_once __DIR__.'/../includes/student_out.php';require_once __DIR__.'/../includes/kelas.php';require_once __DIR__.'/../includes/spp_advance.php';require_once __DIR__.'/../includes/reports.php';require_once __DIR__.'/../includes/savings_owners.php';
+$db=$koneksi;if((int)$db->query('SELECT @@port')->fetch_row()[0]===3306)throw new RuntimeException('Isolated server required.');
+$checks=0;$check=static function($ok,string $message)use(&$checks){if(!$ok)throw new RuntimeException($message);$checks++;};
+$reject=static function(callable $fn,string $message)use($check){try{$fn();}catch(Throwable $e){$check(str_contains($e->getMessage(),'OUT'),$message.': '.$e->getMessage());return;}$check(false,$message);};
+$db->begin_transaction();
+try{
+ $actors=[];foreach(['super_admin','admin'] as $role){$a=hp_one($db,'SELECT id,nama FROM admin WHERE role=? AND is_active=1 LIMIT 1',[$role]);if(!$a){lf_query($db,'INSERT INTO admin(username,password,nama,role,is_active) VALUES(?,?,?,?,1)',['qa_out_'.$role,password_hash(bin2hex(random_bytes(20)),PASSWORD_DEFAULT),'QA OUT '.$role,$role]);$a=['id'=>$db->insert_id,'nama'=>'QA OUT '.$role];}$actors[$role]=$a;}
+ foreach($actors as $role=>$actor)foreach([1,2,3] as $unit){
+  $_SESSION=['admin_id'=>(int)$actor['id'],'admin_nama'=>$actor['nama'],'admin_role'=>$role,'active_unit_id'=>$unit];unit_set_context($db,$unit);$_SERVER['HTTP_X_SPP_TEST_CURRENT_YEAR']='2186/2187';lb_cache($db,true);
+  [$first,$last]=unit_level_bounds();$grade=$last-1;$nis='99887'.($role==='admin'?'2':'1').'001';
+  $class=hp_one($db,'SELECT * FROM master_kelas WHERE tingkat=? AND is_placeholder=0 AND is_active=1 LIMIT 1',[$grade]);$outClass=hp_one($db,"SELECT * FROM master_kelas WHERE jenis='out' LIMIT 1");
+  lf_query($db,"INSERT INTO siswa(NO_INDUK,NAMA,KELAS,master_kelas_id,SPP_PERBULAN,POMG,is_active) VALUES(?,'QA OUT',?,?,100000,15000,1)",[$nis,$grade,$class['id']]);$id=(int)$db->insert_id;
+  $cm=spp_master_ensure_year($db,'2186/2187');$fm=spp_master_ensure_year($db,'2187/2188');$rates=array_fill($first+1,$last-$first,100000);
+  if(spp_master_rates_editable(spp_master_state($db,(int)$cm['id'])))spp_master_save_rates($db,(int)$cm['id'],$rates);
+  if(spp_master_rates_editable(spp_master_state($db,(int)$fm['id'])))spp_master_save_rates($db,(int)$fm['id'],$rates);
+  $sync=null;$placement=class_sync_student_current_year($db,$nis,(int)$class['id'],100000,15000,true,$sync);spp_publish_students($db,(int)$cm['id'],[$nis]);spa_complete_year($db,(int)$fm['id'],[$nis]);
+  foreach(['tagihan_spp','tagihan_komite'] as $table)lf_query($db,"DELETE FROM $table WHERE no_induk=? AND bulan='08' AND tahun='2186'",[$nis]);
+  lf_query($db,"UPDATE tagihan_spp SET status='cancelled',cancel_reason='Manual QA' WHERE no_induk=? AND bulan='05' AND tahun='2187'",[$nis]);lf_query($db,"UPDATE tagihan_komite SET status='cancelled' WHERE no_induk=? AND bulan='05' AND tahun='2187'",[$nis]);
+  // A pre-existing partial receipt must remain collectible evidence, never a waiver.
+  lf_query($db,"INSERT INTO bayar(NO_INDUK,KELAS,U_SPP,U_KOMITE,BULAN,TAHUN,TGL_BYR,total_jumlah,user_id,payment_link_version) VALUES(?,?,50000,5000,'12','2186','2186-11-01 10:00:00',55000,?,1)",[$nis,$grade,$actor['id']]);$payment=(int)$db->insert_id;
+  $sb=hp_one($db,"SELECT * FROM tagihan_spp WHERE no_induk=? AND bulan='12' AND tahun='2186'",[$nis]);$kb=hp_one($db,"SELECT * FROM tagihan_komite WHERE no_induk=? AND bulan='12' AND tahun='2186'",[$nis]);
+  lf_query($db,"INSERT INTO spp_alokasi_batch(no_induk,bayar_id,tanggal,user_id,komite_required,uang_baru,status) VALUES(?,?,'2186-11-01 10:00:00',?,1,50000,'active')",[$nis,$payment,$actor['id']]);$batch=(int)$db->insert_id;
+  lf_query($db,'INSERT INTO spp_alokasi(batch_id,tagihan_spp_id,nominal_dari_bayar) VALUES(?,?,50000)',[$batch,$sb['id']]);lf_query($db,'INSERT INTO bayar_komite(bayar_id,tagihan_komite_id,nominal) VALUES(?,?,5000)',[$payment,$kb['id']]);
+  lf_query($db,"INSERT INTO tabungan(NO_INDUK,SALDO) VALUES(?,250000)",[$nis]);
+  lf_query($db,"INSERT INTO transaksi_m(NO_INDUK,TANGGAL,MASUK,KELUAR,user_id,keterangan) VALUES(?,'2186-11-01 10:00:00',250000,0,?,'QA OUT')",[$nis,$actor['id']]);$journal=(int)$db->insert_id;
+  lf_query($db,"INSERT INTO Daftar_ulang(tahun_ajaran_id,th_ajaran,kelas,Jumlah) VALUES(?,?,?,500000) ON DUPLICATE KEY UPDATE id=LAST_INSERT_ID(id)",[$fm['tahun_ajaran_id'],'2187/2188',$grade+1]);$duMaster=(int)hp_one($db,'SELECT id FROM Daftar_ulang WHERE tahun_ajaran_id=? AND kelas=?',[$fm['tahun_ajaran_id'],$grade+1])['id'];
+  lf_query($db,"INSERT INTO tagihan_daftar_ulang(tahun_ajaran_id,penempatan_asal_id,master_daftar_ulang_id,no_induk,kelas_snapshot,tahun_ajaran_snapshot,nominal_awal,nominal_tagihan) VALUES(?,?,?,?,?,'2187/2188',500000,500000)",[$fm['tahun_ajaran_id'],$placement,$duMaster,$nis,$grade+1]);$du=(int)$db->insert_id;
+  $financial=['payment'=>hp_one($db,'SELECT * FROM bayar WHERE id=?',[$payment]),'allocation'=>hp_one($db,'SELECT * FROM spp_alokasi WHERE batch_id=?',[$batch]),'savings'=>hp_one($db,'SELECT * FROM tabungan WHERE NO_INDUK=?',[$nis]),'journal'=>hp_one($db,'SELECT * FROM transaksi_m WHERE id=?',[$journal])];
+  $before=hp_one($db,'SELECT * FROM siswa WHERE id=?',[$id]);lf_query($db,"UPDATE siswa SET KELAS='OUT',master_kelas_id=?,is_active=0 WHERE id=?",[$outClass['id'],$id]);
+  $r=sout_transition($db,$id,$before,'out',(int)$actor['id'],'2186-11-10 10:00:00');
+  $event=hp_one($db,'SELECT * FROM student_out_periods WHERE student_id=? AND returned_at IS NULL',[$id]);
+  $check($event['first_free_month']==='2186-12-01','Exit starts next month');$check($r['event_created']===1,'One event created');$check($r['protected']===2,'Partial SPP and Komite protected');
+  $check(hp_one($db,'SELECT status FROM tagihan_spp WHERE id=?',[$sb['id']])['status']==='open','Paid SPP retains original obligation');$check(hp_one($db,'SELECT status FROM tagihan_komite WHERE id=?',[$kb['id']])['status']==='open','Paid Komite retains original obligation');
+  $check(hp_one($db,"SELECT status FROM tagihan_spp WHERE no_induk=? AND bulan='11' AND tahun='2186'",[$nis])['status']==='open','Exit-month arrear retained');
+  $jan=hp_one($db,"SELECT * FROM tagihan_spp WHERE no_induk=? AND bulan='01' AND tahun='2187'",[$nis]);$check($jan['status']==='cancelled','Future invoice cancelled');$check((int)$jan['out_period_id']===(int)$event['id'],'Cancellation has explicit provenance');$check(hp_one($db,'SELECT status FROM tagihan_daftar_ulang WHERE id=?',[$du])['status']==='cancelled','Next year DU cancelled');
+  if($unit===1&&$role==='super_admin'){$filters=report_filters($db,['template'=>'spp-tahunan','siswa_status'=>'all','q'=>$nis,'tahun_ajaran'=>'2186/2187','student_id'=>$id]);$report=report_monthly_evidence($db,'spp',[[1,2187],[12,2186]],$filters);$check(count($report)===1&&$report[0]['periods']['2187-01']['text']==='Dibatalkan','Global report shows cancellation, not settlement');$check($report[0]['periods']['2186-12']['paid']===50000.0&&$report[0]['periods']['2186-12']['text']==='Cicilan','Global report preserves original cash and partial obligation');}
+  $count=(int)hp_one($db,'SELECT COUNT(*) n FROM spp_audit_log WHERE no_induk=?',[$nis])['n'];$again=sout_transition($db,$id,$before,'out',(int)$actor['id'],'2186-12-20 10:00:00');
+  $check($again['event_created']===0&&$again['cancelled']===0,'Replay changes zero');$check((int)hp_one($db,'SELECT COUNT(*) n FROM spp_audit_log WHERE no_induk=?',[$nis])['n']===$count,'Replay adds no audit');
+  $reject(fn()=>sout_assert_student($db,$nis),'Server rejects OUT');$reject(fn()=>so_resolve($db,['student_id'=>$id],true),'Savings resolver rejects OUT');
+  $reject(fn()=>lf_query($db,'UPDATE bayar SET KETERANGAN=? WHERE id=?',['rejected',$payment]),'Native correction guarded');$reject(fn()=>lf_query($db,'DELETE FROM bayar WHERE id=?',[$payment]),'Native deletion guarded');$reject(fn()=>lf_query($db,'UPDATE transaksi_m SET keterangan=? WHERE id=?',['rejected',$journal]),'Savings correction guarded');
+  $reject(fn()=>lf_query($db,'INSERT INTO transaksi_k(NO_INDUK,TANGGAL,MASUK,KELUAR,user_id) VALUES(?,?,0,1,?)',[$nis,'2186-11-11 10:00:00',$actor['id']]),'Savings withdrawal guarded');
+  $reject(fn()=>lf_query($db,'UPDATE tagihan_spp SET status=\'open\' WHERE id=?',[$jan['id']]),'Cannot reopen OUT invoice');
+  $reject(fn()=>lf_query($db,'UPDATE tabungan SET SALDO=0 WHERE NO_INDUK=?',[$nis]),'Direct savings balance correction guarded');
+  unit_set_context($db,0);$check(sout_period_blocked($db,$nis,'spp','2187-01',$unit),'All-unit reader resolves exact student unit');$check(!sout_period_blocked($db,$nis,'spp','2187-01',$unit===3?1:$unit+1)||$role==='admin','Equal NIS in another unit cannot borrow OUT interval');unit_set_context($db,$unit);
+  $after=['payment'=>hp_one($db,'SELECT * FROM bayar WHERE id=?',[$payment]),'allocation'=>hp_one($db,'SELECT * FROM spp_alokasi WHERE batch_id=?',[$batch]),'savings'=>hp_one($db,'SELECT * FROM tabungan WHERE NO_INDUK=?',[$nis]),'journal'=>hp_one($db,'SELECT * FROM transaksi_m WHERE id=?',[$journal])];$check($financial===$after,'Exit and rejected writes preserve all financial rows');
+  $currentOut=hp_one($db,'SELECT * FROM siswa WHERE id=?',[$id]);lf_query($db,'UPDATE siswa SET KELAS=?,master_kelas_id=?,is_active=1 WHERE id=?',[$grade,$class['id'],$id]);
+  $returned=sout_transition($db,$id,$currentOut,'reguler',(int)$actor['id'],'2187-01-05 10:00:00');$check($returned['restored']>0,'Return automatically restores invoices');
+  class_sync_student_current_year($db,$nis,(int)$class['id'],100000,15000,true,$sync);
+  $check(hp_one($db,'SELECT id,status FROM tagihan_spp WHERE id=?',[$jan['id']])['status']==='open','Same January invoice restored');$check(!sout_period_blocked($db,$nis,'spp','2187-01')&&sout_period_blocked($db,$nis,'spp','2186-12'),'Only OUT interval remains exempt');sout_assert_student($db,$nis);
+  $check(hp_one($db,'SELECT status FROM tagihan_daftar_ulang WHERE id=?',[$du])['status']==='open','Future DU restored with same ID');
+  foreach(['tagihan_spp','tagihan_komite'] as $table){$check(!hp_one($db,"SELECT id FROM $table WHERE no_induk=? AND bulan='08' AND tahun='2186'",[$nis]),'Return does not publish a missing prior obligation');$check(hp_one($db,"SELECT status FROM $table WHERE no_induk=? AND bulan='05' AND tahun='2187'",[$nis])['status']==='cancelled','Manual cancellation remains protected');}
+  $check(hp_one($db,"SELECT status FROM tagihan_spp WHERE no_induk=? AND bulan='12' AND tahun='2186'",[$nis])['status']==='open','Paid December remains protected after return');
+  lf_query($db,'UPDATE bayar SET KETERANGAN=? WHERE id=?',['valid after return',$payment]);$check(hp_one($db,'SELECT KETERANGAN FROM bayar WHERE id=?',[$payment])['KETERANGAN']==='valid after return','Financial writes available again after return');
+  lf_query($db,"UPDATE siswa SET KELAS='OUT',master_kelas_id=?,is_active=0 WHERE id=?",[$outClass['id'],$id]);sout_transition($db,$id,null,'out',(int)$actor['id'],'2187-03-31 23:59:59');
+  $check((int)hp_one($db,'SELECT COUNT(*) n FROM student_out_periods WHERE student_id=?',[$id])['n']===2,'Second OUT creates distinct interval');$check(hp_one($db,'SELECT first_free_month FROM student_out_periods WHERE student_id=? AND returned_at IS NULL',[$id])['first_free_month']==='2187-04-01','Month end next-month boundary');
+  $check(hp_one($db,'SELECT unit_id FROM siswa WHERE id=?',[$id])['unit_id']==$unit,'Same NIS remains isolated by unit');
+  $custom=hp_one($db,"SELECT id FROM master_kelas WHERE jenis='custom' LIMIT 1");if($custom){lf_query($db,"UPDATE siswa SET KELAS='CUSTOM',master_kelas_id=? WHERE id=?",[$custom['id'],$id]);$r=sout_transition($db,$id,null,'custom',(int)$actor['id'],'2187-04-02 10:00:00');$check($r['is_active']===0,'Nonacademic reassignment is not an official return');$reject(fn()=>sout_assert_student($db,$nis),'Open OUT interval still blocks transactions');$reject(fn()=>lf_query($db,'UPDATE bayar SET KETERANGAN=? WHERE id=?',['rejected after custom',$payment]),'Database guard retains open OUT decision');}
+ }
+ $check(sout_now('2186-12-31 23:59:59')->modify('first day of next month')->format('Y-m-01')==='2187-01-01','Calendar year boundary uses next month');
+ unit_set_context($db,1);$_SESSION=['admin_id'=>(int)$actors['super_admin']['id'],'admin_role'=>'super_admin','admin_nama'=>$actors['super_admin']['nama'],'active_unit_id'=>1];
+ $legacy=hp_one($db,"SELECT o.*,s.NO_INDUK FROM legacy_op_owners o JOIN siswa s ON s.id=o.student_id AND s.unit_id=o.unit_id WHERE s.KELAS<>'OUT' AND o.kind='active' AND EXISTS(SELECT 1 FROM legacy_op_payments p WHERE p.owner_id=o.id) AND EXISTS(SELECT 1 FROM legacy_op_accounts a WHERE a.owner_id=o.id) LIMIT 1");
+ $check((bool)$legacy,'Restored Legacy owner available for real guards');
+ lf_query($db,"UPDATE siswa SET KELAS='OUT',is_active=0 WHERE id=?",[$legacy['student_id']]);
+ $reject(fn()=>sout_assert_owner($db,(int)$legacy['id']),'Linked Legacy identity rejects OUT');
+ $lp=hp_one($db,'SELECT * FROM legacy_op_payments WHERE owner_id=? LIMIT 1',[$legacy['id']]);$la=hp_one($db,'SELECT * FROM legacy_op_accounts WHERE owner_id=?',[$legacy['id']]);
+ $reject(fn()=>lf_query($db,'UPDATE legacy_op_payments SET note=? WHERE id=?',['rejected',$lp['id']]),'Legacy payment correction rejected');
+ $reject(fn()=>lf_query($db,'DELETE FROM legacy_op_payments WHERE id=?',[$lp['id']]),'Legacy payment cancellation rejected');
+ $reject(fn()=>lf_query($db,'UPDATE legacy_op_accounts SET balance=0 WHERE id=?',[$la['id']]),'Linked Legacy savings correction rejected');
+ $check($lp===hp_one($db,'SELECT * FROM legacy_op_payments WHERE id=?',[$lp['id']])&&$la===hp_one($db,'SELECT * FROM legacy_op_accounts WHERE id=?',[$la['id']]),'Rejected Legacy writes preserve all columns');
+ $credited=null;foreach(hp_rows($db,"SELECT t.* FROM tagihan_spp t JOIN siswa s ON s.NO_INDUK=t.no_induk AND s.unit_id=t.unit_id JOIN legacy_op_owners o ON o.student_id=s.id AND o.unit_id=s.unit_id WHERE t.status='open' AND o.kind='active' AND NOT EXISTS(SELECT 1 FROM spp_alokasi a JOIN spp_alokasi_batch b ON b.id=a.batch_id AND b.unit_id=a.unit_id WHERE a.tagihan_spp_id=t.id AND b.status='active') ORDER BY t.id LIMIT 100") as $bill)if(sout_has_credit($db,'spp',$bill)){$credited=$bill;break;}
+ $check((bool)$credited,'Real Legacy credit exists without native allocation');$s=sout_student($db,$credited['no_induk'],true);$exit=sout_now($credited['tahun'].'-'.$credited['bulan'].'-01 10:00:00')->modify('-1 month')->format('Y-m-d H:i:s');lf_query($db,"UPDATE siswa SET KELAS='OUT',is_active=0 WHERE id=?",[$s['id']]);$result=sout_transition($db,(int)$s['id'],$s,'out',(int)$actors['super_admin']['id'],$exit);$check($result['protected']>0,'Exit service protects Legacy credit');$saved=hp_one($db,'SELECT * FROM tagihan_spp WHERE id=?',[$credited['id']]);$check($saved===$credited,'Legacy-credit bill remains identical including its unpaid installment');
+ echo 'PASS '.$checks.' OUT lifecycle and financial-protection checks.',PHP_EOL;
+}finally{$db->rollback();unset($GLOBALS['sout_periods'][$db->thread_id],$GLOBALS['sout_returning'][$db->thread_id],$GLOBALS['sout_returning_nis'][$db->thread_id]);}

@@ -61,7 +61,7 @@ function spa_issue_student(mysqli $db,array $master,array $row,array $rates): ar
     $start=false;
     foreach(spp_academic_periods($master['label']) as $p){
         if($p['bulan']===($row['komite_mulai_bulan']??'07'))$start=true;if(!$start)continue;
-        $period=$p['tahun'].'-'.$p['bulan'];if(lful_is_covered($db,$nis,'komite',$period))continue;
+        $period=$p['tahun'].'-'.$p['bulan'];require_once __DIR__.'/student_out.php';if(sout_period_blocked($db,$nis,'komite',$period)||lful_is_covered($db,$nis,'komite',$period))continue;
         if(!hp_one($db,'SELECT id FROM tagihan_komite WHERE no_induk=? AND bulan=? AND tahun=?',[$nis,$p['bulan'],$p['tahun']])){
             lf_query($db,'INSERT INTO tagihan_komite(tahun_ajaran_id,penempatan_id,penempatan_asal_id,no_induk,kelas_rombel_snapshot,bulan,tahun,nominal_tagihan) VALUES(?,?,?,?,?,?,?,?)',[$master['tahun_ajaran_id'],$row['placement_id'],$row['penempatan_asal_id']??null,$nis,$row['kelas_rombel_snapshot'],$p['bulan'],$p['tahun'],$row['komite_rate']]);
             $result['komite_created']++;

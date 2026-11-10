@@ -473,6 +473,8 @@ function du_create_bill_for_placement(mysqli $db, int $placementId, bool $syncLe
     $row = $stmt->get_result()->fetch_assoc();
     $stmt->close();
     if (!$row || $row['placement_status'] !== 'aktif') return null;
+    require_once __DIR__.'/student_out.php';
+    if(sout_period_blocked($db,(string)$row['no_induk'],'du',(string)$row['label']))return null;
     if(du_advance_schema_ready($db)){
         $advance=hp_one($db,'SELECT id FROM tagihan_daftar_ulang WHERE no_induk=? AND tahun_ajaran_id=? AND penempatan_asal_id IS NOT NULL',[$row['no_induk'],$row['tahun_ajaran_id']]);
         if($advance){du_bind_advance_placement($db,$placementId);return (int)$advance['id'];}

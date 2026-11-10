@@ -39,5 +39,6 @@ function so_resolve(mysqli $db,array $input,bool $write=false): array {
     if($write&&(unit_active_id()===0||(int)$r['unit_id']!==unit_active_id()))throw new DomainException('Pilih satu unit rekening.');
     if($write&&$r['state']!=='ready')throw new DomainException('Rekening belum siap atau diblokir. Selesaikan pemeriksaan rekening terlebih dahulu.');
     if($r['student_id']){lop_bank_assert_ready($db,$r['identity'],(int)$r['unit_id']);if(lop_ready($db)&&lf_one($db,"SELECT id FROM legacy_op_owners WHERE student_id=? AND state<>'ready'",[$r['student_id']]))throw new DomainException('Rekening belum siap.');}
+    if($write){require_once __DIR__.'/student_out.php';if($r['student_id'])sout_assert_student($db,$r['identity']);else sout_assert_owner($db,(int)$r['owner_id']);}
     $r['class_label']=so_class_label($r);$r['alumni_label']=class_is_alumni($r)?$r['class_label']:'';return $r;
 }

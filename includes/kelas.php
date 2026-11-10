@@ -309,7 +309,7 @@ function class_sync_student_current_year(
     $stmt->execute();
     $latestYear = (string)($stmt->get_result()->fetch_assoc()['latest_year'] ?? '');
     $stmt->close();
-    if ($latestYear !== '' && strcmp($latestYear, $academicLabel) < 0) {
+    if ($latestYear !== '' && strcmp($latestYear, $academicLabel) < 0 && empty($GLOBALS['sout_returning_nis'][$db->thread_id][$noInduk])) {
         throw new RuntimeException('Riwayat kelas tahun ajaran berjalan belum ada. Proses kenaikan kelas siswa terlebih dahulu.');
     }
     if ($latestYear !== '' && strcmp($latestYear, $academicLabel) > 0) {
@@ -404,5 +404,8 @@ function class_sync_student_current_year(
     if($placementId>0)du_bind_advance_placement($db,$placementId);
     if($placementId>0){require_once __DIR__.'/spp_advance.php';spa_sync_student($db,$noInduk);}
     if($placementId>0&&du_psb_schema_ready($db))du_psb_reconcile($db,$academicLabel,(int)($_SESSION['admin_id']??0),$placementId);
+    if($placementId>0&&!empty($GLOBALS['sout_returning_nis'][$db->thread_id][$noInduk])){
+        require_once __DIR__.'/student_out.php';sout_complete_return($db,(int)$GLOBALS['sout_returning_nis'][$db->thread_id][$noInduk],$placementId);
+    }
     return $placementId > 0 ? $placementId : null;
 }

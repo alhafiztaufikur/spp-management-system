@@ -18,7 +18,7 @@ function lb_scope_student_read(mysqli $db,string $nis): void {
 
 // A policy read can request just its candidate identities. The subset has its own
 // request-cache key; financial writers retain the complete default model.
-function lb_cache(mysqli $db, bool $refresh=false,?array $onlyStudents=null): array {
+function lb_cache(mysqli $db, bool $refresh=false,?array $onlyStudents=null,bool $invalidateOnly=false): array {
     $profileStarted=microtime(true);
     static $cache=[];$scope=(int)($GLOBALS['app_unit_id']??unit_active_id());$compact=!empty($GLOBALS['lb_report_compact'][$db->thread_id]);$readProjection=!empty($GLOBALS['lb_read_projection'][$db->thread_id]);$prefix=$db->thread_id.($compact?':report:':($readProjection?':read:':':'));
     if($onlyStudents!==null){$onlyStudents=array_values(array_unique(array_map('strval',$onlyStudents)));sort($onlyStudents,SORT_STRING);$prefix.='subset:'.hash('sha256',json_encode($onlyStudents)).':';}
@@ -26,6 +26,7 @@ function lb_cache(mysqli $db, bool $refresh=false,?array $onlyStudents=null): ar
     $studentWhere=$nis===null?'':" AND s.NO_INDUK='".$db->real_escape_string($nis)."'";
     if($onlyStudents!==null)$studentWhere.=$onlyStudents?' AND s.NO_INDUK IN ('.implode(',',array_map(static fn($v)=>"'".$db->real_escape_string($v)."'",$onlyStudents)).')':' AND FALSE';
     if($refresh){$GLOBALS['lb_cache_generation'][$db->thread_id]=($GLOBALS['lb_cache_generation'][$db->thread_id]??0)+1;unset($GLOBALS['lb_monthly_plan_cache'][$db->thread_id]);if(function_exists('du_psb_invalidate'))du_psb_invalidate($db);foreach(array_keys($cache) as $cachedKey)if(str_starts_with($cachedKey,$db->thread_id.':'))unset($cache[$cachedKey]);}
+    if($refresh&&$invalidateOnly)return [];
     if(!$refresh&&isset($cache[$key]))return $cache[$key];
     // An all-unit report has already read this evidence under the connection's
     // authorized scope. Partition it by immutable owner/source IDs instead of

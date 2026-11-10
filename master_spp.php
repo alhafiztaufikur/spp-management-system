@@ -117,47 +117,7 @@ if($_SERVER['REQUEST_METHOD']==='POST'){
             spp_write_audit($koneksi,$masterId,null,'buka_tahun',['status'=>'closed'],['status'=>'published']);
             $_SESSION['flash']=['type'=>'success','msg'=>'Tahun SPP dibuka kembali.'];
         }elseif($action==='batalkan_mulai_bulan'){
-            if($master['status']!=='published')throw new RuntimeException('Hanya tahun SPP berstatus Terbit yang dapat dibatalkan tagihannya.');
-            $students=is_array($_POST['selected_students']??null)?array_values(array_unique(array_filter(array_map('strval',$_POST['selected_students'])))):[];
-            $start=(string)($_POST['cancel_start_month']??'');$reason=trim((string)($_POST['cancel_reason']??''));
-            if(!$students||!preg_match('/^(0[1-9]|1[0-2])$/',$start)||$reason==='')throw new RuntimeException('Pilih siswa, bulan efektif keluar, dan alasan pembatalan.');
-            $periods=spp_academic_periods($selectedYear);$orders=[];foreach($periods as $p)$orders[$p['bulan'].'-'.$p['tahun']]=$p['order'];
-            $startOrder=null;foreach($periods as $p)if($p['bulan']===$start){$startOrder=$p['order'];break;}
-            $cancelled=0;
-            $checkStudent=$koneksi->prepare("SELECT s.is_active FROM siswa s
-                JOIN siswa_tahun_ajaran sta ON sta.no_induk=s.NO_INDUK
-                JOIN tahun_ajaran ta ON ta.id=sta.tahun_ajaran_id
-                WHERE s.NO_INDUK=? AND ta.label=?
-                  AND CAST(sta.kelas AS UNSIGNED) " . unit_level_between_sql() . "
-                LIMIT 1 FOR UPDATE");
-            $select=$koneksi->prepare("SELECT ts.id,ts.bulan,ts.tahun,EXISTS(SELECT 1 FROM spp_alokasi a JOIN spp_alokasi_batch ab ON ab.id=a.batch_id AND ab.status='active' WHERE a.tagihan_spp_id=ts.id) allocated FROM tagihan_spp ts WHERE ts.master_spp_tahun_id=? AND ts.no_induk=? AND ts.status='open' FOR UPDATE");
-            $update=$koneksi->prepare("UPDATE tagihan_spp SET status='cancelled',cancel_reason=? WHERE id=?");
-            foreach($students as $nis){
-                $checkStudent->bind_param('ss',$nis,$selectedYear);
-                $checkStudent->execute();
-                $student=$checkStudent->get_result()->fetch_assoc();
-                if(!$student||(int)$student['is_active']!==0){
-                    throw new RuntimeException('Arsipkan siswa yang keluar di Data Siswa sebelum membatalkan tagihan SPP.');
-                }
-                $studentCancelled=0;
-                $select->bind_param('is',$masterId,$nis);
-                $select->execute();
-                foreach($select->get_result()->fetch_all(MYSQLI_ASSOC) as $bill){
-                    $order=$orders[$bill['bulan'].'-'.$bill['tahun']]??-1;
-                    if($order<$startOrder||(int)$bill['allocated']===1||lb_spp_credit($koneksi,$nis,$bill['bulan'],$bill['tahun'])>.001)continue;
-                    $billId=(int)$bill['id'];
-                    $update->bind_param('si',$reason,$billId);
-                    $update->execute();
-                    $cancelled++;
-                    $studentCancelled++;
-                }
-                spp_write_audit($koneksi,$masterId,$nis,'batalkan_mulai_bulan',null,
-                    ['bulan'=>$start,'alasan'=>$reason],$studentCancelled);
-            }
-            $checkStudent->close();
-            $select->close();
-            $update->close();
-            $_SESSION['flash']=['type'=>'success','msg'=>$cancelled.' tagihan belum bayar berhasil dibatalkan.'];
+            throw new DomainException('Pembatalan tagihan mengikuti keputusan OUT di Data Siswa. Muat ulang halaman.');
         }else throw new RuntimeException('Aksi Master SPP tidak dikenali.');
         if($studentTariffRequest)$studentTariffResponse=json_encode(['ok'=>true,'result'=>$result,'context'=>sct_context_for_student($koneksi,$masterId,(int)$studentId),'year_summary'=>sct_year_summary($koneksi,$masterId,$selectedYear),'rate_version'=>spp_master_rate_version(spp_master_state($koneksi,$masterId,true),spp_master_rates($koneksi,$masterId,true))],JSON_THROW_ON_ERROR);
         $koneksi->commit();
@@ -194,7 +154,6 @@ if($studentTariffReady){
 }
 $rombelChoices=[];foreach($students as $student)$rombelChoices[(string)$student['kelas_rombel_snapshot']]=(string)$student['kelas_rombel_snapshot'];
 filter_register('rombel_filter',$_GET['rombel_filter']??null,$rombelChoices);filter_output_start();
-$cancelEligibleStudents=array_values(array_filter($students,static fn(array $student):bool=>(int)$student['is_active']===0));
 $stmt=$koneksi->prepare("SELECT COUNT(*) bills,SUM(CASE WHEN paid+0.001>=nominal_tagihan THEN 1 ELSE 0 END) paid_bills,SUM(CASE WHEN paid+0.001<nominal_tagihan AND status='open' THEN 1 ELSE 0 END) unpaid_bills FROM (SELECT ts.id,ts.nominal_tagihan,ts.status,COALESCE(SUM(CASE WHEN ab.status='active' THEN a.nominal_dari_bayar ELSE 0 END),0) paid FROM tagihan_spp ts LEFT JOIN spp_alokasi a ON a.tagihan_spp_id=ts.id LEFT JOIN spp_alokasi_batch ab ON ab.id=a.batch_id WHERE ts.master_spp_tahun_id=? GROUP BY ts.id) x");
 $stmt->bind_param('i',$masterId);$stmt->execute();$stats=$stmt->get_result()->fetch_assoc();$stmt->close();
 foreach(lf_rows($koneksi,"SELECT t.no_induk,t.bulan,t.tahun,t.nominal_tagihan,COALESCE(SUM(CASE WHEN b.status='active' THEN a.nominal_dari_bayar ELSE 0 END),0) paid FROM tagihan_spp t LEFT JOIN spp_alokasi a ON a.tagihan_spp_id=t.id LEFT JOIN spp_alokasi_batch b ON b.id=a.batch_id WHERE t.master_spp_tahun_id=? AND t.status='open' GROUP BY t.id",[$masterId]) as $b)if((float)$b['paid']+.001<(float)$b['nominal_tagihan']&&(float)$b['paid']+lb_spp_credit($koneksi,$b['no_induk'],$b['bulan'],$b['tahun'])+.001>=(float)$b['nominal_tagihan']){$stats['paid_bills']++;$stats['unpaid_bills']--;}
@@ -259,7 +218,6 @@ $yearStart = (int)substr($selectedYear, 0, 4);
         <nav class="spp-workspace-tabs" aria-label="Bagian Master SPP">
           <a href="#spp-rate-panel" data-spp-tab="rates"><?= master_workspace_icon('coins') ?>Tarif SPP</a>
           <a href="#spp-students-panel" data-spp-tab="students" class="is-active"><?= master_workspace_icon('students') ?>Pilih Siswa</a>
-          <a href="#spp-year-panel" data-spp-tab="year"><?= master_workspace_icon('calendar') ?>Status Tahun</a>
         </nav>
         <section class="spp-tab-panel" id="spp-rate-panel" data-spp-panel="rates">
           <div class="spp-section-heading"><h2>Tarif Dasar per Tingkat</h2></div>
@@ -313,25 +271,10 @@ $yearStart = (int)substr($selectedYear, 0, 4);
             <div class="promotion-submit-bar"><span class="spp-workspace-icon"><?= master_workspace_icon('check') ?></span><div><strong id="spp-submit-summary">Belum ada siswa dipilih</strong><span>Penerbitan tidak akan membuat tagihan ganda.</span></div><?php if ($master['status'] !== 'closed' && $students): ?><button class="btn btn-primary" id="spp-submit-button" type="submit" disabled><?= master_workspace_icon('send') ?>Terbitkan SPP</button><?php elseif ($master['status'] === 'closed'): ?><span class="recap-status is-unpaid">Tahun SPP ditutup</span><?php endif; ?></div>
           </form>
         </section>
-        <section class="spp-tab-panel" id="spp-year-panel" data-spp-panel="year">
-          <div class="spp-section-heading"><h2>Status Tahun SPP <?= mspp_e($selectedYear) ?></h2><p>Tarif dan tagihan SPP berdiri sendiri dari penerbitan Daftar Ulang.</p></div>
-          <div class="spp-year-explanation"><?= master_workspace_icon('info') ?><div><strong><?= $master['status'] === 'closed' ? 'Tahun SPP ditutup' : ($master['status'] === 'published' ? 'Tahun SPP sudah diterbitkan' : 'Tahun SPP belum diterbitkan') ?></strong><p>Tarif dasar terkunci saat halaman dibuka. Koreksi dapat dilakukan melalui Edit Tarif. Tunggakan yang sudah terbit tetap bisa dilunasi. Gunakan tindakan pada panel Status Tahun SPP di sebelah kanan.</p></div></div>
-          <?php if ($master['status'] === 'published' && $cancelEligibleStudents): ?>
-          <section class="spp-cancel-section"><h3>Batalkan Tagihan Siswa Keluar</h3><p class="payment-auto-note">Arsipkan siswa yang keluar di Data Siswa terlebih dahulu. Tagihan belum dibayar mulai bulan efektif keluar akan dibatalkan; tagihan yang pernah menerima alokasi tetap dilindungi.</p>
-            <form method="post" class="fields-grid" onsubmit="return confirm('Batalkan tagihan SPP siswa mulai bulan terpilih?')">
-              <input type="hidden" name="csrf_token" value="<?= mspp_e($_SESSION['csrf_master_spp']) ?>"><input type="hidden" name="aksi" value="batalkan_mulai_bulan"><input type="hidden" name="tahun_ajaran" value="<?= mspp_e($selectedYear) ?>">
-              <div class="field-row"><label class="field-label">Siswa</label><select class="field-input field-select" name="selected_students[]" required><option value="">Pilih siswa</option><?php foreach ($cancelEligibleStudents as $s): ?><option value="<?= mspp_e($s['no_induk']) ?>"><?= mspp_e($s['NAMA'].' · '.$s['kelas_rombel_snapshot']) ?></option><?php endforeach; ?></select></div>
-              <div class="field-row"><label class="field-label">Efektif Mulai</label><select class="field-input field-select" name="cancel_start_month" required><?php foreach (spp_academic_periods($selectedYear) as $p): ?><option value="<?= $p['bulan'] ?>"><?= mspp_e($p['label']) ?></option><?php endforeach; ?></select></div>
-              <div class="field-row full-span"><label class="field-label">Alasan</label><input class="field-input" name="cancel_reason" maxlength="255" required placeholder="Contoh: pindah sekolah efektif Oktober"></div>
-              <div class="action-bar full-span"><button class="btn btn-warning" type="submit">Batalkan Tagihan Belum Bayar</button></div>
-            </form>
-          </section><?php endif; ?>
-        </section>
       </section>
       <aside class="spp-aside" aria-label="Informasi tarif dan status tahun">
         <section class="main-card master-modern-card spp-side-card"><div class="spp-side-heading"><div><h2>Tarif Dasar per Tingkat</h2></div></div><dl class="spp-rate-list"><?php for ($i=$firstLevel+1;$i<=$lastLevel;$i++): ?><div><dt>Kelas <?= $i ?></dt><dd>Rp <?= mspp_money($rates[$i]) ?></dd></div><?php endfor; ?></dl><a href="#spp-rate-panel" class="spp-side-link" data-spp-tab="rates">Lihat Pengaturan Tarif <span aria-hidden="true">&rarr;</span></a></section>
-        <section class="main-card master-modern-card spp-side-card spp-status-card"><div class="spp-side-heading"><div><h2>Status Tahun SPP</h2><p>Menutup tahun menghentikan penerbitan tambahan. Tunggakan yang sudah terbit tetap bisa dilunasi.</p></div></div>
-          <div class="spp-status-note"><div><strong><?= $master['status'] === 'closed' ? 'Tahun ajaran ini sudah ditutup' : ($master['status'] === 'published' ? 'Tahun ajaran ini sedang terbuka' : 'Tahun ajaran ini masih draft') ?></strong><small><?= $master['status'] === 'closed' ? 'Buka kembali untuk melanjutkan penerbitan atau koreksi tarif.' : ($ratesEditable ? 'Tarif dapat diubah sebelum penerbitan pertama.' : 'Gunakan Edit Tarif untuk mengoreksi tagihan yang belum dibayar.') ?></small></div></div>
+        <section class="spp-year-actions" aria-label="Tindakan tahun SPP">
           <div class="action-bar">
             <?php if ($master['status'] !== 'closed'): ?><form data-sct-close-year <?= $master['status']==='published'?'':'hidden' ?> method="post" onsubmit="return confirm('Tutup tahun SPP ini?')"><input type="hidden" name="csrf_token" value="<?= mspp_e($_SESSION['csrf_master_spp']) ?>"><input type="hidden" name="aksi" value="tutup"><input type="hidden" name="tahun_ajaran" value="<?= mspp_e($selectedYear) ?>"><button class="btn btn-warning" type="submit"><?= master_workspace_icon('lock') ?>Tutup Tahun</button></form>
             <?php elseif ($master['status'] === 'closed'): ?><form method="post"><input type="hidden" name="csrf_token" value="<?= mspp_e($_SESSION['csrf_master_spp']) ?>"><input type="hidden" name="aksi" value="buka"><input type="hidden" name="tahun_ajaran" value="<?= mspp_e($selectedYear) ?>"><button class="btn btn-primary" type="submit"><?= master_workspace_icon('reset') ?>Buka Kembali</button></form><?php endif; ?>

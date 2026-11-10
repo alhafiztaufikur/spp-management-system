@@ -777,6 +777,7 @@ function report_billing_history_component_columns(array $groups): array {
     return $result;
 }
 function report_billing_history_data(mysqli $db,array $f):array{
+    require_once __DIR__.'/student_out.php';
     $profileStarted=microtime(true);
     $legacyPayments=report_legacy_periods($db)['payments'];
     $rows=[];$existing=[];$studentWhere=report_student_status_where($f);
@@ -788,7 +789,10 @@ function report_billing_history_data(mysqli $db,array $f):array{
         return " AND ($column IS NULL OR $column NOT REGEXP '^[0-9]{4}/[0-9]{4}$' OR CAST(LEFT($column,4) AS UNSIGNED)<".(int)$f['_debt_before'].')';
     };
     $sink=$GLOBALS['report_history_sink'][$db->thread_id]??null;
-    $append=static function(array $row)use(&$rows,&$existing,$f,$sink,$legacyPayments):void{
+    $append=static function(array $row)use(&$rows,&$existing,$f,$sink,$legacyPayments,$db):void{
+        $outComponent=['spp'=>'spp','komite'=>'komite','daftar_ulang'=>'du'][$row['komponen_key']??'']??null;
+        $outPeriod=$outComponent==='du'?($row['tahun_ajaran']??''):($row['periode_code']??'');
+        if($outComponent&&$outPeriod!==''&&isset($row['tagihan'],$row['terbayar'])&&(float)$row['tagihan']>.001&&(float)$row['terbayar']<=.001&&sout_period_blocked($db,(string)$row['nis'],$outComponent,$outPeriod,(int)($row['unit_id']??unit_active_id()))){$row['status']='Dibatalkan';$row['sisa']=0.0;}
         // Index issued identities before display filters, including cancelled bills.
         if(!isset($row['_read_count'])&&isset($legacyPayments[$row['nis']??'']))$existing[report_billing_identity($row)]=true;
         if(!empty($f['_debt_only'])){

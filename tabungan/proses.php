@@ -77,6 +77,7 @@ try {
     financial_request_reserve($koneksi, $requestKey, 'tabungan_' . $aksi, (int)$_SESSION['admin_id']);
     require_once __DIR__.'/../includes/legacy_operational_read.php';lop_bank_assert_ready($koneksi,$no_induk);
     $ledger=savings_locked_ledger($koneksi,$no_induk);
+    require_once __DIR__.'/../includes/student_out.php';sout_assert_student($koneksi,$no_induk);
     if(!(int)$ledger['student']['id']||(int)$ledger['student']['id']!==(int)$target['student_id'])throw new RuntimeException('Identitas rekening berubah.');
     $saldo=$ledger['balance']/100;
     if ($aksi === 'keluar' && $saldo <= 0) {

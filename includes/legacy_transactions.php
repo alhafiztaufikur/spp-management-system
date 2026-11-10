@@ -37,6 +37,7 @@ function lt_model(mysqli $db,int $id,bool $deleted=false): array {
     $r=lop_payment_model($db,$id)['legacy'];if((bool)$r['cancelled']!==$deleted)throw new OutOfBoundsException('Transaksi tidak tersedia pada daftar ini.');
     $events=lt_events($db,$id);$request=lt_schema_ready($db)?lf_one($db,'SELECT *,request_reason reason FROM transaksi_otorisasi WHERE legacy_payment_id=? ORDER BY id DESC LIMIT 1',[$id]):null;
     $writable=!$deleted&&!unit_all_readonly()&&hasRole(['admin','kasir'])&&(!$request||$request['status']!=='pending');
+    require_once __DIR__.'/student_out.php';if(!empty(sout_student($db,(string)$r['NO_INDUK'],false,(int)$r['unit_id'])['is_out']))$writable=false;
     $p=$r+['TGL_BYR'=>$r['payment_datetime'],'total_jumlah'=>$r['total'],'kelas_transaksi'=>$r['class_snapshot'],'KELAS'=>$r['class_snapshot'],'KETERANGAN'=>$r['note'],'sistem_pembayaran'=>$r['method']?:'Tidak tercatat','created_at'=>null,'updated_at'=>null];$p['id']=-1000000000-$id;$p['BULAN']='';$p['TAHUN']='';
     if($deleted)$p['_deleted_event']=end($events);
     return ['payment'=>$p,'legacy_record'=>$r,'deleted'=>$deleted,'events'=>$events,'summary'=>['creator'=>$events[0],'last'=>end($events)],'request'=>$request,'components'=>array_map(fn($i)=>[lcs_component_view($i)['display_label'],$i['amount']],$r['items']),'batch_print'=>false,'capabilities'=>['can_edit'=>$writable,'can_delete'=>$writable,'can_print'=>!$deleted,'locked'=>false,'reason'=>($request&&$request['status']==='pending')?'Menunggu keputusan Super Admin.':'']];
@@ -48,6 +49,7 @@ function lt_submit(mysqli $db,int $actor,int $unit,int $id,int $version,array $i
     $a=lt_actor($db,$actor,$unit);if(!preg_match('/^[a-f0-9]{64}$/D',$key))throw new DomainException('Kunci transaksi tidak valid.');
     $db->begin_transaction();try{
         $p=lop_record($db,'payment',$id,true);
+        require_once __DIR__.'/student_out.php';sout_assert_owner($db,(int)$p['owner_id']);if(!empty($input['owner_id']))sout_assert_owner($db,(int)$input['owner_id']);
         $stable=$input;unset($stable['preview_expires'],$stable['confirmation']);$inputDigest=hash('sha256',lf_json([$id,$version,$stable]));$input['_request_input_digest']=$inputDigest;
         if(lt_schema_ready($db)&&($retry=lf_one($db,"SELECT id,requested_by,proposed_payload FROM transaksi_otorisasi WHERE legacy_payment_id=? AND JSON_UNQUOTE(JSON_EXTRACT(proposed_payload,'$.legacy_key'))=?",[$id,$key]))){$payload=json_decode($retry['proposed_payload'],true);if((int)$retry['requested_by']!==$actor||($payload['legacy_input']['_request_input_digest']??'')!==$inputDigest)throw new DomainException('Kunci formulir sudah digunakan untuk usulan berbeda.');$db->commit();return ['request_id'=>(int)$retry['id'],'replayed'=>true];}
         $done=lf_one($db,'SELECT * FROM legacy_op_audit WHERE request_key=?',[$key]);if($done){$saved=json_decode($done['after_data'],true);if((int)$done['actor_id']!==$actor||$done['entity_type']!=='payment'||(int)$done['entity_id']!==$id||($saved['_request_input_digest']??'')!==$inputDigest)throw new DomainException('Kunci formulir sudah digunakan.');$db->commit();return ['replayed'=>true];}

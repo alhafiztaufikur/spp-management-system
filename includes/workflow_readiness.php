@@ -9,6 +9,7 @@ function workflow_schema_ready(mysqli $db): bool {
     if($n!==9)return false;
     require_once __DIR__.'/psb_spp_schema.php';if(!pspp_ready($db))return false;
     require_once __DIR__.'/spp_advance_schema.php';if(!spa_ready($db))return false;
+    require_once __DIR__.'/student_out_schema.php';if(!sout_ready($db))return false;
     require_once __DIR__.'/du_psb.php';if(!du_psb_schema_ready($db))return false;
     require_once __DIR__.'/other_fee_billing_schema.php';if(!ofb_schema_ready($db))return false;
     if(!$db->query("SELECT 1 FROM information_schema.TABLES WHERE TABLE_SCHEMA=DATABASE() AND TABLE_NAME='workflow_migration_log'")->num_rows)return false;

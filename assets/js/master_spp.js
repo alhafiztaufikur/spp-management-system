@@ -3,6 +3,7 @@ document.addEventListener('DOMContentLoaded', function () {
   const tabs = [...document.querySelectorAll('.spp-workspace-tabs [data-spp-tab]')];
   const panels = [...document.querySelectorAll('[data-spp-panel]')];
   const panelNames = new Set(panels.map(panel => panel.dataset.sppPanel));
+  if(location.hash==='#spp-year-panel')history.replaceState(null,'','#spp-students-panel');
   function activate(name, focus) {
     if (!panelNames.has(name)) name = 'students';
     tabs.forEach(tab => { const active = tab.dataset.sppTab === name; tab.classList.toggle('is-active', active); tab.setAttribute('aria-selected', String(active)); tab.tabIndex = active ? 0 : -1; });

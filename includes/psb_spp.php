@@ -61,6 +61,7 @@ function pspp_save(mysqli $db,int $studentId,string $spp,string $komite,string $
     $changed=0;$locked=0;$outcomes=[];$actor=(int)$_SESSION['admin_id'];$reason='Tarif masuk melalui Master Siswa';
     $rules=sct_rules($db)[$nis]??[];$bills=sct_bill_map($db,(int)$master['id'],true,$nis);
     foreach(spp_academic_periods($year) as $p){
+        require_once __DIR__.'/student_out.php';if(sout_period_blocked($db,$nis,'spp',$p['tahun'].'-'.$p['bulan']))continue;
         $period=$p['tahun'].'-'.$p['bulan'];$bill=$bills[$nis][$period]??null;
         $protected=$bill&&((int)$bill['allocated']||!in_array($bill['status'],['open','waived'],true));
         $protected=$protected||lb_spp_credit($db,$nis,$p['bulan'],$p['tahun'])>.001;
@@ -91,6 +92,7 @@ function pspp_save(mysqli $db,int $studentId,string $spp,string $komite,string $
     $basis=['id'=>$plan['penempatan_id'],'rencana_masuk_id'=>(int)$plan['id'],'no_induk'=>$nis,'kelas'=>$first,'master_kelas_id'=>$placement['master_kelas_id']??null,'kelas_rombel_snapshot'=>$placement['kelas_rombel_snapshot']??(string)$first,'potongan_spp_nominal'=>0,'spp_covered_by_psb'=>0];
     $emitted=spp_publish_placement_periods($db,(int)$master['id'],$master,$basis,[$first=>(float)$spp],'07',null,false);$changed+=$emitted['created'];
     foreach(spp_academic_periods($year) as $p)foreach(['spp','komite'] as $kind){
+        if(sout_period_blocked($db,$nis,$kind,$p['tahun'].'-'.$p['bulan']))continue;
         if(lful_is_covered($db,$nis,$kind,$p['tahun'].'-'.$p['bulan']))continue;
         if(!hp_one($db,"SELECT id FROM tagihan_$kind WHERE no_induk=? AND bulan=? AND tahun=? AND tahun_ajaran_id=?",[$nis,$p['bulan'],$p['tahun'],$plan['tahun_ajaran_id']]))throw new RuntimeException('Penerbitan pasangan tagihan belum lengkap. Seluruh perubahan dibatalkan.');
     }

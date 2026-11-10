@@ -342,6 +342,7 @@ function report_legacy_periods(mysqli $db,?array $onlyPeriods=null): array {
     return $cache[$key]=$out;
 }
 function report_monthly_evidence(mysqli $db,string $category,array $months,array $f): array {
+    require_once __DIR__.'/student_out.php';
     $periods=array_map(static fn($m)=>sprintf('%04d-%02d',$m[1],$m[0]),$months);
     $years=array_values(array_unique(array_map('lb_payment_year',$periods)));
     $students=[];foreach(hp_rows($db,'SELECT s.*,mk.tingkat,mk.kode_rombel,mk.is_placeholder,mk.jenis,mk.nama_custom,mk.legacy_kind,mk.graduation_year FROM siswa s LEFT JOIN master_kelas mk ON mk.id=s.master_kelas_id WHERE s.legacy_pending=0') as $s){
@@ -405,6 +406,7 @@ function report_monthly_evidence(mysqli $db,string $category,array $months,array
                 }
             }
             if(!$p){$row['periods'][$period]=['bill'=>null,'paid'=>null,'remaining'=>null,'text'=>'—','status'=>''];continue;}
+            if(($p['bill']??0)>.001&&$p['paid']<=.001&&sout_period_blocked($db,$nis,$category,$period,(int)$row['unit_id'])){$p['status']='cancelled';$p['remaining']=0.0;$p['text']='Dibatalkan';}
             $bill=$p['bill'];$amount=$p['paid'];$cancelled=$p['status']==='cancelled';$isUnknown=$bill===null;
             $text=$isUnknown?($amount>.001?'Ada Pembayaran':'Belum Diketahui'):($p['status']==='unbilled'?'Tidak Ditagihkan':($p['status']==='covered_psb'?'Tercakup Uang PSB':($p['status']==='waived'?'Potongan Penuh':($cancelled?'Dibatalkan':report_status_name($bill,$amount)))));
             $text=$p['text']??$text;$rest=$p['remaining']??($isUnknown?null:($cancelled?0.0:max(0,$bill-$amount)));

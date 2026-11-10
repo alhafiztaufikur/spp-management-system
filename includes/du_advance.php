@@ -65,6 +65,7 @@ function du_publish_advance(mysqli $db,int $yearId,string $year,int $actor):arra
     if(!du_advance_schema_ready($db))throw new DomainException('Peningkatan skema DU diperlukan sebelum menerbitkan tahun berikutnya.');
     $out=['created'=>0,'existing'=>0,'unknown'=>0,'covered_psb'=>0,'conflicts'=>0,'linked'=>0];$coverage=du_psb_reconcile($db,$year,$actor);$out['covered_psb']=$coverage['covered_psb'];
     foreach(du_target_roster($db,$year) as $r){
+        require_once __DIR__.'/student_out.php';if(sout_period_blocked($db,$r['nis'],'du',$year))continue;
         if($r['reason']){$out['unknown']++;continue;}
         $student=lf_one($db,'SELECT s.is_active,s.KELAS,m.jenis FROM siswa s LEFT JOIN master_kelas m ON m.id=s.master_kelas_id AND m.unit_id=s.unit_id WHERE s.id=? FOR UPDATE',[$r['student_id']]);
         if(!$student||!$student['is_active']||($student['jenis']!==null&&$student['jenis']!=='reguler'))continue;

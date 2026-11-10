@@ -2,6 +2,9 @@
   "version": 1,
   "source": "Schema structure verified from the 26 October 2026 full export against existing migration definitions; row data and identity counters excluded",
   "indexes": [
+    {"table":"student_out_periods_data","name":"PRIMARY","unique":true,"columns":["id"]},
+    {"table":"student_out_periods_data","name":"uq_out_open","unique":true,"columns":["unit_id","open_student_id"]},
+    {"table":"student_out_periods_data","name":"idx_out_student","unique":false,"columns":["unit_id","student_id","first_free_month"]},
     {"table":"admin","name":"idx_admin_unit_role","unique":false,"columns":["unit_id","role","is_active"]},
     {"table":"admin","name":"PRIMARY","unique":true,"columns":["id"]},
     {"table":"admin","name":"uk_one_active_super","unique":true,"columns":["active_super_guard"]},
@@ -232,7 +235,7 @@
     {"table":"tagihan_biaya_lain_data","name":"idx_unit_id","unique":false,"columns":["unit_id"]},
     {"table":"tagihan_biaya_lain_data","name":"lf_unit_id","unique":true,"columns":["unit_id","id"]},
     {"table":"tagihan_biaya_lain_data","name":"PRIMARY","unique":true,"columns":["id"]},
-    {"table":"tagihan_biaya_lain_data","name":"uk_tagihan_biaya_lain_siswa_master","unique":true,"columns":["unit_id","master_biaya_lain_id","no_induk"]},
+    {"table":"tagihan_biaya_lain_data","name":"ofb_occurrence","unique":true,"columns":["unit_id","master_biaya_lain_id","no_induk","occurrence_key"]},
     {"table":"tagihan_daftar_ulang_data","name":"fk_tagihan_du_siswa","unique":false,"columns":["no_induk"]},
     {"table":"tagihan_daftar_ulang_data","name":"fk_unit_nis_52d20d6cdc0b0552","unique":false,"columns":["unit_id","no_induk"]},
     {"table":"tagihan_daftar_ulang_data","name":"idx_tagihan_du_master","unique":false,"columns":["master_daftar_ulang_id"]},
@@ -285,6 +288,7 @@
     {"table":"workflow_migration_log","name":"PRIMARY","unique":true,"columns":["migration_key"]}
   ],
   "auto_increment": [
+    {"table":"student_out_periods_data","column":"id","type":"bigint"},
     {"table":"admin","column":"id","type":"int"},
     {"table":"bayar_biaya_lain_data","column":"id","type":"int"},
     {"table":"bayar_data","column":"id","type":"int"},

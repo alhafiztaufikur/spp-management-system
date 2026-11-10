@@ -1,5 +1,9 @@
 # Tarif khusus SPP per siswa dan ringkasan transaksi master biaya
 
+Pembaruan 11 November 2026: [OUT otomatis dan Master SPP](STUDENT_OUT_POLICY_20261111.md).
+Keputusan OUT di Master Siswa menghentikan transaksi serta kewajiban mendatang
+yang memenuhi syarat; pembatalan manual dan tab Status Tahun di Master SPP dihapus.
+
 Pembaruan 9 November 2026: [tarif SPP–Komite saat PSB](PSB_SPP_ADMISSION_20261109.md)
 menambahkan penerbitan melalui Master Siswa dan dasar rencana masuk sebelum
 penempatan. Tarif dasar kelas 1/7/10 tidak lagi diinput melalui Master SPP.

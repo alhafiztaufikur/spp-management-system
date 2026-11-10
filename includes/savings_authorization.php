@@ -99,7 +99,7 @@ function savings_correct(mysqli $db,string $action,string $kind,int $id,array $s
             $s=$db->prepare('UPDATE tabungan_otorisasi SET status=?,decided_by=?,decision_note=?,decided_at=NOW() WHERE id=?');$s->bind_param('sisi',$status,$actor,$reason,$requestId);$s->execute();$s->close();
             $before=json_decode($r['before_snapshot'],true,512,JSON_THROW_ON_ERROR);$row=$before['transaction'];savings_event($db,$row,$status,$actor,$before,null,$status.':'.$requestId,$requestId,$reason);$db->commit();return $id;
         }
-        [$row,$ledger]=savings_target_locked($db,$kind,$id);$snapshot=savings_snapshot($row,$ledger['student']);savings_ensure_baseline($db,$row,$snapshot['data']);
+        [$row,$ledger]=savings_target_locked($db,$kind,$id);require_once __DIR__.'/student_out.php';sout_assert_student($db,$row['NO_INDUK']);$snapshot=savings_snapshot($row,$ledger['student']);savings_ensure_baseline($db,$row,$snapshot['data']);
         if(isset($source['expected_hash'])&&(!is_string($source['expected_hash'])||!hash_equals($snapshot['hash'],$source['expected_hash'])))throw new RuntimeException('Transaksi berubah sejak formulir dibuka. Muat ulang sebelum mengirim koreksi.');
         if($requestId){$r=savings_request_find($db,$requestId,true);if(!$r||$r['status']!=='pending')throw new RuntimeException('Pengajuan sudah diproses.');}
         $s=$db->prepare("SELECT id FROM tabungan_otorisasi WHERE jenis=? AND transaction_id=? AND status='pending' FOR UPDATE");$s->bind_param('si',$kind,$id);$s->execute();$pending=$s->get_result()->fetch_row()[0]??0;$s->close();

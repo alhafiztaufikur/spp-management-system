@@ -11,9 +11,11 @@ function komite_academic_year(string $month, string $year): string {
 
 /** Tagihan dibuat dari penempatan yang tersimpan, tanpa bergantung pada penerbitan SPP. */
 function komite_sync_placement(mysqli $db, int $placementId): int {
+    require_once __DIR__.'/student_out.php';
     $stmt = $db->prepare('SELECT sta.*,ta.label,s.POMG FROM siswa_tahun_ajaran sta JOIN tahun_ajaran ta ON ta.id=sta.tahun_ajaran_id JOIN siswa s ON s.NO_INDUK=sta.no_induk AND s.unit_id=sta.unit_id WHERE sta.id=? FOR UPDATE');
     $stmt->bind_param('i', $placementId); $stmt->execute();
     $placement = $stmt->get_result()->fetch_assoc(); $stmt->close();
+    if($placement&&!empty(sout_student($db,(string)$placement['no_induk'])['is_out']))return 0;
     [$firstLevel, $lastLevel] = unit_level_bounds();
     if (!$placement || in_array($placement['status'],['lulus','dibatalkan'],true)
         || (int)$placement['kelas'] < $firstLevel || (int)$placement['kelas'] > $lastLevel) return 0;
@@ -37,6 +39,9 @@ function komite_sync_placement(mysqli $db, int $placementId): int {
     $insert = $db->prepare("INSERT IGNORE INTO tagihan_komite(tahun_ajaran_id,penempatan_id,no_induk,kelas_rombel_snapshot,bulan,tahun,nominal_tagihan) VALUES(?,?,?,?,?,?,?)");
     $created = 0;
     foreach ($periods as $index => $period) {
+        $returningId=$GLOBALS['sout_returning_nis'][$db->thread_id][$placement['no_induk']]??null;$resume=$returningId?($GLOBALS['sout_returning'][$db->thread_id][$returningId]??null):null;
+        if($resume&&$period['tahun'].'-'.$period['bulan']<substr($resume,0,7))continue;
+        if(sout_period_blocked($db,(string)$placement['no_induk'],'komite',$period['tahun'].'-'.$period['bulan']))continue;
         if ($index < $startIndex) continue;
         $yearId = (int)$placement['tahun_ajaran_id'];
         $nis = (string)$placement['no_induk'];

@@ -244,6 +244,11 @@ function transaction_authorization_decide(mysqli $db, int $requestId, string $st
     if (mb_strlen($note) > 1000) throw new RuntimeException('Catatan keputusan maksimal 1000 karakter.');
     $request = transaction_authorization_find($db, $requestId, true);
     if (!$request || $request['status'] !== 'pending') throw new RuntimeException('Permintaan sudah diproses.');
+    if($status==='approved'){
+        require_once __DIR__.'/student_out.php';
+        if(($request['transaction_source']??'system')==='legacy_op'){$p=sout_rows($db,'SELECT owner_id FROM legacy_op_payments WHERE id=?',[$request['legacy_payment_id']])[0]??null;if($p)sout_assert_owner($db,(int)$p['owner_id']);}
+        else {$p=sout_rows($db,'SELECT NO_INDUK FROM bayar WHERE id=?',[$request['bayar_id']])[0]??null;if($p)sout_assert_student($db,$p['NO_INDUK']);}
+    }
     if ($status === 'cancelled' && (int)$request['requested_by'] !== $deciderId) {
         throw new RuntimeException('Hanya pemohon yang dapat membatalkan permintaan.');
     }

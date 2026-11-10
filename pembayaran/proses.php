@@ -689,8 +689,9 @@ if ($aksi === 'input') {
         validate_payment_context($tanggal_bayar, $bulan_bayar, (string)$tahun_bayar, true);
         if ($usePublishedSpp && $potongan_spp > 0.001) throw new RuntimeException('Potongan manual saat pembayaran SPP sudah tidak didukung. Atur nominal potongannya pada Master Siswa.');
         if (!$usePublishedSpp && $potongan_spp > $uang_spp) throw new RuntimeException('Potongan SPP tidak boleh melebihi pembayaran SPP.');
+        require_once __DIR__.'/../includes/student_out.php';sout_assert_student($koneksi,$no_induk);
         $siswa_data = validate_student_and_komite($koneksi, $no_induk, $bulan_bayar, $tahun_bayar, $uang_komite);
-        if(in_array($siswa_data['KELAS'],['CUSTOM','OUT'],true))throw new RuntimeException('Rombel nonakademik tidak menerima transaksi pembayaran sekolah baru. Gunakan menu Tabungan.');
+        if($siswa_data['KELAS']==='CUSTOM')throw new RuntimeException('Rombel nonakademik tidak menerima transaksi pembayaran sekolah baru. Gunakan menu Tabungan.');
         $kelas_siswa = $siswa_data['KELAS'];
         $master_kelas_id = (int)($siswa_data['master_kelas_id'] ?? 0);
         $kelas_rombel_snapshot = class_label([

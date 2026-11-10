@@ -41,7 +41,7 @@ foreach([1=>1,2=>7,3=>10] as $unit=>$first){
         $receipt=payment_receipt_remaining($db,['NO_INDUK'=>$nis,'BULAN'=>'Oktober','TAHUN'=>'2026']);dpt_check($receipt[1]===['DU tahun pertama',null,'Tercakup PSB']&&$receipt[0][1]===9000000.0,'Receipt uses coverage label while PSB remains payable');
         dpt_check(lmr_database_checksums($db)===$readBefore,'GET readers do not write markers or audit');
         // Keep an intentionally conflicting, paid native bill for correction through existing UI.
-        lf_query($db,'INSERT INTO Daftar_ulang(tahun_ajaran_id,th_ajaran,kelas,Jumlah) VALUES(?,?,?,1000000)',[$yearId,$year,(string)$first]);$master=(int)$db->insert_id;
+        lf_query($db,'INSERT INTO Daftar_ulang(tahun_ajaran_id,th_ajaran,kelas,Jumlah) VALUES(?,?,?,1000000) ON DUPLICATE KEY UPDATE Jumlah=VALUES(Jumlah)',[$yearId,$year,(string)$first]);$master=(int)hp_one($db,'SELECT id FROM Daftar_ulang WHERE tahun_ajaran_id=? AND kelas=?',[$yearId,(string)$first])['id'];
         lf_query($db,'INSERT INTO tagihan_daftar_ulang(tahun_ajaran_id,penempatan_id,master_daftar_ulang_id,no_induk,kelas_snapshot,tahun_ajaran_snapshot,nominal_awal,nominal_tagihan) VALUES(?,?,?,?,?,?,1000000,1000000)',[$yearId,$placement,$master,$nis,(string)$first,$year]);$bill=(int)$db->insert_id;
         $db->query('SET @legacy_full_apply=1');lf_query($db,"INSERT INTO bayar(NO_INDUK,TGL_BYR,BULAN,TAHUN,user_id,total_jumlah) VALUES(?,'2026-10-27','Oktober','2026','1',100000)",[$nis]);$cash=(int)$db->insert_id;
         lf_query($db,'INSERT INTO bayar_du(bayar_id,tagihan_daftar_ulang_id,no_induk,kelas,th_ajaran,jumlah) VALUES(?,?,?,?,?,100000)',[$cash,$bill,$nis,(string)$first,$year]);$db->query('SET @legacy_full_apply=0');$cashBefore=hp_one($db,'SELECT * FROM bayar WHERE id=?',[$cash]);
@@ -58,7 +58,7 @@ foreach([1=>1,2=>7,3=>10] as $unit=>$first){
         $next=((int)substr($year,0,4)+1).'/'.((int)substr($year,5,4)+1);$ny=spp_master_ensure_year($db,$next);$nextId=(int)$ny['tahun_ajaran_id'];
         lf_query($db,"UPDATE tahun_ajaran SET status='published' WHERE id=?",[$nextId]);
         lf_query($db,'INSERT INTO siswa_tahun_ajaran(tahun_ajaran_id,no_induk,kelas,status) VALUES(?,?,?,\'aktif\')',[$nextId,$nis,(string)($first+1)]);$promoted=(int)$db->insert_id;
-        lf_query($db,'INSERT INTO Daftar_ulang(tahun_ajaran_id,th_ajaran,kelas,Jumlah) VALUES(?,?,?,1200000)',[$nextId,$next,(string)($first+1)]);
+        lf_query($db,'INSERT INTO Daftar_ulang(tahun_ajaran_id,th_ajaran,kelas,Jumlah) VALUES(?,?,?,1200000) ON DUPLICATE KEY UPDATE Jumlah=VALUES(Jumlah)',[$nextId,$next,(string)($first+1)]);
         $nextBill=du_create_bill_for_placement($db,$promoted);dpt_check($nextBill>0&&(float)hp_one($db,'SELECT nominal_tagihan FROM tagihan_daftar_ulang WHERE id=?',[$nextBill])['nominal_tagihan']===1200000.0,'Promotion receives normal next-year DU');
         dpt_check((int)hp_one($db,'SELECT du_covered_by_psb FROM siswa_tahun_ajaran WHERE id=?',[$promoted])['du_covered_by_psb']===0,'New placement does not inherit policy flag');
         $move=promotion_apply_student($db,$admit,$classes[$first+1],promotion_context($db,$yearId),$admitted['target_placement_id'],$first);

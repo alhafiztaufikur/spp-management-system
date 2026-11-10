@@ -20,7 +20,7 @@ function ir_structure_plan(mysqli $db,?array $contract=null,array $counterFloors
     $signatures=[];foreach($indexes as $index)if($index['supported'])$signatures[ir_index_signature($index)]=true;
     foreach($contract['indexes'] as $index){
         $table=$index['table'];$key=$table.'.'.$index['name'];ir_identifier($table);ir_identifier($index['name']);
-        if(!isset($columns[$table])&&in_array($table,['tabungan_otorisasi_data','tabungan_aktivitas_data'],true))continue;
+        if(!isset($columns[$table])&&in_array($table,['tabungan_otorisasi_data','tabungan_aktivitas_data','student_out_periods_data'],true))continue;
         foreach($index['columns'] as $column){ir_identifier($column);if(!isset($columns[$table][$column])){$mismatches[]=$key.': missing column '.$column;continue 2;}}
         if(isset($indexes[$key])&&(!$indexes[$key]['supported']||ir_index_signature($indexes[$key])!==ir_index_signature($index))){$mismatches[]=$key;continue;}
         if(isset($signatures[ir_index_signature($index)]))continue;
@@ -33,7 +33,7 @@ function ir_structure_plan(mysqli $db,?array $contract=null,array $counterFloors
     }
     foreach($contract['auto_increment'] as $identity){
         $table=$identity['table'];$column=$identity['column'];$key=$table.'.'.$column;
-        if(!isset($columns[$table])&&in_array($table,['tabungan_otorisasi_data','tabungan_aktivitas_data'],true))continue;
+        if(!isset($columns[$table])&&in_array($table,['tabungan_otorisasi_data','tabungan_aktivitas_data','student_out_periods_data'],true))continue;
         if(!preg_match('/^(?:tinyint|smallint|mediumint|int|bigint)(?: unsigned)?$/D',$identity['type']))throw new RuntimeException('Unsupported identity type.');
         $actual=$columns[$table][$column]??null;
         if(!$actual||$actual['COLUMN_TYPE']!==$identity['type']||$actual['IS_NULLABLE']!=='NO'||$actual['COLUMN_DEFAULT']!==null||!in_array($actual['EXTRA'],['','auto_increment'],true)){$mismatches[]=$key.': identity definition';continue;}

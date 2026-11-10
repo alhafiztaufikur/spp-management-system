@@ -38,6 +38,7 @@ try {
         foreach($counterFloors as $table=>$floor)if(!in_array($table,$allowed,true)||!ctype_digit((string)$floor)||strlen((string)$floor)>18||(int)$floor<1)throw new RuntimeException('Invalid identity counter evidence.');
     }
     if ($options['apply']) {
+        if(in_array('student_out',$plan['missing_modules'],true))throw new RuntimeException('Jalankan scripts/migrate_student_out.php dengan backup terverifikasi sebelum repair.');
         $isolated = (int)$db->query('SELECT @@port')->fetch_row()[0] !== 3306 && getenv('SPP_TEST_ALLOW_MUTATION') === '1';
         if (!$isolated) {
             $backup = $options['backup'] ? realpath($options['backup']) : false;

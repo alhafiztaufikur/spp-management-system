@@ -330,7 +330,9 @@ function spp_month_label(string $month): string {
 
 /** Shared SPP-only emitter. Caller owns eligibility checks, student locks and transaction. */
 function spp_publish_placement_periods(mysqli $db,int $masterYearId,array $master,array $placement,array $rates,string $start,?array $allowedPeriods=null,bool $restoreCancellations=true): array {
+    require_once __DIR__.'/student_out.php';
     $created=0;$skipped=0;$legacyCovered=0;$nis=(string)$placement['no_induk'];$yearId=(int)$master['tahun_ajaran_id'];
+    if(!empty(sout_student($db,$nis)['is_out']))return ['created'=>0,'existing'=>0,'legacy_covered'=>0];
     $periods=spp_academic_periods((string)$master['label']);
     if(!in_array($start,array_column($periods,'bulan'),true))throw new RuntimeException('Bulan mulai tagihan tidak valid.');
     $planId=$placement['rencana_masuk_id']??null;
@@ -345,6 +347,7 @@ function spp_publish_placement_periods(mysqli $db,int $masterYearId,array $maste
     $startIndex=0;
     foreach($periods as $idx=>$period) if($period['bulan']===$start){$startIndex=$idx;break;}
     foreach($periods as $idx=>$period){
+        if(sout_period_blocked($db,$nis,'spp',$period['tahun'].'-'.$period['bulan']))continue;
         if($idx<$startIndex)continue;
         if($allowedPeriods!==null&&!in_array($period['tahun'].'-'.$period['bulan'],$allowedPeriods,true))continue;
         require_once __DIR__.'/legacy_full_read.php';if(lful_is_covered($db,$nis,'spp',$period['tahun'].'-'.str_pad($period['bulan'],2,'0',STR_PAD_LEFT))){$legacyCovered++;continue;}

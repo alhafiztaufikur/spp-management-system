@@ -42,6 +42,7 @@ function ir_check_signature(string $clause): string {
 function ir_plan(mysqli $db): array {
     $contract = ir_contract(); $missing = []; $violations = []; $mismatches = [];
     $tables=array_flip(array_column($db->query("SELECT TABLE_NAME FROM information_schema.TABLES WHERE TABLE_SCHEMA=DATABASE() AND TABLE_TYPE='BASE TABLE'")->fetch_all(MYSQLI_ASSOC),'TABLE_NAME'));
+    $outReady=isset($tables['student_out_periods_data'])&&(int)$db->query("SELECT COUNT(*) FROM information_schema.COLUMNS WHERE TABLE_SCHEMA=DATABASE() AND TABLE_NAME IN ('tagihan_spp_data','tagihan_komite_data','tagihan_daftar_ulang_data') AND COLUMN_NAME='out_period_id'")->fetch_row()[0]===3;
     $savingsTables=['tabungan_otorisasi_data','tabungan_aktivitas_data'];
     $savingsReady=count(array_intersect(array_keys($tables),$savingsTables))===2
         && (int)$db->query("SELECT COUNT(*) FROM information_schema.VIEWS WHERE TABLE_SCHEMA=DATABASE() AND TABLE_NAME IN ('tabungan_otorisasi','tabungan_aktivitas')")->fetch_row()[0]===2
@@ -49,6 +50,7 @@ function ir_plan(mysqli $db): array {
     $actual = ir_foreign_keys($db); $signatures = array_flip(array_map('ir_fk_signature', $actual));
     $names = []; foreach ($actual as $fk) $names[$fk['table_name'].'.'.$fk['name']] = $fk;
     foreach ($contract['foreign_keys'] as $fk) {
+        if(!$outReady&&str_starts_with($fk['name'],'fk_out_'))continue;
         if((!isset($tables[$fk['table_name']])&&in_array($fk['table_name'],$savingsTables,true))||(!isset($tables[$fk['parent']])&&in_array($fk['parent'],$savingsTables,true)))continue;
         $signature = ir_fk_signature($fk);
         if (!isset($signatures[$signature])) {
@@ -66,12 +68,13 @@ function ir_plan(mysqli $db): array {
     }
     $checks = []; foreach (ir_checks($db) as $check) $checks[$check['table_name'].'.'.$check['name']] = $check;
     foreach ($contract['checks'] as $check) {
+        if(!$outReady&&$check['table_name']==='student_out_periods_data')continue;
         $key = $check['table_name'].'.'.$check['name'];
         if (!isset($checks[$key])) $missing[] = ['kind'=>'check'] + $check;
         elseif ($checks[$key]['enforced'] !== 'YES' || ir_check_signature($checks[$key]['clause']) !== ir_check_signature($check['clause'])) $mismatches[] = $key;
         if ($count = (int)$db->query('SELECT COUNT(*) FROM '.ir_identifier($check['table_name']).' WHERE NOT ('.$check['clause'].')')->fetch_row()[0]) $violations[] = ['constraint'=>$key, 'rows'=>$count];
     }
-    return ['missing'=>$missing, 'violations'=>$violations, 'mismatches'=>$mismatches,'missing_modules'=>$savingsReady?[]:['savings_authorization']];
+    return ['missing'=>$missing, 'violations'=>$violations, 'mismatches'=>$mismatches,'missing_modules'=>array_merge($savingsReady?[]:['savings_authorization'],$outReady?[]:['student_out'])];
 }
 function ir_apply_schema(mysqli $db, array $plan, callable $progress): void {
     if (PHP_SAPI !== 'cli' || $plan['violations'] || $plan['mismatches']) throw new RuntimeException('Repair preflight failed; no DDL permitted.');

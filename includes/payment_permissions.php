@@ -16,6 +16,7 @@ function payment_capabilities(mysqli $db, array $payment, ?array $events = null,
     $pending ??= function_exists('transaction_authorization_schema_ready') && transaction_authorization_schema_ready($db) ? (transaction_authorization_pending_for_payments($db,[$id])[$id]??[]) : [];
     $mutable=$allowed && !$deleted && $scope!==0 && in_array($role,['super_admin','admin','kasir'],true)
         && (int)($payment['payment_link_version']??0)===1 && !$pending;
+    require_once __DIR__.'/student_out.php';$out=!empty(sout_student($db,(string)($payment['NO_INDUK']??''),false,$unit)['is_out']);if($out)$mutable=false;
     $reason='';
     if (!$allowed) $reason=$owner>0 ? 'Transaksi milik '.(($creator['actor_name']??'')?:'akun lain').'. Hanya detail dan riwayat aktivitas yang dapat dilihat.' : 'Pemilik tidak tercatat. Hanya Super Admin yang dapat melakukan tindakan.';
     elseif($deleted) $reason='Transaksi dihapus. Arsip hanya untuk dilihat.';
@@ -23,6 +24,7 @@ function payment_capabilities(mysqli $db, array $payment, ?array $events = null,
     elseif($pending) $reason='Pengajuan perubahan masih menunggu keputusan Super Admin.';
     elseif((int)($payment['payment_link_version']??0)!==1) $reason='Transaksi lama memerlukan rekonsiliasi sebelum dapat diubah.';
     elseif($role==='bendahara') $reason='Bendahara dapat melihat dan mencetak, tanpa edit atau hapus.';
+    if($out)$reason='Siswa OUT. Transaksi hanya dapat dilihat dan dicetak.';
     return ['owner_id'=>$owner?:null,'owner_name'=>($creator['actor_name']??'')?:'Tidak tercatat',
         'can_edit'=>$mutable,'can_delete'=>$mutable,'can_print'=>$allowed&&!$deleted&&in_array($role,['super_admin','admin','kasir','bendahara'],true),
         'can_read_activity'=>$inScope,'locked'=>!$allowed,'reason'=>$reason];
@@ -34,8 +36,9 @@ function payment_assert_owner(mysqli $db, int $id, int $actorId): void
     $s=$db->prepare('SELECT role,is_active,unit_id FROM admin WHERE id=?');$s->bind_param('i',$actorId);$s->execute();$actor=$s->get_result()->fetch_assoc();$s->close();
     if(!$actor || !(int)$actor['is_active'] || $actor['role']!==($_SESSION['admin_role']??'')) throw new RuntimeException('Akun operator tidak aktif atau perannya tidak sesuai.');
     if(!operational_role($actor['role']) || !in_array(unit_active_id(),[1,2,3],true)) throw new RuntimeException('Pilih satu unit operasional yang diizinkan.');
-    $s=$db->prepare('SELECT id,unit_id FROM bayar WHERE id=?');$s->bind_param('i',$id);$s->execute();$row=$s->get_result()->fetch_assoc();$s->close();
+    $s=$db->prepare('SELECT id,unit_id,NO_INDUK FROM bayar WHERE id=?');$s->bind_param('i',$id);$s->execute();$row=$s->get_result()->fetch_assoc();$s->close();
     if(!$row) throw new RuntimeException('Transaksi tidak ditemukan pada unit ini.');
+    require_once __DIR__.'/student_out.php';sout_assert_student($db,$row['NO_INDUK']);
     if(unit_active_id()!==0 && (int)$row['unit_id']!==unit_active_id()) throw new RuntimeException('Transaksi tidak ditemukan pada unit ini.');
     // The immutable creator stays in the journal. Admin/Kasir request a correction;
     // only the separately checked Super Admin decision can apply that request.

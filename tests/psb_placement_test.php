@@ -48,7 +48,7 @@ try {
         $actual=$koneksi->query("SELECT $columns FROM siswa_tahun_ajaran WHERE no_induk='$one'")->fetch_assoc();
         $expected=$koneksi->query("SELECT $columns FROM siswa_tahun_ajaran WHERE no_induk='$control'")->fetch_assoc();
         psb_assert($actual===$expected,'Initial snapshot differs from Data Siswa');
-        psb_assert((int)$actual['spp_covered_by_psb']===($first===1?1:0),'PSB SPP protection incorrect');
+        psb_assert((int)$actual['spp_covered_by_psb']===0,'New PSB placement must not create free SPP coverage');
         foreach (['tagihan_komite'=>'bulan,tahun,nominal_tagihan','tagihan_daftar_ulang'=>'nominal_awal,nominal_tagihan'] as $table=>$cols) {
             $actual=$koneksi->query("SELECT $cols FROM $table WHERE no_induk='$one' ORDER BY id")->fetch_all(MYSQLI_ASSOC);
             $expected=$koneksi->query("SELECT $cols FROM $table WHERE no_induk='$control' ORDER BY id")->fetch_all(MYSQLI_ASSOC);
