@@ -1,9 +1,9 @@
 /* Master Daftar Ulang: presentation only, scoped to this workspace. */
 html body[data-readable-workspace="master-registration"] .du-workspace {
   --du-ink: #101f28;
-  --du-muted: #697588;
+  --du-muted: #566678;
   --du-line: #e5ebef;
-  --du-accent: #0a925c;
+  --du-accent: #087848;
   --du-accent-soft: #dff2e7;
   --du-icon-soft: #dff5e9;
   --du-title: #05291c;
@@ -18,33 +18,41 @@ html body[data-readable-workspace="master-registration"] .du-workspace {
   --du-surface: #fff;
   --du-hero-start: #f0faf6;
   --du-hero-end: #c7eddf;
+  --du-warning-ink: #805014;
+  --du-warning-surface: #fff8ed;
+  --du-warning-line: #ebd4ad;
   background: linear-gradient(180deg, transparent 70px, var(--du-page-wash) 680px, transparent 1000px);
   color: var(--du-ink);
   font-family: var(--font-body);
+  font-size: 14px;
+  line-height: 1.6;
 }
+/* Local scale keeps global readability rules from flattening the hierarchy. */
+html body[data-readable-workspace="master-registration"] .du-workspace .main-card { animation: none; }
+body[data-readable-workspace="master-registration"] .bg-orbs { display: none; }
 html body[data-readable-workspace="master-registration"] .du-workspace .du-master-hero {
   position: relative;
   isolation: isolate;
   display: flex;
   align-items: center;
   min-height: 0;
-  padding: 27px;
+  padding: 24px;
   margin: 24px 28px 20px;
   border: 0;
   border-radius: 13px;
   background: linear-gradient(108deg, var(--du-hero-start) 0%, var(--du-hero-start) 48%, var(--du-hero-end) 100%);
-  box-shadow: 0 8px 28px color-mix(in srgb, var(--du-accent) 2%, transparent);
+  box-shadow: none;
 }
 .du-hero-copy { position: relative; z-index: 1; min-width: 0; width: 100%; }
 .du-workspace :is(h1,h2,h3,h4) { font-family: var(--font-body); }
 html body[data-readable-workspace="master-registration"] .du-workspace .recap-class-overline {
-  color: var(--du-kicker); font-size: 14px; font-weight: 700; letter-spacing: .09em; text-transform: uppercase;
+  color: var(--du-hero-muted); font-size: 13px; font-weight: 500; letter-spacing: 0; text-transform: none;
 }
 .du-workspace .du-hero-copy h1 {
-  font-family: var(--font-body); font-size: clamp(40px, 4.1vw, 58px); font-weight: 700;
-  letter-spacing: -2.3px; line-height: 1.12; color: var(--du-title); margin: 9px 0 12px;
+  font-family: var(--font-body); font-size: clamp(28px, 2.5vw, 34px); font-weight: 700;
+  letter-spacing: -.8px; line-height: 1.25; color: var(--du-title); margin: 4px 0 8px;
 }
-.du-hero-copy>p { color: var(--du-hero-muted); font-size: 18px; line-height: 1.6; margin: 0 0 20px; }
+.du-hero-copy>p { color: var(--du-hero-muted); font-size: 14px; line-height: 1.6; margin: 0 0 16px; max-width: 65ch; }
 html body[data-readable-workspace="master-registration"] .du-workspace .du-master-year-tools {
   display: flex; flex-direction: row; flex-wrap: wrap; align-items: center; justify-content: flex-start;
   justify-self: start; width: 100%; min-width: 0; padding: 0; border: 0; gap: 12px 15px;
@@ -55,15 +63,15 @@ html body[data-readable-workspace="master-registration"] .du-workspace .du-maste
 .du-year-picker-icon svg { width: 20px; height: 20px; }
 html body[data-readable-workspace="master-registration"] .du-workspace .du-year-picker :is(.field-select,.spp-select-trigger) {
   width: 100%; min-height: 48px !important; padding: 11px 14px 11px 53px; border: 1px solid var(--du-control-line);
-  border-radius: 10px; background-color: var(--du-surface); color: var(--du-ink); font-size: 16px; font-weight: 500; box-shadow: none;
+  border-radius: 8px; background-color: var(--du-surface); color: var(--du-ink); font-size: 15px; font-weight: 600; box-shadow: none;
 }
 .du-workspace .du-year-picker .spp-select { width: 100%; }
-html body[data-readable-workspace="master-registration"] .du-workspace .du-year-picker .spp-select-caption { font-size: 16px; white-space: nowrap; overflow-wrap: normal; }
+html body[data-readable-workspace="master-registration"] .du-workspace .du-year-picker .spp-select-caption { font-size: 15px; white-space: nowrap; overflow-wrap: normal; }
 .du-year-state { display: flex; align-items: center; gap: 8px; flex: 0 0 auto; }
-.du-year-state-label { color: var(--du-muted); font-size: 12px; line-height: 1.5; }
+.du-year-state-label { color: var(--du-muted); font-size: 13px; line-height: 1.5; }
 html body[data-readable-workspace="master-registration"] .du-workspace .du-master-year-tools .du-year-status {
   display: inline-flex; align-items: center; gap: 7px; padding: 5px 10px; border: 0; border-radius: 999px;
-  background: var(--du-accent-soft); color: var(--du-accent); font-size: 12px; font-weight: 600; line-height: 1.6;
+  background: var(--du-accent-soft); color: var(--du-accent); font-size: 13px; font-weight: 600; line-height: 1.6;
   white-space: nowrap; cursor: default;
 }
 .du-year-status-dot { flex: 0 0 6px; width: 6px; height: 6px; border-radius: 50%; background: currentColor; }
@@ -74,47 +82,75 @@ html body[data-readable-workspace="master-registration"] .du-workspace .du-maste
   border: 1px solid var(--du-control-line); border-radius: 10px; background: var(--du-surface); color: var(--du-ink); font-size: 13px; font-weight: 600; box-shadow: none;
 }
 .du-workspace .du-master-year-tools .btn:hover { background: var(--du-surface); border-color: var(--du-accent); }
-.du-hero-art { position: absolute; z-index: 0; top: 0; right: 0; width: min(46%, 550px); height: 100%; pointer-events: none; border-radius: inherit; }
-
-.du-workspace a:focus-visible { outline: 3px solid var(--du-accent); outline-offset: 4px; }
+html body[data-readable-workspace="master-registration"] .du-workspace :is(a,button,select,label[for]) { cursor: pointer; }
+html body[data-readable-workspace="master-registration"] .du-workspace :is(button,input,select):disabled { cursor: not-allowed; }
+html body[data-readable-workspace="master-registration"] .du-workspace :is(a,button,input,select):focus-visible { outline: 2px solid var(--du-accent); outline-offset: 3px; }
 
 html body[data-readable-workspace="master-registration"] .du-workspace .master-modern-form { padding: 24px; border: 1px solid var(--du-line); border-radius: 14px; background: var(--du-surface); box-shadow: none; scroll-margin-top: 90px; }
 .du-workspace .master-modern-form .student-panel-heading { margin-bottom: 0; }
-.du-workspace .master-modern-form .student-panel-heading h3 { color: var(--du-ink); }
-.du-workspace .master-modern-form .student-panel-heading p { color: var(--du-muted); }
+.du-workspace .master-modern-form .du-section-title { color: var(--du-ink); font-size: 20px; font-weight: 700; line-height: 1.4; margin: 0 0 6px; }
+html body[data-readable-workspace="master-registration"] .du-workspace .student-panel-heading p { color: var(--du-muted); font-size: 14px; line-height: 1.6; margin: 0; }
 .du-workspace .du-save-action .btn { border-radius: 10px; }
 .du-workspace .du-save-action .recap-status { white-space: normal; text-align: left; }
-.du-workspace .du-rate-grid { align-items: stretch; }
+.du-workspace .du-rate-grid { align-items: stretch; gap: 16px; margin-top: 20px; }
 .du-workspace .du-rate-card { display: flex; flex-direction: column; border-color: var(--du-line); background: var(--du-surface); border-radius: 12px; padding: 20px; }
 .du-workspace .du-rate-unset { border-color: #efcf9f; }
-.du-workspace .du-rate-card-heading { margin-bottom: 20px; }
-.du-workspace .du-rate-card-heading h3 { color: var(--du-ink); }
-.du-workspace .du-rate-card-heading small { color: var(--du-muted); }
-.du-workspace .du-rate-estimate { margin-top: auto; padding-top: 15px; }
-.du-workspace .du-class-progress { margin-bottom: 12px; }
-.du-workspace .du-rate-card>small { margin-bottom: 12px; }
-.du-workspace .du-tariff-basis { font-size: 11px; white-space: normal; }
+.du-workspace .du-rate-card-heading { margin-bottom: 18px; flex-wrap: wrap; }
+html body[data-readable-workspace="master-registration"] .du-workspace .du-rate-card h3 { color: var(--du-ink); font-size: 17px; font-weight: 700; line-height: 1.4; margin: 0 0 4px; }
+.du-workspace .du-rate-card-heading small { color: var(--du-muted); font-size: 13px; line-height: 1.5; }
+.du-workspace .du-rate-label { font-size: 13px; color: var(--du-muted); margin-bottom: 7px; }
+.du-workspace .du-rate-input-wrap { border-color: var(--du-control-line); background: var(--du-surface); padding-left: 12px; gap: 8px; border-radius: 8px; }
+html body[data-readable-workspace="master-registration"] .du-workspace .du-rate-input-wrap>span { color: var(--du-muted); font-size: 14px; }
+html body[data-readable-workspace="master-registration"] .du-workspace .du-rate-input-wrap .field-input { min-height: 48px; padding: 10px 12px 10px 0; font-size: 18px; font-weight: 600; line-height: 1.5; color: var(--du-ink); font-variant-numeric: tabular-nums; }
+.du-workspace .du-rate-input-wrap:has(input:disabled) { background: var(--du-mint); }
+.du-workspace .du-rate-input-wrap .field-input:disabled { opacity: 1; -webkit-text-fill-color: var(--du-muted); }
+.du-workspace .du-rate-input-wrap .field-input::placeholder { color: var(--du-muted); font-size: 14px; font-weight: 400; opacity: 1; }
+html body[data-readable-workspace="master-registration"] .du-workspace .du-rate-estimate { margin-top: auto; padding-top: 14px; border-color: var(--du-line); color: var(--du-muted); font-size: 13px; gap: 6px 12px; }
+html body[data-readable-workspace="master-registration"] .du-workspace .du-rate-estimate strong { color: var(--du-ink); font-size: 15px; font-weight: 600; font-variant-numeric: tabular-nums; }
+.du-workspace .du-class-progress { color: var(--du-muted); font-size: 13px; margin: 12px 0 20px; line-height: 1.6; }
+.du-workspace .du-class-progress strong { color: var(--du-ink); font-weight: 600; }
+.du-workspace .du-rate-card>small { color: var(--du-muted); font-size: 13px; margin: -10px 0 16px; }
+.du-workspace .du-tariff-basis { font-size: 12px; font-weight: 500; white-space: normal; background: var(--du-mint); color: var(--du-muted); padding: 4px 8px; border-radius: 6px; }
+.du-workspace .du-psb-card .du-tariff-basis { background: var(--du-accent-soft); color: var(--du-accent); }
+.du-workspace .du-rate-unset .du-tariff-basis { background: var(--du-warning-surface); color: var(--du-warning-ink); }
+.du-workspace .du-info-note { margin: 16px 0; padding: 12px 14px; font-size: 13px; line-height: 1.65; background: var(--du-mint); color: var(--du-muted); border-radius: 8px; }
+.du-workspace .du-conflict-note { border: 1px solid var(--du-warning-line); color: var(--du-warning-ink); background: var(--du-warning-surface); }
+.du-conflict-note>strong { font-size: 14px; font-weight: 600; }
+.du-conflict-note>p { margin: 4px 0 0; }
+.du-workspace .du-conflict-note a { display: inline; color: inherit; font-weight: 600; text-decoration: underline; text-underline-offset: 3px; }
+.du-workspace .du-conflict-note a:hover { text-decoration-thickness: 2px; }
+.du-workspace .du-save-note { background: none; padding: 0; margin: 18px 0; }
+.du-workspace .du-save-footer { border-color: var(--du-line); padding-top: 20px; }
+.du-workspace .du-save-footer>div>span { color: var(--du-muted); font-size: 13px; }
+.du-workspace .du-save-footer strong { color: var(--du-ink); font-size: 24px; font-variant-numeric: tabular-nums; line-height: 1.3; overflow-wrap: anywhere; }
+.du-workspace .du-save-footer small { color: var(--du-muted); font-size: 13px; }
+.du-workspace .du-save-action { gap: 6px; }
+html body[data-readable-workspace="master-registration"] .du-workspace .du-save-action .btn { background: var(--du-accent); color: var(--du-surface); font-size: 14px !important; }
+.du-workspace .du-save-action .btn:hover { filter: brightness(.92); }
+.du-workspace .du-save-action .btn:active { transform: translateY(1px); }
+.du-workspace .du-save-action .btn:disabled { opacity: .7; filter: none; transform: none; }
 .du-workspace .du-psb-card { border-color: var(--du-control-line); background: linear-gradient(150deg, var(--du-mint), var(--du-surface) 80%); }
-.du-psb-heading { display: flex; align-items: flex-start; gap: 10px; margin-bottom: 17px; }
+.du-psb-heading { display: flex; align-items: flex-start; gap: 10px; margin-bottom: 14px; }
 .du-psb-heading>span { display: grid; place-items: center; flex: 0 0 34px; height: 34px; border-radius: 9px; background: var(--du-icon-soft); color: var(--du-accent); }
 .du-psb-heading svg { width: 21px; height: 21px; }
 .du-psb-heading h4 { font-size: 14px; font-weight: 650; line-height: 1.5; color: var(--du-ink); margin: 0 0 4px; }
-.du-psb-heading p { font-size: 12px; line-height: 1.7; color: var(--du-muted); margin: 0; }
-.du-psb-counts { display: grid; grid-template-columns: 1fr 1.25fr; margin: 0 0 16px; padding: 13px 0; border-top: 1px solid var(--du-psb-line); border-bottom: 1px solid var(--du-psb-line); }
+.du-psb-heading p { font-size: 13px; line-height: 1.6; color: var(--du-muted); margin: 0; }
+.du-psb-counts { display: grid; grid-template-columns: 1fr 1fr; margin: 0 0 14px; padding: 12px 0; border-top: 1px solid var(--du-psb-line); border-bottom: 1px solid var(--du-psb-line); }
 .du-psb-counts>div { display: flex; flex-direction: column; justify-content: space-between; gap: 8px; padding-right: 12px; }
 .du-psb-counts>div+div { padding: 0 0 0 14px; border-left: 1px solid var(--du-psb-line); }
-.du-psb-counts dt { font-size: 12px; line-height: 1.6; color: var(--du-muted); }
-.du-psb-counts dd { margin: 0; font-size: 25px; line-height: 1.2; font-weight: 700; letter-spacing: -.6px; color: var(--du-ink); }
-.du-psb-counts dd span { font-size: 11px; font-weight: 400; letter-spacing: 0; color: var(--du-muted); }
-.du-psb-installments { display: flex; align-items: flex-start; gap: 8px; margin: auto 0 0; color: var(--du-muted); font-size: 12px; line-height: 1.7; }
+.du-psb-counts dt { font-size: 12px; line-height: 1.5; color: var(--du-muted); }
+.du-psb-counts dd { margin: 0; font-size: 22px; line-height: 1.3; font-weight: 700; letter-spacing: -.4px; color: var(--du-ink); font-variant-numeric: tabular-nums; }
+.du-psb-counts dd span { font-size: 12px; font-weight: 400; letter-spacing: 0; color: var(--du-muted); }
+.du-psb-installments { display: flex; align-items: flex-start; gap: 8px; margin: auto 0 0; color: var(--du-muted); font-size: 13px; line-height: 1.6; }
 .du-psb-installments svg { flex: 0 0 16px; height: 16px; margin-top: 2px; color: var(--du-accent); }
-.du-psb-installments strong { display: block; color: var(--du-ink); font-size: 12px; font-weight: 600; }
+.du-psb-installments strong { display: block; color: var(--du-ink); font-size: 13px; font-weight: 600; }
 
 html[data-theme="dark"] body[data-readable-workspace="master-registration"] .du-workspace {
   --du-ink: #edf5f1; --du-muted: #abbdb7; --du-line: #30443f; --du-accent: #5cd6a8;
   --du-accent-soft: #254e3b; --du-icon-soft: #234c3c; --du-title: #ecfff5; --du-kicker: #83d7ae;
   --du-hero-muted: #c0d8ce; --du-control-line: #335b48; --du-psb-line: #335b48;
   --du-mint: #1d3730; --du-surface: #192824; --du-hero-start: #1c3830; --du-hero-end: #265d49;
+  --du-warning-ink: #f1cb91; --du-warning-surface: #352c20; --du-warning-line: #665133;
   background: none;
 }
 html[data-theme="dark"] body[data-readable-workspace="master-registration"] .du-workspace .du-year-status.is-draft { background: #4c3b21; color: #f1c47e; }
@@ -123,7 +159,7 @@ html[data-theme="dark"] body[data-readable-workspace="master-registration"] .du-
 /* Reuse the active unit palette for all decorative accents, in either theme. */
 html[data-palette]:not([data-palette="sd"]) body[data-readable-workspace="master-registration"] .du-workspace {
   --du-ink: var(--text-primary);
-  --du-muted: var(--text-muted);
+  --du-muted: var(--text-secondary);
   --du-surface: var(--bg-card);
   --du-accent: var(--accent);
   --du-accent-soft: color-mix(in srgb, var(--du-surface) 88%, var(--accent) 12%);
@@ -140,29 +176,21 @@ html[data-palette]:not([data-palette="sd"]) body[data-readable-workspace="master
   --du-page-wash: color-mix(in srgb, var(--du-surface) 98%, var(--accent) 2%);
   --du-progress: var(--accent);
   --du-progress-light: var(--accent-light);
-  --du-art-base: rgb(var(--unit-rgb));
-  --du-art-light: color-mix(in srgb, white 78%, var(--du-art-base) 22%);
-  --du-art-mid: color-mix(in srgb, white 42%, var(--du-art-base) 58%);
-  --du-art-strong: var(--du-art-base);
-  --du-art-deep: color-mix(in srgb, black 35%, var(--du-art-base) 65%);
-  --du-art-paper: color-mix(in srgb, white 94%, var(--du-art-base) 6%);
 }
 
-@media (max-width: 1450px) {
-  .du-hero-art { width: 40%; opacity: .9; }
-}
-@media (max-width: 1150px) {
-  .du-hero-art { width: 35%; opacity: .5; }
-  .du-hero-copy>p { font-size: 16px; }
+@media (min-width: 1001px) and (max-width: 1280px) {
+  .du-workspace .du-rate-grid { grid-template-columns: repeat(2, minmax(0, 1fr)); }
 }
 @media (max-width: 650px) {
-  html body[data-readable-workspace="master-registration"] .du-workspace .du-master-hero { margin: 18px 12px 14px; padding: 23px 20px; min-height: 0; }
-  .du-workspace .du-hero-copy h1 { font-size: 41px; letter-spacing: -1.8px; }
-  html body[data-readable-workspace="master-registration"] .du-workspace .recap-class-overline { font-size: 11px; }
-  .du-hero-copy>p { font-size: 14px; margin-bottom: 18px; }
-  .du-hero-art { display: none; }
+  html body[data-readable-workspace="master-registration"] .du-workspace .du-master-hero { margin: 18px 12px 14px; padding: 20px 18px; }
+  .du-workspace .du-hero-copy h1 { font-size: 28px; letter-spacing: -.6px; }
+  .du-hero-copy>p { margin-bottom: 16px; }
   html body[data-readable-workspace="master-registration"] .du-workspace .du-master-year-tools { gap: 10px; }
-  .du-workspace .du-year-picker { width: 180px !important; }
-  html body[data-readable-workspace="master-registration"] .du-workspace .du-year-picker :is(.spp-select-trigger,.spp-select-caption) { font-size: 14px; }
+  .du-workspace .du-year-picker { width: 196px !important; }
   html body[data-readable-workspace="master-registration"] .du-workspace .master-modern-form { padding: 18px; margin: 0 12px 20px; }
+  .du-workspace .du-rate-card { padding: 18px; }
+  .du-workspace .du-save-footer { gap: 18px; }
+}
+@media (prefers-reduced-motion: reduce) {
+  .du-workspace *, .du-workspace *::before, .du-workspace *::after { animation: none !important; transition: none !important; }
 }

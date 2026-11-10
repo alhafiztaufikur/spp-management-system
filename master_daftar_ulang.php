@@ -175,10 +175,10 @@ $priorDebt=$yearId?report_prior_debt_summary($koneksi,$selectedYear,report_activ
 </div><?php endif; ?>
 <section class="main-card du-master-hero master-modern-shell" aria-labelledby="du-year-title">
   <div class="du-hero-copy">
-    <span class="recap-class-overline">Konfigurasi Tahun Ajaran</span><h1 id="du-year-title"><?= master_du_e($selectedYear) ?></h1><p>Atur tarif dan lengkapi tagihan siswa dalam satu langkah.</p>
+    <label class="recap-class-overline" for="du-year-select">Tahun ajaran</label><h1 id="du-year-title"><?= master_du_e($selectedYear) ?></h1><p>Atur tarif dan lengkapi tagihan daftar ulang per kelas.</p>
 <?php if($selectedYear>du_current_academic_year()): ?><p>Tagihan Mendatang memakai kelas tujuan dan dapat dicicil tanpa mengubah kelas aktif.</p><?php endif; ?>
     <div class="du-master-year-tools">
-      <form method="get" class="du-year-picker"><span class="du-year-picker-icon"><?= master_workspace_icon('calendar') ?></span><select class="field-input field-select" name="tahun" aria-label="Pilih tahun ajaran" onchange="this.form.submit()">
+      <form method="get" class="du-year-picker"><span class="du-year-picker-icon" aria-hidden="true"><?= master_workspace_icon('calendar') ?></span><select id="du-year-select" class="field-input field-select" name="tahun" aria-label="Pilih tahun ajaran" onchange="this.form.submit()">
         <?php foreach($yearRows as $yr): ?><option value="<?= master_du_e($yr['label']) ?>" <?= $yr['label']===$selectedYear?'selected':'' ?>><?= master_du_e($yr['label']) ?></option><?php endforeach; ?>
       </select></form>
       <div class="du-year-state"><span class="du-year-state-label">Status:</span><span class="du-year-status is-<?= master_du_e($year['status']) ?>"><span class="du-year-status-dot" aria-hidden="true"></span><?= master_du_e(['draft'=>'Belum terbit','published'=>'Sudah terbit','closed'=>'Tertutup'][$year['status']]) ?></span></div>
@@ -188,16 +188,16 @@ $priorDebt=$yearId?report_prior_debt_summary($koneksi,$selectedYear,report_activ
   </div>
 </section>
 <section class="main-card master-modern-card master-modern-form" id="du-rate-section">
-  <div class="student-panel-heading"><div><h3>Tarif daftar ulang per kelas</h3><p>Isi tarif yang belum tersedia. Tagihan dan pembayaran yang sudah ada tetap dipertahankan.</p></div></div>
-  <?php if(!empty($priorDebt['has_debt'])): ?><p class="du-info-note">Tunggakan tahun sebelumnya tetap tercatat dan dapat dibayar. Penerbitan tahun berjalan tetap dapat dilanjutkan.</p><?php endif; ?>
-  <?php if($coverageConflicts): ?><p class="du-info-note"><?= $coverageConflicts ?> penetapan DU tersendiri bertentangan dengan cakupan PSB. Tagihan dan pembayaran tetap disimpan. Periksa melalui <a href="pembayaran/riwayat_daftar_ulang.php">Riwayat Daftar Ulang</a> untuk koreksi melalui alur yang tersedia.</p><?php endif; ?>
+  <div class="student-panel-heading"><div><h2 class="du-section-title">Tarif daftar ulang per kelas</h2><p>Isi tarif kelas yang ingin dilengkapi. Tarif yang dikosongkan tidak diubah.</p></div></div>
+  <?php if(!empty($priorDebt['has_debt'])): ?><p class="du-info-note">Tunggakan tahun sebelumnya tetap dapat dibayar dan tidak menghalangi penerbitan tahun ini.</p><?php endif; ?>
+  <?php if($coverageConflicts): ?><div class="du-info-note du-conflict-note"><strong><?= $coverageConflicts ?> penetapan DU perlu ditinjau</strong><p>Penetapan DU tersendiri bertentangan dengan cakupan PSB. Tagihan dan pembayaran tetap disimpan. Periksa di <a href="pembayaran/riwayat_daftar_ulang.php">Riwayat Daftar Ulang</a> untuk melakukan koreksi.</p></div><?php endif; ?>
   <form method="post" id="du-rate-form">
     <input type="hidden" name="csrf_token" value="<?= master_du_e($_SESSION['csrf_master_du']) ?>">
     <input type="hidden" name="aksi" value="simpan_lengkapi">
     <input type="hidden" name="tahun_ajaran" value="<?= master_du_e($selectedYear) ?>">
     <div class="du-rate-grid">
       <?php for($c=$firstLevel;$c<=$lastLevel;$c++):
-        $basis=$masters[$c]>0?(isset($masterBases[$masterIds[$c]??0])?'Ditetapkan admin':'Legacy'):'Belum ditetapkan';
+        $basis=$masters[$c]>0?(isset($masterBases[$masterIds[$c]??0])?'Tarif admin':'Tarif Legacy'):'Belum ditetapkan';
         $value=$masters[$c]>0?number_format($masters[$c],round($masters[$c],2)==round($masters[$c])?0:2,',','.') : '';
         if(($inputState['year']??'')===$selectedYear&&isset($inputState['amounts'][$c])&&is_scalar($inputState['amounts'][$c]))$value=mb_substr((string)$inputState['amounts'][$c],0,80);
       ?>
@@ -205,7 +205,7 @@ $priorDebt=$yearId?report_prior_debt_summary($koneksi,$selectedYear,report_activ
       <article class="du-rate-card du-psb-card" data-du-rate-card>
         <div class="du-rate-card-heading"><div><h3>Kelas <?= $c ?></h3><small><?= $activeByClass[$c] ?> siswa aktif</small></div><span class="du-tariff-basis">Mengikuti PSB</span></div>
         <div class="du-psb-heading"><span><?= master_workspace_icon('layers') ?></span><div><h4>DU tercakup dalam PSB</h4><p>Daftar ulang kelas awal termasuk dalam paket PSB.</p></div></div>
-        <dl class="du-psb-counts"><div><dt>Tercakup PSB</dt><dd><?= $coveredByClass[$c] ?><span> siswa</span></dd></div><div><dt>Penetapan lain / perlu ditinjau</dt><dd><?= max(0,$activeByClass[$c]-$coveredByClass[$c]) ?><span> siswa</span></dd></div></dl>
+        <dl class="du-psb-counts"><div><dt>Tercatat tercakup PSB</dt><dd><?= $coveredByClass[$c] ?><span> siswa</span></dd></div><div><dt>Belum tercatat tercakup</dt><dd><?= max(0,$activeByClass[$c]-$coveredByClass[$c]) ?><span> siswa</span></dd></div></dl>
         <p class="du-psb-installments"><?= master_workspace_icon('info') ?><span><strong>Tetap tercakup saat PSB dicicil</strong>Cicilan tetap mengikuti kewajiban PSB.</span></p>
         <input type="hidden" name="jumlah[<?= $c ?>]" value="0">
       </article>
@@ -214,17 +214,17 @@ $priorDebt=$yearId?report_prior_debt_summary($koneksi,$selectedYear,report_activ
         <div class="du-rate-card-heading"><div><h3>Kelas <?= $c ?></h3><small><?= $activeByClass[$c] ?> siswa aktif</small></div><span class="du-tariff-basis"><?= master_du_e($basis) ?></span></div>
         <label class="du-rate-label" for="du-rate-<?= $c ?>">Tarif per siswa</label>
         <div class="du-rate-input-wrap"><span aria-hidden="true">Rp</span><input id="du-rate-<?= $c ?>" class="field-input rupiah-input" name="jumlah[<?= $c ?>]" inputmode="decimal" autocomplete="off" value="<?= master_du_e($value) ?>" placeholder="Masukkan nominal" data-saved-value="<?= master_du_e($value) ?>" <?= !$canEdit?'disabled':'' ?>></div>
-        <p class="du-class-progress"><?= $activeIssuedByClass[$c] ?> dari <?= $activeByClass[$c] ?> siswa memiliki tagihan</p>
+        <p class="du-class-progress"><?php if($activeByClass[$c]>0): ?><strong><?= $activeIssuedByClass[$c] ?> dari <?= $activeByClass[$c] ?> siswa</strong> memiliki tagihan<?php else: ?>Belum ada siswa aktif di kelas ini.<?php endif; ?></p>
         <?php if($masters[$c]<=0): ?><small>Tarif belum tersedia untuk tahun ini.</small><?php endif; ?>
         <div class="du-rate-estimate"><span>Total tagihan tercatat</span><strong><?= ($masters[$c]<=0||(!empty($duUnknownByClass[$c])&&!$issuedCountByClass[$c]))?'-':'Rp '.number_format($issuedByClass[$c],0,',','.') ?></strong></div>
       </article>
       <?php endfor; ?>
     </div>
-    <p class="du-info-note">Tarif yang Anda tetapkan menjadi dasar tagihan baru. Pembayaran Legacy tetap diperhitungkan. Tarif kelas yang dikosongkan tidak diubah.</p>
+    <p class="du-info-note du-save-note">Tarif menjadi dasar tagihan baru. Tagihan dan pembayaran yang sudah tercatat, termasuk Legacy, tetap dipertahankan.</p>
     <div class="du-save-footer">
       <div><span>Total Tagihan DU Terpisah</span><strong data-du-issued-total>Rp <?= number_format((float)$billSummary['total'],0,',','.') ?></strong></div>
       <div class="du-save-action">
-        <?php if($canEdit): ?><button class="btn btn-primary" type="submit" id="du-rate-submit"><?= master_workspace_icon('save') ?>Simpan Tarif &amp; Lengkapi Tagihan</button><small>Menyimpan tarif dan membuat tagihan yang belum ada.</small><small data-du-unsaved hidden role="status">Ada perubahan tarif yang belum disimpan.</small><?php else: ?><span class="recap-status is-unpaid"><?= $year['status']==='closed'?'Tarif dan penerbitan terkunci':'Histori tahun lain tetap tersimpan; penerbitan untuk tahun berjalan.' ?></span><?php endif; ?>
+        <?php if($canEdit): ?><button class="btn btn-primary" type="submit" id="du-rate-submit"><?= master_workspace_icon('save') ?><span data-du-submit-label>Simpan Tarif &amp; Lengkapi Tagihan</span></button><small>Menyimpan tarif dan membuat tagihan yang belum ada.</small><small data-du-unsaved hidden role="status">Ada perubahan tarif yang belum disimpan.</small><?php else: ?><span class="recap-status is-unpaid"><?= $year['status']==='closed'?'Tarif dan penerbitan terkunci':'Histori tahun lain tetap tersimpan; penerbitan untuk tahun berjalan.' ?></span><?php endif; ?>
       </div>
     </div>
   </form>
