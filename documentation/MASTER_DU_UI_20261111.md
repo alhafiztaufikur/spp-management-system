@@ -1,5 +1,22 @@
 # Perapihan UI Master Daftar Ulang, 11 November 2026
 
+## Koreksi tampilan sesuai permintaan pengguna
+
+Deskripsi statis pada hero, judul bagian, kartu PSB, dan footer dihapus.
+Banner tunggakan dan konflik DU–PSB juga dihapus dari Master DU. Kartu kelas awal
+cukup menampilkan **Tercakup PSB**, tanpa hitungan peninjauan atau penjelasan
+cicilan. Pesan perubahan belum disimpan dan hasil aksi tetap muncul sesuai keadaan.
+Penghapusan ini hanya menyederhanakan presentasi; aturan dan data konflik tetap
+dipertahankan pada layanan existing. Pembacaan tunggakan yang hanya dipakai banner
+dihapus karena tidak lagi diperlukan oleh halaman.
+
+**68 pemeriksaan koreksi UI lulus**: teks/panel yang diminta tidak ada,
+18 kombinasi tiga unit × dua tema × lebar 320/390/1600 px tidak meluap,
+jumlah field, nilai tersembunyi PSB, aksi simpan, penanda perubahan dan tahun depan
+tetap bekerja. PHP lint, parser CSS, detector selector dan whitespace lulus.
+Tidak ada kiriman finansial pada pengujian ini. Artefak: `clean-result.json`
+dan `clean-*.png` di direktori privat yang sama dengan pengujian awal.
+
 ## Arah dan cakupan
 
 Mode antislop: **During**, dipilih pengguna dalam chat. Arah berasal dari gambar
@@ -8,7 +25,7 @@ Design Read: formulir operasional kasir/admin sekolah, memakai identitas SistemS
 dan palet unit existing; **ENERGY 1 / RHYTHM 1 / MOTION 1**.
 
 - Warna unit dan bidang tahun ajaran dipertahankan agar halaman tetap dikenali;
-  amber hanya menandai konflik yang perlu tindakan.
+  amber pada badge menandai tarif yang belum ditetapkan.
 - Kartu per kelas tetap dipakai untuk membandingkan tarif pada posisi yang sama;
   kartu kelas awal tetap berbeda karena mengikuti kebijakan PSB.
 - Font aplikasi existing tetap dipakai agar konsisten dengan halaman pembayaran.
@@ -18,16 +35,15 @@ dan palet unit existing; **ENERGY 1 / RHYTHM 1 / MOTION 1**.
   hero dipadatkan agar formulir lebih cepat terlihat.
 - Total kartu memakai tinta netral agar tidak bersaing dengan tombol simpan.
   Angka memakai tabular numerals untuk memudahkan pembacaan nominal.
-- Label sumber tarif menjelaskan admin/Legacy; catatan konflik dibedakan dari
-  catatan umum. Hitungan PSB menyebut status pencatatan, bukan menyatakan bahwa
-  seluruh selisih hitungan merupakan konflik.
+- Label sumber tarif menjelaskan admin/Legacy; kelas awal cukup menyebut cakupan
+  PSB. Deskripsi kebijakan dan peninjauan tidak ditampilkan pada formulir tarif.
 - Tidak membuat gambar, ikon, font, navigasi, atau menu baru. Ikon existing
   tetap menunjukkan kalender, simpan, penguncian tahun, serta cakupan PSB.
 - Tidak menambahkan animasi; transisi masuk kartu ditiadakan di halaman ini.
   Preferensi reduced motion dihormati.
 
 Perubahan dibatasi pada template Master DU, stylesheet halaman, dan skrip UI
-Master Workspace. Query, layanan penerbitan, perhitungan nominal, otorisasi,
+Master Workspace. Layanan penerbitan, perhitungan nominal, otorisasi,
 struktur database, dan proses POST server tidak diubah. ID/nama field serta
 nilai tersembunyi kelas awal tetap sama. Label tahun mengaktifkan picker existing;
 tanpa JavaScript label tetap terhubung ke select native.
@@ -44,7 +60,7 @@ guard server tetap menolak penulisan sebelum menangani aksi.
 Artefak privat: `C:/laragon/backups/spp-management-system/du_ui_20261111/`.
 Pemeriksaan dilakukan pada localhost dengan akun Super Admin existing.
 
-Hasil utama: **164 pemeriksaan UI/browser/CSS lulus**, termasuk 30 kombinasi
+Hasil versi awal: **164 pemeriksaan UI/browser/CSS lulus**, termasuk 30 kombinasi
 visual. Pengujian tambahan memeriksa cakupan Semua Unit dan pemulihan halaman.
 Sebanyak **8 pemeriksaan tambahan** tersebut lulus, termasuk penolakan HTTP 409
 pada Semua Unit dan simulasi event `pageshow` untuk memulihkan status tombol.
@@ -60,9 +76,10 @@ Artefak utama: `full-result.json`, `scope-result.json`, dan screenshot `after-*`
 - Tombol tutup tahun membuka konfirmasi; batal mempertahankan tahun terbuka.
   Pembukaan kembali tahun tetap memakai handler server existing yang tidak diedit;
   tindakan mengubah status tahun tidak dijalankan pada database operasional.
-- Tahun berikutnya menampilkan penjelasan tagihan mendatang dan tarif belum
-  ditetapkan; tahun di luar jangkauan tetap mengunci input/tombol penerbitan.
-- Tautan konflik membuka Riwayat Daftar Ulang. Tombol tema benar-benar mengubah
+- Tahun berikutnya tetap menyediakan input tarif; tahun di luar jangkauan tetap
+  mengunci input/tombol penerbitan. Penjelasan statis tagihan mendatang telah dihapus.
+- Pada versi awal tautan konflik membuka Riwayat Daftar Ulang; banner beserta
+  tautannya kini dihapus sesuai permintaan pengguna. Tombol tema benar-benar mengubah
   terang/gelap; navigasi ponsel dibuka dan ditutup melalui kontrol existing.
 - Uji submit mengganti token CSRF menjadi token tidak sah sebelum request
   diteruskan. Server menolak sebelum transaksi database dimulai. Status sibuk,
@@ -89,10 +106,10 @@ dan Core Web Vitals tidak diukur dan tidak diklaim.
 | R-17 | PASS: angka siswa dan nominal tetap berasal dari read model existing. |
 | R-18 | PASS: tidak ada testimoni atau identitas rekaan. |
 | R-23 | PASS: konsep mengikuti arahan pengguna; tidak ada aset/navigasi baru. |
-| R-24 | PASS: tautan konflik membuka halaman riwayat DU existing. |
+| R-24 | PASS: tidak menambah tautan; navigasi existing tetap tersedia melalui menu. |
 | R-25 | PASS: kontras teks diukur pada 30 kombinasi, termasuk ujung gradien. |
 | R-26 | PASS: picker, input, simpan, konfirmasi, tautan dan toggle diuji nyata. |
-| R-27 | PASS: tarif kosong/siswa kosong dijelaskan; simpan sibuk dan error diuji. |
+| R-27 | PASS: badge tarif kosong, keadaan siswa kosong, simpan sibuk dan error tersedia. |
 | R-28 | PASS: tidak membuat FAQ. |
 | R-32 | PASS: Tab input, fokus terlihat, Escape picker/modal dan pemulihan fokus diuji. |
 | R-33 | PASS: implementasi langsung melalui patch source; tidak ada skrip penulis CSS. |
@@ -103,7 +120,7 @@ dan Core Web Vitals tidak diukur dan tidak diklaim.
 | R-38 | PASS: memakai data aplikasi existing; tidak menambahkan isi fiktif. |
 | R-39 | PASS: field berlabel, kontrol native/komponen existing, cursor/fokus/disabled jelas. |
 | R-40 | PASS: tidak menambah media, font, skrip pihak ketiga, atau klaim skor performa. |
-| R-01 | PASS: gradien tahun mempertahankan identitas existing; amber menandai konflik. |
+| R-01 | PASS: gradien tahun mempertahankan identitas existing; amber menandai tarif kosong. |
 | R-04 | PASS: ikon existing dipakai sesuai kalender/simpan/penguncian/cakupan. |
 | R-06 | PASS: font existing dengan skala lokal untuk membedakan tarif dan keterangan. |
 | R-07 | PASS: tidak menambahkan pola latar; orbs halaman disembunyikan. |
