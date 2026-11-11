@@ -11,6 +11,7 @@
         "includes/psb_spp_schema.php",
         "includes/spp_advance_schema.php",
         "includes/student_out_schema.php",
+        "includes/schema_catalog.php",
         "includes/du_psb.php",
         "includes/du_advance.php"
     ],

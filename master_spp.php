@@ -141,22 +141,30 @@ $ratesEditable=spp_master_rates_editable($master);$rateVersion=spp_master_rate_v
 $rateEditing=$master['status']==='published'&&((string)($_GET['edit_tarif']??'')==='1'||($rateDraft['action']??'')==='ubah_tarif_terbit');
 $rateValues=$rateDraft&&in_array($rateDraft['action'],['simpan_tarif','ubah_tarif_terbit'],true)?$rateDraft['rates']:$rates;
 $years=[];$currentStart=(int)substr(du_current_academic_year(),0,4);for($offset=-2;$offset<=3;$offset++){$start=$currentStart+$offset;$label=$start.'/'.($start+1);$years[$label]=$label;}$res=$koneksi->query('SELECT label FROM tahun_ajaran ORDER BY label DESC');while($r=$res->fetch_assoc())$years[$r['label']]=$r['label'];krsort($years);
-$students=array_values(spa_roster($koneksi,$selectedYear));
+$rosterEvidence=[];$students=array_values(spa_roster($koneksi,$selectedYear,$rosterEvidence));
+$tariffBills=sct_master_read_bills($koneksi,$masterId);
+lb_master_read($koneksi,$selectedYear,'spp',array_merge(array_column($students,'no_induk'),array_keys($tariffBills)));
 $studentTariffs=[];$studentTariffReady=sct_ready($koneksi)&&$masterId>0;
 if($studentTariffReady){
-    require_once __DIR__.'/includes/legacy_full_read.php';$tariffBills=sct_bill_map($koneksi,$masterId);
-    $tariffCoverage=lful_monthly_coverage_snapshot($koneksi,array_map('strval',array_column($students,'no_induk')),'spp',array_map(static fn($p)=>$p['tahun'].'-'.$p['bulan'],spp_academic_periods($selectedYear)));
+    $tariffCoverage=$rosterEvidence['spp'];
     foreach($students as $student){
-        $admission=sct_admission_student($koneksi,(int)$student['student_id'],(int)$master['tahun_ajaran_id']);
-        if($admission)$student['admission_rate']=$admission['admission_rate'];
         $studentTariffs[(int)$student['student_id']]=sct_context($koneksi,$master,$student,$rates,$tariffBills,$tariffCoverage);
     }
 }
 $rombelChoices=[];foreach($students as $student)$rombelChoices[(string)$student['kelas_rombel_snapshot']]=(string)$student['kelas_rombel_snapshot'];
 filter_register('rombel_filter',$_GET['rombel_filter']??null,$rombelChoices);filter_output_start();
-$stmt=$koneksi->prepare("SELECT COUNT(*) bills,SUM(CASE WHEN paid+0.001>=nominal_tagihan THEN 1 ELSE 0 END) paid_bills,SUM(CASE WHEN paid+0.001<nominal_tagihan AND status='open' THEN 1 ELSE 0 END) unpaid_bills FROM (SELECT ts.id,ts.nominal_tagihan,ts.status,COALESCE(SUM(CASE WHEN ab.status='active' THEN a.nominal_dari_bayar ELSE 0 END),0) paid FROM tagihan_spp ts LEFT JOIN spp_alokasi a ON a.tagihan_spp_id=ts.id LEFT JOIN spp_alokasi_batch ab ON ab.id=a.batch_id WHERE ts.master_spp_tahun_id=? GROUP BY ts.id) x");
-$stmt->bind_param('i',$masterId);$stmt->execute();$stats=$stmt->get_result()->fetch_assoc();$stmt->close();
-foreach(lf_rows($koneksi,"SELECT t.no_induk,t.bulan,t.tahun,t.nominal_tagihan,COALESCE(SUM(CASE WHEN b.status='active' THEN a.nominal_dari_bayar ELSE 0 END),0) paid FROM tagihan_spp t LEFT JOIN spp_alokasi a ON a.tagihan_spp_id=t.id LEFT JOIN spp_alokasi_batch b ON b.id=a.batch_id WHERE t.master_spp_tahun_id=? AND t.status='open' GROUP BY t.id",[$masterId]) as $b)if((float)$b['paid']+.001<(float)$b['nominal_tagihan']&&(float)$b['paid']+lb_spp_credit($koneksi,$b['no_induk'],$b['bulan'],$b['tahun'])+.001>=(float)$b['nominal_tagihan']){$stats['paid_bills']++;$stats['unpaid_bills']--;}
+$stats=['bills'=>0,'paid_bills'=>0,'unpaid_bills'=>0];$legacyPaidBills=0;
+foreach($tariffBills as $monthlyBills)foreach($monthlyBills as $b){
+    $stats['bills']++;$paid=(float)$b['paid']+.001>=(float)$b['nominal_tagihan'];
+    if($paid)$stats['paid_bills']++;
+    elseif($b['status']==='open'){
+        $stats['unpaid_bills']++;
+        if((float)$b['paid']+lb_spp_credit($koneksi,$b['no_induk'],$b['bulan'],$b['tahun'])+.001>=(float)$b['nominal_tagihan'])$legacyPaidBills++;
+    }
+}
+$stats['paid_bills']=$stats['bills']?(string)$stats['paid_bills']:null;
+$stats['unpaid_bills']=$stats['bills']?(string)$stats['unpaid_bills']:null;
+if($legacyPaidBills){$stats['paid_bills']+=$legacyPaidBills;$stats['unpaid_bills']-=$legacyPaidBills;}
 
 
 require_once __DIR__ . '/includes/master_workspace_ui.php';

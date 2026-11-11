@@ -53,6 +53,12 @@ function sct_bill_map(mysqli $db,int $masterId,bool $lock=false,?string $nis=nul
     }
     if($paid)$paid->close();return $out;
 }
+/** Reuse one live bill/payment read for the master preview and its counters. */
+function sct_master_read_bills(mysqli $db,int $masterId): array {
+    $rows=hp_rows($db,"SELECT t.*,MAX(CASE WHEN b.status='active' THEN 1 ELSE 0 END) allocated,COALESCE(SUM(CASE WHEN b.status='active' THEN a.nominal_dari_bayar ELSE 0 END),0) paid FROM tagihan_spp t LEFT JOIN spp_alokasi a ON a.tagihan_spp_id=t.id AND a.unit_id=t.unit_id LEFT JOIN spp_alokasi_batch b ON b.id=a.batch_id AND b.unit_id=a.unit_id WHERE t.master_spp_tahun_id=? GROUP BY t.id ORDER BY t.id",[$masterId]);
+    $out=[];foreach($rows as $row)$out[$row['no_induk']][$row['tahun'].'-'.$row['bulan']]=$row;
+    return $out;
+}
 function sct_context(mysqli $db,array $master,array $student,array $rates,array $bills,?array $coverage=null): array {
     require_once __DIR__.'/legacy_full_read.php';
     $nis=(string)$student['no_induk'];$year=(string)$master['label'];
@@ -86,13 +92,16 @@ function sct_context(mysqli $db,array $master,array $student,array $rates,array 
         'name'=>$student['NAMA'],'class'=>$student['kelas_rombel_snapshot'],'year'=>$year,'version'=>$version,'periods'=>$periods];
 }
 
+function sct_admission_row(array $plan,array $student,?array $placement): array {
+    return $student+['placement_id'=>$plan['penempatan_id'],'rencana_masuk_id'=>$plan['id'],'tahun_ajaran_id'=>(int)$plan['tahun_ajaran_id'],'no_induk'=>$plan['NO_INDUK'],'kelas'=>$plan['tingkat'],'master_kelas_id'=>$placement['master_kelas_id']??null,'kelas_rombel_snapshot'=>$placement['kelas_rombel_snapshot']??(string)$plan['tingkat'],'spp_covered_by_psb'=>0,'admission_rate'=>(float)$plan['spp_rate']];
+}
 function sct_admission_student(mysqli $db,int $studentId,int $yearId): ?array {
     require_once __DIR__.'/psb_spp.php';$plan=pspp_find($db,$studentId);
     if(!$plan||(int)$plan['tahun_ajaran_id']!==$yearId)return null;
     $s=hp_one($db,'SELECT id student_id,NAMA,is_active,potongan_spp_nominal FROM siswa WHERE id=?',[$studentId]);
     if(!$s)return null;
     $p=$plan['penempatan_id']?hp_one($db,'SELECT * FROM siswa_tahun_ajaran WHERE id=?',[$plan['penempatan_id']]):null;
-    return $s+['placement_id'=>$plan['penempatan_id'],'rencana_masuk_id'=>$plan['id'],'tahun_ajaran_id'=>$yearId,'no_induk'=>$plan['NO_INDUK'],'kelas'=>$plan['tingkat'],'master_kelas_id'=>$p['master_kelas_id']??null,'kelas_rombel_snapshot'=>$p['kelas_rombel_snapshot']??(string)$plan['tingkat'],'spp_covered_by_psb'=>0,'admission_rate'=>(float)$plan['spp_rate']];
+    return sct_admission_row($plan,$s,$p);
 }
 
 function sct_context_for_student(mysqli $db,int $masterId,int $studentId): array {

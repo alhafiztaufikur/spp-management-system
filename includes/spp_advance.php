@@ -4,7 +4,7 @@ require_once __DIR__.'/psb_spp.php';
 require_once __DIR__.'/legacy_full_read.php';
 
 /** One roster for issuance, individual tariffs and the master summary; no writes on reads. */
-function spa_roster(mysqli $db,string $year): array {
+function spa_roster(mysqli $db,string $year,?array &$readEvidence=null): array {
     if(unit_active_id()===0){
         $had=array_key_exists('active_unit_id',$_SESSION);$saved=$_SESSION['active_unit_id']??null;$context=(int)($GLOBALS['app_unit_id']??0);$rows=[];
         try{foreach([1,2,3] as $unit){$_SESSION['active_unit_id']=$unit;unit_set_context($db,$unit);$rows+=spa_roster($db,$year);}}
@@ -13,8 +13,8 @@ function spa_roster(mysqli $db,string $year): array {
     $placements=[];$pending=[];$out=[];$counts=[];$current=du_current_academic_year();
     $students=hp_rows($db,'SELECT s.*,m.jenis rombel_jenis FROM siswa s LEFT JOIN master_kelas m ON m.id=s.master_kelas_id AND m.unit_id=s.unit_id ORDER BY s.id');
     $periodKeys=array_map(static fn($p)=>$p['tahun'].'-'.$p['bulan'],spp_academic_periods($year));$coverage=[];
-    foreach(['spp','komite'] as $kind)$coverage[$kind]=lful_monthly_coverage_snapshot($db,array_map('strval',array_column($students,'NO_INDUK')),$kind,$periodKeys)['coverage'];
-    $plans=[];foreach(hp_rows($db,'SELECT r.student_id,y.label,r.tahun_ajaran_id FROM psb_spp_plans r JOIN tahun_ajaran y ON y.id=r.tahun_ajaran_id AND y.unit_id=r.unit_id WHERE y.label=?',[$year]) as $plan)$plans[(int)$plan['student_id']]=$plan;
+    foreach(['spp','komite'] as $kind){$snapshot=lful_monthly_coverage_snapshot($db,array_map('strval',array_column($students,'NO_INDUK')),$kind,$periodKeys);$coverage[$kind]=$snapshot['coverage'];$readEvidence[$kind]=$snapshot;}
+    $plans=[];foreach(hp_rows($db,'SELECT r.*,y.label,s.NO_INDUK,p.master_kelas_id,p.kelas_rombel_snapshot FROM psb_spp_plans r JOIN tahun_ajaran y ON y.id=r.tahun_ajaran_id AND y.unit_id=r.unit_id JOIN siswa s ON s.id=r.student_id AND s.unit_id=r.unit_id LEFT JOIN siswa_tahun_ajaran p ON p.id=r.penempatan_id AND p.unit_id=r.unit_id WHERE y.label=?',[$year]) as $plan)$plans[(int)$plan['student_id']]=$plan;
     foreach(hp_rows($db,"SELECT p.*,y.label FROM siswa_tahun_ajaran p JOIN tahun_ajaran y ON y.id=p.tahun_ajaran_id AND y.unit_id=p.unit_id WHERE y.label IN (?,?) AND p.status<>'dibatalkan'",[$year,$current]) as $p)$placements[$p['unit_id'].'|'.$p['no_induk']][$p['label']]=$p;
     if(spa_ready($db))foreach(hp_rows($db,'SELECT t.*,y.label,a.kelas origin_grade FROM tagihan_spp t JOIN tahun_ajaran y ON y.id=t.tahun_ajaran_id AND y.unit_id=t.unit_id JOIN siswa_tahun_ajaran a ON a.id=t.penempatan_asal_id AND a.unit_id=t.unit_id WHERE y.label=?',[$year]) as $b)$pending[$b['unit_id'].'|'.$b['no_induk']]=$b;
     foreach(['spp','komite'] as $kind)foreach(hp_rows($db,"SELECT t.no_induk,t.unit_id,t.bulan,t.tahun,t.status FROM tagihan_$kind t JOIN tahun_ajaran y ON y.id=t.tahun_ajaran_id AND y.unit_id=t.unit_id WHERE y.label=?",[$year]) as $b)$counts[$b['unit_id'].'|'.$b['no_induk']][$kind][$b['tahun'].'-'.$b['bulan']]=$b['status'];
@@ -29,7 +29,7 @@ function spa_roster(mysqli $db,string $year): array {
             $row=['placement_id'=>null,'penempatan_asal_id'=>$source['id']??null,'tahun_ajaran_id'=>null,'kelas'=>(int)$s['KELAS']+1,'master_kelas_id'=>null,'kelas_rombel_snapshot'=>(string)((int)$s['KELAS']+1),'spp_covered_by_psb'=>0,'komite_mulai_bulan'=>'07','issue_reason'=>$reason];
         }
         $plan=$plans[(int)$s['id']]??null;
-        if($plan&&$plan['label']===$year){$admission=sct_admission_student($db,(int)$s['id'],(int)$plan['tahun_ajaran_id']);if($admission)$row=array_merge($row??[],$admission);}
+        if($plan&&$plan['label']===$year){$admission=sct_admission_row($plan,['student_id'=>$s['id'],'NAMA'=>$s['NAMA'],'is_active'=>$s['is_active'],'potongan_spp_nominal'=>$s['potongan_spp_nominal']],$plan);$row=array_merge($row??[],$admission);}
         if(!$row)continue;
         if($bill)$row['penempatan_asal_id']=$bill['penempatan_asal_id'];
         $row=array_merge(['student_id'=>$s['id'],'unit_id'=>$s['unit_id'],'no_induk'=>$s['NO_INDUK'],'NAMA'=>$s['NAMA'],'NO_induk_diknas'=>$s['NO_induk_diknas'],'is_active'=>$s['is_active'],'potongan_spp_nominal'=>$s['potongan_spp_nominal'],'komite_rate'=>$s['POMG'],'issue_reason'=>null],$row);

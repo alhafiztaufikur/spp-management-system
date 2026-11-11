@@ -1,23 +1,25 @@
 <?php
+require_once __DIR__.'/schema_catalog.php';
 /** CLI installation; admission plans are financial evidence, not academic placements. */
 function pspp_schema_plan(mysqli $db): array {
-    $steps=[];
-    if(!$db->query("SELECT 1 FROM information_schema.TABLES WHERE TABLE_SCHEMA=DATABASE() AND TABLE_NAME='psb_spp_plans_data'")->num_rows)$steps[]='create_plan';
+    $steps=[];$catalog=schema_catalog($db);
+    if(!isset($catalog['tables']['psb_spp_plans_data']))$steps[]='create_plan';
     foreach(['tagihan_spp','tagihan_komite','spp_tarif_siswa'] as $name){
-        $columns=[];foreach($db->query("SELECT COLUMN_NAME,IS_NULLABLE FROM information_schema.COLUMNS WHERE TABLE_SCHEMA=DATABASE() AND TABLE_NAME='{$name}_data'") as $c)$columns[$c['COLUMN_NAME']]=$c['IS_NULLABLE'];
+        $columns=array_column($catalog['columns'][$name.'_data']??[],'IS_NULLABLE','COLUMN_NAME');
         if(!isset($columns['rencana_masuk_id']))$steps[]='extend_'.$name;
         elseif(($columns['penempatan_id']??'')!=='YES')throw new RuntimeException('Konflik nullability '.$name);
         if(isset($columns['rencana_masuk_id'])){
-            $column=$db->query("SELECT COLUMN_TYPE,IS_NULLABLE FROM information_schema.COLUMNS WHERE TABLE_SCHEMA=DATABASE() AND TABLE_NAME='{$name}_data' AND COLUMN_NAME='rencana_masuk_id'")->fetch_assoc();
+            $column=$catalog['columns'][$name.'_data']['rencana_masuk_id'];
             if($column['COLUMN_TYPE']!=='bigint'||$column['IS_NULLABLE']!=='YES')throw new RuntimeException('Konflik tipe dasar rencana '.$name);
-            if(!$db->query("SELECT 1 FROM information_schema.KEY_COLUMN_USAGE WHERE TABLE_SCHEMA=DATABASE() AND TABLE_NAME='{$name}_data' AND COLUMN_NAME='rencana_masuk_id' AND REFERENCED_TABLE_NAME='psb_spp_plans_data' AND REFERENCED_COLUMN_NAME='id'")->num_rows)$steps[]='fk_'.$name;
+            $matching=array_filter($catalog['foreign_keys'][$name.'_data']['rencana_masuk_id']??[],static fn($fk)=>$fk['REFERENCED_TABLE_NAME']==='psb_spp_plans_data'&&$fk['REFERENCED_COLUMN_NAME']==='id');
+            if(!$matching)$steps[]='fk_'.$name;
         }
-        if(!$db->query("SELECT 1 FROM information_schema.COLUMNS WHERE TABLE_SCHEMA=DATABASE() AND TABLE_NAME='$name' AND COLUMN_NAME='rencana_masuk_id'")->num_rows)$steps[]='view_'.$name;
-        foreach(['INSERT','UPDATE'] as $event){$trigger='pspp_'.$name.'_'.strtolower($event);$body=$db->query("SELECT ACTION_STATEMENT FROM information_schema.TRIGGERS WHERE TRIGGER_SCHEMA=DATABASE() AND TRIGGER_NAME='$trigger'")->fetch_row();if(!$body||!str_contains($body[0],"REGEXP '^[0-9]{4}-(0[1-9]|1[0-2])$'")||($event==='INSERT'&&!str_contains($body[0],'SET NEW.unit_id=current_unit_id()')))$steps[]=$trigger;}
+        if(!isset($catalog['columns'][$name]['rencana_masuk_id']))$steps[]='view_'.$name;
+        foreach(['INSERT','UPDATE'] as $event){$trigger='pspp_'.$name.'_'.strtolower($event);$body=$catalog['triggers'][$trigger]??'';if(!str_contains($body,"REGEXP '^[0-9]{4}-(0[1-9]|1[0-2])$'")||($event==='INSERT'&&!str_contains($body,'SET NEW.unit_id=current_unit_id()')))$steps[]=$trigger;}
     }
-    if(!$db->query("SELECT 1 FROM information_schema.VIEWS WHERE TABLE_SCHEMA=DATABASE() AND TABLE_NAME='psb_spp_plans'")->num_rows)$steps[]='plan_view';
-    foreach(['i','u'] as $suffix){$body=$db->query("SELECT ACTION_STATEMENT FROM information_schema.TRIGGERS WHERE TRIGGER_SCHEMA=DATABASE() AND TRIGGER_NAME='spp_tarif_siswa_data_$suffix'")->fetch_row();if(!$body||!str_contains($body[0],'NEW.rencana_masuk_id IS NULL'))$steps[]='tariff_plan_'.$suffix;}
-    foreach(['INSERT','UPDATE','DELETE'] as $event){$body=$db->query("SELECT ACTION_STATEMENT FROM information_schema.TRIGGERS WHERE TRIGGER_SCHEMA=DATABASE() AND TRIGGER_NAME='pspp_plan_".strtolower($event)."'")->fetch_row();if(!$body||($event!=='DELETE'&&!str_contains($body[0],'NEW.penempatan_id IS NOT NULL OR y.label=')))$steps[]='plan_'.strtolower($event);}
+    if(($catalog['tables']['psb_spp_plans']??null)!=='VIEW')$steps[]='plan_view';
+    foreach(['i','u'] as $suffix){$body=$catalog['triggers']['spp_tarif_siswa_data_'.$suffix]??'';if(!str_contains($body,'NEW.rencana_masuk_id IS NULL'))$steps[]='tariff_plan_'.$suffix;}
+    foreach(['INSERT','UPDATE','DELETE'] as $event){$body=$catalog['triggers']['pspp_plan_'.strtolower($event)]??'';if($body===''||($event!=='DELETE'&&!str_contains($body,'NEW.penempatan_id IS NOT NULL OR y.label=')))$steps[]='plan_'.strtolower($event);}
     return $steps;
 }
 function pspp_ready(mysqli $db): bool {return $GLOBALS['pspp_ready'][$db->thread_id]??= !pspp_schema_plan($db);}

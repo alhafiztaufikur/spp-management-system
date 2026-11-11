@@ -1,18 +1,20 @@
 <?php
+require_once __DIR__.'/schema_catalog.php';
 /** Native monthly obligations may precede official promotion; installation is CLI only. */
 function spa_schema_plan(mysqli $db): array {
-    $steps=[];
+    $steps=[];$catalog=schema_catalog($db);
     foreach(['tagihan_spp','tagihan_komite','spp_tarif_siswa'] as $table){
-        $c=$db->query("SELECT COLUMN_TYPE,IS_NULLABLE FROM information_schema.COLUMNS WHERE TABLE_SCHEMA=DATABASE() AND TABLE_NAME='{$table}_data' AND COLUMN_NAME='penempatan_asal_id'")->fetch_assoc();
+        $c=$catalog['columns'][$table.'_data']['penempatan_asal_id']??null;
         if(!$c)$steps[]='extend_'.$table;
         elseif($c['COLUMN_TYPE']!=='bigint'||$c['IS_NULLABLE']!=='YES')throw new RuntimeException('Konflik dasar proyeksi '.$table);
-        if($c&&!$db->query("SELECT 1 FROM information_schema.KEY_COLUMN_USAGE WHERE TABLE_SCHEMA=DATABASE() AND TABLE_NAME='{$table}_data' AND COLUMN_NAME='penempatan_asal_id' AND REFERENCED_TABLE_NAME='siswa_tahun_ajaran_data' AND REFERENCED_COLUMN_NAME='id'")->num_rows)throw new RuntimeException('FK proyeksi tidak sesuai: '.$table);
-        if(!$db->query("SELECT 1 FROM information_schema.COLUMNS WHERE TABLE_SCHEMA=DATABASE() AND TABLE_NAME='$table' AND COLUMN_NAME='penempatan_asal_id'")->num_rows)$steps[]='view_'.$table;
-        foreach(['insert','update'] as $event){$body=$db->query("SELECT ACTION_STATEMENT FROM information_schema.TRIGGERS WHERE TRIGGER_SCHEMA=DATABASE() AND TRIGGER_NAME='spa_{$table}_{$event}'")->fetch_row();if(!$body||!str_contains($body[0],'spa_v1'))$steps[]=$table.'_'.$event;}
-        $body=$db->query("SELECT ACTION_STATEMENT FROM information_schema.TRIGGERS WHERE TRIGGER_SCHEMA=DATABASE() AND TRIGGER_NAME='pspp_{$table}_insert'")->fetch_row();
-        if(!$body||!str_contains($body[0],'NEW.penempatan_asal_id IS NULL'))$steps[]='basis_'.$table;
+        $matching=array_filter($catalog['foreign_keys'][$table.'_data']['penempatan_asal_id']??[],static fn($fk)=>$fk['REFERENCED_TABLE_NAME']==='siswa_tahun_ajaran_data'&&$fk['REFERENCED_COLUMN_NAME']==='id');
+        if($c&&!$matching)throw new RuntimeException('FK proyeksi tidak sesuai: '.$table);
+        if(!isset($catalog['columns'][$table]['penempatan_asal_id']))$steps[]='view_'.$table;
+        foreach(['insert','update'] as $event){$body=$catalog['triggers']['spa_'.$table.'_'.$event]??'';if(!str_contains($body,'spa_v1'))$steps[]=$table.'_'.$event;}
+        $body=$catalog['triggers']['pspp_'.$table.'_insert']??'';
+        if(!str_contains($body,'NEW.penempatan_asal_id IS NULL'))$steps[]='basis_'.$table;
     }
-    foreach(['i','u'] as $e){$body=$db->query("SELECT ACTION_STATEMENT FROM information_schema.TRIGGERS WHERE TRIGGER_SCHEMA=DATABASE() AND TRIGGER_NAME='spp_tarif_siswa_data_$e'")->fetch_row();if(!$body||!str_contains($body[0],'NEW.penempatan_asal_id IS NULL'))$steps[]='tariff_'.$e;}
+    foreach(['i','u'] as $e){$body=$catalog['triggers']['spp_tarif_siswa_data_'.$e]??'';if(!str_contains($body,'NEW.penempatan_asal_id IS NULL'))$steps[]='tariff_'.$e;}
     return $steps;
 }
 function spa_ready(mysqli $db): bool {return $GLOBALS['spa_ready'][$db->thread_id]??= !spa_schema_plan($db);}

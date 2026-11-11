@@ -1,4 +1,5 @@
 <?php
+require_once __DIR__.'/schema_catalog.php';
 /** OUT is an operational decision; installing its schema never fabricates cash. */
 function sout_cash_sources(): array {
     $sources=[];
@@ -10,26 +11,26 @@ function sout_cash_sources(): array {
     return $sources;
 }
 function sout_schema_plan(mysqli $db): array {
-    $steps=[];
-    if(!$db->query("SELECT 1 FROM information_schema.TABLES WHERE TABLE_SCHEMA=DATABASE() AND TABLE_NAME='student_out_periods_data'")->num_rows)$steps[]='periods';
+    $steps=[];$catalog=schema_catalog($db);
+    if(!isset($catalog['tables']['student_out_periods_data']))$steps[]='periods';
     else {
-        $columns=array_column($db->query("SHOW COLUMNS FROM student_out_periods_data")->fetch_all(MYSQLI_ASSOC),'Type','Field');
+        $columns=array_column($catalog['columns']['student_out_periods_data']??[],'COLUMN_TYPE','COLUMN_NAME');
         if(($columns['student_id']??'')!=='int'||!isset($columns['resume_month'],$columns['open_student_id'],$columns['first_free_month']))throw new RuntimeException('Konflik struktur periode OUT.');
-        foreach(['student_id'=>'siswa_data','unit_id'=>'unit_sekolah'] as $column=>$parent){$fk=$db->query("SELECT REFERENCED_TABLE_NAME,REFERENCED_COLUMN_NAME FROM information_schema.KEY_COLUMN_USAGE WHERE TABLE_SCHEMA=DATABASE() AND TABLE_NAME='student_out_periods_data' AND COLUMN_NAME='$column' AND REFERENCED_TABLE_NAME IS NOT NULL")->fetch_assoc();if(!$fk||$fk['REFERENCED_TABLE_NAME']!==$parent||$fk['REFERENCED_COLUMN_NAME']!=='id')throw new RuntimeException('Konflik FK periode OUT: '.$column);}
+        foreach(['student_id'=>'siswa_data','unit_id'=>'unit_sekolah'] as $column=>$parent){$fk=$catalog['foreign_keys']['student_out_periods_data'][$column][0]??null;if(!$fk||$fk['REFERENCED_TABLE_NAME']!==$parent||$fk['REFERENCED_COLUMN_NAME']!=='id')throw new RuntimeException('Konflik FK periode OUT: '.$column);}
     }
-    if(!$db->query("SELECT 1 FROM information_schema.VIEWS WHERE TABLE_SCHEMA=DATABASE() AND TABLE_NAME='student_out_periods'")->num_rows)$steps[]='view';
-    foreach(['out_assert_student','out_assert_owner'] as $name){$r=$db->query("SELECT ROUTINE_DEFINITION FROM information_schema.ROUTINES WHERE ROUTINE_SCHEMA=DATABASE() AND ROUTINE_NAME='$name'")->fetch_row();$version=$name==='out_assert_student'?'out_v2':'out_v1';if(!$r||!str_contains($r[0],$version))$steps[]=$name;}
+    if(($catalog['tables']['student_out_periods']??null)!=='VIEW')$steps[]='view';
+    foreach(['out_assert_student','out_assert_owner'] as $name){$body=$catalog['routines'][$name]??'';$version=$name==='out_assert_student'?'out_v2':'out_v1';if(!str_contains($body,$version))$steps[]=$name;}
     foreach(['tagihan_spp','tagihan_komite','tagihan_daftar_ulang'] as $t){
-        $c=$db->query("SELECT COLUMN_TYPE,IS_NULLABLE FROM information_schema.COLUMNS WHERE TABLE_SCHEMA=DATABASE() AND TABLE_NAME='{$t}_data' AND COLUMN_NAME='out_period_id'")->fetch_assoc();
+        $c=$catalog['columns'][$t.'_data']['out_period_id']??null;
         if(!$c)$steps[]='extend_'.$t;
         elseif($c['COLUMN_TYPE']!=='bigint'||$c['IS_NULLABLE']!=='YES')throw new RuntimeException('Konflik relasi OUT: '.$t);
-        if($c){$fk=$db->query("SELECT REFERENCED_TABLE_NAME,REFERENCED_COLUMN_NAME FROM information_schema.KEY_COLUMN_USAGE WHERE TABLE_SCHEMA=DATABASE() AND TABLE_NAME='{$t}_data' AND COLUMN_NAME='out_period_id' AND REFERENCED_TABLE_NAME IS NOT NULL")->fetch_assoc();if(!$fk||$fk['REFERENCED_TABLE_NAME']!=='student_out_periods_data'||$fk['REFERENCED_COLUMN_NAME']!=='id')throw new RuntimeException('Konflik FK tagihan OUT: '.$t);}
-        if(!$db->query("SELECT 1 FROM information_schema.COLUMNS WHERE TABLE_SCHEMA=DATABASE() AND TABLE_NAME='$t' AND COLUMN_NAME='out_period_id'")->num_rows)$steps[]='view_'.$t;
+        if($c){$fk=$catalog['foreign_keys'][$t.'_data']['out_period_id'][0]??null;if(!$fk||$fk['REFERENCED_TABLE_NAME']!=='student_out_periods_data'||$fk['REFERENCED_COLUMN_NAME']!=='id')throw new RuntimeException('Konflik FK tagihan OUT: '.$t);}
+        if(!isset($catalog['columns'][$t]['out_period_id']))$steps[]='view_'.$t;
     }
     $triggers=['out_periods_i','out_periods_u','out_periods_d'];
     foreach(sout_cash_sources() as $t=>$source)foreach(['i','u','d'] as $e)$triggers[]='out_cash_'.$t.'_'.$e;
     foreach(['tagihan_spp','tagihan_komite','tagihan_daftar_ulang'] as $t)foreach(['i','u'] as $e)$triggers[]='out_bill_'.$t.'_'.$e;
-    foreach($triggers as $name){$r=$db->query("SELECT ACTION_STATEMENT FROM information_schema.TRIGGERS WHERE TRIGGER_SCHEMA=DATABASE() AND TRIGGER_NAME='$name'")->fetch_row();$version=str_starts_with($name,'out_bill_tagihan_daftar_ulang_')?'out_v3':(str_starts_with($name,'out_cash_')||str_starts_with($name,'out_bill_')?'out_v2':'out_v1');if(!$r||!str_contains($r[0],$version))$steps[]=$name;}
+    foreach($triggers as $name){$body=$catalog['triggers'][$name]??'';$version=str_starts_with($name,'out_bill_tagihan_daftar_ulang_')?'out_v3':(str_starts_with($name,'out_cash_')||str_starts_with($name,'out_bill_')?'out_v2':'out_v1');if(!str_contains($body,$version))$steps[]=$name;}
     return $steps;
 }
 function sout_ready(mysqli $db): bool {return $GLOBALS['sout_ready'][$db->thread_id]??= !sout_schema_plan($db);}

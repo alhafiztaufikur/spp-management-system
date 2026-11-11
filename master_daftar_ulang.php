@@ -105,6 +105,7 @@ if ($_SERVER['REQUEST_METHOD'] === 'POST') {
 if(($_SERVER['REQUEST_METHOD']??'')==='GET'){
     $GLOBALS['lb_report_compact'][$koneksi->thread_id]=true;
     $GLOBALS['lb_read_projection'][$koneksi->thread_id]=true;
+    lb_master_read($koneksi,$selectedYear,'du');
 }
 $inputState=$_SESSION['du_rate_input']??null;unset($_SESSION['du_rate_input']);
 require_once __DIR__.'/includes/read_session.php';read_session_release();
