@@ -3,6 +3,7 @@
 // laporan/export_pdf.php - Server-rendered payment slips PDF
 // ============================================
 session_start();
+unset($_GET['undated'], $_GET['include_undated'], $_GET['all_periods']);
 require_once '../koneksi.php';
 require_once '../includes/auth.php';
 require_once '../includes/spp_billing.php';

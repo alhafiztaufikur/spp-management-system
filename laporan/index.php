@@ -104,10 +104,8 @@ $periodLabel = report_transaction_date_label($filter_tanggal_awal, $filter_tangg
 require_once '../includes/general_report_sections.php';
 $sectionPages=[];$requestedPages=is_array($_GET['section_page']??null)?$_GET['section_page']:[];
 foreach(['semua'] as $type)$sectionPages[$type]=is_scalar($requestedPages[$type]??null)?max(1,min(1000000,(int)$requestedPages[$type])):1;
-$sectionQuery=['unit'=>$reportUnitId===0?'all':'active','tanggal_awal'=>$filter_tanggal_awal,'tanggal_akhir'=>$filter_tanggal_akhir,'bulan'=>$filter_bulan,'tahun'=>$filter_tahun,'q'=>$filter_q,'urut'=>$sort,'per_page'=>$perPage,'student_id'=>max(0,(int)($_GET['student_id']??0)),'all_periods'=>($_GET['all_periods']??'')==='1'?'1':'0','include_undated'=>($_GET['include_undated']??'')==='1'?'1':'0','section_page'=>$sectionPages];
+$sectionQuery=['unit'=>$reportUnitId===0?'all':'active','tanggal_awal'=>$filter_tanggal_awal,'tanggal_akhir'=>$filter_tanggal_akhir,'bulan'=>$filter_bulan,'tahun'=>$filter_tahun,'q'=>$filter_q,'urut'=>$sort,'per_page'=>$perPage,'student_id'=>max(0,(int)($_GET['student_id']??0)),'section_page'=>$sectionPages];
 $sectionQuery['panel']=$financePanel;
-if($sectionQuery['all_periods']==='1')$periodLabel='Semua periode';
-if($sectionQuery['include_undated']==='1')$periodLabel.=' (termasuk tanpa tanggal sesuai periode kewajiban)';
 if(isset($_GET['fragment'])){
     header('Content-Type: application/json; charset=utf-8');header('Cache-Control: private, no-store');
     try{
@@ -164,7 +162,6 @@ $financeTrend = finance_payment_trend($koneksi, $filter_tanggal_akhir, $studentS
 $financeTrendMax = max(1, ...array_values($financeTrend));
 $exportQuery = filter_build_query([
     'panel'=>$financePanel,
-    'all_periods'=>$sectionQuery['all_periods'],'include_undated'=>$sectionQuery['include_undated'],
     'urut' => $sort,
     'unit' => $reportUnitId===0?'all':'active',
     'bulan' => $filter_bulan,
@@ -299,7 +296,6 @@ $exportQuery = filter_build_query([
               <?php endforeach; ?>
             </datalist>
           </div>
-          <div class="report-period-options"><label><input type="checkbox" name="all_periods" value="1" <?= $sectionQuery['all_periods']==='1'?'checked':'' ?>> Semua periode</label><label><input type="checkbox" name="include_undated" value="1" <?= $sectionQuery['include_undated']==='1'?'checked':'' ?>> Sertakan transaksi tanpa tanggal sesuai periode kewajiban</label></div>
           <div class="report-general-actions">
             <div class="report-filter-actions">
               <button type="submit" class="btn btn-primary"><?= finance_icon('search') ?>Tampilkan Rekap</button>
@@ -349,7 +345,7 @@ $exportQuery = filter_build_query([
         </div>
 
         <form method="GET" action="export_pdf.php" id="print-selected-form" target="_blank" rel="noopener"><input type="hidden" name="unit" value="<?= $reportUnitId===0?'all':'active' ?>">
-          <input type="hidden" name="all_periods" value="<?= $sectionQuery['all_periods'] ?>"><input type="hidden" name="include_undated" value="<?= $sectionQuery['include_undated'] ?>"><input type="hidden" name="output" value="preview">
+          <input type="hidden" name="output" value="preview">
           <input type="hidden" name="bulan" value="<?= general_page_e($filter_bulan) ?>">
           <input type="hidden" name="tahun" value="<?= general_page_e($filter_tahun) ?>">
           <input type="hidden" name="tanggal_awal" value="<?= general_page_e($filter_tanggal_awal) ?>">

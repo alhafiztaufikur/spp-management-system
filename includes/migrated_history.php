@@ -22,7 +22,7 @@ function mh_students_source(mysqli $db): string {
 /** Return destinations are server-owned; no caller-supplied redirect URL. */
 function mh_return_create(string $route,array $query,int $unit,string $kind,int $id): string {
     if(!in_array($route,['pembayaran/lihat.php','pembayaran/riwayat_daftar_ulang.php','tabungan/riwayat.php','legacy_accounts.php','siswa/daftar.php'],true))throw new InvalidArgumentException('Tujuan kembali tidak valid.');
-    $allowed=['owner','status','kelas','tingkat','back_context','special_members','special_member_page','saldo_q','saldo_status','saldo_class','saldo_page','page','per_page','selected','selected_unit','search','q','view','student_id','owner_id','nis','tanggal_awal','tanggal_akhir','all_periods','undated','source','owner_type','rombel','operator','batch','group','class_id','id','jenis','lg_open','lg_q','lg_kind','lg_page','special_q','special_kind','special_status','special_page'];
+    $allowed=['owner','status','kelas','tingkat','back_context','special_members','special_member_page','saldo_q','saldo_status','saldo_class','saldo_page','page','per_page','selected','selected_unit','search','q','view','student_id','owner_id','nis','tanggal_awal','tanggal_akhir','all_periods','source','owner_type','rombel','operator','batch','group','class_id','id','jenis','lg_open','lg_q','lg_kind','lg_page','special_q','special_kind','special_status','special_page'];
     $allowed[]='fee_master_id';$query=array_intersect_key($query,array_flip($allowed));
     foreach($_SESSION['history_returns']??[] as $key=>$r)if($r['expires']<time())unset($_SESSION['history_returns'][$key]);
     while(count($_SESSION['history_returns']??[])>=100)array_shift($_SESSION['history_returns']);
@@ -31,6 +31,7 @@ function mh_return_create(string $route,array $query,int $unit,string $kind,int 
 function mh_return_url(mixed $token,int $unit,string $kind,int $id): ?string {
     if(!is_string($token)||!preg_match('/^[a-f0-9]{48}$/D',$token))return null;$r=$_SESSION['history_returns'][$token]??null;
     if(!$r||$r['expires']<time()||$r['unit']!==$unit||$r['kind']!==$kind||$r['id']!==$id||$r['actor']!==(int)($_SESSION['admin_id']??0))return null;
+    unset($r['query']['undated'], $r['query']['include_undated']);
     return $r['route'].'?'.http_build_query($r['query']);
 }
 

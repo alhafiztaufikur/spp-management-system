@@ -9,7 +9,7 @@ function transaction_report_sort_options(): array {
 
 function transaction_report_normalize_request(): string {
     // Obsolete report selectors must never expand this route into other reports.
-    unset($_GET['jenis_laporan']);
+    unset($_GET['jenis_laporan'], $_GET['undated'], $_GET['include_undated'], $_GET['all_periods']);
     $_GET['panel']=transaction_report_panel($_GET['panel']??null);
     $sort=$_GET['urut']??'terbaru';
     return $_GET['urut']=is_string($sort)&&isset(transaction_report_sort_options()[$sort])?$sort:'terbaru';

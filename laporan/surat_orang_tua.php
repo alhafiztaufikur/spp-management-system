@@ -1,5 +1,6 @@
 <?php
 session_start();
+unset($_GET['undated'], $_GET['include_undated']);
 require_once __DIR__.'/../koneksi.php';
 require_once __DIR__.'/../includes/auth.php';
 require_once __DIR__.'/../includes/reports.php';

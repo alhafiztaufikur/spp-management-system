@@ -1,0 +1,31 @@
+<?php
+if(PHP_SAPI!=='cli')exit(1);
+require_once __DIR__.'/../includes/units.php';
+require_once __DIR__.'/../includes/transaction_report.php';
+require_once __DIR__.'/../includes/reports.php';
+require_once __DIR__.'/../includes/payment_return.php';
+$checks=0;
+function undated_check(bool $ok,string $label):void{global $checks;if(!$ok)throw new RuntimeException($label);$checks++;}
+$_GET=['undated'=>['1'],'include_undated'=>'1','all_periods'=>'1','jenis_laporan'=>'belum_spp','panel'=>'komponen','urut'=>'nama','tanggal_awal'=>'2026-10-01'];
+undated_check(transaction_report_normalize_request()==='nama','Keep valid sort');
+undated_check($_GET===['panel'=>'komponen','urut'=>'nama','tanggal_awal'=>'2026-10-01'],'Obsolete selectors cannot widen transaction requests');
+$evidence=['include_undated'=>true,'tanggal_awal'=>'2026-07-01','tanggal_akhir'=>'2027-06-30','_multi'=>['kelas'=>['4A']],'_template'=>'status'];
+$query=report_multiple_query($evidence);
+undated_check(!isset($query['include_undated'])&&$query['kelas']===['4A'],'Public report links omit undated toggle');
+undated_check($evidence['include_undated']&&report_undated_matches($evidence,'2026/2027'),'Internal obligation-period evidence remains readable');
+undated_check(!report_undated_matches($evidence,'2019/2020'),'Unrelated obligations do not match the requested period');
+$_SESSION=['admin_id'=>1,'active_unit_id'=>1];
+$old=['all_periods'=>'1','selected'=>-123,'undated'=>'1','include_undated'=>'1'];
+$token=payment_return_create(-123,1,$old,'lihat.php');
+undated_check(!isset($_SESSION['payment_returns'][$token]['query']['undated']),'New edit returns omit obsolete option');
+$_SESSION['payment_returns'][$token]['query']=$old;
+$url=payment_return_url($token,-123);
+undated_check(!str_contains($url,'undated')&&str_contains($url,'all_periods=1'),'Existing edit return tokens are cleaned without removing all periods');
+$token=mh_return_create('pembayaran/lihat.php',$old,1,'receipt',-123);
+undated_check(!isset($_SESSION['history_returns'][$token]['query']['undated']),'New history returns omit obsolete option');
+$_SESSION['history_returns'][$token]['query']=$old;
+$url=mh_return_url($token,1,'receipt',-123);
+undated_check($url!==null&&!str_contains($url,'undated')&&str_contains($url,'all_periods=1'),'Existing history tokens are cleaned');
+undated_check(mh_return_url($token,2,'receipt',-123)===null,'Return tokens remain bound to the original unit');
+undated_check(payment_return_url('expired',-123)==='riwayat_daftar_ulang.php','Expired return remains safe');
+echo "PASS $checks request, serialization, Legacy evidence and return-context checks\n";

@@ -78,8 +78,6 @@
 .report-general-page .report-section-page .du-pagination{justify-content:flex-end;margin-left:auto;flex-wrap:wrap}
 .report-general-page .report-evidence-note,.report-general-page .report-section-status{font-size:12px;line-height:1.8;color:var(--text-muted);margin:12px 0}
 .report-general-page .report-section-page[aria-busy="true"] .du-pagination{opacity:.65}
-.report-period-options{grid-column:1/-1;display:flex;align-items:center;gap:12px 24px;flex-wrap:wrap;padding:12px;border:1px solid var(--border);border-radius:10px;background:var(--bg-surface);font-size:12px;color:var(--text-secondary)}
-.report-period-options label{display:flex;align-items:center;gap:9px;line-height:1.6;cursor:pointer}.report-period-options input{width:16px;height:16px;accent-color:var(--accent)}
 .correction-refined{max-width:1280px;margin:0 auto}
 .correction-header{display:flex;justify-content:space-between;align-items:flex-start;gap:20px;margin-bottom:24px}
 .correction-header small{font-size:11px;font-weight:700;letter-spacing:.08em;color:var(--accent)}
@@ -128,7 +126,7 @@ body#global-report-workspace.recap-filter-refined .report-template-shell .report
 body#global-report-workspace.recap-filter-refined .report-template-shell .report-template-filters>.field-row,body#global-report-workspace.recap-filter-refined .report-template-shell .report-template-filters>.field-row:has(select),body#global-report-workspace.recap-filter-refined .report-template-shell .report-template-filters>.report-date-range-field{grid-column:auto!important;grid-row:auto!important;order:0!important;min-width:0}
 body#global-report-workspace.recap-filter-refined .report-template-shell .report-template-filters>.report-student-search-row{display:contents!important}
 body#global-report-workspace.recap-filter-refined .report-template-shell .report-template-filters .field-input,body#global-report-workspace.recap-filter-refined .report-template-shell .report-template-filters .spp-select-trigger{min-height:48px;width:100%;box-sizing:border-box}
-body#global-report-workspace.recap-filter-refined .report-template-shell .report-template-filters>.report-undated-field,body#global-report-workspace.recap-filter-refined .report-template-shell .report-template-filters>.field-row:has(input[name="include_undated"]),body#global-report-workspace.recap-filter-refined .report-template-shell .report-template-filters>.report-filter-actions{grid-column:1/-1!important;order:1!important}
+body#global-report-workspace.recap-filter-refined .report-template-shell .report-template-filters>.report-filter-actions{grid-column:1/-1!important;order:1!important}
 body#global-report-workspace.recap-filter-refined .report-template-shell .report-template-filters>.report-filter-actions{order:2!important;display:flex!important;flex-wrap:wrap;justify-content:flex-end;gap:10px;border-top:1px solid var(--border);padding-top:16px}
 body#global-report-workspace.recap-filter-refined .report-template-shell .report-filter-actions>.btn{flex:0 1 auto;min-width:150px;min-height:44px}
 @media(max-width:1099px){body#global-report-workspace.recap-filter-refined .report-template-shell .report-template-filters{grid-template-columns:repeat(2,minmax(0,1fr))!important}}

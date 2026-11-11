@@ -62,7 +62,7 @@ function report_multiple_sections(mysqli $db,string $template,array $filters):?a
     return report_evidence_notes($report,$template,$filters);
 }
 function report_multiple_query(array $filters):array{
-    $query=$filters;unset($query['_multi'],$query['_multiple_leaf'],$query['_template']);foreach($filters['_multi']??[] as $key=>$values)$query[$key]=$values;return $query;
+    $query=$filters;unset($query['_multi'],$query['_multiple_leaf'],$query['_template'],$query['include_undated']);foreach($filters['_multi']??[] as $key=>$values)$query[$key]=$values;return $query;
 }
 function report_section_html(array $section,int $start=0):string{
     require_once __DIR__.'/global_report_ui.php';

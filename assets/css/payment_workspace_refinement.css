@@ -41,22 +41,12 @@
 .ui-time-polish .student-history .sh-filter label{font-size:13px;font-weight:600}
 .ui-time-polish .student-history .sh-filter :is(select,.spp-select-trigger,.btn){min-height:48px}
 .ui-time-polish .ph-time-note{display:block;font-size:12px;color:var(--text-muted);line-height:1.6;margin-top:5px}
-.ui-time-polish .ph-legacy-filter{display:flex;align-items:center;gap:12px;padding:13px 16px;border:1px solid var(--border);border-radius:12px;background:var(--accent-glow);color:var(--text-primary);text-align:left;cursor:pointer;min-width:0;margin-right:auto}
-.ui-time-polish .ph-legacy-filter>input{width:18px;height:18px;accent-color:var(--accent);flex:none}
-.ui-time-polish .ph-legacy-filter>span{display:grid;gap:3px}
-.ui-time-polish .ph-legacy-filter strong{font-size:13px;line-height:1.5}
-.ui-time-polish .ph-legacy-filter small{font-size:12px;line-height:1.5;font-weight:400;color:var(--text-secondary)}
-.ui-time-polish .ph-legacy-filter .ph-legacy-count{display:inline-block;padding:1px 7px;border-radius:6px;background:var(--bg-card);font-size:12px;margin-left:5px;font-variant-numeric:tabular-nums}
 .ui-time-polish .ph-filter-actions{flex-wrap:wrap;gap:10px}
+@media(min-width:1101px){html body[data-readable-workspace="payment-history"].ui-time-polish .layout .ph-filter-form .ph-filter-actions{grid-column:2/-1!important;align-self:end}}
 body.ui-time-polish.unified-registration .layout .ph-filter-form{grid-template-columns:repeat(4,minmax(0,1fr));gap:18px;align-items:end}
 body.ui-time-polish.unified-registration .ph-filter-form .field-row{margin:0;min-width:0;font-size:13px;line-height:1.5;gap:8px}
 body.ui-time-polish.unified-registration .ph-filter-form :is(.field-input,.spp-select-trigger){box-sizing:border-box;width:100%;height:48px;min-height:48px;font-size:14px;margin:0;border-radius:10px}
 body.ui-time-polish.unified-registration .ph-filter-actions{grid-column:1/-1;border-top:1px solid var(--border);padding-top:16px;margin-top:2px;justify-content:flex-end}
-.ui-time-polish .du-history-notice{display:flex;align-items:flex-start;gap:13px;margin:16px 0 22px;padding:16px 18px;border-radius:13px;border:1px solid var(--border);background:var(--accent-glow)}
-.ui-time-polish .du-history-notice>svg{width:21px;height:21px;flex:none;color:var(--accent);margin-top:2px}
-.ui-time-polish .du-history-notice strong{display:block;font-size:14px;line-height:1.6;color:var(--text-primary)}
-.ui-time-polish .du-history-notice p{margin:4px 0 0;font-size:13px;line-height:1.6;color:var(--text-secondary)}
-.ui-time-polish .du-history-notice .du-history-count{font-variant-numeric:tabular-nums;color:var(--accent)}
 .ui-time-polish.unified-registration .ph-detail-panel{border-radius:18px}
 .ui-time-polish.unified-registration .ph-detail-body{padding:22px}
 .ui-time-polish.unified-registration .ph-detail-body>h3{font-size:20px;line-height:1.5}
@@ -112,4 +102,4 @@ body.ui-time-polish.unified-registration .ph-filter-actions{grid-column:1/-1;bor
 @media(min-width:769px) and (max-width:1199px){.ui-time-polish .form-payment-table :is(td,th){padding-left:8px;padding-right:8px}}
 @media(max-width:1279px){body.ui-time-polish.unified-registration .layout .ph-filter-form{grid-template-columns:repeat(2,minmax(0,1fr))}.ui-time-polish #account-recap .mh-recap-filter{grid-template-columns:repeat(3,minmax(0,1fr))}.ui-time-polish #account-recap .mh-recap-filter>.btn{grid-column:1/-1;width:auto;justify-self:end}}
 @media(max-width:1023px){.legacy-edit-layout{grid-template-columns:minmax(0,1fr)}.legacy-edit-aside{position:static}.ui-time-polish .du-selector-menu{max-height:300px}}
-@media(max-width:767px){body.ui-time-polish.unified-registration .layout .ph-filter-form{grid-template-columns:minmax(0,1fr)}.ui-time-polish #account-recap{padding:18px}.ui-time-polish #account-recap .mh-recap-filter{grid-template-columns:minmax(0,1fr);padding:15px}.ui-time-polish #account-recap .mh-recap-filter>.btn{width:100%}.ui-time-polish #account-recap .savings-recap-total{width:100%;min-width:0}.ui-time-polish .ph-legacy-filter{width:100%;box-sizing:border-box}.ui-time-polish.unified-registration .ph-detail-body{padding:16px}.ui-time-polish.unified-payment-edit .main-card{padding:20px}.legacy-edit-date{grid-template-columns:minmax(0,1fr)}.legacy-edit-heading h1{font-size:23px}.ui-time-polish .student-history .sh-toolbar{align-items:stretch;flex-wrap:wrap}}
+@media(max-width:767px){body.ui-time-polish.unified-registration .layout .ph-filter-form{grid-template-columns:minmax(0,1fr)}.ui-time-polish #account-recap{padding:18px}.ui-time-polish #account-recap .mh-recap-filter{grid-template-columns:minmax(0,1fr);padding:15px}.ui-time-polish #account-recap .mh-recap-filter>.btn{width:100%}.ui-time-polish #account-recap .savings-recap-total{width:100%;min-width:0}.ui-time-polish.unified-registration .ph-detail-body{padding:16px}.ui-time-polish.unified-payment-edit .main-card{padding:20px}.legacy-edit-date{grid-template-columns:minmax(0,1fr)}.legacy-edit-heading h1{font-size:23px}.ui-time-polish .student-history .sh-toolbar{align-items:stretch;flex-wrap:wrap}}

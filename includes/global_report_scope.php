@@ -36,7 +36,7 @@ function global_report_scope(mysqli $db, array &$query): int {
 
 /** Unit-dependent identities/categories are omitted intentionally on scope navigation. */
 function global_report_preserved_query(mysqli $db, array $query): array {
-    $allowed=['template','tanggal_awal','tanggal_akhir','tahun_ajaran','bulan_awal','bulan_akhir','tahun','tahun_awal','tahun_akhir','mode','per_page','include_undated','all_periods'];
+    $allowed=['template','tanggal_awal','tanggal_akhir','tahun_ajaran','bulan_awal','bulan_akhir','tahun','tahun_awal','tahun_akhir','mode','per_page','all_periods'];
     $keep=array_intersect_key($query,array_flip($allowed));
     if (isset($keep['tahun_ajaran'])) {
         // A unit-navigation link needs membership for the requested years, not

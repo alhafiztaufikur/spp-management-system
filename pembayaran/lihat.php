@@ -3,6 +3,7 @@
 // pembayaran/lihat.php - View All Payments
 // ============================================
 session_start();
+unset($_GET['undated'], $_GET['include_undated']);
 if (!isset($_SESSION['admin_id'])) { header('Location: ../login.php'); exit; }
 require_once '../koneksi.php';
 require_once '../includes/auth.php';
@@ -123,8 +124,7 @@ $lastShown = $totalPayments > 0 ? min($offset + count($paymentRows), $totalPayme
 $periodLabel = $filter_tanggal_awal === $filter_tanggal_akhir
     ? spp_date_label($filter_tanggal_awal)
     : spp_date_label($filter_tanggal_awal) . ' - ' . spp_date_label($filter_tanggal_akhir);
-if(($_GET['undated']??'')==='1')$periodLabel='Histori tanpa tanggal';
-elseif(($_GET['all_periods']??'')==='1')$periodLabel='Semua periode';
+if(($_GET['all_periods']??'')==='1')$periodLabel='Semua periode';
 $originBack=null;
 if($selectedRow){$originBack=mh_return_url($_GET['back_context']??null,(int)$selectedRow['unit_id'],'receipt',(int)$selectedRow['id']);if(!$originBack&&!empty($selectedRow['student_id']))$originBack=mh_return_url($_GET['back_context']??null,(int)$selectedRow['unit_id'],'student',(int)$selectedRow['student_id']);}
 $studentSearchDisplay = $search;
@@ -238,14 +238,14 @@ filter_output_start();
           <?php if($feeMaster): ?><input type="hidden" name="fee_master_id" value="<?= (int)$feeMaster['id'] ?>"><?php endif; ?>
           <?php if(($_GET['all_periods']??'')==='1'): ?><input type="hidden" name="all_periods" value="1"><?php endif; ?>
           <?php endif; ?>
-          <div class="ph-filter-actions"><label class="ph-legacy-filter"><input type="checkbox" name="undated" value="1" <?= ($_GET['undated']??'')==='1'?'checked':'' ?>><span><strong>Histori Legacy tanpa tanggal <span class="ph-legacy-count"><?= number_format($history['undated']??0,0,',','.') ?></span></strong><small>Tanggal tidak tersedia pada sumber lama.</small></span></label>
-            <?php if(!$isArchive): ?><a class="btn btn-ghost" href="lihat.php?<?= authorization_escape(http_build_query(array_replace($_GET,['all_periods'=>'1','undated'=>null,'page'=>1,'selected'=>null]))) ?>">Semua Periode</a><?php endif; ?>
+          <div class="ph-filter-actions">
+            <?php if(!$isArchive): ?><a class="btn btn-ghost" href="lihat.php?<?= authorization_escape(http_build_query(array_replace($_GET,['all_periods'=>'1','page'=>1,'selected'=>null]))) ?>">Semua Periode</a><?php endif; ?>
             <button type="submit" name="all_periods" value="0" class="btn btn-primary" id="btn-filter">Tampilkan Rekap</button>
             <a href="lihat.php?view=<?= $isArchive ? "deleted" : "active" ?>" class="btn btn-ghost" id="btn-reset-filter">Reset</a>
             <?php if(hasRole(['admin','kasir']) && !unit_all_readonly()): ?><a href="form.php" class="btn btn-primary" id="btn-tambah">Tambah Baru</a><?php endif; ?>
           </div>
           <noscript><label>Tanggal mulai<input class="field-input" type="date" name="tanggal_awal" value="<?= authorization_escape($filter_tanggal_awal) ?>"></label><label>Tanggal akhir<input class="field-input" type="date" name="tanggal_akhir" value="<?= authorization_escape($filter_tanggal_akhir) ?>"></label></noscript>
-        </form><?php if(!$isArchive&&$history['outside']>0): ?><p class="ph-period-summary"><?= number_format($history['outside'],0,',','.') ?> transaksi lain berada di luar periode ini. Pilih <strong>Semua Periode</strong> untuk menelusurinya, termasuk histori tanpa tanggal.</p><?php endif; ?></section>
+        </form><?php if(!$isArchive&&$history['outside']>0): ?><p class="ph-period-summary"><?= number_format($history['outside'],0,',','.') ?> transaksi lain berada di luar periode ini. Pilih <strong>Semua Periode</strong> untuk menelusurinya.</p><?php endif; ?></section>
       <?php if(!$isArchive): ?><div class="ph-export-actions"><a class="btn btn-ghost" href="export_history.php?<?= authorization_escape(http_build_query(array_replace($_GET,['format'=>'xlsx']))) ?>">Excel - Semua Hasil Filter</a><a class="btn btn-ghost" href="export_history.php?<?= authorization_escape(http_build_query(array_replace($_GET,['format'=>'pdf']))) ?>" target="_blank" rel="noopener">Cetak Halaman Ini</a></div><?php endif; ?>
       <div class="ph-workspace" data-payment-workspace data-view="<?= $isArchive?'deleted':'active' ?>">
       <section class="ph-list-panel"><?php if($feeMaster): ?><p class="ph-period-summary">Transaksi biaya: <strong><?= authorization_escape($feeMaster['nama']) ?></strong>. Total Bayar tetap menunjukkan seluruh isi struk.</p><?php endif; ?><header class="ph-panel-heading"><div><h3> Daftar Transaksi</h3></div></header>

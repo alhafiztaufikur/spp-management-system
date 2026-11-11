@@ -1,5 +1,6 @@
 <?php
 session_start();
+unset($_GET['undated'], $_GET['include_undated']);
 require_once '../koneksi.php'; require_once '../includes/auth.php'; require_once '../includes/reports.php';
 requireRole(['admin','bendahara','kasir']);
 require_once __DIR__.'/../includes/global_report_ui.php';

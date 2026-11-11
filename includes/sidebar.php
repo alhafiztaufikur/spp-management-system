@@ -11,6 +11,12 @@ if (in_array($dir, ['pembayaran', 'siswa', 'tabungan', 'laporan'])) {
 }
 
 $role = $_SESSION['admin_role'] ?? '';
+$unitSwitchUri = $_SERVER['REQUEST_URI'] ?? '/dashboard.php';
+$unitSwitchNext = (string)(parse_url($unitSwitchUri, PHP_URL_PATH) ?: '/dashboard.php');
+parse_str((string)(parse_url($unitSwitchUri, PHP_URL_QUERY) ?? ''), $unitSwitchQuery);
+unset($unitSwitchQuery['undated'], $unitSwitchQuery['include_undated']);
+if ($dir === 'laporan' && $current === 'index.php') unset($unitSwitchQuery['all_periods']);
+if ($unitSwitchQuery) $unitSwitchNext .= '?' . http_build_query($unitSwitchQuery);
 
 // Definisi semua nav item: [href, label, svg-path, roles yang boleh akses, kategori]
 $allNavItems = [
@@ -193,7 +199,7 @@ document.addEventListener('DOMContentLoaded', function () {
   <div class="sidebar-unit-panel">
     <form action="<?= $root ?>unit_switch.php" method="post" class="sidebar-unit-form" data-operational-unit="<?= $activeUnit ?>">
       <input type="hidden" name="csrf_token" value="<?= htmlspecialchars($_SESSION['csrf_unit_switch'],ENT_QUOTES,'UTF-8') ?>">
-      <input type="hidden" name="next" value="<?= htmlspecialchars($_SERVER['REQUEST_URI'] ?? '/dashboard.php',ENT_QUOTES,'UTF-8') ?>">
+      <input type="hidden" name="next" value="<?= htmlspecialchars($unitSwitchNext,ENT_QUOTES,'UTF-8') ?>">
       <span class="sidebar-unit-kicker"><span aria-hidden="true"></span> <?= htmlspecialchars(strtoupper($roleLabel),ENT_QUOTES,'UTF-8') ?></span>
       <label for="sidebar-unit-select" class="sidebar-unit-heading">Unit operasional</label>
       <span class="sidebar-unit-select-wrap">

@@ -51,8 +51,6 @@ if ($filter_tanggal_awal !== '' && $filter_tanggal_akhir !== '') {
     $period_label = $bulan_label . ' ' . $filter_tahun;
 }
 
-if(($_GET['all_periods']??'')==='1')$period_label='Semua periode';
-if(($_GET['include_undated']??'')==='1')$period_label.=' (termasuk transaksi tanpa tanggal sesuai periode kewajiban)';
 
 // The PDF shell needs only filter labels; the PDF request builds the fresh report once.
 if(!empty($sppGeneralPdf)&&!in_array($_GET['output']??'preview',['pdf','inline','html'],true)){
