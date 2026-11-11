@@ -12,10 +12,10 @@ function lt_schema_ready(mysqli $db): bool {return transaction_authorization_col
 function lt_snapshot(array $v,array $identity,array $time=[]): array {
     return ['payment'=>array_replace($v,$identity,['TGL_BYR'=>$time['payment_datetime']??$v['source_date']??null,'time_precision'=>$time['time_precision']??$v['_time_precision']??(empty($v['source_date'])?'none':'datetime'),'total_jumlah'=>$v['total']??0,'BULAN'=>$v['source_period']??'','KETERANGAN'=>$v['note']??'','sistem_pembayaran'=>$v['method']??'']),'details'=>['legacy_items'=>$v['items']??[]]];
 }
-function lt_events(mysqli $db,int $id): array {
-    $p=lop_payment_model($db,$id)['legacy'];$rows=[];
+function lt_events(mysqli $db,int $id,?array $payment=null): array {
+    $p=$payment??lop_payment_model($db,$id)['legacy'];$rows=[];
     $identity=['id'=>-1000000000-$id,'NAMA'=>$p['NAMA'],'NO_INDUK'=>$p['NO_INDUK'],'unit_id'=>$p['unit_id']];
-    $audits=lf_rows($db,"SELECT a.*,u.nama actor_name,u.username actor_username,u.role actor_role FROM legacy_op_audit a LEFT JOIN admin u ON u.id=a.actor_id WHERE a.entity_type IN ('payment','payment_request') AND a.entity_id=? ORDER BY a.created_at,a.id",[$id]);
+    $audits=hp_rows($db,"SELECT a.*,u.nama actor_name,u.username actor_username,u.role actor_role FROM legacy_op_audit a LEFT JOIN admin u ON u.id=a.actor_id WHERE a.entity_type IN ('payment','payment_request') AND a.entity_id=? ORDER BY a.created_at,a.id",[$id]);
     $evidence=payment_time_index($db)[$p['unit_id'].'|'.$p['source_id'].'|'.$p['row_key']]??[];
     unset($evidence['override_precision']);$initial=$p['source_date'];
     foreach($audits as $a)if($a['entity_type']==='payment'){$initial=json_decode($a['before_data'],true)['source_date'];break;}
@@ -33,14 +33,17 @@ function lt_events(mysqli $db,int $id): array {
     }
     return $rows;
 }
+function lt_capabilities(mysqli $db,array $r,?array $request,bool $deleted=false,?bool $isOut=null): array {
+    $writable=!$deleted&&!unit_all_readonly()&&hasRole(['admin','kasir'])&&(!$request||$request['status']!=='pending');
+    require_once __DIR__.'/student_out.php';if($isOut??!empty(sout_student($db,(string)$r['NO_INDUK'],false,(int)$r['unit_id'])['is_out']))$writable=false;
+    return ['can_edit'=>$writable,'can_delete'=>$writable,'can_print'=>!$deleted,'locked'=>false,'reason'=>($request&&$request['status']==='pending')?'Menunggu keputusan Super Admin.':''];
+}
 function lt_model(mysqli $db,int $id,bool $deleted=false): array {
     $r=lop_payment_model($db,$id)['legacy'];if((bool)$r['cancelled']!==$deleted)throw new OutOfBoundsException('Transaksi tidak tersedia pada daftar ini.');
-    $events=lt_events($db,$id);$request=lt_schema_ready($db)?lf_one($db,'SELECT *,request_reason reason FROM transaksi_otorisasi WHERE legacy_payment_id=? ORDER BY id DESC LIMIT 1',[$id]):null;
-    $writable=!$deleted&&!unit_all_readonly()&&hasRole(['admin','kasir'])&&(!$request||$request['status']!=='pending');
-    require_once __DIR__.'/student_out.php';if(!empty(sout_student($db,(string)$r['NO_INDUK'],false,(int)$r['unit_id'])['is_out']))$writable=false;
+    $events=lt_events($db,$id,$r);$request=lt_schema_ready($db)?hp_one($db,'SELECT *,request_reason reason FROM transaksi_otorisasi WHERE legacy_payment_id=? ORDER BY id DESC LIMIT 1',[$id]):null;
     $p=$r+['TGL_BYR'=>$r['payment_datetime'],'total_jumlah'=>$r['total'],'kelas_transaksi'=>$r['class_snapshot'],'KELAS'=>$r['class_snapshot'],'KETERANGAN'=>$r['note'],'sistem_pembayaran'=>$r['method']?:'Tidak tercatat','created_at'=>null,'updated_at'=>null];$p['id']=-1000000000-$id;$p['BULAN']='';$p['TAHUN']='';
     if($deleted)$p['_deleted_event']=end($events);
-    return ['payment'=>$p,'legacy_record'=>$r,'deleted'=>$deleted,'events'=>$events,'summary'=>['creator'=>$events[0],'last'=>end($events)],'request'=>$request,'components'=>array_map(fn($i)=>[lcs_component_view($i)['display_label'],$i['amount']],$r['items']),'batch_print'=>false,'capabilities'=>['can_edit'=>$writable,'can_delete'=>$writable,'can_print'=>!$deleted,'locked'=>false,'reason'=>($request&&$request['status']==='pending')?'Menunggu keputusan Super Admin.':'']];
+    return ['payment'=>$p,'legacy_record'=>$r,'deleted'=>$deleted,'events'=>$events,'summary'=>['creator'=>$events[0],'last'=>end($events)],'request'=>$request,'components'=>array_map(fn($i)=>[lcs_component_view($i)['display_label'],$i['amount']],$r['items']),'batch_print'=>false,'capabilities'=>lt_capabilities($db,$r,$request,$deleted)];
 }
 function lt_request_event(mysqli $db,array $r,int $actor,string $action,string $note): void {
     lf_query($db,"INSERT INTO legacy_op_audit(unit_id,actor_id,entity_type,entity_id,request_key,reason,before_data,after_data) VALUES(?,?,'payment_request',?,?,?,?,?)",[$r['unit_id'],$actor,$r['legacy_payment_id'],hash('sha256','lt:'.$r['id'].':'.$action),$note?:'Keputusan pengajuan', $r['before_snapshot'],lf_json(['_action'=>$action,'_request_id'=>$r['id']])]);

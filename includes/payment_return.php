@@ -6,7 +6,7 @@ function payment_return_create(int $paymentId, int $unitId, array $query, string
     foreach ($_SESSION['payment_returns'] ?? [] as $key => $entry) {
         if (($entry['expires'] ?? 0) < time()) unset($_SESSION['payment_returns'][$key]);
     }
-    $query = array_intersect_key($query, array_flip(['q','student_id','kelas','tahun_ajaran','status','operator','rombel','per_page','page','selected','selected_unit','view','search','tanggal','tanggal_awal','tanggal_akhir','all_periods','source','owner_type','year','class_id','status_filter','fee_master_id']));
+    $query = array_intersect_key($query, array_flip(['q','student_id','kelas','tahun_ajaran','status','operator','rombel','per_page','page','selected','selected_unit','selected_year','view','search','tanggal','tanggal_awal','tanggal_akhir','all_periods','source','owner_type','year','class_id','status_filter','fee_master_id']));
     if(isset($query['fee_master_id'])&&!is_scalar($query['fee_master_id']))unset($query['fee_master_id']);
     while (count($_SESSION['payment_returns'] ?? []) >= 512) array_shift($_SESSION['payment_returns']);
     $token = bin2hex(random_bytes(24));

@@ -33,19 +33,18 @@ function ldu_admin_proof(array $source,array $student,array $live,array $master,
 }
 
 /** One row per receipt and DU year; mixed-year slots never inherit MIN(year). */
-function ldu_receipt_lines_sql(bool $compactRead=false): string {
+function ldu_receipt_lines_sql(bool $compactRead=false,?string $paymentSource=null,bool $withHeader=false,?mysqli $db=null): string {
     $fallback=lma_legacy_du_year_sql('p');
     $year="CASE WHEN j.version IN (1,2,3,4,5) AND j.period REGEXP '^20[0-9]{2}/20[0-9]{2}$' AND CAST(RIGHT(j.period,4) AS UNSIGNED)=CAST(LEFT(j.period,4) AS UNSIGNED)+1 THEN j.period ELSE $fallback END";
-    $from='legacy_op_payments';
-    if($compactRead){
-        require_once __DIR__.'/menu_performance.php';
-        $candidate=menu_performance_metadata_expression('c');
-        // Disjoint branches: retain every old-format receipt, and only skip
-        // modern receipts that cannot contain a DU line. The full/default
-        // transaction reader remains available to the reconciliation engine.
-        $from="(SELECT * FROM legacy_op_payments c WHERE ($candidate)=1 UNION ALL SELECT * FROM legacy_op_payments WHERE JSON_CONTAINS_PATH(items,'one','$[0].migration')=0)";
+    $from=$paymentSource??'legacy_op_payments';
+    if($compactRead&&$paymentSource===null){
+        require_once __DIR__.'/history_performance.php';
+        $candidate=hp_json_category_candidate('c.items','daftar_ulang');
+        if($db){require_once __DIR__.'/menu_performance.php';if(history_performance_du_ready($db))$candidate=history_performance_du_expression('c').'>0';}
+        $from="(SELECT id,unit_id,items,source_period".($withHeader?',owner_id,batch_id,class_snapshot,cancelled':'')." FROM legacy_op_payments c WHERE $candidate)";
     }
-    return "SELECT p.id payment_id,p.unit_id,$year year,SUM(j.amount) amount FROM $from p JOIN JSON_TABLE(CAST(p.items AS JSON),'$[*]' COLUMNS(category VARCHAR(100) PATH '$.category',period VARCHAR(20) PATH '$.migration.period' NULL ON EMPTY,version INT PATH '$.migration.version' NULL ON EMPTY,amount DECIMAL(20,2) PATH '$.amount')) j WHERE j.category='daftar_ulang' GROUP BY p.unit_id,p.id,$year";
+    $header=$withHeader?',p.owner_id,p.batch_id,p.class_snapshot,p.cancelled':'';
+    return "SELECT p.id payment_id,p.unit_id$header,$year year,SUM(j.amount) amount FROM $from p JOIN JSON_TABLE(CAST(p.items AS JSON),'$[*]' COLUMNS(category VARCHAR(100) PATH '$.category',period VARCHAR(20) PATH '$.migration.period' NULL ON EMPTY,version INT PATH '$.migration.version' NULL ON EMPTY,amount DECIMAL(20,2) PATH '$.amount')) j WHERE j.category='daftar_ulang' GROUP BY p.unit_id,p.id$header,$year";
 }
 
 /** Per-slot read model for both old/new metadata. Recaps remain archive evidence. */

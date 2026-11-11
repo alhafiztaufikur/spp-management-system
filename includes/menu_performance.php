@@ -1,6 +1,13 @@
 <?php
 /** Additive read indexes shared by the CLI installer and verified restore runner. */
-function menu_performance_indexes(): array {
+function menu_performance_indexes(string $profile='menu'): array {
+    if($profile==='history')return [
+        ['legacy_op_journals_data','idx_history_journal_operator','unit_id,batch_id,source_operator,origin'],
+        ['legacy_op_payments_data','idx_history_payment_operator','unit_id,batch_id,source_operator,cancelled'],
+        ['legacy_op_audit_data','idx_history_audit_entity','unit_id,entity_type,entity_id,id'],
+        ['legacy_op_payments_data','idx_history_du_candidate','unit_id,(('.history_performance_du_expression().')),id'],
+    ];
+    if($profile!=='menu')throw new InvalidArgumentException('Profil indeks tidak valid.');
     return [
         ['legacy_op_journals_data','idx_menu_journal_date','unit_id,source_date,owner_id'],
         ['legacy_op_journals_data','idx_menu_journal_operator','unit_id,batch_id,source_operator,origin'],
@@ -8,20 +15,20 @@ function menu_performance_indexes(): array {
         ['legacy_op_payments_data','idx_menu_payment_period','unit_id,cancelled,source_period,batch_id'],
     ];
 }
-function menu_performance_plan(mysqli $db): array {
+function menu_performance_plan(mysqli $db,string $profile='menu'): array {
     $indexes=[];
-    $result=$db->query("SELECT TABLE_NAME,INDEX_NAME,IS_VISIBLE,GROUP_CONCAT(COLUMN_NAME ORDER BY SEQ_IN_INDEX) cols,
+    $result=$db->query("SELECT TABLE_NAME,INDEX_NAME,IS_VISIBLE,GROUP_CONCAT(COALESCE(COLUMN_NAME,CONCAT('(',EXPRESSION,')')) ORDER BY SEQ_IN_INDEX) cols,
         SUM(SUB_PART IS NOT NULL) prefixes FROM information_schema.STATISTICS
-        WHERE TABLE_SCHEMA=DATABASE() AND TABLE_NAME IN ('legacy_op_journals_data','legacy_op_payments_data')
+        WHERE TABLE_SCHEMA=DATABASE() AND TABLE_NAME IN ('legacy_op_journals_data','legacy_op_payments_data','legacy_op_audit_data')
         GROUP BY TABLE_NAME,INDEX_NAME,IS_VISIBLE");
     foreach($result as $index)$indexes[$index['TABLE_NAME']][]=$index;
     $plan=[];
-    foreach(menu_performance_indexes() as [$table,$name,$columns]){
+    foreach(menu_performance_indexes($profile) as [$table,$name,$columns]){
         if(!isset($indexes[$table])){$plan[]=['table'=>$table,'index'=>$name,'state'=>'unavailable','columns'=>$columns];continue;}
         $match=null;
         foreach($indexes[$table] as $index){
             if($index['IS_VISIBLE']==='YES' && !(int)$index['prefixes']
-                && ($index['cols']===$columns||str_starts_with($index['cols'],$columns.','))){$match=$index['INDEX_NAME'];break;}
+                && ($index['cols']===$columns||str_starts_with($index['cols'],$columns.',')||(str_contains($columns,'(')&&history_performance_expression_key($index['cols'])===history_performance_expression_key($columns)))){$match=$index['INDEX_NAME'];break;}
         }
         if($match){$plan[]=['table'=>$table,'index'=>$match,'state'=>'ready','columns'=>$columns];continue;}
         foreach($indexes[$table] as $index)if($index['INDEX_NAME']===$name)throw new RuntimeException('Indeks performa bertentangan: '.$table.'.'.$name);
@@ -29,13 +36,39 @@ function menu_performance_plan(mysqli $db): array {
     }
     return $plan;
 }
+function history_performance_du_expression(string $alias=''): string {
+    if($alias!==''&&!preg_match('/^[a-z]+$/D',$alias))throw new LogicException('Invalid DU alias.');
+    $field=$alias===''?'items':$alias.'.items';$cats="JSON_UNQUOTE(JSON_EXTRACT($field,_utf8mb4'$[*].category'))";
+    return "GREATEST(LOCATE(_utf8mb4'daftar_ulang',LOWER($cats)),LOCATE(0x5C,$cats),(LENGTH($cats)-CHAR_LENGTH($cats)))";
+}
+/** Normalize MySQL's metadata escape layer for this fixed scalar expression. */
+function history_performance_expression_key(string $expression): string {
+    $parts=preg_split("~('(?:\\\\.|''|[^'\\\\])*')~",stripslashes($expression),-1,PREG_SPLIT_DELIM_CAPTURE);
+    if($parts===false)throw new RuntimeException('Index expression could not be parsed.');
+    foreach($parts as $i=>$part)if($i%2===0)$parts[$i]=preg_replace('/[\s`]/','',str_replace('_utf8mb4','',strtolower($part)));
+    $value=implode('',$parts);$prefix='';$suffix='';
+    if(preg_match('/^unit_id,(.*),id$/D',$value,$m)){$prefix='unit_id,';$suffix=',id';$value=$m[1];}
+    while(str_starts_with($value,'(')&&str_ends_with($value,')')){
+        $depth=0;$wrapped=true;
+        for($i=0,$n=strlen($value);$i<$n;$i++){if($value[$i]==='(')$depth++;elseif($value[$i]===')')$depth--;if($depth===0&&$i<$n-1){$wrapped=false;break;}}
+        if(!$wrapped)break;$value=substr($value,1,-1);
+    }
+    return $prefix.$value.$suffix;
+}
+function history_performance_du_ready(mysqli $db): bool {
+    static $cache=[];$key=hp_connection_key($db);$read=PHP_SAPI!=='cli'&&($_SERVER['REQUEST_METHOD']??'')==='GET';
+    if($read&&isset($cache[$key]))return $cache[$key];
+    $ready=false;foreach(menu_performance_plan($db,'history') as $index)if($index['index']==='idx_history_du_candidate'&&$index['state']==='ready')$ready=true;
+    if($read)$cache[$key]=$ready;return $ready;
+}
 /** Caller must verify backup/identity and own the CLI maintenance operation first. */
-function menu_performance_apply(mysqli $db): array {
+function menu_performance_apply(mysqli $db,string $profile='menu'): array {
     if(PHP_SAPI!=='cli')throw new LogicException('Pemasangan indeks hanya melalui CLI.');
     $applied=[];
-    foreach(menu_performance_plan($db) as $index){
+    foreach(menu_performance_plan($db,$profile) as $index){
         if($index['state']!=='missing')continue;
-        $db->query('ALTER TABLE `'.$index['table'].'` ADD INDEX `'.$index['index'].'` ('.$index['columns'].'), ALGORITHM=INPLACE, LOCK=NONE');
+        $lock=str_contains($index['columns'],'(')?'SHARED':'NONE';
+        $db->query('ALTER TABLE `'.$index['table'].'` ADD INDEX `'.$index['index'].'` ('.$index['columns'].'), ALGORITHM=INPLACE, LOCK='.$lock);
         $applied[]=$index;
     }
     return $applied;
@@ -45,8 +78,10 @@ function menu_performance_schema_compatible(array $actual,array $expected): bool
     $normalize=static function(array $schema): array {
         $objects=$schema['objects'];
         if(isset($objects['tables']['legacy_op_payments_data']['ddl']))$objects['tables']['legacy_op_payments_data']['ddl']=menu_performance_strip_metadata_ddl($objects['tables']['legacy_op_payments_data']['ddl']);
-        foreach(menu_performance_indexes() as [$table,$name,$columns]){
+        if(isset($objects['tables']['legacy_op_payments_data']['ddl']))$objects['tables']['legacy_op_payments_data']['ddl']=menu_performance_strip_metadata_ddl($objects['tables']['legacy_op_payments_data']['ddl'],history_performance_du_ddl(),'idx_history_du_candidate');
+        foreach(array_merge(menu_performance_indexes(),menu_performance_indexes('history')) as [$table,$name,$columns]){
             if(!isset($objects['tables'][$table]['ddl']))continue;
+            if(str_contains($columns,'('))continue;
             $fragment=', KEY `'.$name.'` (`'.str_replace(',','`,`',$columns).'`)';
             // SQL literals/comments remain opaque, including a default value
             // that happens to contain text resembling an index declaration.
@@ -84,8 +119,8 @@ function menu_performance_metadata_ddl():string {
 DDL;
 }
 /** Match only a full, trusted index fragment beginning outside SQL literals. */
-function menu_performance_strip_metadata_ddl(string $ddl):string {
-    $fragment=menu_performance_metadata_ddl();$needle=', KEY `idx_menu_payment_du_metadata` ';
+function menu_performance_strip_metadata_ddl(string $ddl,?string $fragment=null,string $name='idx_menu_payment_du_metadata'):string {
+    $fragment??=menu_performance_metadata_ddl();$needle=', KEY `'.$name.'` ';
     $tokens=preg_split('~(\'(?:\\\\.|\'\'|[^\'\\\\])*\'|"(?:\\\\.|""|[^"\\\\])*"|/\*[\s\S]*?\*/)~',$ddl,-1,PREG_SPLIT_DELIM_CAPTURE);
     if($tokens===false)throw new RuntimeException('Schema inventory could not be parsed');
     $offset=0;
@@ -94,4 +129,9 @@ function menu_performance_strip_metadata_ddl(string $ddl):string {
         $offset+=strlen($token);
     }
     return $ddl;
+}
+function history_performance_du_ddl(): string {
+    return <<<'DDL'
+, KEY `idx_history_du_candidate` (`unit_id`,(greatest(locate(_utf8mb4'daftar_ulang',lower(json_unquote(json_extract(`items`,_utf8mb4'$[*].category')))),locate(0x5c,json_unquote(json_extract(`items`,_utf8mb4'$[*].category'))),(length(json_unquote(json_extract(`items`,_utf8mb4'$[*].category'))) - char_length(json_unquote(json_extract(`items`,_utf8mb4'$[*].category')))))),`id`)
+DDL;
 }

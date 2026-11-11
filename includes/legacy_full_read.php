@@ -14,14 +14,22 @@ function lful_operator_options(mysqli $db): array {
     if(!$batches)return [];
     static $options=[];
     $revision=lop_ready($db)?(int)hp_one($db,'SELECT COALESCE(MAX(id),0) revision FROM legacy_op_audit')['revision']:0;
-    $cacheKey=$db->thread_id.':'.hash('sha256',json_encode($batches).':'.$revision);
+    $cacheKey=hp_connection_key($db).':'.(int)($GLOBALS['app_unit_id']??unit_active_id()).':'.hash('sha256',json_encode($batches).':'.$revision);
     if(isset($options[$cacheKey]))return $options[$cacheKey];
     $clauses=[];foreach($batches as $unit=>$ids)$clauses[]='(unit_id='.$unit.' AND batch_id IN ('.implode(',',$ids).'))';$where='('.implode(' OR ',$clauses).')';
     $tables=['legacy_full_payments','legacy_full_journals'];if(lop_ready($db))array_push($tables,'legacy_op_payments','legacy_op_journals');
     // Operator IDs encode the exact source bytes. A case-insensitive DISTINCT
     // can discard a valid ID (including case or trailing-space variants).
-    $parts=[];foreach($tables as $table)$parts[]="SELECT DISTINCT unit_id,CAST(source_operator AS BINARY) source_operator FROM $table WHERE $where".($table==='legacy_op_journals'?" AND origin='legacy'":'');
-    foreach(lf_rows($db,hp_operator_sql($db,implode(' UNION ',$parts))) as $r)$out[lful_operator_key((int)$r['unit_id'],$r['source_operator'])]='Legacy · '.unit_label((int)$r['unit_id']).' · '.($r['source_operator']?:'Tidak tercatat');
+    $parts=[];foreach($tables as $table){
+        $count=$table==='legacy_op_payments'?'SUM(cancelled=0)':($table==='legacy_full_payments'?'COUNT(*)':'0');
+        $parts[]="SELECT unit_id,JSON_OBJECTAGG(HEX(COALESCE(source_operator,'')),1) operator_codes,'$table' origin_kind,$count active_receipts FROM $table p WHERE $where".($table==='legacy_op_journals'?" AND origin='legacy'":'')." GROUP BY unit_id";
+    }
+    $counts=['legacy_op_payments'=>0,'legacy_full_payments'=>0];
+    foreach(lf_rows($db,hp_scan_sql($db,hp_operator_sql($db,implode(' UNION ALL ',$parts)))) as $r){
+        foreach(json_decode($r['operator_codes'],true,512,JSON_THROW_ON_ERROR) as $hex=>$unused){$operator=hex2bin((string)$hex);$out[lful_operator_key((int)$r['unit_id'],$operator)]='Legacy · '.unit_label((int)$r['unit_id']).' · '.($operator?:'Tidak tercatat');}
+        if(isset($counts[$r['origin_kind']]))$counts[$r['origin_kind']]+=(int)$r['active_receipts'];
+    }
+    if(PHP_SAPI!=='cli'&&($_SERVER['REQUEST_METHOD']??'')==='GET')$GLOBALS['lful_operator_counts'][hp_connection_key($db).':'.(int)($GLOBALS['app_unit_id']??unit_active_id())]=$counts;
     return $options[$cacheKey]=$out;
 }
 /** Negative UI IDs are a disjoint read namespace, never written to bayar or authorization. */

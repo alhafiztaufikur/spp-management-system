@@ -305,7 +305,7 @@ function lf_opening_for_student(mysqli $db,int $unit,int $student): ?array {
 }
 function lf_reserved_master(mysqli $db,int $master): bool {
     if(($_SERVER['REQUEST_METHOD']??'')==='GET'){
-        static $ids=[];$key=spl_object_id($db).':'.$db->thread_id.':'.$db->query('SELECT DATABASE()')->fetch_row()[0].':'.(int)($GLOBALS['app_unit_id']??unit_active_id());
+        static $ids=[];$key=(function_exists('hp_connection_key')?hp_connection_key($db):spl_object_id($db).':'.$db->thread_id.':'.$db->query('SELECT DATABASE()')->fetch_row()[0]).':'.(int)($GLOBALS['app_unit_id']??unit_active_id());
         if(!isset($ids[$key]))$ids[$key]=legacy_finance_ready($db)?array_fill_keys(array_column(lf_rows($db,'SELECT id FROM legacy_debt_masters'),'id'),true):[];
         return isset($ids[$key][$master]);
     }

@@ -17,6 +17,12 @@ function other_fee_category_master_sql(string $category): string {
     return "CASE WHEN $category REGEXP '^biaya_lain:[1-9][0-9]*$' THEN CAST(SUBSTRING($category,12) AS UNSIGNED) END";
 }
 
+/** Escaped/non-ASCII categories use the complete reader to preserve JSON/SQL comparison semantics. */
+function other_fee_candidate_sql(string $json): string {
+    if(!preg_match('/^[a-z]+\.(items|before_data|after_data)$/D',$json))throw new LogicException('Invalid fee candidate column.');
+    return hp_json_category_candidate($json,'biaya_lain:');
+}
+
 /** One row per slot, positive native / negative archived receipt IDs, scoped by connection. */
 function other_fee_items_sql(mysqli $db): string {
     $tables=other_fee_usage_tables($db);
@@ -27,7 +33,8 @@ function other_fee_items_sql(mysqli $db): string {
     }
     if(isset($tables['legacy_op_payments'])){
         $master=other_fee_category_master_sql('j.category');
-        $parts[]="SELECT p.unit_id,$master,-1000000000-p.id,j.slot,j.amount,CASE WHEN p.cancelled=1 THEN 'cancelled' WHEN b.state='completed' THEN 'active' ELSE 'pending' END,'legacy' FROM legacy_op_payments p JOIN legacy_full_batches b ON b.id=p.batch_id AND b.unit_id=p.unit_id JOIN JSON_TABLE(CAST(p.items AS JSON),'$[*]' COLUMNS(slot FOR ORDINALITY,category VARCHAR(100) PATH '$.category',amount DECIMAL(20,2) PATH '$.amount')) j";
+        $candidate=other_fee_candidate_sql('p.items');
+        $parts[]="SELECT p.unit_id,$master,-1000000000-p.id,j.slot,j.amount,CASE WHEN p.cancelled=1 THEN 'cancelled' WHEN b.state='completed' THEN 'active' ELSE 'pending' END,'legacy' FROM legacy_op_payments p JOIN legacy_full_batches b ON b.id=p.batch_id AND b.unit_id=p.unit_id JOIN JSON_TABLE(CAST(p.items AS JSON),'$[*]' COLUMNS(slot FOR ORDINALITY,category VARCHAR(100) PATH '$.category',amount DECIMAL(20,2) PATH '$.amount')) j WHERE $candidate";
     }
     if(isset($tables['pembayaran_aktivitas']))$parts[]="SELECT a.unit_id,j.master_id,a.payment_id,j.slot,j.amount,'cancelled','system' FROM pembayaran_aktivitas a JOIN JSON_TABLE(CAST(a.before_snapshot AS JSON),'$.details.bayar_biaya_lain[*]' COLUMNS(slot FOR ORDINALITY,master_id INT PATH '$.master_biaya_lain_id',amount DECIMAL(20,2) PATH '$.nominal_snapshot')) j WHERE a.action='deleted' AND NOT EXISTS(SELECT 1 FROM pembayaran_aktivitas n WHERE n.unit_id=a.unit_id AND n.payment_id=a.payment_id AND n.action='deleted' AND n.id>a.id)";
     return implode(' UNION ALL ',$parts);
@@ -39,9 +46,10 @@ function other_fee_history_refs_sql(mysqli $db): string {
     if(isset($tables['pembayaran_aktivitas']))foreach(['before_snapshot','after_snapshot'] as $column){
         $parts[]="SELECT a.unit_id,j.master_id FROM pembayaran_aktivitas a JOIN JSON_TABLE(CAST(COALESCE(a.$column,JSON_OBJECT()) AS JSON),'$.details.bayar_biaya_lain[*]' COLUMNS(master_id INT PATH '$.master_biaya_lain_id' NULL ON EMPTY)) j";
     }
-    if(isset($tables['legacy_op_audit']))foreach(['before_data','after_data'] as $column){
+    if(isset($tables['legacy_op_audit'])){
         $master=other_fee_category_master_sql('j.category');
-        $parts[]="SELECT a.unit_id,$master FROM legacy_op_audit a JOIN JSON_TABLE(CAST(COALESCE(a.$column,JSON_OBJECT()) AS JSON),'$.items[*]' COLUMNS(category VARCHAR(100) PATH '$.category')) j WHERE a.entity_type IN ('payment','fee_trace','obligation_binding','du_payment')";
+        $candidate='('.other_fee_candidate_sql('a.before_data').' OR '.other_fee_candidate_sql('a.after_data').')';
+        $parts[]="SELECT a.unit_id,$master FROM legacy_op_audit a JOIN JSON_TABLE(JSON_ARRAY(a.before_data,a.after_data),'$[*].items[*]' COLUMNS(category VARCHAR(100) PATH '$.category')) j WHERE a.entity_type IN ('payment','fee_trace','obligation_binding','du_payment') AND $candidate";
     }
     foreach(['legacy_op_obligations','legacy_full_coverage'] as $table)if(isset($tables[$table])){
         $master=other_fee_category_master_sql('r.category');$parts[]="SELECT r.unit_id,$master FROM $table r";
@@ -55,8 +63,10 @@ function other_fee_master_usage(mysqli $db,?int $masterId=null): array {
     $masters=hp_rows($db,"SELECT m.* FROM master_biaya_lain m$where ORDER BY m.id",$args);if(!$masters)return [];
     $items=other_fee_items_sql($db);$history=other_fee_history_refs_sql($db);
     $stats=[];
-    foreach(hp_rows($db,"SELECT i.unit_id,i.master_id,COUNT(DISTINCT CASE WHEN i.state='active' THEN i.payment_id END) receipts,SUM(i.state='active') details,COALESCE(SUM(IF(i.state='active',i.amount,0)),0) amount,COUNT(DISTINCT CASE WHEN i.state='cancelled' THEN i.payment_id END) cancelled,COUNT(*) refs FROM ($items) i JOIN master_biaya_lain m ON m.id=i.master_id AND m.unit_id=i.unit_id$where GROUP BY i.unit_id,i.master_id",$args) as $r)$stats[$r['unit_id'].'|'.$r['master_id']]=$r;
-    $refs=[];foreach(hp_rows($db,"SELECT DISTINCT h.unit_id,h.master_id FROM ($history) h JOIN master_biaya_lain m ON m.id=h.master_id AND m.unit_id=h.unit_id$where",$args) as $r)$refs[$r['unit_id'].'|'.$r['master_id']]=true;
+    foreach(lf_rows($db,hp_scan_sql($db,"SELECT i.unit_id,i.master_id,COUNT(DISTINCT CASE WHEN i.state='active' THEN i.payment_id END) receipts,SUM(i.state='active') details,COALESCE(SUM(IF(i.state='active',i.amount,0)),0) amount,COUNT(DISTINCT CASE WHEN i.state='cancelled' THEN i.payment_id END) cancelled,COUNT(*) refs FROM ($items) i JOIN master_biaya_lain m ON m.id=i.master_id AND m.unit_id=i.unit_id$where GROUP BY i.unit_id,i.master_id"),$args) as $r)$stats[$r['unit_id'].'|'.$r['master_id']]=$r;
+    $unreferenced=[];foreach($masters as $m)if(empty($stats[$m['unit_id'].'|'.$m['id']]['refs']))$unreferenced[]=(int)$m['id'];
+    $refs=[];
+    if($unreferenced)foreach(lf_rows($db,hp_scan_sql($db,"SELECT DISTINCT h.unit_id,h.master_id FROM ($history) h JOIN master_biaya_lain m ON m.id=h.master_id AND m.unit_id=h.unit_id WHERE m.id IN (".implode(',',$unreferenced).')')) as $r)$refs[$r['unit_id'].'|'.$r['master_id']]=true;
     $bills=[];foreach(hp_rows($db,"SELECT t.unit_id,t.master_biaya_lain_id,COUNT(*) n FROM tagihan_biaya_lain t JOIN master_biaya_lain m ON m.id=t.master_biaya_lain_id AND m.unit_id=t.unit_id$where GROUP BY t.unit_id,t.master_biaya_lain_id",$args) as $r)$bills[$r['unit_id'].'|'.$r['master_biaya_lain_id']]=(int)$r['n'];
     foreach($masters as &$m){$key=$m['unit_id'].'|'.$m['id'];$s=$stats[$key]??[];
         $m['jumlah_pemakaian']=(int)($s['receipts']??0);$m['jumlah_rincian']=(int)($s['details']??0);$m['nominal_pemakaian']=$s['amount']??'0.00';$m['jumlah_batal']=(int)($s['cancelled']??0);$m['jumlah_tagihan']=$bills[$key]??0;

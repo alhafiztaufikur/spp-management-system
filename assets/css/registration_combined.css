@@ -1,0 +1,56 @@
+.unified-registration{--du-amount-color:color-mix(in srgb,var(--accent) 75%,#000)}
+[data-theme="dark"] .unified-registration{--du-amount-color:var(--accent)}
+.du-combined-record{display:grid;grid-template-columns:26px minmax(140px,1.25fr) minmax(120px,.85fr) minmax(145px,1fr);gap:16px;align-items:start;padding:18px 16px;margin-bottom:10px;border:1px solid var(--border);border-radius:12px;background:var(--bg-card);color:var(--text-primary);text-decoration:none}
+.du-combined-record:hover{border-color:var(--accent);background:var(--bg-elevated)}
+.du-combined-record.is-selected{border-color:var(--accent);background:var(--accent-glow)}
+.du-combined-record:focus-visible{outline:2px solid var(--accent);outline-offset:3px}
+[data-registration-scope="combined"] .ph-detail-nav .btn,.du-receipt-card .ph-detail-actions .btn{min-height:44px}
+.du-record-identity,.du-record-period,.du-record-money{display:flex;flex-direction:column;gap:7px;min-width:0}
+.du-record-identity>strong{font-size:15px;line-height:1.45;overflow-wrap:anywhere;color:var(--text-primary)}
+.du-record-identity>small,.du-record-period>small,.du-record-money>small{font-size:12px;line-height:1.5;color:var(--text-secondary)}
+.du-record-period>strong{font-size:13px;font-weight:600;color:var(--text-primary)}
+.du-record-period .kelas-badge{align-self:flex-start;white-space:normal;line-height:1.5}
+.unified-registration .du-combined-record .kelas-badge,.unified-registration .du-detail-identity>.kelas-badge{color:#92400e;background:#fff3df}
+.unified-registration .du-combined-record .du-class-unknown,.unified-registration .du-detail-identity>.du-class-unknown{color:#45594d;background:#edf2ef}
+[data-theme="dark"] .unified-registration .du-combined-record .kelas-badge,[data-theme="dark"] .unified-registration .du-detail-identity>.kelas-badge{color:#fcd34d;background:#3c2e18}
+[data-theme="dark"] .unified-registration .du-combined-record .du-class-unknown,[data-theme="dark"] .unified-registration .du-detail-identity>.du-class-unknown{color:#c0cdc8;background:#293a34}
+.du-record-money{align-items:flex-end;text-align:right}
+.du-record-money>strong{font-size:16px;line-height:1.5;color:var(--du-amount-color);font-variant-numeric:tabular-nums;overflow-wrap:anywhere}
+.du-record-source{display:inline-block;align-self:flex-start;font-size:11px;line-height:1.5;color:var(--text-secondary)}
+.du-state{display:inline-block;width:fit-content;padding:4px 9px;border-radius:7px;font-size:11px;font-weight:600;line-height:1.5;white-space:normal}
+.du-state-settled{color:#166534;background:#e7f5ec}
+.du-state-outstanding{color:#92400e;background:#fff3df}
+.du-state-unknown{color:#45594d;background:#edf2ef}
+.du-state-covered{color:var(--du-amount-color);background:var(--accent-glow);border:1px solid var(--border)}
+[data-theme="dark"] .du-state-settled{color:#86efac;background:#16392a}
+[data-theme="dark"] .du-state-outstanding{color:#fcd34d;background:#3c2e18}
+[data-theme="dark"] .du-state-unknown{color:#c0cdc8;background:#293a34}
+.du-detail-identity{display:flex;align-items:flex-start;justify-content:space-between;gap:14px;margin-bottom:18px}
+.du-detail-identity h3{margin:0 0 5px;font-size:18px;line-height:1.45;overflow-wrap:anywhere}
+.du-detail-identity p{margin:0;font-size:12px;color:var(--text-secondary);line-height:1.6}
+.du-detail-identity>.kelas-badge{flex-shrink:0;max-width:44%;white-space:normal}
+.du-balance-card,.du-receipt-card{border:1px solid var(--border);border-radius:13px;overflow:hidden;background:var(--bg-card)}
+.du-balance-card>header{display:flex;justify-content:space-between;align-items:flex-start;gap:12px;padding:17px;background:var(--accent-glow)}
+.du-balance-card h4{margin:0 0 5px;font-size:16px;color:var(--du-amount-color)}
+.du-balance-card header small{font-size:12px;color:var(--text-secondary)}
+.du-balance-grid{display:grid;grid-template-columns:repeat(3,minmax(0,1fr));gap:12px;padding:18px 16px;margin:0}
+.du-balance-grid>div{min-width:0}
+.du-balance-grid dt{font-size:12px;color:var(--text-secondary);margin-bottom:8px}
+.du-balance-grid dd{margin:0;font-size:16px;line-height:1.5;font-weight:700;overflow-wrap:anywhere;font-variant-numeric:tabular-nums}
+.du-balance-grid>div:nth-child(2) dd{color:var(--du-amount-color)}
+.du-balance-grid>div:last-child dd{font-size:15px}
+.du-payment-sources{margin:0 16px 12px;border-top:1px solid var(--border)}
+.du-evidence{margin:0 16px 16px;border-top:1px solid var(--border);padding-top:12px;font-size:12px;line-height:1.6;color:var(--text-secondary)}
+.du-evidence summary{cursor:pointer;color:var(--text-primary);font-weight:600;box-sizing:border-box;min-height:44px;padding:12px 0}
+.du-evidence summary:focus-visible{outline:2px solid var(--accent);outline-offset:2px}
+.du-receipt-heading{font-size:15px!important;margin:24px 0 12px!important}
+.du-receipt-heading>span{font-size:12px;color:var(--text-secondary);font-weight:400;margin-left:5px}
+.du-receipt-card{padding:16px;margin-bottom:12px}
+.du-receipt-card header{display:flex;flex-wrap:wrap;justify-content:space-between;gap:8px;margin-bottom:15px}
+.du-receipt-card time{font-size:12px;color:var(--text-secondary);line-height:1.5}
+.du-receipt-amount{display:flex;justify-content:space-between;gap:12px;font-size:14px;line-height:1.6}
+.du-receipt-amount>strong{color:var(--du-amount-color);font-size:16px}
+.du-mixed-total{font-size:12px!important;color:var(--text-secondary);margin:8px 0!important}
+.du-receipt-card .ph-detail-actions{display:flex;flex-wrap:wrap;gap:8px;margin-top:16px}
+@media(max-width:1450px){.du-combined-record{grid-template-columns:24px minmax(100px,1fr) minmax(120px,1fr);gap:12px}.du-record-period{grid-column:2;grid-row:2}.du-record-money{grid-column:3;grid-row:1/span 2}.du-balance-grid{grid-template-columns:minmax(0,1fr)}.du-balance-grid>div{display:flex;justify-content:space-between;align-items:baseline;gap:12px}.du-balance-grid dt{margin:0}.du-balance-grid dd{text-align:right}}
+@media(max-width:600px){.du-combined-record{padding:14px 12px;grid-template-columns:24px minmax(0,1fr)}.du-record-period{grid-column:2;grid-row:auto}.du-record-money{grid-column:2;grid-row:auto;align-items:flex-start;text-align:left}.du-record-identity>strong{font-size:14px}.du-detail-identity{flex-wrap:wrap}.du-detail-identity>.kelas-badge{max-width:100%}.du-balance-card>header{flex-wrap:wrap}.du-balance-grid{padding:16px}.du-receipt-card{padding:14px}.du-receipt-card .ph-detail-actions .btn{flex:1;text-align:center}}

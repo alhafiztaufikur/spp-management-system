@@ -9,20 +9,23 @@
     index=i;const card=cards[i],version=++generation;controller?.abort();controller=new AbortController();panel.hidden=false;root.classList.remove('detail-closed');
     cards.forEach((c,j)=>{c.classList.toggle('is-selected',i===j);if(i===j)c.setAttribute('aria-current','true');else c.removeAttribute('aria-current');});nav();
     if(push)history.pushState(null,'',card.href);
-    body.setAttribute('aria-busy','true');body.replaceChildren(Object.assign(document.createElement('p'),{textContent:'Memuat detail Daftar Ulang…',className:'ph-empty'}));
-    const query=new URL(card.href).searchParams;query.set('tagihan_id',card.dataset.id);query.set('unit_id',card.dataset.unit);
+    body.style.minHeight=body.getBoundingClientRect().height+'px';body.setAttribute('aria-busy','true');body.replaceChildren(Object.assign(document.createElement('p'),{textContent:'Memuat detail Daftar Ulang…',className:'ph-empty'}));
+    const query=new URL(card.href).searchParams;query.set('unit_id',card.dataset.unit);
+    if(root.dataset.registrationScope==='combined'){query.set('scope','combined');query.set('selected',card.dataset.id);query.set('selected_unit',card.dataset.unit);query.set('selected_year',card.dataset.year);}
+    else query.set('tagihan_id',card.dataset.id);
     try{
       const response=await fetch('detail_daftar_ulang.php?'+query,{signal:controller.signal,headers:{Accept:'application/json'}});
       const data=await response.json();if(!response.ok||!data.ok)throw Error(data.message||'Detail belum dapat dimuat.');
       if(version===generation)body.innerHTML=data.html;
     }catch(error){if(error.name!=='AbortError'&&version===generation){const p=document.createElement('p');p.className='ph-empty';p.textContent=error.message;const retry=document.createElement('button');retry.type='button';retry.className='btn btn-ghost';retry.textContent='Coba Lagi';retry.addEventListener('click',()=>select(i,false));body.replaceChildren(p,retry);}}
-    finally{if(version===generation)body.removeAttribute('aria-busy');}
+    finally{if(version===generation){body.removeAttribute('aria-busy');body.style.removeProperty('min-height');}}
   }
   cards.forEach((c,i)=>c.addEventListener('click',e=>{if(e.ctrlKey||e.metaKey||e.shiftKey||e.altKey)return;e.preventDefault();select(i);}));
   prev.addEventListener('click',()=>select(index-1));next.addEventListener('click',()=>select(index+1));
   root.querySelector('[data-registration-close]').addEventListener('click',()=>{generation++;controller?.abort();panel.hidden=true;root.classList.add('detail-closed');cards[index]?.focus();});
-  addEventListener('popstate',()=>{const q=new URL(location.href).searchParams;const i=cards.findIndex(c=>c.dataset.id===q.get('selected')&&(!q.get('selected_unit')||c.dataset.unit===q.get('selected_unit')));if(i>=0)select(i,false);else if(cards.length)select(0,false);});nav();
+  addEventListener('popstate',()=>{const q=new URL(location.href).searchParams;const i=cards.findIndex(c=>c.dataset.id===q.get('selected')&&(!q.get('selected_unit')||c.dataset.unit===q.get('selected_unit'))&&(!q.has('selected_year')||c.dataset.year===q.get('selected_year')));if(i>=0)select(i,false);else if(cards.length)select(0,false);});nav();
   const dialog=document.getElementById('du-delete-dialog');let source;
+  if(!dialog)return;
   document.addEventListener('click',e=>{const button=e.target.closest('.open-du-delete');if(!button)return;source=button;const form=dialog.querySelector('form');form.reset();delete form.dataset.sending;form.querySelector('[type=submit]').disabled=false;form.elements.id.value=button.dataset.id;form.elements.return_context.value=button.dataset.context;dialog.querySelector('[data-du-delete-copy]').textContent='TRX-'+button.dataset.id.padStart(6,'0')+' · '+button.dataset.student;dialog.showModal();});
   dialog.querySelector('[data-close-du-delete]').addEventListener('click',()=>dialog.close());dialog.addEventListener('close',()=>source?.focus());
   dialog.addEventListener('click',e=>{if(e.target===dialog){const r=dialog.getBoundingClientRect();if(e.clientX<r.left||e.clientX>r.right||e.clientY<r.top||e.clientY>r.bottom)dialog.close();}});

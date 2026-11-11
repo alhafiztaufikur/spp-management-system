@@ -23,7 +23,7 @@ function mh_students_source(mysqli $db): string {
 function mh_return_create(string $route,array $query,int $unit,string $kind,int $id): string {
     if(!in_array($route,['pembayaran/lihat.php','pembayaran/riwayat_daftar_ulang.php','tabungan/riwayat.php','legacy_accounts.php','siswa/daftar.php'],true))throw new InvalidArgumentException('Tujuan kembali tidak valid.');
     $allowed=['owner','status','kelas','tingkat','back_context','special_members','special_member_page','saldo_q','saldo_status','saldo_class','saldo_page','page','per_page','selected','selected_unit','search','q','view','student_id','owner_id','nis','tanggal_awal','tanggal_akhir','all_periods','source','owner_type','rombel','operator','batch','group','class_id','id','jenis','lg_open','lg_q','lg_kind','lg_page','special_q','special_kind','special_status','special_page'];
-    $allowed[]='fee_master_id';$query=array_intersect_key($query,array_flip($allowed));
+    $allowed[]='fee_master_id';$allowed[]='selected_year';$query=array_intersect_key($query,array_flip($allowed));
     foreach($_SESSION['history_returns']??[] as $key=>$r)if($r['expires']<time())unset($_SESSION['history_returns'][$key]);
     while(count($_SESSION['history_returns']??[])>=100)array_shift($_SESSION['history_returns']);
     $token=bin2hex(random_bytes(24));$_SESSION['history_returns'][$token]=['route'=>$route,'query'=>$query,'unit'=>$unit,'kind'=>$kind,'id'=>$id,'actor'=>(int)($_SESSION['admin_id']??0),'expires'=>time()+7200];return $token;
@@ -85,6 +85,11 @@ function mh_payment_simple_count(mysqli $db,array $input,array $classFilter,arra
     if(($input['view']??'')==='deleted'||!filter_is_all($classFilter['values'])||!filter_is_all($operators)
         ||isset($input['fee_master_id'])||trim((string)($input['search']??''))!==''||(int)($input['student_id']??0)>0||(int)($input['owner_id']??0)>0||($input['du_only']??'')==='1')return null;
     $kind=mh_choice($input,'source',['all','system','legacy'],'all');$owner=mh_choice($input,'owner_type',['all','student','account'],'all');
+    $counts=PHP_SAPI!=='cli'&&($_SERVER['REQUEST_METHOD']??'')==='GET'?($GLOBALS['lful_operator_counts'][hp_connection_key($db).':'.(int)($GLOBALS['app_unit_id']??unit_active_id())]??null):null;
+    if($period===null&&$owner==='all'&&$counts!==null){
+        $native=$kind==='legacy'?0:(int)hp_one($db,'SELECT COUNT(*) n FROM bayar')['n'];
+        return $native+($kind==='system'?0:$counts['legacy_op_payments']+$counts['legacy_full_payments']);
+    }
     $parts=[];$args=[];
     $date=static function(string $column,bool $legacy)use($input,$period,&$args):string{
         if($period===null)return '';
@@ -93,11 +98,13 @@ function mh_payment_simple_count(mysqli $db,array $input,array $classFilter,arra
         array_push($args,...$period);return " AND $column>=? AND $column<?";
     };
     if($kind!=='legacy')$parts[]="SELECT COUNT(*) n FROM bayar p".($owner==='all'?'':' LEFT JOIN siswa s ON s.NO_INDUK=p.NO_INDUK AND s.unit_id=p.unit_id')." WHERE 1=1".($owner==='student'?' AND s.id IS NOT NULL':($owner==='account'?' AND s.id IS NULL':'')).$date('p.TGL_BYR',false);
-    if($kind!=='system'&&$owner!=='account'&&lful_read_ready($db))$parts[]="SELECT COUNT(*) n FROM legacy_full_payments p JOIN siswa s ON s.id=p.student_id AND s.unit_id=p.unit_id JOIN legacy_full_batches b ON b.id=p.batch_id AND b.unit_id=p.unit_id WHERE b.state='completed'".$date('p.source_date',true);
+    if($kind!=='system'&&$owner!=='account'&&lful_read_ready($db))$parts[]="SELECT COUNT(*) n FROM legacy_full_payments p JOIN siswa s ON s.id=p.student_id AND s.unit_id=p.unit_id WHERE ".hp_completed_batch_predicate($db,'p').$date('p.source_date',true);
     // owner_id has the existing unit/owner FK. Only owner-type filters need
     // to join the owner; the unfiltered count cannot multiply receipts.
-    if($kind!=='system'&&lop_ready($db))$parts[]="SELECT COUNT(*) n FROM legacy_op_payments p".($owner==='all'?'':' JOIN legacy_op_owners o ON o.id=p.owner_id AND o.unit_id=p.unit_id')." JOIN legacy_full_batches b ON b.id=p.batch_id AND b.unit_id=p.unit_id WHERE b.state='completed' AND p.cancelled=0".($owner==='student'?' AND o.student_id IS NOT NULL':($owner==='account'?' AND o.student_id IS NULL':'')).$date('p.source_date',true);
-    return $parts?(int)lf_one($db,hp_sql($db,'SELECT COALESCE(SUM(n),0) n FROM ('.implode(' UNION ALL ',$parts).') counts'),$args)['n']:0;
+    if($kind!=='system'&&lop_ready($db))$parts[]="SELECT COUNT(*) n FROM legacy_op_payments p".($owner==='all'?'':' JOIN legacy_op_owners o ON o.id=p.owner_id AND o.unit_id=p.unit_id')." WHERE ".hp_completed_batch_predicate($db,'p')." AND p.cancelled=0".($owner==='student'?' AND o.student_id IS NOT NULL':($owner==='account'?' AND o.student_id IS NULL':'')).$date('p.source_date',true);
+    if(!$parts)return 0;
+    $sql='SELECT COALESCE(SUM(n),0) n FROM ('.implode(' UNION ALL ',$parts).') counts';
+    return (int)lf_one($db,$period===null?hp_scan_sql($db,$sql):hp_sql($db,$sql),$args)['n'];
 }
 
 /** Count, page and outside-period summary share exactly the same predicates. */

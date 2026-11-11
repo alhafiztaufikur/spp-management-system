@@ -85,8 +85,9 @@ function payment_time_index(mysqli $db): array {
         $unit=(int)$unit;payment_time_archive_cache($db,$unit,array_filter($batches,static fn($b)=>(int)$b['unit_id']===$unit),array_filter($index,static fn($r)=>(int)$r['unit_id']===$unit));
     }}
     // Only applied corrections can override the original clock or supply an updated time.
-    foreach(lop_ready($db)?hp_rows($db,"SELECT a.id,a.unit_id,a.before_data,a.after_data,a.created_at,p.row_key,b.source_id FROM legacy_op_audit a JOIN legacy_op_payments p ON p.id=a.entity_id AND p.unit_id=a.unit_id JOIN legacy_full_batches b ON b.id=p.batch_id AND b.unit_id=p.unit_id WHERE a.entity_type='payment' AND b.state='completed' ORDER BY a.id"):[] as $a){
+    foreach(lop_ready($db)?lf_rows($db,hp_scan_sql($db,"SELECT a.id,a.unit_id,JSON_OBJECT('source_date',JSON_EXTRACT(a.before_data,'$.source_date')) before_data,JSON_OBJECT('source_date',JSON_EXTRACT(a.after_data,'$.source_date')) after_data,JSON_CONTAINS_PATH(a.after_data,'one','$._time_precision') has_precision,JSON_EXTRACT(a.after_data,'$._time_precision') time_precision,a.created_at,p.row_key,b.source_id FROM legacy_op_audit a STRAIGHT_JOIN legacy_op_payments p ON p.id=a.entity_id AND p.unit_id=a.unit_id JOIN legacy_full_batches b ON b.id=p.batch_id AND b.unit_id=p.unit_id WHERE a.entity_type='payment' AND b.state='completed' ORDER BY a.id")):[] as $a){
         $before=json_decode($a['before_data'],true,512,JSON_THROW_ON_ERROR);$after=json_decode($a['after_data'],true,512,JSON_THROW_ON_ERROR);
+        if($a['has_precision'])$after['_time_precision']=json_decode($a['time_precision'],true,512,JSON_THROW_ON_ERROR);
         $key=$a['unit_id'].'|'.$a['source_id'].'|'.$a['row_key'];
         $index[$key]??=['unit_id'=>(int)$a['unit_id'],'source_id'=>(int)$a['source_id'],'row_key'=>$a['row_key'],'original'=>null,'archive_at'=>null,'override_precision'=>null,'updated_at'=>null,'conflict'=>false];
         $index[$key]['updated_at']=$a['created_at'];
@@ -97,7 +98,7 @@ function payment_time_index(mysqli $db): array {
 }
 function payment_time_projection(mysqli $db,string $p='p',string $b='b',string $alias='pt'): array {
     foreach([$p,$b,$alias] as $name)if(!preg_match('/^[a-z_][a-z0-9_]*$/D',$name))throw new LogicException('Invalid time projection alias.');
-    $json=json_encode(array_values(payment_time_index($db)),JSON_UNESCAPED_UNICODE|JSON_THROW_ON_ERROR);$literal="CONVERT(UNHEX('".bin2hex($json)."') USING utf8mb4)";
+    $literal=hp_json_document($db,array_values(payment_time_index($db)));
     $table="JSON_TABLE($literal,'$[*]' COLUMNS(unit_id INT PATH '$.unit_id',source_id BIGINT PATH '$.source_id',row_key CHAR(64) PATH '$.row_key',original DATETIME PATH '$.original' NULL ON EMPTY NULL ON ERROR,archive_at DATETIME PATH '$.archive_at' NULL ON EMPTY NULL ON ERROR,override_precision VARCHAR(8) PATH '$.override_precision' NULL ON EMPTY,updated_at DATETIME PATH '$.updated_at' NULL ON EMPTY))";
     $use="$alias.override_precision IS NULL AND $alias.archive_at IS NOT NULL AND $p.source_date=$alias.original";
     return ['join'=>" LEFT JOIN (SELECT DISTINCT * FROM $table clock_values) $alias ON $alias.unit_id=$p.unit_id AND $alias.source_id=$b.source_id AND $alias.row_key=$p.row_key ",
@@ -114,6 +115,28 @@ function payment_time_resolve(?string $stored,array $evidence=[]): array {
 function payment_time_record(mysqli $db,array $p): array {
     $key=$p['unit_id'].'|'.$p['source_id'].'|'.$p['row_key'];$e=payment_time_index($db)[$key]??[];
     return payment_time_resolve($p['source_date'],$e)+['updated_at'=>$e['updated_at']??null];
+}
+
+/** Read clocks and applied corrections only for the requested receipt identities. */
+function payment_time_records(mysqli $db,array $payments): array {
+    if(!$payments)return [];$keys=[];$ids=[];$evidence=[];
+    foreach($payments as $p){$key=$p['unit_id'].'|'.$p['source_id'].'|'.$p['row_key'];$keys[(int)$p['unit_id']][(int)$p['source_id']][$p['row_key']]=true;$ids[(int)$p['unit_id']][]=-$p['id']-1000000000;$evidence[$key]=[];}
+    foreach($keys as $unit=>$sources)foreach($sources as $source=>$rows)foreach(array_chunk(array_keys($rows),500) as $chunk){
+        $marks=implode(',',array_fill(0,count($chunk),'?'));
+        foreach(hp_rows($db,"SELECT r.unit_id,r.source_id,r.row_key,r.raw_data FROM legacy_finance_rows r WHERE r.unit_id=? AND r.source_id=? AND r.source_table='bayar' AND r.row_key IN ($marks) AND EXISTS(SELECT 1 FROM legacy_full_batches b WHERE b.unit_id=r.unit_id AND b.source_id=r.source_id AND b.state='completed')",array_merge([$unit,$source],$chunk)) as $row){
+            $clock=payment_time_archive(json_decode($row['raw_data'],true,512,JSON_THROW_ON_ERROR));
+            if($clock['precision']==='datetime'||$clock['conflict'])$evidence[$row['unit_id'].'|'.$row['source_id'].'|'.$row['row_key']]=['original'=>$clock['original'],'archive_at'=>$clock['value']];
+        }
+    }
+    foreach($ids as $unit=>$values){
+        foreach(hp_rows($db,"SELECT a.id,a.unit_id,JSON_OBJECT('source_date',JSON_EXTRACT(a.before_data,'$.source_date')) before_data,JSON_OBJECT('source_date',JSON_EXTRACT(a.after_data,'$.source_date')) after_data,JSON_CONTAINS_PATH(a.after_data,'one','$._time_precision') has_precision,JSON_EXTRACT(a.after_data,'$._time_precision') time_precision,a.created_at,p.row_key,b.source_id FROM legacy_op_audit a STRAIGHT_JOIN legacy_op_payments p ON p.id=a.entity_id AND p.unit_id=a.unit_id JOIN legacy_full_batches b ON b.id=p.batch_id AND b.unit_id=p.unit_id WHERE a.unit_id=? AND a.entity_type='payment' AND a.entity_id IN (".implode(',',array_map('intval',$values)).") AND b.state='completed' ORDER BY a.id",[$unit]) as $row){
+            $key=$row['unit_id'].'|'.$row['source_id'].'|'.$row['row_key'];$before=json_decode($row['before_data'],true,512,JSON_THROW_ON_ERROR);$after=json_decode($row['after_data'],true,512,JSON_THROW_ON_ERROR);
+            $evidence[$key]['updated_at']=$row['created_at'];
+            if($row['has_precision'])$evidence[$key]['override_precision']=json_decode($row['time_precision'],true,512,JSON_THROW_ON_ERROR);
+            elseif(($before['source_date']??null)!==($after['source_date']??null))$evidence[$key]['override_precision']=empty($after['source_date'])?'none':'datetime';
+        }
+    }
+    $out=[];foreach($payments as $p){$key=$p['unit_id'].'|'.$p['source_id'].'|'.$p['row_key'];$out[$key]=payment_time_resolve($p['source_date'],$evidence[$key])+['updated_at'=>$evidence[$key]['updated_at']??null];}return $out;
 }
 
 /** Preserve real midnight: precision is explicit, never guessed from a formatted zero. */

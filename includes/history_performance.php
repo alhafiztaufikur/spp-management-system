@@ -47,7 +47,7 @@ function hp_sql(mysqli $db, string $sql,bool $ordered=false): string {
     $scope=$unit===0?($schoolIds[$key]?' WHERE unit_id IN ('.implode(',',$schoolIds[$key]).')':' WHERE FALSE'):' WHERE unit_id='.$unit;
     if($ordered&&!isset($identityIndexes[$key])){
         $identityIndexes[$key]=[];
-        $r=$db->query("SELECT TABLE_NAME,INDEX_NAME FROM information_schema.STATISTICS WHERE TABLE_SCHEMA=DATABASE() AND IS_VISIBLE='YES' GROUP BY TABLE_NAME,INDEX_NAME HAVING GROUP_CONCAT(COLUMN_NAME ORDER BY SEQ_IN_INDEX)='unit_id,id'");
+$r=$db->query("SELECT TABLE_NAME,INDEX_NAME FROM information_schema.STATISTICS WHERE TABLE_SCHEMA=DATABASE() AND IS_VISIBLE='YES' GROUP BY TABLE_NAME,INDEX_NAME HAVING COUNT(*)=2 AND COUNT(COLUMN_NAME)=2 AND GROUP_CONCAT(COLUMN_NAME ORDER BY SEQ_IN_INDEX)='unit_id,id'");
         while($row=$r->fetch_row())if(preg_match('/^[a-zA-Z0-9_]+$/D',$row[1]))$identityIndexes[$key][$row[0]]=$row[1];
     }
     return preg_replace_callback($pattern,static function($m)use($tables,$key,$unit,$ordered,$identityIndexes,$scope){
@@ -61,10 +61,58 @@ function hp_sql(mysqli $db, string $sql,bool $ordered=false): string {
 function hp_rows(mysqli $db,string $sql,array $args=[]): array {return lf_rows($db,hp_sql($db,$sql),$args);}
 function hp_one(mysqli $db,string $sql,array $args=[]): ?array {return lf_one($db,hp_sql($db,$sql),$args);}
 
+/** Keep repeated JSON_TABLE documents out of prepared SQL text. These variables
+ * belong to this connection only; distinct documents/scopes cannot overwrite one
+ * another when a CLI reader switches units or retains an earlier SQL projection.
+ */
+function hp_json_document(mysqli $db,array $document): string {
+    static $loaded=[];$json=json_encode($document,JSON_UNESCAPED_UNICODE|JSON_THROW_ON_ERROR);
+    $name='@spp_read_'.substr(hash('sha256',hp_connection_key($db).':'.$json),0,48);
+    if(!isset($loaded[$name])){lf_query($db,'SET '.$name.'=?',[$json]);$loaded[$name]=true;}
+    return $name;
+}
+
+function hp_json_category_candidate(string $json,string $needle): string {
+    if(!preg_match('/^[a-z]+\.(items|before_data|after_data)$/D',$json)||!in_array($needle,['biaya_lain:','daftar_ulang'],true))throw new LogicException('Invalid category candidate.');
+    $path=str_ends_with($json,'.items')?'$[*].category':'$.items[*].category';
+    $cats="JSON_UNQUOTE(JSON_EXTRACT($json,'$path'))";
+    return "REGEXP_LIKE($cats,CONCAT('$needle|[^ -~]|',CHAR(92),CHAR(92)),'i')";
+}
+
+/** Whole-scope scans avoid secondary-index row lookups for JSON/operator columns.
+ * Bounded identity/date readers keep their ordinary index selection.
+ */
+function hp_scan_sql(mysqli $db,string $sql): string {
+    static $ordered=[];$key=hp_connection_key($db);$sql=hp_sql($db,$sql);
+    if(!isset($ordered[$key]))$ordered[$key]=array_column($db->query("SELECT TABLE_NAME,INDEX_NAME FROM information_schema.STATISTICS WHERE TABLE_SCHEMA=DATABASE() AND IS_VISIBLE='YES' GROUP BY TABLE_NAME,INDEX_NAME HAVING COUNT(*)=2 AND COUNT(COLUMN_NAME)=2 AND GROUP_CONCAT(COLUMN_NAME ORDER BY SEQ_IN_INDEX)='unit_id,id'")->fetch_all(MYSQLI_ASSOC),'INDEX_NAME','TABLE_NAME');
+    foreach(['legacy_op_payments_data','legacy_op_journals_data'] as $table){
+        $scope=(int)($GLOBALS['app_unit_id']??unit_active_id());
+        $index=$scope>0?($ordered[$key][$table]??'PRIMARY'):'PRIMARY';
+        if(!preg_match('/^[a-zA-Z0-9_]+$/D',$index))throw new LogicException('Invalid scan index.');
+        $sql=str_replace('FROM `'.$table.'` WHERE','FROM `'.$table.'` FORCE INDEX (`'.$index.'`) WHERE',$sql);
+    }
+    return $sql;
+}
+
+function hp_completed_batches(mysqli $db): array {
+    static $cache=[];$key=hp_connection_key($db).':'.(int)($GLOBALS['app_unit_id']??unit_active_id());
+    $read=PHP_SAPI!=='cli'&&($_SERVER['REQUEST_METHOD']??'')==='GET';
+    if($read&&isset($cache[$key]))return $cache[$key];
+    $rows=hp_rows($db,"SELECT id,unit_id FROM legacy_full_batches WHERE state='completed'");
+    if($read)$cache[$key]=$rows;return $rows;
+}
+
+function hp_completed_batch_predicate(mysqli $db,string $alias): string {
+    if(!preg_match('/^[a-z]+$/D',$alias))throw new LogicException('Invalid batch alias.');
+    $units=[];foreach(hp_completed_batches($db) as $r)$units[(int)$r['unit_id']][]="'".$db->real_escape_string($r['id'])."'";
+    $parts=[];foreach($units as $unit=>$ids)$parts[]="($alias.unit_id=$unit AND $alias.batch_id IN (".implode(',',$ids).'))';
+    return '('.(implode(' OR ',$parts)?:'FALSE').')';
+}
+
 /** Covering hints are optional and only touch the verified scoped base projections. */
 function hp_operator_sql(mysqli $db,string $sql): string {
     static $available=[];$key=hp_connection_key($db);
-    if(!isset($available[$key]))$available[$key]=array_column($db->query("SELECT TABLE_NAME,INDEX_NAME FROM information_schema.STATISTICS WHERE TABLE_SCHEMA=DATABASE() AND INDEX_NAME IN ('idx_menu_journal_operator','idx_menu_payment_operator') GROUP BY TABLE_NAME,INDEX_NAME HAVING GROUP_CONCAT(COLUMN_NAME ORDER BY SEQ_IN_INDEX) IN ('unit_id,batch_id,source_operator,origin','unit_id,batch_id,source_operator')")->fetch_all(MYSQLI_ASSOC),'INDEX_NAME','TABLE_NAME');
+    if(!isset($available[$key]))$available[$key]=array_column($db->query("SELECT TABLE_NAME,INDEX_NAME FROM information_schema.STATISTICS WHERE TABLE_SCHEMA=DATABASE() AND IS_VISIBLE='YES' AND INDEX_NAME IN ('idx_menu_journal_operator','idx_menu_payment_operator','idx_history_journal_operator','idx_history_payment_operator') GROUP BY TABLE_NAME,INDEX_NAME HAVING GROUP_CONCAT(COLUMN_NAME ORDER BY SEQ_IN_INDEX) IN ('unit_id,batch_id,source_operator,origin','unit_id,batch_id,source_operator','unit_id,batch_id,source_operator,cancelled') ORDER BY INDEX_NAME DESC")->fetch_all(MYSQLI_ASSOC),'INDEX_NAME','TABLE_NAME');
     $sql=hp_sql($db,$sql);
     foreach($available[$key] as $table=>$index)$sql=str_replace('FROM `'.$table.'` WHERE','FROM `'.$table.'` FORCE INDEX (`'.$index.'`) WHERE',$sql);
     return $sql;
