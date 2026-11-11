@@ -741,7 +741,6 @@ if($formAdmission&&in_array((string)$previewLevel,['0','PSB',(string)$admissionF
                 <label class="field-label" for="student-potongan-psb">Potongan PSB (Rp)</label>
                 <input class="field-input rupiah-input" type="text" inputmode="numeric" id="student-potongan-psb" name="potongan_psb_nominal" <?= $editGraduate?'readonly':'' ?>
                   value="<?= $resetForm ? '' : rupiah_value(form_student_value('potongan_psb_nominal', $oldInput, $formStudent, $fieldMap, 0)) ?>" />
-                <small class="payment-auto-note">Potongan sekali terhadap Uang PSB; tidak mengubah potongan SPP lama.</small>
               </div>
               <div class="field-row"><label class="field-label" for="student-total-psb">Total PSB Setelah Potongan</label><input class="field-input student-derived" type="text" id="student-total-psb" readonly value="0"></div>
               <div class="field-row">

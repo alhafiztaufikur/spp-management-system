@@ -316,7 +316,6 @@ $exportQuery = filter_build_query([
         <article class="finance-stat is-out"><span class="finance-stat-icon"><?= finance_icon('out') ?></span><div><strong><?= general_page_money($tab_keluar) ?></strong><span>Tabungan Keluar</span><small><?= number_format((int)$savingsOutgoing['jml_tx']) ?> transaksi</small></div></article>
         <article class="finance-stat is-count"><span class="finance-stat-icon"><?= finance_icon('clock') ?></span><div><strong><?= number_format((int)($bayar_recap['jml_tx']??0)) ?></strong><span>Jumlah Transaksi Pembayaran</span><small><?= general_page_e($periodLabel) ?></small></div></article>
       </div>
-      <p class="finance-summary-note">Ringkasan seluruh pembayaran dan mutasi tabungan pada periode, siswa, dan cakupan unit yang dipilih.</p>
       <nav class="finance-tabs" aria-label="Tampilan laporan transaksi">
         <?php foreach(['ringkasan'=>['chart','Ringkasan'],'komponen'=>['list','Komponen Pembayaran'],'transaksi'=>['file','Daftar Transaksi']] as $panel=>[$icon,$label]): $tabQuery=$sectionQuery;$tabQuery['panel']=$panel; ?>
         <a id="finance-tab-<?= $panel ?>" class="<?= $financePanel===$panel?'is-active':'' ?>" href="index.php?<?= general_page_e(filter_build_query($tabQuery)) ?>" data-finance-tab="<?= $panel ?>" aria-controls="finance-results" <?= $financePanel===$panel?'aria-current="page"':'' ?>><?= finance_icon($icon) ?><?= $label ?></a>

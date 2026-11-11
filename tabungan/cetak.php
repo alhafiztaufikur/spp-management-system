@@ -113,7 +113,7 @@ function print_book_escape($value): string
         <section class="main-card savings-print-detail" aria-labelledby="savings-print-detail-title" aria-live="polite">
           <div class="savings-print-card-heading"><span class="savings-print-step">02</span><div><span class="savings-print-kicker">PRATINJAU BUKU</span><h2 id="savings-print-detail-title">Periksa sebelum mencetak</h2></div></div>
           <div class="savings-print-student-summary" id="savings-print-summary">
-            <div><span class="savings-print-summary-label">BUKU UNTUK</span><strong id="savings-print-name">Pilih siswa terlebih dahulu</strong><small id="savings-print-nis">Data buku akan tampil di sini.</small></div>
+            <div><span class="savings-print-summary-label">BUKU UNTUK</span><strong id="savings-print-name">Pilih siswa terlebih dahulu</strong><small id="savings-print-nis" hidden></small></div>
           </div>
           <div class="savings-print-details-grid">
             <div><span>Kelas</span><strong id="savings-print-student-class">—</strong></div>
@@ -149,7 +149,8 @@ function print_book_escape($value): string
     action.disabled = true;
     summary.classList.remove('is-selected');
     document.getElementById('savings-print-name').textContent = 'Pilih siswa terlebih dahulu';
-    document.getElementById('savings-print-nis').textContent = 'Data buku akan tampil di sini.';
+    document.getElementById('savings-print-nis').textContent = '';
+    document.getElementById('savings-print-nis').hidden = true;
     document.getElementById('savings-print-student-class').textContent = '—';
     document.getElementById('savings-print-balance').textContent = '—';
     document.getElementById('savings-print-transactions').textContent = '—';
@@ -161,6 +162,7 @@ function print_book_escape($value): string
     selectedNis = nis; selectedId=option.dataset.studentId || '';selectedOwner=option.dataset.ownerId||'';
     document.getElementById('savings-print-name').textContent = option.dataset.nama || option.value;
     document.getElementById('savings-print-nis').textContent = 'NIS ' + nis + (option.dataset.diknas ? ' · NIS Diknas ' + option.dataset.diknas : '');
+    document.getElementById('savings-print-nis').hidden = false;
     document.getElementById('savings-print-student-class').textContent = 'Kelas ' + (option.dataset.kelas || '-');
     document.getElementById('savings-print-balance').textContent = rupiah.format(Number(option.dataset.saldo || 0));
     document.getElementById('savings-print-transactions').textContent = Number(option.dataset.transaksi || 0).toLocaleString('id-ID') + ' transaksi';

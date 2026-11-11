@@ -38,7 +38,6 @@ html body .finance-workspace .report-general-filter .btn-warning{background:rgba
 .finance-stat>div{min-width:0}.finance-stat strong{display:block;font-size:20px;line-height:1.25;overflow-wrap:anywhere}
 .finance-stat div>span{display:block;font-size:11px;color:var(--text-muted);margin:5px 0}
 .finance-stat small{font-size:10px;color:var(--stat);border-radius:5px;background:var(--stat-bg);padding:3px 6px;display:inline-block}
-.finance-summary-note{font-size:11px;color:var(--text-muted);line-height:1.5;margin:0 0 14px}
 .finance-tabs{display:flex;gap:3px;flex-wrap:wrap;padding:0;position:relative;z-index:1}
 .finance-tabs a{display:flex;align-items:center;justify-content:center;gap:8px;border:1px solid var(--border);border-radius:11px 11px 0 0;background:var(--bg-card);color:var(--text-secondary);padding:11px 18px;font-size:12px;font-weight:700;text-decoration:none}
 .finance-tabs a.is-active{background:var(--accent);color:#fff;border-color:var(--accent)}
