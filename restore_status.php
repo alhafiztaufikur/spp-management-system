@@ -16,6 +16,7 @@ $config=['csrf'=>$_SESSION['csrf_backup'],'job'=>$cap];session_write_close();
   <title>Progres Pemulihan | SistemSPP</title>
   <script>try{document.documentElement.dataset.theme=localStorage.getItem('spp_theme')==='dark'?'dark':'light'}catch(e){}</script>
   <link rel="stylesheet" href="assets/css/database_restore.css?v=<?= filemtime(__DIR__.'/assets/css/database_restore.css') ?>">
+  <link rel="stylesheet" href="assets/css/desktop_actions.css?v=<?= filemtime(__DIR__.'/assets/css/desktop_actions.css') ?>">
 </head>
 <body class="restore-status-page">
   <header class="restore-status-topbar"><a class="restore-brand" href="backup_restore.php"><img src="assets/img/school-logo.png" alt="">SistemSPP</a><button type="button" id="restore-theme" class="restore-action secondary" aria-label="Ganti tema">Ganti Tema</button></header>

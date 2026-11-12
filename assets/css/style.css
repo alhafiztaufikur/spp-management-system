@@ -3,6 +3,8 @@
    ============================================ */
 
 @import url('typography.css?v=20261102');
+@import url('desktop_actions.css?v=20261112.5');
+@import url('global_report_totals.css?v=20261113.1');
 
 /* ── M3 CSS Variables (Light Mode Default) ─── */
 :root {

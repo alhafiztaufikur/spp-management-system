@@ -186,6 +186,9 @@ legacy_schema_apply($koneksi);
 require_once __DIR__.'/../includes/financial_components_schema.php';
 financial_components_apply($koneksi);
 
+require_once __DIR__.'/../includes/parent_letter_principals_schema.php';
+plp_schema_apply($koneksi);
+
 require_once __DIR__ . "/payment_activity_schema.php";
 payment_activity_schema_apply($koneksi);
 

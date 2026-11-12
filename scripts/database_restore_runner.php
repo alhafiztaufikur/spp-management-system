@@ -68,7 +68,7 @@ function restore_import(array $c,string $dir,string $sql,string $hash,bool $roll
         $prefix='SELECT CONNECTION_ID();' . "\n".'DROP DATABASE `'.$c['database'].'`;' . "\n";
         if(fwrite($out,$prefix)!==strlen($prefix)||stream_copy_to_stream($in,$out)!==filesize($sql))throw new RuntimeException('Restore input publication incomplete.');
     }finally{fclose($in);fclose($out);}
-    db_backup_process([$c['mysql_bin'].'/mysql.exe','--defaults-file='.$dir.'/target.cnf','--host='.$c['host'],'--port='.$c['port'],'--protocol=TCP','--binary-mode','--local-infile=0','--batch','--skip-column-names','--unbuffered','--default-character-set=utf8mb4','--max-allowed-packet=1G'],$dir.'/target-import',1800,$input);
+    db_backup_process([$c['mysql_bin'].'/mysql.exe','--defaults-file='.$dir.'/target.cnf','--host='.$c['host'],'--port='.$c['port'],'--protocol=TCP','--comments','--binary-mode','--local-infile=0','--batch','--skip-column-names','--unbuffered','--default-character-set=utf8mb4','--max-allowed-packet=1G'],$dir.'/target-import',1800,$input);
     if(!$rollback)restore_test_failure($c,'restore_import');
 }
 $db=null;$row=null;$dir=null;$paths=null;$access=null;$destructive=false;$ownsMaintenance=false;

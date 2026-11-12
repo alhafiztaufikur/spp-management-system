@@ -13,7 +13,7 @@ bp_assert($xp->query('//table[@class="billing-print-table"]')->length===3,'One f
 $numbers=[];foreach($xp->query('//tr[contains(@class,"billing-print-student")]/td[1]') as $n)$numbers[]=$n->textContent;
 bp_assert($numbers===['1','2','3','4','5'],'Numbering continues across rombels and contexts');
 bp_assert($xp->query('//tr[@class="billing-print-group"]')->length===4&&$xp->query('//tr[@class="billing-print-subtotal"]')->length===4,'Every class group has one subtotal');
-bp_assert(str_contains($html,'JUMLAH:')&&str_contains($html,'KELAS: 4A')&&str_contains($html,'>100</span>')&&!str_contains($html,'Rp ')&&str_contains($html,'&lt;panjang&gt;'),'Labels, currency-free numbers and escaping');
+bp_assert(str_contains($html,'JUMLAH:')&&str_contains($html,'KELAS: 4A')&&str_contains($html,'>100</span>')&&str_contains($html,'Total Tunggakan Keseluruhan: Rp 500')&&!str_contains($html,'seluruh hasil filter')&&str_contains($html,'&lt;panjang&gt;'),'Concise grand total, currency-free detail numbers and escaping');
 bp_assert(serialize($view)===$before,'Print layout does not modify the financial projection');
 $sameYear=billing_history_project(array_slice($items,0,3),$filters,[],1);
 $first=billing_history_print_table($sameYear,array_slice($sameYear['rows'],0,1),0,true,false);

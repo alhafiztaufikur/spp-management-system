@@ -1,5 +1,6 @@
 <?php
 require_once __DIR__.'/report_letters.php';
+require_once __DIR__.'/parent_letter_principals.php';
 
 function parent_letter_collect(mysqli $db,array $query): array
 {
@@ -24,7 +25,7 @@ function parent_letter_collect(mysqli $db,array $query): array
         $students=array_values(array_filter($students,static fn($s)=>isset($lookup[unit_student_key($s)])));
     }
     if(!$students)throw new RuntimeException('Tidak ada tunggakan terbuka untuk pilihan ini. Perbarui daftar surat.');
-    return ['students'=>$students,'today'=>$today,'unit'=>unit_active_id()];
+    return ['students'=>$students,'today'=>$today,'unit'=>unit_active_id(),'signatories'=>plp_snapshots($db,$students)];
 }
 
 function parent_letter_draft_create(array $data): string

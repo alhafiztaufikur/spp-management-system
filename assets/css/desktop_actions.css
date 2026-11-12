@@ -1,0 +1,37 @@
+/* Desktop component shapes; avatar, indicator and switch internals keep their own geometry. */
+/* Important layered rules take precedence over local page rules, including disabled states. */
+@layer desktop-actions {
+ @media screen and (min-width:1024px) {
+  html body :is(
+   button,input[type="button"],input[type="submit"],input[type="reset"],
+   [role="button"],[role="tab"],[role="menuitem"],[role="option"]:not(option),.btn,.btn-tbl,.dbt-button,
+   a[class*="btn"],a[class*="button"],label[class*="btn"],label[class*="button"],
+   .preview-back,.report-template-link,.nav-item,.page-link,.du-page-link,
+   .pagination-link,.desktop-page,.principal-row-action,.restore-action,.print-secondary,
+   .global-unit-choice,.sidebar-unit-choice,.account-more summary,
+   .fee-master-tabs a,.legacy-sections a,.legacy-steps a,.account-role-tabs a
+  ) { border-radius:8px!important }
+
+  html body :is(
+   .badge-id,.badge-nis,.badge-count,.badge-role,.excel-badge,.kelas-badge,.savings-class-badge,
+   .account-self-badge,.admin-avatar-badge,.account-scope,.account-status,
+   .clock-badge,.topbar-unit,.sidebar-unit-kicker,.unit-pill,.unit-record-pill,
+   .dashboard-pill,.dashboard-date-pill,.dashboard-payment-badges span,.dashboard-total-meta span,
+   .left-version-badge,.metric-pill,.master-status,.master-list-count,.recap-status,
+   .report-status-pill,.report-status,.matrix-main,.report-result-pill,.report-catalog-count,
+   .report-component-kind,.report-billing-number,.principal-status-badge,
+   .du-option-badge,.du-year-status,.du-pagination-info,.student-class-history-count,
+   .student-search-class,.fee-selected-badge,.sct-rate-badge,.savings-alumni-badge,
+   .ph-status,.ph-record-number,.history-method,.other-fee-status,
+   .sw-status,.sw-class,.sw-row-number,.sw-activity-count,
+   .auth-count,.auth-status,.auth-menu-badge,.authorization-status,
+   .dbt-badge,.dbt-job-status,.spp-dropdown-status,
+   .legacy-kind-badge,.legacy-directory-count,.legacy-ledger-status,
+   .sc-count,.sc-member-state,.participants-status,.participants-held-count,.ll-num,
+   .account-role-tabs a span,.account-step h3>span,.dbt-steps span,.legacy-steps a span
+  ) { border-radius:8px!important }
+
+  html body :is(.global-unit-options,.sidebar-unit-segments,.report-export-actions) { border-radius:8px!important }
+  html body .restore-stage-list li::before { border-radius:8px!important }
+ }
+}

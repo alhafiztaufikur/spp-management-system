@@ -29,7 +29,7 @@ $options->set('isRemoteEnabled',false);
 $options->set('isHtml5ParserEnabled',true);
 $options->setChroot(realpath(__DIR__.'/..'));
 $pdf=new \Dompdf\Dompdf($options);
-$pdf->loadHtml(report_parent_letters_html($students,$today,$messages),'UTF-8');
+$pdf->loadHtml(report_parent_letters_html($students,$today,$messages,$draft['signatories']??[]),'UTF-8');
 $pdf->setPaper('A4','portrait');
 $pdf->render();
 header('Cache-Control: no-store, private');

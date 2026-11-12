@@ -38,7 +38,7 @@ $asOf=$f;$asOf['_billing_as_of']='2026-11-03';
 $dueView=billing_history_project([bh_row('spp',100),bh_row('spp',200,'2026-12')],$asOf,[],1);
 bh_assert($dueView['grand']['total']['value']===100.0&&!str_contains($dueView['rows'][0]['keterangan'],'Des'),'Future monthly obligations are not current arrears');
 $html=billing_history_table($view,[$view['rows'][0]]);
-bh_assert(str_contains($html,'seluruh hasil filter')&&str_contains($html,'Keterangan Tagihan'),'Paged display has explicit full-filter subtotal and description');
+bh_assert(!str_contains($html,'seluruh hasil filter')&&str_contains($html,'Jumlah Rombel')&&str_contains($html,'Keterangan Tagihan'),'Paged display has a concise subtotal and preserves the description');
 $dom=new DOMDocument();@$dom->loadHTML(billing_history_table($view));$xp=new DOMXPath($dom);
 bh_assert($xp->query('//td[contains(concat(" ",@class," ")," billing-matrix-amount ")]')->length===0,'Amount display classes belong to text, never table cells');
 bh_assert($xp->query('//td/span[@class="billing-matrix-amount"]')->length===8,'Every component remains in a separate table cell');

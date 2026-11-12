@@ -66,6 +66,6 @@ function billing_history_print_table(array $view,?array $visible=null,int $offse
     <?php if($last&&(!$finalSubtotalOnly||$row['key']===end($section['rows'])['key'])): ?>
     <tr class="billing-print-subtotal"><th colspan="3">JUMLAH:</th><?php foreach($view['columns'] as $key=>$_): ?><td class="billing-print-numeric"><?= billing_history_print_amount($section['amounts'][$key]??[],$key) ?></td><?php endforeach; ?><td class="billing-print-numeric billing-print-total"><?= billing_history_print_amount($section['total']) ?></td><td class="billing-print-description"></td></tr>
     <?php endif;endforeach; ?></tbody></table></section>
-    <?php }if($showGrand): ?><p class="billing-grand-total"><strong>Total Tunggakan Keseluruhan (seluruh hasil filter): <?= report_e(preg_replace('/^Rp /','',billing_history_amount($view['grand']['total']))) ?></strong></p><?php endif;
+    <?php }if($showGrand): ?><p class="billing-grand-total"><strong>Total Tunggakan Keseluruhan: <?= report_e(billing_history_grand_amount($view['grand']['total'])) ?></strong></p><?php endif;
     return ob_get_clean();
 }

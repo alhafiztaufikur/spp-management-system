@@ -58,13 +58,13 @@ function global_report_matrix(array $report,string $template,int $unit):?array {
         foreach($groupColumns as $column)if(isset($totals[$column['source']]))$subtotals[$column[0]]=$totals[$column['source']];
     }
     if($template==='penerimaan'){
-        $column=['total_penerimaan','Total Penerimaan','money'];$columns[]=$column;
-        $groups[]=['label'=>'Total Penerimaan','subtitle'=>'','columns'=>[$column],'source'=>null];
+        $column=['total_penerimaan','Total','money'];$columns[]=$column;
+        $groups[]=['label'=>'Total','subtitle'=>'','columns'=>[$column],'source'=>null];
         foreach(report_money_totals($report,$template) as $total)if(($total['key']??'')==='total_penerimaan')$subtotals['total_penerimaan']=$total;
     }
     foreach($rows as &$row)foreach($columns as $column)if(!array_key_exists($column[0],$row))$row[$column[0]]=null;
     unset($row);
-    return ['columns'=>$columns,'identity_count'=>count($identities),'groups'=>$groups,'rows'=>$rows,'subtotals'=>$subtotals,'totals'=>report_money_totals($report,$template),'flat_header'=>$template==='penerimaan'&&count($parts)===1];
+    return ['report_template'=>$template,'presentation_surface'=>$report['_presentation_surface']??'screen','columns'=>$columns,'identity_count'=>count($identities),'groups'=>$groups,'rows'=>$rows,'subtotals'=>$subtotals,'totals'=>report_money_totals($report,$template),'flat_header'=>$template==='penerimaan'&&count($parts)===1];
 }
 
 /** Stable horizontal bands; an oversized month group continues with the same identity. */
@@ -109,15 +109,15 @@ function global_report_matrix_html(array $matrix,?array $rows=null,int $start=0,
     <div class="report-standard-scroll report-matrix-scroll" tabindex="0" role="region" aria-label="Tabel laporan, geser untuk melihat seluruh komponen"><table class="data payment-table report-template-table report-horizontal-matrix<?= $print?' report-matrix-print':'' ?>" style="width:100%<?= $print?'':';min-width:'.array_sum($widths).'px' ?>">
     <colgroup><?php foreach($columns as $column): ?><col style="width:<?= $print?$printWidths[$column[0]]:$widths[$column[0]] ?><?= $print?'pt':'px' ?>"><?php endforeach; ?></colgroup>
     <thead><tr><?php foreach($identity as $column): ?><th rowspan="<?= $singleHeader?1:2 ?>" class="matrix-identity matrix-<?= $column[0] ?>" style="<?= $print?'width:'.$printWidths[$column[0]].'pt':$styles[$column[0]] ?>" scope="col"><?= report_e($column[1]) ?></th><?php endforeach; ?>
-    <?php foreach($groups as $group): ?><th colspan="<?= count($group['columns']) ?>"<?= $print?' style="width:'.array_sum(array_map(static fn($col)=>$printWidths[$col[0]],$group['columns'])).'pt"':'' ?> scope="colgroup"><?= report_e($group['label']) ?><?php if($group['subtitle']!==''): ?><span class="matrix-group-period"><?= report_e($group['subtitle']) ?></span><?php endif; ?></th><?php endforeach; ?></tr><?php if(!$singleHeader): ?><tr>
-    <?php foreach($groups as $group): foreach($group['columns'] as $column): ?><th<?= $print?' style="width:'.$printWidths[$column[0]].'pt"':'' ?> scope="col"><?= report_e($column[1]) ?></th><?php endforeach; endforeach; ?></tr><?php endif; ?></thead>
+    <?php foreach($groups as $group): ?><th class="<?= global_report_nowrap_header($group['label'])?'report-header-nowrap':'' ?>" colspan="<?= count($group['columns']) ?>"<?= $print?' style="width:'.array_sum(array_map(static fn($col)=>$printWidths[$col[0]],$group['columns'])).'pt"':'' ?> scope="colgroup"><?= report_e($group['label']) ?><?php if($group['subtitle']!==''): ?><span class="matrix-group-period"><?= report_e($group['subtitle']) ?></span><?php endif; ?></th><?php endforeach; ?></tr><?php if(!$singleHeader): ?><tr>
+    <?php foreach($groups as $group): foreach($group['columns'] as $column): ?><th class="<?= global_report_nowrap_header($column[1])?'report-header-nowrap':'' ?>"<?= $print?' style="width:'.$printWidths[$column[0]].'pt"':'' ?> scope="col"><?= report_e($column[1]) ?></th><?php endforeach; endforeach; ?></tr><?php endif; ?></thead>
     <tbody><?php if(!$rows): ?><tr><td colspan="<?= count($columns) ?>">Tidak ada data sesuai filter.</td></tr><?php endif; ?>
     <?php foreach($rows as $index=>$row): ?><tr><?php foreach($columns as $i=>$column): $key=$column[0];$value=$key==='no'?$start+$index+1:($row[$key]??null);$type=$column[2]??'text';$original=$column['source']??$key; ?>
     <td class="<?= global_report_column_class([$original,$column[1],$type]) ?><?= $i<count($identity)?' matrix-identity matrix-'.$key:'' ?><?= in_array($type,['money','money_optional'],true)?' money':'' ?><?= is_numeric($value)&&$value<0?' report-negative negative':'' ?>"<?= isset($styles[$key])?' style="'.$styles[$key].'"':'' ?>><?= $value===null?'<span class="matrix-empty">—</span>':global_report_cell($value,$type,($matrix['separate_national_id']??false)&&$original==='nis'?array_diff_key($row,array_flip(['diknas','nis_diknas','NO_induk_diknas'])):$row,$original) ?></td>
     <?php endforeach; ?></tr><?php endforeach; ?></tbody>
     <?php if($matrix['subtotals']): ?><tfoot><tr>
-    <?php if($print): ?><th colspan="<?= count($identity) ?>">Subtotal seluruh hasil filter</th>
-    <?php else: foreach($identity as $column): ?><th class="matrix-identity matrix-<?= $column[0] ?>" style="<?= $styles[$column[0]] ?>"><?= $column[0]==='nis'?'Subtotal':($column[0]==='nama'?'Seluruh hasil filter':'') ?></th><?php endforeach; endif; ?>
+    <?php if($print): ?><th colspan="<?= count($identity) ?>"><?= global_report_short_subtotal($matrix['report_template']??'','print')?'Subtotal':'Subtotal seluruh hasil filter' ?></th>
+    <?php else: foreach($identity as $column): ?><th class="matrix-identity matrix-<?= $column[0] ?>" style="<?= $styles[$column[0]] ?>"><?= $column[0]==='nis'?'Subtotal':($column[0]==='nama'&&!global_report_short_subtotal($matrix['report_template']??'','screen')?'Seluruh hasil filter':'') ?></th><?php endforeach; endif; ?>
     <?php foreach(array_slice($columns,count($identity)) as $column): $total=$matrix['subtotals'][$column[0]]??null; ?><td class="money"><?= $total?report_money($total['value']):'—' ?></td><?php endforeach; ?></tr></tfoot><?php endif; ?>
     </table></div>
     <?php return ob_get_clean();
@@ -127,9 +127,10 @@ function global_report_matrix_html(array $matrix,?array $rows=null,int $start=0,
 function global_report_matrix_excel(array $matrix,array $report,string $template,int $unit):array {
     require_once __DIR__.'/excel.php';$columns=[];$includeDiknas=$template!=='psb';
     $widths=['no'=>6,'unit'=>10,'nis'=>16,'nis_diknas'=>18,'nama'=>26,'kelas'=>10];
-    foreach($matrix['columns'] as $column){$definition=spp_excel_column($column[0],$column[1],$column[2]??'text');$definition['width']=$widths[$column[0]]??22;$columns[]=$definition;if($includeDiknas&&$column[0]==='nis'){$definition=spp_excel_column('nis_diknas','NIS Diknas');$definition['width']=18;$columns[]=$definition;}}
+    foreach($matrix['columns'] as $column){$definition=spp_excel_column($column[0],$column[1],$column[2]??'text');$definition['source']=$column['source']??$column[0];$definition['width']=$widths[$column[0]]??22;$columns[]=$definition;if($includeDiknas&&$column[0]==='nis'){$definition=spp_excel_column('nis_diknas','NIS Diknas');$definition['width']=18;$columns[]=$definition;}}
     $section=spp_excel_section($report['title'],$columns,$matrix['rows'],$matrix['totals']);
     $section['flat_header']=$matrix['flat_header']??false;
+    $section['subtotal_label']=global_report_short_subtotal($template,'excel')?'Subtotal':'Subtotal seluruh hasil filter';
     $section['header_groups']=[];$section['identity_count']=$matrix['identity_count']+($includeDiknas?1:0);$section['column_totals']=$matrix['subtotals'];
     foreach($matrix['groups'] as $group)$section['header_groups'][]=['label'=>$group['label'].($group['subtitle']!==''?' | '.$group['subtitle']:''),'keys'=>array_column($group['columns'],0)];
     $doc=spp_excel_document($report['title'],$report['subtitle'],$unit,[['name'=>'Laporan','sections'=>[$section],'signatures'=>false]]);

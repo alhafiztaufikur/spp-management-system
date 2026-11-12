@@ -76,6 +76,9 @@ try {
     }
     require_once __DIR__.'/../includes/legacy_schema.php';
     if(!legacy_schema_ready($koneksi))throw new RuntimeException('Fresh install missing Legacy/unit identity schema');
+    require_once __DIR__.'/../includes/parent_letter_principals_schema.php';
+    if(!plp_schema_ready($koneksi)||plp_seed_pending($koneksi))throw new RuntimeException('Fresh install missing parent letter principals');
+    if(plp_schema_apply($koneksi)!==['schema_changes'=>0,'seeded_units'=>[]])throw new RuntimeException('Fresh principal schema replay changed state');
     require_once __DIR__.'/../includes/psb_spp_schema.php';
     require_once __DIR__.'/../includes/spp_student_tariff.php';
     if(!pspp_ready($koneksi)||!sct_ready($koneksi)||!du_advance_schema_ready($koneksi))throw new RuntimeException('Fresh install missing admission tariff or DU schema');

@@ -264,7 +264,7 @@ try {
     # Remove the startup SQL as soon as the random password is established.
     Remove-Item -LiteralPath $initFile -Force
     Assert-InstanceIdentity
-    $import = Invoke-Child (Join-Path $config.mysql_bin 'mysql.exe') @(('--defaults-file=' + $defaultsFile), '--binary-mode', '--default-character-set=utf8mb4', '--max-allowed-packet=1G') -InputFile $DumpFile -TimeoutSeconds 7200 -ErrorLog (Join-Path $JobDirectory 'mysql-import.log')
+    $import = Invoke-Child (Join-Path $config.mysql_bin 'mysql.exe') @(('--defaults-file=' + $defaultsFile), '--comments', '--binary-mode', '--default-character-set=utf8mb4', '--max-allowed-packet=1G') -InputFile $DumpFile -TimeoutSeconds 7200 -ErrorLog (Join-Path $JobDirectory 'mysql-import.log')
     if ($import.exit_code -ne 0) { throw 'Pemulihan SQL pada instance verifikasi gagal.' }
     Assert-InstanceIdentity
     $auditFile = Assert-PlainPath (Join-Path $config.app_root 'scripts\backup_verify_audit.php')

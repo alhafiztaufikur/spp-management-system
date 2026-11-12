@@ -101,7 +101,7 @@ function render_report_export_preview(string $documentHtml, array $options): voi
         <?php if(!empty($options['full_width'])): ?>
         .preview-frame-shell{width:100%;max-width:none}.preview-status{margin:0;padding:8px 20px;color:var(--muted);font-size:12px;text-align:center}.preview-button[aria-disabled=true]{opacity:.6;cursor:wait}.preview-button:focus-visible{outline:3px solid var(--green);outline-offset:3px}[hidden]{display:none!important}
         <?php endif; ?>
-    </style>
+    <?= file_get_contents(__DIR__.'/../assets/css/desktop_actions.css') ?></style>
     <?php if($styled): ?><script>document.documentElement.dataset.theme=localStorage.getItem('spp_theme')||'light';</script><?php endif; ?>
 </head>
 <body<?php if($pdfActions): ?> data-transaction-preview data-pdf-url="<?= report_preview_escape($options['pdf_url_action']) ?>" data-html-url="<?= report_preview_escape($options['html_url']) ?>" data-model="<?= report_preview_escape($options['model_fingerprint']) ?>" data-filename="rekap-laporan-transaksi.pdf"<?php endif; ?>>
@@ -158,6 +158,18 @@ function render_report_export_preview(string $documentHtml, array $options): voi
             const resizeFrame=function(){
                 if(!frame||!frame.contentDocument)return;
                 const doc=frame.contentDocument;
+                // A desktop host can contain a narrower A4 document viewport.
+                const desktop=window.matchMedia('(min-width:1024px)').matches;
+                const syncShapes=function(rules,inShapes=false){
+                    for(const rule of rules){
+                        if(rule.name==='desktop-actions'&&rule.cssRules)syncShapes(rule.cssRules,true);
+                        else if(inShapes&&rule.type===4){
+                            const media=desktop?'screen':'not all';
+                            if(rule.media.mediaText!==media)rule.media.mediaText=media;
+                        }
+                    }
+                };
+                for(const sheet of doc.styleSheets){try{syncShapes(sheet.cssRules);}catch(e){}}
                 if(doc.documentElement)doc.documentElement.style.overflow='hidden';
                 if(doc.body)doc.body.style.overflow='visible';
                 const height=Math.max(

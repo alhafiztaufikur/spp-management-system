@@ -21,7 +21,6 @@ $catalogGroups=[
 <div class="report-catalog-v2">
   <section class="report-catalog-intro">
     <div class="report-catalog-intro-copy"><span class="report-eyebrow">PUSAT LAPORAN</span><h1>Laporan yang mudah dicari</h1><?= global_report_selector($koneksi,$reportUnitId,$_GET,'global.php') ?></div>
-    <div class="report-catalog-overview" aria-label="Jumlah laporan tersedia"><strong><?= count($registry) ?></strong></div>
   </section>
   <div class="report-catalog-sections"><?php foreach($catalogGroups as $group): $items=array_filter($group['items'],static fn($id)=>isset($registry[$id])); if(!$items)continue; ?>
     <section class="report-catalog-section"><header class="report-catalog-section-head"><div><span class="report-catalog-section-label"><?= report_e($group['label']) ?></span><p><?= report_e($group['description']) ?></p></div><span class="report-catalog-count"><?= count($items) ?> laporan</span></header>

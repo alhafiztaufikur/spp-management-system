@@ -19,7 +19,7 @@ function sout_schema_plan(mysqli $db): array {
         foreach(['student_id'=>'siswa_data','unit_id'=>'unit_sekolah'] as $column=>$parent){$fk=$catalog['foreign_keys']['student_out_periods_data'][$column][0]??null;if(!$fk||$fk['REFERENCED_TABLE_NAME']!==$parent||$fk['REFERENCED_COLUMN_NAME']!=='id')throw new RuntimeException('Konflik FK periode OUT: '.$column);}
     }
     if(($catalog['tables']['student_out_periods']??null)!=='VIEW')$steps[]='view';
-    foreach(['out_assert_student','out_assert_owner'] as $name){$body=$catalog['routines'][$name]??'';$version=$name==='out_assert_student'?'out_v2':'out_v1';if(!str_contains($body,$version))$steps[]=$name;}
+    foreach(['out_assert_student','out_assert_owner'] as $name){$body=$catalog['routines'][$name]??'';$version=$name==='out_assert_student'?'out_v3':'out_v1';if(!str_contains($body,$version))$steps[]=$name;}
     foreach(['tagihan_spp','tagihan_komite','tagihan_daftar_ulang'] as $t){
         $c=$catalog['columns'][$t.'_data']['out_period_id']??null;
         if(!$c)$steps[]='extend_'.$t;
@@ -38,6 +38,8 @@ function sout_schema_apply(mysqli $db): int {
     if(PHP_SAPI!=='cli')throw new LogicException('Gunakan installer CLI OUT.');
     $steps=sout_schema_plan($db);if(!$steps)return 0;
     $collation=$db->query('SELECT DEFAULT_COLLATION_NAME FROM information_schema.SCHEMATA WHERE SCHEMA_NAME=DATABASE()')->fetch_row()[0];if(!preg_match('/^utf8mb4_[a-z0-9_]+$/D',$collation))throw new RuntimeException('Kolasi database OUT tidak didukung.');
+    $nisCollation=$db->query("SELECT COLLATION_NAME FROM information_schema.COLUMNS WHERE TABLE_SCHEMA=DATABASE() AND TABLE_NAME='siswa_data' AND COLUMN_NAME='NO_INDUK'")->fetch_row()[0]??'';
+    if(!preg_match('/^utf8mb4_[a-z0-9_]+$/D',$nisCollation))throw new RuntimeException('Kolasi NIS siswa tidak didukung.');
     $db->query("CREATE TABLE IF NOT EXISTS student_out_periods_data (
         id BIGINT NOT NULL AUTO_INCREMENT PRIMARY KEY,unit_id TINYINT UNSIGNED NOT NULL,student_id INT NOT NULL,
         departed_at DATETIME NOT NULL,first_free_month DATE NOT NULL,departure_year CHAR(9) NOT NULL,
@@ -61,8 +63,8 @@ function sout_schema_apply(mysqli $db): int {
     $db->query("CREATE PROCEDURE out_assert_student(IN p_unit INT,IN p_nis VARCHAR(255)) BEGIN
         DECLARE v_id INT DEFAULT NULL;DECLARE v_out INT DEFAULT 0;
         SELECT s.id,(s.KELAS='OUT' OR COALESCE(m.jenis,'')='out' OR (s.master_kelas_id IS NULL AND EXISTS(SELECT 1 FROM legacy_op_owners_data o WHERE o.unit_id=s.unit_id AND o.student_id=s.id AND o.kind='out')) OR EXISTS(SELECT 1 FROM student_out_periods_data o WHERE o.student_id=s.id AND o.unit_id=s.unit_id AND o.returned_at IS NULL))
-          INTO v_id,v_out FROM siswa_data s LEFT JOIN master_kelas_data m ON m.id=s.master_kelas_id AND m.unit_id=s.unit_id WHERE s.unit_id=p_unit AND s.NO_INDUK=p_nis FOR SHARE;
-        IF v_out=1 THEN SIGNAL SQLSTATE '45000' SET MESSAGE_TEXT='Siswa OUT tidak dapat melakukan transaksi (out_v2)'; END IF;
+          INTO v_id,v_out FROM siswa_data s LEFT JOIN master_kelas_data m ON m.id=s.master_kelas_id AND m.unit_id=s.unit_id WHERE s.unit_id=p_unit AND s.NO_INDUK=p_nis COLLATE $nisCollation FOR SHARE;
+        IF v_out=1 THEN SIGNAL SQLSTATE '45000' SET MESSAGE_TEXT='Siswa OUT tidak dapat melakukan transaksi (out_v3)'; END IF;
     END");
     $db->query('DROP PROCEDURE IF EXISTS out_assert_owner');
     $db->query("CREATE PROCEDURE out_assert_owner(IN p_unit INT,IN p_owner BIGINT) BEGIN

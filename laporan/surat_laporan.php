@@ -29,7 +29,6 @@ require_once __DIR__.'/../includes/read_session.php';read_session_release();
     <div class="report-catalog-v2 letter-catalog">
       <section class="report-catalog-intro">
         <div class="report-catalog-intro-copy"><span class="report-eyebrow">SURAT LAPORAN</span><h1>Pilih surat yang dibutuhkan</h1></div>
-        <div class="report-catalog-overview" aria-label="Jumlah pilihan surat"><strong>2</strong></div>
       </section>
       <section class="report-catalog-section letter-catalog-section" aria-label="Pilihan surat laporan">
         <div class="report-catalog-grid">

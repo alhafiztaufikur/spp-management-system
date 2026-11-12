@@ -1,0 +1,20 @@
+.global-total-summary{box-sizing:border-box;width:480px;max-width:100%;margin:20px 0 18px auto;color:var(--text-primary,#17231d);font-variant-numeric:tabular-nums}
+.global-total-summary h3{margin:0!important;padding:10px 14px;text-align:left!important;font:700 14px/1.4 var(--font-body,"Segoe UI",Arial,sans-serif);background:var(--bg-surface,#f3f7f4);border:1px solid var(--border,#cbd8d0);border-bottom:0;border-radius:8px 8px 0 0}
+.global-total-summary table{width:100%!important;min-width:0!important;border-collapse:collapse;table-layout:fixed;margin:0!important}
+.global-total-summary th,.global-total-summary td{padding:10px 14px!important;border:1px solid var(--border,#cbd8d0);font-size:14px;line-height:1.45;vertical-align:middle;background:var(--bg-card,#fff);color:inherit}
+.global-total-summary th{text-align:left!important;font-weight:600;overflow-wrap:anywhere}.global-total-summary td{text-align:right!important;font-weight:700;white-space:nowrap}
+.global-total-summary tr:last-child th,.global-total-summary tr:last-child td{border-top:2px solid var(--border-hover,#8aa798);font-weight:700}
+.report-header-nowrap{white-space:nowrap!important}
+.global-total-summary col:first-child{width:60%!important}.global-total-summary col:last-child{width:40%!important}
+.global-report-desktop-totals{display:none}
+@media screen and (min-width:1024px){
+ #global-report-workspace .global-report-desktop-totals{display:flow-root}
+ #global-report-workspace .global-report-legacy-totals{display:none!important}
+ #global-report-workspace :is(.report-table-report-filter-setoran,.report-table-report-filter-kas-tabungan)>.global-report-desktop-totals{margin-inline:24px}
+}
+@media print{
+ .global-total-summary{width:95mm;max-width:100%;margin:12pt 0 10pt auto;page-break-inside:avoid;break-inside:avoid;color:#000}
+ .global-total-summary h3{font:700 10pt/1.35 "Times New Roman",serif;background:#fff;border:0;border-bottom:.65pt solid #000;border-radius:0;padding:5pt 4pt;page-break-after:avoid}
+ .global-total-summary th,.global-total-summary td{font:600 9pt/1.4 "Times New Roman",serif;padding:5pt 4pt!important;background:#fff;color:#000;border:0;border-bottom:.5pt solid #999}
+ .global-total-summary td{font-weight:700}.global-total-summary tr:last-child th,.global-total-summary tr:last-child td{border-top:.65pt solid #000;border-bottom:.65pt solid #000}
+}

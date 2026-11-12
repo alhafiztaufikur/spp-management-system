@@ -31,6 +31,9 @@ function billing_history_add(array &$total,?float $value): void {
     $total+=['value'=>0.0,'known'=>0,'unknown'=>false];
     if($value===null)$total['unknown']=true;else{$total['value']+=$value;$total['known']++;}
 }
+function billing_history_grand_amount(array $amount): string {
+    return !empty($amount['known'])?report_money($amount['value']):'—';
+}
 function billing_history_view(mysqli $db,array $report,array $filters): array {
     $years=$filters['_billing_years']??[du_current_academic_year()];$all=filter_is_all($years);$items=[];
     if(isset($report['_billing_groups']))foreach($report['_billing_groups'] as $student)array_push($items,...$student['items']);
@@ -128,7 +131,7 @@ function billing_history_table(array $view,?array $visible=null,bool $export=fal
       <?php foreach($view['columns'] as $c=>$label): ?><td class="money billing-component"><span class="billing-matrix-amount"><?= report_e(billing_history_amount($row['amounts'][$c]??[],$c)) ?></span></td><?php endforeach; ?>
       <td class="money billing-total"><?= report_e(billing_history_amount($row['total'])) ?></td><td class="billing-description"><?= report_e($row['keterangan']) ?></td>
     </tr><?php endforeach; ?>
-    </tbody><?php if($subtotal): ?><tfoot><tr><th colspan="3">Jumlah Rombel<?= $export?'':' (seluruh hasil filter)' ?></th><?php foreach($view['columns'] as $c=>$label): ?><td class="money"><?= report_e(billing_history_amount($s['amounts'][$c]??[],$c)) ?></td><?php endforeach; ?><td class="money billing-total-column"><?= report_e(billing_history_amount($s['total'])) ?></td><td class="billing-description-column"></td></tr></tfoot><?php endif; ?></table></div></section>
-    <?php } ?><?php if($showGrand): ?><p class="billing-grand-total"><strong>Total Tunggakan Keseluruhan (seluruh hasil filter): <?= report_e(billing_history_amount($view['grand']['total'])) ?></strong></p><?php endif; ?>
+    </tbody><?php if($subtotal): ?><tfoot><tr><th colspan="3">Jumlah Rombel</th><?php foreach($view['columns'] as $c=>$label): ?><td class="money"><?= report_e(billing_history_amount($s['amounts'][$c]??[],$c)) ?></td><?php endforeach; ?><td class="money billing-total-column"><?= report_e(billing_history_amount($s['total'])) ?></td><td class="billing-description-column"></td></tr></tfoot><?php endif; ?></table></div></section>
+    <?php } ?><?php if($showGrand): ?><p class="billing-grand-total"><strong>Total Tunggakan Keseluruhan: <?= report_e(billing_history_grand_amount($view['grand']['total'])) ?></strong></p><?php endif; ?>
     <?php return ob_get_clean();
 }

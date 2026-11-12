@@ -3,7 +3,6 @@ document.addEventListener('DOMContentLoaded', () => {
   const category = document.querySelector('[data-report-item-category]');
   const form = category?.closest('form');
   if (!form) return;
-  const notice = form.querySelector('[data-report-filter-pending]');
   const exports = document.querySelectorAll('.report-export-btn');
   const monthly = new Set(['spp', 'komite']);
   const annual = new Set(window.sppAnnualReportCategories || []);
@@ -11,7 +10,6 @@ document.addEventListener('DOMContentLoaded', () => {
   let pending = false;
   function markPending() {
     pending = true;
-    if (notice) notice.hidden = false;
     exports.forEach(link => link.setAttribute('aria-disabled', 'true'));
   }
   function syncPeriods() {
@@ -43,7 +41,6 @@ document.addEventListener('DOMContentLoaded', () => {
   exports.forEach(link => link.addEventListener('click', event => {
     if (!pending) return;
     event.preventDefault();
-    notice?.scrollIntoView({block: 'nearest'});
     form.querySelector('[type="submit"]')?.focus({preventScroll: true});
   }));
   syncPeriods();
