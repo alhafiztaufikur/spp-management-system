@@ -53,3 +53,23 @@ function global_report_totals_html(array $totals,string $template,bool $print=fa
     if(!$totals)return '';
     ob_start(); ?><section class="global-total-summary<?= $print?' is-print':'' ?>" aria-label="Total Rupiah"><h3>Total Rupiah</h3><table><colgroup><col style="width:65%"><col style="width:35%"></colgroup><tbody><?php foreach($totals as $total): ?><tr><th scope="row"><?= report_e($total['label']) ?></th><td><?= report_e($currency?report_money($total['value']):preg_replace('/^Rp /','',report_money($total['value']))) ?></td></tr><?php endforeach; ?></tbody></table></section><?php return ob_get_clean();
 }
+
+/** Screen-only cards; print and export keep their existing summary renderers. */
+function global_report_total_cards_html(array $totals): string {
+    if(!$totals)return '';
+    $primaryKeys=['total_penerimaan','total_bersih'];
+    $secondaryCount=count(array_filter($totals,static fn($total)=>!in_array($total['key']??'', $primaryKeys,true)));
+    ob_start(); ?>
+    <section class="global-report-screen-totals" aria-label="Total Rupiah">
+        <h3>Total Rupiah</h3>
+        <div class="global-report-total-grid" style="--report-total-columns:<?= max(1,min(4,$secondaryCount)) ?>">
+            <?php foreach($totals as $total): ?>
+            <div class="global-report-total-card<?= in_array($total['key']??'', $primaryKeys,true)?' is-primary':'' ?>">
+                <span><?= report_e($total['label']) ?></span>
+                <strong><?= report_e(report_money($total['value'])) ?></strong>
+            </div>
+            <?php endforeach; ?>
+        </div>
+    </section>
+    <?php return ob_get_clean();
+}

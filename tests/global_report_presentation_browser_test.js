@@ -22,8 +22,8 @@ const routes=['dashboard.php','master_spp.php','master_kelas.php','master_daftar
     if(unit!==0&&width===1440){await page.locator('#letter-principal-add').click();await radii(`dialog ${unit}/${theme}`);await page.keyboard.press('Escape');}
     await page.goto(base+'/laporan/template.php?'+query({...common,unit:unit===0?'all':String(unit),template:'penerimaan'}));await radii(`report ${unit}/${width}/${theme}`);
     assert(await page.evaluate(()=>document.documentElement.scrollWidth<=innerWidth+2),'Desktop page overflow');
-    const summary=page.locator('.global-total-summary');if(await summary.count()){
-      const b=await summary.boundingBox();assert(b.width<=481&&b.x+b.width<=width,'Summary fits');assert.equal(await summary.locator('h3').evaluate(n=>getComputedStyle(n).textAlign),'left');assert.equal(await summary.locator('td').first().evaluate(n=>getComputedStyle(n).textAlign),'right');
+    const summary=page.locator('.global-report-screen-totals:visible');if(await summary.count()){
+      const b=await summary.boundingBox();assert(b.x+b.width<=width,'Summary fits');assert.equal(await summary.locator('h3').evaluate(n=>getComputedStyle(n).textAlign),'left');assert(await summary.locator('.global-report-total-card').evaluateAll(ns=>ns.every(n=>getComputedStyle(n).backgroundColor==='rgba(0, 0, 0, 0)')),'Transparent cards');
     }
     if(width===1440)await page.screenshot({path:path.join(out,`totals-u${unit}-${theme}.png`),fullPage:true});
    }

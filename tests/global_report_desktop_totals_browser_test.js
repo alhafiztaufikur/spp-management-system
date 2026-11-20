@@ -49,41 +49,39 @@ async function oldTotals(page,template){
     baseline[key]={rows:await financialRows(page),totals:await oldTotals(page,template),surfaces:{}};
    }else{
     const rows=await financialRows(page);assert.deepEqual(rows,baseline[key].rows,key+' detail/subtotal values');
-    for(const width of [1280,1440,1920])for(const theme of ['light','dark']){
+    for(const width of [390,800,1023,1280,1440,1920])for(const theme of ['light','dark']){
      await setView(page,width,theme);
-     const summary=page.locator('.global-total-summary:visible');
+     const summary=page.locator('.global-report-screen-totals:visible');
      assert.equal(await summary.count(),baseline[key].totals.length?1:0,key+' one summary');
      if(await summary.count()){
       const box=await summary.boundingBox(),shell=await page.locator('.report-template-shell').boundingBox();
-      assert(box.width<=480.1&&box.width>0,key+' compact width');assert(box.x+box.width<=shell.x+shell.width+1,key+' fits shell');
-      assert(box.x>shell.x+shell.width/2-241,key+' aligned right');
-      const cells=await summary.locator('tbody tr').evaluateAll(ns=>ns.map(n=>[n.querySelector('th').textContent,n.querySelector('td').textContent]));
+      assert(box.width>0,key+' visible cards');assert(box.x+box.width<=shell.x+shell.width+1,key+' fits shell');
+      const cells=await summary.locator('.global-report-total-card').evaluateAll(ns=>ns.map(n=>[n.querySelector('span').textContent,n.querySelector('strong').textContent]));
       if(cash.has(template)){
        assert.equal(cells.at(-1)[1],baseline[key].totals[0][1],key+' cash closing amount');
        assert.deepEqual(cells.map(r=>r[0]),template==='setoran'?['Total Setoran']:['Total Tabungan Masuk','Total Tabungan Keluar','Mutasi Bersih']);
       }else assert.deepEqual(cells,baseline[key].totals,key+' labels/order/amounts');
       assert.equal(await summary.locator('h3').evaluate(n=>getComputedStyle(n).textAlign),'left');
-      assert(await summary.locator('th').evaluateAll(ns=>ns.every(n=>getComputedStyle(n).textAlign==='left')));
-      assert(await summary.locator('td').evaluateAll(ns=>ns.every(n=>getComputedStyle(n).textAlign==='right'&&+getComputedStyle(n).fontWeight>=700&&n.scrollWidth<=n.clientWidth+1)),key+' readable amounts');
+      assert(await summary.locator('.global-report-total-card').evaluateAll(ns=>ns.every(n=>getComputedStyle(n).backgroundColor==='rgba(0, 0, 0, 0)')),key+' transparent cards');
+      assert(await summary.locator('strong').evaluateAll(ns=>ns.every(n=>+getComputedStyle(n).fontWeight>=700&&getComputedStyle(n).opacity==='1'&&n.scrollWidth<=n.clientWidth+1)),key+' readable amounts');
      }
-     assert.equal(await page.locator('.report-total-section:visible,.report-settlement-total-card:visible,.billing-grand-total:visible').count(),0,key+' no duplicate closing');
+     assert.equal(await page.locator('.report-total-section:visible,.report-settlement-total-card:visible,.billing-grand-total:visible,.global-total-summary:visible').count(),0,key+' no duplicate closing');
      results.push({key,width,theme});
     }
     if(unit===1&&changed.has(template))await page.screenshot({path:path.join(out,template+'.png'),fullPage:true});
    }
-   for(const width of [800,1023])for(const theme of ['light','dark']){
-    await setView(page,width,theme);const k=width+'/'+theme,value=await snapshot(page);
-    if(baselineMode)baseline[key].surfaces[k]=value;else assert.deepEqual(value,baseline[key].surfaces[k],key+' mobile '+k);
-   }
    await setView(page,1440,'light','print');const print=await snapshot(page);
-   if(baselineMode)baseline[key].surfaces.print=print;else assert.deepEqual(print,baseline[key].surfaces.print,key+' print unchanged');
+   if(baselineMode)baseline[key].surfaces.print=print;else {
+    assert.deepEqual(print,baseline[key].surfaces.print,key+' print unchanged');
+    assert.equal(await page.locator('.global-report-screen-totals:visible').count(),0,key+' cards excluded from print');
+   }
    await page.emulateMedia({media:'screen'});
    if(!baselineMode&&!cash.has(template)&&baseline[key].totals.length){
-    await page.setViewportSize({width:1440,height:1000});const before=await page.locator('.global-total-summary:visible').innerText();
+    await page.setViewportSize({width:1440,height:1000});const before=await page.locator('.global-report-screen-totals:visible').innerText();
     const next=page.locator('a').filter({hasText:/^Selanjutnya/}).last();
     if(await next.count()){
      const href=await next.getAttribute('href');if(href&&href.includes('page=')){
-      await page.goto(new URL(href,page.url()).href);assert.equal(await page.locator('.global-total-summary:visible').innerText(),before,key+' pagination total');paginationChecks++;
+      await page.goto(new URL(href,page.url()).href);assert.equal(await page.locator('.global-report-screen-totals:visible').innerText(),before,key+' pagination total');paginationChecks++;
      }
     }
    }
@@ -96,7 +94,7 @@ async function oldTotals(page,template){
     await page.goto(base+'/laporan/template.php?'+q);await setView(page,1440,'light');
     assert.equal(await page.locator('.report-template-alert').count(),0,template+' empty report');
     assert(!/NaN|undefined/.test(await page.locator('.report-template-shell').innerText()),template+' empty amounts');
-    if(template==='riwayat-tagihan')assert.equal(await page.locator('.global-total-summary td').innerText(),'—');
+    if(template==='riwayat-tagihan')assert.equal(await page.locator('.global-report-screen-totals strong').innerText(),'—');
    }
    for(const template of changed){
     const q=params(template,0);q.delete('kelas');
@@ -105,7 +103,7 @@ async function oldTotals(page,template){
     }
     await page.goto(base+'/laporan/template.php?'+q);await setView(page,1440,'light');
     assert.equal(await page.locator('.report-template-alert').count(),0,template+' combined units');
-    const actual=await page.locator('.global-total-summary:visible tbody tr').evaluateAll(ns=>ns.map(n=>[n.querySelector('th').textContent,n.querySelector('td').textContent]));
+    const actual=await page.locator('.global-report-screen-totals:visible .global-report-total-card').evaluateAll(ns=>ns.map(n=>[n.querySelector('span').textContent,n.querySelector('strong').textContent]));
     const expected=await oldTotals(page,template);
     if(cash.has(template))assert.equal(actual.at(-1)[1],expected[0][1],template+' combined cash');
     else assert.deepEqual(actual,expected,template+' complete combined totals');
@@ -117,18 +115,18 @@ async function oldTotals(page,template){
     }
    }
    await page.goto(base+'/laporan/template.php?'+params('status',1));
-   const edge=fs.readFileSync(path.join(out,'edge-summary.html'),'utf8');
-   await page.locator('.global-report-desktop-totals').evaluate((n,html)=>{n.innerHTML=html},edge);
-   for(const width of [1280,1440,1920])for(const theme of ['light','dark']){
-    await setView(page,width,theme);const summary=page.locator('.global-total-summary:visible');
+   const edge=fs.readFileSync(path.join(out,'edge-cards.html'),'utf8');
+   await page.locator('.global-report-screen-totals').evaluate((n,html)=>{n.outerHTML=html},edge);
+   for(const width of [390,800,1280,1440,1920])for(const theme of ['light','dark']){
+    await setView(page,width,theme);const summary=page.locator('.global-report-screen-totals:visible');
     assert.equal(await summary.count(),1);assert.equal(await summary.locator('script').count(),0);
-    assert.deepEqual(await summary.locator('td').allTextContents(),['Rp 1.234.567.890.123,25','Rp -125,25','Rp 0','—']);
-    assert(await summary.locator('th,td').evaluateAll(ns=>ns.every(n=>n.scrollWidth<=n.clientWidth+1)),'Long label/large amount fits');
+    assert.deepEqual(await summary.locator('strong').allTextContents(),['Rp 1.234.567.890.123,25','Rp -125,25','Rp 0','—']);
+    assert(await summary.locator('span,strong').evaluateAll(ns=>ns.every(n=>n.scrollWidth<=n.clientWidth+1)),'Long label/large amount fits');
    }
    console.log('PASS '+paginationChecks+' pagination checks, 10 empty reports, 5 full combined-unit reports, long/escaped labels, large/negative/fractional/zero/unknown amounts.');
   }
   assert.deepEqual(errors,[]);
   fs.writeFileSync(baselineMode?file:path.join(out,edgesOnly?'edges-results.json':'results.json'),JSON.stringify(baselineMode?baseline:results,null,2));
-  console.log('PASS '+(baselineMode?'40 baseline models and mobile/print surfaces.':edgesOnly?'desktop totals edge scenarios.':results.length+' desktop checks, 40 source value comparisons, 160 mobile and 40 print comparisons.'));
+  console.log('PASS '+(baselineMode?'40 baseline models and print surfaces.':edgesOnly?'card totals edge scenarios.':results.length+' desktop/mobile card checks, 40 source value and unchanged-print comparisons.'));
  }finally{await browser.close();}
 })().catch(e=>{console.error(e);process.exit(1)});
