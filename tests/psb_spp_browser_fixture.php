@@ -14,8 +14,21 @@ if($action==='setup'){
     foreach([1,2,3] as $unit){$_SESSION['active_unit_id']=$unit;unit_set_context($db,$unit);[$first]=unit_level_bounds();$out['units'][$unit]=['psb'=>(int)hp_one($db,'SELECT id FROM master_kelas WHERE tingkat=0 AND is_active=1 LIMIT 1')['id'],'entry'=>(int)hp_one($db,"SELECT id FROM master_kelas WHERE tingkat=? AND is_active=1 AND is_placeholder=0 LIMIT 1",[$first])['id'],'first'=>$first];}
     file_put_contents($file,json_encode($out,JSON_PRETTY_PRINT|JSON_THROW_ON_ERROR));echo 'Fixture sessions ready; no student or money created.'.PHP_EOL;exit;
 }
+if ($action === 'unlink-psb') {
+    $unit = (int)($argv[2] ?? 0);
+    $nis = $argv[3] ?? '';
+    $prefix = '998811' . (getenv('SPP_PSB_RUN') ?: '23');
+    if (!in_array($unit, [1, 2, 3], true) || !in_array($nis, [$prefix . '01', $prefix . '02'], true)) {
+        throw new RuntimeException('Expected a test student in an operational unit.');
+    }
+    unit_set_context($db, $unit);
+    $student = hp_one($db, "SELECT id FROM siswa WHERE NO_INDUK=? AND KELAS='0'", [$nis]);
+    if (!$student || pspp_find($db, (int)$student['id'])) throw new RuntimeException('Expected a PSB fixture without a plan.');
+    lf_query($db, 'UPDATE siswa SET master_kelas_id=NULL WHERE id=?', [(int)$student['id']]);
+    exit;
+}
 if($action==='state'){
-    $out=[];foreach([1,2,3] as $unit){unit_set_context($db,$unit);foreach(['998811'.(getenv('SPP_PSB_RUN')?:'23').'01','998811'.(getenv('SPP_PSB_RUN')?:'23').'02'] as $nis){$s=hp_one($db,'SELECT id,NO_INDUK,NAMA,KELAS FROM siswa WHERE NO_INDUK=?',[$nis]);if(!$s)continue;$out[$unit][$nis]=$s+['plan'=>pspp_find($db,(int)$s['id']),'bills'=>hp_rows($db,'SELECT id,bulan,tahun,nominal_tagihan,penempatan_id FROM tagihan_spp WHERE no_induk=? ORDER BY tahun,bulan',[$nis]),'payments'=>hp_rows($db,'SELECT id,U_SPP,U_KOMITE,KELAS,riwayat_kelas_snapshot,riwayat_tahun_ajaran,TGL_BYR FROM bayar WHERE NO_INDUK=?',[$nis])];}}
+    $out=[];foreach([1,2,3] as $unit){unit_set_context($db,$unit);foreach(['998811'.(getenv('SPP_PSB_RUN')?:'23').'01','998811'.(getenv('SPP_PSB_RUN')?:'23').'02'] as $nis){$s=hp_one($db,'SELECT id,NO_INDUK,NAMA,KELAS,master_kelas_id,PSB,POMG FROM siswa WHERE NO_INDUK=?',[$nis]);if(!$s)continue;$out[$unit][$nis]=$s+['plan'=>pspp_find($db,(int)$s['id']),'bills'=>hp_rows($db,'SELECT id,bulan,tahun,nominal_tagihan,penempatan_id FROM tagihan_spp WHERE no_induk=? ORDER BY tahun,bulan',[$nis]),'payments'=>hp_rows($db,'SELECT id,U_SPP,U_KOMITE,KELAS,riwayat_kelas_snapshot,riwayat_tahun_ajaran,TGL_BYR FROM bayar WHERE NO_INDUK=?',[$nis])];}}
     echo json_encode($out,JSON_THROW_ON_ERROR);exit;
 }
 throw new RuntimeException('Unknown action');

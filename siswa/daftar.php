@@ -65,16 +65,22 @@ function student_redirect(string $location = 'daftar.php'): void {
     exit;
 }
 
-function fail_student(string $message, array $oldInput, string $location): void {
-    $_SESSION['flash'] = ['type' => 'error', 'msg' => $message];
+function fail_student(string $message, array $oldInput, string $location, bool $inline = false): void {
+    $_SESSION['flash'] = ['type' => 'error', 'msg' => $message, 'inline' => $inline];
     $_SESSION['student_old_input'] = array_map(static fn($value)=>is_scalar($value)?(string)$value:'',$oldInput);
     student_redirect($location);
+}
+
+function student_default_psb_class(mysqli $db, ?array $student): int {
+    if (!$student || !empty($student['master_kelas_id']) || !in_array($student['KELAS'], ['0', 'PSB'], true)) return 0;
+    $class = hp_one($db, "SELECT id FROM master_kelas WHERE unit_id=? AND tingkat=0 AND jenis='psb' AND kode_rombel='PSB' AND is_active=1", [(int)$student['unit_id']]);
+    return (int)($class['id'] ?? 0);
 }
 
 function validate_student_identity(mysqli $db, array $source, ?array $current = null): array {
     $noInduk = trim((string)($source['no_induk'] ?? ''));
     $name = trim((string)($source['nama'] ?? ''));
-    $classId = (int)($source['master_kelas_id'] ?? 0);
+    $classId = (int)($source['master_kelas_id'] ?? 0) ?: student_default_psb_class($db, $current);
     if (!preg_match('/^[0-9]{1,10}$/', $noInduk) && (!$current || $noInduk !== (string)$current['NO_INDUK'])) {
         throw new RuntimeException('Nomor induk wajib berupa 1 sampai 10 digit.');
     }
@@ -88,6 +94,17 @@ function validate_student_identity(mysqli $db, array $source, ?array $current = 
     }
     if (!$class) throw new RuntimeException('Pilih kelas/rombel aktif dari Master Kelas.');
     return [$noInduk, $name, class_student_code($class), $classId];
+}
+
+class StudentNominalException extends DomainException {}
+
+function student_optional_nominal(mixed $value, string $label): ?string {
+    if ($value === null || (is_string($value) && trim($value) === '')) return null;
+    try {
+        return sct_amount($value);
+    } catch (DomainException $error) {
+        throw new StudentNominalException('Nominal ' . $label . ' tidak sah. ' . $error->getMessage());
+    }
 }
 
 function reject_removed_student_components(array $source): void {
@@ -142,53 +159,12 @@ if ($_SERVER['REQUEST_METHOD'] === 'POST') {
 
             $targetClass=class_find($koneksi,$classId,false,true);
             $targetKind=class_kind($targetClass);
-            $admissionPlan=$oldStudent?pspp_find($koneksi,$id,true):null;
             [$entryLevel]=unit_level_bounds();
-            $admissionEligible=$targetKind==='psb'||$class==='0'||($targetKind==='reguler'&&(int)$class===$entryLevel);
-            $admissionRequested=$admissionEligible&&(!$oldStudent||$class==='0'||isset($_POST['spp_masuk'])&&(!is_string($_POST['spp_masuk'])||trim($_POST['spp_masuk'])!==''));
-            $admissionRate=null;
-            $admissionUpdateSpp=true;$admissionUpdateKomite=true;
-            if($admissionRequested){
-                foreach(['spp_masuk'=>'SPP','pomg'=>'Komite'] as $field=>$label){
-                    if(!is_string($_POST[$field]??null)||trim($_POST[$field])===''){
-                        $_SESSION['student_fee_error']=$field;
-                        throw new DomainException('Tarif '.$label.' per bulan wajib diisi. Masukkan 0 jika memang tidak ditagihkan.');
-                    }
-                    try{sct_amount($_POST[$field]);}catch(DomainException $e){$_SESSION['student_fee_error']=$field;throw new DomainException('Tarif '.$label.' tidak sah. '.$e->getMessage());}
-                }
-                $admissionRate=sct_amount($_POST['spp_masuk']);
-                $admissionYear=(string)($_POST['spp_masuk_year']??'');
-                $requiredYear=$admissionPlan['label']??($class==='0'?du_next_year():($oldStudent?spp_student_effective_year($koneksi,$noInduk):du_current_academic_year()));
-                if($admissionYear!==$requiredYear)throw new DomainException('Tahun ajaran formulir sudah berubah. Muat ulang Data Siswa.');
-                if($admissionPlan&&!hash_equals(pspp_version($koneksi,$admissionPlan),(string)($_POST['spp_masuk_version']??'')))throw new DomainException('Tarif atau pembayaran sudah berubah. Muat ulang Data Siswa sebelum menyimpan.');
-                if($admissionPlan){
-                    $admissionUpdateSpp=abs((float)$admissionRate-(float)pspp_display_rate($koneksi,$admissionPlan))>.001;
-                    $admissionUpdateKomite=abs((float)sct_amount($_POST['pomg'])-(float)$oldStudent['POMG'])>.001;
-                    if(!$admissionUpdateSpp&&!$admissionUpdateKomite)$admissionRate=null;
-                }
-            }
             $identityOnly=$oldStudent&&student_has_graduated($koneksi,$oldStudent);
             if($identityOnly&&(int)$oldStudent['master_kelas_id']!==$classId)throw new RuntimeException('Kelas lulusan dipertahankan. Edit identitas tidak dapat mengubah kelulusan.');
             $komiteStartMonth = (string)($_POST['komite_mulai_bulan'] ?? '07');
             if (!in_array($komiteStartMonth,['01','02','03','04','05','06','07','08','09','10','11','12'],true)) {
                 throw new RuntimeException('Pilih bulan mulai tagihan Komite yang valid.');
-            }
-            $feeColumns = [
-                'potongan_spp_nominal', 'potongan_psb_nominal', 'PSB', 'POMG', 'DAFTAR_ULANG',
-                'potong_du'
-            ];
-            $postMap = [
-                'potongan_spp_nominal' => 'potongan_spp_nominal', 'potongan_psb_nominal'=>'potongan_psb_nominal',
-                'PSB' => 'psb', 'POMG' => 'pomg',
-                'DAFTAR_ULANG' => 'daftar_ulang',
-                'potong_du' => 'potong_du'
-            ];
-            $values = [];
-            foreach ($feeColumns as $column) {
-                // Stored DECIMAL values use a dot, while form values use Indonesian grouping.
-                // An omitted field must retain its value, not be reparsed as a grouped amount.
-                $values[$column] = $column!=='potongan_spp_nominal'&&array_key_exists($postMap[$column],$_POST)
-                    ? student_amount($_POST[$postMap[$column]]) : (float)($effectiveStudent[$column]??0);
             }
             $nisDiknas = trim((string)($_POST['no_induk_diknas'] ?? $oldStudent['NO_induk_diknas'] ?? ''));
             if ($nisDiknas !== '' && !preg_match('/^[0-9]{10}$/', $nisDiknas)) {
@@ -210,6 +186,41 @@ if ($_SERVER['REQUEST_METHOD'] === 'POST') {
                 if(student_snapshots_differ($before,$after))write_student_audit($koneksi,$id,$noInduk,'update',$before,$after);
                 $koneksi->commit();$_SESSION['flash']=['type'=>'success','msg'=>'Identitas lulusan berhasil disimpan.'];student_redirect('daftar.php?status=archived');
             }
+            $feeInputs = [
+                'PSB' => ['psb', 'Uang PSB'],
+                'potongan_psb_nominal' => ['potongan_psb_nominal', 'Potongan PSB'],
+                'POMG' => ['pomg', 'Komite'],
+                'DAFTAR_ULANG' => ['daftar_ulang', 'Daftar Ulang'],
+                'potong_du' => ['potong_du', 'Potongan Daftar Ulang'],
+            ];
+            $values = ['potongan_spp_nominal' => (float)($effectiveStudent['potongan_spp_nominal'] ?? 0)];
+            $submittedFees = [];
+            foreach ($feeInputs as $column => [$field, $label]) {
+                $submittedFees[$column] = student_optional_nominal($_POST[$field] ?? null, $label);
+                $values[$column] = (float)($submittedFees[$column] ?? $effectiveStudent[$column] ?? 0);
+            }
+
+            $isPsb = $targetKind === 'psb';
+            $admissionEligible = $isPsb || ($targetKind === 'reguler' && (int)$class === $entryLevel);
+            $admissionPlan = $admissionEligible && $oldStudent ? pspp_find($koneksi, $id, true) : null;
+            $submittedSpp = $admissionEligible ? student_optional_nominal($_POST['spp_masuk'] ?? null, 'SPP') : null;
+            $submittedKomite = $submittedFees['POMG'];
+            $admissionUpdateSpp = $submittedSpp !== null && (!$admissionPlan || $submittedSpp !== $admissionPlan['spp_rate']);
+            $komiteChanged = $submittedKomite !== null && (!$oldStudent || $submittedKomite !== $oldStudent['POMG']);
+            $admissionUpdateKomite = $komiteChanged && ($isPsb || $admissionPlan || $admissionUpdateSpp);
+            $admissionRequested = $admissionUpdateSpp || $admissionUpdateKomite;
+            if ($admissionRequested) {
+                $admissionSpp = $submittedSpp ?? $admissionPlan['spp_rate'] ?? $oldStudent['SPP_PERBULAN'] ?? '0.00';
+                $admissionKomite = $submittedKomite ?? $admissionPlan['komite_rate'] ?? $oldStudent['POMG'] ?? '0.00';
+                $yearField = !$isPsb && isset($_POST['spp_masuk_entry_year']) ? 'spp_masuk_entry_year' : 'spp_masuk_year';
+                $admissionYear = (string)($_POST[$yearField] ?? '');
+                $requiredYear = $admissionPlan['label'] ?? ($isPsb ? du_next_year() : ($oldStudent ? spp_student_effective_year($koneksi, $noInduk) : du_current_academic_year()));
+                if ($admissionYear !== $requiredYear) throw new DomainException('Tahun ajaran formulir sudah berubah. Muat ulang Data Siswa.');
+                if (!hash_equals(pspp_version($koneksi, $admissionPlan), (string)($_POST['spp_masuk_version'] ?? ''))) {
+                    throw new DomainException('Tarif atau pembayaran sudah berubah. Muat ulang Data Siswa sebelum menyimpan.');
+                }
+            }
+
             if ($values['potong_du'] > $values['DAFTAR_ULANG']) {
                 throw new RuntimeException('Potongan daftar ulang tidak boleh melebihi tagihan daftar ulang.');
             }
@@ -217,9 +228,6 @@ if ($_SERVER['REQUEST_METHOD'] === 'POST') {
 
             if($values['potongan_psb_nominal']>$values['PSB'])throw new RuntimeException('Potongan PSB tidak boleh melebihi Uang PSB.');
             $asalPsb = $class==='0'?1:(int)($oldStudent['asal_psb']??0);
-            if ($action === 'tambah' && $class === '0' && $values['PSB'] <= 0.001) {
-                throw new RuntimeException('Nominal Uang PSB wajib diisi untuk siswa kelas PSB.');
-            }
             if ($oldStudent) {
                 $oneTimePaid = one_time_fee_status($koneksi, (string)$oldStudent['NO_INDUK'], 0, true);
                 if ($values['PSB']-$values['potongan_psb_nominal'] + 0.001 < $oneTimePaid['psb']['paid']) {
@@ -235,8 +243,11 @@ if ($_SERVER['REQUEST_METHOD'] === 'POST') {
             $effectiveSpp = spp_current_effective_rate($koneksi, $class, $values['potongan_spp_nominal'], $effectiveYear, $oldStudent ? (string)$oldStudent['NO_INDUK'] : null);
             $hasMasterSppRate = $effectiveSpp['year'] !== 'Belum disiapkan';
             if ((!$oldStudent || abs($values['potongan_spp_nominal']-(float)$oldStudent['potongan_spp_nominal'])>.001) && $values['potongan_spp_nominal'] > ($hasMasterSppRate ? (float)$effectiveSpp['base'] : 0) + .001) throw new RuntimeException('Potongan SPP tidak boleh melebihi tarif dasar; siapkan master terlebih dahulu.');
-            $spp = $targetKind!=='reguler' ? 0.0 : ($hasMasterSppRate ? (float)$effectiveSpp['net'] : (float)($oldStudent['SPP_PERBULAN'] ?? 0));
-            if($admissionRate!==null&&$targetKind==='reguler')$spp=(float)$admissionRate;
+            $spp = $isPsb ? (float)($oldStudent['SPP_PERBULAN'] ?? 0) : 0.0;
+            if ($targetKind === 'reguler') {
+                $spp = $hasMasterSppRate ? (float)$effectiveSpp['net'] : (float)($oldStudent['SPP_PERBULAN'] ?? 0);
+                if ($admissionUpdateSpp) $spp = (float)$admissionSpp;
+            }
             $sppDiscountAmount = $values['potongan_spp_nominal'];
             $psb = $values['PSB'];
             $psbDiscountAmount=$values['potongan_psb_nominal'];
@@ -272,7 +283,7 @@ if ($_SERVER['REQUEST_METHOD'] === 'POST') {
                 $outResult = sout_transition($koneksi,$id,$oldStudent,$targetKind,(int)$_SESSION['admin_id']);
                 $active=$outResult['is_active'];
                 $placementId = class_sync_student_current_year($koneksi, $noInduk, $classId, $spp, $pomg, $active===1, $tariffSync);
-                $admissionResult=$admissionRate!==null?pspp_save($koneksi,$id,$admissionRate,sct_amount($_POST['pomg']),$admissionYear):['changed'=>0];
+                if ($admissionRequested) pspp_save($koneksi, $id, $admissionSpp, $admissionKomite, $admissionYear);
                 $startChanged=$placementId?komite_set_start_month($koneksi,$placementId,$komiteStartMonth):false;
                 if ($placementId) du_create_bill_for_placement($koneksi, $placementId);
                 $stateStmt=$koneksi->prepare('UPDATE siswa SET is_active=?,asal_psb=? WHERE id=?');$stateStmt->bind_param('iii',$active,$asalPsb,$id);$stateStmt->execute();$stateStmt->close();
@@ -304,8 +315,11 @@ if ($_SERVER['REQUEST_METHOD'] === 'POST') {
                 $outResult = sout_transition($koneksi,$id,$oldStudent,$targetKind,(int)$_SESSION['admin_id']);
                 $active=$outResult['is_active'];
                 $placementId = class_sync_student_current_year($koneksi, $noInduk, $classId, $spp, $pomg, $active === 1, $tariffSync);
-                $admissionCurrent=pspp_find($koneksi,$id,true);
-                $admissionResult=$admissionRate!==null?pspp_save($koneksi,$id,$admissionRate,sct_amount($_POST['pomg']),$admissionYear,pspp_version($koneksi,$admissionCurrent),$admissionUpdateSpp,$admissionUpdateKomite):['changed'=>0];
+                if ($admissionRequested) {
+                    $admissionCurrent = pspp_find($koneksi, $id, true);
+                    pspp_save($koneksi, $id, $admissionSpp, $admissionKomite, $admissionYear, pspp_version($koneksi, $admissionCurrent),
+                        !$admissionCurrent || $admissionUpdateSpp, !$admissionCurrent || $admissionUpdateKomite);
+                }
                 $sppDiscountSync = $active === 1 && $placementId
                     ? spp_sync_student_discount($koneksi, $noInduk, $sppDiscountAmount, $placementId)
                     : ['updated' => 0, 'locked' => 0];
@@ -330,7 +344,7 @@ if ($_SERVER['REQUEST_METHOD'] === 'POST') {
                 $repairedComponents = array_values(array_diff($syncedComponents, $requestedComponents));
                 $lockedRequested = array_values(array_intersect($lockedComponents, $requestedComponents));
                 $masterChanged = student_snapshots_differ($before, $afterSnapshot);
-                $hasEffectiveChange = $masterChanged || count($syncedComponents) > 0 || !empty($startChanged)||!empty($admissionResult['changed']);
+                $hasEffectiveChange = $masterChanged || count($syncedComponents) > 0 || $startChanged || $admissionRequested;
 
                 if (!$hasEffectiveChange) {
                     $koneksi->commit();
@@ -357,6 +371,7 @@ if ($_SERVER['REQUEST_METHOD'] === 'POST') {
 
                 $messageParts = [];
                 if ($masterChanged) $messageParts[] = "Data siswa $name berhasil diperbarui.";
+                if ($admissionRequested) $messageParts[] = 'Tarif masuk berhasil disimpan.';
                 if (!empty($startChanged)) $messageParts[] = 'Bulan mulai tagihan Komite diperbarui.';
                 if ($updatedComponents) {
                     $messageParts[] = count($updatedComponents) . ' komponen tagihan tahun ' . $syncAudit['tahun_ajaran'] . ' ikut diperbarui.';
@@ -431,7 +446,7 @@ if ($_SERVER['REQUEST_METHOD'] === 'POST') {
         }
     } catch (Throwable $error) {
         try { $koneksi->rollback(); } catch (Throwable $ignored) {}
-        fail_student($error->getMessage(), $_POST, $returnLocation);
+        fail_student($error->getMessage(), $_POST, $returnLocation, $error instanceof StudentNominalException);
     }
 }
 
@@ -476,6 +491,7 @@ $offset = ($page - 1) * $perPage;
 
 $stmtList = $koneksi->prepare("
     SELECT s.*, mk.jenis AS rombel_jenis, mk.nama_custom AS rombel_nama, mk.tingkat AS master_tingkat, mk.kode_rombel, mk.is_placeholder,
+      COALESCE(admission.spp_rate, s.SPP_PERBULAN) AS display_spp_rate,
       (SELECT COUNT(*) FROM bayar p WHERE p.NO_INDUK = s.NO_INDUK AND p.unit_id=s.unit_id) AS jml_bayar,
       ((SELECT COUNT(*) FROM bayar p WHERE p.NO_INDUK = s.NO_INDUK AND p.unit_id=s.unit_id) +
        (SELECT COUNT(*) FROM bayar_du du WHERE du.no_induk = s.NO_INDUK AND du.unit_id=s.unit_id) +
@@ -483,6 +499,7 @@ $stmtList = $koneksi->prepare("
        (SELECT COUNT(*) FROM transaksi_k tk WHERE tk.NO_INDUK = s.NO_INDUK AND tk.unit_id=s.unit_id)) AS history_count
     FROM $studentReadSource s
     LEFT JOIN master_kelas mk ON mk.id = s.master_kelas_id
+    LEFT JOIN psb_spp_plans admission ON s.KELAS IN ('0', 'PSB') AND admission.unit_id=s.unit_id AND admission.student_id=s.id
     WHERE (? = '' OR s.NO_INDUK LIKE CONCAT('%', ?, '%') OR s.NAMA LIKE CONCAT('%', ?, '%') OR s.NO_induk_diknas LIKE CONCAT('%', ?, '%'))
       AND (? = 0 OR s.master_kelas_id = ?)
       AND (? = 'all' OR CASE ? WHEN 'legacy' THEN s.legacy_pending=1 WHEN 'archived' THEN s.legacy_pending=0 AND s.is_active=0 ELSE s.legacy_pending=0 AND s.is_active=1 END) $studentFilterSql
@@ -536,7 +553,6 @@ $formStudent = $editStudent ? lb_psb_effective($koneksi,$editStudent) : [];
 $formAdmission=$editStudent?pspp_find($koneksi,(int)$editStudent['id']):null;
 [$admissionFirstLevel]=unit_level_bounds();
 $admissionFormYear=$formAdmission['label']??du_next_year();
-$studentFeeError=$_SESSION['student_fee_error']??null;unset($_SESSION['student_fee_error']);
 $editGraduate=$editStudent&&student_has_graduated($koneksi,$editStudent);
 if($editGraduate)$classOptions=array_values(array_filter($classOptions,static fn($c)=>(int)$c['id']===(int)$editStudent['master_kelas_id']));
 $komiteStartMonth = '07';
@@ -574,7 +590,10 @@ $previewDiscount = (float)form_student_value('potongan_spp_nominal', $oldInput, 
 $sppRatePreview = spp_current_effective_rate($koneksi, $previewLevel, $previewDiscount, $editStudentYear, $editStudent ? (string)$editStudent['NO_INDUK'] : null);
 $sppRatesByGrade=[];[$firstGrade,$lastGrade]=unit_level_bounds();foreach(range($firstGrade,$lastGrade) as $grade)$sppRatesByGrade[$grade]=spp_current_effective_rate($koneksi,(string)$grade,0,$editStudentYear,$editStudent ? (string)$editStudent['NO_INDUK'] : null);
 if(in_array($previewLevel,['CUSTOM','OUT'],true))$sppRatePreview=['base'=>0,'net'=>0,'year'=>'Nonakademik'];
-if($formAdmission&&in_array((string)$previewLevel,['0','PSB',(string)$admissionFirstLevel],true))$sppRatePreview=['base'=>(float)pspp_display_rate($koneksi,$formAdmission),'net'=>(float)pspp_display_rate($koneksi,$formAdmission),'year'=>$formAdmission['label']];
+if ($formAdmission && in_array($previewLevel, ['0', 'PSB', (string)$admissionFirstLevel], true)) {
+    $displayRate = (float)pspp_display_rate($koneksi, $formAdmission);
+    $sppRatePreview = ['base' => $displayRate, 'net' => $displayRate, 'year' => $formAdmission['label']];
+}
 ?>
 <!DOCTYPE html>
 <html lang="id" data-palette="<?= unit_palette_for_view(isset($reportUnitId) ? (int)$reportUnitId : null) ?>">
@@ -605,7 +624,7 @@ if($formAdmission&&in_array((string)$previewLevel,['0','PSB',(string)$admissionF
       </div>
 
       <?php if ($flash): ?>
-      <div class="alert alert-<?= htmlspecialchars($flash['type']) ?>" id="flash-msg"><?= htmlspecialchars($flash['msg']) ?></div>
+      <div class="alert alert-<?= htmlspecialchars($flash['type']) ?>" id="flash-msg"<?= !empty($flash['inline']) ? ' data-operation-result-skip role="alert"' : '' ?>><?= htmlspecialchars($flash['msg']) ?></div>
       <?php endif; ?>
 
       <?php
@@ -635,6 +654,7 @@ if($formAdmission&&in_array((string)$previewLevel,['0','PSB',(string)$admissionF
           <input type="hidden" name="aksi" value="<?= $editStudent ? 'update' : 'tambah' ?>" />
           <input type="hidden" name="id" value="<?= (int)($editStudent['id'] ?? 0) ?>" />
           <input type="hidden" name="spp_masuk_year" value="<?= htmlspecialchars($admissionFormYear) ?>" />
+          <input type="hidden" name="spp_masuk_entry_year" value="<?= htmlspecialchars($formAdmission['label'] ?? $editStudentYear) ?>" />
           <input type="hidden" name="spp_masuk_version" value="<?= htmlspecialchars(pspp_version($koneksi,$formAdmission)) ?>" />
           <fieldset class="student-form-fieldset" <?= unit_all_readonly()?'disabled':'' ?>><div class="student-workspace-grid">
             <section class="student-panel student-panel-identity">
@@ -657,7 +677,8 @@ if($formAdmission&&in_array((string)$previewLevel,['0','PSB',(string)$admissionF
             <div class="field-row">
               <label class="field-label" for="kelas-baru">Kelas/Rombel <span class="required-mark" aria-hidden="true">*</span></label>
               <?php
-                $selectedClassId = (int)form_student_value('master_kelas_id', $oldInput, $formStudent, $fieldMap, 0);
+                $selectedClassId = (int)form_student_value('master_kelas_id', $oldInput, $formStudent, $fieldMap, 0)
+                    ?: student_default_psb_class($koneksi, $editStudent);
                 $selectedClassLabel = '';
                 foreach ($classOptions as $classOption) {
                     if ($selectedClassId === (int)$classOption['id']) {
@@ -717,8 +738,8 @@ if($formAdmission&&in_array((string)$previewLevel,['0','PSB',(string)$admissionF
             <section class="student-panel student-panel-fees">
 <div class="student-panel-heading"><div><h3>Komponen Biaya</h3></div></div>            <div class="fields-grid student-money-grid">
               <div class="field-row" id="student-spp-masuk-row">
-                <label class="field-label" for="student-spp_masuk">SPP Kelas <?= $admissionFirstLevel ?> / Bulan <span id="student-admission-year"><?= htmlspecialchars($admissionFormYear) ?></span></label>
-                <input class="field-input rupiah-input student-fee-input" type="text" inputmode="decimal" id="student-spp_masuk" name="spp_masuk" value="<?= htmlspecialchars($oldInput['spp_masuk']??($formAdmission?rupiah_value(pspp_display_rate($koneksi,$formAdmission)):''),ENT_QUOTES,'UTF-8') ?>" <?= $editGraduate?'readonly':'' ?> />
+                <label class="field-label" for="student-spp_masuk">SPP</label>
+                <input class="field-input rupiah-input student-fee-input" type="text" inputmode="decimal" id="student-spp_masuk" name="spp_masuk" value="<?= htmlspecialchars($oldInput['spp_masuk']??($formAdmission?rupiah_value($formAdmission['spp_rate']):''),ENT_QUOTES,'UTF-8') ?>" <?= $editGraduate?'readonly':'' ?> />
               </div>
               <?php
               $feeFields = [
@@ -816,7 +837,7 @@ if($formAdmission&&in_array((string)$previewLevel,['0','PSB',(string)$admissionF
                   'kode_rombel' => $student['kode_rombel'] ?? 'BELUM',
                   'is_placeholder' => $student['is_placeholder'] ?? 1,
                 ])) ?></span><?php if($historyRows): ?><button type="button" class="student-class-history-toggle" aria-expanded="false" aria-controls="<?= $historyId ?>" aria-label="Buka Riwayat Kelas <?= htmlspecialchars($student['NAMA'], ENT_QUOTES, 'UTF-8') ?>" data-student-name="<?= htmlspecialchars($student['NAMA'], ENT_QUOTES, 'UTF-8') ?>"><svg aria-hidden="true" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><path d="M3 12a9 9 0 1 0 3-6.7L3 8"/><path d="M3 3v5h5M12 7v5l3 2"/></svg><span>Riwayat</span><span class="student-class-history-chevron" aria-hidden="true">⌄</span></button><?php endif; ?></div></td>
-                <td data-label="SPP/Bulan" class="nominal">Rp <?= number_format((float)$student['SPP_PERBULAN'], 0, ',', '.') ?></td>
+                <td data-label="SPP/Bulan" class="nominal">Rp <?= rupiah_value((float)$student['display_spp_rate']) ?></td>
                 <td data-label="Status"><span class="master-status <?= $student['is_active'] ? 'is-active' : 'is-inactive' ?>"><?= !empty($student['legacy_pending']) ? 'Legacy — belum aktif' : ($isGraduate ? ($graduateYear!==''?'Lulus · TA '.htmlspecialchars($graduateYear):'Alumni '.(int)$alumniRecord['year']) : ($student['KELAS']==='OUT'?'Out':($student['is_active'] ? 'Aktif' : 'Diarsipkan'))) ?></span></td>
                 <td data-label="Riwayat Transaksi" class="student-history-col"><div class="student-finance-history"><span class="student-finance-total"><?= (int)$student['history_count'] ?> catatan</span><div class="student-finance-actions"><a class="student-finance-link" href="../pembayaran/lihat.php?student_id=<?= (int)$student['id'] ?>&amp;all_periods=1&amp;back_context=<?= mh_return_create('siswa/daftar.php',$_GET,(int)$student['unit_id'],'student',(int)$student['id']) ?>" aria-label="Riwayat pembayaran <?= htmlspecialchars($student['NAMA'],ENT_QUOTES,'UTF-8') ?>"><svg aria-hidden="true" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.8"><path d="M6 3h9l3 3v15H6zM9 10h6M9 14h6"/></svg><span>Pembayaran</span><strong><?= (int)$student['jml_bayar'] ?></strong></a><a class="student-finance-link" href="../tabungan/riwayat.php?student_id=<?= (int)$student['id'] ?>&amp;all_periods=1&amp;back_context=<?= mh_return_create('siswa/daftar.php',$_GET,(int)$student['unit_id'],'student',(int)$student['id']) ?>" aria-label="Riwayat tabungan <?= htmlspecialchars($student['NAMA'],ENT_QUOTES,'UTF-8') ?>"><svg aria-hidden="true" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.8"><path d="M3 6h18v14H3zM3 10h18M15 14h3M5 3h13"/></svg><span>Tabungan</span><strong><?= max(0,(int)$student['history_count']-(int)$student['jml_bayar']) ?></strong></a></div></div></td>
                 <td data-label="Aksi" class="aksi-col">
@@ -863,10 +884,7 @@ if($formAdmission&&in_array((string)$previewLevel,['0','PSB',(string)$admissionF
       </div>
     </main>
   </div>
-  <?php require '../includes/spp_warning_modal.php'; ?>
-
   <script src="../assets/js/date_format.js?v=<?= filemtime(__DIR__ . '/../assets/js/date_format.js') ?>"></script>
-  <script src="../assets/js/workflow_dialogs.js?v=<?= filemtime(__DIR__.'/../assets/js/workflow_dialogs.js') ?>"></script>
   <?php if($editGraduate): ?><script>document.addEventListener('DOMContentLoaded',()=>{const form=document.getElementById('nama-baru').form;form.querySelectorAll('input[name],select[name],textarea[name]').forEach(control=>{if(!['no_induk','nama','no_induk_diknas','master_kelas_id','id','aksi','csrf_token','_operational_unit'].includes(control.name))control.disabled=true;});});</script><?php endif; ?>
 <script src="../assets/js/app.js?v=<?= filemtime(__DIR__ . '/../assets/js/app.js') ?>"></script>
   <script>
@@ -880,13 +898,14 @@ if($formAdmission&&in_array((string)$previewLevel,['0','PSB',(string)$admissionF
       };
       const number = id => Number((document.getElementById(id)?.value || '0').replace(/\./g, '').replace(',', '.')) || 0;
       const updateDerived = () => {
-        const base=Number(document.getElementById('student-spp-base')?.dataset.base||0);
         const effective=document.getElementById('student-spp-effective');
-        const admission=document.getElementById('student-spp_masuk');
-        if(admission&&!admission.disabled&&!document.getElementById('student-spp-masuk-row').hidden){
-          const rate=number('student-spp_masuk');
-          const rateBase=document.getElementById('student-spp-base');rateBase.dataset.base=String(rate);rateBase.textContent='Rp '+format(rate);
-          effective.textContent='Rp '+format(rate);document.getElementById('student-spp-year').textContent=document.getElementById('student-admission-year').textContent;
+        if (!admissionInput.disabled && !admissionRow.hidden) {
+          const rateBase = document.getElementById('student-spp-base');
+          const enteredRate = number(admissionInput.id);
+          const rateChanged = admissionInput.value.trim() !== '' && enteredRate !== admissionConfig.rate;
+          rateBase.textContent = 'Rp ' + format(rateChanged ? enteredRate : Number(rateBase.dataset.base));
+          effective.textContent = rateChanged ? rateBase.textContent : previewEffective;
+          document.getElementById('student-spp-year').textContent = document.getElementById('student-komite-year').textContent;
         }
         document.getElementById('student-total-psb').value=format(Math.max(0,number('student-psb')-number('student-potongan-psb')));
         const heroEffective = document.getElementById('student-hero-effective');
@@ -901,21 +920,25 @@ if($formAdmission&&in_array((string)$previewLevel,['0','PSB',(string)$admissionF
       const classLabel = classPicker?.querySelector('[data-class-picker-label]');
       const admissionInput=document.getElementById('student-spp_masuk');
       const admissionRow=document.getElementById('student-spp-masuk-row');
-      const admissionConfig=<?= json_encode(['first'=>$admissionFirstLevel,'next'=>du_next_year(),'current'=>du_current_academic_year(),'saved'=>$formAdmission['label']??null,'version'=>pspp_version($koneksi,$formAdmission),'editYear'=>$editStudentYear],JSON_HEX_TAG|JSON_HEX_AMP|JSON_HEX_QUOT|JSON_HEX_APOS) ?>;
+      let previewEffective = document.getElementById('student-spp-effective').textContent;
+      const admissionConfig=<?= json_encode(['first'=>$admissionFirstLevel,'next'=>du_next_year(),'current'=>du_current_academic_year(),'saved'=>$formAdmission['label']??null,'rate'=>isset($formAdmission['spp_rate'])?(float)$formAdmission['spp_rate']:null,'version'=>pspp_version($koneksi,$formAdmission),'editYear'=>$editStudentYear],JSON_HEX_TAG|JSON_HEX_AMP|JSON_HEX_QUOT|JSON_HEX_APOS) ?>;
       const updateAdmission=()=>{
         const form=document.getElementById('form-master-siswa');
         const option=[...classPicker.querySelectorAll('[data-class-picker-option]')].find(o=>o.dataset.value===classInput.value);
-        const level=Number(option?.dataset.entryLevel??-1);
-        const eligible=level===0||level===admissionConfig.first;
-        admissionRow.hidden=!eligible;admissionInput.disabled=!eligible;
+        const isPsb = option?.dataset.classKind === 'psb';
+        const eligible = isPsb || (option?.dataset.classKind === 'reguler' && Number(option.dataset.entryLevel) === admissionConfig.first);
+        admissionRow.hidden = !eligible;
+        admissionInput.disabled = !eligible || <?= $editGraduate ? 'true' : 'false' ?>;
         const editing=form.elements.aksi.value==='update';
-        const year=editing&&admissionConfig.saved?admissionConfig.saved:(level===0?admissionConfig.next:(editing?admissionConfig.editYear:admissionConfig.current));
-        form.elements.spp_masuk_year.value=year;
+        const savedYear = editing ? admissionConfig.saved : null;
+        const psbYear = savedYear || admissionConfig.next;
+        const entryYear = savedYear || (editing ? admissionConfig.editYear : admissionConfig.current);
+        form.elements.spp_masuk_year.value = psbYear;
+        form.elements.spp_masuk_entry_year.value = entryYear;
         form.elements.spp_masuk_version.value=editing?admissionConfig.version:'';
-        document.getElementById('student-admission-year').textContent=year;
-        const komiteYear=document.getElementById('student-komite-year');komiteYear.hidden=!eligible;komiteYear.textContent=year;
-        admissionInput.required=eligible&&(!editing||level===0||!!admissionConfig.saved);
-        document.getElementById('student-pomg').required=admissionInput.required;
+        const komiteYear = document.getElementById('student-komite-year');
+        komiteYear.hidden = !eligible;
+        komiteYear.textContent = isPsb ? psbYear : entryYear;
       };
       classPanel?.addEventListener('keydown',event=>{
         const options=[...classPanel.querySelectorAll('[data-class-picker-option]')].filter(o=>!o.hidden);
@@ -939,7 +962,9 @@ if($formAdmission&&in_array((string)$previewLevel,['0','PSB',(string)$admissionF
           classInput.value = this.dataset.value || '';
           updateAdmission();
           const rateBase=document.getElementById('student-spp-base');
-          rateBase.dataset.base=this.dataset.sppBase||'0';rateBase.textContent='Rp '+format(rateBase.dataset.base);
+          rateBase.dataset.base=this.dataset.sppBase||'0';rateBase.textContent='Rp '+format(Number(rateBase.dataset.base));
+          previewEffective = rateBase.textContent;
+          document.getElementById('student-spp-effective').textContent = previewEffective;
           document.getElementById('student-spp-year').textContent=['custom','out','alumni'].includes(this.dataset.classKind)?'Nonakademik':(this.dataset.sppYear||'Belum disiapkan');
           document.getElementById('student-rate-status').textContent=['custom','out','alumni'].includes(this.dataset.classKind)?'Tidak diterbitkan tagihan sekolah otomatis.':'Tarif mengikuti tingkat dan tahun penempatan.';
           updateDerived();
@@ -982,6 +1007,8 @@ if($formAdmission&&in_array((string)$previewLevel,['0','PSB',(string)$admissionF
         const base = document.getElementById('student-spp-base');
         base.dataset.base = '0';
         base.textContent = 'Rp 0';
+        previewEffective = base.textContent;
+        document.getElementById('student-spp-effective').textContent = previewEffective;
         document.getElementById('student-spp-year').textContent = 'Belum disiapkan';
         document.getElementById('student-form-title').textContent = 'Tambah Siswa Baru';
         document.querySelectorAll('[data-student-edit-only]').forEach(element => { element.hidden = true; });
@@ -994,7 +1021,7 @@ if($formAdmission&&in_array((string)$previewLevel,['0','PSB',(string)$admissionF
         nis.focus();
       });
       moneyInputs.forEach(input => input.addEventListener('input', function () {
-        if(['student-spp_masuk','student-pomg'].includes(this.id)&&/[^0-9.,\s]/.test(this.value))return;
+        if (/[^0-9.,\s]/.test(this.value)) return;
         this.value = format(this.value); updateDerived();
       }));
       document.getElementById('form-master-siswa').addEventListener('submit', function (event) {
@@ -1005,17 +1032,10 @@ if($formAdmission&&in_array((string)$previewLevel,['0','PSB',(string)$admissionF
           return;
         }
         classPicker?.classList.remove('has-error');
-        for(const input of [admissionInput,document.getElementById('student-pomg')]){
-          if(!input.disabled&&(input.required&&input.value.trim()===''||input.value.trim()!==''&&!/^(?:[0-9]+|[0-9]{1,3}(?:\.[0-9]{3})+)(?:,[0-9]{1,2})?$/.test(input.value))){
-            event.preventDefault();showSppWarning({code:'student_tariff_required',title:'Periksa tarif siswa',message:'Isi tarif '+(input===admissionInput?'SPP':'Komite')+' per bulan dengan nominal yang sah. Masukkan 0 jika tidak ditagihkan.',target:input.id},input,true);return;
-          }
-        }
-        moneyInputs.forEach(input => input.value = input.value.replace(/\./g, ''));
       });
       updateAdmission();
-      <?php if($studentFeeError): ?>showSppWarning({code:'student_tariff_required',title:'Periksa tarif siswa',message:<?= json_encode($flash['msg']??'Tarif siswa wajib diisi.',JSON_HEX_TAG|JSON_HEX_AMP|JSON_HEX_QUOT|JSON_HEX_APOS) ?>,target:<?= json_encode('student-'.$studentFeeError) ?>},admissionInput,true);<?php endif; ?>
       updateDerived();
-      autoHideFlash();
+      if (!document.querySelector('#flash-msg[data-operation-result-skip]')) autoHideFlash();
     });
   </script>
 </body>

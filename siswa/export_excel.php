@@ -11,9 +11,11 @@ require_once '../includes/student_filters.php';
 [$filterClass,$filterStatus,$classOptions,$studentFilterSql]=student_list_filters($koneksi,$_GET);
 require_once __DIR__.'/../includes/migrated_history.php';$studentReadSource=mh_students_source($koneksi);
 $sql = "
-    SELECT s.*, mk.jenis AS rombel_jenis,mk.nama_custom AS rombel_nama,mk.tingkat AS master_tingkat, mk.kode_rombel, mk.is_placeholder
+    SELECT s.*, mk.jenis AS rombel_jenis,mk.nama_custom AS rombel_nama,mk.tingkat AS master_tingkat, mk.kode_rombel, mk.is_placeholder,
+        COALESCE(admission.spp_rate, s.SPP_PERBULAN) AS display_spp_rate
     FROM $studentReadSource s
     LEFT JOIN master_kelas mk ON mk.id = s.master_kelas_id
+    LEFT JOIN psb_spp_plans admission ON s.KELAS IN ('0', 'PSB') AND admission.unit_id=s.unit_id AND admission.student_id=s.id
     WHERE (? = '' OR s.NO_INDUK LIKE CONCAT('%', ?, '%') OR s.NAMA LIKE CONCAT('%', ?, '%') OR s.NO_induk_diknas LIKE CONCAT('%', ?, '%'))
       AND (? = 0 OR s.master_kelas_id = ?)
       AND (? = 'all' OR CASE ? WHEN 'legacy' THEN s.legacy_pending=1 WHEN 'archived' THEN s.legacy_pending=0 AND s.is_active=0 ELSE s.legacy_pending=0 AND s.is_active=1 END) $studentFilterSql
@@ -48,7 +50,7 @@ $filterLabel = implode(' | ', $filterParts);
 require_once __DIR__.'/../includes/excel.php';
 $columns=[spp_excel_column('no','No','number')];
 if(unit_all_readonly())$columns[]=spp_excel_column('export_unit','Unit');
-$columns=array_merge($columns,[spp_excel_column('NO_INDUK','NIS'),spp_excel_column('NO_induk_diknas','NIS Diknas'),spp_excel_column('NAMA','Nama Siswa'),spp_excel_column('export_class','Kelas/Rombel'),spp_excel_column('SPP_PERBULAN','SPP Per Bulan','money'),spp_excel_column('export_status','Status'),spp_excel_column('history_count','Riwayat Transaksi','number')]);
+$columns=array_merge($columns,[spp_excel_column('NO_INDUK','NIS'),spp_excel_column('NO_induk_diknas','NIS Diknas'),spp_excel_column('NAMA','Nama Siswa'),spp_excel_column('export_class','Kelas/Rombel'),spp_excel_column('display_spp_rate','SPP Per Bulan','money'),spp_excel_column('export_status','Status'),spp_excel_column('history_count','Riwayat Transaksi','number')]);
 foreach($rows as $i=>&$row){$row['no']=$i+1;$row['history_count']=$exportHistory[(int)$row['id']]['total']??0;$row['export_unit']=unit_label((int)$row['unit_id']);$row['export_class']=class_label(['jenis'=>$row['rombel_jenis'],'nama_custom'=>$row['rombel_nama'],'tingkat'=>$row['master_tingkat']?:$row['KELAS'],'kode_rombel'=>$row['kode_rombel']??'BELUM','is_placeholder'=>$row['is_placeholder']??1]);$row['export_status']=!empty($row['legacy_pending'])?'Legacy':((int)$row['is_active']===1?'Aktif':'Arsip/Lulus');}unset($row);
 $doc=spp_excel_document('Data Siswa',$filterLabel,unit_active_id(),[['name'=>'Data Siswa','sections'=>[spp_excel_section('Daftar Siswa - '.count($rows).' siswa',$columns,$rows)]]]);
 $downloadQuery=$_GET;$downloadQuery['download']='1';$backQuery=array_intersect_key($_GET,array_flip(['q','kelas','status','per_page','page']));

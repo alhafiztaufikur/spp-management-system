@@ -6,14 +6,14 @@ berlaku; cakupan SPP historis yang sudah tersimpan tidak dihapus.
 
 ## Penggunaan
 
-Pada Komponen Biaya di Master Siswa, isi tarif SPP dan Komite per bulan. Tahun
-tujuan tampil pada kolom yang sama: pendaftaran PSB 2026/2027 memakai 2027/2028.
-Keduanya wajib diisi pada pendaftaran baru; kosong berbeda dari angka nol.
-Nominal tidak sah ditolak oleh server dan ditampilkan melalui modal pembayaran
-existing. Formulir gagal tetap menyimpan isian. Tarif mendukung dua desimal.
+Tarif SPP dan Komite pada Komponen Biaya bersifat opsional. Kolom kosong saat
+edit mempertahankan tarif tersimpan. Masukkan angka nol untuk menyimpan tarif
+Rp0. Pendaftaran PSB 2026/2027 memakai tahun tujuan 2027/2028. Server menolak
+nominal tidak sah melalui pesan kesalahan formulir dan mempertahankan isian.
+Tarif mendukung dua desimal.
 
-Penyimpanan menyiapkan dua belas bulan Juli–Juni dalam satu transaksi bersama
-identitas siswa, tarif individual, dan audit. PSB lama harus disiapkan secara
+Penyimpanan tarif masuk menyiapkan dua belas bulan Juli–Juni dalam satu transaksi
+bersama identitas siswa, tarif individual, dan audit. PSB lama disiapkan secara
 eksplisit melalui Edit Siswa; pemasangan skema tidak menerbitkan tagihan.
 Pendaftaran langsung pada kelas awal memakai tahun penempatan resminya.
 
@@ -73,7 +73,7 @@ berubah setelah backup diverifikasi, buat dan uji restore backup baru.
 - `tests/psb_spp_admission_test.php`: transaksi tiga unit, NIS sama, tarif, nol,
   validasi basis/periode, pairing, replay, stale form, pembayaran, rombel,
   pergantian tahun, kenaikan kelas, laporan, serta cakupan DU. Fixture rollback.
-- `tests/psb_spp_browser_test.js`: Super Admin/Administrator, modal, draft,
+- `tests/psb_spp_browser_test.js`: Super Admin/Administrator, tarif opsional,
   validasi POST, pembayaran native, pengiriman ulang, kedua jalur penempatan,
   desktop/ponsel, tema dan Semua Unit. Hanya server audit terisolasi.
 - `tests/payment_decimal_format_test.js`: format Rupiah dan round-trip desimal.
