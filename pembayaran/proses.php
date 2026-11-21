@@ -830,7 +830,7 @@ if ($aksi === 'input') {
         }
         financial_request_complete($koneksi, $requestKey, (int)$receipt_ids[0]);
         $koneksi->commit();
-        unset($_SESSION['payment_draft']);
+        unset($_SESSION['payment_draft'], $_SESSION['payment_drafts_by_unit'][unit_active_id()]);
         $_SESSION['flash'] = [
             'type' => 'success',
                 'msg' => $payment_plan === 'annual'
@@ -843,9 +843,11 @@ if ($aksi === 'input') {
                 'bulan' => $payment_plan === 'annual' ? '01' : $bulan_bayar,
                 'tahun' => (string)$tahun_bayar,
                 'source' => 'input',
+                'unit_id' => unit_active_id(),
+                'actor_id' => (int)$_SESSION['admin_id'],
             ],
         ];
-        header('Location: lihat.php');
+        header('Location: form.php');
         exit;
     } catch (Throwable $e) {
         $koneksi->rollback();

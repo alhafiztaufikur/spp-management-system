@@ -65,7 +65,23 @@ function total_after_discount($total, $discount, $fallbackTotal = 0) {
 // Flash message
 $flash = $_SESSION['flash'] ?? null;
 unset($_SESSION['flash']);
-$paymentDraft = $_SESSION['payment_drafts_by_unit'][unit_active_id()] ?? $_SESSION['payment_draft'] ?? null;
+$savedPayment = $flash['print_payment'] ?? null;
+$inputPaymentSaved = ($flash['type'] ?? '') === 'success' && is_array($savedPayment)
+    && ($savedPayment['source'] ?? '') === 'input'
+    && (int)($savedPayment['unit_id'] ?? 0) === unit_active_id()
+    && (int)($savedPayment['actor_id'] ?? 0) === (int)$_SESSION['admin_id'];
+$savedPaymentReceiptUrl = null;
+if ($inputPaymentSaved) {
+    require_once __DIR__.'/../includes/payment_permissions.php';
+    try {
+        $savedPaymentId = (int)($savedPayment['id'] ?? 0);
+        payment_assert_owner($koneksi, $savedPaymentId, (int)$_SESSION['admin_id']);
+        $savedPaymentReceiptUrl = '../laporan/cetak_struk.php?' . http_build_query(['id' => $savedPaymentId]);
+    } catch (Throwable $error) {
+        error_log('Tautan struk setelah input pembayaran tidak tersedia: ' . $error->getMessage());
+    }
+}
+$paymentDraft = $inputPaymentSaved ? null : ($_SESSION['payment_drafts_by_unit'][unit_active_id()] ?? $_SESSION['payment_draft'] ?? null);
 unset($_SESSION['payment_drafts_by_unit'][unit_active_id()]);
 unset($_SESSION['payment_draft']);
 ?>
@@ -81,6 +97,7 @@ unset($_SESSION['payment_draft']);
   <link rel="stylesheet" href="../assets/css/date_controls.css?v=duselector8&amp;mtime=<?= filemtime(__DIR__ . '/../assets/css/date_controls.css') ?>" />
   <link rel="stylesheet" href="../assets/css/payment_history.css?v=<?= filemtime(__DIR__ . "/../assets/css/payment_history.css") ?>">
   <link rel="stylesheet" href="../assets/css/payment_details.css?v=<?= filemtime(__DIR__ . "/../assets/css/payment_details.css") ?>">
+  <link rel="stylesheet" href="../assets/css/payment_saved_feedback.css?v=<?= filemtime(__DIR__.'/../assets/css/payment_saved_feedback.css') ?>">
   <!-- Prevent theme flash -->
   <script>(function(){var t=localStorage.getItem('spp_theme')||'light';document.documentElement.setAttribute('data-theme',t);})();</script>
 <link rel="stylesheet" href="../assets/css/rombel_payment_refinement.css?v=<?= filemtime(__DIR__.'/../assets/css/rombel_payment_refinement.css') ?>">
@@ -111,8 +128,11 @@ unset($_SESSION['payment_draft']);
       </div>
 
       <?php if ($flash && ($flash['scope'] ?? '') !== 'spp'): ?>
-      <div class="alert alert-<?= $flash['type'] ?>" id="flash-msg">
+      <div class="alert alert-<?= $flash['type'] ?>" id="flash-msg"<?= $inputPaymentSaved ? ' data-operation-result-skip' : '' ?>>
         <?= htmlspecialchars($flash['msg']) ?>
+        <?php if ($inputPaymentSaved && $savedPaymentReceiptUrl): ?>
+        <a href="<?= htmlspecialchars($savedPaymentReceiptUrl, ENT_QUOTES, 'UTF-8') ?>" target="_blank" rel="noopener">Cetak struk</a>
+        <?php endif; ?>
       </div>
       <?php endif; ?>
 
@@ -353,6 +373,7 @@ unset($_SESSION['payment_draft']);
   </div>
 
   <?php include '../includes/spp_warning_modal.php'; ?>
+  <?php if ($inputPaymentSaved) require __DIR__.'/../includes/payment_saved_feedback.php'; ?>
   </div>
 
   <script>
@@ -369,11 +390,13 @@ unset($_SESSION['payment_draft']);
       JSON_UNESCAPED_UNICODE | JSON_UNESCAPED_SLASHES | JSON_HEX_TAG | JSON_HEX_APOS | JSON_HEX_AMP | JSON_HEX_QUOT
     ) ?>;
     window.paymentDraft = <?= json_encode($paymentDraft, JSON_UNESCAPED_UNICODE | JSON_UNESCAPED_SLASHES | JSON_HEX_TAG | JSON_HEX_APOS | JSON_HEX_AMP | JSON_HEX_QUOT) ?>;
+    window.sppInputPaymentSaved = <?= $inputPaymentSaved ? 'true' : 'false' ?>;
   </script>
   <script src="../assets/js/date_format.js?v=<?= filemtime(__DIR__ . '/../assets/js/date_format.js') ?>"></script>
   <script src="../assets/js/other_fee_picker.js?v=<?= filemtime(__DIR__ . "/../assets/js/other_fee_picker.js") ?>"></script>
   <script src="../assets/js/student_payment_history.js?v=<?= filemtime(__DIR__ . '/../assets/js/student_payment_history.js') ?>"></script>
   <script src="../assets/js/app.js?v=<?= filemtime(__DIR__ . '/../assets/js/app.js') ?>"></script>
+  <?php if ($inputPaymentSaved): ?><script src="../assets/js/payment_saved_feedback.js?v=<?= filemtime(__DIR__.'/../assets/js/payment_saved_feedback.js') ?>"></script><?php endif; ?>
 </body>
 </html>
 

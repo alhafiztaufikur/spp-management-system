@@ -2447,6 +2447,15 @@ document.addEventListener('DOMContentLoaded', function () {
 });
 
 async function restorePaymentDraft() {
+  if (window.sppInputPaymentSaved) {
+    try {
+      const saved = JSON.parse(sessionStorage.getItem('paymentDraftReload') || 'null');
+      if (saved?.source_path === window.location.pathname && Number(saved.edit_id || 0) === 0) {
+        sessionStorage.removeItem('paymentDraftReload');
+      }
+    } catch (_) { /* A successful input must not restore a stale draft. */ }
+    return;
+  }
   let draft=window.paymentDraft;
   try {
     const reloaded=sessionStorage.getItem('paymentDraftReload');

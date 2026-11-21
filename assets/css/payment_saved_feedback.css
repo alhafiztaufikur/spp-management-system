@@ -1,0 +1,7 @@
+.payment-saved-dialog footer{gap:12px;flex-wrap:wrap}
+.payment-saved-dialog footer .btn{display:inline-flex;align-items:center;justify-content:center;text-decoration:none}
+@media(max-width:600px){
+ .payment-saved-dialog h2{font-size:22px}
+ .payment-saved-dialog footer .btn{flex:1 1 100%}
+}
+@media print{.payment-saved-dialog{display:none!important}}

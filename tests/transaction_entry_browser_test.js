@@ -105,7 +105,7 @@ async function paymentInput(page, unit, day) {
         const values = await paymentInput(page,unit,day);
         const response = await post(context,'/pembayaran/proses.php',values);
         eq(response.status(),302,'Payment save redirects');
-        eq(response.headers().location,'lihat.php','Payment accepted with custom date '+day);
+        eq(response.headers().location,'form.php','Payment accepted with custom date '+day);
         const stored = state().units[unit].payments.at(-1);
         eq(stored.TGL_BYR.slice(0,10),day,'Stored payment cash day');
         eq([stored.BULAN,stored.TAHUN],['11','2026'],'Cash date does not change billing period');
