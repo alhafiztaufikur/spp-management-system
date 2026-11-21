@@ -6,9 +6,44 @@ require_once 'includes/auth.php';
 require_once 'includes/biaya_lain.php';
 require_once 'includes/other_fee_usage.php';
 require_once 'includes/legacy_finance.php';
+require_once 'includes/pagination.php';
+require_once 'includes/master_workspace_ui.php';
 requireRole(['admin', 'kasir']);
 
 if (empty($_SESSION['csrf_master_biaya_lain'])) $_SESSION['csrf_master_biaya_lain'] = bin2hex(random_bytes(32));
+
+$masterTab = $_GET['master_tab'] ?? 'aktif';
+if (!in_array($masterTab, ['aktif','nonaktif','hapus'], true)) $masterTab = 'aktif';
+$section = $_SERVER['REQUEST_METHOD'] === 'GET' ? ($_GET['section'] ?? '') : '';
+if (in_array($section, ['usage','roster'], true)) {
+    header('Cache-Control: private, no-store');
+    if (($_GET['scope'] ?? null) !== (string)unit_active_id()) {
+        http_response_code(409);
+        exit;
+    }
+    session_write_close();
+}
+
+if ($section === 'roster') {
+    if (unit_all_readonly()) { http_response_code(403); exit; }
+    header('Content-Type: application/json; charset=utf-8');
+    try {
+        $classes = array_values(array_filter(class_all($koneksi, true), static fn($class) => in_array(class_kind($class), ['reguler','psb'], true)));
+        $students = hp_rows($koneksi, "SELECT id,NO_INDUK,NAMA,master_kelas_id FROM siswa WHERE ".other_fee_publish_eligible()." ORDER BY NAMA,id");
+        echo json_encode([
+            'classes' => array_map(static fn($c) => ['id'=>(int)$c['id'],'label'=>$c['label']], $classes),
+            'students' => array_map(static fn($s) => ['id'=>(int)$s['id'],'name'=>$s['NAMA'],'nis'=>$s['NO_INDUK'],'class_id'=>(int)$s['master_kelas_id']], $students),
+        ], JSON_THROW_ON_ERROR | JSON_INVALID_UTF8_SUBSTITUTE);
+    } catch (Throwable $error) {
+        error_log('Sasaran penerbitan Biaya Lain: '.$error->getMessage());
+        http_response_code(503);
+        echo '{}';
+    }
+    exit;
+}
+
+$feeModes = ['berulang'=>'Berulang', 'tidak_berulang'=>'Tidak Berulang'];
+if (ofb_manual_ready($koneksi)) $feeModes['input_manual'] = 'Input Manual';
 
 function master_amount($value): float {
     if ($value === null || $value === '') return 0.0;
@@ -17,12 +52,16 @@ function master_amount($value): float {
 
 function master_redirect(): void {
     $tab=$_POST['master_tab']??$_GET['master_tab']??'aktif';if(!is_string($tab)||!in_array($tab,['aktif','nonaktif','hapus'],true))$tab='aktif';
-    header('Location: master_biaya_lain.php?master_tab='.$tab.'#daftar-master-biaya');
+    $page = (int)($_POST['page'] ?? $_GET['page'] ?? 1);
+    header('Location: '.page_url('master_biaya_lain.php', ['master_tab'=>$tab], $page).'#daftar-master-biaya');
     exit;
 }
 
-$flash = $_SESSION['flash'] ?? null;
-unset($_SESSION['flash']);
+$flash = null;
+if ($section !== 'usage') {
+    $flash = $_SESSION['flash'] ?? null;
+    unset($_SESSION['flash']);
+}
 
 if ($_SERVER['REQUEST_METHOD'] === 'POST') {
     if (!hash_equals($_SESSION['csrf_master_biaya_lain'], (string)($_POST['csrf_token'] ?? ''))) {
@@ -38,8 +77,10 @@ if ($_SERVER['REQUEST_METHOD'] === 'POST') {
 
     if ($aksi === 'terbitkan_tagihan') {
         try {
-            if(!is_string($_POST['target']??null)||!is_string($_POST['expected_master']??null)||!is_array($_POST['target_ids']??[])||!is_array($_POST['expected_student_ids']??null))throw new RuntimeException('Formulir penerbitan tidak valid.');
-            $koneksi->begin_transaction();$result=other_fee_publish($koneksi,(int)($_POST['master_id']??0),$_POST['target'],$_POST['target_ids']??[],$_POST['expected_master'],$_POST['expected_student_ids']);$koneksi->commit();
+            $targets = master_publish_ids('target_ids', []);
+            $expected = master_publish_ids('expected_student_ids');
+            if(!is_string($_POST['target']??null)||!is_string($_POST['expected_master']??null))throw new RuntimeException('Formulir penerbitan tidak valid.');
+            $koneksi->begin_transaction();$result=other_fee_publish($koneksi,(int)($_POST['master_id']??0),$_POST['target'],$targets,$_POST['expected_master'],$expected);$koneksi->commit();
             $_SESSION['flash']=['type'=>'success','msg'=>$result['created'].' tagihan diterbitkan; '.$result['skipped'].' siswa sudah memiliki tagihan master ini.'];
         }catch(Throwable $error){$koneksi->rollback();$_SESSION['flash']=['type'=>'error','msg'=>$error instanceof mysqli_sql_exception?'Penerbitan gagal. Muat ulang dan coba lagi.':$error->getMessage()];}
         master_redirect();
@@ -47,21 +88,29 @@ if ($_SERVER['REQUEST_METHOD'] === 'POST') {
 
     if ($aksi === 'tambah' || $aksi === 'update') {
         $id = (int)($_POST['id'] ?? 0);
-        $nama = trim($_POST['nama'] ?? '');
-        $nominal = master_amount($_POST['nominal'] ?? 0);
+        $nama = is_string($_POST['nama'] ?? null) ? trim($_POST['nama']) : '';
         $isActive = isset($_POST['is_active']) ? 1 : 0;
         if(legacy_finance_ready($koneksi)&&preg_match('/^Tunggakan Legacy(?:\s|[·:]|$)/iu',$nama)){
             $_SESSION['flash']=['type'=>'error','msg'=>'Nama Tunggakan Legacy khusus untuk pengesahan melalui Import Legacy.'];master_redirect();
         }
         $jenis=$_POST['jenis_pembayaran']??'berulang';
-        if(!is_string($jenis)||!in_array($jenis,['berulang','tidak_berulang'],true)){$_SESSION['flash']=['type'=>'error','msg'=>'Jenis pembayaran tidak valid.'];master_redirect();}
+        if(!is_string($jenis)||!isset($feeModes[$jenis])){$_SESSION['flash']=['type'=>'error','msg'=>'Jenis pembayaran tidak valid.'];master_redirect();}
+        $manual = $jenis === 'input_manual';
+        $nominal = $manual ? 0.0 : master_amount($_POST['nominal'] ?? 0);
 
         if ($nama === '' || mb_strlen($nama) > 100) {
             $_SESSION['flash'] = ['type' => 'error', 'msg' => 'Nama biaya wajib diisi dan maksimal 100 karakter.'];
             master_redirect();
         }
-        $tariffPending=$nominal===0.0&&$isActive===0&&$id>0&&(int)$koneksi->query("SELECT COUNT(*) FROM information_schema.COLUMNS WHERE TABLE_SCHEMA=DATABASE() AND TABLE_NAME='master_biaya_lain' AND COLUMN_NAME='legacy_tariff_pending'")->fetch_row()[0]===1&&lf_one($koneksi,'SELECT id FROM master_biaya_lain WHERE id=? AND legacy_tariff_pending=1',[$id]);
-        if ($nominal <= 0 && !$tariffPending) {
+        $hasPendingColumn = (int)$koneksi->query("SELECT COUNT(*) FROM information_schema.COLUMNS WHERE TABLE_SCHEMA=DATABASE() AND TABLE_NAME='master_biaya_lain' AND COLUMN_NAME='legacy_tariff_pending'")->fetch_row()[0] === 1;
+        $pendingMaster = $aksi === 'update' && $id > 0 && $hasPendingColumn
+            && lf_one($koneksi,'SELECT id FROM master_biaya_lain WHERE id=? AND legacy_tariff_pending=1',[$id]);
+        if ($manual && $pendingMaster) {
+            $_SESSION['flash'] = ['type'=>'error','msg'=>'Tetapkan tarif master Legacy sebelum mengubah jenis pembayaran.'];
+            master_redirect();
+        }
+        $tariffPending = $nominal === 0.0 && $isActive === 0 && $pendingMaster;
+        if (!$manual && $nominal <= 0 && !$tariffPending) {
             $_SESSION['flash'] = ['type' => 'error', 'msg' => 'Nominal biaya harus lebih dari Rp 0.'];
             master_redirect();
         }
@@ -87,7 +136,7 @@ if ($_SERVER['REQUEST_METHOD'] === 'POST') {
                 : ['type' => 'error', 'msg' => 'Master biaya gagal ditambahkan.'];
         } else {
             if ($id <= 0) master_redirect();
-            $clearPending=$nominal>0&&(int)$koneksi->query("SELECT COUNT(*) FROM information_schema.COLUMNS WHERE TABLE_SCHEMA=DATABASE() AND TABLE_NAME='master_biaya_lain' AND COLUMN_NAME='legacy_tariff_pending'")->fetch_row()[0]===1;
+            $clearPending=$nominal>0&&$hasPendingColumn;
             $stmt = $koneksi->prepare('UPDATE master_biaya_lain SET nama = ?, nominal = ?, is_active = ?,jenis_pembayaran=?'.($clearPending?',legacy_tariff_pending=0':'').' WHERE id = ?');
             $stmt->bind_param('sdisi', $nama, $nominal, $isActive, $jenis, $id);
             $berhasil = $stmt->execute();
@@ -112,7 +161,7 @@ if ($_SERVER['REQUEST_METHOD'] === 'POST') {
             $stmt->bind_param('i', $id); $stmt->execute();
             $current = $stmt->get_result()->fetch_assoc(); $stmt->close();
             if (!$current) throw new RuntimeException('Master biaya tidak ditemukan.');
-            if($targetStatus&&((float)$current['nominal']<=0))throw new DomainException('Isi tarif positif sebelum mengaktifkan master ini.');
+            if($targetStatus&&$current['jenis_pembayaran']!=='input_manual'&&(float)$current['nominal']<=0)throw new DomainException('Isi tarif positif sebelum mengaktifkan master ini.');
             if ((int)$current['is_active'] === (int)$targetStatus) {
                 $koneksi->commit();
                 $_SESSION['flash'] = ['type' => 'warning', 'msg' => 'Status master biaya sudah sesuai. Tidak ada perubahan.'];
@@ -164,6 +213,60 @@ if ($_SERVER['REQUEST_METHOD'] === 'POST') {
     }
 }
 
+function master_publish_ids(string $name, ?array $default = null): array {
+    $json = $_POST[$name.'_json'] ?? null;
+    $ids = $json === null || $json === '' ? ($_POST[$name] ?? $default) : (is_string($json) ? json_decode($json, false, 8) : null);
+    if (!is_array($ids) || !array_is_list($ids)) throw new RuntimeException('Formulir penerbitan tidak valid.');
+    return $ids;
+}
+
+function master_tab_counts(mysqli $db): array {
+    $counts = ['aktif'=>0, 'nonaktif'=>0];
+    foreach (hp_rows($db, 'SELECT is_active,COUNT(*) total FROM master_biaya_lain GROUP BY is_active') as $row) {
+        $counts[$row['is_active'] ? 'aktif' : 'nonaktif'] = (int)$row['total'];
+    }
+    return $counts;
+}
+
+$perPage = 25;
+$masterRows = [];
+$masterPage = 1;
+$masterPages = 1;
+$detailsReady = $section === 'usage';
+try {
+    $koneksi->begin_transaction(MYSQLI_TRANS_START_READ_ONLY | MYSQLI_TRANS_START_WITH_CONSISTENT_SNAPSHOT);
+    $masterCounts = master_tab_counts($koneksi);
+    $masterTotal = $masterCounts[$masterTab] ?? 0;
+    if ($masterTab === 'hapus' && $detailsReady) {
+        $deletable = array_values(array_filter(other_fee_master_usage($koneksi, orderByName: true), static fn($row) => $row['can_delete']));
+        $masterTotal = count($deletable);
+    }
+    $masterPages = total_pages($masterTotal, $perPage);
+    $masterPage = min(page_int_param('page'), $masterPages);
+    $offset = ($masterPage - 1) * $perPage;
+    if ($masterTab === 'hapus') {
+        if ($detailsReady) $masterRows = array_slice($deletable, $offset, $perPage);
+    } elseif ($masterTotal > 0) {
+        $active = (int)($masterTab === 'aktif');
+        $masterRows = hp_rows($koneksi, "SELECT * FROM master_biaya_lain WHERE is_active=? ORDER BY nama,id LIMIT $perPage OFFSET $offset", [$active]);
+        if ($detailsReady) {
+            $usage = array_column(other_fee_master_usage($koneksi, array_column($masterRows, 'id')), null, 'id');
+            $masterRows = array_values(array_filter(array_map(static fn($row) => $usage[$row['id']] ?? null, $masterRows)));
+        }
+    }
+    $koneksi->commit();
+} catch (Throwable $error) {
+    $koneksi->rollback();
+    error_log('Pembacaan pemakaian master biaya: '.$error->getMessage());
+    http_response_code(503);
+    exit('Pemakaian master biaya belum dapat dibaca.');
+}
+if ($detailsReady) {
+    header('Content-Type: text/html; charset=utf-8');
+    require __DIR__.'/includes/other_fee_master_list.php';
+    exit;
+}
+
 $editData = null;
 $editId = (int)($_GET['edit'] ?? 0);
 if ($editId > 0) {
@@ -175,19 +278,9 @@ if ($editId > 0) {
     $stmt->close();
 }
 
-try {$masterRows=other_fee_master_usage($koneksi);}
-catch(Throwable $error){error_log('Pembacaan pemakaian master biaya: '.$error->getMessage());http_response_code(503);exit('Pemakaian master biaya belum dapat dibaca. Muat ulang sebelum mengubah atau menghapus master.');}
-usort($masterRows,static fn($a,$b)=>(int)$b['is_active']<=>(int)$a['is_active']?:strnatcasecmp($a['nama'],$b['nama']));
-$masterTab=is_string($_GET['master_tab']??null)&&in_array($_GET['master_tab'],['aktif','nonaktif','hapus'],true)?$_GET['master_tab']:'aktif';
-$masterCounts=['aktif'=>0,'nonaktif'=>0,'hapus'=>0];
-foreach($masterRows as &$master){$master['reserved']=lf_reserved_master($koneksi,(int)$master['id']);$masterCounts[$master['is_active']?'aktif':'nonaktif']++;if($master['can_delete'])$masterCounts['hapus']++;}unset($master);
-$masterRows=array_values(array_filter($masterRows,static fn($m)=>$masterTab==='hapus'?$m['can_delete']:(bool)$m['is_active']===($masterTab==='aktif')));
-$activeMasters = $koneksi->query("SELECT * FROM master_biaya_lain WHERE is_active=1 AND jenis_pembayaran='tidak_berulang' ORDER BY nama")->fetch_all(MYSQLI_ASSOC);
-$activeMasters=array_values(array_filter($activeMasters,static fn($master)=>!lf_reserved_master($koneksi,(int)$master['id'])));
-$activeClasses = array_values(array_filter(class_all($koneksi,true),static fn($c)=>in_array(class_kind($c),['reguler','psb'],true)));
-// The publishing form still needs its roster; the removed statistic does not.
-$activeStudents=$koneksi->query("SELECT id,NO_INDUK,NAMA,master_kelas_id FROM siswa WHERE is_active=1 AND legacy_pending=0 AND KELAS NOT IN ('CUSTOM','OUT') ORDER BY NAMA")->fetch_all(MYSQLI_ASSOC);
-require_once __DIR__ . '/includes/master_workspace_ui.php';
+$activeMasters = unit_all_readonly() ? [] : hp_rows($koneksi, "SELECT * FROM master_biaya_lain WHERE is_active=1 AND jenis_pembayaran='tidak_berulang' ORDER BY nama,id");
+$activeMasters = array_values(array_filter($activeMasters, static fn($master) => !lf_reserved_master($koneksi, (int)$master['id'])));
+$usageQuery = ['master_tab'=>$masterTab,'scope'=>unit_active_id(),'section'=>'usage','page'=>page_int_param('page')];
 ?>
 <!DOCTYPE html>
 <html lang="id" data-palette="<?= unit_palette_for_view(isset($reportUnitId) ? (int)$reportUnitId : null) ?>">
@@ -222,16 +315,9 @@ require_once __DIR__ . '/includes/master_workspace_ui.php';
       <?php endif; ?>
 
       <div class="fee-workspace-content">
-      <section class="main-card fee-hero">
-          <div class="fee-hero-copy">
-            <span class="recap-class-overline">Data Master</span>
-            <h1>Master Biaya Lain</h1>
-            <p>Kelola biaya tambahan di luar SPP. Berulang dibayar langsung; Tidak Berulang diterbitkan sekali per siswa.</p>
-            <div class="fee-hero-stats">
-              <div class="fee-stat"><div><span>Biaya Aktif</span><strong><?= number_format(count($activeMasters)) ?></strong></div></div>
-              <div class="fee-stat"><div><span>Rombel Aktif</span><strong><?= number_format(count($activeClasses)) ?></strong></div></div>
-            </div>
-          </div>
+      <section class="main-card fee-overview" aria-labelledby="fee-page-title">
+        <h1 id="fee-page-title">Master Biaya Lain</h1>
+        <dl><dt>Biaya Aktif</dt><dd><?= number_format($masterCounts['aktif'], 0, ',', '.') ?></dd></dl>
       </section>
 
       <div class="fee-panel-grid">
@@ -240,7 +326,7 @@ require_once __DIR__ . '/includes/master_workspace_ui.php';
           <div><h2><?= $editData ? 'Edit Master Biaya' : 'Tambah Master Biaya' ?></h2><?php if($editData): ?><p>Perbarui jenis biaya; transaksi lama tetap memakai tarif sebelumnya.</p><?php endif; ?></div>
         </div>
         <form method="POST" action="master_biaya_lain.php" id="form-master-biaya">
-          <input type="hidden" name="master_tab" value="<?= htmlspecialchars($masterTab) ?>"><input type="hidden" name="csrf_token" value="<?= htmlspecialchars($_SESSION['csrf_master_biaya_lain']) ?>" />
+          <input type="hidden" name="master_tab" value="<?= htmlspecialchars($masterTab) ?>"><input type="hidden" name="page" value="<?= $masterPage ?>"><input type="hidden" name="csrf_token" value="<?= htmlspecialchars($_SESSION['csrf_master_biaya_lain']) ?>" />
           <input type="hidden" name="aksi" value="<?= $editData ? 'update' : 'tambah' ?>" />
           <input type="hidden" name="id" value="<?= (int)($editData['id'] ?? 0) ?>" />
           <div class="fields-grid master-fee-form">
@@ -250,17 +336,24 @@ require_once __DIR__ . '/includes/master_workspace_ui.php';
                 placeholder="Contoh: Biaya Ekstrakurikuler" value="<?= htmlspecialchars($editData['nama'] ?? '') ?>" />
             </div>
             <div class="field-row">
+              <label class="field-label" for="jenis-pembayaran">Jenis Pembayaran</label>
+              <select class="field-input field-select" id="jenis-pembayaran" name="jenis_pembayaran"><?php foreach($feeModes as $mode=>$label): ?>
+                <option value="<?= $mode ?>" <?= ($editData['jenis_pembayaran']??'berulang')===$mode?'selected':'' ?>><?= $label ?></option>
+              <?php endforeach; ?></select>
+              <small class="payment-auto-note" id="fee-manual-note" <?= ($editData['jenis_pembayaran']??'')==='input_manual'?'':'hidden' ?>>Nominal diisi saat pembayaran.</small>
+            </div>
+            <?php $manualEdit = ($editData['jenis_pembayaran'] ?? '') === 'input_manual'; ?>
+            <div class="field-row" id="fee-amount-row" <?= $manualEdit?'hidden':'' ?>>
               <label class="field-label" for="nominal-biaya">Nominal</label>
               <div class="fee-amount-control"><span aria-hidden="true">Rp</span>
-              <input class="field-input rupiah-input" id="nominal-biaya" name="nominal" inputmode="numeric" required
-                placeholder="0" value="<?= $editData ? number_format((float)$editData['nominal'], 0, ',', '.') : '' ?>" />
+              <input class="field-input rupiah-input" id="nominal-biaya" name="nominal" inputmode="numeric" <?= $manualEdit?'disabled':'required' ?>
+                placeholder="0" value="<?= $editData && !$manualEdit ? number_format((float)$editData['nominal'], 0, ',', '.') : '' ?>" />
               </div>
             </div>
-            <div class="field-row"><label class="field-label" for="jenis-pembayaran">Jenis Pembayaran</label><select class="field-input field-select" id="jenis-pembayaran" name="jenis_pembayaran"><option value="berulang" <?= ($editData['jenis_pembayaran']??'berulang')==='berulang'?'selected':'' ?>>Berulang — langsung tersedia</option><option value="tidak_berulang" <?= ($editData['jenis_pembayaran']??'')==='tidak_berulang'?'selected':'' ?>>Tidak Berulang — terbitkan tagihan</option></select><small class="payment-auto-note">Perubahan jenis tidak mengubah transaksi dan tagihan lama.</small></div>
             <label class="master-active-check">
               <input type="checkbox" name="is_active" value="1" <?= !$editData || (int)$editData['is_active'] === 1 ? 'checked' : '' ?> />
               <span class="fee-switch-track" aria-hidden="true"></span>
-              <span>Aktif dan tampil di pembayaran<small>Berulang tampil langsung; Tidak Berulang memerlukan penerbitan.</small></span>
+              <span>Aktif</span>
             </label>
           </div>
           <div class="action-bar" style="margin-top:16px">
@@ -273,52 +366,26 @@ require_once __DIR__ . '/includes/master_workspace_ui.php';
       <?php include __DIR__.'/includes/other_fee_publish_ui.php'; ?>
       </div>
 
-      <div class="main-card master-modern-card master-modern-list fee-list-panel" id="daftar-master-biaya" style="margin-top:0">
-        <div class="card-title-row fee-panel-heading"><div><h2>Daftar Master Biaya (<?= count($masterRows) ?>)</h2></div></div>
-        <nav class="fee-master-tabs" aria-label="Bagian master biaya"><?php foreach(['aktif'=>'Aktif','nonaktif'=>'Nonaktif','hapus'=>'Bisa Dihapus'] as $tab=>$label): ?><a href="master_biaya_lain.php?master_tab=<?= $tab ?>#daftar-master-biaya" <?= $masterTab===$tab?'aria-current="page"':'' ?>><?= $label ?><span class="badge-count"><?= $masterCounts[$tab] ?></span></a><?php endforeach; ?></nav>
-        <div class="table-container">
-          <table class="payment-table responsive-table">
-            <thead><tr><th>No</th><th>Nama Biaya</th><th>Nominal</th><th>Jenis</th><th>Status</th><th>Tagihan Terbit</th><th>Transaksi</th><th>Aksi</th></tr></thead>
-            <tbody>
-              <?php if (!$masterRows): ?>
-              <tr><td colspan="8"><div class="empty-state"><p>Tidak ada master pada bagian ini</p><span><?= $masterTab==='aktif'&&$masterCounts['nonaktif']>0?'Master hasil migrasi tersedia pada tab Nonaktif. Tarifnya belum ditetapkan untuk pembayaran baru.':'Pilih bagian lain atau tambahkan master biaya.' ?></span></div></td></tr>
-              <?php else: $no = 1; foreach ($masterRows as $item): ?>
-              <tr>
-                <td data-label="No"><?= $no++ ?></td>
-                <td data-label="Nama Biaya"><strong><?= unit_record_badge($item) ?><?= htmlspecialchars($item['nama']) ?></strong></td>
-                <td data-label="Nominal" class="nominal"><?= lf_reserved_master($koneksi,(int)$item['id'])?'Per pengesahan':(!empty($item['legacy_tariff_pending'])&&(float)$item['nominal']===0.0?'Tarif belum ditetapkan':'Rp '.number_format((float)$item['nominal'],0,',','.')) ?></td>
-                <td data-label="Jenis"><?= $item['jenis_pembayaran']==='berulang'?'Berulang':'Tidak Berulang' ?></td><td data-label="Status"><span class="master-status <?= $item['is_active'] ? 'is-active' : 'is-inactive' ?>"><?= $item['is_active'] ? 'Aktif' : 'Nonaktif' ?></span></td>
-                <td data-label="Tagihan Terbit"><span class="badge-count"><?= (int)$item['jumlah_tagihan'] ?></span></td>
-                <td data-label="Transaksi"><div class="fee-master-transactions">
-                  <?php if($item['jumlah_pemakaian']): ?>
-                    <span class="fee-transaction-caption"><?= number_format($item['jumlah_rincian'],0,',','.') ?> rincian</span>
-                    <a class="fee-transaction-link" href="pembayaran/lihat.php?<?= htmlspecialchars(http_build_query(['fee_master_id'=>(int)$item['id'],'all_periods'=>'1'])) ?>" aria-label="Riwayat pembayaran <?= htmlspecialchars($item['nama'],ENT_QUOTES,'UTF-8') ?>"><?= master_workspace_icon('document') ?><span>Pembayaran</span><strong><?= number_format($item['jumlah_pemakaian'],0,',','.') ?></strong></a>
-                    <div class="fee-transaction-amount"><span>Total</span><strong>Rp <?= number_format((float)$item['nominal_pemakaian'],2,',','.') ?></strong></div>
-                  <?php else: ?><span class="fee-transaction-empty">Belum ada transaksi</span><?php endif; ?>
-                  <?php if($item['jumlah_batal']): ?><a class="fee-transaction-link is-cancelled" href="pembayaran/lihat.php?<?= htmlspecialchars(http_build_query(['fee_master_id'=>(int)$item['id'],'all_periods'=>'1','view'=>'deleted'])) ?>" aria-label="Riwayat transaksi dibatalkan <?= htmlspecialchars($item['nama'],ENT_QUOTES,'UTF-8') ?>"><?= master_workspace_icon('document') ?><span>Dibatalkan</span><strong><?= number_format($item['jumlah_batal'],0,',','.') ?></strong></a><?php endif; ?>
-                </div></td>
-                <td data-label="Aksi" class="aksi-col">
-                  <?php if(lf_reserved_master($koneksi,(int)$item['id'])): ?><span class="master-status">Pengesahan Legacy</span><?php else: ?>
-                  <a class="btn-tbl btn-tbl-edit" href="master_biaya_lain.php?master_tab=<?= $masterTab ?>&amp;edit=<?= (int)$item['id'] ?>">Edit</a>
-                  <form method="POST" action="master_biaya_lain.php" style="display:inline">
-                    <input type="hidden" name="master_tab" value="<?= htmlspecialchars($masterTab) ?>"><input type="hidden" name="csrf_token" value="<?= htmlspecialchars($_SESSION['csrf_master_biaya_lain']) ?>" />
-                    <input type="hidden" name="aksi" value="toggle" /><input type="hidden" name="id" value="<?= (int)$item['id'] ?>" /><input type="hidden" name="target_active" value="<?= $item['is_active'] ? '0' : '1' ?>" />
-                    <button class="btn-tbl btn-tbl-toggle" type="submit"><?= $item['is_active'] ? 'Nonaktifkan' : 'Aktifkan' ?></button>
-                  </form>
-                  <form method="POST" action="master_biaya_lain.php" style="display:inline" onsubmit="return confirm('Hapus master biaya <?= htmlspecialchars(addslashes($item['nama'])) ?>?')">
-                    <input type="hidden" name="master_tab" value="<?= htmlspecialchars($masterTab) ?>"><input type="hidden" name="csrf_token" value="<?= htmlspecialchars($_SESSION['csrf_master_biaya_lain']) ?>" />
-                    <input type="hidden" name="aksi" value="hapus" /><input type="hidden" name="id" value="<?= (int)$item['id'] ?>" />
-                    <button class="btn-tbl btn-tbl-del" type="submit" <?= !$item['can_delete'] ? 'disabled title="Sudah memiliki tagihan atau riwayat transaksi"' : '' ?>>Hapus</button>
-                  </form>
-                  <?php endif; ?>
-                  <?php if(!$item['can_delete']): ?><small class="fee-master-lock"><?= $item['reserved']?'Dikelola melalui pengesahan Legacy.':'Tidak dapat dihapus: sudah memiliki tagihan atau transaksi.' ?></small><?php endif; ?>
-                </td>
-              </tr>
-              <?php endforeach; endif; ?>
-            </tbody>
-          </table>
+      <section class="main-card master-modern-card master-modern-list fee-list-panel" id="daftar-master-biaya"
+          data-usage-url="<?= htmlspecialchars('master_biaya_lain.php?'.http_build_query($usageQuery), ENT_QUOTES, 'UTF-8') ?>"
+          data-load-usage="<?= $masterRows || $masterTab === 'hapus' ? '1' : '0' ?>">
+        <div class="card-title-row fee-panel-heading"><h2>Daftar Master Biaya</h2></div>
+        <nav class="fee-master-tabs" aria-label="Bagian master biaya">
+          <?php foreach (['aktif'=>'Aktif','nonaktif'=>'Nonaktif','hapus'=>'Bisa Dihapus'] as $tab => $label): ?>
+            <a href="master_biaya_lain.php?master_tab=<?= $tab ?>#daftar-master-biaya" <?= $masterTab===$tab?'aria-current="page"':'' ?>>
+              <?= $label ?><?php if ($tab !== 'hapus' || $masterTab === 'hapus'): ?>
+                <span class="badge-count" <?= $tab === 'hapus' ? 'id="fee-delete-count" hidden' : '' ?>><?= $masterCounts[$tab] ?? '' ?></span>
+              <?php endif; ?>
+            </a>
+          <?php endforeach; ?>
+        </nav>
+        <div class="fee-usage-feedback" <?= $masterRows || $masterTab === 'hapus' ? '' : 'hidden' ?>>
+          <p id="fee-usage-status" role="status">Memuat rincian pemakaian…</p>
+          <button type="button" class="btn btn-ghost btn-sm" id="fee-usage-retry" hidden>Coba Lagi</button>
+          <noscript><a href="<?= htmlspecialchars('master_biaya_lain.php?'.http_build_query($usageQuery), ENT_QUOTES, 'UTF-8') ?>">Muat rincian pemakaian</a></noscript>
         </div>
-      </div>
+        <?php require __DIR__.'/includes/other_fee_master_list.php'; ?>
+      </section>
       </div>
     </main>
   </div>
@@ -326,9 +393,22 @@ require_once __DIR__ . '/includes/master_workspace_ui.php';
   <script src="assets/js/app.js?v=<?= filemtime(__DIR__ . '/assets/js/app.js') ?>"></script>
   <script src="assets/js/workflow_dialogs.js?v=<?= filemtime(__DIR__.'/assets/js/workflow_dialogs.js') ?>"></script>
   <script src="assets/js/other_fee_publish.js?v=<?= filemtime(__DIR__.'/assets/js/other_fee_publish.js') ?>"></script>
+  <script src="assets/js/other_fee_master.js?v=<?= filemtime(__DIR__.'/assets/js/other_fee_master.js') ?>"></script>
   <script>
     document.addEventListener('DOMContentLoaded', function () {
       var nominal = document.getElementById('nominal-biaya');
+      const mode = document.getElementById('jenis-pembayaran');
+      const amountRow = document.getElementById('fee-amount-row');
+      const manualNote = document.getElementById('fee-manual-note');
+      const syncFeeMode = () => {
+        const manual = mode.value === 'input_manual';
+        amountRow.hidden = manual;
+        nominal.disabled = manual;
+        nominal.required = !manual;
+        manualNote.hidden = !manual;
+      };
+      mode?.addEventListener('change', syncFeeMode);
+      if (mode) syncFeeMode();
       if (nominal) nominal.addEventListener('input', function () {
         var clean = this.value.replace(/\D/g, '');
         this.value = clean ? Number(clean).toLocaleString('id-ID') : '';

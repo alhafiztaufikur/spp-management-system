@@ -63,20 +63,21 @@ function pagination_legacy_markup(string $html):string {
     },$html)??$html;
 }
 
-function render_pagination(string $path, array $query, int $page, int $totalPages, int $totalRows, int $perPage, string $label = 'data', string $pageParam = 'page'): void {
+function render_pagination(string $path, array $query, int $page, int $totalPages, int $totalRows, int $perPage, string $label = 'data', string $pageParam = 'page', string $fragment = ''): void {
     if ($totalRows <= 0) return;
     $firstShown = (($page - 1) * $perPage) + 1;
     $lastShown = min($totalRows, $page * $perPage);
     [$windowStart, $windowEnd] = page_window($page, $totalPages);
+    $url = static fn($target) => page_url($path, $query, $target, $pageParam).$fragment;
     ?>
-    <?= pagination_controls($page,$totalPages,static fn($target)=>page_url($path,$query,$target,$pageParam)) ?>
+    <?= pagination_controls($page,$totalPages,$url) ?>
     <div class="du-pagination-footer pagination-mobile">
       <p class="du-pagination-info">Menampilkan <strong><?= number_format($firstShown) ?>&ndash;<?= number_format($lastShown) ?></strong> dari <strong><?= number_format($totalRows) ?></strong> <?= htmlspecialchars($label) ?></p>
       <?php if ($totalPages > 1): ?>
       <nav class="du-pagination" aria-label="Navigasi halaman">
         <?php if ($page > 1): ?>
-          <a class="du-page-link du-page-desktop-only" href="<?= htmlspecialchars(page_url($path, $query, 1, $pageParam)) ?>">Awal</a>
-          <a class="du-page-link du-page-prev" href="<?= htmlspecialchars(page_url($path, $query, $page - 1, $pageParam)) ?>" rel="prev">Sebelumnya</a>
+          <a class="du-page-link du-page-desktop-only" href="<?= htmlspecialchars($url(1)) ?>">Awal</a>
+          <a class="du-page-link du-page-prev" href="<?= htmlspecialchars($url($page - 1)) ?>" rel="prev">Sebelumnya</a>
         <?php else: ?>
           <span class="du-page-link du-page-desktop-only is-disabled" aria-disabled="true">Awal</span>
           <span class="du-page-link du-page-prev is-disabled" aria-disabled="true">Sebelumnya</span>
@@ -88,14 +89,14 @@ function render_pagination(string $path, array $query, int $page, int $totalPage
             <?php if ($pageNumber === $page): ?>
               <span class="du-page-link is-active" aria-current="page"><?= $pageNumber ?></span>
             <?php else: ?>
-              <a class="du-page-link" href="<?= htmlspecialchars(page_url($path, $query, $pageNumber, $pageParam)) ?>"><?= $pageNumber ?></a>
+              <a class="du-page-link" href="<?= htmlspecialchars($url($pageNumber)) ?>"><?= $pageNumber ?></a>
             <?php endif; ?>
           <?php endfor; ?>
         </span>
 
         <?php if ($page < $totalPages): ?>
-          <a class="du-page-link du-page-next" href="<?= htmlspecialchars(page_url($path, $query, $page + 1, $pageParam)) ?>" rel="next">Berikutnya</a>
-          <a class="du-page-link du-page-desktop-only" href="<?= htmlspecialchars(page_url($path, $query, $totalPages, $pageParam)) ?>">Akhir</a>
+          <a class="du-page-link du-page-next" href="<?= htmlspecialchars($url($page + 1)) ?>" rel="next">Berikutnya</a>
+          <a class="du-page-link du-page-desktop-only" href="<?= htmlspecialchars($url($totalPages)) ?>">Akhir</a>
         <?php else: ?>
           <span class="du-page-link du-page-next is-disabled" aria-disabled="true">Berikutnya</span>
           <span class="du-page-link du-page-desktop-only is-disabled" aria-disabled="true">Akhir</span>

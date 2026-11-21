@@ -8,8 +8,7 @@
   align-items: start; gap: 14px 12px; padding: 18px; position: relative;
 }
 .biaya-lain-row .ll-num { grid-column:1; grid-row:1; margin-top:24px; }
-.biaya-lain-row .ll-field-kind { grid-column:2 / 4; grid-row:1; }
-.biaya-lain-row .ll-field-note { grid-column:4 / 6; grid-row:1; }
+.biaya-lain-row .ll-field-kind { grid-column:2 / 6; grid-row:1; }
 .biaya-lain-row .btn-remove-biaya-lain { grid-column:6; grid-row:1; margin-top:23px; }
 .biaya-lain-row .ll-field:has(.biaya-lain-total) { grid-column:2; grid-row:2; }
 .biaya-lain-row .ll-field:has(.biaya-lain-paid) { grid-column:3; grid-row:2; }
@@ -19,6 +18,8 @@
 .biaya-lain-row .ll-field[hidden] { display:none!important; }
 .biaya-lain-row.is-optional-fee .ll-field-reference { grid-column:2 / 4; grid-row:2; }
 .biaya-lain-row.is-optional-fee .ll-field-amount { grid-column:4 / 6; grid-row:2; }
+.biaya-lain-row.is-manual-fee .ll-field-kind { grid-column:2 / 4; }
+.biaya-lain-row.is-manual-fee .ll-field-amount { grid-column:4 / 6; grid-row:1; }
 .other-fee-picker { position:relative; min-width:0; }
 .other-fee-native { position:absolute!important; width:1px!important; height:1px!important; opacity:0; pointer-events:none; }
 .other-fee-trigger { display:flex; align-items:center; justify-content:space-between; gap:14px; height:auto; min-height:48px; text-align:left; cursor:pointer; }
@@ -62,14 +63,14 @@
 @media(max-width:900px) {
   .biaya-lain-row { grid-template-columns:28px repeat(2,minmax(0,1fr)) 38px; }
   .biaya-lain-row .ll-field-kind { grid-column:2 / 4; }
-  .biaya-lain-row .ll-field-note { grid-column:2 / 4; grid-row:2; }
   .biaya-lain-row .btn-remove-biaya-lain { grid-column:4; }
-  .biaya-lain-row .ll-field:has(.biaya-lain-total) { grid-column:2; grid-row:3; }
-  .biaya-lain-row .ll-field:has(.biaya-lain-paid) { grid-column:3; grid-row:3; }
-  .biaya-lain-row .ll-field:has(.biaya-lain-sisa) { grid-column:2; grid-row:4; }
-  .biaya-lain-row .ll-field:has(.biaya-lain-nominal) { grid-column:3; grid-row:4; }
-  .biaya-lain-row.is-optional-fee .ll-field-reference { grid-column:2; grid-row:3; }
-  .biaya-lain-row.is-optional-fee .ll-field-amount { grid-column:3; grid-row:3; }
+  .biaya-lain-row .ll-field:has(.biaya-lain-total) { grid-column:2; grid-row:2; }
+  .biaya-lain-row .ll-field:has(.biaya-lain-paid) { grid-column:3; grid-row:2; }
+  .biaya-lain-row .ll-field:has(.biaya-lain-sisa) { grid-column:2; grid-row:3; }
+  .biaya-lain-row .ll-field:has(.biaya-lain-nominal) { grid-column:3; grid-row:3; }
+  .biaya-lain-row.is-optional-fee .ll-field-reference { grid-column:2; grid-row:2; }
+  .biaya-lain-row.is-optional-fee .ll-field-amount { grid-column:3; grid-row:2; }
+  .biaya-lain-row.is-manual-fee .ll-field-amount { grid-column:2 / 4; grid-row:2; }
   .payment-history-shell .payment-operator-cell { min-width:0; max-width:none; }
 }
 @media(max-width:560px) {

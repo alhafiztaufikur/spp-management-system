@@ -77,6 +77,14 @@ function ofb_paid(mysqli $db,int $billId,int $exclude=0,bool $lock=false): float
 function ofb_audit(mysqli $db,int $bill,string $action,array $before,array $after): void {
     ofb_write($db,'INSERT INTO other_fee_billing_audit(unit_id,bill_id,actor_id,action,before_data,after_data) SELECT unit_id,id,?,?,?,? FROM tagihan_biaya_lain WHERE id=?',[$_SESSION['admin_id']??0,$action,json_encode($before,JSON_THROW_ON_ERROR),json_encode($after,JSON_THROW_ON_ERROR),$bill]);
 }
+function other_fee_purchase_mode(?array $bill): string {
+    if (($bill['origin'] ?? '') === 'purchase') {
+        $provenance = json_decode($bill['provenance'] ?? 'null', true);
+        if (($provenance['jenis_pembayaran'] ?? '') === 'input_manual') return 'input_manual';
+    }
+    return 'berulang';
+}
+
 /** Purchases are an occurrence, never an instalment against an unrelated issued bill. */
 function ofb_purchase_line(mysqli $db,int $paymentId,array $line): array {
     $p=hp_one($db,'SELECT * FROM bayar WHERE id=? FOR UPDATE',[$paymentId]);if(!$p)throw new DomainException('Transaksi pembelian tidak ditemukan.');
@@ -85,9 +93,14 @@ function ofb_purchase_line(mysqli $db,int $paymentId,array $line): array {
     $amount=ofb_money(ofb_cents($line['nominal']));$period=trim($p['BULAN'].' '.$p['TAHUN']);
     $class=trim((string)($p['kelas_rombel_snapshot']??''));if($class==='')$class=trim((string)($p['KELAS']??''));if($class==='')$class='Tidak tercatat';
     if(!$bill){
-        ofb_write($db,"INSERT INTO tagihan_biaya_lain(master_biaya_lain_id,no_induk,master_kelas_id,nama_snapshot,nominal_tagihan,kelas_rombel_snapshot,created_by,occurrence_key,origin,obligation_period,provenance) VALUES(?,?,NULLIF(?,0),?,?,?,?,?,'purchase',?,?)",[$line['master_id'],$p['NO_INDUK'],$p['master_kelas_id']??0,$line['nama'],$amount,$class,$_SESSION['admin_id'],$key,$period,json_encode(['payment_id'=>$paymentId,'tariff'=>$line['tarif_referensi']??null,'rule'=>OFB_RULE_VERSION],JSON_THROW_ON_ERROR)]);
-        $billId=(int)$db->insert_id;ofb_audit($db,$billId,'purchase_created',[],['nominal_tagihan'=>$amount,'payment_id'=>$paymentId]);
+        $evidence = ['payment_id'=>$paymentId,'tariff'=>$line['tarif_referensi']??null,'rule'=>OFB_RULE_VERSION];
+        if (($line['jenis_pembayaran'] ?? '') === 'input_manual') $evidence['jenis_pembayaran'] = 'input_manual';
+        ofb_write($db,"INSERT INTO tagihan_biaya_lain(master_biaya_lain_id,no_induk,master_kelas_id,nama_snapshot,nominal_tagihan,kelas_rombel_snapshot,created_by,occurrence_key,origin,obligation_period,provenance) VALUES(?,?,NULLIF(?,0),?,?,?,?,?,'purchase',?,?)",[$line['master_id'],$p['NO_INDUK'],$p['master_kelas_id']??0,$line['nama'],$amount,$class,$_SESSION['admin_id'],$key,$period,json_encode($evidence,JSON_THROW_ON_ERROR)]);
+        $billId=(int)$db->insert_id;ofb_audit($db,$billId,'purchase_created',[],['nominal_tagihan'=>$amount]+$evidence);
     }else{
+        if (other_fee_purchase_mode($bill) !== ($line['jenis_pembayaran'] ?? 'berulang')) {
+            throw new DomainException('Jenis pembayaran berbeda dari tagihan pembelian sebelumnya.');
+        }
         $billId=(int)$bill['id'];if(ofb_paid($db,$billId,$paymentId,true)>.001)throw new DomainException('Tagihan pembelian mempunyai kredit lain; koreksi dihentikan.');
         if(ofb_cents($bill['nominal_tagihan'])!==ofb_cents($amount)||$bill['status']!=='open'){
             ofb_write($db,"UPDATE tagihan_biaya_lain SET nominal_tagihan=?,status='open',cancel_reason=NULL WHERE id=?",[$amount,$billId]);ofb_audit($db,$billId,'purchase_edited',$bill,['nominal_tagihan'=>$amount,'payment_id'=>$paymentId]);

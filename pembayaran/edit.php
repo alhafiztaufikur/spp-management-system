@@ -236,19 +236,35 @@ $stmt_biaya_lain = $koneksi->prepare("
 $stmt_biaya_lain->bind_param('i', $id);
 $stmt_biaya_lain->execute();
 $biaya_lain_details = $stmt_biaya_lain->get_result()->fetch_all(MYSQLI_ASSOC);
-foreach($biaya_lain_details as &$feeDetail){if(!empty($feeDetail['tagihan_biaya_lain_id'])){ $feeBill=hp_one($koneksi,'SELECT origin FROM tagihan_biaya_lain WHERE id=?',[$feeDetail['tagihan_biaya_lain_id']]);if(($feeBill['origin']??'')==='purchase')$feeDetail['_purchase']=true; }}unset($feeDetail);
+foreach ($biaya_lain_details as &$feeDetail) {
+    $feeBill = !empty($feeDetail['tagihan_biaya_lain_id'])
+        ? hp_one($koneksi,'SELECT origin,provenance FROM tagihan_biaya_lain WHERE id=?',[$feeDetail['tagihan_biaya_lain_id']]) : null;
+    $feeDetail['_purchase'] = ($feeBill['origin'] ?? '') === 'purchase';
+    $feeDetail['_fee_mode'] = other_fee_purchase_mode($feeBill);
+    $feeDetail['_original_choice'] = ($feeDetail['_purchase'] || empty($feeDetail['tagihan_biaya_lain_id'])) && !empty($feeDetail['master_biaya_lain_id'])
+        ? 'master:'.$feeDetail['master_biaya_lain_id'] : '';
+    $feeDetail['_original_amount'] = $feeDetail['nominal_snapshot'];
+}
+unset($feeDetail);
 $stmt_biaya_lain->close();
 if (isset($restoreDraft['biaya_lain_tagihan_id']) && is_array($restoreDraft['biaya_lain_tagihan_id'])) {
     $originalDetails = array_column($biaya_lain_details, null, 'id');
     $biaya_lain_details = [];
+    $catalogModes = array_column(other_fee_optional_choices($koneksi), 'jenis_pembayaran', 'id');
     foreach (array_slice($restoreDraft['biaya_lain_tagihan_id'], 0, 100) as $index => $billId) {
         $detailId = (int)($restoreDraft['biaya_lain_detail_id'][$index] ?? 0);
         $original = $originalDetails[$detailId] ?? [];
         $nominal = $restoreDraft['biaya_lain_nominal'][$index] ?? 0;
-        $biaya_lain_details[] = ['id'=>$original['id'] ?? '', 'choice'=>is_scalar($billId)?(string)$billId:'','master_biaya_lain_id'=>$original['master_biaya_lain_id']??null,'tagihan_biaya_lain_id'=>is_scalar($billId)?(int)$billId:0,
+        $choice = is_scalar($billId) ? (string)$billId : '';
+        $sameChoice = $choice === ($original['_original_choice'] ?? '');
+        $feeMode = $sameChoice ? ($original['_fee_mode'] ?? 'berulang') : ($catalogModes[$choice] ?? 'berulang');
+        $biaya_lain_details[] = ['id'=>$original['id'] ?? '', 'choice'=>$choice,'master_biaya_lain_id'=>$original['master_biaya_lain_id']??null,'tagihan_biaya_lain_id'=>(int)$choice,
+            '_fee_mode'=>$feeMode, '_original_choice'=>$original['_original_choice']??'', '_original_amount'=>$original['_original_amount']??0,
+            'tarif_referensi_snapshot'=>$sameChoice?($original['tarif_referensi_snapshot']??null):null,
+            '_draft_amount'=>$feeMode==='input_manual'&&is_scalar($nominal)?(string)$nominal:null,
             'nama_biaya_snapshot'=>$original['nama_biaya_snapshot'] ?? '',
             'nominal_snapshot'=>is_scalar($nominal)?(float)str_replace(['.',','],['','.'],(string)$nominal):0,
-            'keterangan'=>is_scalar($restoreDraft['biaya_lain_keterangan'][$index] ?? null)?(string)$restoreDraft['biaya_lain_keterangan'][$index]:''];
+        ];
     }
 }
 if (!$biaya_lain_details) {
@@ -505,19 +521,21 @@ $selectedPaymentMethod = $d['sistem_pembayaran'] ?? 'VA';
               $selectedBillId = !empty($detail['_purchase'])?0:(int)($detail['tagihan_biaya_lain_id'] ?? 0);
               $optionalChoice=$detail['choice']??(!$selectedBillId&&!empty($detail['master_biaya_lain_id'])?'master:'.$detail['master_biaya_lain_id']:'');
               $currentNominal = (float)($detail['nominal_snapshot'] ?? 0);
+              $manualFee = ($detail['_fee_mode'] ?? '') === 'input_manual' && str_starts_with($optionalChoice,'master:');
+              $displayAmount = $detail['_draft_amount'] ?? number_format($currentNominal, fmod($currentNominal,1.0)===0.0?0:2, ',', '.');
               $selectedBill = null;
               foreach($biaya_lain_bills[$d['NO_INDUK']] ?? [] as $candidate) if((int)$candidate['id']===$selectedBillId){$selectedBill=$candidate;break;}
               $masterTotal = $selectedBill ? (float)$selectedBill['nominal'] : $currentNominal;
               $paidOther = $selectedBill ? (float)$selectedBill['paid'] : 0.0;
               $remainingAfterCurrent = max(0, $masterTotal - $paidOther);
             ?>
-            <div class="lainlain-row biaya-lain-row" data-original-choice="<?= htmlspecialchars($optionalChoice,ENT_QUOTES,'UTF-8') ?>" data-original-amount="<?= $currentNominal ?>">
+            <div class="lainlain-row biaya-lain-row<?= $manualFee?' is-optional-fee is-manual-fee':'' ?>" data-original-choice="<?= htmlspecialchars($detail['_original_choice']??'',ENT_QUOTES,'UTF-8') ?>" data-original-amount="<?= money_attr($detail['_original_amount']??$currentNominal) ?>">
               <span class="ll-num"><?= $index + 1 ?></span>
               <input type="hidden" name="biaya_lain_detail_id[]" value="<?= (int)($detail['id'] ?? 0) ?: '' ?>" />
               <label class="ll-field ll-field-kind">
                 <span class="ll-field-label">Jenis</span>
                 <select class="field-input field-select biaya-lain-select" name="biaya_lain_tagihan_id[]">
-                  <?php if($optionalChoice): ?><option value="<?= htmlspecialchars($optionalChoice,ENT_QUOTES,'UTF-8') ?>" data-nominal="<?= money_attr($currentNominal) ?>" data-base-label="<?= htmlspecialchars($detail['nama_biaya_snapshot'],ENT_QUOTES,'UTF-8') ?>" selected><?= htmlspecialchars($detail['nama_biaya_snapshot']) ?> (Opsional)</option><?php endif; ?>
+                  <?php if($optionalChoice): ?><option value="<?= htmlspecialchars($optionalChoice,ENT_QUOTES,'UTF-8') ?>" data-fee-mode="<?= $manualFee?'input_manual':'berulang' ?>" data-nominal="<?= money_attr($detail['tarif_referensi_snapshot']??$currentNominal) ?>" data-base-label="<?= htmlspecialchars($detail['nama_biaya_snapshot'],ENT_QUOTES,'UTF-8') ?>" selected><?= htmlspecialchars($detail['nama_biaya_snapshot']) ?></option><?php endif; ?>
                   <option value="" <?= !$optionalChoice && $selectedBillId === 0 ? 'selected' : '' ?> <?= $selectedBillId === 0 && !empty($detail['id']) ? 'data-legacy="1" data-nominal="'.money_attr($currentNominal).'"' : '' ?>><?= $selectedBillId === 0 && !empty($detail['id']) ? htmlspecialchars($detail['nama_biaya_snapshot']) . ' (Data lama)' : '-- Pilih Biaya / Tagihan Lama --' ?></option>
                   <?php foreach ($biaya_lain_bills[$d['NO_INDUK']] ?? [] as $bill): $isSelected=(int)$bill['id']===$selectedBillId; ?>
                   <option value="<?= (int)$bill['id'] ?>" data-master-id="<?= (int)$bill['master_id'] ?>" data-nominal="<?= money_attr($bill['nominal']) ?>" data-paid="<?= money_attr($bill['paid']) ?>" data-base-label="<?= htmlspecialchars($bill['nama']) ?>" <?= $isSelected ? 'selected' : '' ?>>
@@ -532,10 +550,8 @@ $selectedPaymentMethod = $d['sistem_pembayaran'] ?? 'VA';
                 value="<?= number_format($paidOther, 0, ',', '.') ?>" placeholder="Sudah" /></label>
               <label class="ll-field"><span class="ll-field-label">Sisa</span><input class="field-input biaya-lain-sisa" type="text" readonly aria-label="Sisa biaya lain"
                 value="<?= number_format($remainingAfterCurrent, 0, ',', '.') ?>" placeholder="Sisa" /></label>
-              <label class="ll-field"><span class="ll-field-label">Bayar</span><input class="field-input biaya-lain-nominal" type="text" name="biaya_lain_nominal[]" aria-label="Input bayar biaya lain"
-                value="<?= number_format($currentNominal, 0, ',', '.') ?>" placeholder="Input bayar" /></label>
-              <label class="ll-field ll-field-note"><span class="ll-field-label">Keterangan</span><input class="field-input biaya-lain-keterangan" type="text" name="biaya_lain_keterangan[]" maxlength="255"
-                value="<?= htmlspecialchars($detail['keterangan'] ?? '') ?>" placeholder="Keterangan opsional..." /></label>
+              <label class="ll-field"><span class="ll-field-label"><?= $manualFee?'Nominal Dibayar':'Bayar' ?></span><input class="field-input biaya-lain-nominal" type="text" inputmode="decimal" name="biaya_lain_nominal[]" aria-label="Input bayar biaya lain"
+                value="<?= htmlspecialchars($displayAmount, ENT_QUOTES, 'UTF-8') ?>" placeholder="Input bayar" /></label>
               <button class="btn-icon-danger btn-remove-biaya-lain" type="button" title="Hapus baris" aria-label="Hapus baris">
                 <svg width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><polyline points="3 6 5 6 21 6"/><path d="M19 6l-1 14H6L5 6"/><path d="M10 11v6M14 11v6"/></svg>
               </button>
@@ -563,7 +579,6 @@ $selectedPaymentMethod = $d['sistem_pembayaran'] ?? 'VA';
               <label class="ll-field"><span class="ll-field-label">Sudah Dibayar</span><input class="field-input biaya-lain-paid" type="text" value="0" placeholder="Sudah" readonly aria-label="Sudah dibayar biaya lain" /></label>
               <label class="ll-field"><span class="ll-field-label">Sisa</span><input class="field-input biaya-lain-sisa" type="text" value="0" placeholder="Sisa" readonly aria-label="Sisa biaya lain" /></label>
               <label class="ll-field"><span class="ll-field-label">Bayar</span><input class="field-input biaya-lain-nominal" type="text" value="0" placeholder="Input bayar" name="biaya_lain_nominal[]" aria-label="Input bayar biaya lain" /></label>
-              <label class="ll-field ll-field-note"><span class="ll-field-label">Keterangan</span><input class="field-input biaya-lain-keterangan" type="text" placeholder="Keterangan opsional..." name="biaya_lain_keterangan[]" maxlength="255" /></label>
               <button class="btn-icon-danger btn-remove-biaya-lain" type="button" title="Hapus baris" aria-label="Hapus baris">
                 <svg width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><polyline points="3 6 5 6 21 6"/><path d="M19 6l-1 14H6L5 6"/><path d="M10 11v6M14 11v6"/></svg>
               </button>

@@ -8,6 +8,10 @@ status Ada Pembayaran. Pemetaan ke master tidak membuktikan tarif atau kelunasan
 ## Alur resmi
 
 - Tidak Berulang tetap diterbitkan ke siswa melalui Master Biaya Lain.
+- Input Manual cukup diberi nama pada Master Biaya Lain. Kasir mengisi nominal
+  positif saat membayar. Pembayaran menyimpan tagihan kejadian yang langsung
+  lunas sebesar nominal tersebut, tanpa tarif referensi master. Pada transaksi
+  berikutnya, siswa dapat memakai master yang sama dengan nominal berbeda.
 - Berulang dibeli lewat formulir yang sama. Saat pembayaran berhasil, layanan
   membuat tagihan `origin=purchase`, dengan identitas kejadian berdasarkan ID
   pembayaran dan master. Tarif dibekukan; satu struk hanya mempunyai satu rincian
@@ -30,7 +34,9 @@ status Ada Pembayaran. Pemetaan ke master tidak membuktikan tarif atau kelunasan
 `sql/install_other_fee_billing.php` adalah installer CLI dengan preview bawaan.
 Ia menambahkan identitas kejadian, asal, periode dan bukti pada tagihan, memperluas
 keunikan menjadi unit/master/siswa/kejadian, serta memasang tabel/view kredit dan
-audit. Tagihan existing mendapat kejadian `once` dan asal `issued`. Readiness HTTP
+audit. Installer juga menambahkan jenis `input_manual` dan memeriksa kombinasi
+jenis, nominal, serta status tarif Legacy pada master. Tagihan existing mendapat
+kejadian `once` dan asal `issued` saat peningkatan skema kejadian. Readiness HTTP
 hanya memeriksa; tidak menjalankan DDL. Installer memeriksa orphan/nominal sebelum
 DDL dan memerlukan backup terverifikasi untuk apply. Installer ulang: changes 0.
 

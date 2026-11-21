@@ -7,6 +7,11 @@ require_once __DIR__ . '/kelas.php';
 function other_fee_master_version(array $master): string {
     return hash('sha256',json_encode(array_map(static fn($key)=>(string)($master[$key]??''),['id','unit_id','nama','nominal','jenis_pembayaran','is_active','updated_at']),JSON_THROW_ON_ERROR));
 }
+function other_fee_publish_eligible(string $alias = ''): string {
+    $prefix = $alias === '' ? '' : $alias.'.';
+    return "{$prefix}is_active=1 AND {$prefix}legacy_pending=0 AND {$prefix}KELAS NOT IN ('CUSTOM','OUT')";
+}
+
 /** Caller owns transaction; lock master before students, matching deletion and payment rules. */
 function other_fee_publish(mysqli $db,int $masterId,string $target,array $ids,string $expected,?array $expectedStudents=null): array {
     if(!in_array(unit_active_id(),[1,2,3],true)||!operational_role())throw new RuntimeException('Pilih satu unit operasional.');
@@ -18,7 +23,7 @@ function other_fee_publish(mysqli $db,int $masterId,string $target,array $ids,st
     if(!$master||!(int)$master['is_active']||$master['jenis_pembayaran']!=='tidak_berulang')throw new RuntimeException('Hanya master aktif Tidak Berulang yang dapat diterbitkan.');
     if(!hash_equals(other_fee_master_version($master),$expected))throw new RuntimeException('Master berubah. Muat ulang sebelum menerbitkan.');
     $where=$target==='all'?'':(' AND '.($target==='rombel'?'s.master_kelas_id':'s.id').' IN ('.implode(',',$ids).')');
-    $students=$db->query("SELECT s.id,s.NO_INDUK,s.master_kelas_id,s.KELAS,mk.tingkat,mk.kode_rombel,mk.is_placeholder FROM siswa s LEFT JOIN master_kelas mk ON mk.id=s.master_kelas_id WHERE s.is_active=1 AND s.legacy_pending=0 AND s.KELAS NOT IN ('CUSTOM','OUT')$where ORDER BY s.id FOR UPDATE")->fetch_all(MYSQLI_ASSOC);
+    $students=$db->query("SELECT s.id,s.NO_INDUK,s.master_kelas_id,s.KELAS,mk.tingkat,mk.kode_rombel,mk.is_placeholder FROM siswa s LEFT JOIN master_kelas mk ON mk.id=s.master_kelas_id WHERE ".other_fee_publish_eligible('s')."$where ORDER BY s.id FOR UPDATE")->fetch_all(MYSQLI_ASSOC);
     if(!$students)throw new RuntimeException('Tidak ada siswa aktif yang sesuai sasaran.');
     if($expectedStudents!==null){foreach($expectedStudents as $id)if(!is_scalar($id)||!preg_match('/^[1-9][0-9]*$/D',(string)$id))throw new RuntimeException('Pratinjau sasaran tidak valid.');$expectedIds=array_values(array_unique(array_map('intval',$expectedStudents)));sort($expectedIds);$actualIds=array_map('intval',array_column($students,'id'));sort($actualIds);if($actualIds!==$expectedIds)throw new RuntimeException('Sasaran siswa berubah sejak pratinjau. Muat ulang dan tinjau kembali.');}
     if($target==='siswa'&&count($students)!==count($ids))throw new RuntimeException('Siswa sasaran berubah atau berada di unit lain.');

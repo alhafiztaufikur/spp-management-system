@@ -34,12 +34,22 @@ def main():
         status,_,body=req(path); check(status==200 and b'Fatal error:' not in body,path); return body.decode('utf-8')
     def switch(unit):
         parser=Forms();parser.feed(page('master_biaya_lain.php')); f=next(f for f in parser.forms if 'unit_switch.php' in f['action']); f['fields'].update(unit_id=str(unit),next='/master_biaya_lain.php'); check(req('unit_switch.php',f['fields'])[0] in (302,303),'switch '+str(unit))
+    def master_usage(tab, unit, number=1):
+        return page(f'master_biaya_lain.php?section=usage&scope={unit}&master_tab={tab}&page={number}')
+    def master_row(name, tab, unit):
+        number=1
+        while True:
+            fragment=master_usage(tab,unit,number)
+            match=next((row for row in re.findall(r'<tr data-master-id="\d+">.*?</tr>',fragment,re.S) if name in row),None)
+            if match or 'rel="next"' not in fragment:
+                return fragment,match
+            number+=1
     identity=json.loads(page('tests/browser_clone_identity.php')); manifest=json.loads(Path(os.environ['SPP_TEST_ISOLATED_INSTANCE']).read_text(encoding='utf-8-sig'))
     check(identity['server_uuid']==manifest['server_uuid'] and int(identity['port'])==int(manifest['port']) and identity['server_uuid']!=manifest['source_server_uuid'],'owned isolated HTTP target')
     check(req('login.php',{'username':'superadmin','password':os.environ['SPP_TEST_SUPERADMIN_PASSWORD']})[0]==302,'login')
     switch(1); active=page('master_biaya_lain.php'); check('tab Nonaktif' in active,'empty active tab explains migrated masters')
-    inactive=page('master_biaya_lain.php?master_tab=nonaktif'); row=next(r for r in re.findall(r'<tr>.*?</tr>',inactive,re.S) if 'Buku Ummi' in r)
-    check('2.873x' in row and '3.547 rincian' in row and '67.177.500,00' in row,'source master totals visible')
+    inactive,row=master_row('Buku Ummi','nonaktif',1)
+    check(row and '<strong>2.873</strong>' in row and '3.547 rincian' in row and '67.177.500,00' in row,'source master totals visible')
     check(re.search(r'<button[^>]*disabled[^>]*>Hapus</button>',row) is not None,'used master delete disabled')
     href=html.unescape(re.search(r'href="(pembayaran/lihat.php\?[^"]+)"',row)[1]); book=urllib.parse.parse_qs(urllib.parse.urlparse(href).query)['fee_master_id'][0]
     history=page(href); check(re.search(r'2[.,]873 transaksi',history) is not None and 'Transaksi biaya:' in history,'master link scopes history across all dates')
@@ -58,13 +68,13 @@ def main():
     check(fee_sum==Decimal('67177500.00'),'Excel component amount matches master independently of receipt cash')
     parser=Forms();parser.feed(inactive); csrf=next(f['fields']['csrf_token'] for f in parser.forms if 'master_tab' in f['fields'])
     check(req('master_biaya_lain.php',{'aksi':'hapus','id':book,'master_tab':'nonaktif','_operational_unit':'1','csrf_token':csrf})[0] in (302,303),'direct delete POST handled')
-    check('Buku Ummi' in page('master_biaya_lain.php?master_tab=nonaktif'),'direct POST cannot delete used Legacy master')
+    check(master_row('Buku Ummi','nonaktif',1)[1] is not None,'direct POST cannot delete used Legacy master')
     for bad in ('0','bad','9999999999'):
         check(req('pembayaran/lihat.php?fee_master_id='+bad)[0]==400,'invalid master context '+bad)
     switch(2); check(req(href)[0]==400,'SD master cannot be opened from SMP')
     for unit,expected in ((2,51),(3,23)):
         if unit!=2:switch(unit)
-        text=page('master_biaya_lain.php?master_tab=hapus'); check('Tidak ada master pada bagian ini' in text,'no used masters deletable unit '+str(unit))
+        text=master_usage('hapus',unit); check('Tidak ada master pada bagian ini' in text,'no used masters deletable unit '+str(unit))
     switch(1)
     # Fixture service uses the same CLI and HTTP instance guards; no production writes.
     def fixture(action,state=None):
@@ -82,12 +92,12 @@ $db->commit();echo json_encode($result);
         return json.loads(r.stdout)
     state=fixture('seed')
     try:
-        deletable=page('master_biaya_lain.php?master_tab=hapus');check('QA fee HTTP' in deletable,'unused fixture initially deletable')
+        deletable,unused=master_row('QA fee HTTP','hapus',1);check(unused is not None,'unused fixture initially deletable')
         parser=Forms();parser.feed(deletable);token=next(f['fields']['csrf_token'] for f in parser.forms if 'master_tab' in f['fields'])
         state=fixture('use',state)
         req('master_biaya_lain.php',{'aksi':'hapus','id':state['master'],'master_tab':'hapus','_operational_unit':'1','csrf_token':token})
-        check('QA fee HTTP' in page('master_biaya_lain.php?master_tab=nonaktif'),'usage added after render prevents deletion on POST')
-        check('QA fee HTTP' not in page('master_biaya_lain.php?master_tab=hapus'),'same reader removes newly used fixture from deletable tab')
+        check(master_row('QA fee HTTP','nonaktif',1)[1] is not None,'usage added after render prevents deletion on POST')
+        check(master_row('QA fee HTTP','hapus',1)[1] is None,'same reader removes newly used fixture from deletable tab')
     finally:fixture('clean',state)
     Path(args.output).write_text(json.dumps({'passed':len(checks),'checks':checks},indent=2),encoding='utf-8');print('PASS',len(checks),'HTTP checks')
 

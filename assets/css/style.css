@@ -2258,9 +2258,6 @@ h1, h2, h3, h4, h5, h6, .card-title, .topbar-title h2, .sidebar-brand-name {
   line-height: 1;
   text-transform: uppercase;
 }
-.ll-field-note {
-  min-width: 0;
-}
 .lainlain-row .field-select { max-width: 100%; }
 .lainlain-row input[type="number"] { max-width: 130px; }
 .lainlain-row .biaya-lain-select { max-width: 100%; }
@@ -2276,7 +2273,6 @@ h1, h2, h3, h4, h5, h6, .card-title, .topbar-title h2, .sidebar-brand-name {
   border-color: rgba(52, 211, 153, 0.3);
   color: var(--text-primary);
 }
-.lainlain-row .biaya-lain-keterangan { min-width: 0; }
 .btn-add-biaya-lain { margin-top: 12px; }
 .btn-icon-danger {
   width: 38px;

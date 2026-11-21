@@ -1,6 +1,46 @@
 <?php
+function ofb_master_mode_column(mysqli $db): ?array {
+    return $db->query("SELECT COLUMN_TYPE,IS_NULLABLE,COLUMN_DEFAULT FROM information_schema.COLUMNS WHERE TABLE_SCHEMA=DATABASE() AND TABLE_NAME='master_biaya_lain_data' AND COLUMN_NAME='jenis_pembayaran'")->fetch_assoc() ?: null;
+}
+
+function ofb_master_nominal_check(bool $manual): string {
+    $tariff = '(nominal>0 OR (nominal=0 AND is_active=0 AND legacy_tariff_pending=1))';
+    return $manual
+        ? "(jenis_pembayaran='input_manual' AND nominal=0 AND legacy_tariff_pending=0) OR (jenis_pembayaran IN ('berulang','tidak_berulang') AND $tariff)"
+        : $tariff;
+}
+
+function ofb_manual_schema_plan(mysqli $db): array {
+    $old = "enum('berulang','tidak_berulang')";
+    $new = "enum('berulang','tidak_berulang','input_manual')";
+    $mode = ofb_master_mode_column($db);
+    $type = $mode['COLUMN_TYPE'] ?? null;
+    if ($mode && (!in_array($type, [$old,$new], true) || $mode['IS_NULLABLE'] !== 'NO' || $mode['COLUMN_DEFAULT'] !== 'berulang')) {
+        throw new RuntimeException('Definisi jenis pembayaran Biaya Lain bertentangan.');
+    }
+    $check = $db->query("SELECT c.CHECK_CLAUSE,t.ENFORCED FROM information_schema.TABLE_CONSTRAINTS t
+        JOIN information_schema.CHECK_CONSTRAINTS c ON c.CONSTRAINT_SCHEMA=t.CONSTRAINT_SCHEMA AND c.CONSTRAINT_NAME=t.CONSTRAINT_NAME
+        WHERE t.TABLE_SCHEMA=DATABASE() AND t.TABLE_NAME='master_biaya_lain_data' AND t.CONSTRAINT_NAME='lop_tariff_pending'")->fetch_assoc();
+    if (!$check || $check['ENFORCED'] !== 'YES') throw new RuntimeException('Pasang skema tarif Legacy sebelum Input Manual.');
+    $steps = [];
+    if ($type !== $new || !str_contains(stripslashes($check['CHECK_CLAUSE']), "'input_manual'")) {
+        $change = $type === $new ? '' : ($mode ? 'MODIFY' : 'ADD') . " jenis_pembayaran $new NOT NULL DEFAULT 'berulang', ";
+        $steps[] = 'ALTER TABLE master_biaya_lain_data '.$change.'DROP CHECK lop_tariff_pending, ADD CONSTRAINT lop_tariff_pending CHECK ('.ofb_master_nominal_check(true).')';
+    }
+    $viewType = $db->query("SELECT COLUMN_TYPE FROM information_schema.COLUMNS WHERE TABLE_SCHEMA=DATABASE() AND TABLE_NAME='master_biaya_lain' AND COLUMN_NAME='jenis_pembayaran'")->fetch_row()[0] ?? null;
+    if ($viewType === null || ($type === $new && $viewType !== $new)) {
+        $steps[] = 'CREATE OR REPLACE VIEW master_biaya_lain AS SELECT * FROM master_biaya_lain_data WHERE current_unit_id()=0 OR unit_id=current_unit_id() WITH CASCADED CHECK OPTION';
+    }
+    return $steps;
+}
+
+function ofb_manual_ready(mysqli $db): bool {
+    try { return !ofb_manual_schema_plan($db); }
+    catch (Throwable $error) { return false; }
+}
+
 /** Explicit installer contract; HTTP readiness only reads information_schema. */
-function ofb_schema_plan(mysqli $db,bool $preflight=false): array {
+function ofb_schema_plan(mysqli $db,bool $preflight=false,bool $includeManual=true): array {
     $ddl=[];$conflicts=[];
     $columns=[];foreach($db->query("SELECT COLUMN_NAME,COLUMN_TYPE FROM information_schema.COLUMNS WHERE TABLE_SCHEMA=DATABASE() AND TABLE_NAME='tagihan_biaya_lain_data'") as $c)$columns[$c['COLUMN_NAME']]=$c['COLUMN_TYPE'];
     if(!$columns)throw new RuntimeException('Pasang skema multiunit sebelum tagihan Biaya Lain.');
@@ -55,14 +95,14 @@ function ofb_schema_plan(mysqli $db,bool $preflight=false): array {
         if(!$definition||($view==='tagihan_biaya_lain'&&!str_contains($definition[0],'occurrence_key')))$ddl[]="CREATE OR REPLACE VIEW $view AS SELECT * FROM {$view}_data WHERE current_unit_id()=0 OR unit_id=current_unit_id() WITH CASCADED CHECK OPTION";
     }
     if($conflicts)throw new RuntimeException('Preflight tagihan Biaya Lain: '.implode('; ',$conflicts));
-    return $ddl;
+    return $includeManual ? array_merge($ddl, ofb_manual_schema_plan($db)) : $ddl;
 }
 function ofb_schema_ready(mysqli $db): bool {
-    try{return !ofb_schema_plan($db);}catch(Throwable $e){return false;}
+    try{return !ofb_schema_plan($db,false,false);}catch(Throwable $e){return false;}
 }
 function ofb_schema_apply(mysqli $db): int {
     if(PHP_SAPI!=='cli')throw new RuntimeException('Installer hanya melalui CLI.');
     $plan=ofb_schema_plan($db,true);foreach($plan as $sql)$db->query($sql);
-    if(!ofb_schema_ready($db))throw new RuntimeException('Struktur tagihan Biaya Lain belum lengkap.');
+    if(ofb_schema_plan($db))throw new RuntimeException('Struktur tagihan Biaya Lain belum lengkap.');
     return count($plan);
 }

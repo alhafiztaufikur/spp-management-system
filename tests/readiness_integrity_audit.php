@@ -7,10 +7,47 @@ if (PHP_SAPI !== 'cli') {
 require_once __DIR__ . '/../koneksi.php';
 require_once __DIR__ . '/../includes/legacy_finance.php';
 require_once __DIR__ . '/../includes/legacy_full.php';
+require_once __DIR__ . '/../includes/schema_catalog.php';
 unit_set_context($koneksi, 0);
 
 function readiness_scalar(mysqli $db, string $sql): float {
     return (float)$db->query($sql)->fetch_row()[0];
+}
+
+function readiness_monthly_relation_sql(mysqli $db, string $table): string {
+    $columns = schema_catalog($db)['columns'][$table] ?? [];
+    $joins = "LEFT JOIN siswa_tahun_ajaran p ON p.id=t.penempatan_id
+        LEFT JOIN tahun_ajaran y ON y.id=t.tahun_ajaran_id AND y.unit_id=t.unit_id";
+    $invalid = ['y.id IS NULL', '(t.penempatan_id IS NOT NULL AND
+        (p.id IS NULL OR p.unit_id<>t.unit_id OR p.no_induk<>t.no_induk OR p.tahun_ajaran_id<>t.tahun_ajaran_id))'];
+    $missing = ['t.penempatan_id IS NULL'];
+    $period = "CONCAT(t.tahun,'-',LPAD(t.bulan,2,'0'))";
+    $invalidPeriod = "$period NOT BETWEEN DATE_FORMAT(y.tanggal_mulai,'%Y-%m') AND DATE_FORMAT(y.tanggal_selesai,'%Y-%m')";
+
+    if (isset($columns['rencana_masuk_id'])) {
+        $joins .= " LEFT JOIN psb_spp_plans r ON r.id=t.rencana_masuk_id
+            LEFT JOIN siswa rs ON rs.id=r.student_id AND rs.unit_id=r.unit_id";
+        $grade = $table === 'tagihan_spp' ? ' OR t.tingkat_snapshot<>r.tingkat' : '';
+        $invalid[] = "(t.rencana_masuk_id IS NOT NULL AND (r.id IS NULL OR rs.id IS NULL OR r.unit_id<>t.unit_id
+            OR rs.NO_INDUK<>t.no_induk OR r.tahun_ajaran_id<>t.tahun_ajaran_id OR $invalidPeriod
+            OR (t.penempatan_id IS NOT NULL AND NOT(t.penempatan_id<=>r.penempatan_id))$grade))";
+        $missing[] = 't.rencana_masuk_id IS NULL';
+    }
+    if (isset($columns['penempatan_asal_id'])) {
+        $joins .= " LEFT JOIN siswa_tahun_ajaran a ON a.id=t.penempatan_asal_id
+            LEFT JOIN tahun_ajaran ay ON ay.id=a.tahun_ajaran_id AND ay.unit_id=a.unit_id
+            LEFT JOIN unit_sekolah u ON u.id=t.unit_id";
+        $grade = $table === 'tagihan_spp' ? ' OR t.tingkat_snapshot<>CAST(a.kelas AS UNSIGNED)+1' : '';
+        $invalid[] = "(t.penempatan_asal_id IS NOT NULL AND (a.id IS NULL OR ay.id IS NULL OR u.id IS NULL
+            OR a.unit_id<>t.unit_id OR a.no_induk<>t.no_induk
+            OR CAST(a.kelas AS UNSIGNED) NOT BETWEEN u.tingkat_awal AND u.tingkat_akhir-1
+            OR y.label<>CONCAT(CAST(LEFT(ay.label,4) AS UNSIGNED)+1,'/',CAST(LEFT(ay.label,4) AS UNSIGNED)+2)
+            OR $invalidPeriod OR (p.id IS NOT NULL AND CAST(p.kelas AS UNSIGNED)<>CAST(a.kelas AS UNSIGNED)+1)$grade))";
+        $missing[] = 't.penempatan_asal_id IS NULL';
+        if (isset($columns['rencana_masuk_id'])) $invalid[] = '(t.rencana_masuk_id IS NOT NULL AND t.penempatan_asal_id IS NOT NULL)';
+    }
+    $invalid[] = '('.implode(' AND ', $missing).')';
+    return "SELECT COUNT(*) FROM $table t $joins WHERE ".implode(' OR ', $invalid);
 }
 
 $metrics = [
@@ -56,15 +93,8 @@ $checks = [
             +COALESCE(b.U_LAIN,0)+COALESCE(d.total_du,0)
             -COALESCE(b.potong_spp,0)
         ))>0.01",
-    'tagihan_spp_salah_relasi' => "SELECT COUNT(*) FROM tagihan_spp t
-        LEFT JOIN siswa_tahun_ajaran p ON p.id=t.penempatan_id
-        LEFT JOIN tahun_ajaran y ON y.id=t.tahun_ajaran_id
-        WHERE p.id IS NULL OR y.id IS NULL OR p.no_induk<>t.no_induk
-          OR p.tahun_ajaran_id<>t.tahun_ajaran_id OR p.unit_id<>t.unit_id OR y.unit_id<>t.unit_id",
-    'tagihan_komite_salah_relasi' => "SELECT COUNT(*) FROM tagihan_komite t
-        LEFT JOIN siswa_tahun_ajaran p ON p.id=t.penempatan_id
-        WHERE p.id IS NULL OR p.no_induk<>t.no_induk
-          OR p.tahun_ajaran_id<>t.tahun_ajaran_id OR p.unit_id<>t.unit_id",
+    'tagihan_spp_salah_relasi' => readiness_monthly_relation_sql($koneksi, 'tagihan_spp'),
+    'tagihan_komite_salah_relasi' => readiness_monthly_relation_sql($koneksi, 'tagihan_komite'),
     'tagihan_du_salah_relasi' => du_invalid_relation_sql($koneksi),
     'alokasi_spp_salah_relasi' => "SELECT COUNT(*) FROM spp_alokasi a
         LEFT JOIN spp_alokasi_batch b ON b.id=a.batch_id

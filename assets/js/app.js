@@ -1226,8 +1226,8 @@ function applyGraduatePaymentLock(opt) {
       delete select.dataset.graduateLocked;
     }
   });
-  document.querySelectorAll('.biaya-lain-nominal, .biaya-lain-keterangan').forEach(input => {
-    if (graduateOnly) input.value = input.classList.contains('biaya-lain-nominal') ? '0' : '';
+  document.querySelectorAll('.biaya-lain-nominal').forEach(input => {
+    if (graduateOnly) input.value = '0';
     if (graduateOnly) {
       input.readOnly = true;
       input.dataset.graduateLocked = '1';
@@ -1492,7 +1492,6 @@ function clearPaymentAmountsOnContextChange(studentChanged = false) {
     for (const row of document.querySelectorAll('#biaya-lain-list .biaya-lain-row')) {
       const select=row.querySelector('.biaya-lain-select'); if (select) select.value='';
       const amount=row.querySelector('.biaya-lain-nominal'); if (amount) amount.value='0';
-      const note=row.querySelector('.biaya-lain-keterangan'); if (note) note.value='';
     }
   }
   updateTotal();
@@ -1982,14 +1981,45 @@ function formatNumericInput(input) {
   }
 }
 
+const manualFeeTypingPattern = /^(?:[0-9]+|[0-9]{1,3}(?:\.[0-9]{3})+)(?:,[0-9]{0,2})?$/;
+
+function formatManualFeeInput(input, editing = false) {
+  const raw = input.value.trim();
+  const indonesian = manualFeeTypingPattern.test(raw);
+  const editable = /^[0-9.]+(?:,[0-9]{0,2})?$/;
+  if (!indonesian && !(editing ? editable.test(raw) : /^[0-9]+\.[0-9]{1,2}$/.test(raw))) return;
+  const asDecimal = !editing && !indonesian;
+  const significant = (text) => text.replace(/[.\s]/g, '');
+  const [whole, fraction] = (asDecimal ? raw.replace('.', ',') : significant(raw)).split(',');
+  if (!whole) return;
+  const formatted = whole.replace(/\B(?=(?:[0-9]{3})+(?![0-9]))/g, '.') + (fraction === undefined ? '' : ',' + fraction);
+  if (formatted === input.value) return;
+  const before = input.value.slice(0, input.selectionStart ?? input.value.length);
+  const digitsBefore = significant(asDecimal ? before.replace('.', ',') : before).length;
+  input.value = formatted;
+  let cursor = 0;
+  for (let remaining = digitsBefore; remaining > 0 && cursor < formatted.length; cursor++) {
+    if (formatted[cursor] !== '.') remaining--;
+  }
+  input.setSelectionRange(cursor, cursor);
+}
+
 function bindNumericInput(input) {
   if (!input || input.dataset.numericBound === '1') return;
   input.dataset.numericBound = '1';
   if (input.value && input.value !== '0') {
-    input.value = formatRupiahString(input.value);
+    if (input.closest('.is-manual-fee')) formatManualFeeInput(input);
+    else input.value = formatRupiahString(input.value);
   }
+  let editingManual = false;
+  input.addEventListener('beforeinput', event => {
+    editingManual = input.closest('.is-manual-fee') && manualFeeTypingPattern.test(input.value)
+      && (event.inputType.startsWith('delete') || (event.inputType === 'insertText' && /^[0-9,]$/.test(event.data || '')));
+  });
   input.addEventListener('input', function () {
-    formatNumericInput(this);
+    if (this.closest('.is-manual-fee')) formatManualFeeInput(this, editingManual);
+    else formatNumericInput(this);
+    editingManual = false;
 
     if (this.id.endsWith('-total') || this.id.endsWith('-bayar') || this.id.endsWith('-input')) {
       const key = this.id.split('-')[0];
@@ -2309,7 +2339,7 @@ document.addEventListener('DOMContentLoaded', function () {
     if (window.sppPublishedBilling && !window.sppEditPaymentId) form.noValidate = true;
     const normalizePaymentInputs = () => {
       document.querySelectorAll('.tbl-input, #potongan-spp, #kewajiban-spp, .biaya-lain-nominal').forEach(input => {
-        input.value = input.value.replace(/\./g, '');
+        if (!input.closest('.is-manual-fee')) input.value = input.value.replace(/\./g, '');
       });
     };
     form.addEventListener('submit', async function (event) {
@@ -2506,7 +2536,6 @@ function capturePaymentDraftInBrowser() {
   const rows=Array.from(document.querySelectorAll('#biaya-lain-list .biaya-lain-row'));
   draft.biaya_lain_tagihan_id=rows.map(row => row.querySelector('.biaya-lain-select')?.value || '');
   draft.biaya_lain_nominal=rows.map(row => row.querySelector('.biaya-lain-nominal')?.value || '0');
-  draft.biaya_lain_keterangan=rows.map(row => row.querySelector('.biaya-lain-keterangan')?.value || '');
   return draft;
 }
 
@@ -2526,9 +2555,11 @@ function restorePaymentDraftOtherFees() {
     select.value=String(id || '');
     refreshBiayaLainRow(row,true);
     const amount=row.querySelector('.biaya-lain-nominal');
-    if (amount) amount.value=formatRupiahString(parseNumber(draft.biaya_lain_nominal?.[index] || 0));
-    const note=row.querySelector('.biaya-lain-keterangan');
-    if (note) note.value=String(draft.biaya_lain_keterangan?.[index] || '');
+    if (amount) {
+      const value = draft.biaya_lain_nominal?.[index] ?? '';
+      amount.value = row.classList.contains('is-manual-fee') ? String(value) : formatRupiahString(parseNumber(value));
+      if (row.classList.contains('is-manual-fee')) formatManualFeeInput(amount);
+    }
     refreshBiayaLainRow(row,true);
   });
   updateTotal();
@@ -2563,6 +2594,21 @@ function paidBiayaLainForSelectedStudent(billId) {
   return parseNumber(selected?.dataset.paid || 0);
 }
 
+function otherFeeOptionPrefix(option) {
+  if (!option.value.startsWith('master:')) return 'Tagihan: ';
+  return option.dataset.feeMode === 'input_manual' ? 'Input Manual: ' : 'Berulang: ';
+}
+
+function manualOtherFeeAmountValid(value) {
+  const amount = value.trim();
+  const validFormat = /^(?:[0-9]+|[0-9]{1,3}(?:\.[0-9]{3})+)(?:,[0-9]{1,2})?$/.test(amount)
+    || /^[0-9]+\.[0-9]{1,2}$/.test(amount);
+  const parsed = parseNumber(amount);
+  return validFormat && parsed > 0 && parsed <= 9999999999999.99;
+}
+
+const manualOtherFeeAmountError = 'Isi nominal Input Manual lebih dari Rp 0 dengan maksimal dua desimal.';
+
 function refreshBiayaLainOptions() {
   const bills = biayaLainBillsForSelectedStudent();
   document.querySelectorAll('.biaya-lain-select').forEach(select => {
@@ -2570,13 +2616,15 @@ function refreshBiayaLainOptions() {
     const currentOption = select.options[select.selectedIndex];
     const legacyPlaceholder = Array.from(select.options).find(option => option.dataset.legacy === '1');
     const catalogChoice=bills.find(bill=>String(bill.id)===String(current));
-    const historicalChoice=current.startsWith('master:')&&!!select.closest('.biaya-lain-row')?.querySelector('[name="biaya_lain_detail_id[]"]')?.value;
+    const historicalChoice=current.startsWith('master:')&&select.closest('.biaya-lain-row')?.dataset.originalChoice===current;
     const legacy = current && (historicalChoice||(!current.startsWith('master:')&&!catalogChoice))
       ? {
           id: current,
           master_id: currentOption?.dataset.masterId || (current.startsWith('master:')?current.slice(7):''),
           nama: currentOption?.dataset.baseLabel || currentOption?.textContent || 'Biaya Lain (histori)',
-          nominal: catalogChoice?.nominal ?? currentOption?.dataset.nominal ?? 0,
+          nominal: catalogChoice?.jenis_pembayaran===currentOption?.dataset.feeMode
+            ? (catalogChoice?.nominal ?? currentOption?.dataset.nominal ?? 0) : (currentOption?.dataset.nominal ?? 0),
+          jenis_pembayaran: currentOption?.dataset.feeMode || catalogChoice?.jenis_pembayaran,
           paid: currentOption?.dataset.paid || 0
         }
       : null;
@@ -2593,7 +2641,8 @@ function refreshBiayaLainOptions() {
     }
     select.appendChild(placeholder);
     const optionalGroup=document.createElement('optgroup');optionalGroup.label='Biaya Berulang';
-    const billGroup=document.createElement('optgroup');billGroup.label='Tagihan Tidak Berulang / Tagihan Lama';select.append(optionalGroup,billGroup);
+    const manualGroup=document.createElement('optgroup');manualGroup.label='Input Manual';
+    const billGroup=document.createElement('optgroup');billGroup.label='Tagihan Tidak Berulang / Tagihan Lama';
     available.forEach(bill => {
       const option = document.createElement('option');
       option.value = String(bill.id);
@@ -2601,9 +2650,12 @@ function refreshBiayaLainOptions() {
       option.dataset.nominal = String(bill.nominal || bill.nominal_tagihan || 0);
       option.dataset.paid = String(bill.paid || bill.terbayar || 0);
       option.dataset.baseLabel = String(bill.nama || bill.nama_snapshot || 'Biaya Lain');
-      option.textContent = (option.value.startsWith("master:") ? "Berulang: " : "Tagihan: ") + option.dataset.baseLabel;
-      (option.value.startsWith('master:')?optionalGroup:billGroup).appendChild(option);
+      if (option.value.startsWith('master:')) option.dataset.feeMode = bill.jenis_pembayaran || 'berulang';
+      option.textContent = otherFeeOptionPrefix(option) + option.dataset.baseLabel;
+      const group = option.dataset.feeMode === 'input_manual' ? manualGroup : (option.dataset.feeMode ? optionalGroup : billGroup);
+      group.appendChild(option);
     });
+    [optionalGroup,manualGroup,billGroup].forEach(group=>{if (group.children.length) select.appendChild(group);});
     if (current && Array.from(select.options).some(option => option.value === current)) select.value = current;
     else if(current.startsWith('master:')){
       const amount=select.closest('.biaya-lain-row')?.querySelector('.biaya-lain-nominal');
@@ -2706,7 +2758,7 @@ function refreshBiayaLainAvailability() {
       const usedByOtherRow = rows.some(otherRow => otherRow !== row
         && key(otherRow.querySelector('.biaya-lain-select')?.selectedOptions[0]) === key(option));
       option.disabled = option.value !== selectedId && (fullyPaid || usedByOtherRow);
-      option.textContent = (option.value.startsWith('master:')?'Berulang: ':'Tagihan: ') + baseLabel + (fullyPaid ? ' (Lunas)' : (usedByOtherRow ? ' (Sudah dipilih)' : ''));
+      option.textContent = otherFeeOptionPrefix(option) + baseLabel + (fullyPaid ? ' (Lunas)' : (usedByOtherRow ? ' (Sudah dipilih)' : ''));
     });
 
     const selectedOption = select.options[select.selectedIndex];
@@ -2751,12 +2803,43 @@ function refreshBiayaLainRow(row, preserveInput) {
   const option = select.options[select.selectedIndex];
   const billId = option?.value || '';
   const optional = billId.startsWith('master:');
+  const mode = optional ? (option.dataset.feeMode || 'berulang') : '';
+  const manual = mode === 'input_manual';
   row.classList.toggle('is-optional-fee',optional);
+  row.classList.toggle('is-manual-fee',manual);
   totalEl?.closest('label')?.classList.add('ll-field-reference');
   nominal.closest('label')?.classList.add('ll-field-amount');
   const nominalLabel=nominal.closest('label')?.querySelector('.ll-field-label');if(nominalLabel)nominalLabel.textContent=optional?'Nominal Dibayar':'Bayar';
   [paidEl,sisaEl].forEach(el=>{if(el?.closest('label'))el.closest('label').hidden=optional;});
+  if(totalEl?.closest('label'))totalEl.closest('label').hidden=manual;
+  nominal.setAttribute('aria-label',optional?'Nominal Dibayar':'Input bayar biaya lain');
+  nominal.inputMode = 'decimal';
+  nominal.required = manual;
   const totalLabel=totalEl?.closest('label')?.querySelector('.ll-field-label');if(totalLabel)totalLabel.textContent=optional?'Tarif Referensi':'Total Tagihan';
+  let modeField = row.querySelector('[data-other-fee-mode]');
+  if (optional && !modeField) {
+    modeField = document.createElement('input');
+    modeField.type = 'hidden';
+    modeField.dataset.otherFeeMode = '1';
+    row.append(modeField);
+  }
+  if (modeField) {
+    if (optional) {
+      modeField.name = '_other_fee_modes[' + billId + ']';
+      modeField.value = mode;
+    }
+    modeField.disabled = !optional;
+  }
+  if (manual) {
+    if (!preserveInput) nominal.value = '';
+    const quote = row.querySelector('[data-recurring-quote]');
+    if (quote) { quote.disabled = true; delete quote.dataset.choice; }
+    const invalid = nominal.value.trim() !== '' && !manualOtherFeeAmountValid(nominal.value);
+    nominal.setCustomValidity(invalid ? manualOtherFeeAmountError : '');
+    nominal.toggleAttribute('aria-invalid', invalid);
+    row.classList.remove('row-overpaid');
+    return;
+  }
   if(optional){
     const tariff=Number(option.dataset.nominal||0);
     if(totalEl)totalEl.value=formatRupiahString(tariff);
@@ -2887,13 +2970,13 @@ document.addEventListener('DOMContentLoaded', function () {
     if (list.querySelectorAll('.biaya-lain-row').length === 1) {
       row.querySelector('.biaya-lain-select').value = '';
       row.querySelector('[name="biaya_lain_detail_id[]"]').value = '';
-      row.querySelector('.biaya-lain-keterangan').value = '';
       row.querySelector('.biaya-lain-total').value = '0';
       row.querySelector('.biaya-lain-paid').value = '0';
       row.querySelector('.biaya-lain-sisa').value = '0';
       row.querySelector('.biaya-lain-nominal').value = '0';
       row.querySelector('.biaya-lain-nominal').setCustomValidity('');
       row.classList.remove('row-overpaid');
+      refreshBiayaLainRow(row, false);
     } else {
       row.remove();
     }
@@ -3201,6 +3284,7 @@ function updateTotal() {
   });
 
   document.querySelectorAll('.biaya-lain-nominal').forEach(input => {
+    if (input.closest('.is-manual-fee') && !manualOtherFeeAmountValid(input.value)) return;
     total += parseNumber(input.value || 0);
   });
 
@@ -3389,6 +3473,15 @@ document.addEventListener('DOMContentLoaded',()=>{
       const select=row.querySelector('.biaya-lain-select'),input=row.querySelector('.biaya-lain-nominal');
       if(!select?.value.startsWith('master:')||!input)continue;
       const option=select.selectedOptions[0],tariff=Number(option?.dataset.nominal||0),amount=parseNumber(input.value);
+      if (option?.dataset.feeMode === 'input_manual') {
+        if (!manualOtherFeeAmountValid(input.value)) {
+          event.preventDefault();
+          event.stopImmediatePropagation();
+          showSppWarning({code:'manual_fee_amount',severity:'error',title:'Periksa nominal',message:manualOtherFeeAmountError},input,true);
+          return;
+        }
+        continue;
+      }
       if(row.dataset.originalChoice===select.value&&Math.abs(amount-Number(row.dataset.originalAmount))<.001)continue;
       if(Math.abs(amount-tariff)>.001){event.preventDefault();event.stopImmediatePropagation();
         const name=option.dataset.baseLabel||option.textContent;

@@ -127,6 +127,7 @@ function transaction_authorization_payload(array $source, string $action): array
         if (isset($source[$key]) && is_array($source[$key])) $payload[$key] = array_values($source[$key]);
     }
     if(isset($source['_other_fee_tariffs'])&&is_array($source['_other_fee_tariffs']))$payload['_other_fee_tariffs']=$source['_other_fee_tariffs'];
+    if(isset($source['_other_fee_modes'])&&is_array($source['_other_fee_modes']))$payload['_other_fee_modes']=$source['_other_fee_modes'];
     $payload['id'] = (int)($source['id'] ?? 0);
     return $payload;
 }

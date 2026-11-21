@@ -6,6 +6,7 @@
 if (PHP_SAPI !== 'cli') exit(1);
 require_once __DIR__ . '/../koneksi.php';
 require_once __DIR__ . '/readiness_migration_guard.php';
+require_once __DIR__ . '/../includes/other_fee_billing_schema.php';
 
 $apply = in_array('--apply', $argv, true);
 if ($apply) readiness_migration_assert_apply_allowed($argv, DB_NAME);
@@ -18,7 +19,7 @@ if (($table['TABLE_TYPE'] ?? '') !== 'VIEW') {
 /** Parse the limited, known CHECK grammar into a boolean tree. This keeps
  * AND/OR grouping while ignoring MySQL's redundant predicate parentheses. */
 function schema_check_tokens(string $expression): array {
-    preg_match_all('/`(?:``|[^`])*`|[a-z_][a-z_0-9]*|[0-9]+(?:\.[0-9]+)?|>=|<=|<>|!=|[()+,=<>-]/i',
+    preg_match_all('/(?:_[a-z0-9]+)?\'[a-z0-9_]+\'|`(?:``|[^`])*`|[a-z_][a-z_0-9]*|[0-9]+(?:\.[0-9]+)?|>=|<=|<>|!=|[()+,=<>-]/i',
         $expression, $matches, PREG_OFFSET_CAPTURE);
     $tokens = [];
     $offset = 0;
@@ -26,7 +27,7 @@ function schema_check_tokens(string $expression): array {
         if (trim(substr($expression, $offset, $position - $offset)) !== '') {
             throw new RuntimeException('Sintaks CHECK di luar parser audit.');
         }
-        $tokens[] = strtolower(trim($token, '`'));
+        $tokens[] = strtolower(preg_replace("/^_[a-z0-9]+(?=')/i", '', trim($token, '`')));
         $offset = $position + strlen($token);
     }
     if (trim(substr($expression, $offset)) !== '') throw new RuntimeException('Sintaks CHECK di luar parser audit.');
@@ -96,7 +97,7 @@ function schema_check_parse_factor(array $tokens, int &$position): array {
 function schema_check_definition_matches(string $expected, string $actual): bool {
     try {
         $left = schema_check_tokens($expected);
-        $right = schema_check_tokens($actual);
+        $right = schema_check_tokens(stripslashes($actual));
         $leftPos = $rightPos = 0;
         $leftTree = schema_check_parse_or($left, $leftPos);
         $rightTree = schema_check_parse_or($right, $rightPos);
@@ -156,6 +157,10 @@ $result = $koneksi->query("SELECT tc.TABLE_NAME,tc.CONSTRAINT_NAME,tc.ENFORCED,c
       ON cc.CONSTRAINT_SCHEMA=tc.CONSTRAINT_SCHEMA AND cc.CONSTRAINT_NAME=tc.CONSTRAINT_NAME
     WHERE tc.CONSTRAINT_SCHEMA=DATABASE() AND tc.CONSTRAINT_TYPE='CHECK'");
 while ($row = $result->fetch_assoc()) $existing[$row['TABLE_NAME']][$row['CONSTRAINT_NAME']] = $row;
+if (isset($existing['master_biaya_lain_data']['lop_tariff_pending'])) {
+    $mode = ofb_master_mode_column($koneksi);
+    $checks['master_biaya_lain_data'] = ['lop_tariff_pending' => ofb_master_nominal_check(str_contains($mode['COLUMN_TYPE'] ?? '', "'input_manual'"))];
+}
 $tariffGradeViolations = (int)$koneksi->query("SELECT COUNT(*) n FROM master_spp_tarif_data t
     LEFT JOIN unit_sekolah u ON u.id=t.unit_id
     WHERE u.id IS NULL OR t.tingkat NOT BETWEEN u.tingkat_awal AND u.tingkat_akhir")->fetch_assoc()['n'];

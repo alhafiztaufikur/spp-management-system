@@ -493,15 +493,18 @@ function collect_biaya_lain(mysqli $koneksi, string $noInduk, int $bayarId = 0):
         if($choice!==''&&!preg_match('/^(master:)?[0-9]+$/D',$choice))throw new RuntimeException('Pilihan Biaya Lain tidak valid.');
         $billId = (int)$choice;
         $nominalInput = parse_amount($nominals[$index] ?? null);
-        $note = trim((string)($notes[$index] ?? ''));
+        $oldLine = $detailId > 0 ? ($existing[$detailId] ?? null) : null;
+        $note = isset($notes[$index]) ? trim((string)$notes[$index]) : other_fee_existing_note($oldLine, $choice);
         if (mb_strlen($note) > 255) $note = mb_substr($note, 0, 255);
 
-        $oldLine = $detailId > 0 && isset($existing[$detailId]) ? $existing[$detailId] : null;
+        if (str_starts_with($choice, 'master:')) {
+            $lines[] = other_fee_optional_line($koneksi, $choice, $nominalInput, $note, $oldLine, $submittedByBill, $nominals[$index] ?? '');
+            continue;
+        }
         if (!is_finite($nominalInput) || $nominalInput < 0) {
             throw new RuntimeException('Nominal biaya lain harus berupa angka positif atau nol.');
         }
 
-        if(str_starts_with($choice,'master:')){$lines[]=other_fee_optional_line($koneksi,$choice,$nominalInput,$note,$oldLine,$submittedByBill);continue;}
         if ($billId <= 0) {
             // Detail hasil migrasi tidak memiliki master, tetapi snapshot-nya tetap sah.
             if ($oldLine && $oldLine['tagihan_biaya_lain_id'] === null) {
@@ -527,7 +530,9 @@ function collect_biaya_lain(mysqli $koneksi, string $noInduk, int $bayarId = 0):
                 'message'=>'Tagihan Biaya Lain berubah sejak halaman dibuka. Perbarui tagihan sebelum menyimpan.',
                 'target'=>'biaya-lain-list']);
         }
-        if(($bill['origin']??'')==='purchase'&&!$sameBillAsOldLine)throw new DomainException('Pilih master Biaya Lain untuk pembelian baru.');
+        if (($bill['origin'] ?? '') === 'purchase' && (!$sameBillAsOldLine || other_fee_purchase_mode($bill) === 'input_manual')) {
+            throw new DomainException('Pilih master Biaya Lain untuk mencatat atau mengoreksi pembelian.');
+        }
         $masterTotal = (float)$bill['nominal_tagihan'];
         $paidBefore = other_fee_paid_for_bill($koneksi, $billId, $bayarId, true);
         if ($paidBefore > $masterTotal + 0.001) {

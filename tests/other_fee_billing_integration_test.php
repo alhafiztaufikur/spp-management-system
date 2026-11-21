@@ -4,6 +4,7 @@ require __DIR__.'/http_form_scope.php';spp_test_assert_database_target();
 $_SESSION=['admin_id'=>1,'admin_role'=>'super_admin','active_unit_id'=>1];
 require __DIR__.'/../koneksi.php';spp_test_isolated_manifest($koneksi);
 require __DIR__.'/../includes/reports.php';require __DIR__.'/../includes/biaya_lain.php';require __DIR__.'/../includes/other_fee_reconciliation.php';
+require_once __DIR__.'/../includes/student_out.php';
 $db=$koneksi;$checks=[];
 function fb_check(bool $ok,string $label):void {global $checks;if(!$ok)throw new RuntimeException($label);$checks[]=$label;echo "PASS $label\n";}
 function fb_sql(string $sql,array $params=[]):int {global $db;ofb_write($db,$sql,$params);return (int)$db->insert_id;}
@@ -42,7 +43,14 @@ try{
     fb_check(hp_one($db,'SELECT status FROM tagihan_biaya_lain WHERE id=?',[$purchase])['status']==='cancelled','Unit '.$unit.' cancelling purchase cancels its bill');
     fb_check(hp_one($db,'SELECT status FROM tagihan_biaya_lain WHERE id=?',[$oldBill])['status']==='open','Unit '.$unit.' issued debt remains open');
     // Explicitly authorised historical obligation fixture; receipt amount is NOT its tariff.
-    $details=ofb_legacy_details($db);$source=reset($details);$p=hp_one($db,'SELECT * FROM legacy_op_payments WHERE id=? FOR UPDATE',[$source['payment_id']]);
+    $source=null;
+    foreach(ofb_legacy_details($db) as $detail){
+        if($detail['source_kind']!=='operational')continue;
+        $ownerStudent=sout_student($db,$detail['nis'],false,$unit);
+        if($ownerStudent&&empty($ownerStudent['is_out'])){$source=$detail;break;}
+    }
+    if(!$source)throw new RuntimeException('Unit '.$unit.' has no eligible operational receipt for the correction fixture');
+    $p=hp_one($db,'SELECT * FROM legacy_op_payments WHERE id=? FOR UPDATE',[$source['payment_id']]);
     $principal=ofb_cents($source['amount'])+50000;$ob=fb_sql('INSERT INTO legacy_op_obligations(unit_id,owner_id,category,period,principal,remaining,evidence) VALUES(?,?,?,?,?,500,?)',[$unit,$p['owner_id'],'biaya_lain:'.$source['master_id'],ofb_period($source['source_period'])??'2026',ofb_money($principal),'QA explicit historical principal fixture; isolated rollback only']);
     $items=json_decode($p['items'],true);foreach($items as &$i)if($i['column']===$source['source_column'])$i['obligation_id']=$ob;unset($i);fb_sql('UPDATE legacy_op_payments SET items=? WHERE id=?',[json_encode($items),$p['id']]);ofb_invalidate($db);
     $countNative=(int)hp_one($db,'SELECT COUNT(*) n FROM bayar')['n'];$result=ofb_reconcile($db,1);fb_check($result['bills_created']===1&&$result['credits_bound']===1,'Unit '.$unit.' proven obligation creates and binds one historical bill');
