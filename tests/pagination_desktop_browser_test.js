@@ -39,11 +39,13 @@ const artifactRoot=process.env.SPP_BROWSER_ARTIFACT_ROOT||(fs.existsSync(root+'/
      const perPage=await page.locator('.report-per-page-field').boundingBox(),search=await page.locator('.report-student-field').boundingBox();
      assert(Math.abs(perPage.y-search.y)<2&&search.x>=perPage.x+perPage.width,'Search stays beside students/page');
      assert.equal(await page.locator('.billing-rombel>h3').first().evaluate(el=>getComputedStyle(el).paddingLeft),'24px');
-     assert.equal(await page.locator('.billing-grand-total').evaluate(el=>getComputedStyle(el).paddingLeft),'24px');
-     for(const pager of await pagers.all())assert.equal(await pager.evaluate(el=>getComputedStyle(el).paddingRight),'24px');
+     const summary=page.locator('.global-report-screen-totals');
+     assert.equal(await summary.evaluate(el=>getComputedStyle(el).paddingLeft),'24px');
+     assert.deepEqual(await summary.locator('.global-report-total-card span').allTextContents(),['Jumlah Tagihan','Sudah Dibayar','Sisa Tagihan']);
+     assert.equal(await page.locator('.report-template-shell > .desktop-pager:visible').count(),await pagers.count());
      assert(await page.locator('.billing-rombel').count()>0);assert(/keterangan tagihan/i.test(text));assert(/jumlah rombel/i.test(text));
      assert.deepEqual(await page.locator('.billing-rombel').first().locator('thead th').allTextContents(),['No','No Induk','Nama Siswa','PSB','D.ULANG','SPP','Komite','TOTAL','Keterangan Tagihan']);
-     for(const note of await page.locator('.billing-description').allTextContents())assert(!/\b(?:19|20)\d{2}\b/.test(note),'Display note still contains a year');
+     for(const note of await page.locator('.billing-description').allTextContents())assert(!/\b(?:SPP|Komite) (?:19|20)\d{2} \(/.test(note),'Monthly notes use an academic year');
      const table=page.locator('.billing-rombel table').first();
      async function checkRows(){
       const problems=await table.locator('tbody tr').evaluateAll(rows=>rows.flatMap(row=>{

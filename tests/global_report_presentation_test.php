@@ -51,8 +51,8 @@ foreach($sheet->getRowIterator() as $row)foreach($row->getCellIterator() as $cel
 }
 presentation_check(count($found)===1,'Summary heading is part of its block');$book->disconnectWorksheets();
 $amount=['value'=>125.25,'known'=>1,'unknown'=>true];
-presentation_check(billing_history_grand_amount($amount)==='Rp 125,25'&&str_contains(billing_history_amount($amount),'belum diketahui'),'Grand simplification retains detail uncertainty');
-presentation_check(billing_history_grand_amount(['known'=>0,'unknown'=>true])==='—','An unknown grand total is not zero');
+presentation_check(billing_history_grand_amount($amount)==='Rp 125,25'&&billing_history_amount($amount)==='Rp 125,25','Mixed totals display the known amount');
+presentation_check(billing_history_grand_amount(['known'=>0,'unknown'=>true])==='-','An unknown grand total displays a dash');
 $matrix=global_report_matrix(global_report_present($base,'per-item','print'),'per-item',1);$matrix['currency_prefix']=false;
 $html=global_report_clean_table($matrix);
 presentation_check(str_contains($html,'report-header-nowrap')&&!str_contains($html,'seluruh hasil filter')&&!str_contains($html,'Lunas<br>'),'Print cell and header cleanup');

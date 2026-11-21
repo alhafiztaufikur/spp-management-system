@@ -1,12 +1,18 @@
 # Alur aktif Tabungan — 17 Oktober 2026
 
+## Edit dan Hapus langsung — 21 November 2026
+
+Administrator dan Super Admin mengoreksi atau menghapus transaksi yang dibuat di SistemSPP dari Detail Transaksi SD, SMP, atau SMA. Ini mencakup transaksi baru pada rekening nonsiswa. Jurnal impor dan penyesuaian migrasi tetap tersedia di riwayat dan buku tabungan.
+
+Koreksi langsung yang berhasil menutup pengajuan lama yang masih menunggu dan mencatat alasannya di audit. Pembatalan transaksi tampil di **Arsip Transaksi**. Riwayat Aktivitas mencatat pembuat awal dan petugas yang mengubah transaksi.
+
 ## Filter rombel dan kas sekolah — 18 Oktober 2026
 
 Riwayat menyediakan filter beberapa **Kelas/Rombel rekening sekarang**, termasuk custom/Out/PSB dan rombel nonaktif beranggota. Filter diterapkan sebelum daftar, ringkasan dan pagination aktif/arsip; pilihan bertahan pada detail/AJAX, tab, pagination dan kembali dari koreksi. Saldo serta filter Rekap Saldo yang terpisah tidak berubah. Penjelasan lama Filter Operator pada toolbar dihilangkan.
 
 Dashboard dan **Rekap Kas Tabungan Harian** beserta preview/PDF/Excel mengecualikan rekening custom berdasarkan rombel sekarang, termasuk mutasi lama. Jurnal, saldo, buku dan laporan khusus Tabungan tetap mencakup custom. Aturan ini menggantikan perilaku kas sekolah sebelumnya; tidak menghapus transaksi. [Panduan lengkap](FILTER_ROMBEL_TABUNGAN_CUSTOM_20261018.md).
 
-Super Admin dan Administrator mengoreksi/menghapus langsung melalui dialog isian dan tinjauan. Alasan wajib, saldo historis tidak boleh negatif, snapshot/version diperiksa, dan kiriman ganda ditolak. Pengajuan lama tetap terkunci sampai diputuskan Super Admin. Semua Unit dan arsip tetap baca saja. Riwayat Aktivitas tidak menyediakan kontrol keputusan.
+Super Admin dan Administrator mengoreksi/menghapus langsung melalui dialog isian dan tinjauan. Alasan opsional dan dicatat dalam audit jika diisi. Dialog Edit memuat nominal dan tanggal/waktu WIB. Catatan transaksi yang tersimpan tetap tersedia di Detail Transaksi. Saldo historis dan versi transaksi diperiksa saat menyimpan.
 
 Filter Operator tetap berarti pembuat awal, mencakup akun lama yang dinonaktifkan. Filter membatasi daftar, ringkasan, pagination, dan Cetak Laporan; tidak membatasi saldo rekening. **Cetak Buku Tabungan** selalu mencetak seluruh mutasi sah siswa pada A5 potret, tanpa sampul/lipat. URL bukti transaksi lama memeriksa akses dahulu lalu mengarahkan ke buku siswa.
 
@@ -16,7 +22,7 @@ Rincian fitur sebelumnya di bawah merupakan catatan evolusi; aturan aktif di ata
 
 ## Tombol tindakan, dialog dan Operator - 17 Oktober 2026
 
-Detail transaksi memakai tombol **Edit**, **Hapus**, dan **Riwayat Aktivitas**. Super Admin dan Administrator memakai **Edit/Hapus** langsung dengan alasan. Hanya dua role aktif tersedia. Pengajuan Tabungan lama tetap menunggu keputusan Super Admin dan belum mengubah saldo; pengajuan baru tidak digunakan. Pending mengunci perubahan baru; Semua Unit dan arsip tidak menyediakan edit/hapus.
+Detail transaksi memakai tombol **Edit**, **Hapus**, dan **Riwayat Aktivitas**. Saat pembaruan 17 Oktober, pengajuan lama masih mengunci perubahan sampai ada keputusan Super Admin. Pembaruan 21 November mengganti aturan tersebut.
 
 Edit/hapus membuka satu dialog dengan tahap isian dan tinjauan sebelum pengiriman. Nominal berformat ribuan, waktu WIB, keterangan dan alasan tetap divalidasi. **Kembali** mempertahankan isian, **Batal/Escape** menutup tanpa menyimpan, fokus kembali ke tombol pembuka. Kiriman ganda ditahan dan pergantian detail AJAX membatalkan dialog transaksi lama. Riwayat Aktivitas berada pada dialog terpisah yang hanya membaca informasi.
 

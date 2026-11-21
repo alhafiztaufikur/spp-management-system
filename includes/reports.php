@@ -41,12 +41,12 @@ function report_registry(): array {
     return [
         'psb' => ['label'=>'Pembayaran PSB','description'=>'Ringkasan total kewajiban PSB, jumlah yang sudah terbayar, dan sisa per siswa.','icon'=>'PSB','orientation'=>'portrait'],
         'status' => ['label'=>'Laporan Status Pembayaran','description'=>'Membantu admin melihat siapa yang sudah lunas, masih cicilan, atau belum membayar pada kewajiban yang dipilih.','icon'=>'OK','orientation'=>'portrait'],
-        'penerimaan' => ['label'=>'Rekap Penerimaan Harian','description'=>'Menampilkan nominal pembayaran yang diterima kasir per siswa dan per komponen pada tanggal yang dipilih.','icon'=>'RP','orientation'=>'landscape'],
+        'penerimaan' => ['label'=>'Rekap Penerimaan Harian','description'=>'Menampilkan tanggal dan nominal setiap transaksi sesuai komponen pembayaran yang dipilih.','icon'=>'RP','orientation'=>'landscape'],
         'spp-tahunan' => ['label'=>'Rekap SPP Tahun Ajaran per Kelas','description'=>'Memudahkan pengecekan SPP Juli sampai Juni untuk melihat bulan yang sudah lunas dan yang masih tertunggak.','icon'=>'SPP','orientation'=>'landscape'],
         'per-item' => ['label'=>'Rekap Pembayaran per Item','description'=>'Menampilkan kondisi satu jenis pembayaran agar admin cepat mengecek tagihan, pembayaran, dan sisa per siswa.','icon'=>'ITEM','orientation'=>'landscape'],
         'tabungan-siswa' => ['label'=>'Rekap Transaksi Tabungan Siswa','description'=>'Daftar transaksi tabungan masuk dan keluar sesuai tanggal, siswa, rombel, dan kasir yang dipilih.','icon'=>'TAB','orientation'=>'portrait'],
         'saldo-tabungan' => ['label'=>'Rekap Saldo Tabungan','description'=>'Menampilkan saldo tabungan terkini setiap siswa agar admin dapat mengecek saldo tanpa membuka riwayat transaksi.','icon'=>'SAL','orientation'=>'portrait'],
-        'riwayat-tagihan' => ['label'=>'Riwayat Tagihan Siswa','description'=>'Ringkasan nominal tagihan per komponen untuk setiap siswa pada tanggal pembuatan yang dipilih.','icon'=>'TAG','orientation'=>'landscape'],
+        'riwayat-tagihan' => ['label'=>'Riwayat Tagihan Siswa','description'=>'Ringkasan tagihan per siswa dan komponen menurut periode kewajiban dan tahun ajaran.','icon'=>'TAG','orientation'=>'landscape'],
         'tunggakan-siswa' => ['label'=>'Cetak Surat ke Kepala Sekolah','description'=>'Surat resmi berisi total tunggakan per rombel atau seluruh kelas untuk kepala sekolah.','icon'=>'UTG','orientation'=>'portrait'],
         'setoran' => ['label'=>'Rekap Setoran Kas Harian','description'=>'Ringkasan penerimaan pembayaran sekolah berdasarkan komponen dan metode pembayaran untuk penutupan kas harian.','icon'=>'KAS','orientation'=>'portrait'],
         'kas-tabungan' => ['label'=>'Rekap Kas Tabungan Harian','description'=>'Ringkasan tabungan masuk, tabungan keluar, dan mutasi bersih untuk pengecekan kas tabungan harian.','icon'=>'KT','orientation'=>'portrait'],
@@ -76,14 +76,18 @@ function report_billing_date_matches(string $createdAt,array $filters):bool {
 }
 function report_filters(mysqli $db, array $source,bool $registerChoices=true): array {
     $source=billing_history_defaults($source);
-    $billingYears=($source['template']??'')==='riwayat-tagihan'?billing_history_years($db,$source):[];
+    $billing=($source['template']??'')==='riwayat-tagihan';
+    $billingYears=$billing?billing_history_years($db,$source):[];
+    [$periodStart,$periodEnd]=$billing?billing_history_month_bounds($source):['',''];
+    $legacyBillingDates=$billing&&!array_key_exists('periode_awal',$source)&&!array_key_exists('periode_akhir',$source)
+        &&(!empty($source['tanggal_awal'])||!empty($source['tanggal_akhir']));
     if(($source['template']??'')==='psb')$source['kategori']='psb';
     // Internal scalar summaries do not render filter controls. Public callers
     // keep normalization/registration and its full option validation unchanged.
     if(!$registerChoices&&array_filter($source,'is_array'))throw new LogicException('Internal summary filters must be scalar.');
     $multiple=$registerChoices?report_multiple_normalize($db,$source):[];
     $today = date('Y-m-d');
-    if(($source['template']??'')==='riwayat-tagihan')[$start,$end]=report_billing_date_range($source);
+    if($billing)[$start,$end]=$legacyBillingDates?report_billing_date_range($source):['',''];
     else {
         $start = report_date_value($source['tanggal_awal'] ?? '', $today);
         $end = report_date_value($source['tanggal_akhir'] ?? '', $start);
@@ -99,6 +103,7 @@ function report_filters(mysqli $db, array $source,bool $registerChoices=true): a
     $requestedPerPage = (int)($source['per_page'] ?? 25);
     $perPage = in_array($requestedPerPage, [25,50,100], true) ? $requestedPerPage : 25;
     $currentYear = du_current_academic_year();
+    $showFuture=$billing&&!$legacyBillingDates&&($periodStart!==''||filter_is_all($billingYears)||array_filter($billingYears,static fn($year)=>$year>$currentYear));
     $academicYear = trim((string)($source['tahun_ajaran'] ?? $currentYear));
     if (!preg_match('/^\d{4}\/\d{4}$/', $academicYear)) $academicYear = $currentYear;
     $requestedOperator = trim((string)($source['operator'] ?? ''));
@@ -108,7 +113,9 @@ function report_filters(mysqli $db, array $source,bool $registerChoices=true): a
     return [
         '_billing_as_of'=>($source['template']??'')==='riwayat-tagihan'?report_letter_today():'','_billing_years'=>$billingYears,'_template'=>(string)($source['template']??''),'_multi'=>$multiple,'include_undated'=>($source['include_undated']??'')==='1','owner_id'=>max(0,(int)($source['owner_id']??0)),'all_periods'=>($source['all_periods']??'')==='1','student_id'=>$selectedId,'student_unit'=>(int)($selected['unit_id']??0),'student_nis'=>$selected['NO_INDUK']??null,
         'tanggal_awal'=>$start,'tanggal_akhir'=>$end,
-        'filter_tanggal_tagihan'=>($source['template']??'')==='riwayat-tagihan',
+        'filter_tanggal_tagihan'=>$legacyBillingDates,
+        'periode_awal'=>$periodStart,'periode_akhir'=>$periodEnd,
+        '_billing_period_projection'=>$billing&&!$legacyBillingDates,'_billing_show_future'=>$showFuture,
         'tahun_ajaran'=>$academicYear,
         'bulan_awal'=>report_month_code($source['bulan_awal'] ?? date('m')),
         'bulan_akhir'=>report_month_code($source['bulan_akhir'] ?? ($source['bulan_awal'] ?? date('m'))),
@@ -402,28 +409,36 @@ function report_receipt_data(mysqli $db,array $f):array{
     $displaySelected=array_map(static fn($key)=>$key===lcs_sorga_history_key()?'komite':$key,$selected);
     $wantedCategories=array_intersect_key($allCategories,array_fill_keys($all?array_column($components,'kategori_key'):$displaySelected,true));
     $orderedCategories=[];foreach($allCategories as $key=>$label)if(isset($wantedCategories[$key]))$orderedCategories[$key]=$label;
-    $columns=[['nis','NIS','nis'],['nama','Nama Siswa'],['kelas','Kelas','kelas']];
+    $columns=[['nis','NIS','nis'],['nama','Nama Siswa'],['kelas','Kelas','kelas'],['tanggal','Tanggal Transaksi','datetime']];
     foreach($orderedCategories as $key=>$label)$columns[]=[$key,$label,'money_optional'];
     $columns[]=['total_penerimaan','Total','money_optional'];
-    $rowsByStudent=[];
+    $rows=report_receipt_rows($components,$orderedCategories,report_query_unit_id());
+    return ['title'=>'Rekap Penerimaan Harian','subtitle'=>report_date_range_label($f['tanggal_awal'],$f['tanggal_akhir']).' · nominal per transaksi dan komponen pembayaran','columns'=>$columns,'rows'=>$rows,'receipt_components'=>$components];
+}
+function report_receipt_rows(array $components,array $categories,int $unit): array {
+    $rows=[];
     foreach($components as $component){
-        if(!isset($orderedCategories[$component['kategori_key']]))continue;
+        $key=$component['kategori_key'];
+        if(!isset($categories[$key]))continue;
         $nis=(string)$component['nis'];
-        // A date range may cross promotion or a rombel transfer. Keep the
-        // transaction's class snapshot instead of assigning all cash to the
-        // first class encountered for this student.
-        $groupKey=$nis."\0".(string)$component['kelas'];
-        if(!isset($rowsByStudent[$groupKey])){
-            $rowsByStudent[$groupKey]=['nis'=>$nis,'nis_diknas'=>$component['nis_diknas']??'','nama'=>$component['nama'],'kelas'=>$component['kelas'],'total_penerimaan'=>0];
-            foreach($orderedCategories as $key=>$_)$rowsByStudent[$groupKey][$key]=null;
+        // Positive IDs are native; both Legacy receipt sources use disjoint negative ID ranges.
+        $receiptUnit=(int)($component['unit_id']??$unit);$id=(int)$component['id'];
+        $groupKey=$receiptUnit.'|'.$id;
+        if(!isset($rows[$groupKey])){
+            $date=$component['tanggal']??null;
+            $rows[$groupKey]=['unit_id'=>$receiptUnit,'nis'=>$nis,'nis_diknas'=>$component['nis_diknas']??'','nama'=>$component['nama'],
+                'tanggal'=>$date,'time_precision'=>$component['time_precision']??($date?'datetime':'none'),
+                '_receipt_id'=>$id,'_classes'=>[],'total_penerimaan'=>0.0];
+            $rows[$groupKey]+=array_fill_keys(array_keys($categories),null);
         }
-        $key=$component['kategori_key'];$amount=(float)$component['nominal'];
-        $rowsByStudent[$groupKey][$key]=($rowsByStudent[$groupKey][$key]??0)+$amount;
-        $rowsByStudent[$groupKey]['total_penerimaan']+=$amount;
+        $class=trim((string)$component['kelas']);if($class!=='')$rows[$groupKey]['_classes'][$class]=true;
+        $amount=(float)$component['nominal'];$rows[$groupKey][$key]=($rows[$groupKey][$key]??0)+$amount;
+        $rows[$groupKey]['total_penerimaan']+=$amount;
     }
-    $rows=array_values($rowsByStudent);
-    usort($rows,fn($a,$b)=>[$a['kelas'],$a['nama'],$a['nis']]<=>[$b['kelas'],$b['nama'],$b['nis']]);
-    return ['title'=>'Rekap Penerimaan Harian','subtitle'=>report_date_range_label($f['tanggal_awal'],$f['tanggal_akhir']).' · nominal per siswa dan komponen pembayaran','columns'=>$columns,'rows'=>$rows,'receipt_components'=>$components];
+    foreach($rows as &$row){$row['kelas']=implode(' / ',array_keys($row['_classes']));unset($row['_classes']);}unset($row);
+    $rows=array_values($rows);
+    usort($rows,static fn($a,$b)=>[$a['nama'],$a['nis'],$a['tanggal']??'9999',$a['_receipt_id']]<=>[$b['nama'],$b['nis'],$b['tanggal']??'9999',$b['_receipt_id']]);
+    return $rows;
 }
 
 function report_academic_months(string $label):array{[$a,$b]=array_map('intval',explode('/',$label));$out=[];for($m=7;$m<=12;$m++)$out[]=[$m,$a];for($m=1;$m<=6;$m++)$out[]=[$m,$b];return $out;}
@@ -806,7 +821,7 @@ function report_billing_history_data(mysqli $db,array $f):array{
                 if(($f['_debt_as_of_year']??null)!==null&&$rowStart!==null&&$rowStart>$f['_debt_as_of_year'])return;
             }
         }
-        if(!billing_history_period_visible($row,$f))return;
+        if(!billing_history_matches_period($row,$f)||!billing_history_period_visible($row,$f))return;
         if(!report_billing_date_matches((string)($row['tanggal_dibuat']??''),$f))return;
         if(isset($f['_multi']['komponen_tagihan'])&&!filter_is_all($f['_multi']['komponen_tagihan'])&&!in_array($row['komponen_key'],$f['_multi']['komponen_tagihan'],true))return;
         if($f['komponen_tagihan']!==''&&$row['komponen_key']!==$f['komponen_tagihan'])return;
@@ -859,13 +874,13 @@ function report_billing_history_data(mysqli $db,array $f):array{
     // Legacy rows already apply class/date/student-state restrictions. Avoid
     // repeating the same all-status/all-component checks for every archive row.
     if(empty($f['_debt_only'])&&$allComponents&&$allStatuses&&!(($f['student_id']??0)>0)&&(string)($f['q']??'')===''){
+        $legacyRows=array_values(array_filter($legacyRows,static fn($row)=>billing_history_matches_period($row,$f)&&billing_history_period_visible($row,$f)));
         if($sink)foreach($legacyRows as $row)$sink($row);else $rows=array_merge($rows,$legacyRows);
     }
     else foreach($legacyRows as $legacyRow)$append($legacyRow);
     report_billing_history_sort_rows($rows);
     if(getenv('SPP_REQUEST_METRICS')==='1')$GLOBALS['report_read_phases'][]=['phase'=>'history_model','ms'=>(microtime(true)-$profileStarted)*1000];
-    $period=($f['tanggal_awal']??'')!==''?report_date_range_label($f['tanggal_awal'],$f['tanggal_akhir']):'Semua tanggal';
-    return ['title'=>'Riwayat Tagihan Siswa','subtitle'=>'Tagihan dibuat: '.$period,'columns'=>[['nis','NIS','nis'],['nama','Nama Siswa'],['kelas','Kelas','kelas'],['komponen','Komponen'],['periode','Periode/Tahun Ajaran'],['tagihan','Tagihan','money_optional'],['terbayar','Sudah Dibayar','money'],['sisa','Sisa','money_optional'],['status','Status','status']],'rows'=>$rows];
+    return ['title'=>'Riwayat Tagihan Siswa','subtitle'=>billing_history_period_label($f),'columns'=>[['nis','NIS','nis'],['nama','Nama Siswa'],['kelas','Kelas','kelas'],['komponen','Komponen'],['periode','Periode/Tahun Ajaran'],['tagihan','Tagihan','money_optional'],['terbayar','Sudah Dibayar','money'],['sisa','Sisa','money_optional'],['status','Status','status']],'rows'=>$rows];
 }
 function report_academic_year_start(string $label):?int{
     return preg_match('/^(\d{4})\/\d{4}$/',trim($label),$match)?(int)$match[1]:null;
@@ -1199,7 +1214,7 @@ function report_build_scoped(mysqli $db,string $template,array $filters):array{
             }
         } finally {unit_set_context($db,0);}
         if($template==='penerimaan'){
-            $order=array_flip(array_merge(['unit','nis','nama','kelas'],array_keys(report_categories($db)),['potongan','total_penerimaan']));
+            $order=array_flip(array_merge(['unit','nis','nama','kelas','tanggal'],array_keys(report_categories($db)),['potongan','total_penerimaan']));
             usort($combined['columns'],static fn($a,$b)=>($order[$a[0]]??PHP_INT_MAX)<=>($order[$b[0]]??PHP_INT_MAX));
         }
         if(isset($categoryLabels[$filters['kategori']])){if($template==='status')$combined['title']=$categoryLabels[$filters['kategori']];if($template==='per-item')$combined['title']='Rekap Pembayaran per Item: '.$categoryLabels[$filters['kategori']];}

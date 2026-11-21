@@ -23,6 +23,7 @@ function report_history_monthly_row(array $r,string $category):array {
         'tagihan'=>(float)$r['tagihan'],'terbayar'=>(float)$r['terbayar'],'sisa'=>(float)$r['sisa'],
         '_outstanding_periods'=>array_values(array_filter(json_decode($r['outstanding_periods']??'[]',true)??[])),
         '_advance_paid'=>!empty($r['advance_paid']),
+        '_billing_future'=>!empty($r['billing_future']),
         'status'=>$status,'_read_count'=>(int)$r['read_count'],'_read_fractional'=>(bool)$r['read_fractional'],
     ];
 }
@@ -34,15 +35,31 @@ function report_history_monthly_rollup(mysqli $db,string $sql,string $category,a
     $json=json_encode($credits,JSON_THROW_ON_ERROR);
     $paid='(q.terbayar+COALESCE(c.paid,0)/100)';
     $cutoff=empty($filters['_billing_as_of'])?null:(int)str_replace('-','',substr($filters['_billing_as_of'],0,7));
-    $futurePaid=$cutoff===null?'0':"(q.tahun*100+q.bulan>$cutoff AND $paid>0.001 AND $paid+0.001>=q.tagihan)";
-    $where=$cutoff===null?'':" WHERE (q.tahun*100+q.bulan<=$cutoff".(empty($filters['_debt_only'])?" OR $futurePaid":'').')';
-    if(!empty($filters['filter_tanggal_tagihan'])&&$filters['tanggal_awal']!==''){
-        $where.=($where===''?' WHERE ':' AND ')." LEFT(q.tanggal_dibuat,10)>='".$db->real_escape_string($filters['tanggal_awal'])."' AND LEFT(q.tanggal_dibuat,10)<='".$db->real_escape_string($filters['tanggal_akhir'])."'";
+    $period='(q.tahun*100+q.bulan)';
+    $future=$cutoff===null?'0':"$period>$cutoff";
+    $futurePaid=$cutoff===null?'0':"($future AND $paid>0.001 AND $paid+0.001>=q.tagihan)";
+    $splitFuture=!empty($filters['_billing_period_projection'])&&$cutoff!==null;
+    $futureGroup=$splitFuture?", ($future)":'';
+    $conditions=[];
+    if($cutoff!==null&&(empty($filters['_billing_show_future'])||!empty($filters['_debt_only'])))
+        $conditions[]="($period<=$cutoff".(empty($filters['_debt_only'])?" OR $futurePaid":'').')';
+    if(($filters['periode_awal']??'')!==''){
+        $from=(int)str_replace('-','',$filters['periode_awal']);$to=(int)str_replace('-','',$filters['periode_akhir']);
+        $conditions[]="$period BETWEEN $from AND $to";
     }
+    $years=$filters['_billing_years']??['*'];
+    if(!empty($filters['_billing_period_projection'])&&!filter_is_all($years))
+        $conditions[]="q.tahun_ajaran IN (".implode(',',array_map(static fn($year)=>"'".$db->real_escape_string($year)."'",$years)).')';
+    if(!empty($filters['filter_tanggal_tagihan'])&&$filters['tanggal_awal']!==''){
+        $conditions[]="LEFT(q.tanggal_dibuat,10)>='".$db->real_escape_string($filters['tanggal_awal'])."' AND LEFT(q.tanggal_dibuat,10)<='".$db->real_escape_string($filters['tanggal_akhir'])."'";
+    }
+    $where=$conditions?' WHERE '.implode(' AND ',$conditions):'';
+    $futureFlag=$splitFuture?"MAX($future)":'0';
     $query="SELECT /*+ SET_VAR(join_buffer_size=33554432) SET_VAR(tmp_table_size=67108864) */
         MIN(q.nis) nis,ANY_VALUE(q.nis_diknas) nis_diknas,ANY_VALUE(q.nama) nama,MIN(q.kelas) kelas,q.master_kelas_id,q.tingkat,MIN(q.tahun_ajaran) tahun_ajaran,
         MIN(q.tahun*100+q.bulan) first_period,
         MAX(CASE WHEN $futurePaid THEN 1 ELSE 0 END) advance_paid,
+        $futureFlag billing_future,
         JSON_ARRAYAGG(CASE WHEN q.bill_status NOT IN ('cancelled','covered_psb','waived') AND q.tagihan>$paid THEN CONCAT(q.tahun,'-',LPAD(q.bulan,2,'0')) ELSE NULL END) outstanding_periods,
         q.tagihan read_bill,$paid read_paid,q.bill_status read_bill_status,
         MAX(MOD(q.tagihan,1)<>0 OR MOD(q.terbayar,1)<>0 OR MOD(COALESCE(c.paid,0),100)<>0) read_fractional,
@@ -52,7 +69,7 @@ function report_history_monthly_rollup(mysqli $db,string $sql,string $category,a
           JSON_TABLE(?,'\$[*]' COLUMNS(nis VARCHAR(100) PATH '\$[0]',year INT PATH '\$[1]',month INT PATH '\$[2]',paid BIGINT PATH '\$[3]')) credit
           GROUP BY CAST(nis AS BINARY),year,month) c
           ON CAST(c.nis AS BINARY)=CAST(q.nis AS BINARY) AND c.year=q.tahun AND c.month=q.bulan$where
-        GROUP BY CAST(q.nis AS BINARY),CAST(q.kelas AS BINARY),q.master_kelas_id,q.tingkat,CAST(q.tahun_ajaran AS BINARY),q.tagihan,$paid,q.bill_status";
+        GROUP BY CAST(q.nis AS BINARY),CAST(q.kelas AS BINARY),q.master_kelas_id,q.tingkat,CAST(q.tahun_ajaran AS BINARY),q.tagihan,$paid,q.bill_status$futureGroup";
     if($emit!==null&&isset($GLOBALS['report_history_pending'][$db->thread_id])){
         $GLOBALS['report_history_pending'][$db->thread_id][]=['sql'=>hp_sql($db,$query),'json'=>$json,'category'=>$category,'emit'=>$emit,'unit'=>report_query_unit_id()];
         return [];

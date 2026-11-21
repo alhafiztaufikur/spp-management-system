@@ -36,8 +36,17 @@ function global_report_scope(mysqli $db, array &$query): int {
 
 /** Unit-dependent identities/categories are omitted intentionally on scope navigation. */
 function global_report_preserved_query(mysqli $db, array $query): array {
-    $allowed=['template','tanggal_awal','tanggal_akhir','tahun_ajaran','bulan_awal','bulan_akhir','tahun','tahun_awal','tahun_akhir','mode','per_page','all_periods'];
+    $allowed=['template','tanggal_awal','tanggal_akhir','periode_awal','periode_akhir','billing_year','tahun_ajaran','bulan_awal','bulan_akhir','tahun','tahun_awal','tahun_akhir','mode','per_page','all_periods'];
     $keep=array_intersect_key($query,array_flip($allowed));
+    if(isset($keep['billing_year'])){
+        $requested=is_string($keep['billing_year'])?[$keep['billing_year']]:$keep['billing_year'];
+        if(is_array($requested)&&in_array('*',$requested,true))$keep['billing_year']=['*'];
+        elseif(is_array($requested)){
+            $options=billing_history_year_options(report_years($db));
+            $keep['billing_year']=array_values(array_filter($requested,static fn($year)=>is_string($year)&&isset($options[$year])));
+            if(!$keep['billing_year'])unset($keep['billing_year']);
+        }else unset($keep['billing_year']);
+    }
     if (isset($keep['tahun_ajaran'])) {
         // A unit-navigation link needs membership for the requested years, not
         // every historical year. Native years are always part of report_years.

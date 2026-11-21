@@ -1,12 +1,13 @@
 <?php
-if(PHP_SAPI!=='cli'||!preg_match('/^db_spp_audit_[a-z0-9_]+$/D',(string)getenv('SPP_DB_NAME')))exit('Gunakan salinan database uji.');
+require_once __DIR__.'/http_form_scope.php';spp_test_assert_database_target();
 require_once __DIR__.'/../koneksi.php';require_once __DIR__.'/../includes/parent_letter_drafts.php';require_once __DIR__.'/../includes/pdf.php';
+spp_test_assert_database_target($koneksi);
 function rich_assert(bool $condition,string $message):void{if(!$condition)throw new RuntimeException($message);}
 function rich_reject(callable $task):void{$failed=false;try{$task();}catch(InvalidArgumentException|RuntimeException $e){$failed=true;}rich_assert($failed,'Permintaan tidak sah diterima.');}
 $_SESSION=['admin_id'=>41,'admin_role'=>'super_admin','active_unit_id'=>0];unit_set_context($koneksi,0);
 $students=parent_letter_collect($koneksi,['mode'=>'all'])['students'];
 $selected=[];foreach([1,2,3] as $unit){$selected[]=array_values(array_filter($students,static fn($s)=>(int)$s['unit_id']===$unit))[0];}
-$draft=parent_letter_draft_create(['students'=>$selected,'today'=>report_letter_today(),'unit'=>0]);$keys=array_map('unit_student_key',$selected);
+$draft=parent_letter_draft_create(['students'=>$selected,'today'=>report_letter_today(),'unit'=>0,'signatories'=>plp_snapshots($koneksi,$selected,true),'layout_version'=>3]);$keys=array_map('unit_student_key',$selected);
 $initial=parent_letter_draft_read($draft);$expiry=$initial['expires'];
 $rich=['format'=>'rich_text','html'=>'<p onclick="bad()"><b>Pengingat &amp; kegiatan</b> <i>sekolah</i> <u>besok</u></p><ul><li>Bawa buku</li></ul><script>BAD_SCRIPT</script><img src="x" onerror="bad()"><a href="javascript:bad()">Tetap sopan</a>'];
 $normalized=parent_letter_message_normalize($rich);
@@ -26,18 +27,19 @@ $allApplied=parent_letter_draft_apply($draft,$keys[0],$rich,[$keys[1],$keys[2]],
 rich_assert($allApplied['updated']===2&&$allApplied['skipped']===0,'Penerapan semua melewati pesan lama.');
 $allSaved=parent_letter_draft_read($draft);
 foreach($keys as $key)rich_assert($allSaved['messages'][$key]===$normalized,'Pesan/format berbeda setelah penerapan semua.');
-$allHtml=report_parent_letters_html($selected,$allSaved['today'],$allSaved['messages']);
+$allHtml=report_parent_letters_html($selected,$allSaved['today'],$allSaved['messages'],$allSaved['signatories'],$allSaved['layout_version']);
 rich_assert(substr_count($allHtml,'Pengingat &amp; kegiatan')===3,'Pratinjau surat tidak memakai pesan baru untuk setiap siswa.');
 parent_letter_draft_update($draft,[$keys[1]=>'Khusus siswa kedua.']);rich_assert(parent_letter_draft_read($draft)['messages'][$keys[2]]===$normalized,'Salinan masih terhubung ke sumber.');
 rich_reject(fn()=>parent_letter_draft_apply($draft,$keys[0],'',[$keys[2]]));rich_reject(fn()=>parent_letter_draft_apply($draft,$keys[0],$rich,[]));
 rich_reject(fn()=>parent_letter_message_normalize(['format'=>'rich_text','html'=>'<p>'.str_repeat('a',2001).'</p>']));
 rich_assert(mb_strlen(parent_letter_message_text(parent_letter_message_normalize(['format'=>'rich_text','html'=>'<p>'.str_repeat('😀',2000).'</p>'])))===2000,'Batas Unicode salah.');
-$html=report_parent_letters_html($selected,$saved['today'],$saved['messages']);rich_assert(strpos($html,'Jumlah tunggakan')<strpos($html,'Pengingat')&&strpos($html,'Pengingat')<strpos($html,'Mohon Bapak/Ibu'),'Letak pesan salah.');
+$html=report_parent_letters_html($selected,$saved['today'],$saved['messages'],$saved['signatories'],$saved['layout_version']);
+rich_assert(strpos($html,'Jumlah Tagihan Biaya')<strpos($html,'Pengingat &amp; kegiatan')&&strpos($html,'Pengingat &amp; kegiatan')<strpos($html,'Biaya SPP dibayarkan'),'Letak pesan salah.');
 rich_assert(str_contains(parent_letter_message_html('<b>Teks lama</b>'),'&lt;b&gt;'),'Draf teks lama ditafsirkan sebagai HTML.');
 rich_assert(parent_letter_message_html(['format'=>'rich_text','html'=>'<p><br></p>'])==='','Format kosong tidak dianggap kosong.');
 $principal=report_principal_letter_html([],$saved['today']);
 parent_letter_draft_update($draft,[$keys[0]=>['format'=>'rich_text','html'=>str_repeat('<p>Pengingat biaya pendidikan.</p>',55).'<p>AKHIR_FORMAT</p>']]);
-$long=parent_letter_draft_read($draft);require_pdf_library();$pdf=new \Dompdf\Dompdf();$pdf->loadHtml(report_parent_letters_html([$selected[0]],$long['today'],$long['messages']),'UTF-8');$pdf->setPaper('A4','portrait');$pdf->render();rich_assert($pdf->getCanvas()->get_page_count()>1,'Pesan berformat panjang terpotong.');
+$long=parent_letter_draft_read($draft);require_pdf_library();$pdf=new \Dompdf\Dompdf();$pdf->loadHtml(report_parent_letters_html([$selected[0]],$long['today'],$long['messages'],$long['signatories'],$long['layout_version']),'UTF-8');$pdf->setPaper('A4','portrait');$pdf->render();rich_assert($pdf->getCanvas()->get_page_count()>1,'Pesan berformat panjang terpotong.');
 if($out=getenv('SPP_UI_OUTPUT'))file_put_contents($out.'/rich-long.pdf',$pdf->output());
 rich_assert($principal===report_principal_letter_html([],$saved['today']),'Surat kepala sekolah berubah.');
 $_SESSION['active_unit_id']=1;rich_reject(fn()=>parent_letter_draft_read($draft));$_SESSION['active_unit_id']=0;

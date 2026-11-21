@@ -163,6 +163,24 @@ function mh_payment_page(mysqli $db,array $input,array $classFilter,array $opera
         'read_sql'=>"SELECT p.*$feeSelect FROM $source p $where $period ORDER BY p.TGL_BYR DESC,p.unit_id,p.id DESC",'read_args'=>$params];
 }
 
+function mh_savings_account_source(bool $operatorEvidence=true,bool $archived=false): string {
+    $newActor=$operatorEvidence?"COALESCE(CAST((SELECT MIN(a.actor_id) FROM legacy_op_audit a WHERE a.unit_id=j.unit_id AND a.entity_type='bank_new' AND a.entity_id=j.id) AS CHAR),'0')":"'0'";
+    $status=$archived?"j.cancelled=1 AND j.origin='new'":'j.cancelled=0';
+    return "SELECT -(1000000000+CAST(j.id AS SIGNED)) id,j.unit_id,COALESCE(s.NO_INDUK,o.source_identity) NO_INDUK,
+        s.id student_id,o.id legacy_owner_id,o.name NAMA,s.NO_induk_diknas,COALESCE(s.KELAS,o.source_class) KELAS,
+        COALESCE(s.master_kelas_id,g.master_kelas_id) current_class_id,j.source_date TANGGAL,
+        IF(j.origin='adjustment',0,j.incoming) nominal,IF(j.origin='adjustment',0,j.outgoing) keluar,
+        IF(j.incoming>0,'masuk','keluar') jenis,
+        IF(j.origin='legacy',CONCAT('Legacy · ',COALESCE(j.source_operator,'Tidak tercatat')),COALESCE(j.source_operator,'Tidak tercatat')) user_id,
+        IF(j.origin='adjustment','Penyesuaian Saldo Migrasi',j.note) keterangan,
+        IF(j.origin='legacy',CONCAT('legacy:',j.unit_id,':',LOWER(HEX(COALESCE(j.source_operator,'')))),$newActor) operator_key,
+        j.origin,IF(j.origin='adjustment',j.incoming-j.outgoing,0) adjustment_delta
+        FROM legacy_op_journals j JOIN legacy_op_owners o ON o.id=j.owner_id AND o.unit_id=j.unit_id
+        LEFT JOIN siswa s ON s.id=o.student_id AND s.unit_id=o.unit_id
+        LEFT JOIN legacy_op_groups g ON g.id=o.group_id AND g.unit_id=o.unit_id
+        JOIN legacy_full_batches b ON b.id=j.batch_id AND b.unit_id=j.unit_id WHERE b.state='completed' AND $status";
+}
+
 function mh_savings_source(mysqli $db,bool $operatorEvidence=true,?array $target=null): string {
     require_once __DIR__.'/savings_operator.php';
     $parts=[];$targetId=(int)($target['id']??0);$targetKind=$target['kind']??'';
@@ -175,8 +193,7 @@ function mh_savings_source(mysqli $db,bool $operatorEvidence=true,?array $target
     $fullTarget=$target?($targetId<0&&$targetId>=-1000000000?' AND j.id='.(-$targetId):' AND FALSE'):'';
     if(lful_read_ready($db))$parts[]="SELECT -j.id,j.unit_id,s.NO_INDUK,s.id,NULL,s.NAMA,s.NO_induk_diknas,s.KELAS,s.master_kelas_id,j.source_date,j.incoming,j.outgoing,IF(j.incoming>0,'masuk','keluar'),CONCAT('Legacy · ',COALESCE(j.source_operator,'Tidak tercatat')),'Histori Legacy',CONCAT('legacy:',j.unit_id,':',LOWER(HEX(COALESCE(j.source_operator,'')))),'legacy',0 FROM legacy_full_journals j JOIN siswa s ON s.id=j.student_id AND s.unit_id=j.unit_id JOIN legacy_full_batches b ON b.id=j.batch_id AND b.unit_id=j.unit_id WHERE b.state='completed' $fullTarget";
     $opTarget=$target?($targetId<-1000000000?' AND j.id='.(-1000000000-$targetId):' AND FALSE'):'';
-    $newActor=$operatorEvidence?"COALESCE(CAST((SELECT MIN(a.actor_id) FROM legacy_op_audit a WHERE a.unit_id=j.unit_id AND a.entity_type='bank_new' AND a.entity_id=j.id) AS CHAR),'0')":"'0'";
-    if(lop_ready($db))$parts[]="SELECT -(1000000000+j.id),j.unit_id,COALESCE(s.NO_INDUK,o.source_identity),s.id,o.id,o.name,s.NO_induk_diknas,COALESCE(s.KELAS,o.source_class),COALESCE(s.master_kelas_id,g.master_kelas_id),j.source_date,IF(j.origin='adjustment',0,j.incoming),IF(j.origin='adjustment',0,j.outgoing),IF(j.incoming>0,'masuk','keluar'),IF(j.origin='legacy',CONCAT('Legacy · ',COALESCE(j.source_operator,'Tidak tercatat')),COALESCE(j.source_operator,'Tidak tercatat')),IF(j.origin='adjustment','Penyesuaian Saldo Migrasi',j.note),IF(j.origin='legacy',CONCAT('legacy:',j.unit_id,':',LOWER(HEX(COALESCE(j.source_operator,'')))),$newActor),j.origin,IF(j.origin='adjustment',j.incoming-j.outgoing,0) FROM legacy_op_journals j JOIN legacy_op_owners o ON o.id=j.owner_id AND o.unit_id=j.unit_id LEFT JOIN siswa s ON s.id=o.student_id AND s.unit_id=o.unit_id LEFT JOIN legacy_op_groups g ON g.id=o.group_id AND g.unit_id=o.unit_id JOIN legacy_full_batches b ON b.id=j.batch_id AND b.unit_id=j.unit_id WHERE b.state='completed' AND j.cancelled=0 $opTarget";
+    if(lop_ready($db))$parts[]=mh_savings_account_source($operatorEvidence).$opTarget;
     $union=implode(' UNION ALL ',$parts);
     return hp_sql($db,"(SELECT x.*,x.current_class_id master_kelas_id,mk.jenis rombel_jenis,mk.nama_custom rombel_nama,mk.tingkat,mk.kode_rombel,mk.is_placeholder FROM ($union) x LEFT JOIN master_kelas mk ON mk.id=x.current_class_id AND mk.unit_id=x.unit_id)");
 }

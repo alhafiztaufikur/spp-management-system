@@ -15,14 +15,17 @@ const password=fs.readFileSync(process.env.SPP_TEST_ADMIN_PASSWORD_FILE,'utf8').
     const identity=await (await page.request.get(base+'/tests/browser_clone_identity.php')).json();assert.equal(identity.isolated_test,true);assert.notEqual(identity.port,3306);
     await page.goto(base+'/login.php');await page.locator('#username').fill(process.env.SPP_TEST_ADMIN_USER||'qa_principal');await page.locator('#password').fill(password);await Promise.all([page.waitForNavigation(),page.locator('#btn-login').click()]);assert.ok(!page.url().endsWith('/login.php'));
     const keys=[];
-    for(const [unit,principal,school] of [[1,'Hairul Laka',"SD Al-Qur'an (SDA) Mutiara Hikmah"],[2,'Ahmad Hubbudin','SMP IT Mutiara Hikmah'],[3,'Nur Qomariyah','SMA IT Mutiara Hikmah']]){
-      await switchUnit(unit);assert.equal(await page.locator('#letter-principal-select option:checked').textContent(),principal);assert.equal(await page.locator('.letter-principal-school strong').textContent(),school);
+    for(const unit of [1,2,3]){
+      await switchUnit(unit);const initial=(await data()).states[0];
+      const principal=initial.names.find(item=>item.id===initial.selected_id).name;
+      assert.equal(await page.locator('#letter-principal-select option:checked').textContent(),principal);
+      assert.equal(await page.locator('#letter-finance-select option:checked').textContent(),'Ervina Safitri, A.Md.');
       const first=await page.locator('.letter-action-cell a').first().getAttribute('href');const key=new URL(first,base+'/laporan/').searchParams.get('student_key');keys.push(key);assert.ok(key.startsWith(unit+'|'));
-      for(const width of [1280,1440,1920])for(const theme of ['light','dark']){
+      for(const width of [390,1280,1440,1920])for(const theme of ['light','dark']){
         await page.setViewportSize({width,height:1000});await page.evaluate(theme=>{localStorage.setItem('spp_theme',theme);document.documentElement.dataset.theme=theme;},theme);
         await page.evaluate(()=>{document.body.offsetWidth;document.getAnimations().filter(animation=>animation instanceof CSSTransition).forEach(animation=>animation.finish());});
         assert.equal(await page.evaluate(()=>document.documentElement.scrollWidth>innerWidth),false);
-        const rects=await page.locator('.letter-principal-school,.letter-principal-choice,.letter-principal-buttons').evaluateAll(nodes=>nodes.map(n=>{const r=n.getBoundingClientRect();return {left:r.left,right:r.right,top:r.top,bottom:r.bottom};}));assert.ok(rects[0].right<=rects[1].left&&rects[1].right<=rects[2].left);assert.ok(rects[2].right<=width);
+        const rects=await page.locator('[data-letter-signer]').evaluateAll(nodes=>nodes.map(n=>{const r=n.getBoundingClientRect();return {left:r.left,right:r.right,top:r.top,bottom:r.bottom};}));assert.ok(width===390?rects[0].bottom<=rects[1].top:rects[0].right<=rects[1].left);assert.ok(rects[1].right<=width);
         const contrasts=await page.locator('#letter-principal-select,.letter-principal-buttons button').evaluateAll(nodes=>{
           const ctx=document.createElement('canvas').getContext('2d');ctx.canvas.width=ctx.canvas.height=1;
           const color=value=>{ctx.clearRect(0,0,1,1);ctx.fillStyle=value;ctx.fillRect(0,0,1,1);return [...ctx.getImageData(0,0,1,1).data];};
@@ -35,7 +38,23 @@ const password=fs.readFileSync(process.env.SPP_TEST_ADMIN_PASSWORD_FILE,'utf8').
       }
       if(process.env.SPP_TEST_VISUAL_ONLY==='1')continue;
       await page.setViewportSize({width:1440,height:1000});await page.locator('.letter-select').first().check();
-      await page.locator('#letter-principal-delete').click();assert.equal(await page.locator('#letter-principal-save').isDisabled(),true);await page.keyboard.press('Escape');
+      const financeCount=await page.locator('#letter-finance-select option').count();
+      await page.locator('#letter-finance-delete').click();assert.equal(await page.locator('#letter-finance-save').isDisabled(),financeCount===1);await page.keyboard.press('Escape');
+      const financeOriginal=await page.locator('#letter-finance-select').inputValue();
+      const financeResponse=async() => {
+        const response=page.waitForResponse(r=>r.url().endsWith('/surat_orang_tua_kepala.php')&&r.request().method()==='POST');
+        await page.locator('#letter-finance-save').click();
+        assert.equal((await response).status(),200);
+        await page.waitForFunction(()=>document.getElementById('letter-finance-panel').getAttribute('aria-busy')!=='true');
+      };
+      await page.locator('#letter-finance-add').click();await page.locator('#letter-finance-name').fill('Super Admin Surat Uji '+unit);await financeResponse();
+      assert.equal(await page.locator('#letter-finance-select option:checked').textContent(),'Super Admin Surat Uji '+unit);
+      await pdfFor(base+'/laporan/'+first,`browser-u${unit}-finance.pdf`);
+      await page.goto(base+'/laporan/surat_orang_tua.php');
+      await page.locator('#letter-finance-edit').click();await page.locator('#letter-finance-name').fill('Super Admin Surat Edit '+unit);await financeResponse();
+      await page.locator('#letter-finance-delete').click();await page.locator('#letter-finance-replacement').selectOption(financeOriginal);await financeResponse();
+      assert.equal(await page.locator('#letter-finance-select option:checked').textContent(),'Ervina Safitri, A.Md.');
+      await page.locator('.letter-select').first().check();
       await page.locator('#letter-principal-add').click();await page.locator('#letter-principal-name').fill('Kepala Sekolah Uji '+unit);assert.equal((await responseClick('#letter-principal-save')).status(),200);assert.equal(await page.locator('#print-selected').textContent(),'Cetak Dipilih (1)');
       let cfg=await data();let api=await (await page.request.get(base+'/laporan/surat_orang_tua_kepala.php')).json();let current=api.states[0];const added=current.selected_id,original=cfg.states[0].selected_id;
       const token=await pdfFor(base+'/laporan/'+first,`browser-u${unit}-new.pdf`);
@@ -49,7 +68,7 @@ const password=fs.readFileSync(process.env.SPP_TEST_ADMIN_PASSWORD_FILE,'utf8').
       try{await page.locator('#letter-principal-select').selectOption(String(original));await started;await page.waitForFunction(()=>document.getElementById('letter-principal-panel').getAttribute('aria-busy')==='true');const pageCount=context.pages().length;await page.locator('.letter-action-cell a').first().click({force:true});assert.equal(context.pages().length,pageCount);}finally{release();}
       await saved();await page.unroute('**/surat_orang_tua_kepala.php');
       await page.locator('#letter-principal-select').selectOption(String(added));await saved();
-      await page.locator('#letter-principal-delete').click();await page.locator('#letter-principal-replacement').selectOption(String(original));assert.equal((await responseClick('#letter-principal-save')).status(),200);assert.equal(await page.locator('#letter-principal-select option').count(),1);
+      await page.locator('#letter-principal-delete').click();await page.locator('#letter-principal-replacement').selectOption(String(original));assert.equal((await responseClick('#letter-principal-save')).status(),200);assert.equal(await page.locator('#letter-principal-select option').count(),initial.names.length);
       cfg=await data();api=await (await page.request.get(base+'/laporan/surat_orang_tua_kepala.php')).json();current=api.states[0];
       const post=(body,csrf=cfg.csrf)=>page.request.post(base+'/laporan/surat_orang_tua_kepala.php',{headers:{'X-CSRF-Token':csrf},data:{unit_id:unit,version:current.version,...body}});
       assert.equal((await post({action:'select',id:original},'bad')).status(),403);
@@ -66,15 +85,24 @@ const password=fs.readFileSync(process.env.SPP_TEST_ADMIN_PASSWORD_FILE,'utf8').
       await pdfFor(base+'/laporan/'+first,`browser-u${unit}-default.pdf`);
     }
     if(process.env.SPP_TEST_VISUAL_ONLY==='1'){assert.deepEqual(errors,[]);console.log('PASS: desktop matrix and measured text contrast for SD/SMP/SMA in both themes.');return;}
-    await switchUnit(0);assert.equal(await page.locator('.letter-principal-summary>div').count(),3);assert.equal(await page.locator('#letter-principal-select').count(),0);let cfg=await data();assert.equal((await page.request.post(base+'/laporan/surat_orang_tua_kepala.php',{headers:{'X-CSRF-Token':cfg.csrf},data:{unit_id:1,version:1,action:'add',name:'Forbidden'}})).status(),409);
+    await switchUnit(0);assert.equal(await page.locator('.letter-principal-summary>div').count(),6);assert.equal(await page.locator('#letter-principal-select').count(),0);let cfg=await data();assert.equal((await page.request.post(base+'/laporan/surat_orang_tua_kepala.php',{headers:{'X-CSRF-Token':cfg.csrf},data:{unit_id:1,version:1,action:'add',name:'Forbidden'}})).status(),409);
     const token=await pdfFor(base+'/laporan/surat_orang_tua_susun.php?mode=selected&students='+encodeURIComponent(keys.join(',')),'browser-mixed.pdf');
-    await page.goto(base+'/laporan/surat_orang_tua_susun.php?draft='+token+'&preview=1');assert.equal(await page.locator('#parent-pdf-frame').count(),1);
+    await page.locator('.parent-recipient').first().click();
+    await page.locator('#parent-message').fill('Pengingat manual pendaftaran dan pembayaran.');
+    await page.locator('#parent-copy').click();await page.locator('#copy-select-all').check();await page.locator('#copy-apply').click();
+    await page.waitForURL('**&preview=1');assert.equal(await page.locator('#parent-pdf-frame').count(),1);
+    const preview=await page.request.get(base+'/laporan/surat_orang_tua_pdf.php?draft='+token);
     const download=await page.request.get(base+'/laporan/surat_orang_tua_pdf.php?draft='+token+'&download=1');assert.match(download.headers()['content-disposition'],/attachment/);
     if(output){
+      fs.writeFileSync(path.join(output,'browser-mixed.pdf'),await preview.body());
       fs.writeFileSync(path.join(output,'browser-mixed-download.pdf'),await download.body());await page.screenshot({path:path.join(output,'principal-mixed-preview.png')});
       const pngDownload=page.waitForEvent('download',{timeout:120000});await page.locator('#parent-png').click();await (await pngDownload).saveAs(path.join(output,'browser-mixed.zip'));
       const singleToken=await pdfFor(base+'/laporan/surat_orang_tua_susun.php?mode=single&student_key='+encodeURIComponent(keys[0]),'browser-single.pdf');
-      await page.goto(base+'/laporan/surat_orang_tua_susun.php?draft='+singleToken+'&preview=1');const singleDownload=page.waitForEvent('download',{timeout:120000});await page.locator('#parent-png').click();await (await singleDownload).saveAs(path.join(output,'browser-single.png'));
+      await page.locator('#parent-message').fill('Pengingat manual surat tunggal.');
+      await page.locator('#parent-preview').click();await page.waitForURL('**&preview=1');
+      const singlePreview=await page.request.get(base+'/laporan/surat_orang_tua_pdf.php?draft='+singleToken);
+      fs.writeFileSync(path.join(output,'browser-single.pdf'),await singlePreview.body());
+      const singleDownload=page.waitForEvent('download',{timeout:120000});await page.locator('#parent-png').click();await (await singleDownload).saveAs(path.join(output,'browser-single.png'));
     }
     assert.deepEqual(errors,[]);console.log('PASS: desktop matrix, CRUD, immutable PDFs, persistent defaults, duplicate/CSRF/unit/version rejection, pending-print guard, conflict recovery, mixed-unit preview/download.');
   }finally{await browser.close();}

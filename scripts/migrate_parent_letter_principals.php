@@ -12,20 +12,25 @@ require_once __DIR__.'/../includes/legacy_migration_verification.php';
 $db=$koneksi;$target=lmr_target($db);
 if($target['database_name']!==$database||(int)$target['port']!==$port)throw new RuntimeException('Koneksi target berbeda.');
 $pending=plp_schema_plan($db);$seeds=plp_seed_pending($db);
-$out=['target'=>$target,'mode'=>$mode,'pending_schema'=>$pending,'pending_seed_units'=>$seeds,'schema_changes'=>0,'seeded_units'=>[]];
-if($mode==='apply'&&($pending||$seeds)){
+$financePending=plp_schema_plan($db,'finance');$financeSeeds=plp_seed_pending($db,'finance');
+$out=['target'=>$target,'mode'=>$mode,'pending_schema'=>$pending,'pending_seed_units'=>$seeds,'schema_changes'=>0,'seeded_units'=>[],
+    'finance'=>['pending_schema'=>$financePending,'pending_seed_units'=>$financeSeeds,'schema_changes'=>0,'seeded_units'=>[]]];
+if($mode==='apply'&&($pending||$seeds||$financePending||$financeSeeds)){
     require_once __DIR__.'/../includes/legacy_full.php';
     $access=lful_wait_access(database_access_paths($database,$port),static fn()=>fwrite(STDERR,"Menunggu akses aplikasi...\n"));
     try {
         lmr_backup_check($db,$options['backup-proof']??'');
         $before=lmr_snapshot($db);$checksums=lmr_database_checksums($db);
         $out=array_replace($out,plp_schema_apply($db));
-        if(lmr_snapshot($db)!==$before)throw new RuntimeException('Data terlindungi berubah saat pemasangan Kepala Sekolah.');
+        $out['finance']=array_replace($out['finance'],plp_schema_apply($db,'finance'));
+        if(lmr_snapshot($db)!==$before)throw new RuntimeException('Data terlindungi berubah saat pemasangan penanda tangan.');
         $after=lmr_database_checksums($db);
-        foreach($checksums as $table=>$checksum)if(!in_array($table,['parent_letter_principals_data','parent_letter_principal_settings_data'],true)&&($after[$table]??null)!==$checksum)throw new RuntimeException('Tabel existing berubah: '.$table);
+        foreach($checksums as $table=>$checksum)if(!in_array($table,['parent_letter_principals_data','parent_letter_principal_settings_data','parent_letter_finance_signers_data','parent_letter_finance_settings_data'],true)&&($after[$table]??null)!==$checksum)throw new RuntimeException('Tabel existing berubah: '.$table);
         $out['protected_data_preserved']=true;$out['pending_schema']=plp_schema_plan($db);$out['pending_seed_units']=plp_seed_pending($db);
+        $out['finance']['pending_schema']=plp_schema_plan($db,'finance');$out['finance']['pending_seed_units']=plp_seed_pending($db,'finance');
     }finally{database_access_release($access);}
 }
-$out['ready']=plp_schema_ready($db)&&plp_seed_pending($db)===[];
+$out['finance']['ready']=plp_schema_ready($db,'finance')&&plp_seed_pending($db,'finance')===[];
+$out['ready']=plp_schema_ready($db)&&plp_seed_pending($db)===[]&&$out['finance']['ready'];
 $json=json_encode($out,JSON_PRETTY_PRINT|JSON_UNESCAPED_UNICODE|JSON_THROW_ON_ERROR);
 if(isset($options['output']))file_put_contents($options['output'],$json);echo $json.PHP_EOL;

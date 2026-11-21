@@ -3,7 +3,7 @@ require_once __DIR__.'/legacy_migration_automation.php';
 require_once __DIR__.'/other_fee_usage.php';
 require_once __DIR__.'/legacy_full.php';require_once __DIR__.'/legacy_operational_read.php';
 /** Narrow operational permission; importing and payment corrections retain their own gates. */
-function lop_correction_actor(mysqli $db,int $actor,int $unit,string $kind,?array $before=null,array $input=[],bool $lock=false):array {
+function lop_correction_actor(mysqli $db,int $actor,int $unit,string $kind,?array $before=null,array $input=[],bool $lock=false,bool $bankEntryOnly=false):array {
     require_once __DIR__.'/legacy_transactions.php';
     $account=lt_actor($db,$actor,$unit);
     if($account['role']==='super_admin'){lop_actor($db,$actor,$unit,$lock);return $account;}
@@ -13,7 +13,9 @@ function lop_correction_actor(mysqli $db,int $actor,int $unit,string $kind,?arra
         if(!$locked||!$locked['is_active']||$locked['role']!=='admin'||($locked['unit_id']!==null&&(int)$locked['unit_id']!==$unit))throw new DomainException('Akses koreksi sudah berubah. Muat ulang.',403);
     }
     if($before){
-        if((int)($input['owner_id']??$before['owner_id'])!==(int)$before['owner_id']||(bool)($input['cancelled']??$before['cancelled'])!==(bool)$before['cancelled'])throw new DomainException('Pemindahan pemilik dan pembatalan Legacy hanya tersedia untuk Super Admin.',403);
+        $moving=(int)($input['owner_id']??$before['owner_id'])!==(int)$before['owner_id'];
+        $changingStatus=(bool)($input['cancelled']??$before['cancelled'])!==(bool)$before['cancelled'];
+        if($moving||($changingStatus&&!$bankEntryOnly))throw new DomainException('Pemindahan pemilik dan pembatalan Legacy hanya tersedia untuk Super Admin.',403);
     }
     return $account;
 }
@@ -52,11 +54,16 @@ function lop_journal_timeline(mysqli $db,array $owner,array $replacement): array
     return $filtered;
 }
 /** Compute exact financial effects before asking for confirmation. */
-function lop_correction_preview(mysqli $db,int $actor,int $unit,string $kind,int $id,int $version,array $input): array {
+function lop_correction_preview(mysqli $db,int $actor,int $unit,string $kind,int $id,int $version,array $input,bool $bankEntryOnly=false): array {
     lop_require($db);require_once __DIR__.'/legacy_transactions.php';lt_actor($db,$actor,$unit);$before=lop_record($db,$kind,$id);if((int)$before['version']!==$version)throw new DomainException('Transaksi berubah. Muat ulang.');
     // Payment proposals by Administrator are handled by the existing approval service.
-    if($kind==='journal')lop_correction_actor($db,$actor,$unit,$kind,$before,$input);
-    $reason=trim((string)($input['reason']??''));if(mb_strlen($reason)<10||mb_strlen($reason)>1000)throw new DomainException('Isi alasan koreksi minimal 10 karakter.');
+    if($bankEntryOnly&&($kind!=='journal'||$before['origin']!=='new'||$before['cancelled']
+        ||(int)($input['owner_id']??$before['owner_id'])!==(int)$before['owner_id']))
+        throw new DomainException('Transaksi aktif SistemSPP tidak ditemukan.');
+    if($kind==='journal')lop_correction_actor($db,$actor,$unit,$kind,$before,$input,false,$bankEntryOnly);
+    $reason=trim((string)($input['reason']??''));$maxReason=$bankEntryOnly?500:1000;
+    if(!$bankEntryOnly&&mb_strlen($reason)<10)throw new DomainException('Isi alasan koreksi minimal 10 karakter.');
+    if(mb_strlen($reason)>$maxReason)throw new DomainException('Alasan maksimal '.$maxReason.' karakter.');
     $expires=(int)($input['preview_expires']??0);if($expires<time()||$expires>time()+300)throw new DomainException('Pratinjau koreksi kedaluwarsa. Periksa kembali.');
     $after=$before;$after['source_date']=lop_date(array_key_exists('date',$input)?$input['date']:$before['source_date']);if($after['source_date']&&$after['source_date']>date('Y-m-d H:i:s'))throw new DomainException('Tanggal tidak boleh di masa depan.');
     if(array_key_exists('time_precision',$input)||$after['source_date']!==$before['source_date']){
@@ -65,8 +72,12 @@ function lop_correction_preview(mysqli $db,int $actor,int $unit,string $kind,int
         $after['_time_precision']=$precision;
     }
     if($kind==='journal'&&($before['origin']??'')==='adjustment'&&(int)($input['owner_id']??$before['owner_id'])!==(int)$before['owner_id'])throw new DomainException('Penyesuaian saldo tidak dapat dipindahkan ke rekening lain.');
-    $after['note']=trim((string)($input['note']??$before['note']));if(mb_strlen($after['note'])>1000)throw new DomainException('Catatan maksimal 1.000 karakter.');
+    if(!$bankEntryOnly||array_key_exists('note',$input)){
+        $after['note']=trim((string)($input['note']??$before['note']));
+        if(mb_strlen($after['note'])>1000)throw new DomainException('Catatan maksimal 1.000 karakter.');
+    }
     $after['cancelled']=($input['cancelled']??false)===true?1:0;$ownerId=(int)($input['owner_id']??$before['owner_id']);$owner=lf_one($db,"SELECT * FROM legacy_op_owners WHERE id=? AND state='ready'",[$ownerId]);if(!$owner||$owner['batch_id']!==$before['batch_id'])throw new DomainException('Pilih pemilik yang sudah disahkan pada batch/unit yang sama.');$after['owner_id']=$ownerId;
+    if($bankEntryOnly&&$owner['student_id'])throw new DomainException('Gunakan alur tabungan siswa untuk rekening siswa.');
     $effects=[];$context=[];
     if($kind==='payment'){
         $after['method']=trim((string)($input['method']??$before['method']));if(mb_strlen($after['method'])>100)throw new DomainException('Metode maksimal 100 karakter.');
@@ -91,24 +102,28 @@ function lop_correction_preview(mysqli $db,int $actor,int $unit,string $kind,int
         foreach(array_keys($obligations) as $oid){$o=lf_one($db,'SELECT * FROM legacy_op_obligations WHERE id=?',[$oid]);$paid=lop_obligation_paid($db,$oid,$after);$principal=lf_cents($o['principal']);if($paid>$principal)throw new DomainException('Koreksi melebihi kewajiban. Periksa pembayaran di muka atau kewajiban tujuan.');$remaining=lf_money($principal-$paid);$effects[]=['obligation_id'=>$oid,'before'=>lf_money($principal-lop_obligation_paid($db,$oid)),'after'=>$remaining];$context[]=[$o,lop_obligation_paid($db,$oid)];}
     }else{
         if(($before['origin']??'')==='adjustment'&&$after['source_date']!==$before['cutoff'])throw new DomainException('Tanggal penyesuaian saldo tetap pada waktu peralihan.');
-        if(!$after['source_date']||(in_array($before['origin'],['legacy','adjustment'],true)&&$after['source_date']>$before['cutoff'])||($before['origin']==='new'&&$after['source_date']<$before['cutoff']))throw new DomainException('Tanggal jurnal Legacy harus berada sebelum/saat peralihan.');
+        if(!$after['source_date']||(!$bankEntryOnly&&((in_array($before['origin'],['legacy','adjustment'],true)&&$after['source_date']>$before['cutoff'])||($before['origin']==='new'&&$after['source_date']<$before['cutoff']))))throw new DomainException('Tanggal jurnal tidak sesuai dengan sumber transaksi.');
         $after['incoming']=lf_money(lf_cents($input['incoming']??$before['incoming']));$after['outgoing']=lf_money(lf_cents($input['outgoing']??$before['outgoing']));if((lf_cents($after['incoming'])>0)===(lf_cents($after['outgoing'])>0))throw new DomainException('Pilih satu arah transaksi dengan nominal positif.');
+        if($bankEntryOnly&&(lf_cents($after['incoming'])>0)!==(lf_cents($before['incoming'])>0))
+            throw new DomainException('Jenis transaksi tabungan tidak dapat diubah.');
         $old=$before['cancelled']?0:lf_cents($before['incoming'])-lf_cents($before['outgoing']);$new=$after['cancelled']?0:lf_cents($after['incoming'])-lf_cents($after['outgoing']);$changes=[(int)$before['owner_id']=>-$old];$changes[$ownerId]=($changes[$ownerId]??0)+$new;ksort($changes);
         foreach($changes as $affected=>$delta){$affectedOwner=lf_one($db,"SELECT * FROM legacy_op_owners WHERE id=? AND state='ready'",[$affected]);$account=lf_one($db,'SELECT * FROM legacy_op_accounts WHERE owner_id=?',[$affected]);if(!$affectedOwner||!$account)throw new DomainException('Kedua rekening harus sudah direkonsiliasi.');$balance=lop_current_balance($db,$affectedOwner,$account);$opening=lf_cents($account['opening'])+(in_array($before['origin'],['legacy','adjustment'],true)?$delta:0);
             if($opening<0||lf_cents($balance)+$delta<0)throw new DomainException('Koreksi membuat saldo negatif sebesar '.legacy_ui_money(lf_money(abs(min($opening,lf_cents($balance)+$delta)))).'. Periksa transaksi lanjutan; rekening lain tidak terpengaruh.');
             $timeline=lop_journal_timeline($db,$affectedOwner,$after);
+            if($bankEntryOnly&&array_sum(array_map(static fn($row)=>$row['cancelled']?0:lf_cents($row['incoming'])-lf_cents($row['outgoing']),$timeline))!==lf_cents($balance)+$delta)
+                throw new DomainException('Saldo tersimpan tidak sesuai jurnal. Koreksi dibatalkan.');
             $effects[]=['owner_id'=>$affected,'balance_before'=>$balance,'balance_after'=>lf_money(lf_cents($balance)+$delta),'opening_after'=>lf_money($opening)];$context[]=[$affectedOwner,$account,$balance,$timeline];}
     }
     $digest=hash('sha256',lf_json([$unit,$actor,$kind,$id,$version,$before,$after,$effects,$context,$reason,$expires]));return compact('kind','id','version','before','after','effects','reason','digest','expires');
 }
-function lop_correction_apply(mysqli $db,int $actor,int $unit,string $kind,int $id,int $version,array $input,string $digest,string $key,bool $manageTransaction=true): array {
+function lop_correction_apply(mysqli $db,int $actor,int $unit,string $kind,int $id,int $version,array $input,string $digest,string $key,bool $manageTransaction=true,bool $bankEntryOnly=false): array {
     require_once __DIR__.'/student_out.php';$outRecord=lop_record($db,$kind,$id);sout_assert_owner($db,(int)$outRecord['owner_id'],false);if(!empty($input['owner_id']))sout_assert_owner($db,(int)$input['owner_id'],false);
     if(!preg_match('/^[a-f0-9]{64}$/D',$key)||($input['confirmation']??'')!=='SIMPAN KOREKSI')throw new DomainException('Konfirmasi koreksi diperlukan.');
     if($manageTransaction){$db->query('SET TRANSACTION ISOLATION LEVEL READ COMMITTED');$db->begin_transaction();}try{lop_correction_actor($db,$actor,$unit,$kind,null,[],true);$done=lf_one($db,'SELECT * FROM legacy_op_audit WHERE request_key=? FOR UPDATE',[$key]);if($done){$saved=json_decode($done['after_data'],true);if((int)$done['actor_id']!==$actor||$done['entity_type']!==$kind||(int)$done['entity_id']!==$id||($saved['_preview_digest']??'')!==$digest)throw new DomainException('Kunci koreksi sudah digunakan.');if($manageTransaction)$db->commit();return ['saved'=>true,'replayed'=>true];}
         if($kind==='payment'){$snapshot=lop_record($db,$kind,$id);other_fee_lock_items($db,$unit,array_merge($snapshot['items'],is_array($input['items']??null)?$input['items']:[]));}
         $old=lop_record($db,$kind,$id,true);$ids=[(int)$old['owner_id'],(int)($input['owner_id']??$old['owner_id'])];sort($ids);foreach(array_unique($ids) as $oid){lf_one($db,'SELECT id FROM legacy_op_owners WHERE id=? FOR UPDATE',[$oid]);$owner=lf_one($db,'SELECT * FROM legacy_op_owners WHERE id=?',[$oid]);if($owner&&$owner['student_id'])lf_one($db,'SELECT id FROM siswa WHERE id=? FOR UPDATE',[$owner['student_id']]);$account=lf_one($db,'SELECT * FROM legacy_op_accounts WHERE owner_id=? FOR UPDATE',[$oid]);if($account)lop_current_balance($db,$owner,$account,true);foreach(lf_rows($db,'SELECT id FROM legacy_op_obligations WHERE owner_id=? ORDER BY id FOR UPDATE',[$oid]) as $ignored){}}
         foreach(array_unique($ids) as $oid){$o=lf_one($db,'SELECT * FROM legacy_op_owners WHERE id=?',[$oid]);if($o&&$o['student_id'])lf_one($db,'SELECT id FROM siswa WHERE id=? FOR UPDATE',[$o['student_id']]);lf_rows($db,'SELECT id FROM legacy_op_payments WHERE owner_id=? ORDER BY id FOR UPDATE',[$oid]);lf_rows($db,'SELECT id FROM legacy_op_journals WHERE owner_id=? ORDER BY id FOR UPDATE',[$oid]);foreach(lf_rows($db,'SELECT bill_id FROM legacy_op_obligations WHERE owner_id=? ORDER BY id FOR UPDATE',[$oid]) as $ob)if($ob['bill_id']){lf_one($db,'SELECT id FROM tagihan_biaya_lain WHERE id=? FOR UPDATE',[$ob['bill_id']]);lf_rows($db,'SELECT id FROM bayar_biaya_lain WHERE tagihan_biaya_lain_id=? FOR UPDATE',[$ob['bill_id']]);}}
-        $p=lop_correction_preview($db,$actor,$unit,$kind,$id,$version,$input);if(!hash_equals($p['digest'],$digest))throw new DomainException('Dampak koreksi berubah. Periksa ulang.');$a=$p['after'];
+        $p=lop_correction_preview($db,$actor,$unit,$kind,$id,$version,$input,$bankEntryOnly);if(!hash_equals($p['digest'],$digest))throw new DomainException('Dampak koreksi berubah. Periksa ulang.');$a=$p['after'];
         if($kind==='payment'){lf_query($db,'UPDATE legacy_op_payments SET owner_id=?,source_date=?,source_period=?,method=?,note=?,items=?,total=?,cancelled=?,version=version+1 WHERE id=?',[$a['owner_id'],$a['source_date'],$a['source_period'],$a['method'],$a['note'],lf_json($a['items']),$a['total'],$a['cancelled'],$id]);
             foreach($p['effects'] as $e){$o=lf_one($db,'SELECT * FROM legacy_op_obligations WHERE id=?',[$e['obligation_id']]);if($o['bill_id']){$paid=lf_one($db,'SELECT COALESCE(SUM(nominal_snapshot),0) paid FROM bayar_biaya_lain WHERE tagihan_biaya_lain_id=?',[$o['bill_id']]);$nominal=lf_cents($e['after'])+lf_cents((string)$paid['paid']);$billKind=lf_one($db,'SELECT origin FROM tagihan_biaya_lain WHERE id=?',[$o['bill_id']]);if(($billKind['origin']??'')==='legacy')$nominal=lf_cents($o['principal']);lf_query($db,'UPDATE tagihan_biaya_lain SET nominal_tagihan=?,status=? WHERE id=?',[lf_money($nominal),$nominal===0?'waived':'open',$o['bill_id']]);}lf_query($db,'UPDATE legacy_op_obligations SET remaining=?,version=version+1 WHERE id=?',[$e['after'],$e['obligation_id']]);}
         }else{lf_query($db,'UPDATE legacy_op_journals SET owner_id=?,source_date=?,incoming=?,outgoing=?,note=?,cancelled=?,version=version+1 WHERE id=?',[$a['owner_id'],$a['source_date'],$a['incoming'],$a['outgoing'],$a['note'],$a['cancelled'],$id]);foreach($p['effects'] as $e){lf_query($db,'UPDATE legacy_op_accounts SET opening=?,balance=?,version=version+1 WHERE owner_id=?',[$e['opening_after'],$e['balance_after'],$e['owner_id']]);$o=lf_one($db,'SELECT student_id FROM legacy_op_owners WHERE id=?',[$e['owner_id']]);if($o['student_id'])lf_query($db,'UPDATE tabungan t JOIN siswa s ON s.NO_INDUK=t.NO_INDUK AND s.unit_id=t.unit_id SET t.SALDO=? WHERE s.id=?',[$e['balance_after'],$o['student_id']]);}}

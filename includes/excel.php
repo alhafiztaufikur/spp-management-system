@@ -42,14 +42,16 @@ function spp_excel_report_document(array $report,string $template,int $unit): ar
         $columns[]=spp_excel_column('total','TOTAL','money_optional');$columns[]=spp_excel_column('keterangan','Keterangan Tagihan');
         $amount=static function($v,string $component=''){
             $v=billing_history_display_amount($v,$component);
-            return !empty($v['unknown'])?['text'=>billing_history_amount($v)]:(!empty($v['known'])?$v['value']:null);
+            return !empty($v['known'])?$v['value']:['text'=>'-'];
         };
         foreach($view['sections'] as $section){
             $rows=[];foreach($section['rows'] as $i=>$g){$row=['no'=>$g['no']??$i+1,'nis'=>$g['nis'],'nama'=>$g['nama'],'total'=>$amount($g['total']),'keterangan'=>$g['keterangan']];foreach($view['columns'] as $key=>$label)$row[$key]=$amount($g['amounts'][$key]??[],$key);$rows[]=$row;}
             $subtotal=['nama'=>'JUMLAH ROMBEL','total'=>$amount($section['total'])];foreach($view['columns'] as $key=>$label)$subtotal[$key]=$amount($section['amounts'][$key]??[],$key);$rows[]=$subtotal;
-            $sections[]=spp_excel_section('Tahun Ajaran: '.$section['year'].' | Kelas: '.$section['kelas'].($unit===0?' | '.unit_label($section['unit_id']):''),$columns,$rows,[],false);
+            $sections[]=spp_excel_section(billing_history_section_caption($section,$unit),$columns,$rows,[],false);
         }
-        $sections[]=spp_excel_section('Total Keseluruhan',[spp_excel_column('label','Keterangan'),spp_excel_column('amount','Total Tunggakan','money_optional')],[['label'=>'Total Tunggakan Keseluruhan','amount'=>!empty($view['grand']['total']['known'])?$view['grand']['total']['value']:null]],[],false);
+        $summary=[['label'=>BILLING_HISTORY_CURRENT_TOTAL_LABEL,'amount'=>$amount($view['grand']['total'])]];
+        foreach($view['empty_years']??[] as $year)$summary[]=['label'=>'Tahun ajaran '.$year.' · Tidak ada tagihan sesuai filter.','amount'=>null];
+        $sections[]=spp_excel_section('Total Keseluruhan',[spp_excel_column('label','Keterangan'),spp_excel_column('amount','Nominal','money_optional')],$summary,[],false);
         $doc=spp_excel_document($report['title'],'Tahun Ajaran: '.billing_history_year_label($view['years']),$unit,[['name'=>'Riwayat Tagihan','sections'=>$sections,'signatures'=>false]]);$doc['billing_history']=true;$doc['_billing_view']=$view;return $doc;
     }
     if(isset($report['sections'])){
@@ -246,7 +248,9 @@ function spp_excel_workbook(array $doc): \PhpOffice\PhpSpreadsheet\Spreadsheet {
         }
         $setup->setPrintArea('A1:'.$last.$printEndRow);$sheet->getPageMargins()->setTop(.35)->setBottom(.35)->setLeft(.3)->setRight(.3);$sheet->getHeaderFooter()->setOddFooter('&L'.$doc['unit_label'].' | SistemSPP&RHalaman &P / &N');
         if($global)global_report_excel_finish($sheet,$doc,$definition,$n);
-        if(!empty($doc['billing_history'])){foreach([6,7] as $hiddenRow){$sheet->setCellValue('A'.$hiddenRow,null);$sheet->getRowDimension($hiddenRow)->setRowHeight(0);}}
+        if(!empty($doc['billing_history'])&&empty($doc['period_caption'])){
+            foreach([6,7] as $hiddenRow){$sheet->setCellValue('A'.$hiddenRow,null);$sheet->getRowDimension($hiddenRow)->setRowHeight(0);}
+        }
         if(!empty($doc['billing_history']))$setup->setOrientation('landscape')->setFitToPage(true)->setFitToWidth(1)->setFitToHeight(0)->setRowsToRepeatAtTopByStartAndEnd(1,7);
         $repeatColumns=$setup->getColumnsToRepeatAtLeft();
         if(!empty($repeatColumns[1])&&$repeatColumns[1]!==$last){

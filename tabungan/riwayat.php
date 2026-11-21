@@ -38,7 +38,7 @@ if ($filter_tanggal_awal > $filter_tanggal_akhir) {
 }
 $allowedPageSizes = [10, 25, 50];
 $perPage = page_size_param('per_page', $allowedPageSizes, 10);
-$page = page_int_param('page');
+$requestedPage = $page = page_int_param('page');
 
 $selectedFilterNis = '';$selectedFilterUnit=0;
 if ($filter_nis !== '') {
@@ -94,21 +94,18 @@ $historyPaginationQuery = pagination_query([
     'rombel' => $rombelFilter['values'],
     'all_periods'=>($_GET['all_periods']??'')==='1'?'1':null,
     'owner_id'=>max(0,(int)($_GET['owner_id']??0)),
+    'student_id'=>max(0,(int)($_GET['student_id']??0)),
+    'back_context'=>is_string($_GET['back_context']??null)?$_GET['back_context']:null,
 ]);
 
 if(is_file(__DIR__.'/../includes/savings_authorization.php'))require_once '../includes/savings_authorization.php';
 $archiveView=($_GET['view']??'active')==='archive';
 if($archiveView&&function_exists('savings_authorization_ready')&&savings_authorization_ready($koneksi)){
-    $archiveOwner=savings_operator_owner_sql('a.unit_id','a.jenis','a.transaction_id',"JSON_UNQUOTE(JSON_EXTRACT(a.before_snapshot,'$.transaction.user_id'))");
-    $archiveOperatorWhere=savings_operator_where($operators,$archiveOwner).history_class_archive_where($rombelFilter,'a.unit_id',"JSON_UNQUOTE(JSON_EXTRACT(a.before_snapshot,'$.transaction.NO_INDUK'))");
-    $s=$koneksi->prepare("SELECT a.jenis,a.transaction_id id,a.before_snapshot,a.unit_id FROM tabungan_aktivitas a WHERE a.action='deleted'
-        AND JSON_UNQUOTE(JSON_EXTRACT(a.before_snapshot,'$.transaction.TANGGAL'))>=? AND JSON_UNQUOTE(JSON_EXTRACT(a.before_snapshot,'$.transaction.TANGGAL'))<?
-        AND (?='' OR JSON_UNQUOTE(JSON_EXTRACT(a.before_snapshot,'$.transaction.NO_INDUK'))=? OR JSON_UNQUOTE(JSON_EXTRACT(a.before_snapshot,'$.transaction.NAMA')) LIKE ?)
-        $archiveOperatorWhere ORDER BY a.occurred_at DESC,a.id DESC");
-    $like='%'.$filter_nis.'%';$s->bind_param('sssss',$periodStart,$periodEnd,$filter_nis,$filter_nis,$like);$s->execute();$archived=$s->get_result()->fetch_all(MYSQLI_ASSOC);$s->close();
-    $historySummary=['total_masuk'=>0,'total_keluar'=>0];foreach($archived as $a){$tx=json_decode($a['before_snapshot'],true)['transaction'];$historySummary['total_masuk']+=(float)$tx['MASUK'];$historySummary['total_keluar']+=(float)$tx['KELUAR'];}
-    $totalHistoryRows=count($archived);$totalPages=total_pages($totalHistoryRows,$perPage);$page=min($page,$totalPages);$offset=($page-1)*$perPage;$rows=[];
-    foreach(array_slice($archived,$offset,$perPage) as $a){$row=json_decode($a['before_snapshot'],true)['transaction'];$row['nominal']=$row['MASUK'];$row['keluar']=$row['KELUAR'];$row['deleted']=true;$rows[]=$row;}
+    $archived=mh_savings_archived_rows($koneksi,$_GET,$rombelFilter,$operators,$periodStart,$periodEnd);
+    $historySummary=['total_masuk'=>array_sum(array_column($archived,'nominal')),'total_keluar'=>array_sum(array_column($archived,'keluar'))];
+    $totalHistoryRows=count($archived);$totalPages=total_pages($totalHistoryRows,$perPage);$page=min($requestedPage,$totalPages);
+    foreach($archived as $index=>$row)if((int)$row['id']===$wantedId&&$row['jenis']===$wantedKind){$page=intdiv($index,$perPage)+1;break;}
+    $offset=($page-1)*$perPage;$rows=array_slice($archived,$offset,$perPage);$_GET['page']=$page;
     $historyPaginationQuery['view']='archive';
 }
 $total_masuk=(float)$historySummary['total_masuk'];$total_keluar=(float)$historySummary['total_keluar'];
@@ -182,6 +179,7 @@ if(($_GET['all_periods']??'')==='1')$periodLabel='Semua periode';
           </div>
           <?php if(($_GET['all_periods']??'')==='1'): ?><input type="hidden" name="all_periods" value="1"><?php endif; ?>
           <div class="sw-filter-actions"><div class="sw-toolbar-group sw-toolbar-filter" role="group" aria-label="Filter riwayat"><a class="btn btn-ghost" href="riwayat.php?<?= savings_e(http_build_query(array_replace($_GET,['all_periods'=>'1','page'=>1,'id'=>null,'jenis'=>null]))) ?>">Semua Periode</a>
+            <a class="btn btn-ghost" href="riwayat.php?<?= savings_e(http_build_query(array_replace($_GET,['view'=>$archiveView?'active':'archive','page'=>1,'id'=>null,'jenis'=>null]))) ?>"><?= $archiveView?'Transaksi Aktif':'Arsip Transaksi' ?></a>
             <button type="submit" name="all_periods" value="0" class="btn btn-primary"><?= savings_icon('check') ?>Tampilkan Rekap</button>
             <a href="riwayat.php" class="btn btn-ghost"><?= savings_icon('reload') ?>Reset</a>
             </div><?php if (hasRole(['admin','kasir'])): ?>

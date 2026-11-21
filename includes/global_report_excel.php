@@ -6,7 +6,8 @@ function global_report_excel_body_style($sheet,array $section,array $positions,i
     foreach($section['columns'] as $i=>$column){
         [$start,$end]=$positions[$i];$key=$column['key'];$type=$column['type'];
         $money=in_array($type,['money','money_optional'],true);
-        $center=in_array($type,['number','count','html','status','kelas'],true)||in_array($key,['no','nis','nis_diknas','export_diknas','NO_INDUK','NO_induk_diknas','nama','NAMA','kelas','KELAS','export_class','unit','export_unit','jenis','status','periode'],true);
+        $receiptTime=!empty($section['stacked_receipt_time'])&&$key==='tanggal'&&$type==='datetime';
+        $center=$receiptTime||in_array($type,['number','count','html','status','kelas'],true)||in_array($key,['no','nis','nis_diknas','export_diknas','NO_INDUK','NO_induk_diknas','nama','NAMA','kelas','KELAS','export_class','unit','export_unit','jenis','status','periode'],true);
         $alignment=$money?'right':($center?'center':'left');
         $style=['alignment'=>['horizontal'=>$alignment,'vertical'=>'center','wrapText'=>true,'indent'=>$center?0:1]];
         if($money)$style['numberFormat']=['formatCode'=>'"Rp "#,##0;[Red]"Rp "-#,##0;"Rp "0'];
@@ -18,7 +19,7 @@ function global_report_excel_body_style($sheet,array $section,array $positions,i
         }
         $sheet->getStyle($letter($start).$first.':'.$letter($end).$last)->applyFromArray($style);
         if($money)foreach($section['rows'] as $offset=>$data){$amount=$data[$key]??null;if(is_numeric($amount)&&fmod((float)$amount,1.0)!=0.0)$sheet->getStyle($letter($start).($first+$offset))->getNumberFormat()->setFormatCode('"Rp "#,##0.00;[Red]"Rp "-#,##0.00;"Rp "0.00');}
-        if($type==='datetime')foreach($section['rows'] as $offset=>$data)if(($data['time_precision']??'')==='date')$sheet->getStyle($letter($start).($first+$offset))->getNumberFormat()->setFormatCode('dd/mm/yyyy "· Jam tidak tercatat"');
+        if($type==='datetime')foreach($section['rows'] as $offset=>$data)if(($data['time_precision']??'')==='date')$sheet->getStyle($letter($start).($first+$offset))->getNumberFormat()->setFormatCode($receiptTime?"dd/mm/yyyy\n\"Jam tidak tercatat\"":'dd/mm/yyyy "· Jam tidak tercatat"');
         if($type==='status')foreach($section['rows'] as $offset=>$data)if(($data[$key]??'')==='Lunas'){
             $row=$first+$offset;
             $sheet->getStyle($letter($start).$row.':'.$letter($end).$row)->getFill()->setFillType('solid')->getStartColor()->setRGB('DFF5E8');
@@ -80,9 +81,9 @@ function global_report_excel_preview(array $doc): string {
     if(isset($doc['_billing_view'])){
         ob_start(); ?>
         <!doctype html><html lang="id"><meta charset="utf-8"><style>
-        body{padding:24px;margin:0;font:14px "Segoe UI",Arial,sans-serif;color:#17231d}.excel-head{display:flex;gap:18px;align-items:center}.excel-head img{width:58px}.excel-head h1{font-size:20px;margin:0}.excel-head p{font-size:14px}.excel-title{text-align:center;font-size:22px;margin-top:24px}.excel-meta{text-align:center}.billing-rombel th{background:#165c44;color:#fff}
+        body{padding:24px;margin:0;font:14px "Segoe UI",Arial,sans-serif;color:#17231d}.excel-head{display:flex;gap:18px;align-items:center}.excel-head img{width:58px}.excel-head h1{font-size:20px;margin:0}.excel-head p{font-size:14px}.excel-title{text-align:center;font-size:22px;margin-top:24px}.excel-period,.excel-meta{text-align:center}.billing-rombel th{background:#165c44;color:#fff}
         <?= file_get_contents(dirname(__DIR__).'/assets/css/billing_history_report.css') ?>
-        </style><body class="billing-history-document"><div class="excel-head"><img src="<?= $image ?>" alt="Logo sekolah"><div><h1><?= report_e($doc['school']) ?></h1><p>Perum Bekasi Griya Asri II, Tambun Selatan | Telp. 021-88363466</p></div></div><h1 class="excel-title"><?= report_e($doc['title']) ?></h1><?= billing_history_table($doc['_billing_view'],null,true) ?></body></html>
+        </style><body class="billing-history-document"><div class="excel-head"><img src="<?= $image ?>" alt="Logo sekolah"><div><h1><?= report_e($doc['school']) ?></h1><p>Perum Bekasi Griya Asri II, Tambun Selatan | Telp. 021-88363466</p></div></div><h1 class="excel-title"><?= report_e($doc['title']) ?></h1><?php if(!empty($doc['period_caption'])): ?><p class="excel-period"><?= report_e($doc['period_caption']) ?></p><?php endif; ?><?= billing_history_table($doc['_billing_view'],null,true) ?></body></html>
         <?php return ob_get_clean();
     }
     ob_start(); ?>

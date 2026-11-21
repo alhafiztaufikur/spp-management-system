@@ -57,7 +57,7 @@ function report_psb_print_document(array $report,int $unit,string $subtitle,stri
     .psb-footer{position:fixed;bottom:-7mm;left:0;right:0;font-size:7pt;border-top:.5pt solid #000;padding-top:1mm}.psb-footer:after{content:" · Halaman " counter(page)}
     @media screen{body{max-width:186mm;margin:24px auto}.psb-footer{position:static;margin-top:5mm}}
     </style></head><body>
-    <header class="psb-heading"><h1><?= report_e(unit_school_name($unit)) ?></h1><h2>PEMBAYARAN PSB</h2></header>
+    <header class="psb-heading"><h1><?= report_e(unit_school_name($unit)) ?></h1><h2>PEMBAYARAN PSB</h2><?php if($subtitle!==''): ?><p><?= report_e($subtitle) ?></p><?php endif; ?></header>
     <table class="psb-table"><colgroup><col style="width:5%"><col style="width:8%"><col style="width:14%"><col style="width:28%"><col style="width:15%"><col style="width:15%"><col style="width:15%"></colgroup>
     <thead><tr><th style="width:5%" class="psb-number">NO</th><th style="width:8%">KELAS</th><th style="width:14%">NO. INDUK</th><th style="width:28%">NAMA SISWA</th><th style="width:15%" class="psb-money">JUMLAH</th><th style="width:15%" class="psb-money">U_PSB</th><th style="width:15%" class="psb-money">SISA</th></tr></thead><tbody>
     <?php if(!$rows): ?><tr><td colspan="7">Tidak ada data sesuai filter.</td></tr><?php endif; ?>

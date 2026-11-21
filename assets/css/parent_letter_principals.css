@@ -13,3 +13,19 @@ html[data-theme] body .letter-principal-panel .field-input,html[data-theme] body
 html[data-theme] body .letter-principal-panel .btn-ghost,html[data-theme] body .letter-principal-dialog .btn-ghost{background:var(--bg-card);color:var(--text-primary);border-color:var(--border);box-shadow:none}
 html[data-theme] body .letter-principal-panel .btn-ghost:hover,html[data-theme] body .letter-principal-dialog .btn-ghost:hover{background:var(--accent-glow);border-color:var(--accent)}
 @media(min-width:1000px) and (max-width:1399px){.letter-principal-controls{grid-template-columns:minmax(170px,.9fr) minmax(205px,1fr) auto;gap:16px}.letter-principal-panel .btn{padding:10px 11px}}
+
+.letter-signers{
+  display:grid;grid-template-columns:repeat(2,minmax(0,1fr));gap:14px;padding:16px 28px;
+  border-top:1px solid var(--border);background:var(--bg-elevated);
+}
+.letter-signers .letter-principal-panel{min-width:0;padding:18px;border:1px solid var(--border);border-radius:12px}
+.letter-signers .letter-principal-heading{min-height:48px;margin-bottom:14px;align-items:flex-start}
+.letter-signers .letter-principal-heading h2{margin-top:4px}
+.letter-signers .letter-principal-controls{grid-template-columns:minmax(0,1fr) auto;gap:12px}
+.letter-signers .letter-principal-buttons{flex-wrap:wrap}
+.letter-signers .letter-principal-summary{grid-template-columns:1fr;gap:10px}
+.letter-signers .letter-principal-summary>div{display:flex;flex-wrap:wrap;justify-content:space-between;gap:4px 12px}
+.letter-signer-dialog-error{color:var(--text-primary);font-size:13px;font-weight:600;line-height:1.6;margin:16px 0 0}
+@media(max-width:1200px){.letter-signers .letter-principal-controls{grid-template-columns:1fr}}
+@media(max-width:800px){.letter-signers{grid-template-columns:1fr;padding:14px;gap:12px}}
+@media(max-width:420px){.letter-signers .letter-principal-panel{padding:14px}.letter-signers .letter-principal-panel .btn{padding:8px 10px}}

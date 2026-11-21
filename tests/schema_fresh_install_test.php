@@ -79,6 +79,10 @@ try {
     require_once __DIR__.'/../includes/parent_letter_principals_schema.php';
     if(!plp_schema_ready($koneksi)||plp_seed_pending($koneksi))throw new RuntimeException('Fresh install missing parent letter principals');
     if(plp_schema_apply($koneksi)!==['schema_changes'=>0,'seeded_units'=>[]])throw new RuntimeException('Fresh principal schema replay changed state');
+    if(!plp_schema_ready($koneksi,'finance')||plp_seed_pending($koneksi,'finance'))throw new RuntimeException('Fresh install missing parent letter finance signers');
+    $financeNames=$koneksi->query('SELECT p.name FROM parent_letter_finance_settings_data s JOIN parent_letter_finance_signers_data p ON p.unit_id=s.unit_id AND p.id=s.selected_id ORDER BY s.unit_id')->fetch_all(MYSQLI_ASSOC);
+    if(array_column($financeNames,'name')!==array_fill(0,3,PLP_DEFAULT_FINANCE_NAME))throw new RuntimeException('Fresh finance selections differ by unit');
+    if(plp_schema_apply($koneksi,'finance')!==['schema_changes'=>0,'seeded_units'=>[]])throw new RuntimeException('Fresh finance schema replay changed state');
     require_once __DIR__.'/../includes/psb_spp_schema.php';
     require_once __DIR__.'/../includes/spp_student_tariff.php';
     if(!pspp_ready($koneksi)||!sct_ready($koneksi)||!du_advance_schema_ready($koneksi))throw new RuntimeException('Fresh install missing admission tariff or DU schema');

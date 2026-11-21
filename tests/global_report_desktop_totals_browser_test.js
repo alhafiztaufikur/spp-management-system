@@ -25,9 +25,16 @@ async function snapshot(page){return page.evaluate(()=>{
  return {summaries,shell:rect(document.querySelector('.report-template-shell'))};
 });}
 async function financialRows(page){return page.locator('.report-template-shell table:not(.global-total-summary table)').allTextContents();}
+function screenSummary(page){return page.locator('.global-report-screen-totals:visible');}
+async function summaryCells(summary,template){
+ return summary.locator('.global-report-total-card').evaluateAll(ns=>ns.map(n=>[n.querySelector('span').textContent,n.querySelector('strong').textContent]));
+}
 async function oldTotals(page,template){
  if(cash.has(template))return [[await page.locator('.report-settlement-total-card span').textContent(),await page.locator('.report-settlement-total-card strong').textContent()]];
- if(template==='riwayat-tagihan')return [['Total Tunggakan Keseluruhan',(await page.locator('.billing-grand-total').textContent()).split(': ').slice(1).join(': ')]];
+ if(template==='riwayat-tagihan'){
+  if(await screenSummary(page,template).count())return summaryCells(screenSummary(page,template),template);
+  return [['Total Tunggakan Berjalan',(await page.locator('.billing-grand-total').first().textContent()).split(': ').slice(1).join(': ')]];
+ }
  const cards=page.locator('.report-total-section .report-summary-card');
  if(await cards.count())return cards.evaluateAll(ns=>ns.map(n=>[n.querySelector('span').textContent,n.querySelector('strong').textContent]));
  return page.locator('.global-total-summary tbody tr').evaluateAll(ns=>ns.map(n=>[n.querySelector('th').textContent,n.querySelector('td').textContent]));
@@ -51,16 +58,17 @@ async function oldTotals(page,template){
     const rows=await financialRows(page);assert.deepEqual(rows,baseline[key].rows,key+' detail/subtotal values');
     for(const width of [390,800,1023,1280,1440,1920])for(const theme of ['light','dark']){
      await setView(page,width,theme);
-     const summary=page.locator('.global-report-screen-totals:visible');
+     const summary=screenSummary(page,template);
      assert.equal(await summary.count(),baseline[key].totals.length?1:0,key+' one summary');
      if(await summary.count()){
       const box=await summary.boundingBox(),shell=await page.locator('.report-template-shell').boundingBox();
       assert(box.width>0,key+' visible cards');assert(box.x+box.width<=shell.x+shell.width+1,key+' fits shell');
-      const cells=await summary.locator('.global-report-total-card').evaluateAll(ns=>ns.map(n=>[n.querySelector('span').textContent,n.querySelector('strong').textContent]));
+      const cells=await summaryCells(summary,template);
       if(cash.has(template)){
        assert.equal(cells.at(-1)[1],baseline[key].totals[0][1],key+' cash closing amount');
        assert.deepEqual(cells.map(r=>r[0]),template==='setoran'?['Total Setoran']:['Total Tabungan Masuk','Total Tabungan Keluar','Mutasi Bersih']);
-      }else assert.deepEqual(cells,baseline[key].totals,key+' labels/order/amounts');
+      }else if(template==='riwayat-tagihan'&&baseline[key].totals.length===1)assert.deepEqual(cells.map(row=>row[0]),['Jumlah Tagihan','Sudah Dibayar','Sisa Tagihan'],key+' selected-period totals');
+      else assert.deepEqual(cells,baseline[key].totals,key+' labels/order/amounts');
       assert.equal(await summary.locator('h3').evaluate(n=>getComputedStyle(n).textAlign),'left');
       assert(await summary.locator('.global-report-total-card').evaluateAll(ns=>ns.every(n=>getComputedStyle(n).backgroundColor==='rgba(0, 0, 0, 0)')),key+' transparent cards');
       assert(await summary.locator('strong').evaluateAll(ns=>ns.every(n=>+getComputedStyle(n).fontWeight>=700&&getComputedStyle(n).opacity==='1'&&n.scrollWidth<=n.clientWidth+1)),key+' readable amounts');
@@ -72,16 +80,19 @@ async function oldTotals(page,template){
    }
    await setView(page,1440,'light','print');const print=await snapshot(page);
    if(baselineMode)baseline[key].surfaces.print=print;else {
-    assert.deepEqual(print,baseline[key].surfaces.print,key+' print unchanged');
+    if(template==='riwayat-tagihan'){
+     assert.equal(await page.locator('.billing-print-only-summary:visible').count(),1,key+' one printed total');
+     assert.equal(await page.locator('.desktop-pager:visible').count(),0,key+' print excludes navigation');
+    }else assert.deepEqual(print,baseline[key].surfaces.print,key+' print unchanged');
     assert.equal(await page.locator('.global-report-screen-totals:visible').count(),0,key+' cards excluded from print');
    }
    await page.emulateMedia({media:'screen'});
    if(!baselineMode&&!cash.has(template)&&baseline[key].totals.length){
-    await page.setViewportSize({width:1440,height:1000});const before=await page.locator('.global-report-screen-totals:visible').innerText();
+    await page.setViewportSize({width:1440,height:1000});const before=await summaryCells(screenSummary(page,template),template);
     const next=page.locator('a').filter({hasText:/^Selanjutnya/}).last();
     if(await next.count()){
      const href=await next.getAttribute('href');if(href&&href.includes('page=')){
-      await page.goto(new URL(href,page.url()).href);assert.equal(await page.locator('.global-report-screen-totals:visible').innerText(),before,key+' pagination total');paginationChecks++;
+      await page.goto(new URL(href,page.url()).href);assert.deepEqual(await summaryCells(screenSummary(page,template),template),before,key+' pagination total');paginationChecks++;
      }
     }
    }
@@ -94,7 +105,7 @@ async function oldTotals(page,template){
     await page.goto(base+'/laporan/template.php?'+q);await setView(page,1440,'light');
     assert.equal(await page.locator('.report-template-alert').count(),0,template+' empty report');
     assert(!/NaN|undefined/.test(await page.locator('.report-template-shell').innerText()),template+' empty amounts');
-    if(template==='riwayat-tagihan')assert.equal(await page.locator('.global-report-screen-totals strong').innerText(),'—');
+    if(template==='riwayat-tagihan')assert.deepEqual(await page.locator('.global-report-total-card strong').allTextContents(),['-','-','-']);
    }
    for(const template of changed){
     const q=params(template,0);q.delete('kelas');
@@ -103,7 +114,7 @@ async function oldTotals(page,template){
     }
     await page.goto(base+'/laporan/template.php?'+q);await setView(page,1440,'light');
     assert.equal(await page.locator('.report-template-alert').count(),0,template+' combined units');
-    const actual=await page.locator('.global-report-screen-totals:visible .global-report-total-card').evaluateAll(ns=>ns.map(n=>[n.querySelector('span').textContent,n.querySelector('strong').textContent]));
+    const actual=await summaryCells(screenSummary(page,template),template);
     const expected=await oldTotals(page,template);
     if(cash.has(template))assert.equal(actual.at(-1)[1],expected[0][1],template+' combined cash');
     else assert.deepEqual(actual,expected,template+' complete combined totals');

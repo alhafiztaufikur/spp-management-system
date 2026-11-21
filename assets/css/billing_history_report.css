@@ -13,6 +13,7 @@
 .billing-rombel tfoot{font-weight:700}
 .billing-grand-total{padding:12px 0;margin:12px 0;border-top:2px solid #a9bdb2;font-size:14px}
 .billing-empty{margin:0;padding:24px;font-size:14px;line-height:1.5}
+.billing-print-only-summary{display:none}
 .billing-rombel table .billing-print-context{text-align:left!important;text-transform:none!important;background:#fff!important;color:#17231d!important;border:0;font-size:11pt;font-weight:700;padding:8pt 0}
 .billing-rombel table thead .billing-context-row,
 #global-report-workspace .billing-rombel table.report-billing-matrix-table thead .billing-context-row>.billing-print-context{background:#fff!important;color:#17231d!important;border:0!important;box-shadow:none!important}
@@ -20,8 +21,6 @@
 .billing-history-document .kop p{font-size:14px!important}
 @media screen and (min-width:1024px){
  body[data-report-template="riwayat-tagihan"] .billing-rombel>h3{padding:0 24px 4px}
- body[data-report-template="riwayat-tagihan"] .billing-grand-total{padding:16px 24px;margin:12px 0}
- body[data-report-template="riwayat-tagihan"] .report-template-shell>.desktop-pager{padding:0 24px 20px;margin:12px 0 0}
  html body[data-report-template="riwayat-tagihan"] .report-template-shell .report-global-filter-form>.report-inline-search-row{display:grid;grid-template-columns:minmax(0,1fr) minmax(0,2fr);grid-column:1/-1!important;gap:12px;align-items:end}
  .billing-rombel table{min-width:1180px}
  .billing-rombel table tbody td{vertical-align:middle}
@@ -64,6 +63,7 @@
  .billing-rombel table thead{display:table-header-group;page-break-after:avoid}
  .billing-rombel tfoot{display:table-row-group}
  .billing-grand-total{font-size:10pt}
+ .billing-print-only-summary{display:block}
  .billing-empty{font-size:10pt;padding:12pt 0}
  .billing-history-document .kop p{font-size:10pt!important}
 }

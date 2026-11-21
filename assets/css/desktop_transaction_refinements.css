@@ -1,4 +1,17 @@
 /* Scoped presentation refinements; no transaction or report filtering rules. */
+@media screen and (min-width:1024px){
+  .report-billing-period{border:0;padding:0;margin:0;min-width:0}
+  .report-billing-period legend{padding:0;margin-bottom:8px}
+  .report-billing-months{display:grid;grid-template-columns:repeat(2,minmax(0,1fr));gap:8px}
+  .report-billing-months label{display:grid;gap:4px;min-width:0}
+  .report-billing-months label>span{font-size:12px;color:var(--text-muted)}
+  .report-billing-months .field-input{width:100%;min-width:0}
+  #global-report-workspace .recap-report-copy .report-period-caption{line-height:1.55;margin:4px 0 16px}
+  #global-report-workspace[data-report-template="penerimaan"] .matrix-kelas{box-shadow:none}
+  #global-report-workspace[data-report-template="penerimaan"] .matrix-tanggal{text-align:center;font-variant-numeric:tabular-nums;box-shadow:3px 0 4px #0000000d}
+  #global-report-workspace[data-report-template="penerimaan"] td.matrix-tanggal{white-space:nowrap}
+  #global-report-workspace[data-report-template="penerimaan"] td.matrix-tanggal .report-time{display:block;font-size:11px;color:var(--text-muted);margin-top:2px}
+}
 /* Keep long class histories inside their column in every desktop unit view. */
 @media screen and (min-width:1024px){
   #global-report-workspace[data-report-template="riwayat-tagihan"] .report-billing-matrix-table col:nth-child(4){width:160px!important}

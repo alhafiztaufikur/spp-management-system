@@ -1,15 +1,18 @@
-# Kepala Sekolah pada surat orang tua
+# Penanda tangan surat orang tua
 
 Nama tersimpan per unit dan berlaku untuk seluruh pengguna. Pilihan, tambah,
-edit, serta hapus tersedia pada panel Kepala Sekolah di daftar surat. Nama baru
+edit, serta hapus tersedia pada panel Kepala Sekolah dan Super Admin di daftar surat. Nama baru
 langsung terpilih. Penghapusan nama aktif wajib disertai pengganti; tambahkan
 pengganti terlebih dahulu bila hanya ada satu nama. Penghapusan bersifat logis.
 Semua Unit menampilkan ringkasan baca saja, menggunakan kepala sekolah masing-masing
-siswa ketika membuat draf gabungan.
+siswa ketika membuat draf gabungan. Super Admin mengelola nama penanda tangan
+Bagian Keuangan. **Ervina Safitri, A.Md.** merupakan pilihan awal untuk SD, SMP,
+dan SMA pada instalasi baru. Pengelola dapat mengganti pilihan dari panel.
 
-Nama sekolah dan kepala sekolah disalin ke draf saat draf dibuat. Perubahan daftar
-tidak mengubah draf yang sudah terbuka. Pratinjau, PDF, dan PNG memakai draf yang
-sama. Draf lama tanpa snapshot mempertahankan kop dan garis tanda tangan lama.
+Nama sekolah dan kedua penanda tangan disalin ke draf saat dibuat. Pratinjau, PDF,
+dan PNG memakai draf yang sama, termasuk pesan manual per siswa. Surat baru
+memakai redaksi pemberitahuan dan jabatan kepala sekolah sesuai unit. Draf
+yang sudah dibuat tetap memakai versi template yang tersimpan.
 
 ## Pemasangan
 
@@ -25,12 +28,13 @@ php scripts/migrate_parent_letter_principals.php --database=db_spp --port=3306 -
 php scripts/migrate_parent_letter_principals.php --database=db_spp --port=3306 --mode=apply
 ```
 
-Default adalah preview. Replay harus menghasilkan `schema_changes: 0`,
+Default adalah preview. Untuk Kepala Sekolah dan Super Admin, replay harus menghasilkan `schema_changes: 0`,
 `seeded_units: []`, dan `ready: true`. Seed hanya menginisialisasi unit yang belum
 memiliki pengaturan; tidak mengembalikan nama default yang sudah diedit/dihapus.
 Alur instalasi baru melalui `sql/migrate_units.php` memasang skema yang sama.
 GET halaman/API hanya membaca. Bila skema belum tersedia, daftar siswa tetap
-terlihat, tetapi pembuatan surat baru ditahan sampai pemasangan selesai.
+terlihat. Pembuatan surat baru membutuhkan pengaturan Kepala Sekolah. Jika
+pengaturan Super Admin belum tersedia, surat memakai label **Bagian Keuangan**.
 
 ## Verifikasi
 

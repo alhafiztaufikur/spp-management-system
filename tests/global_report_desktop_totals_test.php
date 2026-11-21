@@ -34,7 +34,7 @@ foreach(global_report_templates() as $template){
 }
 $cash=['total_masuk'=>125.25,'total_keluar'=>150.5,'mutasi_bersih'=>-25.25];
 desktop_total_check(array_column(report_money_totals($cash,'kas-tabungan'),'value')===[125.25,150.5,-25.25],'Cash totals use their existing model');
-desktop_total_check(billing_history_grand_amount(['known'=>0,'unknown'=>true])==='—','Unknown history grand total remains absent');
+desktop_total_check(billing_history_grand_amount(['known'=>0,'unknown'=>true])==='-','Unknown history grand total displays a dash');
 desktop_total_check(billing_history_grand_amount(['known'=>1,'unknown'=>true,'value'=>0])==='Rp 0','Known zero history total stays zero');
 if($out=getenv('SPP_UI_OUTPUT')){
     if(!is_dir($out.'/desktop-totals'))mkdir($out.'/desktop-totals',0700,true);

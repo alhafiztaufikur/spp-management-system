@@ -24,6 +24,49 @@ function mh_savings_read_query(mysqli $db,array $input,array $classFilter,array 
     return ['sql'=>"SELECT t.* FROM $source t $where",'args'=>$args];
 }
 
+function mh_savings_archived_rows(mysqli $db,array $input,array $classFilter,array $operators,string $start,string $end): array {
+    $allPeriods=($input['all_periods']??'')==='1';
+    $student=max(0,(int)($input['student_id']??0));$owner=max(0,(int)($input['owner_id']??0));
+    $q=is_string($input['nis']??null)?trim($input['nis']):'';
+    $rows=[];
+    if(!$owner){
+        $nis="JSON_UNQUOTE(JSON_EXTRACT(a.before_snapshot,'$.transaction.NO_INDUK'))";
+        $date="JSON_UNQUOTE(JSON_EXTRACT(a.before_snapshot,'$.transaction.TANGGAL'))";
+        $name="JSON_UNQUOTE(JSON_EXTRACT(a.before_snapshot,'$.transaction.NAMA'))";
+        $operator=savings_operator_owner_sql('a.unit_id','a.jenis','a.transaction_id',"JSON_UNQUOTE(JSON_EXTRACT(a.before_snapshot,'$.transaction.user_id'))");
+        $where='';$args=[];
+        if(!$allPeriods){$where.=" AND $date>=? AND $date<?";$args=[$start,$end];}
+        if($q!==''){
+            $where.=" AND ($nis=? OR JSON_UNQUOTE(JSON_EXTRACT(a.before_snapshot,'$.transaction.NO_induk_diknas'))=? OR $name LIKE ?)";
+            array_push($args,$q,$q,'%'.$q.'%');
+        }
+        if($student){$where.=" AND EXISTS(SELECT 1 FROM siswa s WHERE s.id=? AND s.unit_id=a.unit_id AND s.NO_INDUK=$nis)";$args[]=$student;}
+        $where.=savings_operator_where($operators,$operator).history_class_archive_where($classFilter,'a.unit_id',$nis);
+        foreach(lf_rows($db,"SELECT a.before_snapshot,a.occurred_at FROM tabungan_aktivitas a WHERE a.action='deleted'$where",$args) as $archive){
+            $row=json_decode($archive['before_snapshot'],true)['transaction']??null;
+            if($row)$rows[]=$row+['nominal'=>$row['MASUK'],'keluar'=>$row['KELUAR'],'deleted'=>true,'archived_at'=>$archive['occurred_at']];
+        }
+    }
+    if(!$student&&lop_ready($db)){
+        $source=mh_savings_account_source(true,true);
+        $where=' WHERE tx.student_id IS NULL';$args=[];
+        if(!$allPeriods){$where.=' AND tx.TANGGAL>=? AND tx.TANGGAL<?';$args=[$start,$end];}
+        if($q!==''){$where.=' AND (tx.NO_INDUK=? OR tx.NAMA LIKE ?)';array_push($args,$q,'%'.$q.'%');}
+        if($owner){$where.=' AND tx.legacy_owner_id=?';$args[]=$owner;}
+        $where.=filter_sql_values($classFilter['values'],'tx.current_class_id').savings_operator_where($operators,'tx.operator_key');
+        $sql="SELECT tx.*,1 deleted,mk.jenis rombel_jenis,mk.nama_custom rombel_nama,mk.tingkat,mk.kode_rombel,mk.is_placeholder,
+                (SELECT MAX(a.created_at) FROM legacy_op_audit a WHERE a.unit_id=tx.unit_id AND a.entity_type='journal'
+                 AND a.entity_id=-1000000000-tx.id AND JSON_EXTRACT(a.after_data,'$.cancelled')=1) archived_at
+            FROM ($source) tx LEFT JOIN master_kelas mk ON mk.id=tx.current_class_id AND mk.unit_id=tx.unit_id $where";
+        foreach(lf_rows($db,$sql,$args) as $row){
+            $row['kelas_label']=class_label($row);
+            $rows[]=$row;
+        }
+    }
+    usort($rows,static fn($a,$b)=>[$b['archived_at'],(int)$b['id'],$b['jenis']]<=>[$a['archived_at'],(int)$a['id'],$a['jenis']]);
+    return $rows;
+}
+
 function mh_account_source(mysqli $db,bool $activity=true): string {
     $journal=mh_savings_source($db);$students=mh_students_source($db);
     $student="SELECT s.id student_id,0 legacy_owner_id,'' batch_id,s.unit_id,s.NO_INDUK,s.NO_induk_diknas,s.NAMA,s.KELAS,s.master_kelas_id,COALESCE(t.SALDO,0) SALDO,'student' owner_type FROM $students s LEFT JOIN tabungan t ON t.NO_INDUK=s.NO_INDUK AND t.unit_id=s.unit_id WHERE s.legacy_pending=0";

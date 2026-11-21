@@ -83,13 +83,16 @@
     const dialog=form.closest('dialog');if(!dialog?.open)return;
     const review=dialog.querySelector('.sw-review-stage');review.innerHTML='<header class="sw-confirm-heading"><span data-sw-icon aria-hidden="true"></span><div><small>TRANSAKSI TABUNGAN</small><h3 id="sw-confirm-title"></h3></div></header><div class="sw-confirm-body"><div class="sw-confirm-identity"><strong data-sw-student></strong><small data-sw-reference></small></div><p id="sw-confirm-copy"></p><dl class="sw-confirm-summary" data-sw-summary></dl><div class="sw-confirm-reason"><small>Alasan</small><p data-sw-reason></p></div><footer class="sw-confirm-actions"><button class="btn btn-ghost" type="button" data-sw-back>Kembali</button><button class="btn btn-ghost" type="button" data-sw-cancel>Batal</button><button class="btn btn-primary" type="button" data-sw-accept>Simpan Koreksi</button></footer></div>';
     const accept=review.querySelector('[data-sw-accept]');
-    const action=form.elements.action.value,deletion=action.endsWith('hapus'),proposal=action.startsWith('request_');
+    const deletion=form.elements.action.value==='direct_hapus';
     dialog.dataset.danger=String(deletion);
-    review.querySelector('#sw-confirm-title').textContent=proposal?(deletion?'Ajukan penghapusan transaksi?':'Ajukan koreksi transaksi?'):(deletion?'Hapus transaksi ini?':'Simpan koreksi transaksi?');
+    review.querySelector('#sw-confirm-title').textContent=deletion?'Hapus transaksi ini?':'Simpan koreksi transaksi?';
     review.querySelector('[data-sw-student]').textContent=form.dataset.student;
     review.querySelector('[data-sw-reference]').textContent=form.dataset.reference;
-    review.querySelector('#sw-confirm-copy').textContent=proposal?'Pengajuan akan diperiksa Super Admin. Transaksi dan saldo berubah setelah pengajuan disetujui.':deletion?'Transaksi akan dikeluarkan dari saldo aktif. Riwayat dan alasan penghapusan tetap tersimpan. Saldo akan diperiksa ulang.':'Perubahan akan disimpan dan saldo diperiksa ulang. Pembuat awal dan riwayat aktivitas tetap tercatat.';
-    review.querySelector('[data-sw-reason]').textContent=form.elements.reason.value.trim();
+    review.querySelector('#sw-confirm-copy').textContent=deletion?'Saldo diperiksa ulang sebelum transaksi dihapus. Penghapusan tercatat di riwayat aktivitas.':'Perubahan akan disimpan dan saldo diperiksa ulang. Pembuat awal dan riwayat aktivitas tetap tercatat.';
+    const reason=form.elements.reason.value.trim();
+    const reasonText=review.querySelector('[data-sw-reason]');
+    reasonText.textContent=reason;
+    reasonText.parentElement.hidden=reason==='';
     const summary=review.querySelector('[data-sw-summary]');summary.replaceChildren();
     const line=(label,before,after)=>{
       const row=document.createElement('div'),dt=document.createElement('dt'),dd=document.createElement('dd');
@@ -101,11 +104,10 @@
       let date=form.elements.tanggal.value.replace('T',' ');if(date.length===16)date+=':00';
       const dateLabel=value=>window.sppDateLabel?window.sppDateLabel(value,true):value+' WIB';
       line('Tanggal / waktu WIB',dateLabel(form.dataset.originalDate),dateLabel(date));
-      line('Keterangan',form.dataset.originalNote||'—',form.elements.keterangan.value.trim()||'—');
     }
     review.querySelector('[data-sw-icon]').innerHTML='<svg viewBox="0 0 24 24" width="26" height="26" fill="none" stroke="currentColor" stroke-width="1.8"><path d="'+(deletion?'M3 6h18M9 6V3h6v3M5 6l1 15h12l1-15M10 10v7M14 10v7':'m16 3 5 5-12 12H4v-5L16 3ZM14 5l5 5')+'"/></svg>';
     accept.className='btn '+(deletion?'btn-danger':'btn-primary');
-    accept.textContent=proposal?(deletion?'Ajukan Hapus':'Ajukan Koreksi'):(deletion?'Hapus Transaksi':'Simpan Koreksi');
+    accept.textContent=deletion?'Hapus Transaksi':'Simpan Koreksi';
 
     dialog.querySelector('.sw-editor-stage').hidden=true;review.hidden=false;
     review.querySelector('[data-sw-cancel]').addEventListener('click',()=>dialog.close());

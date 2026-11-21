@@ -23,7 +23,11 @@ function global_report_print_text($value,array $column,array $row=[],bool $curre
     if($key==='nis'&&!empty($row['nis_diknas']))return (string)$value."\nDiknas ".$row['nis_diknas'];
     return (string)$value;
 }
-function global_report_print_cell($value,array $column,array $row=[],bool $currency=true):string {
+function global_report_print_cell($value,array $column,array $row=[],bool $currency=true,bool $receiptTime=false):string {
+    if($receiptTime&&$value!==null){
+        $parts=spp_date_parts($value,$row['time_precision']??null);
+        return report_e($parts['date']).'<span class="global-clean-transaction-time">'.report_e($parts['time']).'</span>';
+    }
     if(is_array($value)&&($value['sub']??'')!=='')return (($value['text']??'')!==''?report_e((string)$value['text']).'<br>':'').'<span class="global-clean-subvalue">'.report_e($currency?(string)$value['sub']:preg_replace('/^Rp /','',(string)$value['sub'])).'</span>';
     if($value==='Tercakup PSB')return '<span class="report-header-nowrap">Tercakup PSB</span>';
     return nl2br(report_e(global_report_print_text($value,$column,$row,$currency)));
@@ -35,6 +39,8 @@ function global_report_print_layout(array $matrix,?string $orientation=null):arr
     foreach($matrix['columns'] as $column){
         $key=$column['source']??$column[0];$type=$column[2]??'text';$money=in_array($type,['money','money_optional'],true);
         $width=match($key){'no'=>24,'unit'=>34,'nis'=>72,'nis_diknas'=>82,'nama'=>116,'kelas'=>36,'tanggal'=>90,'jenis'=>42,'operator'=>76,'keterangan'=>76,default=>$money?($currency?54:44):(in_array($type,['html','status'],true)?54:70)};
+        // Excel fits the complete numeric format before wrapping the date and clock.
+        if(!empty($matrix['stacked_receipt_time'])&&$key==='tanggal'&&$type==='datetime')$width=136;
         $header=global_report_short_months($column[1]);
         foreach(global_report_nowrap_header($header)?[$header]:preg_split('/\s+/u',$header) as $word)$width=max($width,$metrics->getTextWidth($word,$bold,9)+8);
         foreach($matrix['rows'] as $row){
@@ -56,8 +62,22 @@ function global_report_print_layout(array $matrix,?string $orientation=null):arr
     $scale=min(1,($available-2)/max(1,$natural));
     return ['widths'=>$widths,'orientation'=>$orientation,'font_pt'=>round(9*$scale,3),'padding_y'=>round(3*$scale,3),'padding_x'=>round(3*$scale,3),'natural_width'=>$natural];
 }
+function global_report_receipt_print_bands(array $matrix,string $orientation): array {
+    if(($matrix['_clean_layout']['natural_width']??0)<=($orientation==='landscape'?785:538))return [$matrix];
+    $identity=array_slice($matrix['columns'],0,$matrix['identity_count']);
+    $bands=[];
+    foreach(global_report_matrix_bands($matrix,$orientation) as $groups){
+        $band=$matrix;
+        $band['groups']=$groups;
+        $band['columns']=array_merge($identity,...array_column($groups,'columns'));
+        $band['_clean_layout']=global_report_print_layout($band,$orientation);
+        $bands[]=$band;
+    }
+    return $bands?:[$matrix];
+}
 function global_report_clean_table(array $matrix,?array $visible=null,int $start=0,bool $subtotal=true):string {
     $layout=$matrix['_clean_layout']??global_report_print_layout($matrix);$rows=$visible??$matrix['rows'];$identity=array_slice($matrix['columns'],0,$matrix['identity_count']);$groups=$matrix['groups'];$currency=$matrix['currency_prefix']??true;
+    $receipt=($matrix['report_template']??'')==='penerimaan';
     if(!empty($matrix['flat_header'])){$groups=[];foreach(array_slice($matrix['columns'],$matrix['identity_count']) as $c)$groups[]=['label'=>$c[1],'subtitle'=>'','columns'=>[$c]];}
     $single=true;foreach($groups as $g)if(count($g['columns'])!==1||($g['subtitle']??'')!==''||$g['label']!==$g['columns'][0][1])$single=false;
     $style='font-size:'.$layout['font_pt'].'pt';$pad='padding:'.$layout['padding_y'].'pt '.$layout['padding_x'].'pt';$totalWidth=array_sum($layout['widths']);
@@ -68,7 +88,7 @@ function global_report_clean_table(array $matrix,?array $visible=null,int $start
     <?php foreach($groups as $g): ?><th class="<?= global_report_nowrap_header($g['label'])?'report-header-nowrap':'' ?>" style="<?= $pad ?>;width:<?= $width($g['columns']) ?>%" colspan="<?= count($g['columns']) ?>"><?= report_e(global_report_short_months($g['label'])) ?><?= ($g['subtitle']??'')!==''?'<br>'.report_e(global_report_short_months($g['subtitle'])):'' ?></th><?php endforeach; ?></tr>
     <?php if(!$single): ?><tr><?php foreach($groups as $g)foreach($g['columns'] as $c): ?><th class="<?= global_report_nowrap_header($c[1])?'report-header-nowrap':'' ?>" style="<?= $pad ?>;width:<?= $width([$c]) ?>% "><?= report_e(global_report_short_months($c[1])) ?></th><?php endforeach; ?></tr><?php endif; ?></thead><tbody>
     <?php if(!$rows): ?><tr><td colspan="<?= count($matrix['columns']) ?>">Tidak ada data sesuai filter.</td></tr><?php endif; ?>
-    <?php foreach($rows as $i=>$row): ?><tr><?php foreach($matrix['columns'] as $c):$key=$c['source']??$c[0];$type=$c[2]??'text';$value=$c[0]==='no'?$start+$i+1:($row[$c[0]]??null);$r=!empty($matrix['separate_national_id'])?array_diff_key($row,['nis_diknas'=>true]):$row;$class=in_array($type,['money','money_optional'],true)?'numeric':(in_array($key,['no','nis','nis_diknas','kelas','unit'],true)?'identity':'text'); ?><td class="<?= $class ?>" data-column="<?= report_e($key) ?>" style="<?= $pad ?>"><?= global_report_print_cell($value,$c,$r,$currency) ?></td><?php endforeach; ?></tr><?php endforeach; ?></tbody>
+    <?php foreach($rows as $i=>$row): ?><tr><?php foreach($matrix['columns'] as $c):$key=$c['source']??$c[0];$type=$c[2]??'text';$value=$c[0]==='no'?$start+$i+1:($row[$c[0]]??null);$r=!empty($matrix['separate_national_id'])?array_diff_key($row,['nis_diknas'=>true]):$row;$receiptTime=$receipt&&$key==='tanggal'&&$type==='datetime';$class=in_array($type,['money','money_optional'],true)?'numeric':(($receiptTime||in_array($key,['no','nis','nis_diknas','kelas','unit'],true))?'identity':'text'); ?><td class="<?= $class ?>" data-column="<?= report_e($key) ?>" style="<?= $pad ?>"><?= global_report_print_cell($value,$c,$r,$currency,$receiptTime) ?></td><?php endforeach; ?></tr><?php endforeach; ?></tbody>
     <?php if($subtotal&&!empty($matrix['subtotals'])): ?><tfoot><tr><th colspan="<?= count($identity) ?>"><?= global_report_short_subtotal($matrix['report_template']??'',$matrix['presentation_surface']??'print')?'Subtotal':'Subtotal seluruh hasil filter' ?></th><?php foreach(array_slice($matrix['columns'],count($identity)) as $c):$t=$matrix['subtotals'][$c[0]]??null; ?><td class="numeric" style="<?= $pad ?>"><?= $t?report_e(global_report_print_money($t['value'],$currency)):'—' ?></td><?php endforeach; ?></tr></tfoot><?php endif; ?></table></div><?php return ob_get_clean();
 }
 function global_report_clean_styles(bool $pdf=false):string {
@@ -77,7 +97,7 @@ function global_report_clean_styles(bool $pdf=false):string {
 function global_report_clean_excel_document(array $doc,string $template):array {
     if(!global_report_clean_template($template))return $doc;
     $doc['global_clean']=true;$doc['report_template']=$template;$doc['hide_context']=global_report_hide_context($template);$doc['currency_prefix']=false;
-    if($doc['hide_context'])$doc['subtitle']='';
+    if($doc['hide_context']&&empty($doc['period_caption']))$doc['subtitle']='';
     foreach($doc['sheets'] as &$sheet)foreach($sheet['sections'] as &$section){
         if($template==='kas-tabungan')$section['title']=str_replace('Arus Tabungan','Tabungan',$section['title']);
         $section['compact_totals']=global_report_compact_totals($template);
@@ -99,9 +119,13 @@ function global_report_clean_excel_document(array $doc,string $template):array {
 }
 function global_report_clean_excel_finish($sheet,array $doc,array $definition,int $n):void {
     $letter=static fn($c)=>\PhpOffice\PhpSpreadsheet\Cell\Coordinate::stringFromColumnIndex($c);$last=$letter($n);$end=$sheet->getHighestDataRow();
-    $layout=null;foreach($definition['sections'] as $section)if(count($section['columns'])===$n){
+    $layout=null;$receiptTimeColumn=null;foreach($definition['sections'] as $section)if(count($section['columns'])===$n){
         $cols=[];foreach($section['columns'] as $c)$cols[]=[$c['key'],$c['label'],$c['type'],'source'=>$c['source']??$c['key']];
-        $layout=global_report_print_layout(['columns'=>$cols,'rows'=>$section['rows'],'subtotals'=>$section['column_totals']??[],'separate_national_id'=>true,'excel_dates'=>true,'currency_prefix'=>$doc['currency_prefix']??true]);break;
+        if(!empty($section['stacked_receipt_time'])){
+            $index=array_search('tanggal',array_column($cols,0),true);
+            if($index!==false)$receiptTimeColumn=$index+1;
+        }
+        $layout=global_report_print_layout(['columns'=>$cols,'rows'=>$section['rows'],'subtotals'=>$section['column_totals']??[],'separate_national_id'=>true,'excel_dates'=>true,'stacked_receipt_time'=>$receiptTimeColumn!==null,'currency_prefix'=>$doc['currency_prefix']??true]);break;
     }
     $orientation=$layout['orientation']??'portrait';$budget=$orientation==='landscape'?780:535;$pointWidths=[];
     if($layout){$scale=min(1,$budget/$layout['natural_width']);$tableFont=round(9*$scale,2);$pointWidths=array_values(array_map(static fn($w)=>$w*$scale,$layout['widths']));}
@@ -123,8 +147,9 @@ function global_report_clean_excel_finish($sheet,array $doc,array $definition,in
         $range='A'.$row.':'.$last.$row;$sheet->getStyle($range)->getFont()->setBold(true);$sheet->getStyle($range)->getBorders()->getTop()->setBorderStyle('thin')->getColor()->setRGB('000000');$sheet->getStyle($range)->getBorders()->getBottom()->setBorderStyle('thin')->getColor()->setRGB('000000');
     }
     foreach($definition['sections'] as $s)foreach($s['columns'] as $i=>$c)if(count($s['columns'])===$n){
-        $center=in_array($c['key'],['no','nis','nis_diknas','kelas','unit','export_unit','export_class','jenis'],true)||(($doc['report_template']??'')==='saldo-tabungan'&&$c['key']==='nama');$numeric=in_array($c['type'],['money','money_optional','number','count'],true);
-        foreach($headers as $h){$stop=$end;foreach($headers as $later)if($later>$h){$stop=$later-2;break;}if($stop>$h)$sheet->getStyle($letter($i+1).($h+1).':'.$letter($i+1).$stop)->getAlignment()->setHorizontal($center?'center':($numeric?'right':'left'))->setWrapText(!$numeric&&(!$center||$c['key']==='nama'));}
+        $stacked=$i+1===$receiptTimeColumn;
+        $center=$stacked||in_array($c['key'],['no','nis','nis_diknas','kelas','unit','export_unit','export_class','jenis'],true)||(($doc['report_template']??'')==='saldo-tabungan'&&$c['key']==='nama');$numeric=in_array($c['type'],['money','money_optional','number','count'],true);
+        foreach($headers as $h){$stop=$end;foreach($headers as $later)if($later>$h){$stop=$later-2;break;}if($stop>$h)$sheet->getStyle($letter($i+1).($h+1).':'.$letter($i+1).$stop)->getAlignment()->setHorizontal($center?'center':($numeric?'right':'left'))->setWrapText($stacked||(!$numeric&&(!$center||$c['key']==='nama')));}
     }
     $richColumns=[];foreach($definition['sections'] as $s)foreach($s['columns'] as $i=>$c)if($c['type']==='html')$richColumns[$i+1]=true;
     // Remove currency formatting from amounts, preserving literal names and notes.
@@ -135,10 +160,10 @@ function global_report_clean_excel_finish($sheet,array $doc,array $definition,in
             $text=$cell->getValue();$clean=preg_replace('/(^|\n)Rp (?=-?\d)/','$1',$text);
             if($clean!==$text)$cell->setValueExplicit($clean,\PhpOffice\PhpSpreadsheet\Cell\DataType::TYPE_STRING);
         }
-        if($cell->getDataType()==='n')$format=str_replace("\n",'" · "',$format);
+        if($cell->getDataType()==='n'&&$c!==$receiptTimeColumn)$format=str_replace("\n",'" · "',$format);
         $style->getNumberFormat()->setFormatCode($format);
         // Native Excel otherwise replaces tight numeric/date formats with ####.
-        if($cell->getDataType()==='n')$style->getAlignment()->setShrinkToFit(true)->setWrapText(false);
+        if($cell->getDataType()==='n'&&$c!==$receiptTimeColumn)$style->getAlignment()->setShrinkToFit(true)->setWrapText(false);
         if($cell->getValue()==='Tercakup PSB')$style->getAlignment()->setShrinkToFit(true)->setWrapText(false);
     }
     // Reflow rows at the final physical widths, including wrapped names and notes.
@@ -175,7 +200,7 @@ function global_report_clean_excel_finish($sheet,array $doc,array $definition,in
         }
         $sheet->getStyle($start.$r.':'.$last.$r)->getBorders()->getTop()->setBorderStyle('thin');
     }
-    if(!empty($doc['hide_context'])){$sheet->setCellValue('A6',null);$sheet->getRowDimension(6)->setRowHeight(0);}
+    if(!empty($doc['hide_context'])&&empty($doc['period_caption'])){$sheet->setCellValue('A6',null);$sheet->getRowDimension(6)->setRowHeight(0);}
     if(in_array($doc['report_template']??'',['tabungan-siswa','penerimaan'],true)){$sheet->getStyle('A3')->getFont()->setSize(10);$sheet->getRowDimension(3)->setRowHeight(24);}
     if(global_report_large_address($doc['report_template']??'')){$sheet->getStyle('A3')->getFont()->setSize(11);$sheet->getRowDimension(3)->setRowHeight(26);}
     $setup=$sheet->getPageSetup();$setup->setPaperSize(\PhpOffice\PhpSpreadsheet\Worksheet\PageSetup::PAPERSIZE_A4)->setOrientation($orientation)->setFitToPage(true)->setFitToWidth(1)->setFitToHeight(0)->setColumnsToRepeatAtLeft(['','']);
@@ -202,7 +227,7 @@ function global_report_clean_excel_finish($sheet,array $doc,array $definition,in
 }
 function global_report_clean_excel_preview(array $doc):string {
     $logo=__DIR__.'/../assets/img/school-logo.png';$image=is_file($logo)?'data:image/png;base64,'.base64_encode((string)file_get_contents($logo)):'';
-    ob_start(); ?><!doctype html><html lang="id"><meta charset="utf-8"><style>body{padding:24px;margin:0;font:14px "Segoe UI",Arial,sans-serif}.kop{width:100%;border-bottom:1pt solid #000;margin-bottom:16px}.kop img{width:58px}.kop h1{text-align:center;font-size:20px}.kop p{text-align:center}.title{text-align:center}.meta{font-size:13px}.excel-section{margin:20px 0}h3{font-size:16px}.excel-total{margin:10px 0}.excel-total span{margin-right:16px}.sign{display:flex;justify-content:space-around;text-align:center;padding-top:24px}.sign p{margin-top:48px}<?= global_report_clean_styles(false) ?></style><body id="global-report-workspace" class="global-clean-report<?= in_array($doc['report_template']??'',['tabungan-siswa','penerimaan'],true)?' global-clean-address':'' ?><?= global_report_large_address($doc['report_template']??'')?' global-clean-large-address':'' ?>"><table class="kop"><tr><td style="width:70px"><img src="<?= $image ?>" alt="Logo sekolah"></td><td><h1><?= report_e($doc['school']) ?></h1><p>Perum Bekasi Griya Asri II, Tambun Selatan | Telp. 021-88363466</p></td></tr></table><div class="title"><h2><?= report_e($doc['title']) ?></h2><?php if(empty($doc['hide_context'])): ?><p>Unit: <?= report_e($doc['unit_label']) ?> | <?= report_e($doc['subtitle']) ?></p><?php endif; ?></div><p class="meta">Dibuat: <?= report_e($doc['generated']) ?> | Petugas: <?= report_e($doc['operator']) ?></p>
+    ob_start(); ?><!doctype html><html lang="id"><meta charset="utf-8"><style>body{padding:24px;margin:0;font:14px "Segoe UI",Arial,sans-serif}.kop{width:100%;border-bottom:1pt solid #000;margin-bottom:16px}.kop img{width:58px}.kop h1{text-align:center;font-size:20px}.kop p{text-align:center}.title{text-align:center}.meta{font-size:13px}.excel-section{margin:20px 0}h3{font-size:16px}.excel-total{margin:10px 0}.excel-total span{margin-right:16px}.sign{display:flex;justify-content:space-around;text-align:center;padding-top:24px}.sign p{margin-top:48px}<?= global_report_clean_styles(false) ?></style><body id="global-report-workspace" class="global-clean-report<?= in_array($doc['report_template']??'',['tabungan-siswa','penerimaan'],true)?' global-clean-address':'' ?><?= global_report_large_address($doc['report_template']??'')?' global-clean-large-address':'' ?>"><table class="kop"><tr><td style="width:70px"><img src="<?= $image ?>" alt="Logo sekolah"></td><td><h1><?= report_e($doc['school']) ?></h1><p>Perum Bekasi Griya Asri II, Tambun Selatan | Telp. 021-88363466</p></td></tr></table><div class="title"><h2><?= report_e($doc['title']) ?></h2><?php if(!empty($doc['period_caption'])): ?><p><?= report_e($doc['period_caption']) ?></p><?php elseif(empty($doc['hide_context'])): ?><p>Unit: <?= report_e($doc['unit_label']) ?> | <?= report_e($doc['subtitle']) ?></p><?php endif; ?></div><p class="meta">Dibuat: <?= report_e($doc['generated']) ?> | Petugas: <?= report_e($doc['operator']) ?></p>
     <?php foreach($doc['sheets'] as $sheet):foreach($sheet['sections'] as $s):
         $columns=[];foreach($s['columns'] as $c)$columns[]=[$c['key'],$c['label'],$c['type']];$id=$s['identity_count']??1;$by=array_column($columns,null,0);$groups=[];
         foreach($s['header_groups']??[] as $g)$groups[]=['label'=>$g['label'],'subtitle'=>'','columns'=>array_map(static fn($key)=>$by[$key],$g['keys'])];

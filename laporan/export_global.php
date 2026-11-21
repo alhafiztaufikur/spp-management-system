@@ -5,6 +5,7 @@ require_once '../koneksi.php'; require_once '../includes/auth.php'; require_once
 requireRole(['admin','bendahara','kasir']);
 require_once __DIR__.'/../includes/global_report_ui.php';
 require_once __DIR__.'/../includes/global_report_print.php';
+require_once __DIR__.'/../includes/global_report_matrix.php';
 $globalScope=in_array($_GET['template']??'',global_report_templates(),true);
 $unitChoice=global_report_validate_choice($_GET['unit']??'');
 $reportUnitId=$globalScope?global_report_scope($koneksi,$_GET):unit_report_scope($koneksi,$unitChoice);
@@ -22,7 +23,8 @@ if($globalScope)$koneksi->begin_transaction(MYSQLI_TRANS_START_READ_ONLY|MYSQLI_
 $filters=report_filters($koneksi,$_GET);report_perf_mark('filter');if($template==='riwayat-tagihan'&&!isset($_GET['siswa_status']))$filters['siswa_status']='all';if(!isset($_GET['kategori'])&&$template==='penerimaan')$filters['kategori']='semua';if($template==='tunggakan-siswa'){$filters['q']='';if(($_GET['mode']??'')==='all'){$filters['kelas']='';unset($filters['_multi']['kelas']);}}
 require_once __DIR__.'/../includes/report_history_page.php';$historyPage=$template==='riwayat-tagihan'?report_history_page_data($koneksi,$filters,true):null;$report=$historyPage['report']??report_build($koneksi,$template,$filters);if($template==='riwayat-tagihan')$report['_billing_view']=billing_history_view($koneksi,$report,$filters);if(!empty($report['notes']))$report['subtitle'].=' · '.implode(' · ',$report['notes']);if($globalScope)$koneksi->commit();report_perf_mark('query_model');
 if($globalScope)$report=global_report_present($report,$template,$format==='excel'?'excel':'print');
-require_once __DIR__.'/../includes/global_report_matrix.php';$matrix=$globalScope?global_report_matrix($report,$template,$reportUnitId):null;$generated=spp_date_label(new DateTimeImmutable('now'),true);$operator=(string)($_SESSION['admin_nama']??$_SESSION['admin_username']??'Pengguna');
+$periodCaption=$globalScope?global_report_period_caption($koneksi,$filters,$template):'';
+$matrix=$globalScope?global_report_matrix($report,$template,$reportUnitId):null;$generated=spp_date_label(new DateTimeImmutable('now'),true);$operator=(string)($_SESSION['admin_nama']??$_SESSION['admin_username']??'Pengguna');
 if($template==='tunggakan-siswa'&&$format==='excel'&&($_GET['view']??'')==='detail'){
     $classId=report_class_filter_rombel_id($filters);
     $selectedClass=null;
@@ -40,7 +42,8 @@ if($template==='tunggakan-siswa'&&$format==='excel'&&($_GET['view']??'')==='deta
 if($format==='excel'){
     require_once __DIR__.'/../includes/excel.php';$doc=$matrix?global_report_matrix_excel($matrix,$report,$template,$reportUnitId):spp_excel_report_document($report,$template,$reportUnitId);
     if($globalScope)$doc['presentation']='global';
-    $filterText=$globalScope?global_report_filter_text($koneksi,$filters,$template,$report['notes']??[]):spp_excel_filter_text($koneksi,$filters,$template);if($template==='riwayat-tagihan')$filterText='Tahun Ajaran: '.billing_history_year_label($filters['_billing_years']);if($filterText!=='')$doc['subtitle']=$globalScope?$filterText:$doc['subtitle'].' | '.$filterText;
+    if($globalScope){$doc['period_caption']=$periodCaption;$doc['subtitle']=$periodCaption;}
+    else{$filterText=spp_excel_filter_text($koneksi,$filters,$template);if($filterText!=='')$doc['subtitle'].=' | '.$filterText;}
     if($globalScope)$doc=global_report_clean_excel_document($doc,$template);
     $query=$_GET;$query['download']='1';$back=$_GET;unset($back['format'],$back['download']);
     spp_excel_respond($doc,$excelDownload,$template.'-'.date('Ymd-His'),'export_global.php?'.filter_build_query($query),'template.php?'.filter_build_query($back),$matrix?count($matrix['rows']):($template==='riwayat-tagihan'?count(report_history_groups($report)):count($report['rows'])));
@@ -96,9 +99,8 @@ if($isCashRecap)$printOrientation='portrait';
 if($template==='riwayat-tagihan')$printOrientation='landscape';
 if($cleanOutput&&$printMatrix)$printOrientation=$printMatrix['_clean_layout']['orientation'];
 require_once __DIR__.'/../includes/excel.php';
-$appliedFilterText=global_report_filter_text($koneksi,$filters,$template,$report['notes']??[]);
-$documentSubtitle=$template==='riwayat-tagihan'?'':($appliedFilterText?:$report['subtitle']);
-if($hideOutputContext)$documentSubtitle='';
+$appliedFilterText=$globalScope?'':global_report_filter_text($koneksi,$filters,$template,$report['notes']??[]);
+$documentSubtitle=$globalScope?$periodCaption:($appliedFilterText?:$report['subtitle']);
 if($template==='riwayat-tagihan'){require_once __DIR__.'/../includes/billing_history_print.php';$billingPrintFont=billing_history_print_font();}
 $artifactIdentity=['route'=>'global','unit'=>$reportUnitId,'template'=>$template,'filters'=>$filters,'orientation'=>$printOrientation];
 $artifactModel=['report'=>$report,'subtitle'=>$documentSubtitle,'school'=>unit_school_name($reportUnitId),'operator'=>$operator];
@@ -202,10 +204,18 @@ h3{font-size:12px;color:#<?= $documentPalette[0] ?>}.data tfoot th,.data tfoot t
     }else echo billing_history_print_table($view);
 ?>
 <?php elseif($cleanOutput&&$printMatrix): ?>
-<?php if($format==='pdf'&&count($printMatrix['rows'])*count($printMatrix['columns'])>4000){
+<?php $cleanBands=$template==='penerimaan'?global_report_receipt_print_bands($printMatrix,$printOrientation):[$printMatrix];
+if($format==='pdf'&&(count($cleanBands)>1||count($printMatrix['rows'])*count($printMatrix['columns'])>4000)){
     $pdfMatrixChunks=[];echo '<!--global-matrix-fragments-->';$blocks=array_chunk($printMatrix['rows'],80);
-    foreach($blocks as $i=>$block)$pdfMatrixChunks[]=global_report_clean_table($printMatrix,$block,$i*80,$i===count($blocks)-1);
-}else echo global_report_clean_table($printMatrix); ?>
+    if(!$blocks)$blocks=[[]];
+    foreach($cleanBands as $bandIndex=>$band)foreach($blocks as $i=>$block){
+        $heading=count($cleanBands)>1?'<h3>Komponen '.($bandIndex+1).' dari '.count($cleanBands).'</h3>':'';
+        $pdfMatrixChunks[]=$heading.global_report_clean_table($band,$block,$i*80,$i===count($blocks)-1);
+    }
+}else foreach($cleanBands as $bandIndex=>$band){
+    if(count($cleanBands)>1)echo '<h3>Komponen '.($bandIndex+1).' dari '.count($cleanBands).'</h3>';
+    echo global_report_clean_table($band);
+} ?>
 <?php elseif($printMatrix): ?>
 <?php if($template==='riwayat-tagihan'): ?><div class="billing-export-note">Tanggal Uang PSB mengikuti tanggal data siswa dibuat.</div><?php endif; ?>
 <?php if($format!=='pdf'): ?><div class="matrix-screen"><?= global_report_matrix_html($printMatrix) ?></div><?php else: ?>

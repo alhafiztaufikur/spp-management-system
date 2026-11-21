@@ -6,6 +6,7 @@
 .global-clean-table .identity{text-align:center;white-space:nowrap}
 .global-clean-table .numeric{text-align:right;white-space:nowrap}
 .global-clean-table .global-clean-subvalue{white-space:nowrap}
+.global-clean-table .global-clean-transaction-time{display:block;font-size:80%;color:#52645b}
 .global-clean-table td[data-column="jenis"]{text-align:center}
 .global-clean-table td[data-column="tanggal"]{white-space:nowrap}
 .global-clean-balance td[data-column="nama"]{text-align:center;white-space:normal}

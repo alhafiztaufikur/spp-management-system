@@ -20,6 +20,8 @@ function global_report_matrix(array $report,string $template,int $unit):?array {
     $identities=[['no','No','number']];
     if($unit===0)$identities[]=['unit','Unit'];
     $identities=array_merge($identities,[['nis','NIS','nis'],['nama','Nama Siswa'],['kelas','Kelas','kelas']]);
+    if($template==='penerimaan'&&in_array('tanggal',array_column($report['columns'],0),true))$identities[]=['tanggal','Tanggal Transaksi','datetime','width'=>144];
+    $identityKeys=array_merge(['unit'],array_column($identities,0));
     $columns=$identities;$groups=[];$rows=[];$slots=[];$subtotals=[];
     foreach($parts as $index=>$part){
         $label=$part['section_title']??$part['title'];
@@ -32,7 +34,7 @@ function global_report_matrix(array $report,string $template,int $unit):?array {
         }
         foreach($part['columns'] as $column){
             [$key,$caption]=$column;$type=$column[2]??'text';
-            if(in_array($key,['unit','nis','nama','kelas'],true)||isset($moved[$key]))continue;
+            if(in_array($key,$identityKeys,true)||isset($moved[$key]))continue;
             if($template==='penerimaan'&&$key==='total_penerimaan')continue;
             $mapped='g'.$index.'_'.$key;
             $definition=[$mapped,$caption,$type,'source'=>$key,'group'=>$index];
@@ -43,12 +45,18 @@ function global_report_matrix(array $report,string $template,int $unit):?array {
         $occurrences=[];
         foreach($part['rows'] as $sourceIndex=>$source){
             // A historical class is part of identity, and ordinal slots retain duplicates.
-            $identity=json_encode([(int)($source['unit_id']??$unit),(string)($source['nis']??$source['student_id']??''),(string)($source['kelas_asli']??$source['kelas']??'')],JSON_THROW_ON_ERROR);
+            $identity=$template==='penerimaan'&&isset($source['_receipt_id'])
+                ?(int)($source['unit_id']??$unit).'|'.$source['_receipt_id']
+                :json_encode([(int)($source['unit_id']??$unit),(string)($source['nis']??$source['student_id']??''),(string)($source['kelas_asli']??$source['kelas']??'')],JSON_THROW_ON_ERROR);
             $ordinal=$occurrences[$identity]??0;$occurrences[$identity]=$ordinal+1;
             $slot=$identity.'#'.$ordinal;
             if(!isset($slots[$slot])){
                 $slots[$slot]=count($rows);
                 $rows[]=['no'=>count($rows)+1,'unit_id'=>$source['unit_id']??$unit,'unit'=>$source['unit']??unit_label($unit),'nis'=>$source['nis']??'','nis_diknas'=>$source['diknas']??$source['nis_diknas']??$source['NO_induk_diknas']??'','nama'=>$source['nama']??'','kelas'=>$source['kelas_asli']??$source['kelas']??'','_sources'=>[]];
+                if($template==='penerimaan'&&array_key_exists('tanggal',$source)){
+                    $rows[$slots[$slot]]['tanggal']=$source['tanggal'];
+                    $rows[$slots[$slot]]['time_precision']=$source['time_precision']??null;
+                }
             }
             $position=$slots[$slot];$rows[$position]['_sources'][$index]=$sourceIndex;
             foreach($groupColumns as $column)$rows[$position][$column[0]]=$source[$column['source']]??null;
@@ -126,9 +134,10 @@ function global_report_matrix_html(array $matrix,?array $rows=null,int $start=0,
 /** Excel uses the same mapped cells; reports other than PSB also show the national identifier. */
 function global_report_matrix_excel(array $matrix,array $report,string $template,int $unit):array {
     require_once __DIR__.'/excel.php';$columns=[];$includeDiknas=$template!=='psb';
-    $widths=['no'=>6,'unit'=>10,'nis'=>16,'nis_diknas'=>18,'nama'=>26,'kelas'=>10];
+    $widths=['no'=>6,'unit'=>10,'nis'=>16,'nis_diknas'=>18,'nama'=>26,'kelas'=>10,'tanggal'=>18];
     foreach($matrix['columns'] as $column){$definition=spp_excel_column($column[0],$column[1],$column[2]??'text');$definition['source']=$column['source']??$column[0];$definition['width']=$widths[$column[0]]??22;$columns[]=$definition;if($includeDiknas&&$column[0]==='nis'){$definition=spp_excel_column('nis_diknas','NIS Diknas');$definition['width']=18;$columns[]=$definition;}}
     $section=spp_excel_section($report['title'],$columns,$matrix['rows'],$matrix['totals']);
+    if($template==='penerimaan')$section['stacked_receipt_time']=true;
     $section['flat_header']=$matrix['flat_header']??false;
     $section['subtotal_label']=global_report_short_subtotal($template,'excel')?'Subtotal':'Subtotal seluruh hasil filter';
     $section['header_groups']=[];$section['identity_count']=$matrix['identity_count']+($includeDiknas?1:0);$section['column_totals']=$matrix['subtotals'];

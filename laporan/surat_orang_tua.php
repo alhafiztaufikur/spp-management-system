@@ -9,8 +9,16 @@ header('Cache-Control: no-store, private');
 require_once __DIR__.'/../includes/parent_letter_principals.php';
 require_once __DIR__.'/../includes/account_letter_ui.php';
 if(empty($_SESSION['csrf_parent_principal']))$_SESSION['csrf_parent_principal']=bin2hex(random_bytes(32));
-$principalReady=plp_schema_ready($koneksi);$principalStates=[];
-if($principalReady){try{foreach(unit_active_id()===0?[1,2,3]:[unit_active_id()] as $principalScope)$principalStates[]=plp_state($koneksi,$principalScope);}catch(Throwable $e){$principalReady=false;$principalStates=[];}}
+$signerPanels=[];
+foreach(['principal','finance'] as $signerRole){
+    try{
+        $states=[];
+        if(plp_schema_ready($koneksi,$signerRole)){
+            foreach(unit_active_id()===0?[1,2,3]:[unit_active_id()] as $unit)$states[]=plp_state($koneksi,$unit,$signerRole);
+        }
+        $signerPanels[$signerRole]=$states;
+    }catch(Throwable $e){$signerPanels[$signerRole]=[];}
+}
 require_once __DIR__.'/../includes/read_session.php';read_session_release();
 if(($_SERVER['REQUEST_METHOD']??'')==='GET'){
     $GLOBALS['lb_read_projection'][$koneksi->thread_id]=true;

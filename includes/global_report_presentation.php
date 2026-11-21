@@ -55,7 +55,7 @@ function global_report_totals_html(array $totals,string $template,bool $print=fa
 }
 
 /** Screen-only cards; print and export keep their existing summary renderers. */
-function global_report_total_cards_html(array $totals): string {
+function global_report_total_cards_html(array $totals,string $emptyAmount='—'): string {
     if(!$totals)return '';
     $primaryKeys=['total_penerimaan','total_bersih'];
     $secondaryCount=count(array_filter($totals,static fn($total)=>!in_array($total['key']??'', $primaryKeys,true)));
@@ -66,7 +66,7 @@ function global_report_total_cards_html(array $totals): string {
             <?php foreach($totals as $total): ?>
             <div class="global-report-total-card<?= in_array($total['key']??'', $primaryKeys,true)?' is-primary':'' ?>">
                 <span><?= report_e($total['label']) ?></span>
-                <strong><?= report_e(report_money($total['value'])) ?></strong>
+                <strong><?= report_e($total['value']===null?$emptyAmount:report_money($total['value'])) ?></strong>
             </div>
             <?php endforeach; ?>
         </div>

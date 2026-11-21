@@ -35,6 +35,7 @@ function global_report_column_width(array $column, bool $print = false, array $r
         ? ['no'=>22,'unit'=>32,'nis'=>86,'nama'=>112,'kelas'=>40]
         : ['no'=>48,'unit'=>74,'nis'=>170,'nama'=>220,'kelas'=>98];
     if (isset($identity[$key])) return $identity[$key];
+    if($key==='tanggal'&&$type==='date')return $print?72:134;
     if (!$print) return $type==='status' ? 240 : ($type==='datetime' ? 184 : (in_array($type,['money','money_optional','html'],true) ? 155 : 145));
     if (in_array($type,['money','money_optional','html'],true)) {
         $width = 72;
@@ -102,10 +103,61 @@ function global_report_filter_text(mysqli $db,array $filters,string $template,ar
     if($itemOnce)$parts[]='Periode: Sekali saat masuk';
     if($template==='psb')$parts[]='Periode: Sekali saat masuk · Pembayaran kumulatif';
     if(!in_array($template,['psb','status','spp-tahunan','saldo-tabungan','riwayat-tagihan','per-item'],true)||$itemDated)$parts[]='Periode: '.(!empty($filters['all_periods'])?'Semua periode':spp_date_label($filters['tanggal_awal']).' - '.spp_date_label($filters['tanggal_akhir']));
-    if($template==='riwayat-tagihan')$parts[]='Tagihan dibuat: '.(!empty($filters['filter_tanggal_tagihan'])&&($filters['tanggal_awal']??'')!==''?spp_date_label($filters['tanggal_awal']).' - '.spp_date_label($filters['tanggal_akhir']):'Semua tanggal');
+    if($template==='riwayat-tagihan')$parts[]=billing_history_period_label($filters);
     if(!empty($filters['include_undated'])&&($template!=='per-item'||$itemDated))$parts[]='Termasuk transaksi tanpa tanggal sesuai periode kewajiban';
     foreach($notes as $note)if(!in_array($note,$parts,true))$parts[]=$note;
     return implode(' | ',$parts);
+}
+
+function global_report_period_caption(mysqli $db,array $filters,string $template): string {
+    $dateRange=static fn()=>report_date_range_label($filters['tanggal_awal'],$filters['tanggal_akhir']);
+    $year=static function()use($filters):string{
+        $years=$filters['_multi']['tahun_ajaran']??[$filters['tahun_ajaran']];
+        return filter_is_all($years)?'Semua tahun ajaran':'Tahun ajaran '.implode(', ',$years);
+    };
+    $asOf=static fn()=>report_date_label(report_letter_today());
+    if($template==='riwayat-tagihan')return billing_history_period_label($filters);
+    if($template==='psb')return 'Sekali saat masuk · Pembayaran kumulatif · Posisi data '.$asOf().' WIB';
+    if($template==='saldo-tabungan')return 'Posisi saldo per '.$asOf().' WIB';
+    if($template==='spp-tahunan'){
+        $years=$filters['_multi']['tahun_ajaran']??[$filters['tahun_ajaran']];
+        if(filter_is_all($years))return 'Periode tagihan Juli – Juni · '.$year();
+        sort($years,SORT_STRING);
+        $ranges=array_map(static function($academic):string{
+            $start=report_academic_year_start($academic);
+            return $start===null?$academic:'Juli '.$start.' – Juni '.($start+1);
+        },$years);
+        return 'Periode tagihan '.implode(' | ',$ranges).' · '.$year();
+    }
+    if(in_array($template,['penerimaan','setoran','kas-tabungan','tabungan-siswa'],true))
+        return !empty($filters['all_periods'])&&$template==='tabungan-siswa'?'Semua periode transaksi':'Tanggal transaksi '.$dateRange();
+    if(!in_array($template,['status','per-item'],true))return 'Posisi data '.$asOf().' WIB';
+
+    $categories=report_multiple_values($filters,'kategori');
+    if(filter_is_all($categories))$categories=array_keys(report_categories($db));
+    $parts=[];
+    foreach($categories as $category){
+        if(report_item_is_monthly_category($category)){
+            if($template==='per-item'){
+                $range=report_month_range((int)$filters['bulan_awal'],max(2000,(int)$filters['tahun_awal']),(int)$filters['bulan_akhir'],max(2000,(int)$filters['tahun_akhir']));
+                $parts[]='Periode tagihan '.report_month_range_label($range);
+            }else{
+                $months=$filters['_multi']['bulan_awal']??[$filters['bulan_awal']];
+                $names=filter_is_all($months)?'semua bulan':implode(', ',array_map(static fn($month)=>report_months()[$month]??$month,$months));
+                $years=$filters['_multi']['tahun_ajaran']??[$filters['tahun_ajaran']];$stamps=[];
+                if(!filter_is_all($months)&&!filter_is_all($years))foreach($years as $academic)foreach($months as $month){
+                    [$monthCode,$calendarYear]=report_period_from_academic($academic,$month);
+                    $stamps[]=billing_history_month_label(sprintf('%04d-%02d',$calendarYear,$monthCode));
+                }
+                $parts[]='Bulan tagihan '.($stamps?implode(', ',$stamps):$names).' · '.$year();
+            }
+        }elseif(report_item_is_annual_category($category))$parts[]=$year();
+        elseif(report_item_is_one_time_category($category))$parts[]='Sekali saat masuk · Posisi data '.$asOf().' WIB';
+        elseif($template==='per-item')$parts[]='Tanggal transaksi '.$dateRange();
+        elseif(str_starts_with($category,'histori:'))$parts[]='Tahun ajaran '.$filters['tahun_ajaran'].' · Histori pembayaran';
+        else $parts[]='Posisi data '.$asOf().' WIB';
+    }
+    return implode(' | ',array_unique($parts))?:'Posisi data '.$asOf().' WIB';
 }
 
 /** Flat savings reports retain their column order, including the transaction date. */
