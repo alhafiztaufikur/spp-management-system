@@ -9639,11 +9639,14 @@ a.btn {
 }
 .student-class-history-toggle:focus-visible { box-shadow: 0 0 0 3px var(--accent-glow); }
 .student-class-history-chevron {
-  color: currentColor;
-  font-size: 12px;
+  display: block;
+  transform-origin: center;
   transition: transform .18s ease;
 }
 .student-class-history-toggle[aria-expanded="true"] .student-class-history-chevron { transform: rotate(180deg); }
+@media (prefers-reduced-motion: reduce) {
+  .student-class-history-chevron { transition: none; }
+}
 
 .student-class-history-row[hidden] { display: none !important; }
 .payment-table tbody .student-class-history-row,

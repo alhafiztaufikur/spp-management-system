@@ -60,7 +60,12 @@ function receipt_print_document(array $receipts, string $title, string $toolbar,
     </table></article>
     <?php endforeach; ?>
     <script><?= file_get_contents(__DIR__.'/../assets/js/receipt_print.js') ?></script>
-    <?php if(!$pdf): ?><script src="../assets/vendor/html2canvas/html2canvas.min.js"></script><script src="../assets/vendor/jszip/jszip.min.js"></script><script src="../assets/js/receipt_image.js"></script><?php if($options['auto_print']??true): ?><script>window.addEventListener('load',function(){Promise.resolve(document.fonts&&document.fonts.ready).then(function(){setTimeout(function(){window.print()},40)})});</script><?php endif; endif; ?>
+    <?php if(!$pdf): ?>
+      <script src="../assets/js/receipt_image.js?v=<?= filemtime(__DIR__.'/../assets/js/receipt_image.js') ?>" defer></script>
+      <?php if($options['auto_print']??true): ?>
+        <script>window.addEventListener('load', async () => { await document.fonts?.ready; window.print(); }, {once:true});</script>
+      <?php endif; ?>
+    <?php endif; ?>
     </body></html>
     <?php
 }

@@ -2,15 +2,38 @@
 (() => {
   'use strict';
   const button=document.querySelector('[data-receipt-png]'),status=document.querySelector('[data-receipt-export-status]');if(!button)return;
+  const scriptUrl = document.currentScript.src;
+  const scripts = new Map();
+  function loadLibrary(name, filename) {
+    if (window[name]) return Promise.resolve(window[name]);
+    if (scripts.has(name)) return scripts.get(name);
+    const pending = new Promise((resolve, reject) => {
+      const script = document.createElement('script');
+      script.src = new URL('../vendor/' + filename, scriptUrl);
+      const failed = () => {
+        scripts.delete(name);
+        script.remove();
+        reject(new Error('Pustaka gambar belum tersedia.'));
+      };
+      script.onload = () => window[name] ? resolve(window[name]) : failed();
+      script.onerror = failed;
+      document.head.append(script);
+    });
+    scripts.set(name, pending);
+    return pending;
+  }
   const blobOf=canvas=>new Promise((resolve,reject)=>canvas.toBlob(blob=>blob?resolve(blob):reject(new Error('Gambar gagal dibentuk.')),'image/png'));
   function download(blob,name){const url=URL.createObjectURL(blob);const a=document.createElement('a');a.href=url;a.download=name;document.body.append(a);a.click();a.remove();setTimeout(()=>URL.revokeObjectURL(url),60000);}
   button.addEventListener('click',async()=>{
     if(button.disabled)return;button.disabled=true;document.body.classList.add('receipt-exporting');let holder;
     try{
-      if(!window.html2canvas||!window.JSZip||!window.receiptPagination)throw new Error('Pustaka gambar belum tersedia. Muat ulang halaman.');
+      if(!window.receiptPagination)throw new Error('Tata letak struk belum tersedia.');
+      status.textContent = 'Menyiapkan gambar…';
+      const html2canvas = await loadLibrary('html2canvas', 'html2canvas/html2canvas.min.js');
       await Promise.resolve(document.fonts&&document.fonts.ready);window.receiptPagination.prepare();
       const pages=[...document.querySelectorAll('.receipt-print-page')];if(!pages.length)throw new Error('Tidak ada halaman transaksi.');
-      const zip=pages.length>1?new JSZip():null;holder=document.createElement('div');holder.className='receipt-image-holder';document.body.append(holder);
+      const JSZip = pages.length > 1 ? await loadLibrary('JSZip', 'jszip/jszip.min.js') : null;
+      const zip=JSZip?new JSZip():null;holder=document.createElement('div');holder.className='receipt-image-holder';document.body.append(holder);
       const title=(document.title||'Bukti-Transaksi').replace(/[^a-zA-Z0-9_-]+/g,'-').slice(0,100);
       for(let i=0;i<pages.length;i++){
         status.textContent='Membentuk gambar '+(i+1)+' dari '+pages.length+'…';holder.replaceChildren();const paper=document.createElement('div');paper.className='receipt-image-paper';paper.append(pages[i].querySelector('.receipt-document').cloneNode(true));holder.append(paper);

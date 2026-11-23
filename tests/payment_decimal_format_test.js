@@ -5,4 +5,8 @@ const context=vm.createContext({});vm.runInContext(source.slice(start,end),conte
 for(const [raw,value] of [['0',0],['15.000',15000],['325.000,50',325000.50],['325000.50',325000.50],['0,05',.05],[325000.50,325000.50]]){assert.equal(context.parseNumber(raw),value);checks++;}
 for(const value of [0,1,15000,325000.50,.05,123456789.99]){assert.equal(context.parseNumber(context.formatRupiahString(value)),value);checks++;}
 for(const [raw,formatted] of [['15000','15.000'],['325000,50','325.000,50'],['0,','0,'],['0,05','0,05']]){const input={value:raw,selectionStart:raw.length,setSelectionRange(){}};context.formatNumericInput(input);assert.equal(input.value,formatted);checks++;}
+const emptyPaymentEntry={value:'',selectionStart:0,hasAttribute:name=>name==='data-payment-entry-amount',setSelectionRange(){}};
+context.formatNumericInput(emptyPaymentEntry);
+assert.equal(emptyPaymentEntry.value,'','Clearing a new payment amount leaves the placeholder visible');
+checks++;
 console.log('PASS '+checks+' payment number formatting and decimal round trips');

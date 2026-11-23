@@ -105,12 +105,7 @@
 .sw-page .du-pagination,.savings-account-list .du-pagination{margin-left:auto;justify-content:flex-end}
 .unified-savings .sw-student-panel .du-pagination{justify-content:flex-end;margin-left:auto}
 .unified-savings .sw-student-panel .du-pagination-info{width:100%}
-.promotion-context-pending{padding:14px 16px;background:var(--accent-glow);border:1px solid var(--border);border-radius:10px;line-height:1.6;color:var(--text-secondary)}
-.class-participants-panel[data-context-pending="1"] #promotion-batch-form{opacity:.65}
-.class-workspace #promotion-context-form{grid-template-columns:repeat(4,minmax(0,1fr))!important;align-items:start}
-.class-workspace #promotion-target-year{display:flex;align-items:center;min-height:48px;padding:10px 14px;border:1px solid var(--border);border-radius:10px;background:var(--bg-surface);font-size:14px;box-sizing:border-box}
-.class-workspace #promotion-context-form>.field-row{min-width:0}
-.class-workspace #promotion-context-form>.field-row>small{line-height:1.5}
+.class-participants-panel[data-context-pending="1"] :is(#promotion-batch-form,#psb-placement-form){opacity:.65}
 .participants-table th{background:var(--bg-surface)!important;box-shadow:0 1px 0 var(--border);z-index:3}
 .participants-toolbar>label{position:relative;width:min(480px,100%);gap:8px}
 .participants-toolbar input{height:46px;border-radius:12px;padding:12px 16px;border:1px solid var(--border);background:var(--bg-surface);font-size:14px}
@@ -130,8 +125,7 @@ body#global-report-workspace.recap-filter-refined .report-template-shell .report
 body#global-report-workspace.recap-filter-refined .report-template-shell .report-template-filters>.report-filter-actions{order:2!important;display:flex!important;flex-wrap:wrap;justify-content:flex-end;gap:10px;border-top:1px solid var(--border);padding-top:16px}
 body#global-report-workspace.recap-filter-refined .report-template-shell .report-filter-actions>.btn{flex:0 1 auto;min-width:150px;min-height:44px}
 @media(max-width:1099px){body#global-report-workspace.recap-filter-refined .report-template-shell .report-template-filters{grid-template-columns:repeat(2,minmax(0,1fr))!important}}
-@media(max-width:900px){.class-workspace #promotion-context-form{grid-template-columns:repeat(2,minmax(0,1fr))!important}}
-@media(max-width:699px){body#global-report-workspace.recap-filter-refined .report-template-shell .report-template-filters,.class-workspace #promotion-context-form{grid-template-columns:minmax(0,1fr)!important}.du-publishing-actions>.btn,.du-publishing-actions>form:not(#du-complete-bills),.du-publishing-actions>form>.btn{width:100%}.sw-page .du-pagination-info,.savings-account-list .du-pagination-info{width:100%}.fee-master-tabs a{flex:1 1 auto;justify-content:center}body#global-report-workspace.recap-filter-refined .report-template-shell .report-filter-actions>.btn{flex:1 1 auto;min-width:0}}
+@media(max-width:699px){body#global-report-workspace.recap-filter-refined .report-template-shell .report-template-filters{grid-template-columns:minmax(0,1fr)!important}.du-publishing-actions>.btn,.du-publishing-actions>form:not(#du-complete-bills),.du-publishing-actions>form>.btn{width:100%}.sw-page .du-pagination-info,.savings-account-list .du-pagination-info{width:100%}.fee-master-tabs a{flex:1 1 auto;justify-content:center}body#global-report-workspace.recap-filter-refined .report-template-shell .report-filter-actions>.btn{flex:1 1 auto;min-width:0}}
 
 .report-mobile-id{display:none}
 @media(max-width:699px){.report-general-page .finance-transactions .payment-table .report-name-col{left:0;width:170px}.report-general-page .finance-transactions .payment-table .report-id-col{position:static}.report-general-page .finance-transactions .payment-table{min-width:1000px}.report-general-page .report-section-page .du-pagination-info{width:100%}.report-mobile-id{display:block;font-size:11px;font-weight:400;color:var(--text-muted)}}

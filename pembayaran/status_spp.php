@@ -66,7 +66,7 @@ try {
         }
         $status['komite'] = ['exists'=>(bool)$komite,'total'=>(float)($komite['nominal_tagihan'] ?? 0),'paid'=>max(0,$komitePaid)];
     }
-    $status['obligations']=payment_obligations($koneksi,$noInduk);
+    if (($_GET['summary'] ?? '') !== '0') $status['obligations']=payment_obligations($koneksi,$noInduk);
     if(($_GET['details']??'')==='1'){
         require_once '../includes/payment_student_details.php';
         $status['payment_details']=payment_student_details($koneksi,$noInduk,$editId);

@@ -16,6 +16,14 @@ function lb_scope_student_read(mysqli $db,string $nis): void {
     $GLOBALS['lb_read_student'][$db->thread_id]=$nis;
 }
 
+/** The new receipt has already locked this student in the active unit. */
+function lb_scope_payment_student(mysqli $db, string $nis, int $unit): void {
+    if (($_SERVER['REQUEST_METHOD'] ?? '') !== 'POST' || $unit < 1 || $unit !== unit_active_id() || $nis === '') {
+        throw new LogicException('Invalid payment evidence scope.');
+    }
+    $GLOBALS['lb_payment_student'][$db->thread_id] = ['nis' => $nis, 'unit' => $unit, 'object' => spl_object_id($db)];
+}
+
 /** Master-page evidence only. The default reconciliation/payment model is unchanged. */
 function lb_master_read(mysqli $db,string $year,string $component,?array $identities=null): void {
     if(($_SERVER['REQUEST_METHOD']??'')!=='GET'||!in_array($component,['spp','du'],true))throw new LogicException('Master evidence requires a read-only request.');
@@ -26,7 +34,7 @@ function lb_master_read(mysqli $db,string $year,string $component,?array $identi
 }
 
 // A policy read can request just its candidate identities. The subset has its own
-// request-cache key; financial writers retain the complete default model.
+// request-cache key. Unscoped callers retain the complete model.
 function lb_cache(mysqli $db, bool $refresh=false,?array $onlyStudents=null,bool $invalidateOnly=false): array {
     $profileStarted=microtime(true);
     static $cache=[];$scope=(int)($GLOBALS['app_unit_id']??unit_active_id());$compact=!empty($GLOBALS['lb_report_compact'][$db->thread_id]);$readProjection=!empty($GLOBALS['lb_read_projection'][$db->thread_id]);$prefix=$db->thread_id.($compact?':report:':($readProjection?':read:':':'));
@@ -38,7 +46,15 @@ function lb_cache(mysqli $db, bool $refresh=false,?array $onlyStudents=null,bool
         if($profile['identities']!==null&&$onlyStudents!==null)$onlyStudents=array_values(array_intersect($onlyStudents,$profile['identities']));
     }
     if($onlyStudents!==null){$onlyStudents=array_values(array_unique(array_map('strval',$onlyStudents)));sort($onlyStudents,SORT_STRING);$prefix.='subset:'.hash('sha256',json_encode($onlyStudents)).':';}
-    $nis=$GLOBALS['lb_read_student'][$db->thread_id]??null;$key=$prefix.$scope.($nis===null?'':':student:'.$nis);
+    $paymentStudent = $GLOBALS['lb_payment_student'][$db->thread_id] ?? null;
+    if ($paymentStudent) {
+        if ($paymentStudent['unit'] !== $scope || $paymentStudent['object'] !== spl_object_id($db)) {
+            throw new LogicException('Payment evidence scope changed.');
+        }
+        $prefix .= 'payment:';
+    }
+    $nis = $paymentStudent['nis'] ?? $GLOBALS['lb_read_student'][$db->thread_id] ?? null;
+    $key = $prefix . $scope . ($nis === null ? '' : ':student:' . $nis);
     if($refresh){$GLOBALS['lb_cache_generation'][$db->thread_id]=($GLOBALS['lb_cache_generation'][$db->thread_id]??0)+1;unset($GLOBALS['lb_monthly_plan_cache'][$db->thread_id]);if(function_exists('du_psb_invalidate'))du_psb_invalidate($db);foreach(array_keys($cache) as $cachedKey)if(str_starts_with($cachedKey,$db->thread_id.':'))unset($cache[$cachedKey]);}
     if($refresh&&$invalidateOnly)return [];
     if(!$refresh&&isset($cache[$key]))return $cache[$key];
@@ -205,8 +221,11 @@ function lb_obligation_position(mysqli $db,array $ob): ?array {
 }
 /** Recalculate proven opening obligations inside the caller's financial transaction. */
 function lb_sync_owners(mysqli $db,array $ownerIds): array {
-    lb_cache($db,true);$batches=[];$data=lb_cache($db);
-    foreach($data['students'] as $s){if(!in_array((int)$s['id'],array_map('intval',$ownerIds),true))continue;
+    $data = lb_cache($db, refresh: true, invalidateOnly: !$ownerIds);
+    if (!$ownerIds) return [];
+    $batches = [];
+    $ownerIds = array_map('intval', $ownerIds);
+    foreach($data['students'] as $s){if(!in_array((int)$s['id'],$ownerIds,true))continue;
         foreach(hp_rows($db,'SELECT * FROM legacy_op_obligations WHERE owner_id=? ORDER BY id FOR UPDATE',[$s['id']]) as $ob){
             $position=lb_obligation_position($db,$ob);if(!$position)continue;
             $principal=$position['principal'];$remaining=$position['remaining'];

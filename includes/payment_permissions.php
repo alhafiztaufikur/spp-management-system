@@ -1,6 +1,23 @@
 <?php
 require_once __DIR__.'/payment_activity.php';
 
+function payment_unit_in_scope(int $unit): bool
+{
+    $scope = unit_active_id();
+    return $unit >= 1 && $unit <= 3 && ($scope === $unit || ($scope === 0 && operational_role()));
+}
+
+function payment_action_allowed(int $unit, int $owner): bool
+{
+    return payment_unit_in_scope($unit) && (operational_role() || ($owner > 0 && $owner === (int)($_SESSION['admin_id'] ?? 0)));
+}
+
+function payment_print_allowed(int $unit, int $owner = 0, bool $deleted = false): bool
+{
+    return !$deleted && in_array($_SESSION['admin_role'] ?? '', ['super_admin','admin','kasir','bendahara'], true)
+        && payment_action_allowed($unit, $owner);
+}
+
 /** Ownership is immutable: the first creation event, never the mutable payment operator. */
 function payment_capabilities(mysqli $db, array $payment, ?array $events = null, bool $deleted = false, ?array $pending = null): array
 {
@@ -9,10 +26,9 @@ function payment_capabilities(mysqli $db, array $payment, ?array $events = null,
     $creator=payment_activity_summary($events)['creator'];
     $owner=(int)($creator['actor_id']??0);
     $role=$_SESSION['admin_role']??'';
-    $operator=operational_role($role);
     $scope=unit_active_id(); $unit=(int)($payment['unit_id']??$scope);
-    $inScope=$unit>=1 && $unit<=3 && ($scope===$unit || ($scope===0 && $operator));
-    $allowed=$inScope && ($operator || ($owner>0 && $owner===(int)($_SESSION['admin_id']??0)));
+    $inScope=payment_unit_in_scope($unit);
+    $allowed=payment_action_allowed($unit,$owner);
     $pending ??= function_exists('transaction_authorization_schema_ready') && transaction_authorization_schema_ready($db) ? (transaction_authorization_pending_for_payments($db,[$id])[$id]??[]) : [];
     $mutable=$allowed && !$deleted && $scope!==0 && in_array($role,['super_admin','admin','kasir'],true)
         && (int)($payment['payment_link_version']??0)===1 && !$pending;
@@ -26,7 +42,7 @@ function payment_capabilities(mysqli $db, array $payment, ?array $events = null,
     elseif($role==='bendahara') $reason='Bendahara dapat melihat dan mencetak, tanpa edit atau hapus.';
     if($out)$reason='Siswa OUT. Transaksi hanya dapat dilihat dan dicetak.';
     return ['owner_id'=>$owner?:null,'owner_name'=>($creator['actor_name']??'')?:'Tidak tercatat',
-        'can_edit'=>$mutable,'can_delete'=>$mutable,'can_print'=>$allowed&&!$deleted&&in_array($role,['super_admin','admin','kasir','bendahara'],true),
+        'can_edit'=>$mutable,'can_delete'=>$mutable,'can_print'=>payment_print_allowed($unit,$owner,$deleted),
         'can_read_activity'=>$inScope,'locked'=>!$allowed,'reason'=>$reason];
 }
 

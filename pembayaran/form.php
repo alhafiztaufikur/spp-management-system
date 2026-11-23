@@ -20,7 +20,7 @@ $activeAcademicYearSql = $koneksi->real_escape_string($activeAcademicYear);
 
 $siswa_sql = "
     SELECT
-        s.*,
+        s.id, s.NO_INDUK, s.NO_induk_diknas, s.NAMA, s.KELAS, s.SPP_PERBULAN, s.POMG,
         mk.tingkat AS master_tingkat, mk.kode_rombel, mk.is_placeholder,
         (SELECT ta_l.label FROM siswa_tahun_ajaran sta_l
          JOIN tahun_ajaran ta_l ON ta_l.id=sta_l.tahun_ajaran_id
@@ -42,7 +42,7 @@ $siswa_sql = "
     )
     ) ORDER BY s.NAMA ASC
 ";
-$siswa_list = $koneksi->query($siswa_sql);
+$siswa_list = $koneksi->query(hp_sql($koneksi, $siswa_sql));
 function month_code($value) {
     $map = [
         'Januari' => '01', 'Februari' => '02', 'Maret' => '03', 'April' => '04',
@@ -75,8 +75,10 @@ if ($inputPaymentSaved) {
     require_once __DIR__.'/../includes/payment_permissions.php';
     try {
         $savedPaymentId = (int)($savedPayment['id'] ?? 0);
-        payment_assert_owner($koneksi, $savedPaymentId, (int)$_SESSION['admin_id']);
-        $savedPaymentReceiptUrl = '../laporan/cetak_struk.php?' . http_build_query(['id' => $savedPaymentId]);
+        $receipt = hp_one($koneksi, 'SELECT unit_id FROM bayar WHERE id=?', [$savedPaymentId]);
+        if ($receipt && payment_print_allowed((int)$receipt['unit_id'])) {
+            $savedPaymentReceiptUrl = '../laporan/cetak_struk.php?' . http_build_query(['id' => $savedPaymentId]);
+        }
     } catch (Throwable $error) {
         error_log('Tautan struk setelah input pembayaran tidak tersedia: ' . $error->getMessage());
     }
@@ -289,7 +291,7 @@ unset($_SESSION['payment_draft']);
                   <td data-label="Total Tagihan"><input class="tbl-input tbl-system" type="text" value="0" id="<?=$key?>-total" readonly tabindex="-1" aria-readonly="true" /></td>
                   <td data-label="Sudah Terbayar"><input class="tbl-input tbl-system" type="text" value="0" id="<?=$key?>-bayar" readonly tabindex="-1" aria-readonly="true" /></td>
                   <td data-label="Sisa"><input class="tbl-input tbl-system tbl-system-sisa" type="text" value="0" id="<?=$key?>-sisa" readonly tabindex="-1" aria-readonly="true" /></td>
-                  <td data-label="Input Bayar"><input class="tbl-input tbl-pay tbl-readonly" type="text" value="0"
+                  <td data-label="Input Bayar"><input class="tbl-input tbl-pay tbl-readonly" type="text" data-payment-entry-amount inputmode="decimal"
                         id="<?=$key?>-input" name="<?= $name ?>" placeholder="0" readonly aria-readonly="true" aria-describedby="<?=$key?>-context-label" /></td>
                 </tr>
                 <?php endforeach; ?>
@@ -319,7 +321,7 @@ unset($_SESSION['payment_draft']);
               <label class="ll-field"><span class="ll-field-label">Total</span><input class="field-input biaya-lain-total" type="text" value="0" placeholder="Total" readonly aria-label="Total biaya lain" /></label>
               <label class="ll-field"><span class="ll-field-label">Sudah Dibayar</span><input class="field-input biaya-lain-paid" type="text" value="0" placeholder="Sudah" readonly aria-label="Sudah dibayar biaya lain" /></label>
               <label class="ll-field"><span class="ll-field-label">Sisa</span><input class="field-input biaya-lain-sisa" type="text" value="0" placeholder="Sisa" readonly aria-label="Sisa biaya lain" /></label>
-              <label class="ll-field"><span class="ll-field-label">Bayar</span><input class="field-input biaya-lain-nominal" type="text" value="0" placeholder="Input bayar" name="biaya_lain_nominal[]" aria-label="Input bayar biaya lain" /></label>
+              <label class="ll-field"><span class="ll-field-label">Bayar</span><input class="field-input biaya-lain-nominal" type="text" data-payment-entry-amount inputmode="decimal" placeholder="0" name="biaya_lain_nominal[]" aria-label="Input bayar biaya lain" /></label>
               <button class="btn-icon-danger btn-remove-biaya-lain" type="button" title="Hapus baris" aria-label="Hapus baris">Hapus</button>
             </div>
           </div>
@@ -339,7 +341,7 @@ unset($_SESSION['payment_draft']);
               <label class="ll-field"><span class="ll-field-label">Total</span><input class="field-input biaya-lain-total" type="text" value="0" placeholder="Total" readonly aria-label="Total biaya lain" /></label>
               <label class="ll-field"><span class="ll-field-label">Sudah Dibayar</span><input class="field-input biaya-lain-paid" type="text" value="0" placeholder="Sudah" readonly aria-label="Sudah dibayar biaya lain" /></label>
               <label class="ll-field"><span class="ll-field-label">Sisa</span><input class="field-input biaya-lain-sisa" type="text" value="0" placeholder="Sisa" readonly aria-label="Sisa biaya lain" /></label>
-              <label class="ll-field"><span class="ll-field-label">Bayar</span><input class="field-input biaya-lain-nominal" type="text" value="0" placeholder="Input bayar" name="biaya_lain_nominal[]" aria-label="Input bayar biaya lain" /></label>
+              <label class="ll-field"><span class="ll-field-label">Bayar</span><input class="field-input biaya-lain-nominal" type="text" data-payment-entry-amount inputmode="decimal" placeholder="0" name="biaya_lain_nominal[]" aria-label="Input bayar biaya lain" /></label>
               <button class="btn-icon-danger btn-remove-biaya-lain" type="button" title="Hapus baris" aria-label="Hapus baris">Hapus</button>
             </div>
           </template>

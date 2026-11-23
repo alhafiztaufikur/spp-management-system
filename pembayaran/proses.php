@@ -298,7 +298,7 @@ function validate_student_and_komite(
     int $excludePaymentId = 0,
     ?string $archivedStudentAllowed = null
 ): array {
-    $stmt = $db->prepare("SELECT s.legacy_pending,s.KELAS, s.master_kelas_id, s.POMG, s.SPP_PERBULAN, s.is_active,
+    $stmt = $db->prepare("SELECT s.NO_INDUK,s.unit_id,s.legacy_pending,s.KELAS, s.master_kelas_id, s.POMG, s.SPP_PERBULAN, s.is_active,
         mk.tingkat, mk.kode_rombel, mk.is_placeholder,
         (SELECT ta.label FROM siswa_tahun_ajaran sta_l
          JOIN tahun_ajaran ta ON ta.id=sta_l.tahun_ajaran_id
@@ -323,11 +323,10 @@ function payable_total(float $total, float $discount = 0, float $derivedTotal = 
     return $derivedTotal > 0 ? $derivedTotal : max(0, $total - $discount);
 }
 
-function validate_graduate_payment(array $student, array $components, float $uangDu, array $otherFees = [], float $uangSpp = 0): void {
+function validate_graduate_payment(array $student, array $amounts, array $otherFees = []): void {
     if (empty($student['is_graduate'])) return;
-    $otherTotal = array_sum(array_map('floatval', $components));
-    foreach ($otherFees as $line) $otherTotal += (float)($line['nominal'] ?? 0);
-    if (($uangDu <= 0.001 && $uangSpp <= 0.001 && $otherTotal <= 0.001) || array_sum(array_map('floatval', array_slice($components,0,2))) > .001 || !empty($otherFees)) {
+    $arrearsPayment = $amounts['spp'] + $amounts['komite'] + $amounts['du'];
+    if ($arrearsPayment <= .001 || $amounts['psb'] > .001 || $amounts['discount'] > .001 || $otherFees) {
         throw new RuntimeException('Siswa yang sudah lulus hanya dapat membayar tunggakan SPP, Komite, dan Daftar Ulang.');
     }
 }
@@ -344,11 +343,12 @@ function validate_component_remaining(
     bool $usePublishedSpp = false
 ): void {
     $stmt = $db->prepare('
-        SELECT s.PSB,
+        SELECT s.PSB, s.KELAS,
                SPP_PERBULAN, POMG, DAFTAR_ULANG, potong_du, tot_du,
-               COALESCE(mk.tingkat, CAST(s.KELAS AS UNSIGNED)) AS tingkat, mk.kode_rombel
+               COALESCE(mk.tingkat, CAST(s.KELAS AS UNSIGNED)) AS tingkat,
+               mk.kode_rombel, mk.jenis AS rombel_jenis, mk.legacy_kind
         FROM siswa s
-        LEFT JOIN master_kelas mk ON mk.id=s.master_kelas_id
+        LEFT JOIN master_kelas mk ON mk.id=s.master_kelas_id AND mk.unit_id=s.unit_id
         WHERE s.NO_INDUK = ?
         FOR UPDATE
     ');
@@ -358,17 +358,20 @@ function validate_component_remaining(
     $stmt->close();
     if (!$student) throw new RuntimeException('Data siswa tidak ditemukan.');
 
-    $monthLabel = payment_month_label($bulan);
-    $legacyMonth = (string)(int)$bulan;
-    $stmtPaid = $db->prepare('
-        SELECT COALESCE(SUM(CASE WHEN TAHUN = ? AND (BULAN = ? OR BULAN = ? OR BULAN = ?) THEN U_SPP ELSE 0 END), 0) AS spp
-        FROM bayar
-        WHERE NO_INDUK = ? AND id <> ?
-    ');
-    $stmtPaid->bind_param('sssssi', $tahun, $bulan, $monthLabel, $legacyMonth, $noInduk, $excludePaymentId);
-    $stmtPaid->execute();
-    $paid = $stmtPaid->get_result()->fetch_assoc() ?: [];
-    $stmtPaid->close();
+    $paid = [];
+    if (!$usePublishedSpp) {
+        $monthLabel = payment_month_label($bulan);
+        $legacyMonth = (string)(int)$bulan;
+        $stmtPaid = $db->prepare('
+            SELECT COALESCE(SUM(CASE WHEN TAHUN = ? AND (BULAN = ? OR BULAN = ? OR BULAN = ?) THEN U_SPP ELSE 0 END), 0) AS spp
+            FROM bayar
+            WHERE NO_INDUK = ? AND id <> ?
+        ');
+        $stmtPaid->bind_param('sssssi', $tahun, $bulan, $monthLabel, $legacyMonth, $noInduk, $excludePaymentId);
+        $stmtPaid->execute();
+        $paid = $stmtPaid->get_result()->fetch_assoc() ?: [];
+        $stmtPaid->close();
+    }
 
     if ($uangDu > 0) {
         if (!$duBill || (string)$duBill['no_induk'] !== $noInduk) {
@@ -379,7 +382,8 @@ function validate_component_remaining(
     }
 
     $sppInput = (float)($components['spp'] ?? 0);
-    $isPsb = (int)($student['tingkat'] ?? 0) === 0 || strtoupper((string)($student['kode_rombel'] ?? '')) === 'PSB';
+    $classKind = class_kind($student);
+    $isPsb = $classKind === 'psb' || ($student['rombel_jenis'] === null && $student['KELAS'] === 'PSB');
     if($isPsb&&($sppInput>.001||(float)($components['komite']??0)>.001)){
         require_once __DIR__.'/../includes/psb_spp.php';
         pspp_assert_period($db,$noInduk,$bulan,$tahun);
@@ -696,6 +700,8 @@ if ($aksi === 'input') {
         if (!$usePublishedSpp && $potongan_spp > $uang_spp) throw new RuntimeException('Potongan SPP tidak boleh melebihi pembayaran SPP.');
         require_once __DIR__.'/../includes/student_out.php';sout_assert_student($koneksi,$no_induk);
         $siswa_data = validate_student_and_komite($koneksi, $no_induk, $bulan_bayar, $tahun_bayar, $uang_komite);
+        $no_induk = $siswa_data['NO_INDUK'];
+        lb_scope_payment_student($koneksi, $no_induk, (int)$siswa_data['unit_id']);
         if($siswa_data['KELAS']==='CUSTOM')throw new RuntimeException('Rombel nonakademik tidak menerima transaksi pembayaran sekolah baru. Gunakan menu Tabungan.');
         $kelas_siswa = $siswa_data['KELAS'];
         $master_kelas_id = (int)($siswa_data['master_kelas_id'] ?? 0);
@@ -715,9 +721,11 @@ if ($aksi === 'input') {
             $kelas_du = (string)$du_bill['kelas'];
             $tahun_ajaran_du = (string)$du_bill['tahun_ajaran'];
         }
-        validate_graduate_payment($siswa_data, [
-            $uang_psb, $uang_komite, $potongan_spp
-        ], $uang_du, [], $uang_spp);
+        $graduateAmounts = [
+            'psb' => $uang_psb, 'spp' => $uang_spp, 'komite' => $uang_komite,
+            'du' => $uang_du, 'discount' => $potongan_spp,
+        ];
+        validate_graduate_payment($siswa_data, $graduateAmounts);
 
         $periods = [['bulan' => $bulan_bayar, 'tahun' => (string)$tahun_bayar]];
         $spp_parts = [$uang_spp];
@@ -754,9 +762,7 @@ if ($aksi === 'input') {
         if ($usePublishedSpp) komite_validate_spp_pair($koneksi,$no_induk,$bulan_bayar,(string)$tahun_bayar,$uang_komite,$spp_action === 'bayar' && ($uang_spp > .001));
 
         $biaya_lain = collect_biaya_lain($koneksi, $no_induk);
-        validate_graduate_payment($siswa_data, [
-            $uang_psb, $uang_komite, $potongan_spp
-        ], $uang_du, $biaya_lain, $uang_spp);
+        validate_graduate_payment($siswa_data, $graduateAmounts, $biaya_lain);
         $legacy_biaya_lain = legacy_biaya_lain_values($biaya_lain);
 
         // Satu pembayaran tahunan disimpan sebagai 12 header transaksi agar
@@ -1012,8 +1018,9 @@ if ($aksi === 'update') {
             $kelas_rombel_snapshot=$old_bayar['kelas_rombel_snapshot']??$old_bayar['KELAS'];
         }
         validate_graduate_payment($siswa_data, [
-            $uang_psb, $uang_komite, $potongan_spp
-        ], $uang_du, $biaya_lain, $uang_spp);
+            'psb' => $uang_psb, 'spp' => $uang_spp, 'komite' => $uang_komite,
+            'du' => $uang_du, 'discount' => $potongan_spp,
+        ], $biaya_lain);
         $legacy_biaya_lain = legacy_biaya_lain_values($biaya_lain);
         $uang_lain = $legacy_biaya_lain['total'];
         [$ll_1_ket, $ll_2_ket, $ll_3_ket, $ll_4_ket] = $legacy_biaya_lain['names'];

@@ -22,6 +22,8 @@ function postFields(payload,tokens){
   // Printing is observed without opening a physical printer dialog.
   await context.addInitScript(()=>{window.print=()=>{window.__testPrintInvoked=true;};});
   const page=await context.newPage();page.setDefaultTimeout(20000);page.on('pageerror',e=>errors.push(e.message));
+  const imageDependencies=[];
+  context.on('request',request=>{if(/\/(html2canvas|jszip)\//.test(request.url()))imageDependencies.push(request.url());});
   let identity;
   for(let i=0;i<30;i++){try{identity=await(await context.request.get(base+'/tests/browser_clone_identity.php')).json();break;}catch(e){if(i===29)throw e;await new Promise(r=>setTimeout(r,100));}}
   assert.equal(identity.isolated_test,true);assert.notEqual(identity.port,3306);
@@ -38,7 +40,13 @@ function postFields(payload,tokens){
     await page.locator('#spp-warning-overlay.show').waitFor({state:'visible'});
     await page.locator('#spp-warning-close').click();
     await page.locator('#sistem-pembayaran').selectOption('Tunai');
-    await page.locator('#psb-input').fill('50000');
+    const amount=page.locator('#psb-input');
+    assert.equal(await amount.getAttribute('placeholder'),'0');
+    assert.equal(await amount.inputValue(),'');
+    await amount.fill('50000');
+    await amount.fill('');
+    assert.equal(await amount.inputValue(),'');
+    await amount.fill('50000');
     await page.evaluate(nis=>sessionStorage.setItem('paymentDraftReload',JSON.stringify({source_path:location.pathname,edit_id:0,no_induk:nis,uang_psb:'50000'})),item.payload.no_induk);
     await Promise.all([page.waitForNavigation({waitUntil:'domcontentloaded'}),page.locator('#btn-input').click()]).catch(async error=>{
      throw new Error('Browser submit: '+JSON.stringify(await page.evaluate(()=>({fields:[...document.querySelectorAll('#form-bayar input,#form-bayar select')].filter(n=>n.id).map(n=>[n.id,n.value,n.validationMessage]),warnings:[...document.querySelectorAll('#spp-warning-title,#spp-warning-message')].map(n=>n.textContent)}))),{cause:error});
@@ -75,7 +83,9 @@ function postFields(payload,tokens){
     await page.reload();assert.equal(await page.locator('#payment-saved-dialog').count(),0,'Refresh does not repeat result');
     const replay=await context.request.post(base+'/pembayaran/proses.php',{data:payload,headers:{'Content-Type':'application/x-www-form-urlencoded'},maxRedirects:0});assert.equal(replay.status(),302);assert.equal(state()[k].length,1,'Replaying a committed POST cannot duplicate payment');
    }else if(k==='spp'){
-    const popupPromise=page.waitForEvent('popup');await page.locator('#payment-saved-print').click();const receiptPage=await popupPromise;await receiptPage.waitForLoadState();assert.match(await receiptPage.locator('body').innerText(),new RegExp(item.name));await receiptPage.close();
+    const popupPromise=page.waitForEvent('popup');await page.locator('#payment-saved-print').click();const receiptPage=await popupPromise;await receiptPage.waitForFunction(()=>window.__testPrintInvoked===true);assert.match(await receiptPage.locator('body').innerText(),new RegExp(item.name));
+    assert.deepEqual(imageDependencies,[],'The print preview does not load PNG/ZIP dependencies');
+    await receiptPage.close();
     assert.equal(new URL(page.url()).pathname,'/pembayaran/form.php');
    }else if(k==='komite')await page.keyboard.press('Escape');
    else await page.locator('#payment-saved-continue').click();

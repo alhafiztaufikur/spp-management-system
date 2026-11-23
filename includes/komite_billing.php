@@ -131,10 +131,33 @@ function komite_require_bill(mysqli $db, string $noInduk, string $month, string 
 }
 
 function komite_validate_amount(mysqli $db, string $noInduk, string $month, string $year, float $amount, bool $sppPayment, int $excludePaymentId=0): ?array {
-    if($amount>.001||$sppPayment){
-        foreach(hp_rows($db,"SELECT bulan,tahun FROM tagihan_komite WHERE no_induk=? AND status='open' AND CONCAT(tahun,'-',LPAD(bulan,2,'0'))<? ORDER BY tahun,bulan",[$noInduk,$year.'-'.str_pad($month,2,'0',STR_PAD_LEFT)]) as $period){
-            $older=komite_bill($db,$noInduk,$period['bulan'],$period['tahun'],true,$excludePaymentId);
-            if($older&&$older['remaining']>.001){$label=spp_month_label($period['bulan']).' '.$period['tahun'];throw new SppPaymentException(['code'=>'komite_prior_unpaid','severity'=>'error','title'=>'Ada Komite yang lebih lama','message'=>'Lunasi Komite '.$label.' lebih dahulu, sebesar Rp '.number_format($older['remaining'],0,',','.').'.','amount_label'=>'Sisa Komite Rp '.number_format($older['remaining'],0,',','.'),'target'=>'komite-input']);}
+    if ($amount > .001 || $sppPayment) {
+        $period = $year . '-' . str_pad($month, 2, '0', STR_PAD_LEFT);
+        $olderBills = lf_rows($db, "SELECT id,no_induk,bulan,tahun,nominal_tagihan FROM tagihan_komite
+            WHERE no_induk=? AND status='open' AND CONCAT(tahun,'-',LPAD(bulan,2,'0'))<?
+            ORDER BY tahun,bulan FOR UPDATE", [$noInduk, $period]);
+        if ($olderBills) {
+            $ids = array_column($olderBills, 'id');
+            $placeholders = implode(',', array_fill(0, count($ids), '?'));
+            $exclude = $excludePaymentId > 0 ? ' AND (bayar_id IS NULL OR bayar_id<>?)' : '';
+            if ($excludePaymentId > 0) $ids[] = $excludePaymentId;
+            // Read allocations after locking the bills so a concurrent payment is counted.
+            $nativePaid = [];
+            foreach (lf_rows($db, "SELECT tagihan_komite_id,nominal FROM bayar_komite
+                WHERE tagihan_komite_id IN ($placeholders)$exclude FOR UPDATE", $ids) as $payment) {
+                $billId = $payment['tagihan_komite_id'];
+                $nativePaid[$billId] = ($nativePaid[$billId] ?? 0.0) + (float)$payment['nominal'];
+            }
+            foreach ($olderBills as $olderBill) {
+                $olderBill['native_paid'] = $nativePaid[$olderBill['id']] ?? 0.0;
+                $older = komite_bill_position($db, $olderBill);
+                if ($older['remaining'] <= .001) continue;
+                $label = spp_month_label($older['bulan']) . ' ' . $older['tahun'];
+                $remaining = number_format($older['remaining'], 0, ',', '.');
+                throw new SppPaymentException(['code'=>'komite_prior_unpaid','severity'=>'error','title'=>'Ada Komite yang lebih lama',
+                    'message'=>'Lunasi Komite '.$label.' lebih dahulu, sebesar Rp '.$remaining.'.',
+                    'amount_label'=>'Sisa Komite Rp '.$remaining,'target'=>'komite-input']);
+            }
         }
     }
     $bill=komite_bill($db,$noInduk,$month,$year,true,$excludePaymentId);

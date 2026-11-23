@@ -5,12 +5,14 @@ require_once __DIR__.'/biaya_lain.php';
 /** The same option payloads as the payment form, bounded to one resolved student. */
 function payment_student_details(mysqli $db,string $nis,int $excludePaymentId=0): array {
     require_once __DIR__.'/psb_spp.php';
-    $student=hp_one($db,'SELECT id,KELAS FROM siswa WHERE NO_INDUK=?',[$nis]);
-    $admission=$student?pspp_find($db,(int)$student['id']):null;$admissionPeriod=null;
+    $student=hp_one($db,'SELECT s.id,s.KELAS,m.legacy_kind,m.kode_rombel FROM siswa s
+        LEFT JOIN master_kelas m ON m.id=s.master_kelas_id AND m.unit_id=s.unit_id WHERE s.NO_INDUK=?',[$nis]);
+    $admission=$student&&!class_is_alumni($student)?pspp_find($db,(int)$student['id']):null;$admissionPeriod=null;
+    $komiteBilling = komite_payment_payload($db,$excludePaymentId,$nis)[$nis] ?? [];
     if($admission&&in_array((string)$student['KELAS'],['0','PSB'],true)){
         $unpaid=[];
         foreach(spp_open_bills($db,$nis) as $bill)if((int)($bill['rencana_masuk_id']??0)===(int)$admission['id'])$unpaid[]=['bulan'=>$bill['bulan'],'tahun'=>$bill['tahun']];
-        foreach(komite_payment_payload($db,$excludePaymentId,$nis)[$nis]??[] as $key=>$bill)if((float)$bill['total']-(float)$bill['paid']>.001){[$month,$year]=explode('-',$key);if(komite_academic_year($month,$year)===$admission['label'])$unpaid[]=['bulan'=>$month,'tahun'=>$year];}
+        foreach($komiteBilling as $key=>$bill)if((float)$bill['total']-(float)$bill['paid']>.001){[$month,$year]=explode('-',$key);if(komite_academic_year($month,$year)===$admission['label'])$unpaid[]=['bulan'=>$month,'tahun'=>$year];}
         usort($unpaid,static fn($a,$b)=>[$a['tahun'],$a['bulan']]<=>[$b['tahun'],$b['bulan']]);$admissionPeriod=$unpaid[0]??null;
     }
     $psb=one_time_fee_status($db,$nis,$excludePaymentId)['psb'];
@@ -31,9 +33,9 @@ function payment_student_details(mysqli $db,string $nis,int $excludePaymentId=0)
     return ['admissionPlan'=>$admission?['id'=>(int)$admission['id'],'year'=>$admission['label'],'grade'=>(int)$admission['tingkat'],'oldest_period'=>$admissionPeriod]:null,'psbKnown'=>$psb['known']?'1':'0','totalPsb'=>$psb['total'],'paidPsb'=>$psb['paid'],
         'paidSppPeriods'=>$periods['spp'],'paidKomitePeriods'=>$periods['komite'],'sppPlacements'=>$placements,
         'sppBilling'=>spp_payment_payload($db,$excludePaymentId,$nis)[$nis]??['tagihan'=>[]],
-        'komiteBilling'=>komite_payment_payload($db,$excludePaymentId,$nis)[$nis]??[],
+        'komiteBilling'=>$komiteBilling,
         'duBills'=>du_selectable_bills_payload($db,$excludePaymentId,0,$nis)[$nis]??[],
-        'duCoveredPsb'=>du_psb_state($db,$nis,du_current_academic_year())['covered_psb']?'1':'0',
+        'duCoveredPsb'=>du_psb_state($db,$nis,du_current_academic_year(),singleStudent:true)['covered_psb']?'1':'0',
         'annualFees'=>annual_fee_payload_for_options($db,$excludePaymentId,$nis)[$nis]??[],
         'biayaLainBills'=>array_merge(other_fee_optional_choices($db),$other)];
 }

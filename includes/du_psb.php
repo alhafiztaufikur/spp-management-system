@@ -27,17 +27,21 @@ function du_psb_decision(array $p,string $year,bool $bill=false,bool $evidence=f
 }
 function du_psb_invalidate(mysqli $db): void {foreach(array_keys($GLOBALS['du_psb_states']??[]) as $key)if(str_starts_with($key,$db->thread_id.':'))unset($GLOBALS['du_psb_states'][$key]);}
 /** Read-only shared model; no tariff, placement, bill, or audit is created on GET. */
-function du_psb_states(mysqli $db,string $year,bool $refresh=false,bool $includeUnapplied=false): array {
+function du_psb_states(mysqli $db,string $year,bool $refresh=false,bool $includeUnapplied=false,?string $onlyStudent=null): array {
     if(!du_psb_schema_ready($db))return [];
     $key=$db->thread_id.':'.(int)($GLOBALS['app_unit_id']??unit_active_id()).':'.$year.':'.(int)$includeUnapplied;
+    if ($onlyStudent !== null) $key .= ':student:'.$onlyStudent;
     if($refresh)unset($GLOBALS['du_psb_states'][$key]);if(isset($GLOBALS['du_psb_states'][$key]))return $GLOBALS['du_psb_states'][$key];
-    $placements=hp_rows($db,"SELECT p.*,y.label,y.status year_status,s.id student_id,s.NAMA,s.NO_induk_diknas,s.is_active,s.DAFTAR_ULANG,s.potong_du,s.tot_du FROM siswa_tahun_ajaran p JOIN tahun_ajaran y ON y.id=p.tahun_ajaran_id AND y.unit_id=p.unit_id JOIN siswa s ON s.NO_INDUK=p.no_induk AND s.unit_id=p.unit_id WHERE y.label=? AND ((p.unit_id=1 AND p.kelas='1') OR (p.unit_id=2 AND p.kelas='7') OR (p.unit_id=3 AND p.kelas='10')) AND (p.du_covered_by_psb=1 OR (y.label>=? AND y.status<>'closed' AND p.status='aktif' AND s.is_active=1))",[$year,max('2026/2027',du_current_academic_year())]);
+    $placementArgs = [$year,max('2026/2027',du_current_academic_year())];
+    if ($onlyStudent !== null) $placementArgs[] = $onlyStudent;
+    $placements=hp_rows($db,"SELECT p.*,y.label,y.status year_status,s.id student_id,s.NAMA,s.NO_induk_diknas,s.is_active,s.DAFTAR_ULANG,s.potong_du,s.tot_du FROM siswa_tahun_ajaran p JOIN tahun_ajaran y ON y.id=p.tahun_ajaran_id AND y.unit_id=p.unit_id JOIN siswa s ON s.NO_INDUK=p.no_induk AND s.unit_id=p.unit_id WHERE y.label=? AND ((p.unit_id=1 AND p.kelas='1') OR (p.unit_id=2 AND p.kelas='7') OR (p.unit_id=3 AND p.kelas='10')) AND (p.du_covered_by_psb=1 OR (y.label>=? AND y.status<>'closed' AND p.status='aktif' AND s.is_active=1))".($onlyStudent!==null?' AND p.no_induk=?':''),$placementArgs);
     if(!$placements)return $GLOBALS['du_psb_states'][$key]=[];
     // Only these first-grade students can affect this decision. Historical DU
     // evidence for other grades must not force a scan of the whole archive.
     $studentIds=implode(',',array_unique(array_map('intval',array_column($placements,'student_id'))));
     $data=lb_cache($db,false,array_column($placements,'no_induk'));$bills=[];$history=[];
-    foreach(hp_rows($db,'SELECT unit_id,no_induk FROM tagihan_daftar_ulang WHERE tahun_ajaran_snapshot=?',[$year]) as $b)$bills[$b['unit_id'].'|'.$b['no_induk']]=true;
+    $billArgs = $onlyStudent === null ? [$year] : [$year,$onlyStudent];
+    foreach(hp_rows($db,'SELECT unit_id,no_induk FROM tagihan_daftar_ulang WHERE tahun_ajaran_snapshot=?'.($onlyStudent!==null?' AND no_induk=?':''),$billArgs) as $b)$bills[$b['unit_id'].'|'.$b['no_induk']]=true;
     if(lop_ready($db)){
         $period=lb_du_year_sql('p');
         foreach(hp_rows($db,"SELECT DISTINCT o.unit_id,s.NO_INDUK FROM legacy_op_payments p JOIN legacy_op_owners o ON o.id=p.owner_id AND o.unit_id=p.unit_id JOIN siswa s ON s.id=o.student_id AND s.unit_id=o.unit_id WHERE s.id IN ($studentIds) AND (p.source_table='bayar_du' OR JSON_SEARCH(p.items,'one','daftar_ulang',NULL,'$[*].category') IS NOT NULL) AND ($period)=?",[$year]) as $r)$history[$r['unit_id'].'|'.$r['NO_INDUK']]=true;
@@ -56,7 +60,10 @@ function du_psb_states(mysqli $db,string $year,bool $refresh=false,bool $include
     }
     return $GLOBALS['du_psb_states'][$key]=$out;
 }
-function du_psb_state(mysqli $db,string $nis,string $year,?int $unit=null): array {return du_psb_states($db,$year)[($unit??(int)($GLOBALS['app_unit_id']??unit_active_id())).'|'.$nis]??['status'=>'normal','covered_psb'=>false,'conflict'=>false];}
+function du_psb_state(mysqli $db,string $nis,string $year,?int $unit=null,bool $singleStudent=false): array {
+    $identity = ($unit??(int)($GLOBALS['app_unit_id']??unit_active_id())).'|'.$nis;
+    return du_psb_states($db,$year,onlyStudent:$singleStudent?$nis:null)[$identity]??['status'=>'normal','covered_psb'=>false,'conflict'=>false];
+}
 /** Caller owns the existing transaction; snapshot plus audit are written together. */
 function du_psb_reconcile(mysqli $db,string $year,int $actor,?int $placementId=null): array {
     $out=['covered_psb'=>0,'conflicts'=>0,'changes'=>0];if(!du_psb_schema_ready($db))return $out;

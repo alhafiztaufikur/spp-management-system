@@ -357,22 +357,32 @@ require_once __DIR__.'/includes/master_workspace_ui.php';
     </section>
     <section id="naik-kelas" data-class-panel="promotion" aria-label="Proses tahun ajaran">
     <section class="main-card master-modern-card class-context-panel">
-      <div class="card-title-row"><div><div class="card-title">Proses Tahun Ajaran</div><p class="payment-auto-note">Pilih tahun dan tingkat asal. Setiap tingkat dapat diproses tanpa menunggu tingkat lain selesai.</p></div></div>
+      <header class="promotion-context-heading">
+        <h2>Proses Tahun Ajaran</h2>
+        <?php if(!unit_all_readonly()): ?><p>Pilih tahun ajaran dan tingkat asal untuk melihat peserta.</p><?php endif; ?>
+      </header>
       <?php if($promotionContextError): ?><div class="alert alert-warning"><?= htmlspecialchars($promotionContextError) ?></div><?php endif; ?>
       <?php if(!unit_all_readonly()): ?>
-      <form method="get" id="promotion-context-form" data-custom="<?= $customPromotion?'1':'0' ?>" class="report-filter-grid" data-last-level="<?= $unitMaxLevel ?>">
+      <?php $isGraduationContext = !$customPromotion && $currentPromotionLevel === $unitMaxLevel; ?>
+      <form method="get" id="promotion-context-form" data-custom="<?= $customPromotion?'1':'0' ?>" class="report-filter-grid"
+        data-first-level="<?= $unitMinLevel ?>" data-last-level="<?= $unitMaxLevel ?>" data-psb-year="<?= htmlspecialchars($psbYear) ?>">
         <div class="field-row"><label class="field-label" for="promotion-mode">Sistem Kenaikan</label><select class="field-input field-select" id="promotion-mode" name="promotion_mode"><option value="regular" <?= !$customPromotion?'selected':'' ?>>Reguler satu tingkat</option><option value="custom" <?= $customPromotion?'selected':'' ?>>Custom pilih tingkat/rombel</option></select></div><div class="field-row"><label class="field-label" for="promotion-source-year"><?= $monitorPsb?'Tahun Penempatan':'Tahun Ajaran Asal' ?></label><select id="promotion-source-year" name="source_year_id" class="field-input field-select" <?= $monitorPsb?'disabled':'required' ?>><?php if ($monitorPsb): ?><option value="<?= $sourceYearId ?>"><?= htmlspecialchars($psbYear) ?></option><?php else: ?><option value="">Pilih tahun asal</option><?php foreach($promotionYears as $year): ?><option value="<?= (int)$year['id'] ?>" <?= $sourceYearId===(int)$year['id']?'selected':'' ?>><?= htmlspecialchars($year['label']) ?></option><?php endforeach; endif; ?></select></div>
         <div class="field-row"><label class="field-label" for="promotion-source-level">Tingkat Asal</label><select id="promotion-source-level" name="source_level" class="field-input field-select" required><option value="">Pilih tingkat</option><option value="psb" <?= $monitorPsb?'selected':'' ?>>PSB</option><?php foreach(range($unitMinLevel,$unitMaxLevel) as $grade): ?><option value="<?= $grade ?>" <?= $currentPromotionLevel===$grade?'selected':'' ?>>Kelas <?= $grade ?><?= $grade===$unitMaxLevel?' (Kelulusan)':'' ?></option><?php endforeach; ?></select></div>
-        <div class="field-row"><span class="field-label" id="promotion-target-label"><?= $monitorPsb?(unit_all_readonly()?'Mode Tampilan':'Kelas Tujuan'):((!$customPromotion && $currentPromotionLevel===$unitMaxLevel)?'Tahun Kelulusan':'Tahun Ajaran Tujuan') ?></span><strong id="promotion-target-year"><?= $monitorPsb?(unit_all_readonly()?'Pemantauan PSB':'Kelas '.$unitMinLevel):htmlspecialchars(((!$customPromotion && $currentPromotionLevel===$unitMaxLevel)?$sourceYear:$nextAcademicYear)?:'Pilih tahun asal') ?></strong><small><?= $monitorPsb?(unit_all_readonly()?'Pilih satu unit untuk menempatkan siswa PSB.':'Penempatan awal pada tahun ajaran '.$psbYear.'.'):((!$customPromotion && $currentPromotionLevel===$unitMaxLevel)?'Kelulusan memakai tahun asal, tanpa membuat penempatan tahun berikutnya.':'Tepat satu tahun berikutnya; tahun mendatang belum boleh menjadi asal.') ?></small></div>
-        <div class="report-filter-actions"><button class="btn btn-primary" type="submit">Tampilkan Peserta</button></div>
-      <input type="hidden" name="show_participants" value="1">
+        <div class="field-row">
+          <span class="field-label" id="promotion-target-label"><?= $monitorPsb ? 'Kelas Tujuan' : ($isGraduationContext ? 'Tahun Kelulusan' : 'Tahun Ajaran Tujuan') ?></span>
+          <strong id="promotion-target-year"><?= $monitorPsb ? 'Kelas '.$unitMinLevel : htmlspecialchars(($isGraduationContext ? $sourceYear : $nextAcademicYear) ?: 'Pilih tahun asal') ?></strong>
+          <small id="promotion-target-note"><?= $monitorPsb ? 'Penempatan awal TA '.htmlspecialchars($psbYear).'.' : ($isGraduationContext ? 'Kelulusan tercatat pada tahun asal.' : 'Satu tahun setelah tahun asal.') ?></small>
+        </div>
+        <div class="promotion-context-actions">
+          <p id="promotion-context-pending" role="status" tabindex="-1" hidden>Terapkan pilihan untuk memuat daftar baru.</p>
+          <button class="btn btn-primary" type="submit">Tampilkan Peserta</button>
+        </div>
+        <input type="hidden" name="show_participants" value="1">
       </form>
-      <p class="promotion-context-pending" id="promotion-context-pending" role="status" tabindex="-1" hidden>Pilihan belum diterapkan. Klik Tampilkan Peserta untuk memuat daftar yang sesuai sebelum memproses siswa.</p>
       <noscript><a class="btn btn-ghost" href="master_kelas.php?source_level=psb#naik-kelas">Lihat Siswa PSB</a></noscript>
       <?php else: ?><p class="payment-auto-note">Pilih SD, SMP, atau SMA untuk mengelola rombel dan memproses tahun ajaran. Semua Unit digunakan untuk pemantauan.</p><a class="btn btn-ghost" href="master_kelas.php?source_level=psb#naik-kelas">Lihat PSB</a><?php endif; ?>
     </section>
     <div class="class-participants-panel">
-      <?php participants_panel($participantsModel,$promotionLookup,$promotionMatches,$sourceYearId,$currentPromotionLevel,$customPromotion?'custom':'regular',$participantsOpen); ?>
       <?php if ($promotionBatchResult): ?>
       <div class="promotion-batch-result <?= count($promotionBatchResult['failures']) > 0 ? 'has-failures' : '' ?>">
         <?php foreach($promotionBatchResult['successes'] as $success): if(empty($success['target_placement_id']))continue;$destId=(int)$success['target_placement_id'];$dest=$koneksi->query("SELECT p.tahun_ajaran_id,p.kelas FROM siswa_tahun_ajaran p WHERE p.id=$destId")->fetch_assoc();if(!$dest)continue; ?><p><?= htmlspecialchars($success['student'].' ? '.$success['target'].' ? '.$success['target_year']) ?> <a class="btn btn-ghost" href="master_kelas.php?source_year_id=<?= (int)$dest['tahun_ajaran_id'] ?>&amp;source_level=<?= (int)$dest['kelas'] ?>&amp;show_participants=1#naik-kelas">Lihat Peserta Tujuan</a></p><?php endforeach; ?>
@@ -502,6 +512,7 @@ require_once __DIR__.'/includes/master_workspace_ui.php';
         <?php endif; ?>
       </div>
       <?php participants_held($promotionHeld,$participantsModel); ?>
+      <?php participants_panel($participantsModel,$promotionLookup,$promotionMatches,$sourceYearId,$currentPromotionLevel,$customPromotion?'custom':'regular',$participantsOpen); ?>
     </div>
     </section>
     </div>

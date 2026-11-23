@@ -222,7 +222,10 @@ function pilihSiswaDatalist(input, explicitOption = null) {
     
     if (opt === selectedOption) {
       if(previousNis!==nis)refreshPaymentHistory('');
-      if (window.sppPublishedBilling && previousNis !== nis) clearPaymentAmountsOnContextChange(true);
+      if (previousNis !== nis) {
+        delete opt.dataset.paymentDetailsReady;
+        if (window.sppPublishedBilling) clearPaymentAmountsOnContextChange(true);
+      }
       document.getElementById('disp-nis').value = nis || '';
       document.getElementById('disp-nama').value = nama || '';
       document.getElementById('disp-kelas').value = opt.dataset.kelas || '';
@@ -946,10 +949,11 @@ function publishedSppData(opt = selectedStudentOption()) {
 }
 
 function refreshPublishedKomiteUi(opt = selectedStudentOption()) {
-  let record = null;
-  try { record = JSON.parse(opt?.dataset.komiteBilling || '{}')[selectedPaymentPeriod()] || null; } catch (_) { /* empty */ }
   const live=sppStatusState.contextKey === currentSppStatusContext()?.key ? sppStatusState.payload?.komite : null;
-  if (live) record=live.exists ? live : null;
+  let record = live?.exists ? live : null;
+  if (!live) {
+    try { record = JSON.parse(opt?.dataset.komiteBilling || '{}')[selectedPaymentPeriod()] || null; } catch (_) { /* empty */ }
+  }
   setPaymentComponent('komite', parseNumber(record?.total || 0), parseNumber(record?.paid || 0));
   const context = document.getElementById('komite-context-label');
   if (context) context.textContent = record ? 'Komite ' + paymentPeriodDisplayLabel(selectedPaymentPeriod()) : 'Belum ada tagihan bulan ini.';
@@ -957,14 +961,13 @@ function refreshPublishedKomiteUi(opt = selectedStudentOption()) {
 
 function refreshPublishedSppUi(opt = selectedStudentOption()) {
   if (!window.sppPublishedBilling) return false;
-  const data = publishedSppData(opt) || { tagihan: [] };
-  const bill = data.tagihan.find(item => item.bulan + '-' + item.tahun === selectedPaymentPeriod());
   const contextKey = currentSppStatusContext()?.key || '';
   const live = contextKey && sppStatusState.contextKey === contextKey ? sppStatusState.payload?.selected : null;
+  const bill = live ? null : publishedSppData(opt)?.tagihan.find(item => item.bulan + '-' + item.tahun === selectedPaymentPeriod());
   setPaymentComponent('spp', parseNumber(live?.tariff ?? bill?.total ?? 0), parseNumber(live?.paid ?? bill?.paid ?? 0));
   refreshPublishedKomiteUi(opt);
   const context = document.getElementById('spp-context-label');
-  if (context) context.textContent = bill ? 'SPP ' + paymentPeriodDisplayLabel(selectedPaymentPeriod()) : 'Tidak ada tagihan SPP terbuka bulan ini.';
+  if (context) context.textContent = bill || Number(live?.tariff) > 0 ? 'SPP ' + paymentPeriodDisplayLabel(selectedPaymentPeriod()) : 'Tidak ada tagihan SPP terbuka bulan ini.';
   return true;
 }
 
@@ -1083,7 +1086,7 @@ function refreshDaftarUlangSelector(opt) {
       const hidden = document.getElementById('tagihan-daftar-ulang-id');
       if (hidden) hidden.value = String(record.id);
       const input = document.getElementById('du-input');
-      if (input) input.value = '0';
+      if (input) input.value = paymentEntryAmount(input, '0');
       menu.hidden = true;
       trigger.setAttribute('aria-expanded', 'false');
       setDaftarUlangContext(record.kelas, record.tahun_ajaran);
@@ -1193,7 +1196,7 @@ function applyGraduatePaymentLock(opt) {
     const input = document.getElementById(key + '-input');
     if (!input) return;
     if (graduateOnly && !(window.sppPublishedBilling && (key === 'spp' || key === 'komite'))) {
-      input.value = '0';
+      input.value = paymentEntryAmount(input, '0');
       input.readOnly = true;
       input.classList.add('tbl-readonly');
       input.dataset.graduateLocked = '1';
@@ -1227,7 +1230,7 @@ function applyGraduatePaymentLock(opt) {
     }
   });
   document.querySelectorAll('.biaya-lain-nominal').forEach(input => {
-    if (graduateOnly) input.value = '0';
+    if (graduateOnly) input.value = paymentEntryAmount(input, '0');
     if (graduateOnly) {
       input.readOnly = true;
       input.dataset.graduateLocked = '1';
@@ -1322,7 +1325,7 @@ function setPaymentComponent(key, total, paid) {
 
 function applyStudentPaymentDetails(opt) {
   if (!opt) return;
-  queueMicrotask(() => { if(opt.dataset.psbKnown==='0'){for(const key of ['total','bayar','sisa']){const el=document.getElementById('psb-'+key);if(el)el.value='Belum dapat ditentukan';}const input=document.getElementById('psb-input');if(input){input.value='0';input.readOnly=true;input.setAttribute('aria-readonly','true');}const label=document.getElementById('psb-context-label');if(label)label.textContent='Dasar PSB sumber belum lengkap.';} });
+  queueMicrotask(() => { if(opt.dataset.psbKnown==='0'){for(const key of ['total','bayar','sisa']){const el=document.getElementById('psb-'+key);if(el)el.value='Belum dapat ditentukan';}const input=document.getElementById('psb-input');if(input){input.value = paymentEntryAmount(input, '0');input.readOnly=true;input.setAttribute('aria-readonly','true');}const label=document.getElementById('psb-context-label');if(label)label.textContent='Dasar PSB sumber belum lengkap.';} });
   ensureDefaultDaftarUlangSelection(opt);
   ['psb','spp','komite','du'].forEach(key => {
     if (window.sppPublishedBilling && (key === 'spp' || key === 'komite')) return;
@@ -1371,13 +1374,18 @@ const paymentComponentLabels = {
   du: 'Uang Daftar Ulang'
 };
 
+function paymentEntryAmount(input, value) {
+  const zero = /^(?:0+|0{1,3}(?:\.000)+)(?:,0{1,2})?$|^0+\.0{1,2}$/;
+  return input?.hasAttribute('data-payment-entry-amount') && zero.test(String(value).trim()) ? '' : value;
+}
+
 function setPaymentInputAvailability(input, locked, message = '', clearWhenLocked = false) {
   if (!input) return;
   input.readOnly = locked;
   input.setAttribute('aria-readonly', locked ? 'true' : 'false');
   input.classList.toggle('tbl-readonly', locked);
   if (locked) {
-    if (clearWhenLocked) input.value = '0';
+    if (clearWhenLocked) input.value = paymentEntryAmount(input, '0');
     input.title = message;
     input.setCustomValidity('');
   } else {
@@ -1486,12 +1494,12 @@ function closeSppWarning() {
 function clearPaymentAmountsOnContextChange(studentChanged = false) {
   for (const id of ['spp-input','komite-input',...(studentChanged ? ['psb-input','du-input'] : [])]) {
     const input=document.getElementById(id);
-    if (input) { input.value='0'; input.setCustomValidity(''); }
+    if (input) { input.value = paymentEntryAmount(input, '0'); input.setCustomValidity(''); }
   }
   if (studentChanged) {
     for (const row of document.querySelectorAll('#biaya-lain-list .biaya-lain-row')) {
       const select=row.querySelector('.biaya-lain-select'); if (select) select.value='';
-      const amount=row.querySelector('.biaya-lain-nominal'); if (amount) amount.value='0';
+      const amount=row.querySelector('.biaya-lain-nominal'); if (amount) amount.value = paymentEntryAmount(amount, '0');
     }
   }
   updateTotal();
@@ -1615,6 +1623,7 @@ function applySppStatusPayload(payload) {
   if(opt&&payload.payment_details){
     Object.entries(payload.payment_details).forEach(([key,value])=>{opt.dataset[key]=value!==null&&typeof value==='object'?JSON.stringify(value):String(value??'');});
     opt.dataset.otherFeeChoicesLoaded='1';
+    opt.dataset.paymentDetailsReady='1';
     applyStudentPaymentDetails(opt);
     restorePaymentDraftOtherFees();
   }
@@ -1638,18 +1647,23 @@ async function requestSppStatus(options = {}) {
   const force = options.force === true;
   const sourceElement = options.sourceElement || document.activeElement;
   const urlValue = window.sppPaymentStatusUrl || '';
+  const studentOption = selectedStudentOption();
+  const details = studentOption?.dataset.paymentDetailsLazy === '1' && studentOption.dataset.paymentDetailsReady !== '1';
+  const summary = options.summary === true || details;
   if (!context || !urlValue) {
     resetSppStatusState();
     refreshSppInstallmentAvailability();
     return null;
   }
-  if(!force&&sppStatusState.pending&&sppStatusState.contextKey===context.key&&sppStatusInFlight){
+  if(!force&&sppStatusState.pending&&sppStatusState.contextKey===context.key&&sppStatusInFlight
+    && (!details || sppStatusState.requestDetails) && (!summary || sppStatusState.requestSummary)){
     const payload=await sppStatusInFlight;
     if(interactive&&options.summary&&currentSppStatusContext()?.key===context.key)showPaymentObligations(payload,sourceElement);
     return payload;
   }
 
-  if (!force && sppStatusState.contextKey === context.key && sppStatusState.payload?.ok && !sppStatusState.pending) {
+  if (!force && sppStatusState.contextKey === context.key && sppStatusState.payload?.ok && !sppStatusState.pending
+    && (!details || sppStatusState.payload.payment_details) && (!summary || sppStatusState.payload.obligations)) {
     const cached = sppStatusState.payload;
     if (interactive && sppEditDependencyBlocks(cached.edit_dependency)) {
       showSppWarning(cached.edit_dependency, sourceElement);
@@ -1666,6 +1680,8 @@ async function requestSppStatus(options = {}) {
   if (sppStatusState.contextKey !== context.key) sppStatusState.lastShownKey = '';
   sppStatusState.contextKey = context.key;
   sppStatusState.pending = true;
+  sppStatusState.requestDetails = details;
+  sppStatusState.requestSummary = summary;
   sppStatusState.payload = null;
   refreshSppInstallmentAvailability();
 
@@ -1677,8 +1693,9 @@ async function requestSppStatus(options = {}) {
     const url = new URL(urlValue, window.location.href);
     url.searchParams.set('no_induk', context.noInduk);
     if(Number.isInteger(window.sppPaymentHistoryUnit))url.searchParams.set('unit_id',String(window.sppPaymentHistoryUnit));
-    if(selectedStudentOption()?.dataset.studentId)url.searchParams.set('student_id',selectedStudentOption().dataset.studentId);
-    if(selectedStudentOption()?.dataset.paymentDetailsLazy==='1')url.searchParams.set('details','1');
+    if(studentOption?.dataset.studentId)url.searchParams.set('student_id',studentOption.dataset.studentId);
+    if(details)url.searchParams.set('details','1');
+    if(!summary)url.searchParams.set('summary','0');
     url.searchParams.set('bulan', context.bulan);
     url.searchParams.set('tahun', context.tahun);
     if (context.editId > 0) url.searchParams.set('edit_id', String(context.editId));
@@ -1701,7 +1718,12 @@ async function requestSppStatus(options = {}) {
       if(month&&year&&(month.value!==admissionPeriod.bulan||year.value!==admissionPeriod.tahun)){
         month.value=admissionPeriod.bulan;year.value=admissionPeriod.tahun;
         applySppStatusPayload(payload);refreshSelectedStudentPaymentDetails();window.syncSppDropdowns?.();
-        return await requestSppStatus({force:true,interactive:false});
+        const status = await requestSppStatus({force:true,interactive:false});
+        if (status?.ok && interactive && options.summary && selectedStudentOption() === studentOption
+          && currentSppStatusContext()?.bulan === admissionPeriod.bulan && currentSppStatusContext()?.tahun === admissionPeriod.tahun) {
+          showPaymentObligations(payload,sourceElement);
+        }
+        return status;
       }
     }
     applySppStatusPayload(payload);
@@ -1749,8 +1771,8 @@ function refreshSppInstallmentAvailability() {
     const live = context && sppStatusState.contextKey === context.key ? sppStatusState.payload : null;
     const blocked = !opt || (sppStatusState.pending || !live || live.lock_spp);
     setPaymentInputAvailability(input, blocked, live?.message || (opt ? 'Memeriksa tagihan SPP…' : 'Pilih siswa terlebih dahulu'));
-    if (live && ['not_published', 'not_payable', 'already_paid'].includes(live.status)) input.value = '0';
-    else if (live?.lock_spp && !window.sppEditPaymentId) input.value = '0';
+    if (live && ['not_published', 'not_payable', 'already_paid'].includes(live.status)) input.value = paymentEntryAmount(input, '0');
+    else if (live?.lock_spp && !window.sppEditPaymentId) input.value = paymentEntryAmount(input, '0');
     const due = parseNumber(live?.selected?.remaining || 0);
     const amount = parseNumber(input.value || 0);
     const mismatch = !blocked && amount > .001 && Math.abs(amount - due) > .001;
@@ -1807,7 +1829,7 @@ function refreshSppInstallmentAvailability() {
   const inputValue = parseNumber(input.value || 0);
   setPaymentInputAvailability(input, locked, lockedMessage);
   if (locked) {
-    if (liveStatus?.lock_spp && !window.sppEditPaymentId) input.value = '0';
+    if (liveStatus?.lock_spp && !window.sppEditPaymentId) input.value = paymentEntryAmount(input, '0');
   } else {
     if (inputValue > 0.001 && Math.abs(inputValue - total) > 0.001) {
       input.setCustomValidity('SPP ' + monthLabel + ' ' + year + ' wajib dibayar penuh sebesar Rp ' + formatRupiah(total) + '.');
@@ -1840,7 +1862,7 @@ function refreshOverpaidWarnings() {
 
     row?.classList.toggle('row-overpaid', isOverpaid);
     if (isOverpaid) {
-      inputEl.value = '0';
+      inputEl.value = paymentEntryAmount(inputEl, '0');
       inputEl.disabled = true;
       inputEl.title = 'Input dikunci karena pembayaran sebelumnya sudah melebihi total tagihan.';
       overpaid.push(paymentComponentLabels[key] + ' (total Rp ' + formatRupiah(total) + ', sudah terbayar Rp ' + formatRupiah(paid) + ')');
@@ -1971,7 +1993,12 @@ function formatRupiahString(val) {
 function formatNumericInput(input) {
   let cursorPosition = input.selectionStart;
   const originalLength = input.value.length;
-  const parts=input.value.replace(/[^0-9,]/g,'').split(',');
+  const digits = input.value.replace(/[^0-9,]/g,'');
+  if (!digits && input.hasAttribute?.('data-payment-entry-amount')) {
+    input.value = '';
+    return;
+  }
+  const parts=digits.split(',');
   input.value=Number(parts[0]||0).toLocaleString('id-ID')+(parts.length>1?','+parts.slice(1).join('').slice(0,2):'');
 
   const newLength = input.value.length;
@@ -2011,6 +2038,12 @@ function bindNumericInput(input) {
     if (input.closest('.is-manual-fee')) formatManualFeeInput(input);
     else input.value = formatRupiahString(input.value);
   }
+  if (input.hasAttribute('data-payment-entry-amount')) input.addEventListener('blur', () => {
+    const amount = paymentEntryAmount(input, input.value);
+    if (amount === input.value) return;
+    input.value = amount;
+    updateTotal();
+  });
   let editingManual = false;
   input.addEventListener('beforeinput', event => {
     editingManual = input.closest('.is-manual-fee') && manualFeeTypingPattern.test(input.value)
@@ -2038,23 +2071,27 @@ function initPromotionBatchSelector() {
     context.dataset.ready='1';
     const year=document.getElementById('promotion-source-year'),level=document.getElementById('promotion-source-level');
     const mode=document.getElementById('promotion-mode');
+    const batch = document.querySelector('#promotion-batch-form, #psb-placement-form');
     const applied=[year.value,level.value,mode?.value].join('|');
     const changed=()=>{
-      // PSB is a read-only view of current candidates, without a source placement/year.
-      year.disabled = level.value === 'psb';
+      const isPsb = level.value === 'psb';
+      year.disabled = isPsb;
       year.required = !year.disabled;
       const match=/^(\d{4})\/(\d{4})$/.exec(year.selectedOptions[0]?.textContent.trim()||'');
       const graduation=mode?.value!=='custom'&&Number(level.value)===Number(context.dataset.lastLevel);
-      document.getElementById('promotion-target-label').textContent=level.value==='psb'?'Kelas Tujuan':(graduation?'Tahun Kelulusan':'Tahun Ajaran Tujuan');
-      document.getElementById('promotion-target-year').textContent=level.value==='psb'?'Penempatan PSB':(match?(graduation?match[0]:(Number(match[1])+1)+'/'+(Number(match[2])+1)):'Pilih tahun asal');
+      document.getElementById('promotion-target-label').textContent=isPsb?'Kelas Tujuan':(graduation?'Tahun Kelulusan':'Tahun Ajaran Tujuan');
+      document.getElementById('promotion-target-year').textContent=isPsb?'Kelas '+context.dataset.firstLevel:(match?(graduation?match[0]:(Number(match[1])+1)+'/'+(Number(match[2])+1)):'Pilih tahun asal');
+      document.getElementById('promotion-target-note').textContent = isPsb
+        ? 'Penempatan awal TA ' + context.dataset.psbYear + '.'
+        : (graduation ? 'Kelulusan tercatat pada tahun asal.' : 'Satu tahun setelah tahun asal.');
       const pending=[year.value,level.value,mode?.value].join('|')!==applied;
       document.getElementById('promotion-context-pending')?.toggleAttribute('hidden',!pending);
       const panel=document.querySelector('.class-participants-panel');if(panel)panel.dataset.contextPending=pending?'1':'0';
-      const batch=document.getElementById('promotion-batch-form');if(batch)batch.inert=pending;
-      document.querySelectorAll('#promotion-batch-form button[type="submit"],#promotion-submit-button').forEach(button=>{if(pending){if(!('contextDisabled' in button.dataset))button.dataset.contextDisabled=button.disabled?'1':'0';button.disabled=true;}else if('contextDisabled' in button.dataset){button.disabled=button.dataset.contextDisabled==='1';delete button.dataset.contextDisabled;}});
+      if(batch)batch.inert=pending;
+      batch?.querySelectorAll('button[type="submit"]').forEach(button=>{if(pending){if(!('contextDisabled' in button.dataset))button.dataset.contextDisabled=button.disabled?'1':'0';button.disabled=true;}else if('contextDisabled' in button.dataset){button.disabled=button.dataset.contextDisabled==='1';delete button.dataset.contextDisabled;}});
     };
     year.addEventListener('change',changed);level.addEventListener('change',changed);mode?.addEventListener('change',changed);
-    document.getElementById('promotion-batch-form')?.addEventListener('submit',event=>{if([year.value,level.value,mode?.value].join('|')!==applied){event.preventDefault();event.stopImmediatePropagation();document.getElementById('promotion-context-pending')?.focus();}},true);
+    batch?.addEventListener('submit',event=>{if([year.value,level.value,mode?.value].join('|')!==applied){event.preventDefault();event.stopImmediatePropagation();document.getElementById('promotion-context-pending')?.focus();}},true);
   }
   const form = document.getElementById('promotion-batch-form');
   if (!form || form.dataset.promotionReady === '1') return;
@@ -2342,10 +2379,11 @@ document.addEventListener('DOMContentLoaded', function () {
         if (!input.closest('.is-manual-fee')) input.value = input.value.replace(/\./g, '');
       });
     };
+    let checkingPublishedSubmit = false;
     form.addEventListener('submit', async function (event) {
       if (window.sppPublishedBilling && !window.sppEditPaymentId) {
         event.preventDefault();
-        if (form.dataset.sppSubmitting === '1') return;
+        if (checkingPublishedSubmit || form.dataset.sppSubmitting === '1') return;
         const submitNow = () => {
           if (form.dataset.sppSubmitting === '1') return;
           form.dataset.sppSubmitting = '1';
@@ -2365,7 +2403,6 @@ document.addEventListener('DOMContentLoaded', function () {
         if (!dateInput?.value) { showSppWarning({code:'date_missing',title:'Tanggal bayar belum ada',message:'Pilih tanggal pembayaran sebelum menyimpan.',target:'tgl-bayar'},dateInput,true);return; }
         const amount=parseNumber(document.getElementById('spp-input')?.value || 0);
         const komiteAmount=parseNumber(document.getElementById('komite-input')?.value || 0);
-        const komiteDue=parseNumber(document.getElementById('komite-total')?.value || 0)-parseNumber(document.getElementById('komite-bayar')?.value || 0);
         const total=parseNumber(document.getElementById('hidden-total')?.value || 0);
         if (total <= .001) { showSppWarning({code:'empty_payment',title:'Belum ada pembayaran',message:'Isi setidaknya satu nominal pembayaran sebelum menyimpan.',target:'spp-input'},document.getElementById('spp-input'),true);return; }
         const invalidInput = Array.from(form.querySelectorAll('.tbl-pay, .biaya-lain-nominal, .biaya-lain-select')).find(input => input.validationMessage && !input.readOnly && !input.disabled);
@@ -2382,9 +2419,29 @@ document.addEventListener('DOMContentLoaded', function () {
           const message='Sisa '+label+' Rp '+formatRupiah(remaining)+', tetapi yang diisi Rp '+formatRupiah(parseNumber(invalidInput.value || 0))+'. Kurangi nominalnya sebelum menyimpan.';
           showSppWarning({code:'over_limit',title:'Melebihi sisa tagihan',message,target:invalidInput.id},invalidInput,true);return;
         }
+        let status = null;
+        if (amount > .001 || komiteAmount > .001) {
+          const context = currentSppStatusContext();
+          if (context && sppStatusState.contextKey === context.key) {
+            if (sppStatusState.pending && sppStatusInFlight) {
+              checkingPublishedSubmit = true;
+              try {
+                await sppStatusInFlight;
+              } finally {
+                checkingPublishedSubmit = false;
+              }
+              if (currentSppStatusContext()?.key !== context.key) return;
+            }
+            if (sppStatusState.contextKey === context.key) status = sppStatusState.payload;
+          }
+          if (!status?.ok) {
+            showSppWarning(unavailableSppStatus(), document.getElementById('spp-input'), true);
+            return;
+          }
+        }
+        const komiteDue = Math.max(0, (status?.komite?.total || 0) - (status?.komite?.paid || 0));
         if (amount > .001) {
-          const status=await requestSppStatus({interactive:false,force:true,sourceElement:document.getElementById('spp-input')});
-          if (!status || status.status !== 'payable') { showSppWarning(status || unavailableSppStatus(),document.getElementById('spp-input'),true);return; }
+          if (status.status !== 'payable') { showSppWarning(status,document.getElementById('spp-input'),true);return; }
           if (status.komite && !status.komite.exists) { showSppWarning({code:'billing_changed',title:'Tagihan berubah',message:'Tagihan Komite bulan ini belum tersedia. Perbarui tagihan sebelum menyimpan.',target:'komite-input'},document.getElementById('komite-input'),true);return; }
           const due=parseNumber(status.selected?.remaining || 0);
           if (Math.abs(amount-due)>.001) { showSppWarning({code:'amount_mismatch',title:'Nominal belum sesuai',message:'SPP '+status.selected.label+' harus lunas Rp '+formatRupiah(due)+'. Periksa angka yang diisi.',amount_label:'Sisa SPP Rp '+formatRupiah(due),target:'spp-input'},document.getElementById('spp-input'),true);return; }
@@ -2392,8 +2449,6 @@ document.addEventListener('DOMContentLoaded', function () {
         }
         if (komiteAmount > .001 && Math.abs(komiteAmount-komiteDue)>.001) { showSppWarning({code:'komite_amount',title:'Nominal belum sesuai',message:'Komite '+paymentPeriodDisplayLabel(selectedPaymentPeriod())+' harus lunas Rp '+formatRupiah(komiteDue)+'. Periksa angka yang diisi.',target:'komite-input'},document.getElementById('komite-input'),true);return; }
         if (komiteAmount > .001 && (amount <= .001)) {
-          const status=await requestSppStatus({interactive:false,force:true,sourceElement:document.getElementById('spp-input')});
-          if (!status || !status.ok) { showSppWarning(status || unavailableSppStatus(),document.getElementById('spp-input'),true);return; }
           const sppDue=parseNumber(status.selected?.remaining || 0);
           if (status.status === 'prior_unpaid') { showSppWarning(status,document.getElementById('spp-input'),true);return; }
           if (status.status === 'payable' && sppDue > .001) {
@@ -2498,7 +2553,7 @@ async function restorePaymentDraft() {
   } catch (_) { /* storage unavailable */ }
   if (!draft || !document.getElementById('form-bayar')) return;
   window.sppRestoringDraft=true;
-  const setValue = (id, value) => { const input=document.getElementById(id); if (input && value !== undefined) input.value=String(value); };
+  const setValue = (id, value) => { const input=document.getElementById(id); if (input && value !== undefined) input.value=paymentEntryAmount(input,String(value)); };
   setValue('tgl-bayar', draft.tanggal_bayar);
   if (draft.tanggal_bayar !== undefined) document.getElementById('tgl-bayar')?.dispatchEvent(new Event('change', {bubbles:true}));
   setValue('bulan-bayar', draft.bulan_bayar);
@@ -2535,7 +2590,7 @@ function capturePaymentDraftInBrowser() {
   for (const [key,id] of Object.entries({uang_psb:'psb-input',uang_spp:'spp-input',uang_komite:'komite-input',uang_du:'du-input'})) draft[key]=value(id);
   const rows=Array.from(document.querySelectorAll('#biaya-lain-list .biaya-lain-row'));
   draft.biaya_lain_tagihan_id=rows.map(row => row.querySelector('.biaya-lain-select')?.value || '');
-  draft.biaya_lain_nominal=rows.map(row => row.querySelector('.biaya-lain-nominal')?.value || '0');
+  draft.biaya_lain_nominal=rows.map(row => row.querySelector('.biaya-lain-nominal')?.value ?? '');
   return draft;
 }
 
@@ -2557,7 +2612,8 @@ function restorePaymentDraftOtherFees() {
     const amount=row.querySelector('.biaya-lain-nominal');
     if (amount) {
       const value = draft.biaya_lain_nominal?.[index] ?? '';
-      amount.value = row.classList.contains('is-manual-fee') ? String(value) : formatRupiahString(parseNumber(value));
+      const display = row.classList.contains('is-manual-fee') ? String(value) : formatRupiahString(parseNumber(value));
+      amount.value = paymentEntryAmount(amount, display);
       if (row.classList.contains('is-manual-fee')) formatManualFeeInput(amount);
     }
     refreshBiayaLainRow(row,true);
@@ -2659,7 +2715,7 @@ function refreshBiayaLainOptions() {
     if (current && Array.from(select.options).some(option => option.value === current)) select.value = current;
     else if(current.startsWith('master:')){
       const amount=select.closest('.biaya-lain-row')?.querySelector('.biaya-lain-nominal');
-      if(amount)amount.value='0';
+      if(amount)amount.value = paymentEntryAmount(amount, '0');
     }
   });
   refreshBiayaLainAvailability();
@@ -2716,7 +2772,7 @@ function refreshAnnualPaymentState(opt) {
   const conflicts = annual ? annualSppConflictLabels(opt) : [];
   if (annual && conflicts.length > 0) {
     const message = 'Pembayaran tahunan tidak dapat dibuat karena SPP ' + conflicts.join(', ') + ' sudah dibayar.';
-    sppInput.value = '0';
+    sppInput.value = paymentEntryAmount(sppInput, '0');
     sppInput.readOnly = true;
     if (plan) {
       plan.setCustomValidity(message);
@@ -2843,7 +2899,7 @@ function refreshBiayaLainRow(row, preserveInput) {
   if(optional){
     const tariff=Number(option.dataset.nominal||0);
     if(totalEl)totalEl.value=formatRupiahString(tariff);
-    if(!preserveInput)nominal.value=formatRupiahString(tariff);
+    if(!preserveInput)nominal.value=paymentEntryAmount(nominal,formatRupiahString(tariff));
     let quote=row.querySelector('[data-recurring-quote]');
     if(!quote){quote=document.createElement('input');quote.type='hidden';quote.dataset.recurringQuote='1';row.append(quote);}
     if(quote.dataset.choice!==billId){quote.dataset.choice=billId;quote.value=String(tariff);}
@@ -2863,7 +2919,7 @@ function refreshBiayaLainRow(row, preserveInput) {
     if (totalEl) totalEl.value = legacy ? formatRupiahString(masterTotal) : '0';
     if (paidEl) paidEl.value = '0';
     if (sisaEl) sisaEl.value = legacy ? formatRupiahString(Math.max(0, masterTotal - currentInput)) : '0';
-    if (!preserveInput) nominal.value = '0';
+    if (!preserveInput) nominal.value = paymentEntryAmount(nominal, '0');
     nominal.setCustomValidity('');
     nominal.removeAttribute('aria-invalid');
     nominal.removeAttribute('title');
@@ -2874,7 +2930,7 @@ function refreshBiayaLainRow(row, preserveInput) {
   if (totalEl) totalEl.value = formatRupiahString(masterTotal);
   if (paidEl) paidEl.value = formatRupiahString(alreadyPaid);
   if (!preserveInput) {
-    nominal.value = '0';
+    nominal.value = paymentEntryAmount(nominal, '0');
   }
 
   const inputValue = parseNumber(nominal.value || 0);
@@ -2932,7 +2988,7 @@ function setBiayaLainNominal(row, preserveLegacy) {
   const nominal = row?.querySelector('.biaya-lain-nominal');
   if (!nominal) return;
   if (!preserveLegacy) {
-    nominal.value = '0';
+    nominal.value = paymentEntryAmount(nominal, '0');
   }
   refreshBiayaLainRow(row, preserveLegacy);
   updateTotal();
@@ -2973,7 +3029,8 @@ document.addEventListener('DOMContentLoaded', function () {
       row.querySelector('.biaya-lain-total').value = '0';
       row.querySelector('.biaya-lain-paid').value = '0';
       row.querySelector('.biaya-lain-sisa').value = '0';
-      row.querySelector('.biaya-lain-nominal').value = '0';
+      const amount = row.querySelector('.biaya-lain-nominal');
+      amount.value = paymentEntryAmount(amount, '0');
       row.querySelector('.biaya-lain-nominal').setCustomValidity('');
       row.classList.remove('row-overpaid');
       refreshBiayaLainRow(row, false);
@@ -3326,7 +3383,7 @@ function resetForm() {
   ['psb','spp','komite','du'].forEach(k => {
     ['total','bayar','sisa','input'].forEach(s => {
       const el = document.getElementById(k + '-' + s);
-      if (el) el.value = '0';
+      if (el) el.value = paymentEntryAmount(el, '0');
     });
   });
 

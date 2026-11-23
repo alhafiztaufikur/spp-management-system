@@ -23,20 +23,31 @@ try {
     $scopes[]=['value'=>'unknown','label'=>'Riwayat Lama: Konteks Belum Tercatat'];
     $year=$scope==='active'?$context['year']:$scope;
     $where=$scope==='all'?'':($scope==='unknown'?' AND b.riwayat_tahun_ajaran IS NULL':' AND b.riwayat_tahun_ajaran=?');
-    $s=$koneksi->prepare("SELECT b.*,a.nama operator_nama,COALESCE(du.total,0) du_total,du.years du_years FROM bayar b
+    $s=$koneksi->prepare(hp_sql($koneksi,"SELECT b.id,b.unit_id,b.U_SPP,b.U_PSB,b.U_KOMITE,b.U_LAIN,b.TGL_BYR,b.TAHUN,b.BULAN,b.sistem_pembayaran,b.total_jumlah,
+      b.riwayat_tahun_ajaran,b.riwayat_kelas_snapshot,a.nama operator_nama FROM bayar b
       LEFT JOIN admin a ON b.user_id REGEXP '^[1-9][0-9]*$' AND a.id=CAST(b.user_id AS UNSIGNED)
-      LEFT JOIN (SELECT bayar_id,SUM(jumlah) total,GROUP_CONCAT(DISTINCT th_ajaran ORDER BY th_ajaran SEPARATOR ', ') years FROM bayar_du GROUP BY bayar_id) du ON du.bayar_id=b.id
-      WHERE b.NO_INDUK=?$where ORDER BY b.TGL_BYR DESC,b.id DESC");
+      WHERE b.NO_INDUK=?$where ORDER BY b.TGL_BYR DESC,b.id DESC"));
     if($scope==='all'||$scope==='unknown')$s->bind_param('s',$nis);else $s->bind_param('ss',$nis,$year);
     $s->execute();$payments=$s->get_result()->fetch_all(MYSQLI_ASSOC);$s->close();
-    $events=payment_activity_for_payments($koneksi,array_column($payments,'id'));$rows=[];
+    $paymentIds = array_column($payments,'id');
+    $events = payment_activity_for_payments($koneksi,$paymentIds);
+    $duByPayment = [];
+    foreach (array_chunk($paymentIds, 500) as $ids) {
+        $placeholders = implode(',',array_fill(0,count($ids),'?'));
+        $duRows = hp_rows($koneksi,"SELECT bayar_id,SUM(jumlah) total,GROUP_CONCAT(DISTINCT th_ajaran ORDER BY th_ajaran SEPARATOR ', ') years
+            FROM bayar_du WHERE bayar_id IN ($placeholders) GROUP BY bayar_id",$ids);
+        $duByPayment += array_column($duRows,null,'bayar_id');
+    }
+    $rows=[];
     foreach($payments as $p){
+        $du=$duByPayment[$p['id']]??null;
+        $duTotal=(float)($du['total']??0);
         $components=[];foreach(['U_SPP'=>'SPP','U_PSB'=>'PSB','U_KOMITE'=>'Komite'] as $key=>$label)if((float)$p[$key]>.001)$components[]=$label;
-        if((float)$p['U_LAIN']-(float)$p['du_total']>.001)$components[]='Biaya Lain';
-        if((float)$p['du_total']>.001)$components[]='Daftar Ulang (TA '.$p['du_years'].')';
+        if((float)$p['U_LAIN']-$duTotal>.001)$components[]='Biaya Lain';
+        if($duTotal>.001)$components[]='Daftar Ulang (TA '.$du['years'].')';
         $creator=payment_activity_summary($events[(int)$p['id']]??[])['creator'];
-        $caps=payment_capabilities($koneksi,$p,$events[(int)$p['id']]??[],false,[]);
-        $rows[]=['id'=>(int)$p['id'],'unit_id'=>(int)$p['unit_id'],'tanggal_raw'=>$p['TGL_BYR'],'period_key'=>(int)$p['TAHUN']*100+report_month_code((string)$p['BULAN']),'total_raw'=>(float)$p['total_jumlah'],'components'=>$components,'can_detail'=>true,'can_print'=>$caps['can_print'],'detail_url'=>'detail.php?'.http_build_query(['id'=>(int)$p['id'],'unit_id'=>(int)$p['unit_id'],'readonly'=>'1']),'print_url'=>$caps['can_print']?'../laporan/cetak_struk.php?id='.(int)$p['id']:null,'time_precision'=>'datetime','tanggal_date'=>spp_date_parts($p['TGL_BYR'])['date'],'tanggal_time'=>spp_date_parts($p['TGL_BYR'])['time'],'tanggal'=>spp_date_label($p['TGL_BYR'],true),'periode'=>(report_months()[report_month_code((string)$p['BULAN'])]??$p['BULAN']).' '.$p['TAHUN'],
+        $canPrint=payment_print_allowed((int)$p['unit_id'],(int)($creator['actor_id']??0));
+        $rows[]=['id'=>(int)$p['id'],'unit_id'=>(int)$p['unit_id'],'tanggal_raw'=>$p['TGL_BYR'],'period_key'=>(int)$p['TAHUN']*100+report_month_code((string)$p['BULAN']),'total_raw'=>(float)$p['total_jumlah'],'components'=>$components,'can_detail'=>true,'can_print'=>$canPrint,'detail_url'=>'detail.php?'.http_build_query(['id'=>(int)$p['id'],'unit_id'=>(int)$p['unit_id'],'readonly'=>'1']),'print_url'=>$canPrint?'../laporan/cetak_struk.php?id='.(int)$p['id']:null,'time_precision'=>'datetime','tanggal_date'=>spp_date_parts($p['TGL_BYR'])['date'],'tanggal_time'=>spp_date_parts($p['TGL_BYR'])['time'],'tanggal'=>spp_date_label($p['TGL_BYR'],true),'periode'=>(report_months()[report_month_code((string)$p['BULAN'])]??$p['BULAN']).' '.$p['TAHUN'],
           'komponen'=>$components?implode(', ',$components):'Koreksi','metode'=>$p['sistem_pembayaran'],'operator'=>($creator['actor_name']??'')?:($p['operator_nama']?:'Tidak tercatat'),
           'total'=>'Rp '.number_format((float)$p['total_jumlah'],0,',','.'),'context_year'=>$p['riwayat_tahun_ajaran'],'context_class'=>$p['riwayat_kelas_snapshot']];
     }

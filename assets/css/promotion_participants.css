@@ -14,3 +14,21 @@
 [data-theme=dark] .participants-status-pindah{background:#183a54;color:#98cfff}[data-theme=dark] .participants-status-lulus{background:#35234f;color:#d2b1ff}
 
 .participants-held>summary:focus-visible{outline:2px solid var(--orange,#a46410);outline-offset:-4px}.participants-held-list .btn{font-size:13px;min-height:42px}.participants-toggle{font-size:13px;min-height:44px}@media(prefers-reduced-motion:reduce){.participants-held-chevron{transition:none}}
+[data-participants-pages] {
+  --pager-next-bg: var(--accent-hover);
+  --pager-next-text: #fff;
+  --pager-focus: var(--accent);
+}
+html[data-theme="dark"] [data-participants-pages] {
+  --pager-next-bg: var(--accent);
+  --pager-next-text: var(--bg-base);
+}
+[data-participants-pages] > button:last-child:not(:disabled) {
+  background: var(--pager-next-bg);
+  border-color: var(--pager-next-bg);
+  color: var(--pager-next-text);
+}
+[data-participants-pages] > button:focus-visible {
+  outline: 2px solid var(--pager-focus);
+  outline-offset: 2px;
+}

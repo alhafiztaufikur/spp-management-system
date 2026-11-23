@@ -36,11 +36,6 @@ html:has(body[data-readable-workspace="master-classes"]){scroll-behavior:auto;sc
 .class-workspace .report-filter-grid{grid-template-columns:repeat(2,minmax(0,1fr));gap:14px;}
 .class-workspace .report-filter-actions{grid-column:1/-1;padding:0;display:flex;gap:8px;background:none;border:0;border-radius:0;box-shadow:none;}
 .class-add-panel .report-filter-actions .btn-primary{flex:1;justify-content:center;}
-.class-workspace #promotion-context-form{grid-template-columns:repeat(3,minmax(0,1fr));gap:16px 24px;margin:0;}
-.class-workspace #promotion-context-form>.field-row{position:relative;}
-.class-workspace #promotion-context-form .field-row:nth-child(3){grid-column:auto;}
-.class-workspace #promotion-target-year{font-size:12px;font-weight:650;border-radius:9px;min-height:48px;padding:14px;background:var(--bg-surface);}
-.class-context-panel .field-row>small{font-size:10px;line-height:1.6;color:var(--text-muted);margin-top:7px;}
 .class-context-panel .alert{margin:10px 0;font-size:11px;line-height:1.6;}
 .class-workspace .class-list-heading{flex-wrap:wrap;}
 .class-view-switch{display:flex;gap:5px;margin-left:auto;flex-wrap:wrap;}
@@ -142,9 +137,8 @@ html:has(body[data-readable-workspace="master-classes"]){scroll-behavior:auto;sc
 .class-participants-panel>.alert,.class-participants-panel .alert{font-size:11px;line-height:1.7;}
 @media(max-width:1400px){.class-workspace-content{margin:22px 22px 30px;}.class-stat{padding:16px 14px;gap:10px;}.class-stat strong{font-size:23px;}.class-workspace .main-card{padding:17px;}.class-workspace .promotion-student-identity .class-student-avatar{display:none;}.class-list-panel[data-rombel-view=cards] .rombel-data-table tbody{gap:10px;}.class-list-panel[data-rombel-view=cards] .rombel-data-table tr{padding:12px;}.class-roster-head,.class-workspace .promotion-student-row{grid-template-columns:18px 18px minmax(0,1fr) 53px 93px;gap:6px;}.class-workspace .promotion-filter-bar{grid-template-columns:minmax(0,1fr) 145px;}}
 @media(max-width:1100px){.class-summary-grid{grid-template-columns:repeat(2,minmax(0,1fr));}.class-top-grid,.class-bottom-grid{grid-template-columns:1fr;}.class-workspace .promotion-student-identity .class-student-avatar{display:grid;}.class-list-panel[data-rombel-view=cards] .rombel-data-table tbody{grid-template-columns:repeat(3,minmax(0,1fr));}}
-@media(max-width:700px){.class-workspace-content{margin:18px 12px 24px;gap:14px;}.class-page-heading h1{font-size:24px;}.class-stat{padding:14px 11px;gap:8px;}.class-stat .class-workspace-icon{width:28px;height:28px;}.class-stat svg{width:18px;height:18px;}.class-stat strong{font-size:22px;}.class-stat small{font-size:9px;}.class-workspace .main-card{padding:16px;}.class-workspace #promotion-context-form{grid-template-columns:1fr;}.class-workspace .report-filter-grid{grid-template-columns:1fr;}.class-list-panel[data-rombel-view=cards] .rombel-data-table tbody{grid-template-columns:1fr;}.class-workspace .master-class-filter-bar{grid-template-columns:repeat(2,minmax(0,1fr))!important;}.class-view-switch{margin-left:0;width:100%;}.class-workspace .master-class-summary>div{flex-direction:column;align-items:flex-start;}.class-workspace .promotion-stage-overview{grid-template-columns:1fr;gap:12px;}.class-workspace .promotion-filter-bar{grid-template-columns:1fr;}.class-roster-head{display:none;}.class-workspace #promotion-student-list{border-radius:10px;max-height:480px;}.class-workspace .promotion-student-row,.class-workspace [data-graduation="1"] .promotion-student-row{grid-template-columns:20px minmax(0,1fr);gap:9px;padding:14px;}.class-workspace .promotion-student-check{grid-column:1;grid-row:1;align-self:start;}.class-roster-number{display:none;}.class-workspace .promotion-student-identity{grid-column:2;grid-row:1;}.class-workspace .promotion-student-row>.kelas-badge,.class-workspace .promotion-target-field{grid-column:2;}.class-workspace .promotion-target-field>label{display:block;font-size:10px;color:var(--text-muted);margin-bottom:5px;}.class-workspace .promotion-submit-bar{flex-direction:column;align-items:stretch;}.class-workspace .promotion-submit-bar>div{flex:none;}.class-workspace .promotion-submit-bar .btn{width:100%;min-width:0;}.class-workspace .du-pagination{max-width:100%;}}
+@media(max-width:700px){.class-workspace-content{margin:18px 12px 24px;gap:14px;}.class-page-heading h1{font-size:24px;}.class-stat{padding:14px 11px;gap:8px;}.class-stat .class-workspace-icon{width:28px;height:28px;}.class-stat svg{width:18px;height:18px;}.class-stat strong{font-size:22px;}.class-stat small{font-size:9px;}.class-workspace .main-card{padding:16px;}.class-workspace .report-filter-grid{grid-template-columns:1fr;}.class-list-panel[data-rombel-view=cards] .rombel-data-table tbody{grid-template-columns:1fr;}.class-workspace .master-class-filter-bar{grid-template-columns:repeat(2,minmax(0,1fr))!important;}.class-view-switch{margin-left:0;width:100%;}.class-workspace .master-class-summary>div{flex-direction:column;align-items:flex-start;}.class-workspace .promotion-stage-overview{grid-template-columns:1fr;gap:12px;}.class-workspace .promotion-filter-bar{grid-template-columns:1fr;}.class-roster-head{display:none;}.class-workspace #promotion-student-list{border-radius:10px;max-height:480px;}.class-workspace .promotion-student-row,.class-workspace [data-graduation="1"] .promotion-student-row{grid-template-columns:20px minmax(0,1fr);gap:9px;padding:14px;}.class-workspace .promotion-student-check{grid-column:1;grid-row:1;align-self:start;}.class-roster-number{display:none;}.class-workspace .promotion-student-identity{grid-column:2;grid-row:1;}.class-workspace .promotion-student-row>.kelas-badge,.class-workspace .promotion-target-field{grid-column:2;}.class-workspace .promotion-target-field>label{display:block;font-size:10px;color:var(--text-muted);margin-bottom:5px;}.class-workspace .promotion-submit-bar{flex-direction:column;align-items:stretch;}.class-workspace .promotion-submit-bar>div{flex:none;}.class-workspace .promotion-submit-bar .btn{width:100%;min-width:0;}.class-workspace .du-pagination{max-width:100%;}}
 
-@media(max-width:700px){.class-workspace #promotion-context-form>.field-row::after{display:none;}}
 
 /* The same form nodes remain mounted while the two page sections switch. */
 .class-workspace .class-page-heading{display:flex;align-items:center;justify-content:space-between;gap:1.25rem;padding:1.25rem;background:linear-gradient(115deg,var(--bg-card),var(--accent-glow));border:1px solid var(--border);border-radius:1rem;}
@@ -160,15 +154,7 @@ html[data-theme="dark"] .class-workspace :is(.class-mode-tabs a[aria-selected=tr
 .class-manage-grid{display:grid;grid-template-columns:minmax(16rem,.65fr) minmax(0,1.35fr);gap:1rem;align-items:start;}
 .class-manage-grid:has(>.class-list-panel:only-child){grid-template-columns:minmax(0,1fr);}
 .class-workspace #naik-kelas{display:grid;gap:1rem;}
-.class-workspace .class-context-panel{display:grid;grid-template-columns:minmax(12rem,.3fr) minmax(0,1fr);gap:1rem;align-items:start;}
-.class-workspace .class-context-panel>.card-title-row{margin:0;}
-.class-workspace .class-context-panel>#promotion-context-form{grid-column:2;grid-row:1;}
-.class-workspace .class-context-panel>.alert{grid-column:1/-1;}
-.class-workspace .class-context-panel:not(:has(>#promotion-context-form)){grid-template-columns:minmax(0,1fr);}
 .class-workspace .class-participants-panel{min-width:0;}
-.class-workspace #promotion-context-form{grid-template-columns:repeat(3,minmax(0,1fr)) auto;gap:1rem 1.5rem;align-items:start;}
-.class-workspace #promotion-context-form .report-filter-actions{grid-column:auto;align-self:start;padding-top:1.75rem;}
-.class-workspace #promotion-context-form>.field-row::after{top:2.75rem;}
 .class-workspace #promotion-batch-form{display:grid;grid-template-columns:minmax(0,1fr) minmax(0,1fr);gap:1rem;align-items:start;}
 .class-workspace .class-source-panel{grid-column:1;grid-row:1;}
 .class-workspace .class-destination-panel{grid-column:2;grid-row:1;}
@@ -280,15 +266,11 @@ html[data-theme="dark"] .class-workspace .class-add-shortcut{background:var(--bg
 @media(max-width:1100px){
   .class-workspace .class-page-heading{align-items:flex-start;flex-direction:column;}
   .class-manage-grid{grid-template-columns:minmax(0,1fr);}
-  .class-workspace #promotion-context-form{grid-template-columns:repeat(3,minmax(0,1fr));}
-  .class-workspace #promotion-context-form .report-filter-actions{grid-column:1/-1;padding-top:0;}
-  .class-workspace .class-context-panel{grid-template-columns:minmax(0,1fr);}
-  .class-workspace .class-context-panel>#promotion-context-form{grid-column:1;grid-row:auto;}
 }
 @media(max-width:700px){
   .class-mode-tabs{width:100%;box-sizing:border-box;}
   .class-mode-tabs a{flex:1;padding:.75rem .5rem;}
-  .class-workspace #promotion-batch-form,.class-workspace #promotion-context-form{grid-template-columns:minmax(0,1fr);}
+  .class-workspace #promotion-batch-form{grid-template-columns:minmax(0,1fr);}
   .class-workspace #promotion-batch-form>:is(.class-source-panel,.class-roster-panel,.class-destination-panel){grid-column:1;grid-row:auto;}
   .class-workspace .class-roster-panel .class-roster-head{display:none;}
   .class-workspace .class-roster-panel .promotion-student-row,.class-workspace [data-graduation="1"] .class-roster-panel .promotion-student-row{grid-template-columns:2rem minmax(0,1fr);min-width:0;gap:.625rem .75rem;}

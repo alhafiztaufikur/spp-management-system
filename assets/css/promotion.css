@@ -1,8 +1,64 @@
-/* Scoped layout for explicit promotion context; shared design remains unchanged. */
-#promotion-context-form{grid-template-columns:repeat(3,minmax(0,1fr));align-items:start;gap:14px;margin-bottom:18px}
-#promotion-context-form .field-row{min-width:0}
-#promotion-context-form .report-filter-actions{grid-column:1/-1;display:flex;align-items:center}
-#promotion-target-year{display:block;padding:10px 14px;border:1px solid var(--border,rgba(130,145,150,.3));border-radius:10px;min-height:44px;font-size:15px}
-@media(max-width:768px){#promotion-context-form{grid-template-columns:repeat(2,minmax(0,1fr))}#promotion-context-form .field-row:nth-child(3){grid-column:1/-1}}
-@media(max-width:480px){#promotion-context-form{grid-template-columns:minmax(0,1fr)}}
+.class-workspace .class-context-panel {
+  display: grid;
+  gap: 1rem;
+}
+.promotion-context-heading h2 {
+  margin: 0;
+  font-size: 1.125rem;
+  line-height: 1.4;
+}
+.promotion-context-heading p {
+  margin: .25rem 0 0;
+  color: var(--text-muted);
+  font-size: .875rem;
+  line-height: 1.5;
+}
+.class-workspace #promotion-context-form {
+  grid-template-columns: repeat(4, minmax(0, 1fr));
+  align-items: start;
+  gap: .875rem 1rem;
+  margin: 0;
+}
+#promotion-target-year {
+  display: flex;
+  align-items: center;
+  padding: .625rem .875rem;
+  border: 1px solid var(--border);
+  border-radius: 10px;
+  background: var(--bg-surface);
+}
+.class-context-panel .field-row > small {
+  margin-top: .375rem;
+  color: var(--text-muted);
+  font-size: .8125rem;
+  line-height: 1.45;
+}
+.promotion-context-actions {
+  grid-column: 1 / -1;
+  display: flex;
+  align-items: center;
+  flex-wrap: wrap;
+  gap: .625rem 1rem;
+  padding-top: .875rem;
+  border-top: 1px solid var(--border);
+}
+#promotion-context-pending {
+  margin: 0;
+  color: var(--text-secondary);
+  font-size: .875rem;
+  line-height: 1.5;
+}
+.promotion-context-actions .btn { margin-inline-start: auto; }
+.promotion-context-actions .btn:focus-visible {
+  outline: 2px solid var(--accent);
+  outline-offset: 3px;
+}
+
+@media (max-width: 1120px) {
+  .class-workspace #promotion-context-form { grid-template-columns: repeat(2, minmax(0, 1fr)); }
+}
+@media (max-width: 699px) {
+  .class-workspace #promotion-context-form { grid-template-columns: minmax(0, 1fr); }
+  .promotion-context-actions .btn { width: 100%; }
+}
 

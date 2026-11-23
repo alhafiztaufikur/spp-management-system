@@ -2,7 +2,7 @@
 require_once __DIR__.'/tagihan_sekali.php';
 require_once __DIR__.'/daftar_ulang.php';
 /** Current balance, with the DU year fixed to the receipt period (not print date). */
-function payment_receipt_remaining(mysqli $db,array $payment): array {
+function payment_receipt_remaining(mysqli $db,array $payment,bool $singleStudent=false): array {
     if(array_key_exists('student_id',$payment)&&empty($payment['student_id']))return [['Sisa PSB',null,'Tidak berlaku'],['Sisa DU',null,'Tidak berlaku']];
     $nis=(string)$payment['NO_INDUK'];$psb=one_time_fee_status($db,$nis);
     $lines=[['Sisa PSB',!empty($psb['psb']['known'])?$psb['psb']['remaining']:null,'Belum dapat ditentukan']];
@@ -15,8 +15,8 @@ function payment_receipt_remaining(mysqli $db,array $payment): array {
     $explicitBill=$billId?du_find_bill_by_id($db,$billId):null;
     if($explicitBill&&$explicitBill['no_induk']!==$nis)throw new RuntimeException('Tagihan DU pada struk tidak cocok dengan siswa.');
     if($explicitBill&&$explicitBill['no_induk']===$nis)$year=$explicitBill['tahun_ajaran'];
-    if(!$explicitBill&&$year!==''&&!empty(du_psb_state($db,$nis,$year)['covered_psb'])){$lines[]=['DU tahun pertama',null,'Tercakup PSB'];return $lines;}
-    $bill=$billId?du_find_bill_by_id($db,$billId):($year!==''?lf_one($db,'SELECT id FROM tagihan_daftar_ulang WHERE no_induk=? AND tahun_ajaran_snapshot=? AND status=\'open\'',[$nis,$year]):null);
+    if(!$explicitBill&&$year!==''&&!empty(du_psb_state($db,$nis,$year,singleStudent:$singleStudent)['covered_psb'])){$lines[]=['DU tahun pertama',null,'Tercakup PSB'];return $lines;}
+    $bill=$billId?$explicitBill:($year!==''?lf_one($db,'SELECT id FROM tagihan_daftar_ulang WHERE no_induk=? AND tahun_ajaran_snapshot=? AND status=\'open\'',[$nis,$year]):null);
     if($bill&&!isset($bill['sisa']))$bill=du_find_bill_by_id($db,(int)$bill['id']);
     if($bill&&$bill['status']==='open')$lines[]=['Sisa DU',(float)$bill['sisa']];
     else {$proof=$year!==''?lb_du_source($db,$nis,$year):null;
