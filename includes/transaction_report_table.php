@@ -14,7 +14,7 @@ function transaction_report_table(mysqli $db,array $rows,int $offset=0,bool $sel
       <thead><tr><?php if($selectable): ?><th scope="col" class="select-col"><input data-print-all type="checkbox" class="select-print-check" aria-label="Pilih semua transaksi dalam tabel ini"></th><?php endif; ?><th scope="col" class="report-number-col">No</th><th scope="col" class="report-id-col">No. Induk</th><th scope="col" class="report-name-col">Nama Siswa</th><th scope="col" class="kelas-col">Kelas</th><th scope="col" class="report-period-col">Bulan Tagihan</th><th scope="col" class="report-method-col">Sistem</th><th scope="col" class="nominal">Total Bayar</th><th scope="col" class="report-date-col">Tanggal Bayar</th><th scope="col" class="aksi-col">Aksi</th></tr></thead>
       <tbody><?php if(!$rows): ?><tr><td colspan="<?= $selectable?10:9 ?>">Tidak ada transaksi sesuai filter.</td></tr><?php endif; ?>
       <?php foreach($rows as $i=>$row):
-        $period=$row['periode']??trim($row['BULAN'].' '.$row['TAHUN']);
+        $period=$row['payment_period_label']??$row['periode']??trim($row['BULAN'].' '.$row['TAHUN']);
         $desktopPeriod=$row['payment_period_numeric_label']??$period;
         if(!isset($row['payment_period_numeric_label'])&&($month=lb_payment_month($period))!=='')
             $desktopPeriod=payment_period_numeric_label($month);

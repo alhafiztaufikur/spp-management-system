@@ -12,6 +12,12 @@ if (!payment_period_schema_ready($db)) throw new RuntimeException('Install the f
 unit_set_context($db,1);
 
 $command = $argv[1] ?? 'seed';
+if ($command === 'xlsx_rows') {
+    require_once __DIR__.'/../vendor/autoload.php';
+    $workbook = \PhpOffice\PhpSpreadsheet\IOFactory::load($argv[2]);
+    echo json_encode($workbook->getActiveSheet()->toArray(),JSON_THROW_ON_ERROR);
+    exit;
+}
 if ($command === 'reports') {
     require_once __DIR__.'/../includes/reports.php';
     $nis = $argv[2];

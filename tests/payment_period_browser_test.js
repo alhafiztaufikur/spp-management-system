@@ -356,10 +356,14 @@ async function approve(ctx,id) {
     const params = new URLSearchParams({tanggal_awal:'2026-11-23',tanggal_akhir:'2026-11-23',q:fixture.cases.main.nis});
     const report = await admin.newPage();
     await report.goto(base+'/laporan/index.php?'+params);
-    assert.match(await report.locator('body').innerText(),/November 2026\s*–\s*April 2027/);
+    const reportPeriod = report.locator('tbody .report-period-col');
+    assert.equal(await reportPeriod.innerText(),'11 2026 – 04 2027');
+    assert.equal(await reportPeriod.locator('.report-period-default').textContent(),'November 2026 – April 2027');
     const sheet = await (await admin.request.get(base+'/laporan/export_excel.php?'+params+'&download=1')).body();
     assert.equal(sheet.subarray(0,2).toString(),'PK');
-    fs.writeFileSync(path.join(artifacts,'rekap-transaksi.xlsx'),sheet);
+    const spreadsheetPath = path.join(artifacts,'rekap-transaksi.xlsx');
+    fs.writeFileSync(spreadsheetPath,sheet);
+    assert.ok(JSON.parse(cli('xlsx_rows',spreadsheetPath)).some(row => row.includes('November 2026 – April 2027')));
     const tokenPage = await openForm(cashier);
     const token = await tokenPage.locator('#form-bayar input[name=csrf_token]').inputValue();
     await post(cashier,base,{aksi:'hapus',id:initial.id,_operational_unit:'1',csrf_token:token,authorization_reason:'Pembatalan seluruh kuitansi uji'});
@@ -371,7 +375,9 @@ async function approve(ctx,id) {
     assert.ok(cancelled.events.some(event=>event.action==='deleted'&&event.payment_id===initial.id));
     const archived = await openForm(cashier);
     await archived.goto(base+'/pembayaran/lihat.php?view=deleted&all_periods=1&search='+fixture.cases.main.nis);
-    assert.match(await archived.locator('body').innerText(),/November 2026\s*–\s*April 2027/);
+    const archivedPeriod = archived.locator('[data-payment-record][aria-current="true"] .ph-period-numeric');
+    assert.equal(await archivedPeriod.isVisible(),true);
+    assert.equal(await archivedPeriod.innerText(),'11 2026 – 04 2027');
     assert.deepEqual(errors,[]);
     console.log('PASS authorization, full cancellation, stable receipt number and reports');
   } finally {

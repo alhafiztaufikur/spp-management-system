@@ -99,9 +99,14 @@ function transaction_report_components(mysqli $db,array $rows): array {
 
 function transaction_report_export_section(mysqli $db,array $section): array {
     require_once __DIR__.'/excel.php';
+    require_once __DIR__.'/payment_period.php';
+    $section['rows']=payment_period_meta_for_rows($db,$section['rows']);
     $parts=transaction_report_components($db,$section['rows']);
     $section['columns'][]=['komponen','Rincian Komponen'];
-    foreach($section['rows'] as &$row)$row['komponen']=$parts[(int)$row['id']]??'—';unset($row);
+    foreach($section['rows'] as &$row){
+        $row['periode']=$row['payment_period_label']??$row['periode'];
+        $row['komponen']=$parts[(int)$row['id']]??'—';
+    }unset($row);
     $section['title']='Transaksi Pembayaran';
     return general_excel_sections([$section])[0];
 }
