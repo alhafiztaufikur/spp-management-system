@@ -18,20 +18,36 @@ function receipt_money_words(float $amount): string {
     return ucfirst(($whole?trim(receipt_amount_words($whole)):'nol').($fraction?' koma '.$digits[intdiv($fraction,10)].' '.$digits[$fraction%10]:'').' rupiah');
 }
 
+function receipt_du_label(?string $academicYear): string {
+    return $academicYear ? 'Uang DU '.$academicYear : 'Uang DU';
+}
+
 function receipt_school_primary(array $payment): array {
     return [
         ['Uang PSB', $payment['U_PSB'] ?? 0],
-        ['Uang Daftar Ulang'.(!empty($payment['du_tahun_ajaran'])?' '.$payment['du_tahun_ajaran'].' / Kelas '.$payment['du_kelas']:''), $payment['uang_du'] ?? 0],
+        [receipt_du_label($payment['du_tahun_ajaran'] ?? null), $payment['uang_du'] ?? 0],
         ['Uang SPP', $payment['U_SPP'] ?? 0],
         ['Komite Sekolah', $payment['U_KOMITE'] ?? 0],
         ['Tabungan Wajib', 0],
     ];
 }
 
+function receipt_other_fee_lines(mysqli $db,int $paymentId): array {
+    require_once __DIR__.'/history_performance.php';
+    $lines = [];
+    foreach (hp_rows($db,'SELECT nama_biaya_snapshot,nominal_snapshot,keterangan FROM bayar_biaya_lain WHERE bayar_id=? ORDER BY urutan,id',[$paymentId]) as $detail) {
+        if (abs((float)$detail['nominal_snapshot']) < .005) continue;
+        $label = $detail['nama_biaya_snapshot'];
+        if (trim((string)$detail['keterangan']) !== '') $label .= ' - '.$detail['keterangan'];
+        $lines[] = [$label,$detail['nominal_snapshot']];
+    }
+    return $lines;
+}
+
 /** Presentation only: callers supply the original receipt values and wording. */
 function receipt_print_document(array $receipts, string $title, string $toolbar, bool $pdf = false, array $options = []): void {
     $e=static fn($value)=>htmlspecialchars((string)$value,ENT_QUOTES|ENT_SUBSTITUTE,'UTF-8');
-    // Dompdf needs percentages for fixed table columns; preserve the 5/36/3/23 mm proportions.
+    // Dompdf needs percentages for fixed table columns; match the 5/44/3/23 mm widths in receipt_print.css.
     $money=static fn($value,bool $zero=false)=>!$zero&&abs((float)$value)<.005?'':number_format((float)$value,abs((float)$value-round((float)$value))>.00001?2:0,',','.');
     ?>
     <!doctype html><html lang="id"><head><meta charset="utf-8"><meta name="viewport" content="width=device-width,initial-scale=1">
@@ -63,7 +79,7 @@ function receipt_print_document(array $receipts, string $title, string $toolbar,
       </thead>
       <tbody>
       <?php for($i=0;$i<$count;$i++): ?><tr class="receipt-line">
-        <td><?php if(isset($receipt['primary'][$i])): [$label,$amount]=$receipt['primary'][$i]; $primaryAmount=$money($amount); ?><table class="payments<?= $savings?'':' receipt-primary-payment' ?>"><tr><td class="number"<?= $pdf&&!$savings?' style="width:7.462687%"':'' ?>><?= $i+1 ?>.</td><td class="receipt-payment-label"<?= $pdf&&!$savings?' style="width:53.731343%"':'' ?>><?= $e($label) ?></td><td class="receipt-colon"<?= $pdf&&!$savings?' style="width:4.477612%!important"':'' ?>>:</td><td class="amount"<?= $pdf&&!$savings?' style="width:34.328358%"':'' ?>><?php if(!$savings&&strlen($primaryAmount)>10): ?><span class="receipt-amount-text" style="<?= $pdf?'font-size':'--receipt-amount-size' ?>:<?= round(105/strlen($primaryAmount),2) ?>pt"><?= $e($primaryAmount) ?></span><?php else: ?><?= $e($primaryAmount) ?><?php endif; ?></td></tr></table><?php endif; ?></td>
+        <td><?php if(isset($receipt['primary'][$i])): [$label,$amount]=$receipt['primary'][$i]; $primaryAmount=$money($amount); ?><table class="payments<?= $savings?'':' receipt-primary-payment' ?>"><tr><td class="number"<?= $pdf&&!$savings?' style="width:6.666667%"':'' ?>><?= $i+1 ?>.</td><td class="receipt-payment-label"<?= $pdf&&!$savings?' style="width:58.666667%"':'' ?>><?= $e($label) ?></td><td class="receipt-colon"<?= $pdf&&!$savings?' style="width:4%!important"':'' ?>>:</td><td class="amount"<?= $pdf&&!$savings?' style="width:30.666667%"':'' ?>><?php if(!$savings&&strlen($primaryAmount)>10): ?><span class="receipt-amount-text" style="<?= $pdf?'font-size':'--receipt-amount-size' ?>:<?= round(105/strlen($primaryAmount),2) ?>pt"><?= $e($primaryAmount) ?></span><?php else: ?><?= $e($primaryAmount) ?><?php endif; ?></td></tr></table><?php endif; ?></td>
         <td><?php if(isset($right[$i]['heading'])): ?><strong class="section-label"><?= $e($right[$i]['heading']) ?></strong><?php elseif(isset($right[$i]['line'])): [$label,$amount]=$right[$i]['line']; ?><table class="payments"><tr><td><?= !empty($right[$i]['remaining'])?'<strong>'.$e($label).'</strong>':$e($label) ?></td><?php if(!empty($right[$i]['remaining'])&&!$savings): ?><td class="receipt-colon">:</td><?php endif; ?><td class="amount"><?= $amount===null?(!empty($right[$i]['remaining'])?$e($right[$i]['line'][2]??($label==='Sisa DU'?'-':'Belum dapat ditentukan')):''):$e($money($amount,!empty($right[$i]['remaining']))) ?></td></tr></table><?php endif; ?></td>
       </tr><?php endfor; ?>
       <?php if($savings): ?><tr class="receipt-line"><td colspan="2" style="padding-top:2mm"><strong>Keterangan:</strong> <?= nl2br($e($receipt['note']?:'—')) ?></td></tr><?php endif; ?>

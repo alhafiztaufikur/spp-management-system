@@ -21,15 +21,11 @@ function lful_operator_options(mysqli $db): array {
     // Operator IDs encode the exact source bytes. A case-insensitive DISTINCT
     // can discard a valid ID (including case or trailing-space variants).
     $parts=[];foreach($tables as $table){
-        $count=$table==='legacy_op_payments'?'SUM(cancelled=0)':($table==='legacy_full_payments'?'COUNT(*)':'0');
-        $parts[]="SELECT unit_id,JSON_OBJECTAGG(HEX(COALESCE(source_operator,'')),1) operator_codes,'$table' origin_kind,$count active_receipts FROM $table p WHERE $where".($table==='legacy_op_journals'?" AND origin='legacy'":'')." GROUP BY unit_id";
+        $parts[]="SELECT unit_id,JSON_OBJECTAGG(HEX(COALESCE(source_operator,'')),1) operator_codes FROM $table p WHERE $where".($table==='legacy_op_journals'?" AND origin='legacy'":'')." GROUP BY unit_id";
     }
-    $counts=['legacy_op_payments'=>0,'legacy_full_payments'=>0];
     foreach(lf_rows($db,hp_scan_sql($db,hp_operator_sql($db,implode(' UNION ALL ',$parts)))) as $r){
         foreach(json_decode($r['operator_codes'],true,512,JSON_THROW_ON_ERROR) as $hex=>$unused){$operator=hex2bin((string)$hex);$out[lful_operator_key((int)$r['unit_id'],$operator)]='Legacy · '.unit_label((int)$r['unit_id']).' · '.($operator?:'Tidak tercatat');}
-        if(isset($counts[$r['origin_kind']]))$counts[$r['origin_kind']]+=(int)$r['active_receipts'];
     }
-    if(PHP_SAPI!=='cli'&&($_SERVER['REQUEST_METHOD']??'')==='GET')$GLOBALS['lful_operator_counts'][hp_connection_key($db).':'.(int)($GLOBALS['app_unit_id']??unit_active_id())]=$counts;
     return $options[$cacheKey]=$out;
 }
 /** Negative UI IDs are a disjoint read namespace, never written to bayar or authorization. */

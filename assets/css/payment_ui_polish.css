@@ -123,6 +123,24 @@
 .sh-detail-dialog .ph-info-grid small{font-size:12px;line-height:1.7}
 .sh-detail-dialog .ph-detail-actions{justify-content:flex-end;margin-top:20px;padding-top:16px;border-top:1px solid var(--border)}
 .sh-detail-dialog .ph-detail-actions .history-receipt-button{flex:0 1 auto}
+@media (min-width:1101px) {
+  .payment-input-controls .history-periode {font-variant-numeric:tabular-nums;white-space:nowrap}
+  .payment-input-controls .history-periode .ph-period-default {display:none}
+  .payment-input-controls .history-periode .ph-period-numeric {display:inline}
+  .payment-input-controls #sh-detail[open] {display:flex;flex-direction:column;width:min(880px,calc(100vw - 48px));max-height:calc(100dvh - 48px)}
+  .payment-input-controls #sh-detail > header {flex:none;flex-wrap:nowrap}
+  .payment-input-controls #sh-detail-close {
+    flex:none;display:inline-flex;align-items:center;justify-content:center;
+    width:auto;min-width:72px;height:42px;padding:0 14px;
+    border:1px solid var(--border);border-radius:9px;background:var(--bg-card);
+    font:650 14px/1 var(--font-body);white-space:nowrap;
+  }
+  .payment-input-controls #sh-detail-close:hover {background:var(--accent-glow)}
+  .payment-input-controls #sh-detail-content {min-height:0;max-height:none;overflow:auto;overscroll-behavior:contain}
+  .payment-input-controls #sh-detail .ph-student-period {
+    display:flex;flex-direction:column;align-items:flex-end;min-width:0;max-width:42%;text-align:right;
+  }
+}
 /* Selection tint covers the receipt footer as part of the same registration card. */
 .du-record-wrap{background:var(--bg-card)}
 .du-record-wrap:has(.du-record.is-selected){background:var(--accent-glow);border-color:var(--accent)}

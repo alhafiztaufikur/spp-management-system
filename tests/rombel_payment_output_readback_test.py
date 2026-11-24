@@ -11,7 +11,7 @@ for engine in ["chrome","msedge"]:
    with fitz.open(file) as pdf:
     assert len(pdf)==1, (file,len(pdf))
     text=pdf[0].get_text()
-    assert all(word in text for word in ["Uang Daftar Ulang","Buku Paket","135.000","Sistem Pembayaran:","Jam Bayar:"]),file
+    assert all(word in text for word in ["Uang DU","Buku Paket","135.000","Sistem Pembayaran:","Jam Bayar:"]),file
     assert "terkini" not in text,file
     assert len(pdf[0].get_fonts())>0,file
     assert abs(pdf[0].rect.width-612)<1 and abs(pdf[0].rect.height-396)<1,file

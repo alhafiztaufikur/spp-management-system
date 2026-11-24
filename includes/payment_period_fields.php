@@ -1,15 +1,21 @@
 <?php
-$periodOptions = ['monthly'=>'1 Bulan','range'=>'Beberapa Bulan','academic'=>'Satu Tahun Ajaran'];
-$periodMode = isset($periodOptions[$periodMode ?? '']) ? $periodMode : 'monthly';
-$periodChoice = $periodChoice ?? '';
 $periodEditId = $periodEditId ?? 0;
+$periodOptions = $periodEditId
+    ? ['range'=>'Multi Bulan','academic'=>'Satu Tahun Ajaran']
+    : ['monthly'=>'1 Bulan','range'=>'Multi Bulan'];
+$periodChoice = $periodChoice ?? '';
+if (!$periodEditId && ($periodMode ?? '') === 'academic') {
+    $periodMode = 'range';
+    $periodChoice = '';
+}
+$periodMode = isset($periodOptions[$periodMode ?? '']) ? $periodMode : array_key_first($periodOptions);
 ?>
 <div class="payment-period-select">
   <label class="field-label" for="payment-period-mode">Periode Tagihan SPP &amp; Komite</label>
   <select class="field-input field-select" id="payment-period-mode" name="payment_plan"
       data-unit="<?= unit_active_id() ?>" data-edit-id="<?= (int)$periodEditId ?>"
       data-choice="<?= htmlspecialchars($periodChoice,ENT_QUOTES,'UTF-8') ?>">
-    <?php foreach (($periodEditId ? array_slice($periodOptions,1,true) : $periodOptions) as $value=>$label): ?>
+    <?php foreach ($periodOptions as $value=>$label): ?>
       <option value="<?= $value ?>"<?= $periodMode === $value ? ' selected' : '' ?>><?= $label ?></option>
     <?php endforeach; ?>
   </select>

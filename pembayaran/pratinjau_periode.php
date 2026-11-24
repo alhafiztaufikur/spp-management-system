@@ -21,16 +21,16 @@ try {
     $mode = $_GET['mode'] ?? '';
     $choice = $_GET['choice'] ?? '';
     $edit = (int)($_GET['edit_id'] ?? 0);
-    if (!is_string($nis) || !in_array($mode,['range','academic'],true) || !is_string($choice)) {
+    if (!is_string($nis) || ($mode !== 'range' && !($edit > 0 && $mode === 'academic')) || !is_string($choice)) {
         throw new DomainException('Pilihan periode tidak valid.');
     }
     $old = null;
     if ($edit) {
         payment_assert_owner($koneksi,$edit,(int)$_SESSION['admin_id']);
         $meta = payment_period_meta($koneksi,$edit);
-        if (!$meta) throw new DomainException('Pembayaran beberapa bulan tidak ditemukan.');
+        if (!$meta) throw new DomainException('Pembayaran Multi Bulan tidak ditemukan.');
         $old = lf_one($koneksi,'SELECT NO_INDUK FROM bayar WHERE id=?',[$edit])['NO_INDUK'] ?? null;
-        if ($old === null) throw new DomainException('Pembayaran beberapa bulan tidak ditemukan.');
+        if ($old === null) throw new DomainException('Pembayaran Multi Bulan tidak ditemukan.');
         payment_assert_edit_student((string)$old, $nis);
     }
     session_write_close();

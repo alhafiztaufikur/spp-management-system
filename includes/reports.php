@@ -19,6 +19,10 @@ function report_scoped_query(mysqli $db,string $sql,int $mode=MYSQLI_STORE_RESUL
 function report_e($value): string { return htmlspecialchars((string)$value, ENT_QUOTES, 'UTF-8'); }
 function report_money($value): string { if($value===null)return '—';$v=round((float)$value,2);return 'Rp '.number_format($v,$v===floor($v)?0:2,',','.'); }
 function report_months(): array { return ['01'=>'Januari','02'=>'Februari','03'=>'Maret','04'=>'April','05'=>'Mei','06'=>'Juni','07'=>'Juli','08'=>'Agustus','09'=>'September','10'=>'Oktober','11'=>'November','12'=>'Desember']; }
+function report_status_months(): array {
+    $months = report_months();
+    return array_slice($months, 6, null, true) + array_slice($months, 0, 6, true);
+}
 function report_month_code($value): string {
     $names = array_flip(report_months());
     if (isset($names[$value])) return $names[$value];

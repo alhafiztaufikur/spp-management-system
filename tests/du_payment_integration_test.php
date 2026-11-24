@@ -135,7 +135,7 @@ try {
     $stmt->bind_param('s', $students[0]); $stmt->execute(); $payment = $stmt->get_result()->fetch_assoc(); $stmt->close();
     du_http_assert($payment && (int)$payment['tagihan_daftar_ulang_id'] === $studentBills[$previous] && $payment['th_ajaran'] === $previous && $payment['kelas'] === '1', 'Snapshot DU tidak disalin dari tagihan terpilih.');
     $receipt = du_http_request($baseUrl . '/laporan/cetak_struk.php?id=' . (int)$payment['id'], [], $cookies);
-    du_http_assert($receipt['status'] === 200 && str_contains($receipt['body'], 'Uang Daftar Ulang (TA ' . $previous . ')'), 'Struk tidak menampilkan tahun tagihan Daftar Ulang.');
+    du_http_assert($receipt['status'] === 200 && str_contains($receipt['body'], '>Uang DU ' . $previous . '</td>'), 'Struk tidak menampilkan label dan tahun tagihan DU.');
 
     du_http_assert($submit($students[1], 0, 100000)['status'] === 302 && str_contains(du_http_flash($baseUrl, $cookies), 'Pilih tagihan Daftar Ulang'), 'Submit DU tanpa ID tidak ditolak.');
     du_http_assert($submit($students[1], $studentBills[$previous], 100000)['status'] === 302 && str_contains(du_http_flash($baseUrl, $cookies), 'tidak cocok dengan siswa'), 'ID tagihan milik siswa lain tidak ditolak.');

@@ -114,7 +114,7 @@ function authorization_proposed_snapshot(array $before,array $payload): array
         $after['payment']['payment_period_label'] = payment_period_range_label($plan['range']);
         $after['payment']['U_SPP'] = $plan['spp_total']/100;
         $after['payment']['U_KOMITE'] = $plan['komite_total']/100;
-        $after['payment']['total_jumlah'] = $plan['total']/100;
+        $after['payment']['total_jumlah'] = $plan['total']/100 + payment_period_additional_total($before);
         $rows = [];
         foreach ($plan['rows'] as $row) {
             $spp = $row['spp']['remaining'];

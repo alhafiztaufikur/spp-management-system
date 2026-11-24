@@ -141,7 +141,7 @@ async function submit(page, button = '#btn-input') {
 
     await page.goto(new URL(`/laporan/cetak_struk.php?id=${firstId}`, base).href);
     const receipt = await page.locator('body').innerText();
-    assert.match(receipt, /Uang Daftar Ulang \(TA 2025\/2026\)/);
+    assert.match(receipt, /Uang DU 2025\/2026/);
     assert.match(receipt, /SPP Juli 2026/);
     assert.match(receipt, /Komite Sekolah \(Juli 2026\)/);
 

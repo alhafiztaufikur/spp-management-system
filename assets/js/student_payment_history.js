@@ -24,7 +24,14 @@
       const tr=document.createElement('tr'),date=cell('','history-tanggal');
       const day=document.createElement('span'),clock=document.createElement('small');
       day.textContent=r.tanggal_date||r.tanggal||'Tanggal tidak tercatat';clock.textContent=r.tanggal_time||'';
-      date.append(day,clock);tr.append(date,cell(r.periode),cell(r.komponen));
+      const period = cell(r.periode,'history-periode');
+      if (r.periode_numeric && r.periode_numeric !== r.periode) {
+        const normal = document.createElement('span'), numeric = document.createElement('span');
+        normal.className = 'ph-period-default'; normal.textContent = r.periode;
+        numeric.className = 'ph-period-numeric'; numeric.textContent = r.periode_numeric;
+        period.replaceChildren(normal,numeric);
+      }
+      date.append(day,clock);tr.append(date,period,cell(r.komponen));
       const td=cell(''),badge=document.createElement('span'),name=methodName(r.metode);badge.className='history-method sh-method-'+normalized(name);badge.textContent=name==='Qris'?'QRIS':name;td.append(badge);tr.append(td,cell(r.operator),cell(r.total,'history-total'));
       const actions=cell('','sh-row-actions'),button=document.createElement('button');button.type='button';button.className='sh-more';button.textContent=textControls&&!document.body.classList.contains('payment-input-controls')?'Tindakan':'\u22ee';button.setAttribute('aria-label','Tindakan transaksi '+r.id);button.setAttribute('aria-haspopup','menu');button.setAttribute('aria-expanded','false');button.addEventListener('click',()=>openMenu(button,r));button.addEventListener('keydown',e=>{if(e.key==='ArrowDown'){e.preventDefault();openMenu(button,r);}});actions.append(button);tr.append(actions);fragment.append(tr);
     }

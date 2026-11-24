@@ -51,6 +51,8 @@ async function openForm(ctx,origin = base) {
   const page = await ctx.newPage();
   await page.goto(origin+'/pembayaran/form.php');
   await page.locator('.payment-period-select .spp-select-trigger').waitFor();
+  const saved = page.locator('#payment-saved-dialog[open] #payment-saved-continue');
+  if (await saved.isVisible()) await saved.click();
   return page;
 }
 async function cashSetup(page) {
@@ -62,6 +64,12 @@ async function choose(page,scenario,mode,value,expectSummary = false) {
   await selectStudent(page,scenario,expectSummary);
   await page.selectOption('#payment-period-choice',value);
   await cashSetup(page);
+}
+async function enterAdditionalFees(page, mode) {
+  await page.locator('#psb-input').fill('40000');
+  await page.locator('#du-input').fill('25000,50');
+  await page.locator('#biaya-lain-list .biaya-lain-select').selectOption('master:'+fixture.fees[mode].id);
+  await page.locator('#biaya-lain-list .biaya-lain-nominal').fill(mode === 'berulang' ? '20000' : '12345,50');
 }
 async function oneReceipt(page,transaction) {
   const url = base+'/laporan/cetak_struk.php?id='+transaction.id;
@@ -76,6 +84,21 @@ async function oneReceipt(page,transaction) {
     const amount = new Intl.NumberFormat('id-ID',{maximumFractionDigits:2}).format(transaction[key]);
     assert.ok(contents.includes(amount),key+' missing from receipt');
   }
+  if (Number(transaction.U_PSB) > 0) assert.match(contents,/Uang PSB\s*:\s*40\.000/);
+  if (transaction.du.length) {
+    const label = slip.getByText('Uang DU 2026/2027',{exact:true});
+    assert.match(contents,/Uang DU 2026\/2027\s*:\s*25\.000,50/);
+    const lineCounts = await label.evaluate(async cell => {
+      await document.fonts.ready;
+      return [cell, cell.nextElementSibling, cell.parentElement.lastElementChild].map(part => {
+        const text = document.createRange();
+        text.selectNodeContents(part);
+        return text.getClientRects().length;
+      });
+    });
+    assert.deepEqual(lineCounts,[1,1,1]);
+  }
+  for (const item of transaction.other) assert.ok(contents.includes(item.nama_biaya_snapshot));
   assert.ok(await slip.locator('.receipt-payment-signature').evaluate(el=>el.getBoundingClientRect().height>52));
   const printPages = await page.evaluate(async () => {
     await document.fonts.ready;
@@ -122,6 +145,7 @@ async function approve(ctx,id) {
     assert.equal((await alternateIdentity.json()).server_uuid,manifest.server_uuid);
     const page = await openForm(cashier);
     assert.equal(await activeMode(page).inputValue(),'monthly');
+    assert.deepEqual(await activeMode(page).locator('option').allTextContents(),['1 Bulan','Multi Bulan']);
     assert.equal(await page.locator('.payment-period-inputs').isVisible(),true);
     const cards = await page.locator('.payment-settings-grid > .payment-field-card').evaluateAll(nodes=>nodes.map(node=>node.getBoundingClientRect().toJSON()));
     assert.equal(cards.length,3);
@@ -152,8 +176,19 @@ async function approve(ctx,id) {
       .getByRole('option',{name:'Tunai',exact:true}).click();
     assert.equal(await page.locator('#sistem-pembayaran').inputValue(),'Tunai');
     assert.match(await page.locator('#totalJumlah').innerText(),/1\.200\.001/);
-    assert.equal(await page.locator('#psb-input').isVisible(),false);
-    assert.equal(await page.locator('#psb-input').isDisabled(),true);
+    assert.equal(await page.locator('#spp-input').isDisabled(),true);
+    assert.equal(await page.locator('#komite-input').isDisabled(),true);
+    assert.equal(await page.locator('.form-payment-table tbody tr:visible').count(),2);
+    assert.equal(await page.locator('#psb-input').isVisible(),true);
+    assert.equal(await page.locator('#du-input').isVisible(),true);
+    const sections = await page.locator('#payment-period-heading, #form-bayar .section-divider span').allTextContents();
+    assert.deepEqual(sections.slice(-4),['Rincian SPP & Komite','Rincian Pembayaran','Lain-lain','History Transaksi Siswa']);
+    await enterAdditionalFees(page,'berulang');
+    await page.selectOption('#payment-period-choice','');
+    assert.equal(Number(await page.locator('#hidden-total').inputValue()),85000.50);
+    await page.selectOption('#payment-period-choice','2027-02');
+    await ready(page);
+    assert.equal(Number(await page.locator('#hidden-total').inputValue()),1285001.50);
     assert.equal(await page.locator('#form-bayar').evaluate(form=>form.scrollWidth<=form.clientWidth+2),true);
     await page.evaluate(() => scrollTo(0,0));
     await page.screenshot({path:path.join(artifacts,'desktop-1366-light.png'),fullPage:true});
@@ -162,7 +197,7 @@ async function approve(ctx,id) {
     await page.locator('#btn-input').click();
     await future.waitFor();
     assert.match(await future.innerText(),/Februari 2027/);
-    assert.match(await future.innerText(),/1\.200\.001/);
+    assert.match(await future.innerText(),/1\.285\.001,5/);
     await future.getByRole('button',{name:'Kembali',exact:true}).click();
     assert.equal(state('main').payments.length,0);
     await page.locator('#btn-input').click();
@@ -170,19 +205,30 @@ async function approve(ctx,id) {
     assert.equal(await page.locator('#payment-saved-dialog').isVisible(),true);
     const initial = state('main').payments[0];
     assert.equal(initial.allocations.length,4);
-    assert.equal(Number(initial.total_jumlah),1200001);
+    assert.equal(Number(initial.total_jumlah),1285001.50);
+    assert.equal(Number(initial.U_PSB),40000);
+    assert.equal(Number(initial.du[0].jumlah),25000.50);
+    assert.equal(Number(initial.du[0].tagihan_daftar_ulang_id),fixture.cases.main.du_id);
+    assert.equal(initial.other[0].origin,'purchase');
+    assert.equal(Number(initial.other[0].nominal_snapshot),20000);
     assert.deepEqual(initial.allocations.map(row=>row.period),['2026-11','2026-12','2027-01','2027-02']);
     await post(cashier,base,original);
     assert.equal(state('main').payments.length,1);
     const receipt = await cashier.newPage();
     await oneReceipt(receipt,initial);
     const history = await cashier.request.get(base+'/pembayaran/history_siswa.php?scope=all&unit_id=1&no_induk='+fixture.cases.main.nis);
-    assert.match(await history.text(),/November 2026.*Februari 2027/);
+    const historyRow = (await history.json()).rows.find(row => row.id === initial.id);
+    assert.match(historyRow.periode,/November 2026.*Februari 2027/);
+    assert.equal(historyRow.periode_numeric,'11 2026 – 02 2027');
+    assert.ok(historyRow.components.includes('Biaya Lain'));
+    assert.equal(historyRow.total,'Rp 1.285.001,50');
+    const historyDetail = await cashier.request.get(base+'/pembayaran/'+historyRow.detail_url);
+    assert.ok((await historyDetail.text()).includes(fixture.fees.berulang.name));
     console.log('PASS four-month checkout, receipt, replay and student history');
 
     const annual = await openForm(admin);
     await annual.evaluate(() => document.documentElement.dataset.theme = 'dark');
-    await choose(annual,'annual','academic','2027/2028');
+    await choose(annual,'annual','range','2028-06');
     await ready(annual);
     assert.equal(await annual.locator('.payment-range-table tbody tr').count(),12);
     assert.equal(await annual.locator('#form-bayar').evaluate(form=>form.scrollWidth<=form.clientWidth+2),true);
@@ -192,18 +238,48 @@ async function approve(ctx,id) {
     const yearPayment = state('annual').payments[0];
     assert.equal(yearPayment.allocations.length,12);
     assert.deepEqual([yearPayment.range.mulai,yearPayment.range.akhir],['2027-07','2028-06']);
+    assert.equal(yearPayment.range.mode,'range');
     await oneReceipt(await admin.newPage(),yearPayment);
+    cli('historical_annual',String(yearPayment.id));
+    const historical = await supervisor.newPage();
+    await historical.goto(base+'/pembayaran/edit.php?id='+yearPayment.id);
+    await ready(historical);
+    assert.equal(await activeMode(historical).inputValue(),'academic');
+    assert.equal(await historical.locator('.payment-range-table tbody tr').count(),12);
+    await historical.selectOption('[name=sistem_pembayaran]','VA');
+    await Promise.all([historical.waitForNavigation(),historical.getByRole('button',{name:'Simpan Koreksi'}).click()]);
+    assert.equal(state('annual').payments[0].range.mode,'academic');
+    assert.equal(state('annual').payments[0].sistem_pembayaran,'VA');
 
     const arrears = await openForm(admin);
-    await chooseMode(arrears,'academic');
-    await selectStudent(arrears,'arrears');
-    await arrears.waitForFunction(() => document.getElementById('payment-period-mode').value === 'monthly');
-    assert.equal(await arrears.locator('#bulan-bayar').inputValue(),'10');
-    assert.equal(await arrears.locator('#tahun-bayar').inputValue(),'2026');
-    assert.equal(await arrears.locator('#form-bayar').getAttribute('data-arrears-period'),'2026-10');
-    const blocked = {...await input(arrears),payment_plan:'range',period_choice:'2026-12',period_version:'a'.repeat(64)};
+    await choose(arrears,'arrears','range','2026-12',true);
+    await ready(arrears);
+    assert.equal(await activeMode(arrears).inputValue(),'range');
+    assert.equal(await arrears.locator('[data-payment-period-oldest]').innerText(),'Oktober 2026');
+    const arrearsInput = await input(arrears);
+    const blocked = {...arrearsInput,period_version:'a'.repeat(64)};
     await post(admin,base,blocked);
     assert.equal(state('arrears').payments.length,0);
+    await post(admin,base,arrearsInput);
+    assert.deepEqual(state('arrears').payments[0].allocations.map(row=>row.period),['2026-10','2026-11','2026-12']);
+
+    const extras = await openForm(admin);
+    await chooseMode(extras,'range');
+    await selectStudent(extras,'extras',true);
+    await cashSetup(extras);
+    await extras.locator('[data-payment-period-status]').filter({hasText:'Belum ada tagihan SPP atau Komite'}).waitFor();
+    assert.equal(await extras.locator('#btn-input').isDisabled(),true);
+    await enterAdditionalFees(extras,'input_manual');
+    assert.equal(await extras.locator('#payment-period-choice').inputValue(),'');
+    assert.equal(Number(await extras.locator('#hidden-total').inputValue()),77346);
+    await Promise.all([extras.waitForNavigation(),extras.locator('#btn-input').click()]);
+    const extrasPayment = state('extras').payments[0];
+    assert.equal(extrasPayment.range,null);
+    assert.deepEqual([extrasPayment.BULAN,extrasPayment.TAHUN],['11','2026']);
+    assert.equal(Number(extrasPayment.total_jumlah),77346);
+    assert.equal(Number(extrasPayment.du[0].jumlah),25000.50);
+    assert.equal(Number(extrasPayment.other[0].nominal_snapshot),12345.50);
+
     const three = await openForm(admin);
     await choose(three,'three','range','2027-01');
     await ready(three);
@@ -226,11 +302,11 @@ async function approve(ctx,id) {
     const monthPayment = state('monthly').payments[0];
     assert.equal(monthPayment.range,null);
     assert.equal(Number(monthPayment.total_jumlah),300000.25);
-    await choose(monthly,'monthly','academic','2026/2027');
+    await choose(monthly,'monthly','range','2027-01');
     await ready(monthly);
-    assert.match(await monthly.locator('.payment-range-table tbody tr').nth(4).innerText(),/Sudah lunas/);
-    assert.equal(await monthly.locator('.payment-range-table tbody tr').nth(0).getByText('Tidak ditagihkan').count(),2);
-    console.log('PASS annual checkout, 12-month receipt, unpublished blocker, monthly checkout and settled periods');
+    assert.equal(await monthly.locator('[data-payment-period-oldest]').innerText(),'Desember 2026');
+    assert.equal(await monthly.locator('.payment-range-table tbody tr').count(),2);
+    console.log('PASS 12-month range, historical annual correction, arrears, additional fees without a range, and monthly checkout');
 
     const a = await openForm(admin);
     const b = await openForm(supervisor,alternate);
@@ -243,6 +319,7 @@ async function approve(ctx,id) {
     const rollback = await openForm(admin);
     await choose(rollback,'rollback','range','2026-12');
     await ready(rollback);
+    await rollback.locator('#psb-input').fill('10000');
     const rollbackInput = await input(rollback);
     cli('inject_failure',fixture.cases.rollback.nis);
     try {
@@ -253,6 +330,7 @@ async function approve(ctx,id) {
     }
     await post(admin,base,rollbackInput);
     assert.equal(state('rollback').payments.length,1);
+    assert.equal(Number(state('rollback').payments[0].U_PSB),10000);
     console.log('PASS concurrent checkout, atomic rollback and retry');
 
     const edit = await cashier.newPage();
@@ -323,6 +401,9 @@ async function approve(ctx,id) {
     assert.equal(corrected.id,initial.id);
     assert.equal(corrected.sistem_pembayaran,'VA');
     assert.equal(corrected.allocations.length,6);
+    assert.equal(corrected.U_PSB,initial.U_PSB);
+    assert.deepEqual(corrected.du,initial.du);
+    assert.deepEqual(corrected.other,initial.other);
     const historyView = await supervisor.newPage();
     await historyView.setViewportSize({width:1620,height:940});
     await historyView.goto(base+'/pembayaran/lihat.php?all_periods=1&selected='+initial.id+'&search='+fixture.cases.main.nis);
@@ -349,7 +430,7 @@ async function approve(ctx,id) {
     await oneReceipt(receipt,corrected);
     const reports = JSON.parse(cli('reports',fixture.cases.main.nis));
     assert.equal(reports.receipts.length,1);
-    assert.equal(reports.receipts[0].total_penerimaan,1800001.5);
+    assert.equal(reports.receipts[0].total_penerimaan,1885002);
     assert.equal(reports.monthly.spp['2027-02'],250000.25);
     assert.equal(reports.monthly.komite['2027-04'],50000);
 
@@ -364,6 +445,24 @@ async function approve(ctx,id) {
     const spreadsheetPath = path.join(artifacts,'rekap-transaksi.xlsx');
     fs.writeFileSync(spreadsheetPath,sheet);
     assert.ok(JSON.parse(cli('xlsx_rows',spreadsheetPath)).some(row => row.includes('November 2026 – April 2027')));
+
+    const statusParams = new URLSearchParams({template:'status',unit:'1',tahun_ajaran:'2026/2027',q:fixture.cases.main.nis});
+    const expectedPeriods = ['Juli 2026','Agustus 2026','September 2026','Oktober 2026','November 2026','Desember 2026','Januari 2027','Februari 2027','Maret 2027','April 2027','Mei 2027','Juni 2027'];
+    const columnPeriods = async () => (await report.locator('.report-horizontal-matrix th[scope=colgroup]').allTextContents()).map(label => label.split(' · ').at(-1));
+    statusParams.set('kategori','spp');
+    await report.goto(base+'/laporan/template.php?'+statusParams+'&bulan_awal%5B%5D=*');
+    assert.deepEqual(await columnPeriods(),expectedPeriods);
+    statusParams.set('kategori','komite');
+    for (const value of ['01','12','11']) statusParams.append('bulan_awal[]',value);
+    await report.goto(base+'/laporan/template.php?'+statusParams);
+    assert.deepEqual(await columnPeriods(),expectedPeriods.slice(4,7));
+    const statusExcel = await report.getByRole('link',{name:'Excel',exact:true}).getAttribute('href');
+    const statusSheet = await (await admin.request.get(base+'/laporan/'+statusExcel+'&download=1')).body();
+    assert.equal(statusSheet.subarray(0,2).toString(),'PK');
+    const statusPath = path.join(artifacts,'status-pembayaran.xlsx');
+    fs.writeFileSync(statusPath,statusSheet);
+    const headings = JSON.parse(cli('xlsx_rows',statusPath)).flat().filter(cell => typeof cell === 'string' && /^Komite .+2026\/2027 /i.test(cell));
+    assert.deepEqual(headings.map(label => label.match(/\b(?:Nov|Des|Jan) 202[67]$/)?.[0]),['Nov 2026','Des 2026','Jan 2027']);
     const tokenPage = await openForm(cashier);
     const token = await tokenPage.locator('#form-bayar input[name=csrf_token]').inputValue();
     await post(cashier,base,{aksi:'hapus',id:initial.id,_operational_unit:'1',csrf_token:token,authorization_reason:'Pembatalan seluruh kuitansi uji'});

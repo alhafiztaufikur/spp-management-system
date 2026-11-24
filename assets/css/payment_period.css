@@ -257,7 +257,7 @@
 .payment-input-controls #spp-warning-overlay { display: none; transition: none; }
 .payment-input-controls #spp-warning-overlay.show { display: grid; visibility: visible; opacity: 1; }
 .payment-input-controls #spp-warning-overlay .spp-warning-dialog { transition: none; }
-[data-payment-period-controls][hidden], [data-payment-period-start][hidden],
+[data-payment-period-monthly-row][hidden], [data-payment-period-controls][hidden], [data-payment-period-start][hidden],
 [data-payment-period-preview][hidden], [data-payment-period-table][hidden], [data-payment-period-monthly][hidden], #payment-period-label[hidden] {
   display: none !important;
 }

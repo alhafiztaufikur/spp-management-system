@@ -15,17 +15,22 @@ function payment_history_period(array $p): string
     $raw=(string)($p['BULAN']??'');
     return ($months[$raw]??str_pad($raw,2,'0',STR_PAD_LEFT)).' '.($p['TAHUN']??'Tidak tercatat');
 }
+function payment_history_numeric_period(string $period): string
+{
+    $period = trim($period);
+    $months = [];
+    foreach (preg_split('~\s*[–—]\s*|\s+-\s+~u',$period,2) ?: [$period] as $part) {
+        $month = lb_payment_month($part);
+        if ($month === '') return $period;
+        $months[] = payment_period_numeric_label($month);
+    }
+    return implode(' – ',$months);
+}
 function payment_history_period_html(array $payment): string
 {
     $period=trim(payment_history_period($payment));
     $label=authorization_escape($period);
-    $months=[];
-    foreach(preg_split('~\s*[–—]\s*|\s+-\s+~u',$period,2) ?: [$period] as $part){
-        $month=lb_payment_month($part);
-        if($month==='')return $label;
-        $months[]=payment_period_numeric_label($month);
-    }
-    $numeric=implode(' – ',$months);
+    $numeric=payment_history_numeric_period($period);
     if($numeric===$period)return $label;
     return '<span class="ph-period-default">'.$label.'</span><span class="ph-period-numeric">'.authorization_escape($numeric).'</span>';
 }

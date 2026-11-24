@@ -194,6 +194,7 @@ $classSearch = trim((string)($_GET['q_kelas'] ?? ''));
 $levelOptions=['psb'=>'PSB'];foreach(range($unitMinLevel,$unitMaxLevel) as $level)$levelOptions[(string)$level]='Kelas '.$level;
 $classLevels=filter_register('tingkat_kelas',$_GET['tingkat_kelas']??null,$levelOptions);
 $classStatuses=filter_register('status_kelas',$_GET['status_kelas']??null,['aktif'=>'Aktif','nonaktif'=>'Nonaktif','placeholder'=>'Placeholder']);
+$classFiltered = $classSearch !== '' || !filter_is_all($classLevels) || !filter_is_all($classStatuses);
 $classLevelFilter=filter_scalar($classLevels);$classStatusFilter=filter_scalar($classStatuses);
 filter_register('source_rombel_filter',$_GET['source_rombel_filter']??null,array_map(static fn($r)=>$r['label'],$promotionSourceRombels),$promotionDefaultSourceKey);
 filter_output_start();
@@ -298,11 +299,23 @@ require_once __DIR__.'/includes/master_workspace_ui.php';
     </div></details>
     <?php endif; ?>
       <div class="class-manage-grid">
-    <section class="main-card master-modern-card master-modern-list class-list-panel" data-rombel-view="groups">
-      <div class="card-title-row class-list-heading"><div><div class="card-title">Daftar Rombel per Kelas</div></div><span class="class-group-total"><?= number_format($classTotalRows) ?> rombel hasil filter</span></div>
+    <section class="main-card master-modern-card master-modern-list class-list-panel" data-rombel-view="groups" aria-labelledby="class-list-title">
+      <header class="card-title-row class-list-heading">
+        <div><h2 class="card-title" id="class-list-title">Daftar Rombel per Kelas</h2></div>
+        <span class="class-group-total">
+          <?= number_format($classTotalRows) ?> rombel<span<?= $classFiltered ? '' : ' class="class-filter-label-unfiltered"' ?>> hasil filter</span>
+          <?php if ($classFiltered): ?><a class="class-list-reset" href="master_kelas.php#kelola-rombel">Tampilkan semua rombel</a><?php endif; ?>
+        </span>
+        <?php if (!unit_all_readonly()): ?>
+          <div class="class-list-actions">
+            <a class="btn btn-primary" href="#class-rombel-form" data-open-class-form><?= master_workspace_icon('plus') ?>Tambah Rombel</a>
+            <a class="btn btn-ghost" href="master_kelas.php?special_new=1#special-classes">Tambah Kelas Khusus</a>
+          </div>
+        <?php endif; ?>
+      </header>
       <div class="class-view-switch" hidden role="group" aria-label="Tampilan daftar rombel"><button type="button" data-class-view="groups" aria-pressed="true">Per Kelas</button><button type="button" data-class-view="table" aria-pressed="false">Tabel</button></div>
       <div class="class-level-groups">
-      <?php if (!$classGroups): ?><div class="empty-state"><p>Rombel tidak ditemukan</p><span>Ubah pencarian atau filter yang dipilih.</span></div><?php endif; ?>
+      <?php if (!$classGroups): ?><div class="empty-state"><p>Rombel tidak ditemukan</p><span class="class-filter-hint">Ubah pencarian atau filter yang dipilih.</span></div><?php endif; ?>
       <?php foreach ($classGroups as $grade=>$group): ?>
         <details class="class-level-group" data-level-group >
           <summary><strong><?= is_int($grade)?'Kelas '.$grade:($grade==='psb'?'PSB':ucfirst($grade)) ?></strong><span class="class-group-count"><?= number_format($group['count']) ?> rombel</span><span class="class-group-students"><?= number_format($group['students']) ?> siswa aktif</span><svg class="class-group-chevron" aria-hidden="true" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><path d="m6 9 6 6 6-6"/></svg></summary>

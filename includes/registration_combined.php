@@ -61,7 +61,7 @@ function rc_proof_sql(mysqli $db,string $alias): array {
     $path="CONCAT('$.\"',HEX(CONCAT($alias.owner_id,'|',$alias.th_ajaran,'|',$level)),'\"')";
     return ["CASE WHEN TRIM($alias.kelas) REGEXP CONCAT('^',$level,'[A-Za-z]?$') AND (($alias.unit_id=1 AND $level BETWEEN 1 AND 6) OR ($alias.unit_id=2 AND $level BETWEEN 7 AND 9) OR ($alias.unit_id=3 AND $level BETWEEN 10 AND 12)) THEN CAST(JSON_UNQUOTE(JSON_EXTRACT($json,$path)) AS DECIMAL(20,2)) ELSE NULL END",''];
 }
-function rc_page(mysqli $db,array $input): array {
+function rc_page(mysqli $db,array $input,?string $defaultYear=null): array {
     $operatorOptions=history_operator_options($db);
     $duLines=ldu_receipt_lines_sql(true,null,false,$db);
     $source=mh_choice($input,'source',['all','system','legacy'],($input['view']??'')==='legacy'?'legacy':'all');$baseSql=rc_groups($db,$source,null,false);$fullSql=rc_with_historical_total($db,$baseSql);$sql=$baseSql;$where=' WHERE 1=1';$args=[];
@@ -69,14 +69,14 @@ function rc_page(mysqli $db,array $input): array {
     foreach(['student_id','per_page','page','selected','selected_unit'] as $key)if(isset($input[$key])&&!is_scalar($input[$key]))throw new InvalidArgumentException('Parameter '.$key.' tidak valid.');
     // Validate candidate year syntax now; actual choices come from the same
     // materialized read as the page, so the history is not grouped a second time.
-    $rawYears=$input['year']??$input['tahun_ajaran']??null;$yearOptions=[];
+    $rawYears=$input['year']??$input['tahun_ajaran']??$defaultYear;$yearOptions=[];
     foreach(is_array($rawYears)?$rawYears:[$rawYears] as $v){if($v===null||in_array($v,['','*','all','semua','0'],true))continue;if(!is_scalar($v)||(!preg_match('/^[12][0-9]{3}\/[12][0-9]{3}$/D',(string)$v)&&$v!=='Tidak tercatat'))throw new InvalidArgumentException('Pilihan year tidak tersedia pada unit ini.');$yearOptions[(string)$v]=(string)$v;}
 
     $classes=class_all($db,false);$classOptions=[];foreach(range(...unit_level_bounds()) as $level)$classOptions['tingkat:'.$level]='Kelas '.$level;foreach($classes as $c)$classOptions[(string)$c['id']]=class_label($c);
     $classInput=$input['class_id']??$input['kelas']??null;if(!isset($input['class_id'])&&is_scalar($classInput)&&ctype_digit((string)$classInput)&&isset($classOptions['tingkat:'.$classInput]))$classInput='tingkat:'.$classInput;if($classInput!==null){$convert=static fn($v)=>is_scalar($v)&&str_starts_with((string)$v,'rombel:')?substr((string)$v,7):$v;$classInput=is_array($classInput)?array_map($convert,$classInput):$convert($classInput);}
     $statusOptions=['lunas'=>'Lunas','cicilan'=>'Belum lunas','covered_psb'=>'Tercakup PSB','unknown'=>'Status belum dapat ditentukan'];
     $choose=static function(string $name,$raw,array $options):array{$values=filter_register($name,$raw,$options);foreach($values as $v)if($v!=='*'&&!array_key_exists($v,$options))throw new InvalidArgumentException('Pilihan '.$name.' tidak tersedia pada unit ini.');return $values;};
-    $yearValues=$choose('year',$input['year']??$input['tahun_ajaran']??null,$yearOptions);$year=filter_scalar($yearValues);$where.=filter_sql_values($yearValues,"COALESCE(th_ajaran,'Tidak tercatat')");
+    $yearValues=$choose('year',$rawYears,$yearOptions);$where.=filter_sql_values($yearValues,"COALESCE(th_ajaran,'Tidak tercatat')");
     $classValues=$choose('class_id',$classInput,$classOptions);$class=(int)filter_scalar($classValues,'0');if(!filter_is_all($classValues)){$matches=[];foreach($classValues as $v){if(str_starts_with($v,'tingkat:'))$matches[]='master_kelas_id IN (SELECT id FROM master_kelas WHERE tingkat='.(int)substr($v,8).')';else $matches[]='master_kelas_id='.(int)$v;}$where.=' AND ('.implode(' OR ',$matches).')';}
     $student=max(0,(int)($input['student_id']??0));if($student){$where.=' AND student_id=?';$args[]=$student;}
     $statusValues=$choose('status_filter',$input['status_filter']??$input['status']??null,$statusOptions);$status=filter_scalar($statusValues,'all');
@@ -105,7 +105,9 @@ function rc_page(mysqli $db,array $input): array {
         bounds AS (SELECT LEAST($wanted,GREATEST(1,CEIL(_n/$size))) _page FROM stats)
         SELECT f.*,stats.*,meta._years,bounds._page$proofColumn FROM stats CROSS JOIN meta CROSS JOIN bounds LEFT JOIN filtered f ON f._position>(bounds._page-1)*$size AND f._position<=bounds._page*$size $proofJoin ORDER BY f._position";
     $rows=lf_rows($db,history_performance_du_ready($db)?hp_sql($db,$pageSql):hp_scan_sql($db,$pageSql),$args);$first=$rows[0];$total=(int)$first['_n'];$pages=max(1,(int)ceil($total/$size));$page=(int)$first['_page'];$offset=($page-1)*$size;
-    $years=json_decode($first['_years']??'[]',true)??[];rsort($years,SORT_STRING);$yearOptions=array_combine($years,$years);$yearValues=$choose('year',$rawYears,$yearOptions);$year=filter_scalar($yearValues);
+    $years=json_decode($first['_years']??'[]',true)??[];
+    if ($defaultYear !== null && !in_array($defaultYear,$years,true)) $years[] = $defaultYear;
+    rsort($years,SORT_STRING);$yearOptions=array_combine($years,$years);$yearValues=$choose('year',$rawYears,$yearOptions);$year=filter_scalar($yearValues);
     if(!$total)$rows=[];else foreach($rows as &$row){foreach(['_n','_bill','_native_paid','_legacy_paid','_legacy_count','_years','_page','_position'] as $key)unset($row[$key]);}unset($row);
     $summary=['n'=>$total,'bill'=>$first['_bill'],'native_paid'=>$first['_native_paid'],'legacy_paid'=>$first['_legacy_paid'],'legacy_count'=>$first['_legacy_count']];
     return compact('rows','summary','total','size','pages','page','offset','q','year','class','source','status','operators','operatorOptions','yearOptions','classOptions','statusOptions','yearValues','classValues','statusValues')+['read_sql'=>"SELECT * FROM $fullSql x $where ORDER BY COALESCE(th_ajaran,'') DESC,name,unit_id,id",'read_args'=>$args];

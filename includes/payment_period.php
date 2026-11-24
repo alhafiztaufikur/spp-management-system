@@ -87,38 +87,23 @@ function payment_period_positions(mysqli $db, string $nis, int $exclude = 0, boo
     return $result;
 }
 
-/** The arrears cutoff follows the current calendar month, like Ringkasan Kewajiban. */
-function payment_period_availability(array $bills, string $currentMonth): array {
-    $oldest = null;
-    $years = [];
+function payment_period_oldest_due(array $bills): ?string {
     foreach ($bills as $period=>$components) {
-        if (!in_array('due',array_column($components,'state'),true)) continue;
-        $oldest ??= $period;
-        if ($period >= $currentMonth) $years[lb_payment_year($period)] = true;
+        if (in_array('due',array_column($components,'state'),true)) return $period;
     }
-    $arrears = $oldest !== null && $oldest < $currentMonth
-        ? ['bulan'=>substr($oldest,5,2),'tahun'=>substr($oldest,0,4),'label'=>payment_period_label($oldest)]
-        : null;
-    $years = array_keys($years);
-    rsort($years);
-    return ['oldest'=>$oldest,'years'=>$years,'monthly_period'=>$arrears];
+    return null;
 }
 
 function payment_period_plan(mysqli $db, string $nis, string $mode, string $choice = '', int $exclude = 0,
     bool $lock = false, ?string $fixedStart = null): array {
-    if (!payment_period_schema_ready($db) || !spp_billing_schema_ready($db)) throw new DomainException('Fitur pembayaran beberapa bulan belum tersedia.');
+    if (!payment_period_schema_ready($db) || !spp_billing_schema_ready($db)) throw new DomainException('Fitur pembayaran Multi Bulan belum tersedia.');
+    if ($mode !== 'range' && !($exclude > 0 && $mode === 'academic')) throw new DomainException('Pilihan periode tidak valid.');
     if ($lock) lb_scope_payment_student($db, $nis, unit_active_id());
     $bills = payment_period_positions($db,$nis,$exclude,$lock);
-    $available = payment_period_availability($bills,date('Y-m'));
-    $oldest = $available['oldest'];
+    $oldest = payment_period_oldest_due($bills);
     $last = array_key_last($bills);
-    $arrears = $exclude === 0 ? $available['monthly_period'] : null;
-    $result = ['mode'=>$mode,'oldest'=>$oldest,'years'=>$available['years'],'last'=>$last,
-        'monthly_period'=>$arrears,'range'=>null,'rows'=>[],'total'=>0,'blocking'=>null,'version'=>''];
-    if ($arrears) {
-        $result['blocking'] = 'Lunasi tunggakan '.$arrears['label'].' melalui pilihan 1 Bulan terlebih dahulu.';
-        return $result;
-    }
+    $result = ['mode'=>$mode,'oldest'=>$oldest,'years'=>[],'last'=>$last,
+        'range'=>null,'rows'=>[],'total'=>0,'blocking'=>null,'version'=>''];
     if ($choice === '' && $exclude === 0) return $result;
     $placements = lf_rows($db, "SELECT y.label,p.komite_mulai_bulan FROM siswa_tahun_ajaran p
         JOIN tahun_ajaran y ON y.id=p.tahun_ajaran_id AND y.unit_id=p.unit_id
@@ -253,9 +238,13 @@ function payment_period_paid_components(mysqli $db,int $exclude = 0,?string $nis
 
 function payment_period_receipt_document(mysqli $db,array $payment,string $label,string $signer,bool $singleStudent=false): array {
     require_once __DIR__.'/receipt_balances.php';
+    require_once __DIR__.'/receipt_print.php';
+    $id = (int)$payment['id'];
+    $du = lf_one($db,'SELECT tagihan_daftar_ulang_id,th_ajaran du_tahun_ajaran,kelas du_kelas,jumlah uang_du FROM bayar_du WHERE bayar_id=?',[$id]);
+    if ($du) $payment = array_replace($payment,$du);
     return [
         'payment'=>$payment,'school'=>unit_school_name((int)$payment['unit_id']),
-        'period_range'=>true,'primary'=>receipt_school_primary($payment),'other'=>[],
+        'period_range'=>true,'primary'=>receipt_school_primary($payment),'other'=>receipt_other_fee_lines($db,$id),
         'remaining'=>payment_receipt_remaining($db,$payment,singleStudent:$singleStudent),
         'period'=>$label,
         'words'=>receipt_money_words((float)$payment['total_jumlah']),
@@ -263,7 +252,12 @@ function payment_period_receipt_document(mysqli $db,array $payment,string $label
     ];
 }
 
-function payment_period_write(mysqli $db,array $student,array $plan,string $date,string $method,string $operator,string $note,int $id = 0): int {
+function payment_period_additional_total(array $snapshot): float {
+    return (float)($snapshot['payment']['U_PSB'] ?? 0) + (float)($snapshot['payment']['U_LAIN'] ?? 0)
+        + array_sum(array_column($snapshot['details']['bayar_du'] ?? [],'jumlah'));
+}
+
+function payment_period_update(mysqli $db,array $student,array $plan,string $date,string $method,string $operator,string $note,int $id,float $additionalTotal): void {
     $nis = $student['NO_INDUK'];
     $grade = $student['KELAS'];
     $class = class_label(['tingkat'=>$student['tingkat'] ?? $grade,
@@ -272,27 +266,25 @@ function payment_period_write(mysqli $db,array $student,array $plan,string $date
     $range = $plan['range'];
     $spp = $plan['spp_total']/100;
     $komite = $plan['komite_total']/100;
-    $total = $plan['total']/100;
+    $total = $plan['total']/100 + $additionalTotal;
     $first = $range['mulai'];
     foreach ($plan['rows'] as $row) {
         if ($row['spp']['remaining'] || $row['komite']['remaining']) {$first = $row['period'];break;}
     }
     [$year,$month] = explode('-',$first);
-    if ($id) {
-        $stmt = $db->prepare("UPDATE bayar SET NO_INDUK=?,KELAS=?,master_kelas_id=NULLIF(?,0),kelas_rombel_snapshot=?,
-            U_SPP=?,U_KOMITE=?,total_jumlah=?,TGL_BYR=?,BULAN=?,TAHUN=?,user_id=?,sistem_pembayaran=?,KETERANGAN=? WHERE id=?");
-        $stmt->bind_param('ssisdddssssssi',$nis,$grade,$classId,$class,$spp,$komite,$total,$date,$month,$year,$operator,$method,$note,$id);
-        $stmt->execute();
-    } else {
-        $stmt = $db->prepare("INSERT INTO bayar (NO_INDUK,KELAS,master_kelas_id,kelas_rombel_snapshot,
-            U_SPP,U_KOMITE,total_jumlah,TGL_BYR,BULAN,TAHUN,user_id,sistem_pembayaran,KETERANGAN,payment_link_version)
-            VALUES (?,?,NULLIF(?,0),?,?,?,?,?,?,?,?,?,?,1)");
-        $stmt->bind_param('ssisdddssssss',$nis,$grade,$classId,$class,$spp,$komite,$total,$date,$month,$year,$operator,$method,$note);
-        $id = transaction_entry_insert($db,$date,static fn()=>$stmt->execute());
-        payment_history_stamp($db,$id,$nis);
-    }
+    $stmt = $db->prepare("UPDATE bayar SET NO_INDUK=?,KELAS=?,master_kelas_id=NULLIF(?,0),kelas_rombel_snapshot=?,
+        U_SPP=?,U_KOMITE=?,total_jumlah=?,TGL_BYR=?,BULAN=?,TAHUN=?,user_id=?,sistem_pembayaran=?,KETERANGAN=? WHERE id=?");
+    $stmt->bind_param('ssisdddssssssi',$nis,$grade,$classId,$class,$spp,$komite,$total,$date,$month,$year,$operator,$method,$note,$id);
+    $stmt->execute();
     $stmt->close();
+    payment_period_save_allocations($db,$student,$plan,$date,$operator,$id);
+}
+
+function payment_period_save_allocations(mysqli $db,array $student,array $plan,string $date,string $operator,int $id): void {
+    $nis = $student['NO_INDUK'];
     $unit = (int)$student['unit_id'];
+    $range = $plan['range'];
+    $spp = $plan['spp_total']/100;
     $stmt = $db->prepare('INSERT INTO pembayaran_rentang (unit_id,bayar_id,mode,mulai,akhir) VALUES (?,?,?,?,?)
         ON DUPLICATE KEY UPDATE mode=?,mulai=?,akhir=?');
     $stmt->bind_param('iissssss',$unit,$id,$range['mode'],$range['mulai'],$range['akhir'],$range['mode'],$range['mulai'],$range['akhir']);
@@ -315,5 +307,4 @@ function payment_period_write(mysqli $db,array $student,array $plan,string $date
         if ($row['komite']['remaining']) komite_save_payment($db,$id,$row['komite'],$row['komite']['remaining']/100);
     }
     if (isset($allocation)) $allocation->close();
-    return $id;
 }

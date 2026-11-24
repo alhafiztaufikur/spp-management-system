@@ -153,11 +153,6 @@ foreach ($ids as $paymentId) {
     $otherStmt->execute();
     $otherDetails = $otherStmt->get_result()->fetch_all(MYSQLI_ASSOC);
 
-    $payment['primary_lines'] = [
-        ['Uang PSB', $payment['U_PSB']], ['Uang Daftar Ulang' . (!empty($payment['du_tahun_ajaran']) ? ' (TA ' . $payment['du_tahun_ajaran'] . ')' : ''), $payment['uang_du']],
-        ['Uang SPP', $payment['U_SPP']], ['Komite Sekolah', $payment['U_KOMITE']],
-        ['Tabungan Wajib',0],
-    ];
     $payment['other_lines'] = [];
     foreach ($otherDetails as $detail) {
         $label = $detail['nama_biaya_snapshot'];
@@ -175,7 +170,7 @@ $otherStmt->close();
 $documents=[];
 foreach($receipts as $receipt) $documents[]=[
     'payment'=>$receipt, 'school'=>unit_school_name((int)$receipt['unit_id']),
-    'primary'=>$receipt['primary_lines'], 'remaining'=>$receipt['remaining_lines'], 'other'=>$receipt['other_lines'],
+    'primary'=>receipt_school_primary($receipt), 'remaining'=>$receipt['remaining_lines'], 'other'=>$receipt['other_lines'],
     'period'=>annual_receipt_month($receipt['BULAN']).' '.$receipt['TAHUN'],
     'reference'=>' - No. #'.$receipt['id'].' - '.$receipt['payment_batch_sequence'].'/'.$receipt['payment_batch_count'],
     'words'=>ucfirst(annual_receipt_words((int)round((float)$receipt['total_jumlah']))).' rupiah',

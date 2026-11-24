@@ -1,5 +1,6 @@
 <?php
 session_start();
+unset($_GET['source'], $_GET['owner_type']);
 require_once __DIR__.'/../koneksi.php';require_once __DIR__.'/../includes/auth.php';requireRole(['admin','kasir','bendahara']);
 require_once __DIR__.'/../includes/payment_history.php';require_once __DIR__.'/../includes/history_operator_filter.php';require_once __DIR__.'/../includes/history_class_filter.php';require_once __DIR__.'/../includes/migrated_history.php';require_once __DIR__.'/../includes/pagination.php';
 if($_SERVER['REQUEST_METHOD']!=='GET'){http_response_code(405);exit('Gunakan GET.');}

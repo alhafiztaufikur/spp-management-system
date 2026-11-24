@@ -238,7 +238,7 @@ function pilihSiswaDatalist(input, explicitOption = null) {
   if (sppStatusTimer) window.clearTimeout(sppStatusTimer);
   sppStatusTimer = null;
   const statusRequest = requestSppStatus({
-    interactive: newSelection && !form?.classList.contains('is-period-payment'),
+    interactive: newSelection && form?.elements.payment_plan?.value !== 'range',
     summary: changedStudent,
     showSummary: newSelection,
     sourceElement: input
@@ -1447,8 +1447,11 @@ const sppStatusState = {
 
 function currentSppStatusContext() {
   const noInduk = document.getElementById('disp-nis')?.value.trim() || '';
-  const bulan = document.getElementById('bulan-bayar')?.value || '';
-  const tahun = document.getElementById('tahun-bayar')?.value.trim() || '';
+  let bulan = document.getElementById('bulan-bayar')?.value || '';
+  let tahun = document.getElementById('tahun-bayar')?.value.trim() || '';
+  if (document.getElementById('payment-period-mode')?.value === 'range' && !/^\d{4}-\d{2}$/.test(tahun + '-' + bulan)) {
+    [tahun = '', bulan = ''] = (document.getElementById('tgl-bayar')?.value || '').split('-');
+  }
   if (!noInduk || !/^\d{2}$/.test(bulan) || !/^\d{4}$/.test(tahun)) return null;
   const editId = parseInt(window.sppEditPaymentId || 0, 10) || 0;
   return {
@@ -1688,17 +1691,12 @@ function showPaymentObligations(payload,source) {
     return;
   }
   if (overlay?.classList.contains('show') && ['future_period','method_missing'].includes(overlay.dataset.statusCode)) return;
-  const form = document.getElementById('form-bayar');
-  const range = form?.classList.contains('is-period-payment');
-  if (range && data.oldest_period) {
-    form.dispatchEvent(new CustomEvent('payment:monthly-required',{detail:data.oldest_period}));
-  }
+  const range = document.getElementById('payment-period-mode')?.value === 'range';
   if (paymentObligationsPrompt?.student === selectedStudentOption() && paymentObligationsPrompt.dismissed) return;
-  const redirected = data.oldest_period && form?.dataset.arrearsPeriod === data.oldest_period.tahun+'-'+data.oldest_period.bulan;
   showSppWarning({code:'obligations_summary',severity:'warning',title:'Ringkasan Kewajiban Siswa',
-    message:redirected ? 'Bayar tunggakan '+data.oldest_period.label+' terlebih dahulu melalui pilihan 1 Bulan.'
-      : (range ? 'Pilih periode SPP dan Komite untuk melihat total pembayaran.' : 'Periksa sisa kewajiban siswa sebelum menyimpan pembayaran.'),
-    obligations:data.rows,blocking_period:redirected ? null : data.oldest_period},source,true);
+    message:range && data.oldest_period ? 'Pilih Bulan Akhir untuk melunasi SPP dan Komite dalam rentang tagihan.'
+      : 'Periksa sisa kewajiban siswa sebelum menyimpan pembayaran.',
+    obligations:data.rows,blocking_period:range ? null : data.oldest_period},source,true);
 }
 async function requestSppStatus(options = {}) {
   const context = currentSppStatusContext();
@@ -1784,9 +1782,10 @@ async function requestSppStatus(options = {}) {
       }
     }
     applySppStatusPayload(payload);
-    if (interactive && sppEditDependencyBlocks(payload.edit_dependency)) {
+    const showPeriodWarning = interactive && document.getElementById('payment-period-mode')?.value !== 'range';
+    if (showPeriodWarning && sppEditDependencyBlocks(payload.edit_dependency)) {
       showSppWarning(payload.edit_dependency, sourceElement, force);
-    } else if (interactive && ['prior_unpaid','arrears'].includes(payload.status)) {
+    } else if (showPeriodWarning && ['prior_unpaid','arrears'].includes(payload.status)) {
       showSppWarning(payload, sourceElement, force);
     }
     if(showSummary)showPaymentObligations(payload,sourceElement);
@@ -1917,6 +1916,7 @@ function refreshOverpaidWarnings() {
     const inputEl = document.getElementById(key + '-input');
     const row = totalEl?.closest('tr');
     if (!totalEl || !paidEl || !inputEl) return;
+    if (row?.matches('[data-payment-period-monthly-row][hidden]')) return;
 
     const total = parseNumber(totalEl.value || 0);
     const paid = parseNumber(paidEl.value || 0);
@@ -2617,6 +2617,11 @@ async function restorePaymentDraft() {
   if (!draft || !document.getElementById('form-bayar')) return;
   window.sppRestoringDraft=true;
   const setValue = (id, value) => { const input=document.getElementById(id); if (input && value !== undefined) input.value=paymentEntryAmount(input,String(value)); };
+  const mode = document.getElementById('payment-period-mode');
+  if (mode && ['monthly','range'].includes(draft.payment_plan)) {
+    mode.value = draft.payment_plan;
+    mode.dataset.choice = draft.period_choice || '';
+  }
   setValue('tgl-bayar', draft.tanggal_bayar);
   if (draft.tanggal_bayar !== undefined) document.getElementById('tgl-bayar')?.dispatchEvent(new Event('change', {bubbles:true}));
   setValue('bulan-bayar', draft.bulan_bayar);
@@ -2651,7 +2656,7 @@ function capturePaymentDraftInBrowser() {
   const value=id => document.getElementById(id)?.value || '';
   const draft={source_path:window.location.pathname,edit_id:Number(window.sppEditPaymentId || 0),
     no_induk:value('disp-nis'),tanggal_bayar:value('tgl-bayar'),bulan_bayar:value('bulan-bayar'),tahun_bayar:value('tahun-bayar'),
-    sistem_pembayaran:value('sistem-pembayaran'),
+    sistem_pembayaran:value('sistem-pembayaran'),payment_plan:value('payment-period-mode'),period_choice:value('payment-period-choice'),
     tagihan_daftar_ulang_id:value('tagihan-daftar-ulang-id'),catatan:value('catatan')};
   for (const [key,id] of Object.entries({uang_psb:'psb-input',uang_spp:'spp-input',uang_komite:'komite-input',uang_du:'du-input'})) draft[key]=value(id);
   const rows=Array.from(document.querySelectorAll('#biaya-lain-list .biaya-lain-row'));
@@ -3454,7 +3459,7 @@ function updateTotal() {
   let total = 0;
   ids.forEach(id => {
     const el = document.getElementById(id);
-    if (el) total += parseNumber(el.value || 0);
+    if (el && !el.disabled) total += parseNumber(el.value || 0);
   });
 
   document.querySelectorAll('.biaya-lain-nominal').forEach(input => {
@@ -3468,8 +3473,14 @@ function updateTotal() {
 
   const totalEl   = document.getElementById('totalJumlah');
   const hiddenEl  = document.getElementById('hidden-total');
-  if (totalEl && !totalEl.closest('.is-period-payment')) totalEl.textContent = 'Rp ' + formatRupiah(total);
+  const form = hiddenEl?.form;
+  const range = form?.classList.contains('is-period-payment');
+  if (range) total = (Math.round(total * 100) + Number(form.dataset.paymentRangeTotal || 0)) / 100;
+  if (totalEl && (form || !totalEl.closest('.is-period-payment'))) {
+    totalEl.textContent = range && form.hasAttribute('data-payment-range-incomplete') ? '—' : 'Rp ' + formatRupiah(total);
+  }
   if (hiddenEl) hiddenEl.value = total;
+  if (range) form.dispatchEvent(new Event('payment:total-updated'));
 
   // Kewajiban SPP adalah sisa periode sebelum input transaksi saat ini.
   const sppTotal = parseNumber(document.getElementById('spp-total')?.value || 0);

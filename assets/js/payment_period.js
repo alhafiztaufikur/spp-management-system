@@ -14,7 +14,9 @@ document.addEventListener('DOMContentLoaded', () => {
   const version = form.querySelector('[data-payment-period-version]');
   const tbody = table.querySelector('tbody');
   const total = document.getElementById('totalJumlah');
+  const totalInput = form.elements.total_jumlah;
   const submit = form.querySelector('[type=submit]');
+  const existingAdditional = Number(form.dataset.paymentExistingAdditional || 0);
   const money = new Intl.NumberFormat('id-ID', { style: 'currency', currency: 'IDR', maximumFractionDigits: 2 });
   const tableAmount = new Intl.NumberFormat('id-ID', { maximumFractionDigits: 2 });
   const month = new Intl.DateTimeFormat('id-ID', { month: 'long', year: 'numeric', timeZone: 'UTC' });
@@ -24,41 +26,37 @@ document.addEventListener('DOMContentLoaded', () => {
   let initialChoice = mode.dataset.choice;
   let pending;
   let lastMode;
-  let arrearsSummaryStudent;
   let periodsToPay = [];
 
   function periodName(period) {
     return period ? month.format(new Date(period + '-01T00:00:00Z')) : '—';
   }
 
-  function switchToMonthly(period, refreshSummary = false) {
-    if (editId || !period || mode.value === 'monthly') return;
-    const monthly = form.elements.bulan_bayar;
-    const year = form.elements.tahun_bayar;
-    mode.value = 'monthly';
-    synchronize();
-    monthly.value = period.bulan;
-    year.value = period.tahun;
-    form.dataset.arrearsPeriod = period.tahun+'-'+period.bulan;
-    monthly.dispatchEvent(new Event('change', {bubbles:true}));
-    window.syncSppDropdowns?.();
-    const shouldRefresh = refreshSummary && arrearsSummaryStudent !== nis.value;
-    arrearsSummaryStudent = nis.value;
-    if (shouldRefresh) requestSppStatus({summary:true,showSummary:true,sourceElement:monthly});
+  function canSave() {
+    if (choice.value || editId) return Boolean(version.value);
+    return Boolean(nis.value) && Number(totalInput.value) > 0;
+  }
+
+  function updateRangeTotal(cents = 0) {
+    if (editId) {
+      total.textContent = version.value ? money.format((cents + existingAdditional) / 100) : '—';
+      submit.disabled = !canSave();
+      return;
+    }
+    form.dataset.paymentRangeTotal = cents;
+    form.toggleAttribute('data-payment-range-incomplete', Boolean(choice.value) && !version.value);
+    updateTotal();
   }
 
   function resetResult(message) {
     version.value = '';
     periodsToPay = [];
-    if (mode.value !== 'monthly') {
-      submit.disabled = true;
-      total.textContent = '—';
-    }
     status.textContent = message;
     status.removeAttribute('data-blocked');
     count.hidden = true;
     table.hidden = true;
     tbody.replaceChildren();
+    updateRangeTotal();
   }
 
   function show(result) {
@@ -94,8 +92,7 @@ document.addEventListener('DOMContentLoaded', () => {
     count.hidden = Boolean(result.blocking) || !periodsToPay.length;
     count.textContent = periodsToPay.length + ' BULAN AKAN DIBAYAR';
     version.value = result.version;
-    submit.disabled = !result.version;
-    total.textContent = result.blocking ? '—' : money.format(result.total / 100);
+    updateRangeTotal(result.version ? result.total : 0);
     const range = result.range;
     const description = range ? periodName(range.mulai) + (range.mulai === range.akhir ? '' : ' – ' + periodName(range.akhir)) : '';
     status.textContent = result.blocking || description;
@@ -116,10 +113,6 @@ document.addEventListener('DOMContentLoaded', () => {
       const result = await response.json();
       if (controller.signal.aborted) return;
       if (!response.ok) throw new Error(result.error || 'Rincian gagal dimuat.');
-      if (result.monthly_period && !editId) {
-        switchToMonthly(result.monthly_period,true);
-        return;
-      }
       if (selected) {
         show(result);
         return;
@@ -137,7 +130,8 @@ document.addEventListener('DOMContentLoaded', () => {
       }
       choice.replaceChildren(...options);
       choice.disabled = options.length === 1;
-      status.textContent = choice.disabled ? 'Belum ada tagihan SPP atau Komite yang bisa dibayar pada pilihan ini.' : options[0].text;
+      status.textContent = choice.disabled ? 'Belum ada tagihan SPP atau Komite yang bisa dibayar pada pilihan ini.'
+        : (!editId ? 'Pilih Bulan Akhir untuk membayar SPP dan Komite.' : options[0].text);
       if (initialChoice && options.some(option => option.value === initialChoice)) {
         choice.value = initialChoice;
         initialChoice = '';
@@ -156,8 +150,6 @@ document.addEventListener('DOMContentLoaded', () => {
     const active = mode.value !== 'monthly';
     const changedMode = lastMode !== mode.value;
     if (!changedMode && nis.value === currentStudent) return;
-    delete form.dataset.arrearsPeriod;
-    if (nis.value !== currentStudent) arrearsSummaryStudent = null;
     lastMode = mode.value;
     currentStudent = nis.value;
     form.classList.toggle('is-period-payment', active);
@@ -165,10 +157,15 @@ document.addEventListener('DOMContentLoaded', () => {
     controls.querySelector('[data-payment-period-start]').hidden = mode.value !== 'range';
     controls.querySelector('[data-payment-period-choice-label]').textContent = mode.value === 'range' ? 'Bulan Akhir' : 'Tahun Ajaran';
     form.querySelectorAll('[data-payment-period-monthly]').forEach(section => { section.hidden = section.disabled = active; });
+    form.querySelectorAll('[data-payment-period-monthly-row]').forEach(row => {
+      row.hidden = active;
+      row.querySelector('.tbl-pay').disabled = active;
+    });
     if (!active) {
       request?.abort();
       version.value = '';
       choice.disabled = true;
+      form.removeAttribute('data-payment-range-incomplete');
       submit.disabled = false;
       if (typeof updateTotal === 'function') updateTotal();
       return;
@@ -184,24 +181,27 @@ document.addEventListener('DOMContentLoaded', () => {
     if (choice.value) load(choice.value);
     else {
       request?.abort();
-      resetResult('Pilih periode tagihan.');
+      resetResult(editId ? 'Pilih periode tagihan.' : 'Pilih Bulan Akhir untuk membayar SPP dan Komite.');
     }
   });
   form.addEventListener('payment:student-changed', synchronize);
-  form.addEventListener('payment:monthly-required', event => switchToMonthly(event.detail));
+  form.addEventListener('payment:total-updated', () => {
+    if (!editId && mode.value !== 'monthly') submit.disabled = Boolean(pending) || !canSave();
+  });
   nis.addEventListener('change', synchronize);
   form.addEventListener('reset', () => setTimeout(synchronize));
   form.addEventListener('submit', event => {
     if (mode.value === 'monthly') return;
     event.preventDefault();
     event.stopImmediatePropagation();
-    if (pending || !version.value) return;
+    if (pending || !canSave()) return;
     if (!editId && !validatePaymentMethod(form)) return;
     if (!form.reportValidity()) return;
     const expected = version.value;
     const cashDate = date.value;
+    const expectedTotal = totalInput?.value;
     const save = () => {
-      if (pending || version.value !== expected || date.value !== cashDate) return;
+      if (pending || !canSave() || version.value !== expected || date.value !== cashDate || totalInput?.value !== expectedTotal) return;
       pending = true;
       submit.disabled = true;
       HTMLFormElement.prototype.submit.call(form);

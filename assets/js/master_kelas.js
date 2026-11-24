@@ -64,6 +64,7 @@ document.addEventListener('DOMContentLoaded', function () {
   const controls = panel?.querySelector('.class-view-switch');
   if (!panel || !controls) return;
   const key = 'spp_master_kelas_view';
+  const desktop = window.matchMedia('(min-width: 1101px)');
   function show(view) {
     if (!['groups', 'table'].includes(view)) view = 'groups';
     panel.dataset.rombelView = view;
@@ -76,13 +77,16 @@ document.addEventListener('DOMContentLoaded', function () {
   }
   let saved = 'groups';
   try { saved = localStorage.getItem(key) || 'groups'; } catch (_) { /* Local storage may be unavailable. */ }
-  show(saved);
+  const syncView = () => show(desktop.matches ? 'groups' : saved);
+  syncView();
+  desktop.addEventListener('change', syncView);
   controls.hidden = false;
   controls.addEventListener('click', event => {
     const button = event.target.closest('[data-class-view]');
     if (!button) return;
-    show(button.dataset.classView);
-    try { localStorage.setItem(key, panel.dataset.rombelView); } catch (_) { /* Keep the current view for this page. */ }
+    saved = button.dataset.classView;
+    syncView();
+    try { localStorage.setItem(key, saved); } catch (_) { /* Keep the current view for this page. */ }
   });
 
   const addForm = document.getElementById('class-rombel-form');

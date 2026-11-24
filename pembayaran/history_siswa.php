@@ -4,7 +4,7 @@ function history_fail(int $status,string $code,string $message): void {http_resp
 if(($_SERVER['REQUEST_METHOD']??'GET')!=='GET'){header('Allow: GET');history_fail(405,'method_not_allowed','Gunakan GET untuk membaca riwayat.');}
 if(empty($_SESSION['admin_id']))history_fail(401,'session_expired','Sesi habis. Silakan masuk kembali.');
 require_once '../koneksi.php';require_once '../includes/auth.php';require_once '../includes/reports.php';require_once '../includes/payment_history_context.php';require_once '../includes/payment_activity.php';require_once '../includes/payment_permissions.php';
-require_once '../includes/payment_period.php';
+require_once '../includes/payment_history.php';
 if(empty($_SESSION['admin_id']))history_fail(401,'session_expired','Sesi habis. Silakan masuk kembali.');
 if(!hasRole(['admin']))history_fail(403,'access_denied','Akun tidak dapat membuka riwayat pembayaran.');
 requireRole(['admin']);
@@ -33,29 +33,39 @@ try {
     $paymentIds = array_column($payments,'id');
     $events = payment_activity_for_payments($koneksi,$paymentIds);
     $duByPayment = [];
+    $otherByPayment = [];
     foreach (array_chunk($paymentIds, 500) as $ids) {
         $placeholders = implode(',',array_fill(0,count($ids),'?'));
         $duRows = hp_rows($koneksi,"SELECT bayar_id,SUM(jumlah) total,GROUP_CONCAT(DISTINCT th_ajaran ORDER BY th_ajaran SEPARATOR ', ') years
             FROM bayar_du WHERE bayar_id IN ($placeholders) GROUP BY bayar_id",$ids);
         $duByPayment += array_column($duRows,null,'bayar_id');
+        $otherRows = hp_rows($koneksi,"SELECT DISTINCT bayar_id FROM bayar_biaya_lain WHERE bayar_id IN ($placeholders) AND nominal_snapshot>.001",$ids);
+        $otherByPayment += array_column($otherRows,null,'bayar_id');
     }
     $rows=[];
     foreach(payment_period_meta_for_rows($koneksi,$payments) as $p){
         $du=$duByPayment[$p['id']]??null;
         $duTotal=(float)($du['total']??0);
         $components=[];foreach(['U_SPP'=>'SPP','U_PSB'=>'PSB','U_KOMITE'=>'Komite'] as $key=>$label)if((float)$p[$key]>.001)$components[]=$label;
-        if((float)$p['U_LAIN']-$duTotal>.001)$components[]='Biaya Lain';
+        if(isset($otherByPayment[$p['id']]) || (float)$p['U_LAIN']-$duTotal>.001)$components[]='Biaya Lain';
         if($duTotal>.001)$components[]='Daftar Ulang (TA '.$du['years'].')';
         $creator=payment_activity_summary($events[(int)$p['id']]??[])['creator'];
         $canPrint=payment_print_allowed((int)$p['unit_id'],(int)($creator['actor_id']??0));
         $rows[]=['id'=>(int)$p['id'],'unit_id'=>(int)$p['unit_id'],'tanggal_raw'=>$p['TGL_BYR'],'period_key'=>(int)$p['TAHUN']*100+report_month_code((string)$p['BULAN']),'total_raw'=>(float)$p['total_jumlah'],'components'=>$components,'can_detail'=>true,'can_print'=>$canPrint,'detail_url'=>'detail.php?'.http_build_query(['id'=>(int)$p['id'],'unit_id'=>(int)$p['unit_id'],'readonly'=>'1']),'print_url'=>$canPrint?'../laporan/cetak_struk.php?id='.(int)$p['id']:null,'time_precision'=>'datetime','tanggal_date'=>spp_date_parts($p['TGL_BYR'])['date'],'tanggal_time'=>spp_date_parts($p['TGL_BYR'])['time'],'tanggal'=>spp_date_label($p['TGL_BYR'],true),'periode'=>$p['payment_period_label']??((report_months()[report_month_code((string)$p['BULAN'])]??$p['BULAN']).' '.$p['TAHUN']),
           'komponen'=>$components?implode(', ',$components):'Koreksi','metode'=>$p['sistem_pembayaran'],'operator'=>($creator['actor_name']??'')?:($p['operator_nama']?:'Tidak tercatat'),
-          'total'=>'Rp '.number_format((float)$p['total_jumlah'],0,',','.'),'context_year'=>$p['riwayat_tahun_ajaran'],'context_class'=>$p['riwayat_kelas_snapshot']];
+          'total'=>report_money($p['total_jumlah']),'context_year'=>$p['riwayat_tahun_ajaran'],'context_class'=>$p['riwayat_kelas_snapshot']];
     }
     require_once '../includes/migrated_history.php';
     $legacyIds=mh_student_legacy_ids($koneksi,$student);$legacyCount=count($legacyIds);
     $legacy=in_array($scope,['all','unknown'],true)?mh_student_legacy_history($koneksi,$student,$legacyIds):[];
     if($scope==='all'||$scope==='unknown')$rows=array_merge($rows,$legacy);
+    foreach ($rows as &$row) {
+        $row['periode_numeric'] = payment_history_numeric_period($row['periode']);
+        if (!$row['period_key'] && preg_match('/^(\d{2}) (\d{4})(?:$| – )/u',$row['periode_numeric'],$match)) {
+            $row['period_key'] = (int)$match[2]*100+(int)$match[1];
+        }
+    }
+    unset($row);
     usort($rows,static fn($a,$b)=>strcmp((string)$b['tanggal_raw'],(string)$a['tanggal_raw'])?:($b['id']<=>$a['id']));
     foreach($scopes as &$historyScope)if($historyScope['value']==='unknown')$historyScope['label']='Riwayat Lama / Legacy: '.$legacyCount.' transaksi Legacy';unset($historyScope);
     echo json_encode(['ok'=>true,'period'=>'History pembayaran '.$student['NAMA'].': '.count($rows).' transaksi · '.($scope==='all'?'Semua Tahun':($scope==='unknown'?'Konteks belum tercatat':'TA '.$year)),

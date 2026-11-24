@@ -142,7 +142,9 @@ function global_report_period_caption(mysqli $db,array $filters,string $template
                 $range=report_month_range((int)$filters['bulan_awal'],max(2000,(int)$filters['tahun_awal']),(int)$filters['bulan_akhir'],max(2000,(int)$filters['tahun_akhir']));
                 $parts[]='Periode tagihan '.report_month_range_label($range);
             }else{
-                $months=$filters['_multi']['bulan_awal']??[$filters['bulan_awal']];
+                $selectedMonths=report_multiple_values($filters,'bulan_awal');
+                $months=filter_is_all($selectedMonths)?$selectedMonths:array_keys(array_intersect_key(report_status_months(),array_flip($selectedMonths)));
+                $months=array_map('strval',$months);
                 $names=filter_is_all($months)?'semua bulan':implode(', ',array_map(static fn($month)=>report_months()[$month]??$month,$months));
                 $years=$filters['_multi']['tahun_ajaran']??[$filters['tahun_ajaran']];$stamps=[];
                 if(!filter_is_all($months)&&!filter_is_all($years))foreach($years as $academic)foreach($months as $month){

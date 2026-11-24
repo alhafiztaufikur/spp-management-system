@@ -28,6 +28,7 @@ function registration_filters(mysqli $db, array $input): array
     if ($view === 'deleted') foreach (class_all($db, false) as $class) $classOptions['rombel:'.$class['id']] = $class['label'];
     $years = array_column($db->query("SELECT label FROM tahun_ajaran WHERE status IN ('published','closed') ORDER BY label DESC")->fetch_all(MYSQLI_ASSOC), 'label');
     if ($view === 'deleted') {
+        $years[] = du_current_academic_year();
         foreach (registration_archive_groups($db) as $group) if ($group['th_ajaran'] !== 'Tidak tercatat') $years[] = $group['th_ajaran'];
         $years = array_values(array_unique($years)); rsort($years);
     }

@@ -10,7 +10,7 @@ function report_multiple_normalize(mysqli $db,array &$source):array{
     $spec=[
         'kategori'=>[$categoryPicker?report_categories($db):['spp'=>'SPP'],($source['template']??'')==='penerimaan'?'semua':'spp','semua'],
         'kelas'=>[$classes,'',''], 'tahun_ajaran'=>[$years,du_current_academic_year(),array_key_first($years)??du_current_academic_year()],
-        'bulan_awal'=>[report_months(),date('m'),date('m')],
+        'bulan_awal'=>[report_status_months(),date('m'),date('m')],
         'status'=>[array_fill_keys(['tidak_ditagihkan','belum_bayar','cicilan','lunas','covered_psb','rekonsiliasi','ada_pembayaran','tunggakan','dibatalkan'],''),'',''],
         'siswa_status'=>[['active'=>'Aktif','archived'=>'Arsip/Lulus'],($source['template']??'')==='riwayat-tagihan'?'all':'active','all'],
         'metode'=>[['Tunai'=>'Tunai','VA'=>'VA','Qris'=>'QRIS','Legacy'=>'Histori Legacy'],'',''], 'mutasi'=>[['masuk'=>'Masuk','keluar'=>'Keluar'],'',''],
@@ -39,7 +39,9 @@ function report_multiple_sections(mysqli $db,string $template,array $filters):?a
     $categories=in_array($template,['status','per-item','penerimaan'],true)?report_multiple_values($filters,'kategori'):['spp'];
     if(filter_is_all($categories)||$categories===['semua']){$categories=array_keys(report_categories($db));if($template==='penerimaan')$categories[]='potongan';}
     $years=report_multiple_values($filters,'tahun_ajaran');if(filter_is_all($years))$years=array_column(report_years($db),'label');
-    $months=report_multiple_values($filters,'bulan_awal');if(filter_is_all($months))$months=array_keys(report_months());
+    $selectedMonths=report_multiple_values($filters,'bulan_awal');
+    $academicMonths=array_map('strval',array_keys(report_status_months()));
+    $months=filter_is_all($selectedMonths)?$academicMonths:array_values(array_intersect($academicMonths,$selectedMonths));
     $parts=[];
     foreach($categories as $category){
         $yearBased=$template!=='penerimaan'&&($template==='spp-tahunan'||($template==='status'&&in_array($category,['spp','komite'],true))||report_item_is_annual_category($category));
@@ -47,6 +49,10 @@ function report_multiple_sections(mysqli $db,string $template,array $filters):?a
             $leaf=$filters;$leaf['_multiple_leaf']=true;$leaf['kategori']=$category;if($year!=='')$leaf['tahun_ajaran']=$year;if($month!=='')$leaf['bulan_awal']=$month;
             unset($leaf['_multi']['kategori'],$leaf['_multi']['tahun_ajaran'],$leaf['_multi']['bulan_awal']);
             $part=report_build($db,$template,$leaf);$part['section_title']=($category==='potongan'?'Potongan SPP':(report_categories($db)[$category]??$part['title'])).($year!==''?' — '.$year:'');
+            if($month!==''&&$year!==''){
+                [$monthCode,$calendarYear]=report_period_from_academic($year,$month);
+                $part['section_title'].=' · '.report_months()[$monthCode].' '.$calendarYear;
+            }
             if($template==='per-item'&&report_item_is_monthly_category($category)){
                 $matrixYears=array_values(array_unique(array_column($part['rows'],'tahun_ajaran')));sort($matrixYears);
                 if(count($matrixYears)>1){foreach($matrixYears as $matrixYear){$sub=$part;$sub['section_title'].=' | '.$matrixYear;$sub['rows']=array_values(array_filter($part['rows'],static fn($r)=>$r['tahun_ajaran']===$matrixYear));$parts[]=$sub;}continue;}

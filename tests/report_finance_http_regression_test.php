@@ -209,7 +209,7 @@ try {
         }
         $oldReceipt = finance_http_ok(finance_http_get($base.'laporan/export_pdf.php?'.http_build_query(['output'=>'preview','mode'=>'selected','ids'=>[$duFixturePaymentIds[0]],'tanggal_awal'=>'2026-08-01','tanggal_akhir'=>'2026-08-01']),$sessionId),'Struk DU tahun asal');
         $oldReceipt=html_entity_decode($oldReceipt,ENT_QUOTES|ENT_HTML5,'UTF-8');
-        finance_http_assert(str_contains($oldReceipt,'Uang Daftar Ulang (TA 2026/2027)')
+        finance_http_assert(str_contains($oldReceipt,'Uang DU 2026/2027')
             && str_contains($oldReceipt,'>1A</td>')
             && preg_match('/Sisa DU<\/td>.*?pay-amount">600<\/td>/s',$oldReceipt)===1,
             'Struk DU tahun asal tidak memakai kelas dan sisa tagihan DU tahun asal.');

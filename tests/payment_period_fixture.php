@@ -66,16 +66,24 @@ if ($command === 'inject_failure' || $command === 'remove_failure') {
 }
 if ($command === 'state') {
     $nis = $argv[2];
-    $payments = lf_rows($db,'SELECT id,U_SPP,U_KOMITE,total_jumlah,TGL_BYR,sistem_pembayaran FROM bayar WHERE NO_INDUK=? ORDER BY id',[$nis]);
+    $payments = lf_rows($db,'SELECT id,U_PSB,U_SPP,U_KOMITE,U_LAIN,total_jumlah,BULAN,TAHUN,TGL_BYR,sistem_pembayaran FROM bayar WHERE NO_INDUK=? ORDER BY id',[$nis]);
     foreach ($payments as &$payment) {
         $payment['range'] = payment_period_meta($db,(int)$payment['id']);
         $payment['allocations'] = payment_period_receipt_rows($db,(int)$payment['id']);
+        $payment['du'] = lf_rows($db,'SELECT tagihan_daftar_ulang_id,th_ajaran,kelas,jumlah FROM bayar_du WHERE bayar_id=?',[$payment['id']]);
+        $payment['other'] = lf_rows($db,'SELECT d.tagihan_biaya_lain_id,d.nama_biaya_snapshot,d.nominal_snapshot,t.origin FROM bayar_biaya_lain d JOIN tagihan_biaya_lain t ON t.id=d.tagihan_biaya_lain_id WHERE d.bayar_id=? ORDER BY d.urutan',[$payment['id']]);
     }
     unset($payment);
     $requests = lf_rows($db,'SELECT id,status,action,bayar_id FROM transaksi_otorisasi WHERE no_induk_snapshot=? ORDER BY id',[$nis]);
     $events = lf_rows($db,"SELECT payment_id,action FROM pembayaran_aktivitas
         WHERE JSON_UNQUOTE(JSON_EXTRACT(COALESCE(after_snapshot,before_snapshot),'$.payment.NO_INDUK'))=? ORDER BY id",[$nis]);
     echo json_encode(['payments'=>$payments,'requests'=>$requests,'events'=>$events],JSON_THROW_ON_ERROR);
+    exit;
+}
+if ($command === 'historical_annual') {
+    $id = (int)$argv[2];
+    lf_query($db,"UPDATE pembayaran_rentang SET mode='academic' WHERE bayar_id=? AND mulai='2027-07' AND akhir='2028-06'",[$id]);
+    if ((payment_period_meta($db,$id)['mode'] ?? '') !== 'academic') throw new RuntimeException('Full-year fixture transaction not found.');
     exit;
 }
 if ($command !== 'seed') throw new InvalidArgumentException('Unknown fixture command.');
@@ -97,7 +105,12 @@ try {
         AND jenis='reguler' AND is_active=1 AND is_placeholder=0 LIMIT 1");
     $classLabel = class_label($class);
     $fixtures = [];
-    foreach (['main','annual','arrears','three','missing','race','monthly','rollback'] as $scenario) {
+    foreach (['berulang','input_manual'] as $mode) {
+        $name = 'Uji Biaya Multi '.$mode.' '.bin2hex(random_bytes(3));
+        lf_query($db,'INSERT INTO master_biaya_lain(nama,nominal,is_active,jenis_pembayaran) VALUES(?,?,1,?)',[$name,$mode === 'berulang' ? 20000 : 0,$mode]);
+        $fees[$mode] = ['id'=>(int)$db->insert_id,'name'=>$name];
+    }
+    foreach (['main','annual','arrears','three','missing','race','monthly','rollback','extras'] as $scenario) {
         $academicYear = $scenario === 'annual' ? '2027/2028' : $year;
         $master = $masters[$academicYear];
         $startOrder = match($scenario) {'annual'=>0,'arrears'=>3,default=>4};
@@ -105,12 +118,17 @@ try {
         $label = 'Uji Periode '.$scenario;
         $fixtures[$scenario] = ['nis'=>$nis,'label'=>$label];
         lf_query($db,"INSERT INTO siswa(NO_INDUK,NAMA,KELAS,master_kelas_id,SPP_PERBULAN,POMG,PSB,is_active)
-            VALUES (?,?,4,?,250000.25,50000,?,1)",[$nis,$label,$class['id'],$scenario==='main'?100000:0]);
+            VALUES (?,?,4,?,250000.25,50000,?,1)",[$nis,$label,$class['id'],in_array($scenario,['main','rollback','extras'],true)?100000:0]);
         lf_query($db,"INSERT INTO siswa_tahun_ajaran(tahun_ajaran_id,no_induk,kelas,master_kelas_id,kelas_rombel_snapshot,
             spp_perbulan_snapshot,komite_snapshot,komite_mulai_bulan,status)
             VALUES (?,?,4,?,?,250000.25,50000,?,'aktif')",
             [$master['tahun_ajaran_id'],$nis,$class['id'],$classLabel,spp_academic_periods($academicYear)[$startOrder]['bulan']]);
         $placement = (int)$db->insert_id;
+        if (in_array($scenario,['main','extras'],true)) {
+            lf_query($db,"INSERT INTO tagihan_daftar_ulang(tahun_ajaran_id,penempatan_id,no_induk,kelas_snapshot,tahun_ajaran_snapshot,nominal_awal,nominal_tagihan) VALUES(?,?,?,'4',?,75000.50,75000.50)",[$master['tahun_ajaran_id'],$placement,$nis,$academicYear]);
+            $fixtures[$scenario]['du_id'] = (int)$db->insert_id;
+        }
+        if ($scenario === 'extras') continue;
         foreach (spp_academic_periods($academicYear) as $period) {
             if ($period['order'] < $startOrder) continue;
             $month = $period['bulan'];
@@ -138,4 +156,4 @@ foreach ($actors as $role=>$actor) {
     $sessions[$role] = session_id();
     session_write_close();
 }
-echo json_encode(['database'=>DB_NAME,'cases'=>$fixtures,'sessions'=>$sessions],JSON_PRETTY_PRINT|JSON_THROW_ON_ERROR);
+echo json_encode(['database'=>DB_NAME,'cases'=>$fixtures,'sessions'=>$sessions,'fees'=>$fees],JSON_PRETTY_PRINT|JSON_THROW_ON_ERROR);

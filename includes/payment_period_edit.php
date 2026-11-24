@@ -34,7 +34,8 @@ $ask = transaction_authorization_requires_request();
         <span class="badge-id">TRX-<?= str_pad((string)$periodEditId,6,'0',STR_PAD_LEFT) ?></span>
       </div>
       <?php if ($flash): ?><p class="alert alert-<?= $escape($flash['type']) ?>" id="flash-msg" role="alert" data-operation-focus="#tgl-bayar-display"><?= $escape($flash['msg']) ?></p><?php endif; ?>
-      <form method="post" action="proses.php" class="payment-period-enabled">
+      <form method="post" action="proses.php" class="payment-period-enabled"
+        data-payment-existing-additional="<?= max(0, (int)round(((float)$d['total_jumlah'] - (float)$d['U_SPP'] - (float)$d['U_KOMITE']) * 100)) ?>">
         <input type="hidden" name="aksi" value="update">
         <input type="hidden" name="id" value="<?= (int)$periodEditId ?>">
         <input type="hidden" name="_operational_unit" value="<?= unit_active_id() ?>">

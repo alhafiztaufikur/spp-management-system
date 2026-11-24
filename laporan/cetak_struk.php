@@ -102,40 +102,20 @@ if (($_SERVER['REQUEST_METHOD'] ?? '') === 'GET') lb_scope_student_read($koneksi
 session_write_close();
 
 $range = payment_period_meta($koneksi,$paymentId);
+require_once __DIR__.'/../includes/receipt_print.php';
 if ($range) {
-    require_once __DIR__.'/../includes/receipt_print.php';
     $document = payment_period_receipt_document($koneksi,$payment,payment_period_range_label($range),
         $payment['operator_name'] ?: 'Bagian Keuangan',singleStudent:true);
     receipt_http_output([$document], 'Struk #'.$paymentId.' - '.$payment['NAMA'], 'Struk siap dicetak');
     exit;
 }
 
-$otherDetails = [];
-$stmt = $koneksi->prepare(hp_sql($koneksi, '
-    SELECT d.nama_biaya_snapshot, d.nominal_snapshot, d.keterangan
-    FROM bayar_biaya_lain d
-    WHERE d.bayar_id = ?
-    ORDER BY d.urutan, d.id
-'));
-$stmt->bind_param('i', $paymentId);
-$stmt->execute();
-$detailResult = $stmt->get_result();
-while ($detail = $detailResult->fetch_assoc()) $otherDetails[] = $detail;
-$stmt->close();
-
-$otherLines = [];
-foreach ($otherDetails as $detail) {
-    $label = $detail['nama_biaya_snapshot'];
-    if (trim((string)$detail['keterangan']) !== '') $label .= ' - ' . $detail['keterangan'];
-    $otherLines[] = [$label, $detail['nominal_snapshot']];
-}
-if ((float)$payment['potong_spp'] > 0) $otherLines[] = ['Potongan SPP', -(float)$payment['potong_spp']];
-$otherLines = array_values(array_filter($otherLines, fn($line) => abs((float)$line[1]) >= 0.005));
+$otherLines = receipt_other_fee_lines($koneksi,$paymentId);
+if ((float)$payment['potong_spp'] >= .005) $otherLines[] = ['Potongan SPP', -(float)$payment['potong_spp']];
 
 $remainingLines = payment_receipt_remaining($koneksi, $payment, singleStudent:true);
 $total = (float)$payment['total_jumlah'];
 $signer = $payment['operator_name'] ?: ($_SESSION['admin_nama'] ?? 'Bagian Keuangan');
-require_once __DIR__.'/../includes/receipt_print.php';
 receipt_http_output([[
     'payment'=>$payment, 'school'=>unit_school_name((int)$payment['unit_id']),
     'primary'=>receipt_school_primary($payment), 'remaining'=>$remainingLines, 'other'=>$otherLines,

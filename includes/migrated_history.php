@@ -85,11 +85,6 @@ function mh_payment_simple_count(mysqli $db,array $input,array $classFilter,arra
     if(($input['view']??'')==='deleted'||!filter_is_all($classFilter['values'])||!filter_is_all($operators)
         ||isset($input['fee_master_id'])||trim((string)($input['search']??''))!==''||(int)($input['student_id']??0)>0||(int)($input['owner_id']??0)>0||($input['du_only']??'')==='1')return null;
     $kind=mh_choice($input,'source',['all','system','legacy'],'all');$owner=mh_choice($input,'owner_type',['all','student','account'],'all');
-    $counts=PHP_SAPI!=='cli'&&($_SERVER['REQUEST_METHOD']??'')==='GET'?($GLOBALS['lful_operator_counts'][hp_connection_key($db).':'.(int)($GLOBALS['app_unit_id']??unit_active_id())]??null):null;
-    if($period===null&&$owner==='all'&&$counts!==null){
-        $native=$kind==='legacy'?0:(int)hp_one($db,'SELECT COUNT(*) n FROM bayar')['n'];
-        return $native+($kind==='system'?0:$counts['legacy_op_payments']+$counts['legacy_full_payments']);
-    }
     $parts=[];$args=[];
     $date=static function(string $column,bool $legacy)use($input,$period,&$args):string{
         if($period===null)return '';
@@ -107,7 +102,7 @@ function mh_payment_simple_count(mysqli $db,array $input,array $classFilter,arra
     return (int)lf_one($db,$period===null?hp_scan_sql($db,$sql):hp_sql($db,$sql),$args)['n'];
 }
 
-/** Count, page and outside-period summary share exactly the same predicates. */
+/** Count and page use the same filters, including the requested date range. */
 function mh_payment_page(mysqli $db,array $input,array $classFilter,array $operators,string $start,string $end,int $page,int $size): array {
     $source=mh_payment_source($db,($input['view']??'')==='deleted');$where=' WHERE 1=1';$args=[];
     $feeMaster=other_fee_history_context($db,$input);
@@ -134,10 +129,6 @@ function mh_payment_page(mysqli $db,array $input,array $classFilter,array $opera
         if(lop_ready($db))$du[]="(p.id<-1000000000 AND EXISTS(SELECT 1 FROM legacy_op_payments dp WHERE dp.id=-p.id-1000000000 AND dp.unit_id=p.unit_id AND (dp.source_table='bayar_du' OR JSON_SEARCH(dp.items,'one','daftar_ulang',NULL,'$[*].category') IS NOT NULL)))";
         $where.=$du?' AND ('.implode(' OR ',$du).')':' AND 0=1';
     }
-    $simpleCount=mh_payment_simple_count($db,$input,$classFilter,$operators);
-    $all=$simpleCount??(int)hp_one($db,"SELECT COUNT(*) n FROM $source p $where",$args)['n'];
-    $compact=$simpleCount!==null&&$owner==='all'&&($input['view']??'')!=='deleted';
-    $pageSource=$compact?mh_payment_order_source($db):$source;
     $period='';$periodArgs=[];$dateColumn='p.stored_datetime';
     if(($input['view']??'')==='deleted'){
         $legacyDate=lop_ready($db)?" WHEN p.id<-1000000000 THEN (SELECT MAX(a.created_at) FROM legacy_op_audit a WHERE a.entity_type='payment' AND a.entity_id=-p.id-1000000000 AND a.unit_id=p.unit_id AND JSON_EXTRACT(a.after_data,'$.cancelled')=1) ":'';
@@ -146,7 +137,10 @@ function mh_payment_page(mysqli $db,array $input,array $classFilter,array $opera
     if(($input['undated']??'')==='1')$period=' AND p.id<0 AND p.TGL_BYR IS NULL';
     elseif(($input['all_periods']??'')!=='1'){$period=" AND $dateColumn>=? AND $dateColumn<?";$periodArgs=[$start,$end];}
     $params=array_merge($args,$periodArgs);
-    $total=$period===''?$all:(mh_payment_simple_count($db,$input,$classFilter,$operators,[$start,$end])??(int)hp_one($db,"SELECT COUNT(*) n FROM $source p $where $period",$params)['n']);
+    $simpleCount=mh_payment_simple_count($db,$input,$classFilter,$operators,$period===''?null:[$start,$end]);
+    $total=$simpleCount??(int)hp_one($db,"SELECT COUNT(*) n FROM $source p $where $period",$params)['n'];
+    $compact=$simpleCount!==null&&$owner==='all'&&($input['view']??'')!=='deleted';
+    $pageSource=$compact?mh_payment_order_source($db):$source;
     $pages=max(1,(int)ceil($total/$size));$page=min(max(1,$page),$pages);
     $selected=(int)($input['selected']??0);
     $targetSource=$selected?mh_payment_source($db,($input['view']??'')==='deleted',$selected):$source;
@@ -158,8 +152,7 @@ function mh_payment_page(mysqli $db,array $input,array $classFilter,array $opera
     $offset=($page-1)*$size;
     $rows=hp_rows($db,"SELECT p.*$feeSelect FROM $pageSource p $where $period ORDER BY p.TGL_BYR DESC,p.unit_id,p.id DESC LIMIT $size OFFSET $offset",$params);
     if($compact&&$rows){$hydrate=mh_payment_source($db,false,array_column($rows,'id'));$rows=hp_rows($db,"SELECT p.* FROM $hydrate p ORDER BY p.TGL_BYR DESC,p.unit_id,p.id DESC");}
-    $undated=($input['view']??'')==='deleted'?0:(mh_payment_simple_count($db,array_replace($input,['undated'=>'1','all_periods'=>'0']),$classFilter,$operators,[$start,$end])??(int)hp_one($db,"SELECT COUNT(*) n FROM $source p $where AND p.id<0 AND p.TGL_BYR IS NULL",$args)['n']);
-    return ['fee_master'=>$feeMaster,'rows'=>$rows,'total'=>$total,'all'=>$all,'undated'=>$undated,'outside'=>$all-$total,'pages'=>$pages,'page'=>$page,'offset'=>$offset,
+    return ['fee_master'=>$feeMaster,'rows'=>$rows,'total'=>$total,'pages'=>$pages,'page'=>$page,'offset'=>$offset,
         'read_sql'=>"SELECT p.*$feeSelect FROM $source p $where $period ORDER BY p.TGL_BYR DESC,p.unit_id,p.id DESC",'read_args'=>$params];
 }
 

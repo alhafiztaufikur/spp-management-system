@@ -3,7 +3,7 @@
 // pembayaran/lihat.php - View All Payments
 // ============================================
 session_start();
-unset($_GET['undated'], $_GET['include_undated']);
+unset($_GET['undated'], $_GET['include_undated'], $_GET['source'], $_GET['owner_type']);
 if (!isset($_SESSION['admin_id'])) { header('Location: ../login.php'); exit; }
 require_once '../koneksi.php';
 require_once '../includes/auth.php';
@@ -109,7 +109,7 @@ $archiveTabUrl = 'lihat.php?' . http_build_query(array_merge($tabQuery,['view'=>
 $selectedId=(int)($_GET['selected']??0);
 $selectedRow=null;
 foreach($paymentRows as $candidate) if((int)$candidate['id']===$selectedId) $selectedRow=$candidate;
-if($selectedId===0)$selectedRow=$paymentRows[0]??null;elseif(!$selectedRow)$detailError='Transaksi tidak tersedia dalam filter ini. Pilih Semua Periode atau ubah filter.';
+if($selectedId===0)$selectedRow=$paymentRows[0]??null;elseif(!$selectedRow)$detailError='Transaksi tidak tersedia dalam filter ini. Sesuaikan tanggal atau filter lainnya.';
 $selectedId=(int)($selectedRow['id']??0);
 $selectedModel=null;
 if($selectedRow) {
@@ -213,7 +213,7 @@ filter_output_start();
 
       <div class="ph-page-content">
       <?php if($originBack): ?><p><a class="btn btn-ghost" href="../<?= authorization_escape($originBack) ?>">Kembali ke Daftar Asal</a></p><?php endif; ?><header class="ph-hero"><div class="ph-hero-copy"><div><h1>Riwayat Pembayaran Siswa</h1></div></div><nav class="ph-tabs" aria-label="Jenis riwayat pembayaran"><a href="<?= htmlspecialchars($activeTabUrl) ?>" <?= !$isArchive?'aria-current="page"':'' ?>>Transaksi Aktif</a><a href="<?= htmlspecialchars($archiveTabUrl) ?>" <?= $isArchive?'aria-current="page"':'' ?>>Transaksi Dihapus</a></nav></header>
-      <section class="ph-filter-card">        <form method="GET" action="lihat.php" class="ph-filter-form"><input type="hidden" name="student_id" data-student-identity="1" value="<?= max(0,(int)($_GET['student_id']??0)) ?>">
+      <section class="ph-filter-card">        <form method="GET" action="lihat.php" class="ph-filter-form ph-payment-filters"><input type="hidden" name="student_id" data-student-identity="1" value="<?= max(0,(int)($_GET['student_id']??0)) ?>">
           <input type="hidden" name="view" value="<?= $isArchive ? "deleted" : "active" ?>">
           <div class="ph-filter-intro"><div><strong>Filter Riwayat</strong></div></div>
           <div class="field-row report-date-range-field">
@@ -246,20 +246,14 @@ filter_output_start();
             <option value="<?= $pageSize ?>" <?= $perPage === $pageSize ? 'selected' : '' ?>><?= $pageSize ?> / halaman</option>
             <?php endforeach; ?>
           </select></div>
-          <?php if(!$isArchive): ?>
-          <div class="field-row"><label class="field-label" for="history-source">Sumber transaksi</label><select class="field-input field-select" id="history-source" name="source"><?php foreach(['all'=>'Semua sumber','system'=>'SistemSPP','legacy'=>'Legacy'] as $v=>$label): ?><option value="<?= $v ?>" <?= ($_GET['source']??'all')===$v?'selected':'' ?>><?= $label ?></option><?php endforeach; ?></select></div>
-          <div class="field-row"><label class="field-label" for="history-owner">Jenis pemilik</label><select class="field-input field-select" id="history-owner" name="owner_type"><?php foreach(['all'=>'Semua pemilik','student'=>'Siswa','account'=>'Rekening non-siswa'] as $v=>$label): ?><option value="<?= $v ?>" <?= ($_GET['owner_type']??'all')===$v?'selected':'' ?>><?= $label ?></option><?php endforeach; ?></select></div>
           <?php if($feeMaster): ?><input type="hidden" name="fee_master_id" value="<?= (int)$feeMaster['id'] ?>"><?php endif; ?>
-          <?php if(($_GET['all_periods']??'')==='1'): ?><input type="hidden" name="all_periods" value="1"><?php endif; ?>
-          <?php endif; ?>
           <div class="ph-filter-actions">
-            <?php if(!$isArchive): ?><a class="btn btn-ghost" href="lihat.php?<?= authorization_escape(http_build_query(array_replace($_GET,['all_periods'=>'1','page'=>1,'selected'=>null]))) ?>">Semua Periode</a><?php endif; ?>
-            <button type="submit" name="all_periods" value="0" class="btn btn-primary" id="btn-filter">Tampilkan Rekap</button>
+            <button type="submit" class="btn btn-primary" id="btn-filter">Tampilkan Rekap</button>
             <a href="lihat.php?view=<?= $isArchive ? "deleted" : "active" ?>" class="btn btn-ghost" id="btn-reset-filter">Reset</a>
             <?php if(hasRole(['admin','kasir']) && !unit_all_readonly()): ?><a href="form.php" class="btn btn-primary" id="btn-tambah">Tambah Baru</a><?php endif; ?>
           </div>
           <noscript><label>Tanggal mulai<input class="field-input" type="date" name="tanggal_awal" value="<?= authorization_escape($filter_tanggal_awal) ?>"></label><label>Tanggal akhir<input class="field-input" type="date" name="tanggal_akhir" value="<?= authorization_escape($filter_tanggal_akhir) ?>"></label></noscript>
-        </form><?php if(!$isArchive&&$history['outside']>0): ?><p class="ph-period-summary"><?= number_format($history['outside'],0,',','.') ?> transaksi lain berada di luar periode ini. Pilih <strong>Semua Periode</strong> untuk menelusurinya.</p><?php endif; ?></section>
+        </form></section>
       <?php if(!$isArchive): ?><div class="ph-export-actions"><a class="btn btn-ghost" href="export_history.php?<?= authorization_escape(http_build_query(array_replace($_GET,['format'=>'xlsx']))) ?>">Excel - Semua Hasil Filter</a><a class="btn btn-ghost" href="export_history.php?<?= authorization_escape(http_build_query(array_replace($_GET,['format'=>'pdf']))) ?>" target="_blank" rel="noopener">Cetak Halaman Ini</a></div><?php endif; ?>
       <div class="ph-workspace" data-payment-workspace data-view="<?= $isArchive?'deleted':'active' ?>">
       <section class="ph-list-panel"><?php if($feeMaster): ?><p class="ph-period-summary">Transaksi biaya: <strong><?= authorization_escape($feeMaster['nama']) ?></strong>. Total Bayar tetap menunjukkan seluruh isi struk.</p><?php endif; ?><header class="ph-panel-heading"><div><h3> Daftar Transaksi</h3></div></header>

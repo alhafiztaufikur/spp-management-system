@@ -16,7 +16,7 @@ function mh_scope(int $unit): void {global $db;$_SESSION['active_unit_id']=$unit
 function mh_page(array $input=[],int $page=1): array {global $db;return mh_payment_page($db,$input,['values'=>['*']],['*'],'2026-10-01','2026-10-21',$page,10);}
 foreach([1=>[240,46852,3064],2=>[194,60181,5084],3=>[44,11211,1140],0=>[478,118244,9288]] as $unit=>[$month,$all,$undated]){
     mh_scope($unit);$r=mh_page();mh_assert($r['total']===$month&&count($r['rows'])===10,"Unit $unit count equals visible page");
-    mh_assert($r['all']===$all&&$r['outside']===$all-$month,"Unit $unit complete source summary");
+    mh_assert(!array_intersect(['all','outside','undated'],array_keys($r)),"Unit $unit only returns the requested period count");
     $next=mh_page([],2);mh_assert(!array_intersect(array_column($r['rows'],'id'),array_column($next['rows'],'id')),"Unit $unit stable pages without duplicate IDs");
     $r=mh_page(['undated'=>'1']);mh_assert($r['total']===$undated&&count($r['rows'])===10,"Unit $unit undated DU preserved");
     $r=mh_page(['all_periods'=>'1']);mh_assert($r['total']===$all,"Unit $unit all periods including undated");
