@@ -103,7 +103,6 @@ function report_filters(mysqli $db, array $source,bool $registerChoices=true): a
     $requestedPerPage = (int)($source['per_page'] ?? 25);
     $perPage = in_array($requestedPerPage, [25,50,100], true) ? $requestedPerPage : 25;
     $currentYear = du_current_academic_year();
-    $showFuture=$billing&&!$legacyBillingDates&&($periodStart!==''||filter_is_all($billingYears)||array_filter($billingYears,static fn($year)=>$year>$currentYear));
     $academicYear = trim((string)($source['tahun_ajaran'] ?? $currentYear));
     if (!preg_match('/^\d{4}\/\d{4}$/', $academicYear)) $academicYear = $currentYear;
     $requestedOperator = trim((string)($source['operator'] ?? ''));
@@ -115,7 +114,7 @@ function report_filters(mysqli $db, array $source,bool $registerChoices=true): a
         'tanggal_awal'=>$start,'tanggal_akhir'=>$end,
         'filter_tanggal_tagihan'=>$legacyBillingDates,
         'periode_awal'=>$periodStart,'periode_akhir'=>$periodEnd,
-        '_billing_period_projection'=>$billing&&!$legacyBillingDates,'_billing_show_future'=>$showFuture,
+        '_billing_period_projection'=>$billing&&!$legacyBillingDates,'_billing_show_future'=>$billing&&!$legacyBillingDates,
         'tahun_ajaran'=>$academicYear,
         'bulan_awal'=>report_month_code($source['bulan_awal'] ?? date('m')),
         'bulan_akhir'=>report_month_code($source['bulan_akhir'] ?? ($source['bulan_awal'] ?? date('m'))),

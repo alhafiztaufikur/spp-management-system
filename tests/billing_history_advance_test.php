@@ -50,4 +50,24 @@ $nextPeriod=array_replace($calendar,['_billing_years'=>['2026/2027'],'periode_aw
 $january=array_replace($july,['periode_code'=>'2027-01','sisa'=>50000]);
 $cross=billing_history_project([...$months,$january],$nextPeriod,[],1);
 $check(count($cross['rows'])===1&&$cross['rows'][0]['keterangan']==='SPP 2026/2027 (Des, Jan) + Komite 2026/2027 (Des)','Future-only cross-calendar periods share the same academic-year label per component');
+
+$allMonths=array_replace($filtered,['_billing_years'=>['2026/2027'],'periode_awal'=>'','periode_akhir'=>'']);
+$yearItems=[];
+foreach(spp_academic_periods('2026/2027') as $month){
+    $period=$month['tahun'].'-'.$month['bulan'];
+    $remaining=$period==='2027-06'?200000.0:0.0;
+    $yearItems[]=array_replace($july,[
+        'periode_code'=>$period,'tagihan'=>200000.0,'terbayar'=>200000.0-$remaining,'sisa'=>$remaining,
+        'status'=>$remaining>0?'Belum Bayar':'Lunas',
+    ]);
+}
+$currentDu=array_replace($futureDu,['tahun_ajaran'=>'2026/2027','periode'=>'2026/2027','sisa'=>400000.0,'status'=>'Cicilan']);
+$yearView=billing_history_project([...$yearItems,$currentDu,$futureDu],$allMonths,[],1);
+$check(count($yearView['rows'])===1&&count($yearView['sections'])===1&&$yearView['detail_count']===13,
+    'All twelve months and DU share one student row and one class section, with the selected year enforced');
+$check($yearView['rows'][0]['total']['value']===600000.0&&$yearView['grand']['total']['value']===400000.0,
+    'The full-year row includes the June balance while current arrears exclude it');
+$check($yearView['rows'][0]['keterangan']==='Daftar Ulang 2026/2027 + SPP 2026/2027 (Jun)',
+    'The annual rekap names the outstanding June period inside the same row');
+$check(!str_contains(billing_history_table($yearView),'Mendatang'),'The full-year HTML has no upcoming section');
 echo "PASS $checks future settlement/history cutoff checks.\n";

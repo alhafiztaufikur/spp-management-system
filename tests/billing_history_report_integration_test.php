@@ -28,6 +28,8 @@ try {
     ]);
     $report = report_billing_history_data($koneksi, $filters);
     billing_report_assert($filters['tanggal_awal']===''&&$filters['tanggal_akhir']==='','Filter awal Riwayat Tagihan tidak menampilkan seluruh riwayat.');
+    billing_report_assert($filters['periode_awal']===''&&$filters['periode_akhir']===''&&$filters['_billing_show_future'],
+        'Semua bulan harus mencakup tagihan terbit sampai akhir tahun ajaran.');
 
     $groups = report_billing_history_group_students($report['rows']);
     $columns = report_billing_history_component_columns($groups);

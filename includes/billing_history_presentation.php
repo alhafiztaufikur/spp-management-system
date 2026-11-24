@@ -133,7 +133,6 @@ function billing_history_project(array $items,array $filters,array $placements,i
     $grand=$futureGrand=['amounts'=>[],'total'=>[]];
     $periodTotals=['tagihan'=>[],'terbayar'=>[],'sisa'=>[]];
     $fullPeriods=!empty($filters['_billing_period_projection']);
-    $mergePeriods=$fullPeriods&&($filters['periode_awal']??'')!=='';
     foreach($items as $row){
         $unit=(int)($row['unit_id']??$scope);$nis=(string)$row['nis'];$key=$unit.'|'.$nis;$component=(string)$row['komponen_key'];
         if(!billing_history_matches_period($row,$filters)||!billing_history_period_visible($row,$filters))continue;
@@ -151,13 +150,11 @@ function billing_history_project(array $items,array $filters,array $placements,i
         $itemCount=(int)($row['_read_count']??1);$detailCount+=$itemCount;
         $year=$year?:'Tidak tercatat';$class=$class?:'Rombel belum tercatat';
         $future=$fullPeriods&&billing_history_is_future($row,$filters);
-        $separateFuture=$future&&!$mergePeriods;
-        $identity=[$unit,$year,$rombel,$class];if($separateFuture)$identity[]='future';
-        $sectionKey=json_encode($identity,JSON_THROW_ON_ERROR);$groupKey=$sectionKey.'|'.$nis;
+        $sectionKey=json_encode([$unit,$year,$rombel,$class],JSON_THROW_ON_ERROR);$groupKey=$sectionKey.'|'.$nis;
         $columns[$component]??=(string)$row['komponen'];
-        $groups[$groupKey]??=['key'=>$groupKey,'section_key'=>$sectionKey,'unit_id'=>$unit,'year'=>$year,'kelas'=>$class,'tingkat'=>$level,'nis'=>$nis,'nis_diknas'=>$row['nis_diknas']??'','nama'=>$row['nama'],'amounts'=>[],'total'=>[],'notes'=>[],'future'=>$separateFuture];
+        $groups[$groupKey]??=['key'=>$groupKey,'section_key'=>$sectionKey,'unit_id'=>$unit,'year'=>$year,'kelas'=>$class,'tingkat'=>$level,'nis'=>$nis,'nis_diknas'=>$row['nis_diknas']??'','nama'=>$row['nama'],'amounts'=>[],'total'=>[],'notes'=>[]];
         $g=&$groups[$groupKey];
-        if(!empty($row['_advance_paid'])||(!empty($filters['_billing_as_of'])&&in_array($component,['spp','komite'],true)&&($row['periode_code']??'')>substr($filters['_billing_as_of'],0,7)&&(float)($row['terbayar']??0)>.001))$g['advance_paid']=true;
+        if(!$fullPeriods&&(!empty($row['_advance_paid'])||(!empty($filters['_billing_as_of'])&&in_array($component,['spp','komite'],true)&&($row['periode_code']??'')>substr($filters['_billing_as_of'],0,7)&&(float)($row['terbayar']??0)>.001)))$g['advance_paid']=true;
         $remaining=array_key_exists('sisa',$row)&&$row['sisa']!==null?(float)$row['sisa']:null;
         if(in_array($row['status']??'',['Dibatalkan','Potongan Penuh','Tercakup Uang PSB','Tercakup PSB'],true)){
             $remaining=0.0;$g['settled_states'][(string)$row['status']]=true;
@@ -183,7 +180,7 @@ function billing_history_project(array $items,array $filters,array $placements,i
     }
     $order=array_flip(array_keys($defaults));uksort($columns,static fn($a,$b)=>[($order[$a]??100),$a]<=>[($order[$b]??100),$b]);
     $groups=array_values($groups);usort($groups,static function($a,$b){
-        $first=[$a['unit_id'],$a['year'],$a['future'],$a['tingkat']]<=>[$b['unit_id'],$b['year'],$b['future'],$b['tingkat']];
+        $first=[$a['unit_id'],$a['year'],$a['tingkat']]<=>[$b['unit_id'],$b['year'],$b['tingkat']];
         return $first?:strnatcasecmp($a['kelas'],$b['kelas'])?:([mb_strtolower($a['nama']),$a['nis']]<=>[mb_strtolower($b['nama']),$b['nis']]);
     });
     $sections=[];
@@ -197,8 +194,7 @@ function billing_history_project(array $items,array $filters,array $placements,i
         elseif(!empty($g['total']['unknown'])||($g['total']['value']??0)>.001)$g['keterangan']='-';
         elseif(!empty($g['advance_paid']))$g['keterangan']='Pembayaran di muka';
         else $g['keterangan']=!empty($g['ordinary_items'])?'Lunas':implode(' + ',array_keys($g['settled_states']??['Lunas'=>true]));
-        if($g['future']&&$g['keterangan']!=='-')$g['keterangan']='Mendatang · '.$g['keterangan'];
-        $section=&$sections[$g['section_key']];$section??=['key'=>$g['section_key'],'unit_id'=>$g['unit_id'],'year'=>$g['year'],'kelas'=>$g['kelas'],'rows'=>[],'amounts'=>[],'total'=>[],'future'=>$g['future']];$g['no']=count($section['rows'])+1;$section['rows'][]=$g;
+        $section=&$sections[$g['section_key']];$section??=['key'=>$g['section_key'],'unit_id'=>$g['unit_id'],'year'=>$g['year'],'kelas'=>$g['kelas'],'rows'=>[],'amounts'=>[],'total'=>[]];$g['no']=count($section['rows'])+1;$section['rows'][]=$g;
         foreach($g['amounts'] as $key=>$amount){
             $section['amounts'][$key]??=['value'=>0.0,'known'=>0,'unknown'=>false];
             $section['amounts'][$key]['value']+=$amount['value'];
@@ -212,7 +208,7 @@ function billing_history_project(array $items,array $filters,array $placements,i
         unset($section);
     }unset($g);
     $emptyYears=$all||!$fullPeriods?[]:array_values(array_diff($years,array_column($groups,'year')));
-    return ['rows'=>$groups,'sections'=>$sections,'columns'=>$columns,'grand'=>$grand,'future_grand'=>$futureGrand,'years'=>$years,'empty_years'=>$emptyYears,'detail_count'=>$detailCount,'merged_periods'=>$mergePeriods,'period_totals'=>$periodTotals];
+    return ['rows'=>$groups,'sections'=>$sections,'columns'=>$columns,'grand'=>$grand,'future_grand'=>$futureGrand,'years'=>$years,'empty_years'=>$emptyYears,'detail_count'=>$detailCount,'period_totals'=>$periodTotals];
 }
 function billing_history_screen_totals(array $view): array {
     $totals=[];
@@ -224,7 +220,7 @@ function billing_history_screen_totals(array $view): array {
 }
 function billing_history_section_caption(array $section,int $scope): string {
     return 'Tahun Ajaran: '.$section['year'].' · Kelas: '.$section['kelas']
-        .($scope===0?' · '.unit_label((int)$section['unit_id']):'').(!empty($section['future'])?' · Mendatang':'');
+        .($scope===0?' · '.unit_label((int)$section['unit_id']):'');
 }
 const BILLING_HISTORY_CURRENT_TOTAL_LABEL='Total Tunggakan Berjalan';
 

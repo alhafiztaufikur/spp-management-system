@@ -49,7 +49,7 @@ function billing_history_print_amount(array $amount,string $component=''):string
 }
 function billing_history_print_table(array $view,?array $visible=null,int $offset=0,bool $finalSubtotalOnly=false,bool $showGrand=true):string {
     $visible??=$view['rows'];$contexts=[];
-    foreach($visible as $i=>$row){$context=json_encode([$row['unit_id'],$row['year'],!empty($row['future'])],JSON_THROW_ON_ERROR);$contexts[$context][]=['row'=>$row,'no'=>$offset+$i+1];}
+    foreach($visible as $i=>$row){$context=json_encode([$row['unit_id'],$row['year']],JSON_THROW_ON_ERROR);$contexts[$context][]=['row'=>$row,'no'=>$offset+$i+1];}
     $componentCount=count($view['columns']??[]);
     $wide=$componentCount>6;
     $componentWidth=min(10,30/max(1,$componentCount));
@@ -60,7 +60,7 @@ function billing_history_print_table(array $view,?array $visible=null,int $offse
     if(!$visible)echo '<p class="billing-empty" role="status">Tidak ada data sesuai filter.</p>';
     foreach($contexts as $entries){$first=$entries[0]['row'];$count=5+$componentCount; ?>
     <section class="billing-print-section"><table class="billing-print-table<?= $wide?' is-wide':'' ?>">
-    <thead><tr class="billing-print-year"><th colspan="<?= $count ?>">Tahun Ajaran: <?= report_e($first['year']) ?><?= report_query_unit_id()===0?' · '.report_e(unit_label((int)$first['unit_id'])):'' ?><?= !empty($first['future'])?' · Mendatang':'' ?></th></tr>
+    <thead><tr class="billing-print-year"><th colspan="<?= $count ?>">Tahun Ajaran: <?= report_e($first['year']) ?><?= report_query_unit_id()===0?' · '.report_e(unit_label((int)$first['unit_id'])):'' ?></th></tr>
     <tr class="billing-print-columns"><th class="billing-print-no"<?= $width(4) ?>>NO</th><th class="billing-print-nis"<?= $width(9) ?>>NO INDUK</th><th<?= $width(18+$remaining*.4) ?>>NAMA SISWA</th><?php foreach($view['columns'] as $columnKey=>$label): ?><th class="billing-print-numeric"<?= $width($componentWidth) ?>><?= report_e(mb_strtoupper(billing_history_column_label($columnKey,$label))) ?></th><?php endforeach; ?><th class="billing-print-numeric billing-print-total"<?= $width(10) ?>>TOTAL</th><th class="billing-print-description"<?= $width(29+$remaining*.6) ?>>KETERANGAN TAGIHAN</th></tr></thead><tbody>
     <?php $prior=null;foreach($entries as $i=>$entry):$row=$entry['row'];$section=$view['sections'][$row['section_key']];$next=$entries[$i+1]['row']??null;$last=!$next||$next['section_key']!==$row['section_key'];
         if($prior!==$row['section_key']):$continuation=$row['key']!==$section['rows'][0]['key']; ?>
