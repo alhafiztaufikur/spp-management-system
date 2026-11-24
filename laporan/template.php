@@ -82,9 +82,30 @@ if($isPrincipalLetter){ require __DIR__.'/../includes/principal_letter_page.php'
 <form method="get" class="recap-header-controls report-filter-card report-template-filters report-global-filter-form <?= report_e($templateFilterClass) ?><?= $template==='per-item'&&!$perItemUsesMonthly?' report-per-item-compact':'' ?>"><input type="hidden" name="template" value="<?= report_e($template) ?>"><input type="hidden" name="unit" value="<?= $reportScopeQuery ?>"><div class="report-filter-heading"><span class="recap-filter-label">Filter Laporan</span></div><?php if($template==='tabungan-siswa'): ?><input type="hidden" name="owner_id" value="<?= (int)($filters['owner_id']??0) ?>"><input type="hidden" name="student_id" data-student-identity="1" value="<?= (int)($filters['student_id']??0) ?>"><label class="field-row report-all-period-field"><span class="field-label">Cakupan periode</span><span class="report-period-toggle"><input type="checkbox" name="all_periods" value="1" <?= !empty($filters['all_periods'])?'checked':'' ?>><span class="report-period-switch" aria-hidden="true"></span><span>Semua periode</span></span></label><?php endif; ?>
 <?php if(in_array($template,['penerimaan','setoran','kas-tabungan','tabungan-siswa'],true)||$template==='per-item'): $rangeLabel=$template==='tabungan-siswa'&&!empty($filters['all_periods'])?'Semua periode':($template==='riwayat-tagihan'&&$filters['tanggal_awal']===''?'Semua tanggal':($template==='per-item'?report_item_date_period_label($filters):report_date_range_label($filters['tanggal_awal'],$filters['tanggal_akhir']))); $datePeriodStyle=$template==='per-item'&&($perItemUsesMonthly||$perItemUsesAnnual||$perItemUsesOneTime)?' style="display:none"':''; ?><div class="field-row report-date-range-field" data-per-item-period="date"<?= $datePeriodStyle ?>><label class="field-label"><?= $template==='riwayat-tagihan'?'Tanggal Tagihan Dibuat':'Tanggal Transaksi' ?></label><div class="report-date-range-control report-date-range-picker" data-range-picker data-empty-label="<?= $template==='riwayat-tagihan'?'Semua tanggal':report_e($rangeLabel) ?>"><input type="hidden" name="tanggal_awal" value="<?= report_e($filters['tanggal_awal']) ?>"><input type="hidden" name="tanggal_akhir" value="<?= report_e($filters['tanggal_akhir']) ?>"><button type="button" class="report-date-range-button" aria-expanded="false"><span class="report-date-range-icon"><?= spp_calendar_icon() ?></span><span class="report-date-range-value"><?= report_e($rangeLabel) ?></span></button><div class="report-date-range-popover" hidden><label><span>Mulai</span><input type="date" value="<?= report_e($filters['tanggal_awal']) ?>" data-range-start></label><label><span>Sampai</span><input type="date" value="<?= report_e($filters['tanggal_akhir']) ?>" data-range-end></label><div class="report-date-range-popover-actions"><button type="button" class="btn btn-primary btn-sm" data-range-apply>Terapkan</button></div></div></div></div><?php endif; ?>
 <?php if($billingGroupedView): ?>
-<fieldset class="field-row report-billing-period"><legend class="field-label">Periode Tagihan</legend>
+<fieldset class="field-row report-billing-period report-month-range-picker" data-month-range-picker="billing" data-empty-label="Semua bulan">
+<legend class="field-label" id="billing-month-range-label">Periode Tagihan</legend>
 <div class="report-billing-months"><label><span>Bulan awal</span><input class="field-input" type="month" name="periode_awal" value="<?= report_e($filters['periode_awal']) ?>"></label>
 <label><span>Bulan akhir</span><input class="field-input" type="month" name="periode_akhir" value="<?= report_e($filters['periode_akhir']) ?>"></label></div>
+<button type="button" class="report-month-range-button" aria-expanded="false" aria-controls="billing-month-range-panel" aria-labelledby="billing-month-range-label billing-month-range-value" hidden>
+  <span class="report-month-range-icon" aria-hidden="true"><?= spp_calendar_icon() ?></span>
+  <span class="report-month-range-value" id="billing-month-range-value">Semua bulan</span>
+</button>
+<div class="report-month-range-popover report-billing-month-popover" id="billing-month-range-panel" hidden>
+  <?php foreach (['start'=>'Bulan awal','end'=>'Bulan akhir'] as $endpoint=>$caption): ?>
+  <div class="report-billing-month-endpoint" role="group" aria-labelledby="billing-month-<?= $endpoint ?>">
+    <strong id="billing-month-<?= $endpoint ?>"><?= $caption ?></strong>
+    <label><span>Bulan</span><select data-month-range-<?= $endpoint ?> aria-label="<?= $caption ?>">
+      <option value="">Pilih bulan</option>
+      <?php foreach (report_months() as $code=>$month): ?><option value="<?= $code ?>"><?= report_e($month) ?></option><?php endforeach; ?>
+    </select></label>
+    <label><span>Tahun</span><input class="field-input" type="number" min="1000" max="2999" step="1" inputmode="numeric" value="<?= date('Y') ?>" data-month-range-year aria-label="Tahun <?= $endpoint==='start'?'awal':'akhir' ?>" required disabled></label>
+  </div>
+  <?php endforeach; ?>
+  <div class="report-month-range-popover-actions">
+    <button type="button" class="btn btn-ghost btn-sm" data-month-range-clear>Kosongkan</button>
+    <button type="button" class="btn btn-primary btn-sm" data-month-range-apply>Terapkan</button>
+  </div>
+</div>
 </fieldset>
 <?php endif; ?>
 <?php if($template==='per-item'): ?><div class="field-row" data-per-item-period="one-time"<?= $perItemUsesOneTime?'':' style="display:none"' ?>><span class="field-label">Periode Kewajiban</span><span class="field-input">Sekali saat masuk</span></div><?php endif; ?>

@@ -100,7 +100,12 @@
           }
           showModal(data, form);
         } catch (error) {
-          window.alert(error.message || 'Pemeriksaan tunggakan tidak dapat dilakukan.');
+          window.showOperationResult({
+            type: 'error',
+            title: 'Pemeriksaan tunggakan gagal',
+            message: error.message || 'Pemeriksaan tunggakan tidak dapat dilakukan.',
+            source: submitButton,
+          });
         } finally {
           if (submitButton) submitButton.disabled = false;
         }

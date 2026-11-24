@@ -1,14 +1,14 @@
-/* One desktop pagination treatment, independent of a unit's palette. */
+/* Shared desktop pagination using the current unit palette. */
 .desktop-pager{display:none}
 @media(min-width:1024px){
  body .pagination-mobile{display:none!important}
  body .desktop-pager{display:flex;justify-content:flex-end;align-items:center;gap:8px;margin:12px 0;clear:both}
- body .desktop-pager .desktop-page{box-sizing:border-box;display:inline-flex!important;align-items:center;justify-content:center;gap:8px;flex:0 0 auto;width:120px;height:38px;min-height:38px;padding:0 12px;border:1px solid #e8eeeb!important;border-radius:10px!important;background:#fff!important;color:#40564a!important;box-shadow:none!important;font:700 13px/1 "Segoe UI",Arial,sans-serif!important;text-decoration:none!important;white-space:nowrap;cursor:pointer;transition:background .15s}
- body .desktop-pager .desktop-page.is-next{background:var(--pager-next-bg,#168b57)!important;border-color:var(--pager-next-bg,#168b57)!important;color:var(--pager-next-text,#fff)!important}
+ body .desktop-pager .desktop-page{box-sizing:border-box;display:inline-flex!important;align-items:center;justify-content:center;gap:8px;flex:0 0 auto;width:120px;height:38px;min-height:38px;padding:0 12px;border:1px solid var(--border)!important;border-radius:10px!important;background:var(--bg-card)!important;color:var(--text-secondary)!important;box-shadow:none!important;font:700 13px/1 "Segoe UI",Arial,sans-serif!important;text-decoration:none!important;white-space:nowrap;cursor:pointer;transition:background .15s}
+ body .desktop-pager .desktop-page.is-next{background:var(--pager-next-bg)!important;border-color:var(--pager-next-bg)!important;color:var(--pager-next-text)!important}
  body .desktop-pager .desktop-page>svg[aria-hidden]{display:block!important;width:14px;height:14px;fill:none;stroke:currentColor;stroke-width:2;stroke-linecap:round;stroke-linejoin:round;flex:none}
- body .desktop-pager .desktop-page.is-disabled,body .desktop-pager .desktop-page:disabled{background:#fafcfb!important;border-color:#f0f3f1!important;color:#c5ceca!important;opacity:1!important;cursor:default;pointer-events:none}
+ body .desktop-pager .desktop-page:is(.is-disabled,:disabled,[aria-disabled="true"]){background:var(--bg-surface)!important;border-color:var(--border)!important;color:var(--text-muted)!important;opacity:.6!important;cursor:default;pointer-events:none}
  body .desktop-pager a.desktop-page:hover,body .desktop-pager button.desktop-page:not(:disabled):hover{filter:brightness(.97)}
- body .desktop-pager .desktop-page:focus-visible{outline:3px solid var(--pager-focus,#92cdb0);outline-offset:3px}
+ body .desktop-pager .desktop-page:focus-visible{outline:3px solid var(--accent);outline-offset:3px}
  body .desktop-pagination-source{display:none!important}
  body .desktop-pager[hidden]{display:none!important}
  .ph-list-panel>.desktop-pager{padding:0 14px}

@@ -49,9 +49,5 @@
   }
 
   retry.addEventListener('click', loadUsage);
-  panel.addEventListener('submit', event => {
-    const name = event.target.dataset.confirmFee;
-    if (name && !window.confirm('Hapus master biaya ' + name + '?')) event.preventDefault();
-  });
   if (panel.dataset.loadUsage === '1') requestAnimationFrame(() => requestAnimationFrame(loadUsage));
 })();

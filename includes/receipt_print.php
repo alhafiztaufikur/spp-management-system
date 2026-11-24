@@ -18,6 +18,16 @@ function receipt_money_words(float $amount): string {
     return ucfirst(($whole?trim(receipt_amount_words($whole)):'nol').($fraction?' koma '.$digits[intdiv($fraction,10)].' '.$digits[$fraction%10]:'').' rupiah');
 }
 
+function receipt_school_primary(array $payment): array {
+    return [
+        ['Uang PSB', $payment['U_PSB'] ?? 0],
+        ['Uang Daftar Ulang'.(!empty($payment['du_tahun_ajaran'])?' '.$payment['du_tahun_ajaran'].' / Kelas '.$payment['du_kelas']:''), $payment['uang_du'] ?? 0],
+        ['Uang SPP', $payment['U_SPP'] ?? 0],
+        ['Komite Sekolah', $payment['U_KOMITE'] ?? 0],
+        ['Tabungan Wajib', 0],
+    ];
+}
+
 /** Presentation only: callers supply the original receipt values and wording. */
 function receipt_print_document(array $receipts, string $title, string $toolbar, bool $pdf = false, array $options = []): void {
     $e=static fn($value)=>htmlspecialchars((string)$value,ENT_QUOTES|ENT_SUBSTITUTE,'UTF-8');
@@ -29,6 +39,7 @@ function receipt_print_document(array $receipts, string $title, string $toolbar,
     <body><header class="print-toolbar"><span><?= $e($toolbar) ?></span><div><button type="button" class="print-secondary" onclick="window.close()">Tutup</button><?php if(!empty($options['pdf_url'])): ?><a class="print-secondary" href="<?= $e($options['pdf_url']) ?>">PDF</a><?php endif; ?><button type="button" data-receipt-png>Unduh PNG</button><button type="button" onclick="window.print()">Cetak Lagi</button></div><span role="status" data-receipt-export-status></span></header>
     <?php foreach($receipts as $receiptIndex=>$receipt):
         $p=$receipt['payment'];$savings=($receipt['type']??'payment')==='savings';$right=[];
+        $periodRange=!empty($receipt['period_range']);
         foreach($receipt['remaining'] as $line)if($savings||$line[0]!=='Sisa Komite')$right[]=['line'=>$line,'remaining'=>true];
         if(!$right)$right[]=['line'=>['—',null]];
         if(!$savings){$right[]=['heading'=>'Pembayaran Lain-lain:'];
@@ -36,17 +47,20 @@ function receipt_print_document(array $receipts, string $title, string $toolbar,
         if(!$receipt['other'])$right[]=['line'=>['—',null]];}
         $count=max(count($receipt['primary']),count($right));
     ?>
-    <article class="receipt-sheet<?= $receiptIndex===count($receipts)-1?' receipt-last':'' ?><?= $savings?' receipt-savings-sheet':'' ?>"><table class="receipt-document"><colgroup><col style="width:52%"><col style="width:48%"></colgroup>
+    <article class="receipt-sheet<?= $receiptIndex===count($receipts)-1?' receipt-last':'' ?><?= $savings?' receipt-savings-sheet':'' ?>"><table class="receipt-document<?= $savings?'':' receipt-school-document' ?>"><colgroup><col style="width:52%"><col style="width:48%"></colgroup>
       <thead><tr><td colspan="2" class="receipt-header">
         <h1><?= implode('<br>',array_map($e,preg_split('/\s+(?=\((?:SDA|SMP|SMA)\))/',$receipt['school'],2))) ?></h1>
         <p class="address">Perum Bekasi Griya Asri II, Blok E Jl.H.Nabrih Ds. Sumber Jaya Kp.Buwek Tambun Selatan Telp. 021.88363466</p>
         <div class="document-title"><?= $savings?'BUKTI TRANSAKSI TABUNGAN':'SLIP PEMBAYARAN SEKOLAH' ?><?= $savings?'':$e($receipt['reference']??'') ?></div>
-        <table class="identity"><colgroup><col style="width:27mm"><col style="width:3mm"><col style="width:68mm"><col style="width:48mm"><col style="width:3mm"><col></colgroup>
-          <tr><td style="width:27mm"><?= ($p['owner_type']??'student')==='account'?'Identitas':'No. Induk' ?></td><td class="receipt-colon" style="width:3mm">:</td><td class="identity-value" style="width:68mm"><?= $e($p['NO_INDUK']) ?></td><td style="width:48mm">Kelas</td><td class="receipt-colon" style="width:3mm">:</td><td><?= $e(($p['kelas_rombel_snapshot']??'') ?: (($p['KELAS']??'') ?: ($p['KELAS_SISWA']??''))) ?></td></tr>
-          <tr><td><?= !empty($p['NO_induk_diknas'])?'NIS Diknas':(($p['owner_type']??'student')==='account'?'Nama Pemilik':'Nama Siswa') ?></td><td class="receipt-colon">:</td><td class="identity-value"><?= $e(!empty($p['NO_induk_diknas'])?$p['NO_induk_diknas']:$p['NAMA']) ?></td><td><?= $savings?'Referensi':'Untuk Pembayaran Bulan' ?></td><td class="receipt-colon">:</td><td><?= $e($savings?$receipt['reference']:$receipt['period']) ?></td></tr>
+        <?php $identityRightLabelWidth = $periodRange ? '37mm' : '48mm'; ?>
+        <table class="identity"><colgroup><col style="width:27mm"><col style="width:3mm"><col style="width:68mm"><col style="width:<?= $identityRightLabelWidth ?>"><col style="width:3mm"><col></colgroup>
+          <tr><td style="width:27mm"><?= ($p['owner_type']??'student')==='account'?'Identitas':'No. Induk' ?></td><td class="receipt-colon" style="width:3mm">:</td><td class="identity-value" style="width:68mm"><?= $e($p['NO_INDUK']) ?></td><td style="width:<?= $identityRightLabelWidth ?>">Kelas</td><td class="receipt-colon" style="width:3mm">:</td><td><?= $e(($p['kelas_rombel_snapshot']??'') ?: (($p['KELAS']??'') ?: ($p['KELAS_SISWA']??''))) ?></td></tr>
+          <tr><td><?= !empty($p['NO_induk_diknas'])?'NIS Diknas':(($p['owner_type']??'student')==='account'?'Nama Pemilik':'Nama Siswa') ?></td><td class="receipt-colon">:</td><td class="identity-value"><?= $e(!empty($p['NO_induk_diknas'])?$p['NO_induk_diknas']:$p['NAMA']) ?></td><td><?= $savings?'Referensi':($periodRange?'Periode Tagihan':'Untuk Pembayaran Bulan') ?></td><td class="receipt-colon">:</td><td><?= $e($savings?$receipt['reference']:$receipt['period']) ?></td></tr>
           <?php if(!empty($p['NO_induk_diknas'])): ?><tr><td>Nama Siswa</td><td class="receipt-colon">:</td><td class="identity-value"><?= $e($p['NAMA']) ?></td><td></td><td></td><td></td></tr><?php endif; ?>
         </table>
-      </td></tr><tr class="receipt-column-labels"><th><?= $savings?'Data Tabungan:':'Data Pembayaran:' ?></th><th><?= $savings?'Ringkasan Saldo:':'Sisa Pembayaran:' ?></th></tr></thead>
+      </td></tr>
+      <tr class="receipt-column-labels"><th><?= $savings?'Data Tabungan:':'Data Pembayaran:' ?></th><th><?= $savings?'Ringkasan Saldo:':'Sisa Pembayaran:' ?></th></tr>
+      </thead>
       <tbody>
       <?php for($i=0;$i<$count;$i++): ?><tr class="receipt-line">
         <td><?php if(isset($receipt['primary'][$i])): [$label,$amount]=$receipt['primary'][$i]; $primaryAmount=$money($amount); ?><table class="payments<?= $savings?'':' receipt-primary-payment' ?>"><tr><td class="number"<?= $pdf&&!$savings?' style="width:7.462687%"':'' ?>><?= $i+1 ?>.</td><td class="receipt-payment-label"<?= $pdf&&!$savings?' style="width:53.731343%"':'' ?>><?= $e($label) ?></td><td class="receipt-colon"<?= $pdf&&!$savings?' style="width:4.477612%!important"':'' ?>>:</td><td class="amount"<?= $pdf&&!$savings?' style="width:34.328358%"':'' ?>><?php if(!$savings&&strlen($primaryAmount)>10): ?><span class="receipt-amount-text" style="<?= $pdf?'font-size':'--receipt-amount-size' ?>:<?= round(105/strlen($primaryAmount),2) ?>pt"><?= $e($primaryAmount) ?></span><?php else: ?><?= $e($primaryAmount) ?><?php endif; ?></td></tr></table><?php endif; ?></td>
@@ -55,7 +69,7 @@ function receipt_print_document(array $receipts, string $title, string $toolbar,
       <?php if($savings): ?><tr class="receipt-line"><td colspan="2" style="padding-top:2mm"><strong>Keterangan:</strong> <?= nl2br($e($receipt['note']?:'—')) ?></td></tr><?php endif; ?>
       <tr class="receipt-closing"><td colspan="2">
         <table class="total"><tr><td><?= $savings?'JUMLAH '.($receipt['kind']==='masuk'?'SETORAN':'PENARIKAN'):'JUMLAH TOTAL' ?></td><td class="amount"><?= $e($money($p['total_jumlah'],true)) ?></td></tr></table>
-        <table class="receipt-footer"><tr><td class="footer-left"><p class="words"><strong>Terbilang:</strong> <?= $e($receipt['words']) ?></p><?php if($savings): ?><p>Saldo mengikuti urutan jurnal sampai transaksi ini.</p><?php else: ?><p><strong>Sistem Pembayaran:</strong> <?= $e(($p['sistem_pembayaran']??'')?:'Tidak tercatat') ?></p><p class="receipt-pay-time">Jam Bayar: <?= $e(payment_time_parts($p)['time']) ?></p><?php endif; ?></td><td class="footer-right"><div class="signature-date">Bekasi, <?= $e(!empty($p['TGL_BYR'])?date('d-m-Y',strtotime($p['TGL_BYR'])):$receipt['date']) ?></div><div>Bagian Keuangan</div><div class="signature-space"></div><strong><?= $e(mb_strtoupper((string)$receipt['signer'],'UTF-8')) ?></strong></td></tr></table>
+        <table class="receipt-footer"><tr><td class="footer-left"><p class="words"><strong>Terbilang:</strong> <?= $e($receipt['words']) ?></p><?php if($savings): ?><p>Saldo mengikuti urutan jurnal sampai transaksi ini.</p><?php else: ?><p><strong>Sistem Pembayaran:</strong> <?= $e(($p['sistem_pembayaran']??'')?:'Tidak tercatat') ?></p><p class="receipt-pay-time">Jam Bayar: <?= $e(payment_time_parts($p)['time']) ?></p><?php endif; ?></td><td class="footer-right"><div class="signature-date">Bekasi, <?= $e(!empty($p['TGL_BYR'])?date('d-m-Y',strtotime($p['TGL_BYR'])):$receipt['date']) ?></div><div>Bagian Keuangan</div><div class="signature-space<?= $savings?'':' receipt-payment-signature' ?>"></div><strong><?= $e(mb_strtoupper((string)$receipt['signer'],'UTF-8')) ?></strong></td></tr></table>
       </td></tr></tbody>
     </table></article>
     <?php endforeach; ?>

@@ -15,6 +15,7 @@ require_once '../includes/spp_payment_status.php';
 require_once '../includes/spp_billing.php';
 require_once '../includes/komite_billing.php';
 require_once '../includes/payment_obligations.php';
+require_once '../includes/payment_permissions.php';
 requireRole(['admin', 'kasir']);
 
 if(isset($_GET['unit_id'])&&(!is_string($_GET['unit_id'])||(int)$_GET['unit_id']!==unit_active_id())){http_response_code(409);echo json_encode(['ok'=>false,'code'=>'unit_changed','message'=>'Unit formulir berubah. Muat ulang Input Pembayaran.']);exit;}
@@ -27,7 +28,6 @@ $editId = max(0, (int)($_GET['edit_id'] ?? 0));
 $transactionStarted = false;
 
 try { unit_resolve_student($koneksi,$noInduk,(int)($_GET['student_id']??0)); }catch(Throwable $e){http_response_code(409);echo json_encode(['ok'=>false,'message'=>$e->getMessage()]);exit;}
-if(($_SERVER['REQUEST_METHOD']??'GET')==='GET')lb_scope_student_read($koneksi,$noInduk);
 
 try {
     if ($noInduk === '' || $bulan === '' || !preg_match('/^\d{4}$/', $tahun)) {
@@ -50,13 +50,23 @@ try {
             echo json_encode(['ok' => false, 'code' => 'payment_not_found', 'message' => 'Data pembayaran tidak ditemukan.']);
             exit;
         }
-        $allowInactive = (string)$editedPayment['NO_INDUK'] === $noInduk;
+        try {
+            payment_assert_edit_student((string)$editedPayment['NO_INDUK'], $noInduk);
+        } catch (DomainException $error) {
+            $koneksi->rollback();
+            http_response_code(422);
+            echo json_encode(['ok'=>false,'code'=>'edit_student_locked','message'=>$error->getMessage()], JSON_UNESCAPED_UNICODE);
+            exit;
+        }
+        $allowInactive = true;
     }
+    if(($_SERVER['REQUEST_METHOD']??'GET')==='GET')lb_scope_student_read($koneksi,$noInduk);
 
-    $status = spp_billing_schema_ready($koneksi)
+    $published = spp_billing_schema_ready($koneksi);
+    $status = $published
         ? spp_published_period_status($koneksi,$noInduk,$bulan,$tahun,$editId)
         : spp_payment_status($koneksi, $noInduk, $bulan, $tahun, $editId, false, $allowInactive);
-    if (spp_billing_schema_ready($koneksi)) {
+    if ($published) {
         $komite = komite_bill($koneksi,$noInduk,$bulan,$tahun);
         $komitePaid = (float)($komite['paid'] ?? 0);
         if ($komite && $editId > 0) {
@@ -66,12 +76,15 @@ try {
         }
         $status['komite'] = ['exists'=>(bool)$komite,'total'=>(float)($komite['nominal_tagihan'] ?? 0),'paid'=>max(0,$komitePaid)];
     }
-    if (($_GET['summary'] ?? '') !== '0') $status['obligations']=payment_obligations($koneksi,$noInduk);
-    if(($_GET['details']??'')==='1'){
+    $summary = ($_GET['summary'] ?? '') !== '0';
+    $details = ($_GET['details'] ?? '') === '1';
+    if ($details) {
         require_once '../includes/payment_student_details.php';
-        $status['payment_details']=payment_student_details($koneksi,$noInduk,$editId);
     }
-    $status['edit_dependency'] = spp_billing_schema_ready($koneksi) ? null : ($editId > 0 ? spp_edit_dependency($koneksi, $editId, false) : null);
+    $otherBills = $summary && $details && $editId === 0 ? other_fee_open_bills($koneksi,$noInduk) : null;
+    if ($summary) $status['obligations'] = payment_obligations($koneksi,$noInduk,$otherBills);
+    if ($details) $status['payment_details'] = payment_student_details($koneksi,$noInduk,$editId,$otherBills);
+    $status['edit_dependency'] = $published ? null : ($editId > 0 ? spp_edit_dependency($koneksi, $editId, false) : null);
     $koneksi->commit();
     $transactionStarted = false;
     echo json_encode($status, JSON_UNESCAPED_UNICODE | JSON_UNESCAPED_SLASHES);

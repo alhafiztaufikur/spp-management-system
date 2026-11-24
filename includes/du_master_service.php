@@ -13,6 +13,12 @@ function du_master_rate_cents(mixed $value,int $grade): ?int {
     return $cents;
 }
 
+function du_master_sync_legacy(mysqli $db,array $pendingBatches=[]): void {
+    if(!lop_ready($db))return;
+    $owners=array_column(lb_cache($db)['students'],'id');
+    lb_refresh_manifests($db,array_merge($pendingBatches,lb_sync_owners($db,$owners)));
+}
+
 /** Caller owns transaction: validation, rates, publication and evidence commit together. */
 function du_master_save_and_complete(mysqli $db,int $yearId,string $label,mixed $amounts,int $actor): array {
     $year=lf_one($db,'SELECT * FROM tahun_ajaran WHERE id=? AND label=? FOR UPDATE',[$yearId,$label]);
@@ -36,13 +42,15 @@ function du_master_save_and_complete(mysqli $db,int $yearId,string $label,mixed 
         $publication=du_publish_advance($db,$yearId,$label,$actor);
         $result=['rates_saved'=>$saved,'unpaid_bills_aligned'=>$aligned,'payments_reclassified'=>0]+$publication;
         if($saved||$aligned||$publication['created']||$publication['linked'])du_write_audit($db,$yearId,null,'simpan_lengkapi',null,$result,$publication['created']);
+        du_master_sync_legacy($db);
         return $result;
     }
     $coverage=du_psb_reconcile($db,$label,$actor);
-    $tracking=ldu_reconstruct_payments($db,$actor);
-    lb_cache($db,true);$created=du_publish_year_from_active_students($db,$yearId,$label);
+    $pendingBatches=[];
+    $tracking=ldu_reconstruct_payments($db,$actor,$pendingBatches);
+    $created=du_publish_year_from_active_students($db,$yearId,$label,$pendingBatches);
     $result=['rates_saved'=>$saved,'created'=>$created,'existing'=>max(0,(int)($GLOBALS['du_publish_result']['existing']??0)-$aligned),'unknown'=>(int)($GLOBALS['du_publish_result']['unknown']??0),'unpaid_bills_aligned'=>$aligned,'payments_reclassified'=>$tracking['receipts'],'covered_psb'=>(int)($GLOBALS['du_publish_result']['covered_psb']??$coverage['covered_psb']),'conflicts'=>(int)($GLOBALS['du_publish_result']['conflicts']??$coverage['conflicts'])];
     if($saved||$created||$aligned||$coverage['changes'])du_write_audit($db,$yearId,null,'simpan_lengkapi',null,$result,$created);
-    if(lop_ready($db))lb_refresh_manifests($db,lb_sync_owners($db,array_column(lb_cache($db)['students'],'id')));
+    du_master_sync_legacy($db,$pendingBatches);
     return $result;
 }

@@ -14,6 +14,66 @@
   if(canonical.searchParams.has('urut')&&sort)canonical.searchParams.set('urut',sort);
   if(canonical.href!==location.href)history.replaceState(history.state,'',canonical);
   const results=document.querySelector('[data-finance-panel]'),tabs=[...document.querySelectorAll('[data-finance-tab]')],desktop=matchMedia('(min-width:1100px)');
+  const desktopActions=matchMedia('(min-width:1024px)');
+  const actionMenu=document.createElement('div');
+  actionMenu.id='report-action-popover';
+  actionMenu.className='report-action-popover';
+  actionMenu.hidden=true;
+  document.body.append(actionMenu);
+  let actionTrigger=null;
+  function closeActions(restoreFocus=false){
+    actionMenu.hidden=true;
+    actionTrigger?.setAttribute('aria-expanded','false');
+    if(restoreFocus&&actionTrigger?.isConnected)actionTrigger.focus({preventScroll:true});
+    actionTrigger=null;
+  }
+  function showActions(trigger,button){
+    actionTrigger=trigger;
+    actionTrigger.setAttribute('aria-expanded','true');
+    actionTrigger.setAttribute('aria-controls',actionMenu.id);
+    const action=button.cloneNode(true);
+    action.hidden=false;
+    action.classList.add('btn','btn-ghost');
+    actionMenu.replaceChildren(action);
+    actionMenu.hidden=false;
+    const anchor=trigger.getBoundingClientRect(),width=actionMenu.offsetWidth,height=actionMenu.offsetHeight;
+    actionMenu.style.left=Math.max(8,Math.min(innerWidth-width-8,anchor.right-width))+'px';
+    actionMenu.style.top=Math.max(8,anchor.bottom+height+12<=innerHeight?anchor.bottom+4:anchor.top-height-4)+'px';
+    action.focus({preventScroll:true});
+  }
+  function refreshActions(){
+    form.querySelectorAll('.finance-row-menu .open-payment-activity').forEach(button=>button.hidden=false);
+  }
+  document.addEventListener('click',event=>{
+    const trigger=event.target.closest('.finance-row-menu > summary');
+    if(desktopActions.matches&&trigger){
+      const action=trigger.parentElement.querySelector('.open-payment-activity');
+      if(!action)return;
+      event.preventDefault();
+      if(actionTrigger===trigger){closeActions(true);return;}
+      closeActions();
+      showActions(trigger,action);
+    }else if(!actionMenu.contains(event.target))closeActions();
+  });
+  actionMenu.addEventListener('click',event=>{
+    if(!event.target.closest('.open-payment-activity'))return;
+    const trigger=actionTrigger;
+    closeActions();
+    document.getElementById('payment-activity-dialog')?.addEventListener('close',()=>{
+      if(trigger?.isConnected)trigger.focus({preventScroll:true});
+    },{once:true});
+  });
+  document.addEventListener('keydown',event=>{
+    if(event.key==='Escape'&&actionTrigger){event.preventDefault();closeActions(true);}
+  });
+  document.addEventListener('scroll',event=>{if(!actionMenu.contains(event.target))closeActions();},true);
+  addEventListener('resize',()=>closeActions());
+  desktopActions.addEventListener('change',()=>{
+    closeActions();
+    form.querySelectorAll('.finance-row-menu').forEach(menu=>{menu.open=false;menu.querySelector('summary').removeAttribute('aria-expanded');});
+  });
+  document.addEventListener('report-section-updated',()=>{closeActions();refreshActions();});
+  refreshActions();
   function panelValue(value){return ['ringkasan','komponen','transaksi'].includes(value)?value:'ringkasan';}
   function syncLinks(){
     const current=cleanLegacyParams(new URL(location.href)),panel=panelValue(current.searchParams.get('panel'));
@@ -25,6 +85,7 @@
   }
   function applyPanel(){
     if(!results)return;const panel=panelValue(new URL(location.href).searchParams.get('panel'));
+    closeActions();
     results.dataset.financePanel=panel;
     if(desktop.matches){results.setAttribute('role','tabpanel');results.setAttribute('aria-labelledby','finance-tab-'+panel);results.tabIndex=0;}
     else{results.removeAttribute('role');results.removeAttribute('aria-labelledby');results.removeAttribute('tabindex');}

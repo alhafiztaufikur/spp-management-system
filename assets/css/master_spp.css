@@ -39,10 +39,19 @@
 .spp-workspace .spp-main-panel{padding:0;overflow:visible;}
 .spp-workspace-tabs{display:grid;grid-template-columns:repeat(2,minmax(0,1fr));border-bottom:1px solid var(--border);padding:0 12px;}
 .spp-workspace-tabs a{display:flex;align-items:center;justify-content:center;gap:9px;padding:17px 10px;font-size:12px;font-weight:700;color:var(--text-secondary);text-decoration:none;border-bottom:2px solid transparent;}
-.spp-workspace-tabs a.is-active{border-color:var(--accent);color:var(--text-primary);}
+/* Use the URL fragment until the interactive tabs have initialized. */
+.spp-workspace-tabs a.is-active,
+html:is([data-spp-initial-tab="rates"], :has(#spp-rate-panel:target)) .spp-workspace-tabs:not([role="tablist"]) [data-spp-tab="rates"],
+html:not([data-spp-initial-tab="rates"], :has(#spp-rate-panel:target)) .spp-workspace-tabs:not([role="tablist"]) [data-spp-tab="students"] {
+  border-color:var(--accent);color:var(--text-primary);
+}
 .spp-workspace-tabs a:hover{background:var(--accent-glow);color:var(--text-primary);}
 .spp-workspace-tabs svg{width:18px;height:18px;flex:none;}
 .spp-tab-panel{padding:20px;min-width:0;scroll-margin-top:90px;}
+html:not([data-spp-initial-tab="rates"], :has(#spp-rate-panel:target)) #spp-rate-panel:not([role="tabpanel"]),
+html:is([data-spp-initial-tab="rates"], :has(#spp-rate-panel:target)) #spp-students-panel:not([role="tabpanel"]) {
+  display:none;
+}
 .spp-workspace [hidden]{display:none!important;}
 .spp-section-heading{margin-bottom:20px;}
 .spp-section-heading h2{font-size:16px;margin:0 0 7px;}

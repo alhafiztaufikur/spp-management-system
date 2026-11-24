@@ -60,6 +60,13 @@ function payment_assert_owner(mysqli $db, int $id, int $actorId): void
     // only the separately checked Super Admin decision can apply that request.
 }
 
+function payment_assert_edit_student(string $originalNis, mixed $submittedNis): void
+{
+    if (!is_string($submittedNis) || trim($submittedNis) !== $originalNis) {
+        throw new DomainException('Siswa pada transaksi ini tidak dapat diubah.');
+    }
+}
+
 function payment_can_print_batch(mysqli $db, string $token): bool
 {
     if(!preg_match('/^[a-f0-9]{32}$/D',$token)) return false;

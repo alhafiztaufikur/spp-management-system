@@ -70,6 +70,7 @@ html body .finance-workspace .report-general-filter .btn-warning{background:rgba
 .finance-components .payment-table tbody tr:last-child{background:var(--accent-glow)}
 .finance-components .payment-table tbody tr:last-child td{font-size:12px;padding-block:13px}
 .finance-row-menu{display:inline-block;vertical-align:middle;margin-left:5px}
+.report-period-desktop{display:none}
 .finance-row-menu summary{display:inline-grid;place-items:center;width:26px;height:27px;border:1px solid var(--border);border-radius:7px;list-style:none;font-size:16px;color:var(--text-muted);cursor:pointer}
 .finance-row-menu summary::-webkit-details-marker{display:none}
 .finance-row-menu[open] :is(a,button){display:block;padding:8px 6px;margin-top:6px;font-size:10px;color:var(--accent);white-space:normal;background:var(--accent-glow);border:1px solid var(--border);border-radius:6px;cursor:pointer}

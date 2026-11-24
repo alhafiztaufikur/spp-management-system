@@ -35,16 +35,14 @@ const check=(ok,label)=>{assert(ok,label);checks.push(label);console.log('PASS '
    if(unit===1){
     for(const key of ['single_draft','multi_draft']){
      await page.setViewportSize({width:1440,height:960});await page.goto(f.base+'/laporan/surat_orang_tua_susun.php?preview=1&draft='+f[key]);
-     const button=page.locator('#parent-png');await button.waitFor();
-     const downloaded=page.waitForEvent('download',{timeout:120000});await button.click();const download=await downloaded;
-     const target=path.join(root,'artifacts',key+(key==='single_draft'?'.png':'.zip'));await download.saveAs(target);
-     check(fs.statSync(target).size>10000,key+': PNG/ZIP download contains content');
-     await page.waitForFunction(()=>document.querySelector('#parent-png')?.disabled===false);
-     check((await page.locator('#parent-png-status').innerText()).includes('siap diunduh'),key+': export completes and button resets');
+     const pdf=page.getByRole('link',{name:'Unduh PDF',exact:true});
+     const downloaded=page.waitForEvent('download',{timeout:120000});await pdf.click();const download=await downloaded;
+     const target=path.join(root,'artifacts',key+'.pdf');await download.saveAs(target);
+     check(fs.readFileSync(target).subarray(0,4).toString()==='%PDF',key+': PDF download contains content');
+     check(await page.locator('#parent-png,script[src*="parent_letter_png"]').count()===0,key+': PNG conversion feature removed');
     }
-    await page.route('**/surat_orang_tua_pdf.php?**',route=>route.fulfill({status:400,contentType:'text/html',body:'Draf kedaluwarsa'}));
-    await page.locator('#parent-png').click();await page.waitForFunction(()=>document.querySelector('#parent-png-status').textContent.includes('Surat tidak tersedia'));
-    check(await page.locator('#parent-png').isEnabled(),'Expired draft export reports failure and allows retry');
+    const unavailable=await page.request.get(f.base+'/laporan/surat_orang_tua_pdf.php?draft='+'0'.repeat(32)+'&download=1');
+    check(!unavailable.ok(),'Invalid draft cannot download a PDF');
    }
    await context.close();
   }

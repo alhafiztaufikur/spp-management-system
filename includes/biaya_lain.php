@@ -75,18 +75,11 @@ function other_fee_paid_for_bill(mysqli $db, int $billId, int $excludePaymentId 
 }
 
 function other_fee_open_bills(mysqli $db, string $noInduk,int $excludePaymentId=0): array {
-    $stmt = $db->prepare("SELECT t.id, t.master_biaya_lain_id, t.nama_snapshot AS nama,
-               t.nominal_tagihan AS nominal, t.status,
-               COALESCE(SUM(d.nominal_snapshot), 0) AS terbayar
-        FROM tagihan_biaya_lain t
-        LEFT JOIN bayar_biaya_lain d ON d.tagihan_biaya_lain_id = t.id
-        WHERE t.no_induk = ? AND t.status = 'open'
-        GROUP BY t.id
-        ORDER BY t.nama_snapshot");
-    $stmt->bind_param('s', $noInduk);
-    $stmt->execute();
-    $rows = $stmt->get_result()->fetch_all(MYSQLI_ASSOC);
-    $stmt->close();
+    $rows = hp_rows($db,"SELECT id, master_biaya_lain_id, nama_snapshot AS nama,
+               nominal_tagihan AS nominal, status
+        FROM tagihan_biaya_lain
+        WHERE no_induk = ? AND status = 'open'
+        ORDER BY nama_snapshot",[$noInduk]);
     foreach ($rows as &$row) {
         $row['nominal'] = (float)$row['nominal'];
         $row['terbayar'] = ofb_paid($db,(int)$row['id'],$excludePaymentId);

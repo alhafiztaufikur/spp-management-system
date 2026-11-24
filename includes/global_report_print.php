@@ -7,11 +7,52 @@ function global_report_clean_template(string $template):bool {
 }
 function global_report_hide_context(string $template):bool{return global_report_clean_template($template);}
 function global_report_large_address(string $template):bool{return in_array($template,['saldo-tabungan','status','per-item','spp-tahunan'],true);}
+function global_report_letterhead(int $unit,bool $pdf=false):string {
+    $path=__DIR__.'/../assets/img/school-logo.png';
+    // Dompdf needs GD to embed the school's PNG.
+    $logo=(!$pdf||extension_loaded('gd'))&&is_readable($path)?file_get_contents($path):false;
+    $image=$logo?'<img src="data:image/png;base64,'.base64_encode($logo).'" alt="Logo sekolah">':'';
+    return '<table class="kop"><tr><td style="width:70px">'.$image.'</td><td><h1>'.report_e(unit_school_name($unit)).
+        '</h1><p>Perum Bekasi Griya Asri II, Tambun Selatan · Telp. 021-88363466</p></td><td style="width:70px"></td></tr></table>';
+}
 function global_report_print_money($value,bool $currency=true):string{$text=report_money($value);return $currency?$text:preg_replace('/^Rp /','',$text);}
 function global_report_short_months(string $label):string {
     return preg_replace_callback('/\b(Januari|Februari|Maret|April|Mei|Juni|Juli|Agustus|September|Oktober|November|Desember)\b/iu',static function($m){
         return ['januari'=>'Jan','februari'=>'Feb','maret'=>'Mar','april'=>'Apr','mei'=>'Mei','juni'=>'Jun','juli'=>'Jul','agustus'=>'Agu','september'=>'Sep','oktober'=>'Okt','november'=>'Nov','desember'=>'Des'][mb_strtolower($m[0])];
     },$label);
+}
+function global_report_receipt_header(string $label):bool {
+    return in_array($label,['No','NIS','Nama Siswa','Kelas','Tanggal Transaksi','SPP','Komite','Daftar Ulang','Uang PSB','Total'],true);
+}
+function global_report_print_template(array $matrix):string {
+    return ($matrix['presentation_surface']??'print')==='print'?($matrix['report_template']??''):'';
+}
+function global_report_clean_header(string $label,bool $receipt,string $template=''):string {
+    $text=global_report_short_months($label);
+    if($template==='status')$text=preg_replace('/\h+[-–—]\h+/u',' · ',$text);
+    if($template==='saldo-tabungan'&&$label==='Identitas')return 'NIS';
+    if(in_array($template,['tabungan-siswa','saldo-tabungan'],true)&&in_array($label,['Saldo Berjalan','Saldo Saat Ini'],true))return 'SALDO';
+    if(in_array($template,['spp-tahunan','per-item','status','tabungan-siswa','saldo-tabungan'],true))return mb_strtoupper($text,'UTF-8');
+    if(!$receipt||!global_report_receipt_header($label))return $text;
+    return match($label){
+        'Tanggal Transaksi'=>'TANGGAL',
+        'Daftar Ulang'=>'D.ULANG',
+        default=>mb_strtoupper($text,'UTF-8'),
+    };
+}
+function global_report_print_value($value,array $column,array $row,string $template) {
+    if($template==='status'&&isset($column['du_status_key'])){
+        $status=report_status_key((string)($row[$column['du_status_key']]??''));
+        if(in_array($status,['lunas','covered_psb'],true))return 0;
+    }
+    if($template!=='per-item')return $value;
+    $text=is_array($value)?($value['text']??''):$value;
+    if(!is_string($text)||strcasecmp(trim($text),'Belum Diketahui')!==0)return $value;
+    return is_array($value)?array_replace($value,['text'=>'']):'';
+}
+function global_report_print_status_blank($value,array $column,string $template):bool {
+    return $template==='status'&&isset($column['group'])
+        &&($value===null||(is_string($value)&&in_array(trim($value),['','-','–','—'],true)));
 }
 function global_report_print_text($value,array $column,array $row=[],bool $currency=true):string {
     $key=$column['source']??$column[0];$type=$column[2]??'text';
@@ -23,7 +64,9 @@ function global_report_print_text($value,array $column,array $row=[],bool $curre
     if($key==='nis'&&!empty($row['nis_diknas']))return (string)$value."\nDiknas ".$row['nis_diknas'];
     return (string)$value;
 }
-function global_report_print_cell($value,array $column,array $row=[],bool $currency=true,bool $receiptTime=false):string {
+function global_report_print_cell($value,array $column,array $row=[],bool $currency=true,bool $receiptTime=false,string $template=''):string {
+    $value=global_report_print_value($value,$column,$row,$template);
+    if(global_report_print_status_blank($value,$column,$template))return '';
     if($receiptTime&&$value!==null){
         $parts=spp_date_parts($value,$row['time_precision']??null);
         return report_e($parts['date']).'<span class="global-clean-transaction-time">'.report_e($parts['time']).'</span>';
@@ -35,16 +78,25 @@ function global_report_print_cell($value,array $column,array $row=[],bool $curre
 function global_report_print_layout(array $matrix,?string $orientation=null):array {
     static $metrics=null,$normal=null,$bold=null;
     if($metrics===null){$font=billing_history_print_font();$pdf=new \Dompdf\Dompdf();$metrics=$pdf->getFontMetrics();$normal=$metrics->getFont($font['family'],'normal');$bold=$metrics->getFont($font['family'],'bold');}
-    $widths=[];$currency=$matrix['currency_prefix']??true;
+    $widths=[];$currency=$matrix['currency_prefix']??true;$receipt=($matrix['report_template']??'')==='penerimaan';
+    $template=global_report_print_template($matrix);$compactReceipt=$template==='penerimaan';
     foreach($matrix['columns'] as $column){
         $key=$column['source']??$column[0];$type=$column[2]??'text';$money=in_array($type,['money','money_optional'],true);
-        $width=match($key){'no'=>24,'unit'=>34,'nis'=>72,'nis_diknas'=>82,'nama'=>116,'kelas'=>36,'tanggal'=>90,'jenis'=>42,'operator'=>76,'keterangan'=>76,default=>$money?($currency?54:44):(in_array($type,['html','status'],true)?54:70)};
+        $width=match($key){'no'=>24,'unit'=>34,'nis'=>72,'nis_diknas'=>82,'nama'=>116,'kelas'=>$compactReceipt?32:36,'tanggal'=>$compactReceipt?68:90,'jenis'=>42,'operator'=>76,'keterangan'=>76,default=>$money?($currency?54:44):(in_array($type,['html','status'],true)?54:70)};
         // Excel fits the complete numeric format before wrapping the date and clock.
         if(!empty($matrix['stacked_receipt_time'])&&$key==='tanggal'&&$type==='datetime')$width=136;
-        $header=global_report_short_months($column[1]);
-        foreach(global_report_nowrap_header($header)?[$header]:preg_split('/\s+/u',$header) as $word)$width=max($width,$metrics->getTextWidth($word,$bold,9)+8);
+        $header=global_report_clean_header($column[1],$receipt,$template);
+        $nowrap=global_report_nowrap_header($column[1])||($receipt&&global_report_receipt_header($column[1]));
+        foreach($nowrap?[$header]:preg_split('/\s+/u',$header) as $word)$width=max($width,$metrics->getTextWidth($word,$bold,9)+8);
         foreach($matrix['rows'] as $row){
             $value=$key==='no'?count($matrix['rows']):($row[$column[0]]??null);
+            $value=global_report_print_value($value,$column,$row,$template);
+            if(global_report_print_status_blank($value,$column,$template))continue;
+            if($compactReceipt&&$key==='tanggal'&&$type==='datetime'&&$value!==null){
+                $parts=spp_date_parts($value,$row['time_precision']??null);
+                $width=max($width,$metrics->getTextWidth($parts['date'],$normal,9)+8,$metrics->getTextWidth($parts['time'],$normal,7.2)+8);
+                continue;
+            }
             $r=!empty($matrix['separate_national_id'])?array_diff_key($row,['nis_diknas'=>true]):$row;
             $text=global_report_print_text($value,$column,$r,$currency);
             $parts=($money||$text==='Tercakup PSB'||in_array($type,['date','datetime'],true)||in_array($key,['no','nis','nis_diknas','kelas','unit'],true))?explode("\n",$text):preg_split('/\s+/u',$text);
@@ -78,18 +130,30 @@ function global_report_receipt_print_bands(array $matrix,string $orientation): a
 function global_report_clean_table(array $matrix,?array $visible=null,int $start=0,bool $subtotal=true):string {
     $layout=$matrix['_clean_layout']??global_report_print_layout($matrix);$rows=$visible??$matrix['rows'];$identity=array_slice($matrix['columns'],0,$matrix['identity_count']);$groups=$matrix['groups'];$currency=$matrix['currency_prefix']??true;
     $receipt=($matrix['report_template']??'')==='penerimaan';
+    $template=global_report_print_template($matrix);
+    $tableClass=$receipt?' global-clean-receipts':(($matrix['report_template']??'')==='saldo-tabungan'?' global-clean-balance':'');
+    if(in_array($template,['spp-tahunan','per-item','status','tabungan-siswa'],true))$tableClass.=' global-clean-left-identity';
     if(!empty($matrix['flat_header'])){$groups=[];foreach(array_slice($matrix['columns'],$matrix['identity_count']) as $c)$groups[]=['label'=>$c[1],'subtitle'=>'','columns'=>[$c]];}
     $single=true;foreach($groups as $g)if(count($g['columns'])!==1||($g['subtitle']??'')!==''||$g['label']!==$g['columns'][0][1])$single=false;
     $style='font-size:'.$layout['font_pt'].'pt';$pad='padding:'.$layout['padding_y'].'pt '.$layout['padding_x'].'pt';$totalWidth=array_sum($layout['widths']);
     // Dompdf splits a first-row colspan equally. Size each leaf column before grouped headings.
     $width=static fn(array $cols)=>100*array_sum(array_map(static fn($c)=>$layout['widths'][$c[0]],$cols))/max(1,$totalWidth);
-    ob_start(); ?><div class="global-clean-scroll"><table class="global-clean-table<?= ($matrix['report_template']??'')==='saldo-tabungan'?' global-clean-balance':'' ?>" style="<?= $style ?>"><colgroup><?php foreach($matrix['columns'] as $c): ?><col style="width:<?= 100*$layout['widths'][$c[0]]/max(1,$totalWidth) ?>%"><?php endforeach; ?></colgroup><thead><tr class="global-clean-column-widths" aria-hidden="true"><?php foreach($matrix['columns'] as $c): ?><th style="width:<?= $width([$c]) ?>%"></th><?php endforeach; ?></tr><tr>
-    <?php foreach($identity as $c): ?><th style="<?= $pad ?>;width:<?= $width([$c]) ?>%" rowspan="<?= $single?1:2 ?>"><?= report_e(global_report_short_months($c[1])) ?></th><?php endforeach; ?>
-    <?php foreach($groups as $g): ?><th class="<?= global_report_nowrap_header($g['label'])?'report-header-nowrap':'' ?>" style="<?= $pad ?>;width:<?= $width($g['columns']) ?>%" colspan="<?= count($g['columns']) ?>"><?= report_e(global_report_short_months($g['label'])) ?><?= ($g['subtitle']??'')!==''?'<br>'.report_e(global_report_short_months($g['subtitle'])):'' ?></th><?php endforeach; ?></tr>
-    <?php if(!$single): ?><tr><?php foreach($groups as $g)foreach($g['columns'] as $c): ?><th class="<?= global_report_nowrap_header($c[1])?'report-header-nowrap':'' ?>" style="<?= $pad ?>;width:<?= $width([$c]) ?>% "><?= report_e(global_report_short_months($c[1])) ?></th><?php endforeach; ?></tr><?php endif; ?></thead><tbody>
+    ob_start(); ?><div class="global-clean-scroll"><table class="global-clean-table<?= $tableClass ?>" data-print-template="<?= report_e($template) ?>" style="<?= $style ?>"><colgroup><?php foreach($matrix['columns'] as $c): ?><col style="width:<?= 100*$layout['widths'][$c[0]]/max(1,$totalWidth) ?>%"><?php endforeach; ?></colgroup><thead><tr class="global-clean-column-widths" aria-hidden="true"><?php foreach($matrix['columns'] as $c): ?><th style="width:<?= $width([$c]) ?>%"></th><?php endforeach; ?></tr><tr>
+    <?php foreach($identity as $c): ?>
+      <th data-column="<?= report_e($c['source']??$c[0]) ?>" style="<?= $pad ?>;width:<?= $width([$c]) ?>%" rowspan="<?= $single?1:2 ?>"><?= report_e(global_report_clean_header($c[1],$receipt,$template)) ?></th>
+    <?php endforeach; ?>
+    <?php foreach($groups as $g): $c=$g['columns'][0];$groupKey=count($g['columns'])===1?($c['source']??$c[0]):''; ?>
+      <th data-column="<?= report_e($groupKey) ?>" class="<?= global_report_nowrap_header($g['label'])?'report-header-nowrap':'' ?>" style="<?= $pad ?>;width:<?= $width($g['columns']) ?>%" colspan="<?= count($g['columns']) ?>"><?= report_e(global_report_clean_header($g['label'],$receipt,$template)) ?><?= ($g['subtitle']??'')!==''?'<br>'.report_e(global_report_clean_header($g['subtitle'],false,$template)):'' ?></th>
+    <?php endforeach; ?></tr>
+    <?php if(!$single): ?><tr><?php foreach($groups as $g)foreach($g['columns'] as $c): ?>
+      <th data-column="<?= report_e($c['source']??$c[0]) ?>" class="<?= global_report_nowrap_header($c[1])?'report-header-nowrap':'' ?>" style="<?= $pad ?>;width:<?= $width([$c]) ?>%"><?= report_e(global_report_clean_header($c[1],$receipt,$template)) ?></th>
+    <?php endforeach; ?></tr><?php endif; ?></thead><tbody>
     <?php if(!$rows): ?><tr><td colspan="<?= count($matrix['columns']) ?>">Tidak ada data sesuai filter.</td></tr><?php endif; ?>
-    <?php foreach($rows as $i=>$row): ?><tr><?php foreach($matrix['columns'] as $c):$key=$c['source']??$c[0];$type=$c[2]??'text';$value=$c[0]==='no'?$start+$i+1:($row[$c[0]]??null);$r=!empty($matrix['separate_national_id'])?array_diff_key($row,['nis_diknas'=>true]):$row;$receiptTime=$receipt&&$key==='tanggal'&&$type==='datetime';$class=in_array($type,['money','money_optional'],true)?'numeric':(($receiptTime||in_array($key,['no','nis','nis_diknas','kelas','unit'],true))?'identity':'text'); ?><td class="<?= $class ?>" data-column="<?= report_e($key) ?>" style="<?= $pad ?>"><?= global_report_print_cell($value,$c,$r,$currency,$receiptTime) ?></td><?php endforeach; ?></tr><?php endforeach; ?></tbody>
-    <?php if($subtotal&&!empty($matrix['subtotals'])): ?><tfoot><tr><th colspan="<?= count($identity) ?>"><?= global_report_short_subtotal($matrix['report_template']??'',$matrix['presentation_surface']??'print')?'Subtotal':'Subtotal seluruh hasil filter' ?></th><?php foreach(array_slice($matrix['columns'],count($identity)) as $c):$t=$matrix['subtotals'][$c[0]]??null; ?><td class="numeric" style="<?= $pad ?>"><?= $t?report_e(global_report_print_money($t['value'],$currency)):'—' ?></td><?php endforeach; ?></tr></tfoot><?php endif; ?></table></div><?php return ob_get_clean();
+    <?php foreach($rows as $i=>$row): ?><tr><?php foreach($matrix['columns'] as $c):$key=$c['source']??$c[0];$type=$c[2]??'text';$value=$c[0]==='no'?$start+$i+1:($row[$c[0]]??null);$r=!empty($matrix['separate_national_id'])?array_diff_key($row,['nis_diknas'=>true]):$row;$receiptTime=$receipt&&$key==='tanggal'&&$type==='datetime';$class=in_array($type,['money','money_optional'],true)?'numeric':(($receiptTime||in_array($key,['no','nis','nis_diknas','kelas','unit'],true))?'identity':'text'); ?><td class="<?= $class ?>" data-column="<?= report_e($key) ?>" style="<?= $pad ?>"><?= global_report_print_cell($value,$c,$r,$currency,$receiptTime,$template) ?></td><?php endforeach; ?></tr><?php endforeach; ?></tbody>
+    <?php if($subtotal&&!empty($matrix['subtotals'])): ?><tfoot><tr><th colspan="<?= count($identity) ?>"<?= $receipt?' style="'.$pad.'"':'' ?>><?= global_report_short_subtotal($matrix['report_template']??'',$matrix['presentation_surface']??'print')?'Subtotal':'Subtotal seluruh hasil filter' ?></th>
+    <?php foreach(array_slice($matrix['columns'],count($identity)) as $c): $value=$matrix['subtotals'][$c[0]]['value']??null; ?>
+      <td class="numeric" style="<?= $pad ?>"><?= global_report_print_status_blank($value,$c,$template)?'':report_e(global_report_print_money($value,$currency)) ?></td>
+    <?php endforeach; ?></tr></tfoot><?php endif; ?></table></div><?php return ob_get_clean();
 }
 function global_report_clean_styles(bool $pdf=false):string {
     $font=billing_history_print_font();return billing_history_print_styles($pdf).'.global-clean-table,body.global-clean-report table.data{font-family:"'.$font['family'].'",serif}'.file_get_contents(__DIR__.'/../assets/css/global_report_print.css').file_get_contents(__DIR__.'/../assets/css/global_report_totals.css').file_get_contents(__DIR__.'/../assets/css/desktop_actions.css');

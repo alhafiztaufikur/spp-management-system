@@ -16,8 +16,6 @@ require_once '../includes/transaction_authorization.php';
 require_once '../includes/payment_return.php';
 requireRole(['admin', 'kasir']);
 if (empty($_SESSION['csrf_payment'])) $_SESSION['csrf_payment'] = bin2hex(random_bytes(32));
-$activeAcademicYear = du_current_academic_year();
-$activeAcademicYearSql = $koneksi->real_escape_string($activeAcademicYear);
 
 $flash = $_SESSION['flash'] ?? null;
 unset($_SESSION['flash']);
@@ -57,6 +55,10 @@ if (!$returnEntry) {
     $returnContext = payment_return_create($id, unit_active_id(), [], 'lihat.php');
     $returnUrl = payment_return_url($returnContext, $id);
 }
+if ($periodMeta = payment_period_meta($koneksi,$id)) {
+    require __DIR__.'/../includes/payment_period_edit.php';
+    exit;
+}
 
 // Ambil Daftar Ulang yang secara eksplisit milik pembayaran ini.
 $stmt_du = $koneksi->prepare("SELECT tagihan_daftar_ulang_id, jumlah, kelas, th_ajaran FROM bayar_du WHERE bayar_id = ? LIMIT 1");
@@ -79,13 +81,13 @@ $siswa_sql = "
         s.*,
         COALESCE(p.paid_psb, 0) AS paid_psb,
         COALESCE(du.paid_du, 0) AS paid_du,
-        mk.tingkat AS master_tingkat, mk.kode_rombel, mk.is_placeholder,
+        mk.tingkat AS master_tingkat, mk.kode_rombel, mk.is_placeholder, mk.legacy_kind,
         (SELECT ta_l.label FROM siswa_tahun_ajaran sta_l
          JOIN tahun_ajaran ta_l ON ta_l.id=sta_l.tahun_ajaran_id
          WHERE sta_l.no_induk=s.NO_INDUK AND sta_l.unit_id=s.unit_id AND sta_l.status='lulus'
          ORDER BY ta_l.label DESC LIMIT 1) AS graduation_year
     FROM siswa s
-    LEFT JOIN master_kelas mk ON mk.id=s.master_kelas_id
+    LEFT JOIN master_kelas mk ON mk.id=s.master_kelas_id AND mk.unit_id=s.unit_id
     LEFT JOIN (
         SELECT unit_id,NO_INDUK, SUM(U_PSB) AS paid_psb
         FROM bayar
@@ -98,68 +100,47 @@ $siswa_sql = "
         WHERE bayar_id IS NULL OR bayar_id <> ?
         GROUP BY unit_id,no_induk
     ) du ON du.no_induk = s.NO_INDUK AND du.unit_id=s.unit_id
-    WHERE s.is_active = 1 OR s.NO_INDUK = ? OR (
-        EXISTS(SELECT 1 FROM siswa_tahun_ajaran sta_l WHERE sta_l.no_induk=s.NO_INDUK AND sta_l.unit_id=s.unit_id AND sta_l.status='lulus')
-        AND (EXISTS(SELECT 1 FROM tagihan_daftar_ulang tdu_o
-            LEFT JOIN bayar_du bd_o ON bd_o.tagihan_daftar_ulang_id=tdu_o.id
-            WHERE tdu_o.no_induk=s.NO_INDUK AND tdu_o.unit_id=s.unit_id AND tdu_o.status='open'
-              AND tdu_o.tahun_ajaran_snapshot<='$activeAcademicYearSql'
-            GROUP BY tdu_o.id,tdu_o.nominal_tagihan
-            HAVING tdu_o.nominal_tagihan-COALESCE(SUM(bd_o.jumlah),0)>.001)
-          OR EXISTS(SELECT 1 FROM tagihan_spp ts_o LEFT JOIN spp_alokasi a_o ON a_o.tagihan_spp_id=ts_o.id LEFT JOIN spp_alokasi_batch ab_o ON ab_o.id=a_o.batch_id WHERE ts_o.no_induk=s.NO_INDUK AND ts_o.unit_id=s.unit_id AND ts_o.status='open' GROUP BY ts_o.id HAVING MIN(ts_o.nominal_tagihan)-COALESCE(SUM(CASE WHEN ab_o.status='active' THEN a_o.nominal_dari_bayar ELSE 0 END),0)>.001)
-          OR EXISTS(SELECT 1 FROM tagihan_komite tk_o LEFT JOIN bayar_komite bk_o ON bk_o.tagihan_komite_id=tk_o.id WHERE tk_o.no_induk=s.NO_INDUK AND tk_o.unit_id=s.unit_id AND tk_o.status='open' GROUP BY tk_o.id HAVING MIN(tk_o.nominal_tagihan)-COALESCE(SUM(bk_o.nominal),0)>.001))
-    )
-    ORDER BY s.NAMA ASC
+    WHERE s.NO_INDUK = ? AND s.unit_id = ?
 ";
 $stmt_siswa = $koneksi->prepare($siswa_sql);
 $stmt_siswa->bind_param(
-    'iis',
-    $id, $id, $d['NO_INDUK']
+    'iisi',
+    $id, $id, $d['NO_INDUK'], $d['unit_id']
 );
 $stmt_siswa->execute();
 $siswa_list = $stmt_siswa->get_result();
 
 $period_payments = [];
-$stmt_period = $koneksi->prepare("
-    SELECT NO_INDUK, BULAN, TAHUN, SUM(U_SPP) AS paid_spp, SUM(U_KOMITE) AS paid_komite
-    FROM bayar
-    WHERE id <> ?
-    GROUP BY NO_INDUK, BULAN, TAHUN
-");
-$stmt_period->bind_param('i', $id);
-$stmt_period->execute();
-$spp_paid_result = $stmt_period->get_result();
-while ($paid = $spp_paid_result->fetch_assoc()) {
+foreach (payment_period_paid_components($koneksi,$id,$d['NO_INDUK']) as $paid) {
     $bulan_key = month_code($paid['BULAN']);
     $periodKey = $bulan_key . '-' . $paid['TAHUN'];
     $period_payments[$paid['NO_INDUK']]['spp'][$periodKey] =
-        ($period_payments[$paid['NO_INDUK']]['spp'][$periodKey] ?? 0) + (float)$paid['paid_spp'];
+        ($period_payments[$paid['NO_INDUK']]['spp'][$periodKey] ?? 0) + (float)$paid['spp'];
     $period_payments[$paid['NO_INDUK']]['komite'][$periodKey] =
-        ($period_payments[$paid['NO_INDUK']]['komite'][$periodKey] ?? 0) + (float)$paid['paid_komite'];
+        ($period_payments[$paid['NO_INDUK']]['komite'][$periodKey] ?? 0) + (float)$paid['komite'];
 }
-$stmt_period->close();
 
 $spp_placements = [];
-$placementResult = $koneksi->query("SELECT sta.no_induk, ta.label AS tahun_ajaran, sta.spp_perbulan_snapshot,sta.spp_covered_by_psb
+$placements = hp_rows($koneksi,"SELECT sta.no_induk, ta.label AS tahun_ajaran, sta.spp_perbulan_snapshot,sta.spp_covered_by_psb
     FROM siswa_tahun_ajaran sta
     JOIN tahun_ajaran ta ON ta.id = sta.tahun_ajaran_id
-    WHERE sta.status = 'aktif'
-    ORDER BY sta.no_induk, ta.label");
-while ($placement = $placementResult->fetch_assoc()) {
+    WHERE sta.status = 'aktif' AND sta.no_induk = ? AND sta.unit_id = ?
+    ORDER BY ta.label", [$d['NO_INDUK'], $d['unit_id']]);
+foreach ($placements as $placement) {
     $spp_placements[$placement['no_induk']][] = [
         'tahun_ajaran' => (string)$placement['tahun_ajaran'],
         'tarif' => (float)$placement['spp_perbulan_snapshot'],
         'covered_by_psb' => (int)$placement['spp_covered_by_psb'],
     ];
 }
-$published_spp_payload = spp_billing_schema_ready($koneksi) ? spp_payment_payload($koneksi, $id) : [];
-$komite_payload = komite_payment_payload($koneksi,$id);
+$published_spp_payload = spp_billing_schema_ready($koneksi) ? spp_payment_payload($koneksi, $id, $d['NO_INDUK']) : [];
+$komite_payload = komite_payment_payload($koneksi,$id,$d['NO_INDUK']);
 
 $currentPeriodKey = month_code($d['BULAN']) . '-' . $d['TAHUN'];
 $d['kewajiban_spp'] = max(0, (float)$d['SPP_PERBULAN'] - (float)($period_payments[$d['NO_INDUK']]['spp'][$currentPeriodKey] ?? 0));
 
 $linkedDuBillId = (int)($res_du['tagihan_daftar_ulang_id'] ?? 0);
-$du_bills = du_selectable_bills_payload($koneksi, $id, $linkedDuBillId);
+$du_bills = du_selectable_bills_payload($koneksi, $id, $linkedDuBillId, $d['NO_INDUK']);
 
 function active_academic_year_from_payment_period($bulan, $tahun): string {
     $month = (int)month_code($bulan);
@@ -173,7 +154,7 @@ function active_academic_year_from_payment_period($bulan, $tahun): string {
 $selectedAcademicYear = $res_du && trim((string)$res_du['th_ajaran']) !== ''
     ? (string)$res_du['th_ajaran']
     : active_academic_year_from_payment_period($d['BULAN'], $d['TAHUN']);
-$annual_fee_payload = annual_fee_payload_for_options($koneksi, $id);
+$annual_fee_payload = annual_fee_payload_for_options($koneksi, $id, $d['NO_INDUK']);
 $oneTimeAvailability = one_time_fee_status($koneksi, (string)$d['NO_INDUK'], $id);
 $initialFeeLocks = [];
 foreach (['psb'] as $feeKey) {
@@ -215,15 +196,16 @@ $stmtBills = $koneksi->prepare("SELECT t.id,t.no_induk,t.master_biaya_lain_id,t.
     COALESCE(SUM(CASE WHEN d.bayar_id<>? THEN d.nominal_snapshot ELSE 0 END),0) paid
     FROM tagihan_biaya_lain t
     LEFT JOIN bayar_biaya_lain d ON d.tagihan_biaya_lain_id=t.id
-    WHERE t.status='open' OR EXISTS(SELECT 1 FROM bayar_biaya_lain own WHERE own.bayar_id=? AND own.tagihan_biaya_lain_id=t.id)
+    WHERE t.no_induk=? AND t.unit_id=? AND
+        (t.status='open' OR EXISTS(SELECT 1 FROM bayar_biaya_lain own WHERE own.bayar_id=? AND own.tagihan_biaya_lain_id=t.id))
     GROUP BY t.id ORDER BY t.nama_snapshot");
-$stmtBills->bind_param('ii',$id,$id); $stmtBills->execute();
+$stmtBills->bind_param('isii',$id,$d['NO_INDUK'],$d['unit_id'],$id); $stmtBills->execute();
 foreach($stmtBills->get_result()->fetch_all(MYSQLI_ASSOC) as $bill){
     $bill['paid']=ofb_paid($koneksi,(int)$bill['id'],$id);
     $bill['id']=(int)$bill['id']; $bill['master_id']=(int)$bill['master_biaya_lain_id'];
     $bill['nominal']=(float)$bill['nominal']; $bill['paid']=(float)$bill['paid'];
     $bill['sisa']=max(0,$bill['nominal']-$bill['paid']);
-    if($bill['sisa']>.001 || $bill['no_induk']===$d['NO_INDUK']) $biaya_lain_bills[$bill['no_induk']][]=$bill;
+    $biaya_lain_bills[$bill['no_induk']][]=$bill;
 }
 $stmtBills->close();
 
@@ -309,8 +291,10 @@ $selectedPaymentMethod = $d['sistem_pembayaran'] ?? 'VA';
   <!-- Prevent theme flash -->
   <script>(function(){var t=localStorage.getItem('spp_theme')||'light';document.documentElement.setAttribute('data-theme',t);})();</script>
 <link rel="stylesheet" href="../assets/css/rombel_payment_refinement.css?v=<?= filemtime(__DIR__.'/../assets/css/rombel_payment_refinement.css') ?>">
+<link rel="stylesheet" href="../assets/css/payment_workspace_refinement.css?v=<?= filemtime(__DIR__.'/../assets/css/payment_workspace_refinement.css') ?>">
+<link rel="stylesheet" href="../assets/css/payment_edit.css?v=<?= filemtime(__DIR__.'/../assets/css/payment_edit.css') ?>">
 </head>
-<body>
+<body class="ui-time-polish">
 
   <div class="bg-orbs">
     <div class="orb orb-1"></div><div class="orb orb-2"></div><div class="orb orb-3"></div>
@@ -340,13 +324,13 @@ $selectedPaymentMethod = $d['sistem_pembayaran'] ?? 'VA';
       </div>
       <?php endif; ?>
 
-      <div class="main-card">
+      <div class="main-card payment-edit">
         <div class="card-title-row">
           <div class="card-title">
             <svg width="18" height="18" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><path d="M11 4H4a2 2 0 0 0-2 2v14a2 2 0 0 0 2 2h14a2 2 0 0 0 2-2v-7"/><path d="M18.5 2.5a2.121 2.121 0 0 1 3 3L12 15l-4 1 1-4 9.5-9.5z"/></svg>
             Edit Data Pembayaran
           </div>
-          <span class="badge-id">ID #<?= $d['id'] ?></span>
+          <span class="badge-id">TRX-<?= str_pad((string)$id,6,'0',STR_PAD_LEFT) ?></span>
         </div>
 
         <form method="POST" action="../pembayaran/proses.php" id="form-bayar">
@@ -357,30 +341,32 @@ $selectedPaymentMethod = $d['sistem_pembayaran'] ?? 'VA';
           <input type="hidden" name="csrf_token" value="<?= htmlspecialchars($_SESSION['csrf_payment']) ?>" />
           <input type="hidden" name="activity_request_key" value="<?= bin2hex(random_bytes(16)) ?>" />
 
-          <!-- Tanggal + Jumlah -->
-          <div class="top-info-row">
-            <div class="info-group">
-              <div class="field-row">
-                <label class="field-label" for="tgl-bayar">Tanggal Bayar</label>
-                <input class="field-input" type="date" id="tgl-bayar" name="tanggal_bayar"
-                  value="<?= date('Y-m-d', strtotime($d['TGL_BYR'])) ?>" required />
-              </div>
-              <div class="field-row">
-                <label class="field-label" for="bulan-bayar">Bulan Tagihan SPP &amp; Komite</label>
-                <div class="field-group-inline">
-                  <select class="field-input field-select month-code-select" name="bulan_bayar" id="bulan-bayar" required>
-                    <?php
-                    $month_labels = [
-                        '01' => 'Januari', '02' => 'Februari', '03' => 'Maret', '04' => 'April',
-                        '05' => 'Mei', '06' => 'Juni', '07' => 'Juli', '08' => 'Agustus',
-                        '09' => 'September', '10' => 'Oktober', '11' => 'November', '12' => 'Desember'
-                    ];
-                    $selectedMonth = month_code($d['BULAN']);
-                    foreach ($month_labels as $code => $label):
-                    ?>
-                    <option value="<?= $code ?>" data-label="<?= $label ?>" <?= $selectedMonth === (string)$code ? 'selected' : '' ?>><?= $label ?></option>
-                    <?php endforeach; ?>
-                  </select>
+          <div class="payment-edit-settings">
+            <section class="payment-edit-panel" aria-labelledby="edit-payment-settings">
+              <h3 id="edit-payment-settings">Pengaturan Transaksi</h3>
+              <div class="payment-edit-fields">
+                <div class="field-row">
+                  <label class="field-label" for="tgl-bayar">Tanggal Bayar</label>
+                  <input class="field-input" type="date" id="tgl-bayar" name="tanggal_bayar"
+                    value="<?= date('Y-m-d', strtotime($d['TGL_BYR'])) ?>" required />
+                </div>
+                <div class="field-row payment-edit-month">
+                  <div>
+                    <label class="field-label" for="bulan-bayar">Bulan Tagihan SPP &amp; Komite</label>
+                    <select class="field-input field-select month-code-select" name="bulan_bayar" id="bulan-bayar" required>
+                      <?php
+                      $month_labels = [
+                          '01' => 'Januari', '02' => 'Februari', '03' => 'Maret', '04' => 'April',
+                          '05' => 'Mei', '06' => 'Juni', '07' => 'Juli', '08' => 'Agustus',
+                          '09' => 'September', '10' => 'Oktober', '11' => 'November', '12' => 'Desember'
+                      ];
+                      $selectedMonth = month_code($d['BULAN']);
+                      foreach ($month_labels as $code => $label):
+                      ?>
+                      <option value="<?= $code ?>" data-label="<?= $label ?>" <?= $selectedMonth === (string)$code ? 'selected' : '' ?>><?= $label ?></option>
+                      <?php endforeach; ?>
+                    </select>
+                  </div>
                   <?php
                     $selectedYear = (int)$d['TAHUN'];
                     $yearStart = min((int)date('Y') - 6, $selectedYear);
@@ -397,42 +383,48 @@ $selectedPaymentMethod = $d['sistem_pembayaran'] ?? 'VA';
                     </div>
                   </div>
                 </div>
+                <div class="field-row">
+                  <label class="field-label" for="sistem-pembayaran">Sistem Pembayaran</label>
+                  <select class="field-input field-select" id="sistem-pembayaran" name="sistem_pembayaran" required>
+                    <?php foreach (['Tunai', 'VA', 'Qris'] as $method): ?>
+                    <option value="<?= $method ?>" <?= $selectedPaymentMethod === $method ? 'selected' : '' ?>><?= $method ?></option>
+                    <?php endforeach; ?>
+                  </select>
+                </div>
               </div>
-              <div class="field-row">
-                <label class="field-label" for="sistem-pembayaran">Sistem Pembayaran</label>
-                <select class="field-input field-select" id="sistem-pembayaran" name="sistem_pembayaran" required>
-                  <?php foreach (['Tunai', 'VA', 'Qris'] as $method): ?>
-                  <option value="<?= $method ?>" <?= $selectedPaymentMethod === $method ? 'selected' : '' ?>><?= $method ?></option>
-                  <?php endforeach; ?>
-                </select>
-              </div>
-            </div>
-            <div class="jumlah-box">
-              <span class="jumlah-label">Total Jumlah</span>
-              <span class="jumlah-value" id="totalJumlah">Rp <?= number_format($d['total_jumlah'],0,',','.') ?></span>
+            </section>
+            <div class="payment-edit-total">
+              <span>Total Bayar</span>
+              <strong id="totalJumlah" aria-live="polite"><?= transaction_authorization_money($d['total_jumlah']) ?></strong>
               <input type="hidden" name="total_jumlah" id="hidden-total" value="<?= $d['total_jumlah'] ?>" />
             </div>
           </div>
 
-          <!-- Data Siswa -->
-          <div class="section-divider"><span>Data Siswa</span></div>
-          <div class="fields-grid">
-            <div class="field-row full-span">
-              <label class="field-label" for="siswa-search">Cari Siswa (Nama / NIS / NIS Diknas)</label>
-              <div class="search-box">
-                <svg width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.5" stroke-linecap="round" stroke-linejoin="round"><circle cx="11" cy="11" r="8"/><line x1="21" y1="21" x2="16.65" y2="16.65"/></svg>
-                <input type="text" id="siswa-search" list="siswa-list"
-                  value="<?= htmlspecialchars($d['NAMA']) ?>"
-                  placeholder="Ketik nama, NIS, atau NIS Diknas..." oninput="pilihSiswaDatalist(this)" autocomplete="off" />
-              </div>
-              <datalist id="siswa-list">
-                <?php while ($s = $siswa_list->fetch_assoc()): ?>
+          <section class="payment-edit-panel payment-edit-student" aria-labelledby="edit-payment-student">
+            <h3 id="edit-payment-student">Data Siswa</h3>
+            <div class="payment-edit-student-fields">
+              <label class="field-row"><span class="field-label">Nama Siswa</span>
+                <input class="field-input" type="text" id="disp-nama" value="<?= htmlspecialchars($d['NAMA']) ?>" readonly />
+              </label>
+              <label class="field-row"><span class="field-label">NIS</span>
+                <input class="field-input" type="text" id="disp-nis" name="no_induk" value="<?= htmlspecialchars($d['NO_INDUK']) ?>" readonly />
+              </label>
+              <label class="field-row"><span class="field-label">Kelas</span>
+                <input class="field-input" type="text" id="disp-kelas" value="<?= htmlspecialchars($d['kelas_rombel_snapshot'] ?: ('Kelas '.$d['KELAS'].' (Belum Ditentukan)')) ?>" readonly />
+              </label>
+            </div>
+            <datalist id="siswa-list" hidden>
+                <?php while ($s = $siswa_list->fetch_assoc()):
+                    $classLabel = $s['graduation_year'] ? 'LULUS · TA '.$s['graduation_year']
+                        : class_label(['tingkat'=>$s['master_tingkat']?:$s['KELAS'],'kode_rombel'=>$s['kode_rombel']??'BELUM',
+                            'is_placeholder'=>$s['is_placeholder']??1,'legacy_kind'=>$s['legacy_kind']]);
+                ?>
                 <option value="<?= htmlspecialchars($s['NAMA'].' · NIS '.$s['NO_INDUK']) ?>"
                   data-nis="<?= htmlspecialchars($s['NO_INDUK']) ?>" data-student-id="<?= (int)$s['id'] ?>"
                   data-diknas="<?= htmlspecialchars((string)($s['NO_induk_diknas'] ?? '')) ?>"
                   data-nama="<?= htmlspecialchars($s['NAMA']) ?>"
-                  data-kelas="<?= htmlspecialchars($s['graduation_year'] ? ('LULUS · TA '.$s['graduation_year']) : class_label(['tingkat'=>$s['master_tingkat']?:$s['KELAS'],'kode_rombel'=>$s['kode_rombel']??'BELUM','is_placeholder'=>$s['is_placeholder']??1])) ?>"
-                  data-is-graduate="<?= $s['graduation_year'] ? '1' : '0' ?>"
+                  data-kelas="<?= htmlspecialchars($classLabel) ?>"
+                  data-is-graduate="<?= $s['graduation_year'] || $s['legacy_kind']==='alumni' ? '1' : '0' ?>"
                   data-graduation-year="<?= htmlspecialchars((string)$s['graduation_year']) ?>"
                   data-total-psb="<?= money_attr(max(0,(float)$s['PSB']-(float)$s['potongan_psb_nominal'])) ?>"
                   data-total-spp="<?= money_attr($s['SPP_PERBULAN']) ?>"
@@ -447,24 +439,11 @@ $selectedPaymentMethod = $d['sistem_pembayaran'] ?? 'VA';
                   data-du-bills="<?= htmlspecialchars(json_encode($du_bills[$s['NO_INDUK']] ?? []), ENT_QUOTES, 'UTF-8') ?>"
                   data-du-covered-psb="<?= du_psb_state($koneksi,$s['NO_INDUK'],du_current_academic_year())['covered_psb']?'1':'0' ?>"
                   data-biaya-lain-bills="<?= htmlspecialchars(json_encode($biaya_lain_bills[$s['NO_INDUK']] ?? [], JSON_UNESCAPED_UNICODE), ENT_QUOTES, 'UTF-8') ?>">
-                  <?= htmlspecialchars($s['NAMA']) ?> (<?= htmlspecialchars($s['graduation_year'] ? ('LULUS · TA '.$s['graduation_year']) : class_label(['tingkat'=>$s['master_tingkat']?:$s['KELAS'],'kode_rombel'=>$s['kode_rombel']??'BELUM','is_placeholder'=>$s['is_placeholder']??1])) ?>)
+                  <?= htmlspecialchars($s['NAMA']) ?> (<?= htmlspecialchars($classLabel) ?>)
                 </option>
                 <?php endwhile; ?>
-              </datalist>
-            </div>
-            <div class="field-row">
-              <label class="field-label">No. Induk</label>
-              <input class="field-input" type="text" id="disp-nis" name="no_induk" value="<?= htmlspecialchars($d['NO_INDUK']) ?>" readonly required />
-            </div>
-            <div class="field-row">
-              <label class="field-label">Nama Siswa</label>
-              <input class="field-input" type="text" id="disp-nama" value="<?= htmlspecialchars($d['NAMA']) ?>" readonly />
-            </div>
-            <div class="field-row">
-              <label class="field-label">Kelas</label>
-              <input class="field-input" type="text" id="disp-kelas" value="<?= htmlspecialchars($d['kelas_rombel_snapshot'] ?: ('Kelas '.$d['KELAS'].' (Belum Ditentukan)')) ?>" readonly />
-            </div>
-          </div>
+            </datalist>
+          </section>
 
           <!-- Rincian Pembayaran -->
           <div class="section-divider"><span>Rincian Pembayaran</span></div>
@@ -498,7 +477,7 @@ $selectedPaymentMethod = $d['sistem_pembayaran'] ?? 'VA';
                   <td data-label="Sisa"><input class="tbl-input tbl-system tbl-system-sisa" type="text" value="0" id="<?=$key?>-sisa" readonly tabindex="-1" aria-readonly="true" /></td>
                   <td data-label="Input Bayar"><input class="tbl-input tbl-pay <?= $initialFeeLocks[$key] ? 'tbl-readonly' : '' ?>" type="text"
                         id="<?=$key?>-input" name="<?=$inputName?>"
-                        value="<?= number_format($initialInputZero[$key] ? 0 : (float)$d[$col], 0, ',', '.') ?>"
+                        value="<?= substr(transaction_authorization_money($initialInputZero[$key] ? 0 : $d[$col]), 3) ?>"
                         <?= $initialFeeLocks[$key] ? 'readonly' : '' ?> aria-readonly="<?= $initialFeeLocks[$key] ? 'true' : 'false' ?>"
                         aria-describedby="<?=$key?>-context-label" /></td>
                 </tr>
@@ -588,7 +567,13 @@ $selectedPaymentMethod = $d['sistem_pembayaran'] ?? 'VA';
           <input type="hidden" name="potongan_spp" id="potongan-spp" value="0" />
 
           <input type="hidden" name="catatan" value="<?= htmlspecialchars($d['KETERANGAN'] ?? '') ?>">
-          <div class="section-divider"><span>History Transaksi Siswa</span></div>
+          <?php if (trim((string)($d['KETERANGAN'] ?? '')) !== ''): ?>
+          <section class="payment-edit-panel payment-edit-note">
+            <h3>Catatan</h3>
+            <p><?= htmlspecialchars($d['KETERANGAN']) ?></p>
+          </section>
+          <?php endif; ?>
+          <div class="section-divider"><span>Riwayat Transaksi Siswa</span></div>
           <div class="payment-history-panel" id="payment-history-panel">
             <div class="payment-history-head">
               <div>
@@ -630,7 +615,7 @@ $selectedPaymentMethod = $d['sistem_pembayaran'] ?? 'VA';
 
           <!-- Action Buttons -->
           <div class="action-bar">
-            <button type="submit" class="btn btn-warning" id="btn-update">
+            <button type="submit" class="btn btn-primary" id="btn-update">
               <svg width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.5" stroke-linecap="round" stroke-linejoin="round"><path d="M19 21H5a2 2 0 0 1-2-2V5a2 2 0 0 1 2-2h11l5 5v14a2 2 0 0 1-2 2z"/><polyline points="17 21 17 13 7 13 7 21"/><polyline points="7 3 7 8 15 8"/></svg>
               <?= transaction_authorization_requires_request() ? 'Ajukan Perubahan' : 'Simpan Perubahan' ?>
             </button>

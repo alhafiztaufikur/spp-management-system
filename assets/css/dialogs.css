@@ -1,0 +1,173 @@
+/* The obligation summary supplies the shared dialog surface and header. */
+:root {
+  --dialog-pad: clamp(16px, 3vw, 24px);
+  --dialog-backdrop: rgb(18 38 30 / .49);
+  --dialog-shadow: 0 24px 72px rgb(13 30 23 / .23);
+}
+
+:is(dialog, .modal-box, .spp-warning-dialog, .authorization-modal-card, .prior-debt-modal__dialog, .sw-print-dialog) {
+  --dialog-header-bg: var(--bg-surface, #f1faf5);
+  --dialog-icon-bg: var(--accent-glow, #dcefe4);
+  --dialog-icon-color: var(--accent-hover, #146a3f);
+}
+
+:is(dialog, .modal-overlay, .authorization-modal)[data-dialog-tone="danger"],
+dialog:is([data-danger="true"], [data-type="error"]),
+.spp-warning-overlay[data-severity="error"] {
+  --dialog-header-bg: color-mix(in srgb, var(--red, #b83043) 9%, var(--bg-card, #fff));
+  --dialog-icon-bg: color-mix(in srgb, var(--red, #b83043) 15%, var(--bg-card, #fff));
+  --dialog-icon-color: var(--red, #b83043);
+}
+
+dialog[data-type="warning"], .spp-warning-overlay[data-severity="warning"]:not([data-status-code="obligations_summary"]) {
+  --dialog-header-bg: color-mix(in srgb, var(--orange, #a06608) 10%, var(--bg-card, #fff));
+  --dialog-icon-bg: color-mix(in srgb, var(--orange, #a06608) 16%, var(--bg-card, #fff));
+  --dialog-icon-color: var(--orange, #a06608);
+}
+
+html body :is(dialog, .modal-overlay .modal-box, .spp-warning-overlay .spp-warning-dialog, .authorization-modal .authorization-modal-card, .prior-debt-modal__dialog, .sw-print-dialog) {
+  box-sizing: border-box;
+  max-height: calc(100vh - 24px);
+  max-height: calc(100dvh - 24px);
+  border: 1px solid var(--border, #d0e7da);
+  border-radius: 20px;
+  background: var(--bg-card, #fff);
+  color: var(--text-primary, #182920);
+  box-shadow: var(--dialog-shadow);
+  overscroll-behavior: contain;
+  overflow-wrap: anywhere;
+}
+
+html body :is(.modal-overlay .modal-box, .authorization-modal .authorization-modal-card, .prior-debt-modal__dialog, .sw-print-dialog) {
+  overflow-y: auto;
+}
+
+html body :is(.modal-overlay[aria-modal], .authorization-modal, .spp-warning-overlay, .prior-debt-modal__backdrop, .sw-print-overlay),
+html body dialog::backdrop {
+  background: var(--dialog-backdrop);
+  backdrop-filter: blur(4px);
+}
+
+:is(.modal-overlay, .authorization-modal, .spp-warning-overlay) > :is(.modal-box,.authorization-modal-card,.spp-warning-dialog) {
+  --dialog-header-bg: inherit;
+  --dialog-icon-bg: inherit;
+  --dialog-icon-color: inherit;
+}
+
+:is(.modal-overlay, .authorization-modal, .spp-warning-overlay) {
+  --dialog-header-bg: var(--bg-surface, #f1faf5);
+  --dialog-icon-bg: var(--accent-glow, #dcefe4);
+  --dialog-icon-color: var(--accent-hover, #146a3f);
+}
+
+html body :is(
+  .dialog-heading, .spp-warning-head, .payment-activity-dialog-header, .sw-confirm-heading, .auth-confirm-heading,
+  .prior-debt-modal__header, .sct-dialog-head, .lful-modal-header, .restore-dialog-heading,
+  .sc-members-dialog .sc-member-heading, .letter-principal-dialog header, .workflow-dialog > header,
+  .operation-feedback-dialog > header, .parent-copy-dialog > header, .participants-detail > header, .sh-detail-dialog > header
+) {
+  display: flex;
+  align-items: center;
+  flex-wrap: wrap;
+  gap: 10px 14px;
+  padding: 18px var(--dialog-pad);
+  background: var(--dialog-header-bg);
+  border-bottom: 1px solid var(--border);
+  color: var(--text-primary);
+}
+
+html body :is(.spp-warning-overlay .spp-warning-head, .payment-notice .spp-warning-head) {
+  background: var(--dialog-header-bg);
+  border-bottom-color: var(--border);
+}
+
+.spp-warning-head > :is(h2,h3) { flex: 1 1 165px; }
+html body .spp-warning-dialog:has(#rate-confirm-title) { width: min(620px,100%); padding: 0; overflow: auto; }
+html body .spp-warning-dialog:has(#rate-confirm-title) .spp-warning-content { padding: var(--dialog-pad); }
+
+html body :is(
+  .dialog-heading, .spp-warning-head, .payment-activity-dialog-header, .sw-confirm-heading, .auth-confirm-heading,
+  .prior-debt-modal__header, .sct-dialog-head, .lful-modal-header, .restore-dialog-heading,
+  .sc-members-dialog .sc-member-heading, .letter-principal-dialog header, .workflow-dialog > header,
+  .operation-feedback-dialog > header, .parent-copy-dialog > header, .participants-detail > header, .sh-detail-dialog > header
+) :is(h2,h3,.modal-title) {
+  margin: 0;
+  min-width: 0;
+  color: var(--text-primary);
+  font-size: clamp(18px, 2.3vw, 24px);
+  line-height: 1.35;
+  overflow-wrap: anywhere;
+}
+
+html body :is(.modal-box, .sw-print-dialog, .authorization-modal-card, .du-delete-dialog, .restore-dialog, .sc-dialog, .lf-confirm-dialog) .dialog-heading,
+html body .restore-dialog-heading {
+  margin: calc(-1 * var(--dialog-pad)) calc(-1 * var(--dialog-pad)) 16px;
+  text-align: start;
+}
+
+html body :is(.modal-box, .sw-print-dialog, .authorization-modal-card, .du-delete-dialog, .restore-dialog .dbt-dialog-content, .sc-dialog #special-delete-confirm, .lf-confirm-dialog #lf-confirmation) {
+  padding: var(--dialog-pad);
+}
+
+html body .modal-box { width: min(520px, 100%); max-width: calc(100% - 16px); text-align: start; }
+html body .modal-box .modal-icon { margin: 0; }
+
+:is(.dialog-heading, .sw-confirm-heading, .auth-confirm-heading, .restore-dialog-heading, .parent-copy-dialog > header)
+  > :is(.modal-icon, .sw-head-icon, .dbt-icon, .parent-dialog-icon, span[aria-hidden], span[data-confirm-icon]) {
+  display: grid;
+  place-items: center;
+  flex: 0 0 42px;
+  width: 42px;
+  height: 42px;
+  margin: 0;
+  border-radius: 11px;
+  background: var(--dialog-icon-bg);
+  color: var(--dialog-icon-color);
+  font-size: 21px;
+}
+
+:is(.modal-icon,.sw-head-icon,.dbt-icon,.parent-dialog-icon) svg { width: 23px; height: 23px; }
+
+:is(
+  .dialog-heading, .payment-activity-dialog-header, .sw-confirm-heading, .workflow-dialog > header, .operation-feedback-dialog > header,
+  .prior-debt-modal__header, .sct-dialog-head, .lful-modal-header, .sc-members-dialog .sc-member-heading,
+  .letter-principal-dialog header, .participants-detail > header, .sh-detail-dialog > header,
+  .spp-warning-head:has(#rate-confirm-title)
+):not(:has(> :is(.modal-icon,.sw-head-icon,span[aria-hidden])))::before {
+  content: "";
+  flex: 0 0 42px;
+  width: 42px;
+  height: 42px;
+  border-radius: 11px;
+  background: var(--dialog-icon-bg) no-repeat center / 22px
+    url("data:image/svg+xml,%3Csvg xmlns='http://www.w3.org/2000/svg' viewBox='0 0 24 24' fill='none' stroke='%231b8353' stroke-width='1.8' stroke-linecap='round' stroke-linejoin='round'%3E%3Cpath d='M6 2h8l4 4v16H6zM14 2v5h4M9 12h6M9 16h6'/%3E%3C/svg%3E");
+}
+
+:is(.payment-activity-dialog-header, .sct-dialog-head, .lful-modal-header, .sw-confirm-heading, .participants-detail > header, .sc-members-dialog .sc-member-heading)
+  > :is(div, h3) { flex: 1 1 150px; min-width: 0; }
+.sh-detail-dialog > header > h2 { flex: 1 1 auto; }
+
+html body :is(
+  .modal-actions, .authorization-modal-actions, .spp-warning-actions, .sw-confirm-actions, .auth-confirm-actions,
+  .prior-debt-modal__actions, .workflow-dialog-actions, .operation-feedback-dialog > footer, .parent-copy-dialog > footer,
+  .sct-dialog footer, .dialog-actions
+) {
+  display: flex;
+  align-items: center;
+  justify-content: flex-end;
+  flex-wrap: wrap;
+  gap: 10px;
+}
+
+:is(dialog, [aria-modal="true"]) :is(button, a, input, select, textarea, [tabindex]):focus-visible {
+  outline: 2px solid var(--accent);
+  outline-offset: 2px;
+}
+
+html body :is(dialog, [aria-modal="true"]) :is(.btn,.dbt-button) { min-height: 42px; max-width: 100%; white-space: normal; }
+
+@media (max-width: 520px) {
+  html body :is(dialog, [aria-modal="true"]) :is(.btn,.dbt-button) { min-width: 0; }
+  html body :is(.operation-feedback-dialog > p, .operation-feedback-dialog > footer) { padding-inline: var(--dialog-pad); }
+  .operation-feedback-details { margin-inline: var(--dialog-pad); }
+}

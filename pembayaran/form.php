@@ -12,6 +12,7 @@ require_once '../includes/tagihan_tahunan.php';
 require_once '../includes/tagihan_sekali.php';
 require_once '../includes/spp_billing.php';
 require_once '../includes/komite_billing.php';
+require_once '../includes/payment_period_schema.php';
 requireRole(['admin', 'kasir']);
 if (empty($_SESSION['csrf_payment'])) $_SESSION['csrf_payment'] = bin2hex(random_bytes(32));
 $paymentRequestKey = bin2hex(random_bytes(16));
@@ -21,15 +22,15 @@ $activeAcademicYearSql = $koneksi->real_escape_string($activeAcademicYear);
 $siswa_sql = "
     SELECT
         s.id, s.NO_INDUK, s.NO_induk_diknas, s.NAMA, s.KELAS, s.SPP_PERBULAN, s.POMG,
-        mk.tingkat AS master_tingkat, mk.kode_rombel, mk.is_placeholder,
+        mk.tingkat AS master_tingkat, mk.kode_rombel, mk.is_placeholder, mk.legacy_kind,
         (SELECT ta_l.label FROM siswa_tahun_ajaran sta_l
          JOIN tahun_ajaran ta_l ON ta_l.id=sta_l.tahun_ajaran_id
          WHERE sta_l.no_induk=s.NO_INDUK AND sta_l.unit_id=s.unit_id AND sta_l.status='lulus'
          ORDER BY ta_l.label DESC LIMIT 1) AS graduation_year
     FROM siswa s
-    LEFT JOIN master_kelas mk ON mk.id=s.master_kelas_id
+    LEFT JOIN master_kelas mk ON mk.id=s.master_kelas_id AND mk.unit_id=s.unit_id
     WHERE s.KELAS NOT IN ('CUSTOM','OUT') AND (s.is_active = 1 OR (
-        EXISTS(SELECT 1 FROM siswa_tahun_ajaran sta_l WHERE sta_l.no_induk=s.NO_INDUK AND sta_l.unit_id=s.unit_id AND sta_l.status='lulus')
+        (mk.legacy_kind='alumni' OR EXISTS(SELECT 1 FROM siswa_tahun_ajaran sta_l WHERE sta_l.no_induk=s.NO_INDUK AND sta_l.unit_id=s.unit_id AND sta_l.status='lulus'))
         AND (EXISTS(
             SELECT 1 FROM tagihan_daftar_ulang tdu_o
             LEFT JOIN bayar_du bd_o ON bd_o.tagihan_daftar_ulang_id=tdu_o.id
@@ -84,6 +85,9 @@ if ($inputPaymentSaved) {
     }
 }
 $paymentDraft = $inputPaymentSaved ? null : ($_SESSION['payment_drafts_by_unit'][unit_active_id()] ?? $_SESSION['payment_draft'] ?? null);
+$periodEnabled = payment_period_schema_ready($koneksi) && spp_billing_schema_ready($koneksi);
+$periodMode = $paymentDraft['payment_plan'] ?? 'monthly';
+$periodChoice = $paymentDraft['period_choice'] ?? '';
 unset($_SESSION['payment_drafts_by_unit'][unit_active_id()]);
 unset($_SESSION['payment_draft']);
 ?>
@@ -100,6 +104,7 @@ unset($_SESSION['payment_draft']);
   <link rel="stylesheet" href="../assets/css/payment_history.css?v=<?= filemtime(__DIR__ . "/../assets/css/payment_history.css") ?>">
   <link rel="stylesheet" href="../assets/css/payment_details.css?v=<?= filemtime(__DIR__ . "/../assets/css/payment_details.css") ?>">
   <link rel="stylesheet" href="../assets/css/payment_saved_feedback.css?v=<?= filemtime(__DIR__.'/../assets/css/payment_saved_feedback.css') ?>">
+  <link rel="stylesheet" href="../assets/css/payment_period.css?v=<?= filemtime(__DIR__.'/../assets/css/payment_period.css') ?>">
   <!-- Prevent theme flash -->
   <script>(function(){var t=localStorage.getItem('spp_theme')||'light';document.documentElement.setAttribute('data-theme',t);})();</script>
 <link rel="stylesheet" href="../assets/css/rombel_payment_refinement.css?v=<?= filemtime(__DIR__.'/../assets/css/rombel_payment_refinement.css') ?>">
@@ -115,6 +120,7 @@ unset($_SESSION['payment_draft']);
   <div class="layout">
     <!-- Sidebar -->
     <?php include '../includes/sidebar.php'; ?>
+    <?php session_write_close(); ?>
 
     <!-- Main -->
     <main class="main-content">
@@ -146,7 +152,7 @@ unset($_SESSION['payment_draft']);
           </div>
         </div>
 
-        <form method="POST" action="../pembayaran/proses.php" id="form-bayar">
+        <form method="POST" action="../pembayaran/proses.php" id="form-bayar"<?= $periodEnabled ? ' class="payment-period-enabled"' : '' ?>>
           <input type="hidden" name="_operational_unit" value="<?= unit_active_id() ?>" />
           <input type="hidden" name="aksi" value="input" />
           <input type="hidden" name="csrf_token" value="<?= htmlspecialchars($_SESSION['csrf_payment'], ENT_QUOTES, 'UTF-8') ?>" />
@@ -155,8 +161,11 @@ unset($_SESSION['payment_draft']);
           <!-- Pengaturan transaksi + ringkasan tagihan -->
           <div class="top-info-row payment-input-top">
             <div class="info-group payment-settings-group" aria-label="Pengaturan transaksi">
-              <div class="payment-panel-kicker">Pengaturan Transaksi</div>
-              <input type="hidden" name="payment_plan" value="monthly" />
+              <h3 class="payment-panel-kicker">
+                <svg class="payment-control-icon" viewBox="0 0 24 24" aria-hidden="true"><path d="M20 8V5a2 2 0 0 0-2-2H5a2 2 0 0 0-2 2v14a2 2 0 0 0 2 2h13a2 2 0 0 0 2-2v-3M3 8h17a2 2 0 0 1 2 2v4a2 2 0 0 1-2 2h-4a4 4 0 0 1 0-8m1 4h.01"/></svg>
+                Pengaturan Transaksi
+              </h3>
+              <?php if (!$periodEnabled): ?><input type="hidden" name="payment_plan" value="monthly" /><?php endif; ?>
               <div class="payment-settings-grid">
                 <div class="field-row payment-field-card payment-date-card">
                   <label class="field-label" for="tgl-bayar">
@@ -165,11 +174,15 @@ unset($_SESSION['payment_draft']);
                   <input class="field-input" type="date" id="tgl-bayar" name="tanggal_bayar"
                     value="<?= htmlspecialchars($paymentDraft['tanggal_bayar'] ?? date('Y-m-d'), ENT_QUOTES, 'UTF-8') ?>" required />
                 </div>
-                <div class="field-row payment-field-card payment-period-card">
-                  <label class="field-label" for="bulan-bayar" id="payment-period-label">
+                <div class="field-row payment-field-card payment-period-card<?= $periodEnabled ? ' payment-period-interactive' : '' ?>">
+                  <?php if ($periodEnabled): ?><div class="payment-period-layout"><?php endif; ?>
+                  <?php if ($periodEnabled) require __DIR__.'/../includes/payment_period_fields.php'; ?>
+                  <fieldset class="payment-period-monthly-fieldset"<?= $periodEnabled ? ' data-payment-period-monthly' : '' ?>>
+                  <label class="field-label" for="bulan-bayar" id="payment-period-label"<?= $periodEnabled ? ' hidden' : '' ?>>
                     Bulan Tagihan SPP &amp; Komite
                   </label>
                   <div class="field-group-inline payment-period-inputs">
+                    <?php if ($periodEnabled): ?><label class="payment-period-caption" for="bulan-bayar">Bulan Tagihan</label><?php endif; ?>
                     <select class="field-input field-select month-code-select" id="bulan-bayar" name="bulan_bayar" required>
                       <?php
                       $month_labels = [
@@ -194,8 +207,10 @@ unset($_SESSION['payment_draft']);
                       </div>
                     </div>
                   </div>
+                  </fieldset>
+                  <?php if ($periodEnabled): ?></div><?php endif; ?>
                 </div>
-                <div class="field-row payment-field-card">
+                <div class="field-row payment-field-card payment-method-card">
                   <label class="field-label" for="sistem-pembayaran">
                     Sistem Pembayaran
                   </label>
@@ -210,11 +225,8 @@ unset($_SESSION['payment_draft']);
             </div>
             <section class="payment-overview-panel" aria-label="Ringkasan pembayaran">
               <div class="payment-current-total">
-                <div>
-                  <span>Total Bayar</span>
-                  <small>Nominal transaksi yang sedang diinput</small>
-                </div>
-                <strong id="totalJumlah">Rp 0</strong>
+                <span>TOTAL BAYAR</span>
+                <strong id="totalJumlah" aria-live="polite">Rp 0</strong>
                 <input type="hidden" name="total_jumlah" id="hidden-total" value="0" />
               </div>
             </section>
@@ -230,18 +242,22 @@ unset($_SESSION['payment_draft']);
                 <input type="text" id="siswa-search" list="siswa-list" placeholder="Ketik nama, NIS, atau NIS Diknas..." oninput="pilihSiswaDatalist(this)" autocomplete="off" />
               </div>
               <datalist id="siswa-list">
-                <?php while ($s = $siswa_list->fetch_assoc()): ?>
+                <?php while ($s = $siswa_list->fetch_assoc()):
+                    $classLabel = $s['graduation_year'] ? 'LULUS · TA '.$s['graduation_year']
+                        : class_label(['tingkat'=>$s['master_tingkat']?:$s['KELAS'],'kode_rombel'=>$s['kode_rombel']??'BELUM',
+                            'is_placeholder'=>$s['is_placeholder']??1,'legacy_kind'=>$s['legacy_kind']]);
+                ?>
                 <option value="<?= htmlspecialchars($s['NAMA'].' · NIS '.$s['NO_INDUK']) ?>"
                   data-nis="<?= htmlspecialchars($s['NO_INDUK']) ?>" data-student-id="<?= (int)$s['id'] ?>"
                   data-diknas="<?= htmlspecialchars((string)($s['NO_induk_diknas'] ?? '')) ?>"
                   data-nama="<?= htmlspecialchars($s['NAMA']) ?>"
-                  data-kelas="<?= htmlspecialchars($s['graduation_year'] ? ('LULUS · TA '.$s['graduation_year']) : class_label(['tingkat'=>$s['master_tingkat']?:$s['KELAS'],'kode_rombel'=>$s['kode_rombel']??'BELUM','is_placeholder'=>$s['is_placeholder']??1])) ?>"
-                  data-is-graduate="<?= $s['graduation_year'] ? '1' : '0' ?>"
+                  data-kelas="<?= htmlspecialchars($classLabel) ?>"
+                  data-is-graduate="<?= $s['graduation_year'] || $s['legacy_kind']==='alumni' ? '1' : '0' ?>"
                   data-graduation-year="<?= htmlspecialchars((string)$s['graduation_year']) ?>"
                   data-payment-details-lazy="1"
                   data-total-spp="<?= money_attr($s['SPP_PERBULAN']) ?>"
                   data-total-komite="<?= money_attr($s['POMG']) ?>">
-                  <?= htmlspecialchars($s['NAMA']) ?> (<?= htmlspecialchars($s['graduation_year'] ? ('LULUS · TA '.$s['graduation_year']) : class_label(['tingkat'=>$s['master_tingkat']?:$s['KELAS'],'kode_rombel'=>$s['kode_rombel']??'BELUM','is_placeholder'=>$s['is_placeholder']??1])) ?>)
+                  <?= htmlspecialchars($s['NAMA']) ?> (<?= htmlspecialchars($classLabel) ?>)
                 </option>
                 <?php endwhile; ?>
               </datalist>
@@ -261,6 +277,8 @@ unset($_SESSION['payment_draft']);
           </div>
 
           <!-- Rincian Pembayaran -->
+          <?php if ($periodEnabled) require __DIR__.'/../includes/payment_period_preview.php'; ?>
+          <fieldset class="payment-period-monthly-fieldset"<?= $periodEnabled ? ' data-payment-period-monthly' : '' ?>>
           <div class="section-divider"><span>Rincian Pembayaran</span></div>
           <div class="alert alert-warning payment-overpaid-alert" id="payment-overpaid-alert" hidden></div>
           <div class="alert alert-warning payment-input-overlimit-alert" id="payment-input-overlimit-alert" hidden></div>
@@ -347,6 +365,7 @@ unset($_SESSION['payment_draft']);
           </template>
 
           <input type="hidden" id="potongan-spp" name="potongan_spp" value="0" />
+          </fieldset>
 
           <input type="hidden" id="catatan" name="catatan" value="">
           <div class="section-divider"><span>History Transaksi Siswa</span></div>
@@ -372,7 +391,7 @@ unset($_SESSION['payment_draft']);
     </main>
   </div>
 
-  <?php include '../includes/spp_warning_modal.php'; ?>
+  <?php $showPaymentNoticeIcons = true; include '../includes/spp_warning_modal.php'; ?>
   <?php if ($inputPaymentSaved) require __DIR__.'/../includes/payment_saved_feedback.php'; ?>
   </div>
 
@@ -396,6 +415,7 @@ unset($_SESSION['payment_draft']);
   <script src="../assets/js/other_fee_picker.js?v=<?= filemtime(__DIR__ . "/../assets/js/other_fee_picker.js") ?>"></script>
   <script src="../assets/js/student_payment_history.js?v=<?= filemtime(__DIR__ . '/../assets/js/student_payment_history.js') ?>"></script>
   <script src="../assets/js/app.js?v=<?= filemtime(__DIR__ . '/../assets/js/app.js') ?>"></script>
+  <?php if ($periodEnabled): ?><script src="../assets/js/payment_period.js?v=<?= filemtime(__DIR__.'/../assets/js/payment_period.js') ?>"></script><?php endif; ?>
   <?php if ($inputPaymentSaved): ?><script src="../assets/js/payment_saved_feedback.js?v=<?= filemtime(__DIR__.'/../assets/js/payment_saved_feedback.js') ?>"></script><?php endif; ?>
 </body>
 </html>

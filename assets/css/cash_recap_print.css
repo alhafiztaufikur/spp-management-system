@@ -8,6 +8,11 @@
   .report-component-table thead th:first-child{width:8%}
   .report-component-table thead th:nth-child(2){width:59%}
   .report-component-table thead th:last-child{width:33%}
+  .report-component-table thead th:nth-child(2),
+  .report-component-table tfoot th:first-child,
+  .cash-recap-closing .report-cash-summary-table thead th:first-child{text-align:left}
+  .report-component-table thead th:last-child,
+  .cash-recap-closing .report-cash-summary-table thead th:last-child{text-align:right}
   .report-component-table td{overflow-wrap:break-word}
   .report-component-table .report-number{white-space:nowrap}
   .cash-recap-closing{page-break-inside:avoid;break-inside:avoid}

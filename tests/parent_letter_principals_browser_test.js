@@ -96,13 +96,13 @@ const password=fs.readFileSync(process.env.SPP_TEST_ADMIN_PASSWORD_FILE,'utf8').
     if(output){
       fs.writeFileSync(path.join(output,'browser-mixed.pdf'),await preview.body());
       fs.writeFileSync(path.join(output,'browser-mixed-download.pdf'),await download.body());await page.screenshot({path:path.join(output,'principal-mixed-preview.png')});
-      const pngDownload=page.waitForEvent('download',{timeout:120000});await page.locator('#parent-png').click();await (await pngDownload).saveAs(path.join(output,'browser-mixed.zip'));
+      assert.equal(await page.locator('#parent-png,script[src*="parent_letter_png"]').count(),0);
       const singleToken=await pdfFor(base+'/laporan/surat_orang_tua_susun.php?mode=single&student_key='+encodeURIComponent(keys[0]),'browser-single.pdf');
       await page.locator('#parent-message').fill('Pengingat manual surat tunggal.');
       await page.locator('#parent-preview').click();await page.waitForURL('**&preview=1');
       const singlePreview=await page.request.get(base+'/laporan/surat_orang_tua_pdf.php?draft='+singleToken);
       fs.writeFileSync(path.join(output,'browser-single.pdf'),await singlePreview.body());
-      const singleDownload=page.waitForEvent('download',{timeout:120000});await page.locator('#parent-png').click();await (await singleDownload).saveAs(path.join(output,'browser-single.png'));
+      const singleDownload=page.waitForEvent('download',{timeout:120000});await page.getByRole('link',{name:'Unduh PDF',exact:true}).click();await (await singleDownload).saveAs(path.join(output,'browser-single-download.pdf'));
     }
     assert.deepEqual(errors,[]);console.log('PASS: desktop matrix, CRUD, immutable PDFs, persistent defaults, duplicate/CSRF/unit/version rejection, pending-print guard, conflict recovery, mixed-unit preview/download.');
   }finally{await browser.close();}

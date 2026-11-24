@@ -92,7 +92,7 @@ function report_annual_evidence(mysqli $db,array $f): array {
         if(report_class_matches_row($f,$row))$rows[]=$row;
     }
     usort($rows,static fn($a,$b)=>[$a['kelas'],$a['nama'],$a['nis']]<=>[$b['kelas'],$b['nama'],$b['nis']]);
-    return ['title'=>report_categories($db)[$category],'subtitle'=>'Status kewajiban · '.($category==='psb'?'Sekali saat masuk':$year),'columns'=>[['nis','NIS'],['nama','Nama Siswa'],['kelas','Kelas'],['periode','Periode'],['tagihan','Tagihan','money_optional'],['terbayar','Terbayar','money'],['sisa','Sisa','money_optional'],['status','Status','status']],'rows'=>report_filter_rows($rows,$f)];
+    return ['title'=>report_categories($db)[$category],'subtitle'=>'Status kewajiban · '.($category==='psb'?'Sekali saat masuk':$year),'component_key'=>$category,'columns'=>[['nis','NIS'],['nama','Nama Siswa'],['kelas','Kelas'],['periode','Periode'],['tagihan','Tagihan','money_optional'],['terbayar','Terbayar','money'],['sisa','Sisa','money_optional'],['status','Status','status']],'rows'=>report_filter_rows($rows,$f)];
 }
 /** Payment evidence with no native bill remains visible, without inventing a principal/date. */
 function report_billing_identity(array $row): string {

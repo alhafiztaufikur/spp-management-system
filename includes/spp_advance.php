@@ -12,7 +12,8 @@ function spa_roster(mysqli $db,string $year,?array &$readEvidence=null): array {
     }
     $placements=[];$pending=[];$out=[];$counts=[];$current=du_current_academic_year();
     $students=hp_rows($db,'SELECT s.*,m.jenis rombel_jenis FROM siswa s LEFT JOIN master_kelas m ON m.id=s.master_kelas_id AND m.unit_id=s.unit_id ORDER BY s.id');
-    $periodKeys=array_map(static fn($p)=>$p['tahun'].'-'.$p['bulan'],spp_academic_periods($year));$coverage=[];
+    $periods=spp_academic_periods($year);$months=array_column($periods,'bulan');
+    $periodKeys=array_map(static fn($p)=>$p['tahun'].'-'.$p['bulan'],$periods);$coverage=[];
     foreach(['spp','komite'] as $kind){$snapshot=lful_monthly_coverage_snapshot($db,array_map('strval',array_column($students,'NO_INDUK')),$kind,$periodKeys);$coverage[$kind]=$snapshot['coverage'];$readEvidence[$kind]=$snapshot;}
     $plans=[];foreach(hp_rows($db,'SELECT r.*,y.label,s.NO_INDUK,p.master_kelas_id,p.kelas_rombel_snapshot FROM psb_spp_plans r JOIN tahun_ajaran y ON y.id=r.tahun_ajaran_id AND y.unit_id=r.unit_id JOIN siswa s ON s.id=r.student_id AND s.unit_id=r.unit_id LEFT JOIN siswa_tahun_ajaran p ON p.id=r.penempatan_id AND p.unit_id=r.unit_id WHERE y.label=?',[$year]) as $plan)$plans[(int)$plan['student_id']]=$plan;
     foreach(hp_rows($db,"SELECT p.*,y.label FROM siswa_tahun_ajaran p JOIN tahun_ajaran y ON y.id=p.tahun_ajaran_id AND y.unit_id=p.unit_id WHERE y.label IN (?,?) AND p.status<>'dibatalkan'",[$year,$current]) as $p)$placements[$p['unit_id'].'|'.$p['no_induk']][$p['label']]=$p;
@@ -31,12 +32,15 @@ function spa_roster(mysqli $db,string $year,?array &$readEvidence=null): array {
         $plan=$plans[(int)$s['id']]??null;
         if($plan&&$plan['label']===$year){$admission=sct_admission_row($plan,['student_id'=>$s['id'],'NAMA'=>$s['NAMA'],'is_active'=>$s['is_active'],'potongan_spp_nominal'=>$s['potongan_spp_nominal']],$plan);$row=array_merge($row??[],$admission);}
         if(!$row)continue;
+        // An admission or a projection can have no target-year placement yet.
+        $startMonth=$row['komite_mulai_bulan']??null;
+        $row['komite_mulai_bulan']=in_array($startMonth,$months,true)?$startMonth:$months[0];
         if($bill)$row['penempatan_asal_id']=$bill['penempatan_asal_id'];
         $row=array_merge(['student_id'=>$s['id'],'unit_id'=>$s['unit_id'],'no_induk'=>$s['NO_INDUK'],'NAMA'=>$s['NAMA'],'NO_induk_diknas'=>$s['NO_induk_diknas'],'is_active'=>$s['is_active'],'potongan_spp_nominal'=>$s['potongan_spp_nominal'],'komite_rate'=>$s['POMG'],'issue_reason'=>null],$row);
         $row['bill_count']=count($counts[$key]['spp']??[]);$row['open_count']=count(array_filter($counts[$key]['spp']??[],static fn($v)=>$v==='open'));
         foreach(['covered_psb'=>'covered','waived'=>'waived','cancelled'=>'cancelled'] as $status=>$label)$row[$label.'_count']=count(array_filter($counts[$key]['spp']??[],static fn($v)=>$v===$status));
         $complete=true;$start=false;
-        foreach(spp_academic_periods($year) as $period){if($period['bulan']===($row['komite_mulai_bulan']??'07'))$start=true;if(!$start)continue;$pk=$period['tahun'].'-'.$period['bulan'];foreach(['spp','komite'] as $kind)if(!isset($counts[$key][$kind][$pk])&&!isset($coverage[$kind][(int)$s['id']][$kind][$pk]))$complete=false;}
+        foreach($periods as $period){if($period['bulan']===$row['komite_mulai_bulan'])$start=true;if(!$start)continue;$pk=$period['tahun'].'-'.$period['bulan'];foreach(['spp','komite'] as $kind)if(!isset($counts[$key][$kind][$pk])&&!isset($coverage[$kind][(int)$s['id']][$kind][$pk]))$complete=false;}
         $row['billing_complete']=$complete;$out[(int)$s['id']]=$row;
     }
     uasort($out,static fn($a,$b)=>[(int)$a['kelas'],$a['kelas_rombel_snapshot'],$a['NAMA']]<=>[(int)$b['kelas'],$b['kelas_rombel_snapshot'],$b['NAMA']]);return $out;

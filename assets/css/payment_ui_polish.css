@@ -18,6 +18,86 @@
 .spp-warning-overlay .obligation-line.obligation-total{font-size:16px;line-height:1.6;padding:16px 18px;align-items:center}
 .spp-warning-overlay .spp-warning-actions{margin-top:20px;gap:12px;flex-wrap:wrap}
 .spp-warning-overlay .spp-warning-actions .btn{font-size:16px;line-height:1.4;min-height:44px;padding:11px 22px}
+.payment-notice-symbol { display: none; }
+.payment-input-controls #spp-warning-overlay.payment-notice {
+  background: rgb(11 26 21 / .5);
+  backdrop-filter: blur(4px);
+  --payment-notice-width: 600px;
+}
+.payment-input-controls #spp-warning-overlay[data-status-code="method_missing"] { --payment-notice-width: 460px; }
+.payment-input-controls .payment-notice .spp-warning-dialog {
+  width: min(var(--payment-notice-width), 100%);
+  overflow: hidden;
+  border: 1px solid var(--border-hover);
+  border-radius: 18px;
+  box-shadow: 0 24px 64px rgb(0 0 0 / .24);
+}
+.payment-input-controls .payment-notice .spp-warning-head {
+  display: flex;
+  align-items: center;
+  gap: 12px;
+  padding: 18px 22px;
+  border-color: var(--border);
+  background: var(--bg-surface);
+}
+.payment-input-controls .payment-notice #spp-warning-title { color: var(--text-primary); font-size: 23px; }
+.payment-input-controls .payment-notice .payment-notice-symbol {
+  display: grid;
+  place-items: center;
+  flex: 0 0 42px;
+  height: 42px;
+  border-radius: 10px;
+  background: var(--accent-glow);
+  color: var(--accent-hover);
+}
+.payment-input-controls .payment-notice[data-status-code="method_missing"] .payment-notice-symbol {
+  background: var(--orange-bg);
+  color: var(--payment-notice-title);
+}
+.payment-input-controls #spp-warning-overlay .payment-notice-symbol svg {
+  display: none;
+  width: 22px;
+  height: 22px;
+  fill: none;
+  stroke: currentColor;
+  stroke-width: 1.7;
+  stroke-linecap: round;
+  stroke-linejoin: round;
+}
+.payment-input-controls #spp-warning-overlay.payment-notice[data-status-code="method_missing"] .payment-notice-method-icon,
+.payment-input-controls #spp-warning-overlay.payment-notice:not([data-status-code="method_missing"]) .payment-notice-obligations-icon {
+  display: block;
+}
+.payment-input-controls .payment-notice .spp-warning-content { padding: 18px 22px 20px; }
+.payment-input-controls .payment-notice .spp-warning-message { margin: 0; color: var(--text-secondary); }
+.payment-input-controls .payment-notice #spp-warning-amount.obligation-summary {
+  display: grid;
+  gap: 8px;
+  max-height: min(48dvh, 420px);
+  margin: 14px 0 0;
+  border: 0;
+  border-radius: 0;
+  background: none;
+}
+.payment-input-controls .payment-notice .obligation-summary section {
+  padding: 9px 12px;
+  border: 1px solid var(--border);
+  border-radius: 10px;
+}
+.payment-input-controls .payment-notice .obligation-summary h4 { margin-bottom: 3px; color: var(--text-secondary); }
+.payment-input-controls .payment-notice .obligation-line { padding: 4px 0; }
+.payment-input-controls .payment-notice .obligation-line strong { color: var(--text-primary); text-align: right; }
+.payment-input-controls .payment-notice .obligation-line.obligation-total {
+  position: sticky;
+  bottom: 0;
+  padding: 10px 12px;
+  border: 1px solid var(--border);
+  border-radius: 10px;
+  background: var(--bg-surface);
+}
+.payment-input-controls .payment-notice .obligation-total strong { color: var(--accent-hover); font-size: 18px; }
+.payment-input-controls .payment-notice .spp-warning-actions { margin-top: 16px; gap: 8px; }
+.payment-input-controls .payment-notice .spp-warning-actions .btn { border-radius: 9px; font-size: 14px; }
 .workflow-dialog h2{font-size:26px}.workflow-dialog p,.workflow-dialog li,.workflow-dialog .btn{font-size:16px}
 /* Existing history detail components also style the read-only form dialog. */
 .sh-detail-dialog{padding:0;overflow:hidden}

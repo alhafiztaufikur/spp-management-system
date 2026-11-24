@@ -73,30 +73,52 @@ function lma_reference_evidence(array $job,array $records): array {
         $r['row_key']=hash('sha256',implode('|',[$job['unit'],strtolower($job['hash']),$r['table'],$hash,$occ]));$records[]=$r;
     }}finally{fclose($file);}return $records;
 }
-function lma_context(array $records,int $unit,string $sourceKey=''): array {
-    $sourceIds=[];$active=[];$du=[];$masters=lful_source_fee_masters($records);$fees=[];$anchors=[];$counterparts=[];$masterRows=[];$counterpartRows=[];
-    foreach($records as $r){
+/** The archive reader can replay a cursor instead of holding decoded rows in memory. */
+function lma_context(array|Closure $records,int $unit,string $sourceKey='',?array $selectedReceipts=null): array {
+    $read=$records instanceof Closure?$records:static fn()=>$records;
+    $sourceIds=[];$active=[];$du=[];$fees=[];$anchors=[];$counterparts=[];$masterRows=[];$counterpartRows=[];$masterRecords=[];
+    // Keep evidence from other receipts when it can affect a selected receipt's decision.
+    $wantedDu=[];$wantedAmounts=[];$wantedCounterparts=[];
+    foreach($selectedReceipts??[] as $r){
+        $wantedDu[lma_du_key($r)]=true;
+        foreach(range(1,4) as $slot){
+            try{$amount=lf_cents($r['raw']['JUMLAH'.$slot]??'0');}catch(DomainException){continue;}
+            if($amount<=0)continue;
+            $wantedAmounts[$amount]=true;
+            $wantedCounterparts[lma_receipt_key($r['raw'],$slot)]=true;
+        }
+    }
+    $rowKeys=[];
+    foreach($read() as $r){
         if(isset($r['unit_id'])&&(int)$r['unit_id']!==$unit)throw new DomainException('Sumber otomatisasi berbeda unit.');
         if(isset($r['source_id']))$sourceIds[(string)$r['source_id']]=true;
-        if($r['table']==='lain'){$raw=array_change_key_case($r['raw'],CASE_UPPER);$masterRows[trim((string)($raw['KODE']??''))][]=$r['row_key']??hash('sha256',lf_canonical($r['raw']));}
+        if($sourceKey===''&&isset($r['row_key']))$rowKeys[]=$r['row_key'];
+        if($r['table']==='lain'){$masterRecords[]=$r;$raw=array_change_key_case($r['raw'],CASE_UPPER);$masterRows[trim((string)($raw['KODE']??''))][]=$r['row_key']??hash('sha256',lf_canonical($r['raw']));}
         if($r['table']==='siswa'&&in_array(lop_group((string)($r['raw']['KELAS']??''),$unit)['kind'],['academic','psb'],true))$active[lma_identity(legacy_source_identity($r['raw']))]=true;
     }
     if(count($sourceIds)>1)throw new DomainException('Satu pekerjaan otomatisasi harus memakai satu backup sumber.');
-    foreach($records as $r){
+    $masters=lful_source_fee_masters($masterRecords);
+    unset($masterRecords);
+    foreach($read() as $r){
         $v=$r['raw'];$key=lma_du_key($r);
+        if($selectedReceipts!==null&&!isset($wantedDu[$key]))$key='';
         if($r['table']==='bayar_du'&&$key!=='')try{$amount=lf_cents($v['jumlah']??null);if($amount>0)$du[$key]['values'][(string)$amount]=true;}catch(DomainException $ignored){}
         if($r['table']==='bayar'&&$key!=='')try{$amount=lf_cents($v['U_KEGIATAN']??'0');if($amount>0)$du[$key]['paid']=($du[$key]['paid']??0)+$amount;}catch(DomainException $ignored){$du[$key]['invalid']=true;}
         if(!str_starts_with($r['table'],'bayar')||$r['table']==='bayar_du')continue;
+        $selected=$selectedReceipts===null||isset($selectedReceipts[$r['row_key']]);
         foreach(range(1,4) as $slot){
             try{$amount=lf_cents($v['JUMLAH'.$slot]??'0');}catch(DomainException $ignored){continue;}if($amount<=0)continue;
+            if(!$selected&&!isset($wantedAmounts[$amount]))continue;
             $code=trim((string)($v['LAIN_LAIN'.$slot]??''));$names=$masters[$code]??[];$ctx=lma_fee_context($v);
             $detail=$ctx+['row_key'=>$r['row_key'],'column'=>'JUMLAH'.$slot,'code'=>$code,'amount'=>$amount,'identity'=>lma_identity(legacy_source_identity($v)),'priority'=>lma_priority($v,$active),'note'=>trim((string)($v['KETERANGAN']??'')),'counterpart'=>lma_receipt_key($v,$slot),'is_pomg'=>legacy_source_is_pomg('JUMLAH'.$slot,$v),'du_year'=>lma_year((string)($v['th_ajaran']??'')),'du_grade'=>trim((string)($v['kelas_du']??''))];
             if(count($names)===1&&trim((string)($v['rstatus']??''))===''){
-                $counterparts[$detail['counterpart']][$names[0]]=true;
-                $counterpartRows[$detail['counterpart']][$names[0]][]=$r['row_key'];
+                if($selectedReceipts===null||isset($wantedCounterparts[$detail['counterpart']])){
+                    $counterparts[$detail['counterpart']][$names[0]]=true;
+                    $counterpartRows[$detail['counterpart']][$names[0]][]=$r['row_key'];
+                }
                 if($r['table']==='bayar')$anchors[(string)$amount][]=$detail+['name'=>$names[0]];
             }
-            if($r['table']==='bayar')$fees[$r['row_key']]['JUMLAH'.$slot]=$detail;
+            if($r['table']==='bayar'&&$selected)$fees[$r['row_key']]['JUMLAH'.$slot]=$detail;
         }
     }
     $matched=[];foreach($du as $key=>$g)if(empty($g['invalid'])&&count($g['values']??[])===1&&($g['paid']??0)===(int)array_key_first($g['values']))$matched[$key]=true;
@@ -131,7 +153,7 @@ function lma_context(array $records,int $unit,string $sourceKey=''): array {
         $decisions[$row][$column]=['name'=>$name,'status'=>$state,'rule'=>$rule,'source_code'=>$d['code'],'priority'=>$d['priority'],'category'=>$d['is_pomg']?'komite':($explicitDu?'daftar_ulang':null),
             'evidence'=>['source_master_rows'=>$sourceRows,'supporting_rows'=>$supporting,'candidate_names'=>$names]];
     }
-    if($sourceKey===''){$keys=array_column($records,'row_key');sort($keys,SORT_STRING);$sourceKey=$sourceIds?'source:'.array_key_first($sourceIds):hash('sha256',lf_canonical($keys));}
+    if($sourceKey===''){sort($rowKeys,SORT_STRING);$sourceKey=$sourceIds?'source:'.array_key_first($sourceIds):hash('sha256',lf_canonical($rowKeys));}
     return ['fees'=>$decisions,'du'=>$matched,'active'=>$active,'unit_id'=>$unit,'source_key'=>$sourceKey];
 }
 /** Compact configuration only; per-row evidence is recomputed, never stored in draft settings. */

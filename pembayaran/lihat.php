@@ -89,6 +89,19 @@ $feeMaster=$history['fee_master'];
 $paymentPaginationQuery = pagination_query(['per_page' => $perPage, 'view'=>$isArchive?'deleted':'active','rombel'=>$rombelFilter['values']]);
 unset($paymentPaginationQuery['selected']);
 $activityGroups = payment_activity_for_payments($koneksi, array_column($paymentRows, 'id'));
+if ($isArchive) {
+    foreach ($paymentRows as &$row) {
+        foreach (array_reverse($activityGroups[(int)$row['id']] ?? []) as $event) {
+            if ($event['action'] !== 'deleted') continue;
+            $snapshot = json_decode($event['before_snapshot'],true);
+            $row['payment_period_label'] = $snapshot['payment']['payment_period_label'] ?? '';
+            break;
+        }
+    }
+    unset($row);
+} else {
+    $paymentRows = payment_period_meta_for_rows($koneksi,$paymentRows);
+}
 $tabQuery = $_GET; unset($tabQuery['page']);
 $activeTabUrl = 'lihat.php?' . http_build_query(array_merge($tabQuery,['view'=>'active']));
 $archiveTabUrl = 'lihat.php?' . http_build_query(array_merge($tabQuery,['view'=>'deleted']));
@@ -182,8 +195,9 @@ filter_output_start();
       <?php if ($showPrintPrompt): ?>
       <div class="modal-overlay show" id="receipt-print-modal" role="dialog" aria-modal="true" aria-labelledby="receipt-print-title">
         <div class="modal-box">
-          <div class="modal-icon" aria-hidden="true">🧾</div>
-          <h3 class="modal-title" id="receipt-print-title"><?= $isAnnualPayment ? 'Cetak 12 struk pembayaran?' : ($isUpdatedPayment ? 'Cetak ulang struk pembayaran?' : 'Cetak struk pembayaran?') ?></h3>
+          <header class="dialog-heading">
+            <h3 class="modal-title" id="receipt-print-title"><?= $isAnnualPayment ? 'Cetak 12 struk pembayaran?' : ($isUpdatedPayment ? 'Cetak ulang struk pembayaran?' : 'Cetak struk pembayaran?') ?></h3>
+          </header>
           <p class="modal-body"><?= $isAnnualPayment
               ? 'Pembayaran tahunan sudah dibagi menjadi 12 transaksi. Semua struk Januari–Desember dapat dicetak sekaligus.'
               : ($isUpdatedPayment
@@ -251,7 +265,7 @@ filter_output_start();
       <section class="ph-list-panel"><?php if($feeMaster): ?><p class="ph-period-summary">Transaksi biaya: <strong><?= authorization_escape($feeMaster['nama']) ?></strong>. Total Bayar tetap menunjukkan seluruh isi struk.</p><?php endif; ?><header class="ph-panel-heading"><div><h3> Daftar Transaksi</h3></div></header>
       <div class="ph-record-list">
       <?php foreach($paymentRows as $i=>$row): $id=(int)$row['id'];$href='lihat.php?'.http_build_query(array_merge($_GET,['selected'=>$id]));$rowCaps=$id<0?['can_print'=>true]:payment_capabilities($koneksi,$row,$activityGroups[$id]??[],$isArchive,[]); ?><article class="ph-record-card">
-      <a href="<?= authorization_escape($href) ?>" class="ph-record <?= $id===$selectedId?'is-selected':'' ?> <?= $isArchive?'is-deleted':'' ?>" data-payment-record data-id="<?= $id ?>" data-unit="<?= (int)$row['unit_id'] ?>" <?= $id===$selectedId?'aria-current="true"':'' ?>><span class="ph-record-number"><?= $offset+$i+1 ?></span><div class="ph-record-identity"><strong><?= authorization_escape($row['NO_INDUK']) ?></strong><span><?= authorization_escape($row['NAMA']) ?></span><small><?= ($row['owner_type']??'student')==='account'?'Pemilik rekening non-siswa':'Siswa / Diknas '.authorization_escape($row['NO_induk_diknas']?:'Tidak tercatat') ?></small><?= unit_record_badge($row) ?></div><span class="kelas-badge">Kelas <?= authorization_escape(payment_history_class($row['kelas_transaksi'])) ?></span><div class="ph-record-period"><small>Periode</small><span> <?= authorization_escape(payment_history_period($row)) ?></span><small class="ph-time-note"><?= authorization_escape(payment_time_parts($row)['date']) ?><br><?= authorization_escape(payment_time_parts($row)['time']) ?></small></div><div class="ph-record-total"><small>Total Bayar</small><strong><?= payment_history_money($row['total_jumlah']) ?></strong><?php if($feeMaster): ?><small><?= authorization_escape($feeMaster['nama']) ?>: <?= payment_history_money($row['fee_amount']) ?></small><?php endif; ?></div><span class="ph-status <?= $isArchive?'is-deleted':'' ?>"><?= $isArchive?'Dihapus':($id<0?'Legacy':'SistemSPP') ?></span></a>
+      <a href="<?= authorization_escape($href) ?>" class="ph-record <?= $id===$selectedId?'is-selected':'' ?> <?= $isArchive?'is-deleted':'' ?>" data-payment-record data-id="<?= $id ?>" data-unit="<?= (int)$row['unit_id'] ?>" <?= $id===$selectedId?'aria-current="true"':'' ?>><span class="ph-record-number"><?= $offset+$i+1 ?></span><div class="ph-record-identity"><strong><?= authorization_escape($row['NO_INDUK']) ?></strong><span><?= authorization_escape($row['NAMA']) ?></span><small><?= ($row['owner_type']??'student')==='account'?'Pemilik rekening non-siswa':'Siswa / Diknas '.authorization_escape($row['NO_induk_diknas']?:'Tidak tercatat') ?></small><?= unit_record_badge($row) ?></div><span class="kelas-badge">Kelas <?= authorization_escape(payment_history_class($row['kelas_transaksi'])) ?></span><div class="ph-record-period"><small>Periode</small><span> <?= payment_history_period_html($row) ?></span><small class="ph-time-note"><?= authorization_escape(payment_time_parts($row)['date']) ?><br><?= authorization_escape(payment_time_parts($row)['time']) ?></small></div><div class="ph-record-total"><small>Total Bayar</small><strong><?= payment_history_money($row['total_jumlah']) ?></strong><?php if($feeMaster): ?><small><?= authorization_escape($feeMaster['nama']) ?>: <?= payment_history_money($row['fee_amount']) ?></small><?php endif; ?></div><span class="ph-status <?= $isArchive?'is-deleted':'' ?>"><?= $isArchive?'Dihapus':($id<0?'Legacy':'SistemSPP') ?></span></a>
       <?php if(!$isArchive&&$rowCaps['can_print']): ?><div class="ph-record-print"><a class="btn btn-ghost history-receipt-button" data-print-payment href="../laporan/cetak_struk.php?id=<?= $id ?><?= $feeMaster?'&amp;fee_master_id='.(int)$feeMaster['id']:'' ?>" target="_blank" rel="noopener">Cetak Bukti Transaksi</a></div><?php endif; ?></article>
       <?php endforeach; ?>
       <?php if(!$paymentRows): ?><div class="ph-empty"><h3>Tidak ada transaksi sesuai filter</h3><p><?= $isArchive?'Arsip menggunakan tanggal penghapusan.':'Ubah periode atau pencarian siswa untuk melihat transaksi lain.' ?></p></div><?php endif; ?>
@@ -263,13 +277,13 @@ filter_output_start();
     </main>
   </div>
 
-  <div class="authorization-modal" id="payment-delete-request-modal" hidden role="dialog" aria-modal="true" aria-labelledby="payment-delete-request-title">
+  <div class="authorization-modal" id="payment-delete-request-modal" data-dialog-tone="danger" hidden role="dialog" aria-modal="true" aria-labelledby="payment-delete-request-title">
     <form method="POST" action="proses.php" class="authorization-modal-card">
       <input type="hidden" name="aksi" value="hapus" />
       <input type="hidden" name="return_context" value="" />
       <input type="hidden" name="id" id="payment-delete-request-id" value="" />
       <input type="hidden" name="csrf_token" value="<?= htmlspecialchars($_SESSION['csrf_payment']) ?>" />
-      <h3 id="payment-delete-request-title"><?= transaction_authorization_requires_request() ? 'Ajukan penghapusan transaksi' : 'Hapus transaksi' ?></h3>
+      <header class="dialog-heading"><h3 id="payment-delete-request-title"><?= transaction_authorization_requires_request() ? 'Ajukan penghapusan transaksi' : 'Hapus transaksi' ?></h3></header>
       <p id="payment-delete-request-copy"><?= transaction_authorization_requires_request() ? 'Transaksi tidak akan dihapus sebelum disetujui Super Admin.' : 'Transaksi akan langsung dihapus setelah Anda menyimpan tindakan ini.' ?></p>
       <?php if (transaction_authorization_requires_request()): ?>
       <label class="field-row">
@@ -308,7 +322,7 @@ filter_output_start();
       copy.textContent = <?= json_encode(transaction_authorization_requires_request() ? 'Penghapusan transaksi %s menunggu persetujuan Super Admin.' : 'Transaksi %s akan langsung dihapus setelah tindakan ini disimpan.') ?>.replace('%s', button.dataset.student || 'siswa');
       modal.hidden = false;
       document.body.classList.add('modal-open');
-      (modal.querySelector('textarea') || modal.querySelector('button[type="submit"]')).focus();
+      (modal.querySelector('textarea') || document.getElementById('payment-delete-request-cancel')).focus();
     });
     modal.addEventListener('keydown',event=>{if(event.key==='Escape')close();if(event.key==='Tab'){const items=[...modal.querySelectorAll('textarea,button')];const first=items[0],last=items.at(-1);if(event.shiftKey&&document.activeElement===first){event.preventDefault();last.focus();}else if(!event.shiftKey&&document.activeElement===last){event.preventDefault();first.focus();}}});
     modal.querySelector('form').addEventListener('submit',event=>{if(event.target.dataset.sending){event.preventDefault();return;}event.target.dataset.sending='1';event.target.querySelector('[type=submit]').disabled=true;});
@@ -324,10 +338,18 @@ filter_output_start();
       const printLater = document.getElementById('receipt-print-later');
       const closePrompt = function () {
         modal.classList.remove('show');
+        document.querySelector('[data-payment-record][aria-current="true"], #btn-filter')?.focus({preventScroll:true});
         window.setTimeout(function () { modal.remove(); }, 250);
       };
 
       printLater.addEventListener('click', closePrompt);
+      modal.addEventListener('keydown', function (event) {
+        if (event.key === 'Escape') closePrompt();
+        if (event.key === 'Tab') {
+          event.preventDefault();
+          (document.activeElement === printNow ? printLater : printNow).focus();
+        }
+      });
       printNow.addEventListener('click', function () {
         window.open(<?= json_encode($printPaymentUrl, JSON_HEX_TAG | JSON_HEX_APOS | JSON_HEX_AMP | JSON_HEX_QUOT) ?>, '_blank', 'noopener');
         closePrompt();

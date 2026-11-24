@@ -178,6 +178,11 @@ if($selected_mode&&min($selected_ids)<0){
         unit_set_context($koneksi,$scope);$model=payment_history_model($koneksi,$id,false);$p=$model['payment']??null;
         if(!$p||empty($model['capabilities']['can_print'])||!$p['TGL_BYR']||$p['TGL_BYR']<$period_start||$p['TGL_BYR']>=$period_end)throw new DomainException('Transaksi yang dipilih tidak tersedia atau tidak memiliki izin cetak.');
         unit_set_context($koneksi,(int)$p['unit_id']);$p['owner_type']=empty($p['student_id'])&&$id<0?'account':'student';
+        if (isset($p['payment_period_label'])) {
+            $documents[] = payment_period_receipt_document($koneksi,$p,payment_history_period($p),
+                $model['summary']['creator']['actor_name'] ?? 'Bagian Keuangan');
+            continue;
+        }
         $documents[]=['payment'=>$p,'school'=>unit_school_name((int)$p['unit_id']),'primary'=>$model['components'],'remaining'=>payment_receipt_remaining($koneksi,$p),'other'=>[],'period'=>payment_history_period($p),'words'=>receipt_money_words((float)$p['total_jumlah']),'date'=>spp_date_label($p['TGL_BYR'],true,$p['time_precision']??null),'signer'=>$p['source_operator']??$p['user_id']??'Tidak tercatat'];
     }}catch(Throwable $e){http_response_code(403);exit('Transaksi yang dipilih tidak tersedia atau tidak memiliki izin cetak.');}
     finally{unit_set_context($koneksi,$scope);}
@@ -281,6 +286,8 @@ if ($rows && $selected_mode) {
     if(spp_billing_schema_ready($koneksi))foreach($ids as $paymentId){$summary=spp_payment_allocation_summary($koneksi,$paymentId);if($summary)$spp_allocations_by_payment[$paymentId]=$summary;}
 }
 
+require_once __DIR__.'/../includes/payment_period.php';
+$rows = payment_period_meta_for_rows($koneksi,$rows);
 if (!$selected_mode) {
     $totalRows = count($rows);
     $grandTotal = array_sum(array_map(static fn($row) => (float)($row['total_jumlah'] ?? 0), $rows));
@@ -291,7 +298,7 @@ if (!$selected_mode) {
             . '<td>' . e($row['NO_INDUK'] ?? '') . (!empty($row['NO_induk_diknas']) ? '<br><small>Diknas ' . e($row['NO_induk_diknas']) . '</small>' : '') . '</td>'
             . '<td>' . e($row['NAMA'] ?? '') . '</td>'
             . '<td>' . e($row['kelas_rombel_snapshot'] ?: ($row['KELAS_SISWA'] ?? '')) . '</td>'
-            . '<td>' . e(trim(($row['BULAN'] ?? '') . ' ' . ($row['TAHUN'] ?? ''))) . '</td>'
+            . '<td>' . e($row['payment_period_label']??trim(($row['BULAN'] ?? '') . ' ' . ($row['TAHUN'] ?? ''))) . '</td>'
             . '<td>' . e($row['sistem_pembayaran'] ?? '') . '</td>'
             . '<td>' . e(spp_date_label($row['TGL_BYR'] ?? null,true,$row['time_precision']??null)) . '</td>'
             . '<td class="num">Rp ' . money_total($row['total_jumlah'] ?? 0) . '</td>'
@@ -410,6 +417,17 @@ function total_psb_bill(array $row): float {
 require_once __DIR__.'/../includes/receipt_print.php';
 $documents=[];
 foreach($rows as $row){
+    if (isset($row['payment_period_label'])) {
+        $unit = (int)$row['unit_id'];
+        if ($unit !== $reportUnitId) unit_set_context($koneksi,$unit);
+        try {
+            $documents[] = payment_period_receipt_document($koneksi,$row,$row['payment_period_label'],
+                $row['operator_name'] ?: 'Bagian Keuangan');
+        } finally {
+            if ($unit !== $reportUnitId) unit_set_context($koneksi,$reportUnitId);
+        }
+        continue;
+    }
     $allocation=$spp_allocations_by_payment[(int)$row['id']]??null;
     $sisaDu=(float)$row['uang_du']>.001 && (int)($row['du_bill_id']??0)>0
         ? max(0,(float)$row['du_nominal_tagihan']-(float)$row['du_paid_this_bill']) : null;

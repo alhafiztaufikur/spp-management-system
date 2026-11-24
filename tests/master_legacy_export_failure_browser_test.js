@@ -1,4 +1,4 @@
-/* Export failure is all-or-nothing, and Alumni edit/reset retains its scope. */
+/* Missing letter drafts cannot download, and Alumni edit/reset retains its scope. */
 const fs=require('fs'),path=require('path'),assert=require('assert');
 const {chromium}=require(process.env.SPP_PLAYWRIGHT_CORE);
 const root=process.env.SPP_MASTER_QA_DIR,f=JSON.parse(fs.readFileSync(path.join(root,'fixture.json')));
@@ -18,23 +18,16 @@ const checks=[],check=(ok,label)=>{assert(ok,label);checks.push(label);console.l
   await Promise.all([page.waitForURL(url=>url.searchParams.get('reset_form')==='1'),page.locator('#student-reset-form').click()]);
   check(!new URL(page.url()).searchParams.has('edit')&&await page.locator('[data-class-picker] [role=option]').count()>1,'Reset leaves Alumni edit mode and restores normal class choices');
   await page.goto(f.base+'/laporan/surat_orang_tua_susun.php?preview=1&draft='+f.multi_draft);
-  const downloads=[];page.on('download',d=>downloads.push(d));
-  await page.evaluate(()=>{
-   window.qaToBlob=HTMLCanvasElement.prototype.toBlob;let calls=0;
-   HTMLCanvasElement.prototype.toBlob=function(callback,...args){if(++calls===2)callback(null);else window.qaToBlob.call(this,callback,...args);};
-  });
-  await page.locator('#parent-png').click();
-  await page.waitForFunction(()=>document.querySelector('#parent-png-status').textContent.includes('Halaman PNG gagal'));
-  check(downloads.length===0,'A failure after the first rendered page produces no partial download');
-  await page.waitForFunction(()=>!document.querySelector('#parent-png').disabled);
-  check(await page.locator('#parent-png').isEnabled(),'Failed export releases the button for retry');
-  await page.evaluate(()=>{HTMLCanvasElement.prototype.toBlob=window.qaToBlob;});
-  let pdfFetches=0;page.on('request',r=>{if(r.resourceType()==='fetch'&&r.url().includes('surat_orang_tua_pdf.php'))pdfFetches++;});
-  const downloaded=page.waitForEvent('download',{timeout:120000});
-  await page.locator('#parent-png').evaluate(button=>{button.click();button.click();});
-  await downloaded;await page.waitForFunction(()=>!document.querySelector('#parent-png').disabled);
-  check(downloads.length===1&&pdfFetches===1,'Double click launches one complete export and one PDF fetch');
-  check(errors.length===0,'No browser errors during Alumni reset or export failure/retry');
+  check(await page.locator('#parent-png,script[src*="parent_letter_png"]').count()===0,'Preview has no PNG export controls or script');
+  const link=page.getByRole('link',{name:'Unduh PDF',exact:true});
+  const url=new URL(await link.getAttribute('href'),page.url());
+  const missing=new URL(url);
+  missing.searchParams.set('draft','0'.repeat(32));
+  const failed=await page.request.get(missing.href);
+  check(!failed.ok()&&!failed.headers()['content-disposition'],'Missing draft does not produce a download');
+  const correct=await page.request.get(url.href);
+  check(correct.ok()&&(await correct.body()).subarray(0,4).toString()==='%PDF','The valid draft still downloads');
+  check(errors.length===0,'No browser errors during Alumni reset or PDF preview');
   fs.writeFileSync(path.join(root,'export-failure-browser-results.json'),JSON.stringify({checks:checks.length,passed:checks,browser:await browser.version()},null,2));
   await context.close();
  }finally{await browser.close();}

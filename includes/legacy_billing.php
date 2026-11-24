@@ -189,11 +189,15 @@ function lb_mark_du_master(mysqli $db,string $year,array $levels): void {lb_mark
 function lb_mark_master(mysqli $db,string $year,array $levels,string $kind): void {
     if(!lop_ready($db))return;$record=hp_one($db,'SELECT id FROM tahun_ajaran WHERE label=?',[$year]);if(!$record)throw new DomainException('Tahun tarif tidak ditemukan.');
     $decision=['rule'=>LB_RULE_VERSION,'kind'=>$kind,'year'=>$year,'levels'=>array_map('intval',$levels),'basis'=>'system','actor'=>(int)($_SESSION['admin_id']??0)];
-    lf_query($db,"INSERT INTO legacy_op_audit(unit_id,actor_id,entity_type,entity_id,request_key,reason,before_data,after_data) VALUES(?,?,'billing_rule',?,?,?,'{}',?)",[unit_active_id(),$decision['actor'],$record['id'],bin2hex(random_bytes(32)),'Master disimpan eksplisit untuk tahun/tingkat; snapshot terbayar dipertahankan',lf_json($decision)]);lb_cache($db,true);
+    lf_query($db,"INSERT INTO legacy_op_audit(unit_id,actor_id,entity_type,entity_id,request_key,reason,before_data,after_data) VALUES(?,?,'billing_rule',?,?,?,'{}',?)",[unit_active_id(),$decision['actor'],$record['id'],bin2hex(random_bytes(32)),'Master disimpan eksplisit untuk tahun/tingkat; snapshot terbayar dipertahankan',lf_json($decision)]);lb_cache($db,refresh:true,invalidateOnly:true);
 }
 function lb_refresh_manifests(mysqli $db,array $batchIds): void {
     require_once __DIR__.'/legacy_operational_corrections.php';
-    foreach(array_unique($batchIds) as $id){$b=hp_one($db,'SELECT manifest FROM legacy_full_batches WHERE id=? FOR UPDATE',[$id]);$m=json_decode($b['manifest'],true);$m['working_digest']=lop_working_digest($db,(string)$id);lf_query($db,'UPDATE legacy_full_batches SET manifest=? WHERE id=?',[lf_json($m),$id]);}
+    foreach(array_unique($batchIds) as $id){
+        if(!hp_one($db,'SELECT id FROM legacy_full_batches WHERE id=? FOR UPDATE',[$id]))throw new DomainException('Batch Legacy tidak ditemukan.');
+        $digest=lop_working_digest($db,(string)$id);
+        lf_query($db,"UPDATE legacy_full_batches SET manifest=JSON_SET(manifest,'$.working_digest',?) WHERE id=? AND NOT(JSON_UNQUOTE(JSON_EXTRACT(manifest,'$.working_digest')) <=> ?)",[$digest,$id,$digest]);
+    }
 }
 /** Read the same source-backed position for synchronization and integrity checks. */
 function lb_obligation_position(mysqli $db,array $ob): ?array {

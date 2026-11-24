@@ -436,8 +436,7 @@ try {
 
   <div class="modal-overlay" id="reset-password-modal" role="dialog" aria-modal="true" aria-labelledby="reset-modal-title">
     <div class="modal-box">
-      <div class="modal-icon"><?= account_letter_icon('lock') ?></div>
-      <div class="modal-title" id="reset-modal-title">Ganti Password Akun</div>
+      <header class="dialog-heading"><span class="modal-icon" aria-hidden="true"><?= account_letter_icon('lock') ?></span><h2 class="modal-title" id="reset-modal-title">Ganti Password Akun</h2></header>
       <div class="modal-account" id="reset-account-label"></div>
       <form method="POST" action="<?= htmlspecialchars($accountReturn) ?>" id="form-reset-password">
         <input type="hidden" name="csrf_token" value="<?= htmlspecialchars($csrfToken) ?>" />
@@ -466,10 +465,9 @@ try {
     </div>
   </div>
 
-  <div class="modal-overlay" id="delete-account-modal" role="dialog" aria-modal="true" aria-labelledby="delete-modal-title">
+  <div class="modal-overlay" id="delete-account-modal" data-dialog-tone="danger" role="dialog" aria-modal="true" aria-labelledby="delete-modal-title">
     <div class="modal-box">
-      <div class="modal-icon"><?= account_letter_icon('shield') ?></div>
-      <div class="modal-title" id="delete-modal-title">Konfirmasi Nonaktifkan Akun</div>
+      <header class="dialog-heading"><span class="modal-icon" aria-hidden="true"><?= account_letter_icon('shield') ?></span><h2 class="modal-title" id="delete-modal-title">Konfirmasi Nonaktifkan Akun</h2></header>
       <p style="color:var(--text-secondary);margin:12px 0 6px;font-size:13px;">Akun berikut tidak dapat login sampai diaktifkan kembali.</p>
       <div class="modal-account" id="delete-account-label" style="font-weight:700;color:var(--red);"></div>
       <p class="payment-auto-note" style="margin-top:8px;">Riwayat transaksi dan audit tetap tersimpan.</p>
@@ -486,10 +484,9 @@ try {
     </div>
   </div>
 
-  <div class="modal-overlay" id="purge-account-modal" role="dialog" aria-modal="true" aria-labelledby="purge-modal-title">
+  <div class="modal-overlay" id="purge-account-modal" data-dialog-tone="danger" role="dialog" aria-modal="true" aria-labelledby="purge-modal-title">
     <div class="modal-box">
-      <div class="modal-icon"><?= account_letter_icon('trash') ?></div>
-      <div class="modal-title" id="purge-modal-title">Hapus Akun Permanen</div>
+      <header class="dialog-heading"><span class="modal-icon" aria-hidden="true"><?= account_letter_icon('trash') ?></span><h2 class="modal-title" id="purge-modal-title">Hapus Akun Permanen</h2></header>
       <div class="modal-account" id="purge-account-label"></div>
       <p class="payment-auto-note">Akun tanpa riwayat ini akan dihapus dan tidak dapat dipulihkan. Untuk menghentikan akses sementara, gunakan Nonaktifkan.</p>
       <form method="post" action="<?= htmlspecialchars($accountReturn) ?>" id="form-purge-account">

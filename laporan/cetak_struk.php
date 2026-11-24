@@ -5,6 +5,7 @@ require_once '../koneksi.php';
 require_once '../includes/auth.php';
 require_once '../includes/reports.php';
 require_once '../includes/receipt_balances.php';
+require_once '../includes/payment_period.php';
 requireRole(['admin', 'bendahara', 'kasir']);
 require_once __DIR__.'/../includes/payment_permissions.php';
 
@@ -100,6 +101,15 @@ unit_set_context($koneksi,$unit);
 if (($_SERVER['REQUEST_METHOD'] ?? '') === 'GET') lb_scope_student_read($koneksi,(string)$payment['NO_INDUK']);
 session_write_close();
 
+$range = payment_period_meta($koneksi,$paymentId);
+if ($range) {
+    require_once __DIR__.'/../includes/receipt_print.php';
+    $document = payment_period_receipt_document($koneksi,$payment,payment_period_range_label($range),
+        $payment['operator_name'] ?: 'Bagian Keuangan',singleStudent:true);
+    receipt_http_output([$document], 'Struk #'.$paymentId.' - '.$payment['NAMA'], 'Struk siap dicetak');
+    exit;
+}
+
 $otherDetails = [];
 $stmt = $koneksi->prepare(hp_sql($koneksi, '
     SELECT d.nama_biaya_snapshot, d.nominal_snapshot, d.keterangan
@@ -113,13 +123,6 @@ $detailResult = $stmt->get_result();
 while ($detail = $detailResult->fetch_assoc()) $otherDetails[] = $detail;
 $stmt->close();
 
-$primaryLines = [
-    ['Uang PSB', $payment['U_PSB']],
-    ['Uang Daftar Ulang'.(!empty($payment['du_tahun_ajaran'])?' '.$payment['du_tahun_ajaran'].' / Kelas '.$payment['du_kelas']:''), $payment['uang_du']],
-    ['Uang SPP', $payment['U_SPP']],
-    ['Komite Sekolah',$payment['U_KOMITE']],
-    ['Tabungan Wajib',0],
-];
 $otherLines = [];
 foreach ($otherDetails as $detail) {
     $label = $detail['nama_biaya_snapshot'];
@@ -135,7 +138,7 @@ $signer = $payment['operator_name'] ?: ($_SESSION['admin_nama'] ?? 'Bagian Keuan
 require_once __DIR__.'/../includes/receipt_print.php';
 receipt_http_output([[
     'payment'=>$payment, 'school'=>unit_school_name((int)$payment['unit_id']),
-    'primary'=>$primaryLines, 'remaining'=>$remainingLines, 'other'=>$otherLines,
+    'primary'=>receipt_school_primary($payment), 'remaining'=>$remainingLines, 'other'=>$otherLines,
     'period'=>receipt_month($payment['BULAN']).' '.$payment['TAHUN'],
     'words'=>receipt_money_words($total),
     'date'=>receipt_date($payment['TGL_BYR']), 'signer'=>$signer,

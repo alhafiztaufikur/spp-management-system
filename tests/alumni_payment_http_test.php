@@ -20,7 +20,7 @@ function alumni_test_session(int $actor, int $unit): array {
     return ['id'=>$id, 'csrf'=>$csrf];
 }
 
-function alumni_test_fixture(mysqli $db, int $grade, string $academicYear): array {
+function alumni_test_fixture(mysqli $db, int $grade, string $academicYear, bool $legacy = false): array {
     $class = hp_one($db, "SELECT id FROM master_kelas WHERE tingkat=? AND is_active=1 AND is_placeholder=0 ORDER BY id LIMIT 1", [$grade]);
     wf_assert((bool)$class, 'Final grade has an active rombel');
     $classId = (int)$class['id'];
@@ -40,8 +40,15 @@ function alumni_test_fixture(mysqli $db, int $grade, string $academicYear): arra
         $du = du_create_bill_for_placement($db, $placementId);
         wf_assert($du!==null, 'DU issued before graduation');
         $ctx = promotion_context($db, (int)$master['tahun_ajaran_id']);
-        $result = promotion_apply_student($db, $nis, 0, $ctx, $placementId, $grade, true);
-        wf_assert($result['target']==='Alumni'.substr($academicYear, 5), 'Official graduation sets the Alumni class');
+        if ($legacy) {
+            // Model imported membership with published bills and no graduation event.
+            $alumni = promotion_alumni_class($db, $ctx);
+            ofb_write($db, "UPDATE siswa_tahun_ajaran SET status='pindah' WHERE id=?", [$placementId]);
+            ofb_write($db, "UPDATE siswa SET KELAS='0',master_kelas_id=?,is_active=0 WHERE NO_INDUK=?", [$alumni['id'], $nis]);
+        } else {
+            $result = promotion_apply_student($db, $nis, 0, $ctx, $placementId, $grade, true);
+            wf_assert($result['target']==='Alumni'.substr($academicYear, 5), 'Official graduation sets the Alumni class');
+        }
         $db->commit();
         return compact('nis','du','year');
     } catch (Throwable $error) {
@@ -87,13 +94,17 @@ $db = $koneksi;
 unit_set_context($db, 0);
 $actor = (int)hp_one($db,"SELECT id FROM admin WHERE role='super_admin' AND is_active=1 ORDER BY id LIMIT 1")['id'];
 $units = [];
-foreach ([1=>6, 2=>9, 3=>12] as $unit=>$grade) {
+foreach ([[1,6,false], [2,9,false], [3,12,false], [1,6,true], [2,9,true], [3,12,true]] as [$unit,$grade,$legacy]) {
     $session = alumni_test_session($actor,$unit);
     $_SESSION = ['admin_id'=>$actor, 'admin_role'=>'super_admin', 'active_unit_id'=>$unit];
     unit_set_context($db,$unit);
-    ['nis'=>$nis,'du'=>$du,'year'=>$year] = alumni_test_fixture($db,$grade,du_current_academic_year());
+    ['nis'=>$nis,'du'=>$du,'year'=>$year] = alumni_test_fixture($db,$grade,du_current_academic_year(),$legacy);
     [$code,$form] = wf_http($session['id'],'pembayaran/form.php');
     wf_assert($code===200 && str_contains($form,'data-nis="'.$nis.'"'),'Alumni with arrears is selectable');
+    if ($legacy) {
+        wf_assert(preg_match('/data-nis="'.preg_quote($nis,'/').'"[^>]*data-kelas="Alumni\d{4}"\s+data-is-graduate="1"/s',$form)===1,
+            'Imported alumni keeps the recorded class label and arrears-only controls');
+    }
     $session['input'] = wf_fields($form,'request_key');
     [$code,$body] = wf_http($session['id'],'pembayaran/status_spp.php?'.http_build_query([
         'no_induk'=>$nis,'bulan'=>'07','tahun'=>$year,'unit_id'=>$unit,'details'=>1,
@@ -149,11 +160,11 @@ foreach ([1=>6, 2=>9, 3=>12] as $unit=>$grade) {
         'du_expected_total'=>$duBefore['nominal_tagihan'],'du_expected_paid'=>$duBefore['terbayar'],
     ]);
     wf_assert(abs((float)du_find_bill_by_id($db,$du)['sisa']-((float)$duBefore['sisa']-10000.0))<.001,'Alumni can pay DU');
-    $units[] = $unit;
-    echo 'PASS alumni payment lifecycle for unit '.$unit.PHP_EOL;
+    $units[$unit] = $unit;
+    echo 'PASS '.($legacy ? 'imported' : 'officially graduated').' alumni payment lifecycle for unit '.$unit.PHP_EOL;
 }
 if ($output = getenv('SPP_ALUMNI_QA_RESULT')) {
     $uuid = spp_test_isolated_manifest($db)['server_uuid'];
-    file_put_contents($output,json_encode(['ok'=>true,'restore_uuid'=>$uuid,'units'=>$units,'checks'=>$checks],JSON_THROW_ON_ERROR));
+    file_put_contents($output,json_encode(['ok'=>true,'restore_uuid'=>$uuid,'units'=>array_values($units),'checks'=>$checks],JSON_THROW_ON_ERROR));
 }
 echo 'PASS '.$checks.' alumni payment checks.'.PHP_EOL;

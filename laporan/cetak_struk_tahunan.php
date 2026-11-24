@@ -171,7 +171,7 @@ foreach ($ids as $paymentId) {
 }
 $paymentStmt->close();
 $otherStmt->close();
-require_once __DIR__.'/../includes/receipt_print.php';
+/*  */require_once __DIR__.'/../includes/receipt_print.php';
 $documents=[];
 foreach($receipts as $receipt) $documents[]=[
     'payment'=>$receipt, 'school'=>unit_school_name((int)$receipt['unit_id']),

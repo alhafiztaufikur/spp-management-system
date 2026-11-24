@@ -56,5 +56,46 @@ presentation_check(billing_history_grand_amount(['known'=>0,'unknown'=>true])===
 $matrix=global_report_matrix(global_report_present($base,'per-item','print'),'per-item',1);$matrix['currency_prefix']=false;
 $html=global_report_clean_table($matrix);
 presentation_check(str_contains($html,'report-header-nowrap')&&!str_contains($html,'seluruh hasil filter')&&!str_contains($html,'Lunas<br>'),'Print cell and header cleanup');
+presentation_check(!str_contains($html,'Belum Diketahui')&&str_contains($html,'>520.000</span>')&&str_contains($html,'>0</span>'),'Per-item print hides the unknown label and retains known amounts');
+presentation_check(global_report_clean_header('Januari 2027',false,'spp-tahunan')==='JAN 2027'
+    &&global_report_clean_header('Saldo Berjalan',false,'tabungan-siswa')==='SALDO'
+    &&global_report_clean_header('Saldo Saat Ini',false,'saldo-tabungan')==='SALDO','A4 headers follow the report labels');
+$component=['g0_tagihan','Tagihan','money_optional','source'=>'tagihan','group'=>0];
+presentation_check(global_report_print_cell(null,$component,[],false,false,'status')===''
+    &&global_report_print_cell('—',$component,[],false,false,'status')===''
+    &&global_report_print_cell(0,$component,[],false,false,'status')==='0'
+    &&global_report_print_cell(-125.25,$component,[],false,false,'status')==='-125,25','Only empty status component placeholders are hidden');
+presentation_check(global_report_print_cell(null,$component,[],false)==='—'
+    &&global_report_print_template(['report_template'=>'status','presentation_surface'=>'excel'])==='','Document styling stays scoped to PDF and print');
+$du=['title'=>'Daftar Ulang','component_key'=>'daftar_ulang','columns'=>[
+    ['nis','NIS'],['nama','Nama Siswa'],['kelas','Kelas'],['tagihan','Tagihan','money_optional'],
+    ['terbayar','Terbayar','money'],['sisa','Sisa','money_optional'],['status','Status','status'],
+],'rows'=>[]];
+foreach([
+    ['Lunas',400000,400000,0],['Tercakup PSB',null,0,0],['Cicilan',300000,100000,200000],['Belum Diketahui',null,0,null],
+] as $index=>[$status,$bill,$paid,$balance]){
+    $du['rows'][]=['nis'=>(string)($index+1),'nama'=>'Contoh','kelas'=>'1A','status'=>$status,'tagihan'=>$bill,'terbayar'=>$paid,'sisa'=>$balance];
+}
+$psb=array_replace($du,['title'=>'Uang PSB','component_key'=>'psb','rows'=>[$du['rows'][0]]]);
+$report=['title'=>'Status Pembayaran','sections'=>[$psb,$du]];
+$matrix=global_report_matrix(global_report_present($report,'status','print'),'status',1);
+$matrix['currency_prefix']=false;
+$document=new DOMDocument();
+$document->loadHTML('<meta charset="UTF-8">'.global_report_clean_table($matrix));
+$xpath=new DOMXPath($document);
+$duBills=$xpath->query('//tbody/tr/td[@data-column="tagihan"][2]');
+presentation_check(array_map(static fn($cell)=>$cell->textContent,iterator_to_array($duBills))===['0','0','300.000',''],'DU zero applies to settled rows and PSB coverage');
+presentation_check($xpath->evaluate('string(//tbody/tr[1]/td[@data-column="tagihan"][1])')==='400.000','The paid PSB bill keeps its amount');
+presentation_check($xpath->evaluate('string(//tbody/tr[1]/td[@data-column="terbayar"][2])')==='400.000'
+    &&$matrix['subtotals']['g1_tagihan']['value']===700000.0
+    &&$matrix['rows'][0]['g1_tagihan']===400000,'DU paid figures, subtotals and source principal remain intact');
+$saldo=['title'=>'Rekap Saldo Tabungan','columns'=>[['nis','Identitas','nis'],['nama','Nama Pemilik'],['kelas','Kelas / Kelompok','kelas'],['saldo_saat_ini','Saldo Saat Ini','money']],'rows'=>[['nis'=>'000123','nama'=>'Contoh','kelas'=>'1A','saldo_saat_ini'=>1000]]];
+$matrix=global_report_flat_print_matrix(global_report_present($saldo,'saldo-tabungan','print'));
+$matrix['report_template']='saldo-tabungan';
+$matrix['flat_header']=true;
+$document->loadHTML('<meta charset="UTF-8">'.global_report_clean_table($matrix));
+$xpath=new DOMXPath($document);
+presentation_check($xpath->evaluate('string(//th[@data-column="nis"])')==='NIS'
+    &&$xpath->evaluate('string(//td[@data-column="nis"])')==='000123','Savings balance PDF shows the NIS heading and original number');
 presentation_check(global_report_print_cell('Tercakup PSB',['status','Status'])==='<span class="report-header-nowrap">Tercakup PSB</span>','Whole status phrase');
 echo "PASS presentation scope, immutable evidence, yearly splitting, receipt names, exact operator codes, savings balances and typed right-aligned Excel totals.\n";

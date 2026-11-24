@@ -2,6 +2,7 @@
 /** Pure regression: a large edit form must carry its own server-rendered scope. */
 if(PHP_SAPI!=='cli'){http_response_code(404);exit;}
 require_once __DIR__.'/../includes/payment_return.php';
+require_once __DIR__.'/../includes/payment_permissions.php';
 function unit_active_id(): int{return 1;}
 function edit_scope_check(bool $ok,string $label): void{if(!$ok)throw new RuntimeException($label);}
 $template=file_get_contents(__DIR__.'/../pembayaran/edit.php');
@@ -15,10 +16,17 @@ $token=str_repeat('a',48);$_SESSION=['admin_id'=>7,'payment_returns'=>[$token=>[
 edit_scope_check(payment_return_entry($token,12)===null,'A context from another active unit remains inaccessible.');
 edit_scope_check(payment_return_entry_for_unit($token,12,2)!==null,'Original-unit recovery accepts a matching server context.');
 foreach([[13,2],[12,1],[12,0]] as [$id,$unit])edit_scope_check(payment_return_entry_for_unit($token,$id,$unit)===null,'Wrong payment/unit cannot recover.');
-$_POST=['csrf_token'=>'old','_operational_unit'=>'2','id'=>'12','aksi'=>'update','return_context'=>$token,'uang_psb'=>'200','activity_request_key'=>str_repeat('b',32)];
+$_POST=['csrf_token'=>'old','_operational_unit'=>'2','id'=>'12','aksi'=>'update','return_context'=>$token,'no_induk'=>'201','uang_psb'=>'200','activity_request_key'=>str_repeat('b',32)];
 payment_edit_draft_save(12,$token,2);$draft=$_SESSION['payment_returns'][$token]['draft'];
 edit_scope_check($draft['uang_psb']==='200'&&$draft['activity_request_key']===str_repeat('b',32),'Preserve values and edit idempotency key.');
-foreach(['csrf_token','_operational_unit','id','aksi','return_context'] as $key)edit_scope_check(!array_key_exists($key,$draft),'Do not save scope/security field '.$key);
+foreach(['csrf_token','_operational_unit','id','aksi','return_context','no_induk'] as $key)edit_scope_check(!array_key_exists($key,$draft),'Do not save scope/security field '.$key);
+edit_scope_check(str_contains(payment_edit_restore_markup('<input name="no_induk" value="001">',['no_induk'=>'201']),'value="001"'),'Old drafts cannot replace the transaction student.');
+payment_assert_edit_student('001','001');
+foreach(['1','201',null,['001']] as $student){
+    $rejected=false;
+    try { payment_assert_edit_student('001',$student); } catch (DomainException) { $rejected=true; }
+    edit_scope_check($rejected,'Only the original NIS can be used on an edit.');
+}
 $_SESSION['admin_id']=8;edit_scope_check(payment_return_entry_for_unit($token,12,2)===null,'Other actor cannot recover.');
 $_SESSION['admin_id']=7;$_SESSION['payment_returns'][$token]['expires']=time()-1;edit_scope_check(payment_return_entry_for_unit($token,12,2)===null,'Expired return context cannot recover.');
 echo "PASS: large-form scope, protected draft fields, original-unit/actor/payment/expiry recovery and idempotency key.\n";

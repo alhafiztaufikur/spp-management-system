@@ -100,7 +100,7 @@ function payment_activity_changes(?array $before, ?array $after): array
 {
     if (!$before || !$after) return [];
     $labels = ['NO_INDUK'=>'NIS','KELAS'=>'Kelas','kelas_rombel_snapshot'=>'Kelas/Rombel','TGL_BYR'=>'Tanggal bayar',
-        'BULAN'=>'Bulan tagihan','TAHUN'=>'Tahun tagihan','sistem_pembayaran'=>'Metode pembayaran',
+        'BULAN'=>'Bulan tagihan','TAHUN'=>'Tahun tagihan','payment_period_label'=>'Periode tagihan','sistem_pembayaran'=>'Metode pembayaran',
         'U_PSB'=>'PSB','U_SPP'=>'SPP','U_KOMITE'=>'Komite','U_LAIN'=>'Biaya Lain','potong_spp'=>'Potongan SPP',
         'total_jumlah'=>'Total bayar','KETERANGAN'=>'Keterangan'];
     $money = ['U_PSB','U_SPP','U_KOMITE','U_LAIN','potong_spp','total_jumlah']; $changes = [];
@@ -112,6 +112,18 @@ function payment_activity_changes(?array $before, ?array $after): array
         if($key==='TGL_BYR'){$a=spp_date_label($a,true,$before['payment']['time_precision']??null);$b=spp_date_label($b,true,$after['payment']['time_precision']??null);}
         if (in_array($key,$money,true)) { $a='Rp '.number_format((float)$a,abs((float)$a-round((float)$a))>.00001?2:0,',','.'); $b='Rp '.number_format((float)$b,abs((float)$b-round((float)$b))>.00001?2:0,',','.'); }
         $changes[]=['label'=>$label,'before'=>(string)$a,'after'=>(string)$b];
+    }
+    if (isset($before['details']['payment_period'],$after['details']['payment_period'])) {
+        $display = static function(array $rows): string {
+            $items = [];
+            foreach ($rows as $row) {
+                $items[] = $row['label'].' · SPP '.number_format($row['spp']/100,2,',','.').' · Komite '.number_format($row['komite']/100,2,',','.');
+            }
+            return implode('; ',$items);
+        };
+        $a = $display($before['details']['payment_period']['rows']);
+        $b = $display($after['details']['payment_period']['rows']);
+        if ($a !== $b) $changes[] = ['label'=>'Alokasi SPP dan Komite','before'=>$a,'after'=>$b];
     }
     foreach (['bayar_du'=>'Rincian Daftar Ulang','bayar_biaya_lain'=>'Rincian Biaya Lain','legacy_items'=>'Rincian Pembayaran'] as $table=>$label) {
         $normal = static function(array $rows): string {

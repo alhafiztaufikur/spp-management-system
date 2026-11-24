@@ -27,8 +27,23 @@
           if(event.proposed)item.append(text('p','Usulan pemohon; belum berarti perubahan diterapkan.','payment-activity-legacy'));
           if(event.changes?.length){
             const changes=document.createElement('div');changes.className='payment-activity-changes';
-            event.changes.forEach(change=>{const row=document.createElement('div');row.className='payment-activity-change';const values=document.createElement('div');
-              values.append(text('del','Sebelum: '+(change.before||'—')),text('ins',(event.proposed?'Usulan: ':'Sesudah: ')+(change.after||'—')));row.append(text('strong',change.label),values);changes.append(row);});item.append(changes);
+            event.changes.forEach(change=>{
+              const row=document.createElement('div');row.className='payment-activity-change';
+              const values=document.createElement('div');values.className='payment-activity-values';
+              for(const [tag,label,value] of [['del','Sebelum',change.before],['ins',event.proposed?'Usulan':'Sesudah',change.after]]){
+                const block=document.createElement(tag);
+                block.append(text('strong',label));
+                if(change.label==='Alokasi SPP dan Komite'&&value){
+                  const months=document.createElement('ul');
+                  value.split('; ').forEach(month=>months.append(text('li',month)));
+                  block.append(months);
+                }else{
+                  block.append(text('span',value||'—'));
+                }
+                values.append(block);
+              }
+              row.append(text('strong',change.label),values);changes.append(row);
+            });item.append(changes);
           }
           list.append(item);
         });body.replaceChildren(list);

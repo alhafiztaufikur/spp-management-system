@@ -391,7 +391,6 @@ $usageQuery = ['master_tab'=>$masterTab,'scope'=>unit_active_id(),'section'=>'us
   </div>
   <script src="assets/js/date_format.js?v=<?= filemtime(__DIR__ . '/assets/js/date_format.js') ?>"></script>
   <script src="assets/js/app.js?v=<?= filemtime(__DIR__ . '/assets/js/app.js') ?>"></script>
-  <script src="assets/js/workflow_dialogs.js?v=<?= filemtime(__DIR__.'/assets/js/workflow_dialogs.js') ?>"></script>
   <script src="assets/js/other_fee_publish.js?v=<?= filemtime(__DIR__.'/assets/js/other_fee_publish.js') ?>"></script>
   <script src="assets/js/other_fee_master.js?v=<?= filemtime(__DIR__.'/assets/js/other_fee_master.js') ?>"></script>
   <script>

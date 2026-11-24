@@ -9,6 +9,20 @@
 .global-clean-table .global-clean-transaction-time{display:block;font-size:80%;color:#52645b}
 .global-clean-table td[data-column="jenis"]{text-align:center}
 .global-clean-table td[data-column="tanggal"]{white-space:nowrap}
+.global-clean-table.global-clean-receipts th,.global-clean-table.global-clean-receipts td{text-align:left}
+.global-clean-table.global-clean-receipts td[data-column="kelas"],
+.global-clean-table.global-clean-receipts td[data-column="tanggal"]{text-align:center}
+.global-clean-table[data-print-template="penerimaan"] th[data-column="kelas"],
+.global-clean-table[data-print-template="penerimaan"] th[data-column="tanggal"]{text-align:center}
+.global-clean-table[data-print-template="penerimaan"] td[data-column="tanggal"]{line-height:1.2}
+.global-clean-table[data-print-template="penerimaan"] .global-clean-transaction-time{padding-top:1pt}
+.global-clean-table.global-clean-left-identity th[data-column="nis"],
+.global-clean-table.global-clean-left-identity th[data-column="nama"],
+.global-clean-table.global-clean-left-identity td[data-column="nis"],
+.global-clean-table.global-clean-left-identity td[data-column="nama"],
+.global-clean-table[data-print-template="tabungan-siswa"] th[data-column="tanggal"],
+.global-clean-table[data-print-template="tabungan-siswa"] td[data-column="tanggal"]{text-align:left}
+.global-clean-table[data-print-template="tabungan-siswa"] td[data-column="operator"]{text-align:center}
 .global-clean-balance td[data-column="nama"]{text-align:center;white-space:normal}
 .global-clean-table thead{display:table-header-group}
 .global-clean-table thead th{border-top:.65pt solid #000;border-bottom:.65pt solid #000}

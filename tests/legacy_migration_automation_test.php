@@ -14,6 +14,10 @@ $rows=[$student];
 foreach(['2026-04-15','2026-05-15'] as $date)$rows[]=ma_row('bayar',['NO_INDUK'=>'212200001','KELAS'=>'3A','U_KEGIATAN'=>'500','U_SPP'=>'100','TGL_BYR'=>$date,'BULAN'=>substr($date,5,2),'TAHUN'=>'2026','th_ajaran'=>'2026/2027','kelas_du'=>'4']);
 foreach(['a','b'] as $suffix)$rows[]=ma_row('bayar_du',['no_induk'=>'212200001','kelas'=>'4','th_ajaran'=>'2026/2027','jumlah'=>'1000'],$suffix);
 $original=$rows;$cfg=ma_cfg($rows);$p=lop_prepare($rows,$cfg,1,'2026-10-17');
+$stream=static function()use($rows): Generator {yield from $rows;};
+$full=lma_context($rows,1);
+$targeted=lma_context($stream,1,'',[$rows[1]['row_key']=>$rows[1]]);
+lft_assert($targeted===$full,'Streamed reconstruction lost the other installment or the DU source recap');
 lft_assert(count($p['payments'])===2&&$p['summary']['payment_total']==='1200.00'&&$p['summary']['du_reconciled']===2,'DU recap or repeated recap counted as cash');
 foreach($p['payments'] as $payment){lft_assert(count($payment['items'])===2,'Mixed receipt split');foreach($payment['items'] as $item)if($item['column']==='U_KEGIATAN')lft_assert($item['category']==='daftar_ulang'&&lma_item_period($item,$payment['period'])==='2026/2027','DU prepayment assigned to monthly academic year');}
 lft_assert($rows===$original&&$p===lop_prepare($rows,$cfg,1,'2026-10-17'),'Rules mutate source or are nondeterministic');
@@ -26,6 +30,11 @@ $changed=$rows;$changed[3]['raw']['th_ajaran']='';$changed[4]['raw']['th_ajaran'
 $rows=[$student,ma_row('lain',['KODE'=>'0022','NAMA'=>'Buku Ummi']),ma_row('lain',['KODE'=>'021','NAMA'=>'Basket'])];
 foreach(['212200002','212200003','212200004'] as $i=>$nis){$rows[]=op_raw($nis,'1A');$rows[]=ma_payment($nis,'0022','22000','2026-02-'.(26+$i));}
 $rows[]=ma_payment('212200001','0021','22000','2026-02-25');
+$candidate=$rows[array_key_last($rows)];
+$full=lma_context($rows,1,'fixture');
+$stream=static function()use($rows): Generator {yield from $rows;};
+$targeted=lma_context($stream,1,'fixture',[$candidate['row_key']=>$candidate]);
+lft_assert($targeted['fees']===array_intersect_key($full['fees'],[$candidate['row_key']=>true]),'Streamed reconstruction dropped fee cohort evidence');
 $p=lop_prepare($rows,ma_cfg($rows),1,'2026-10-17');$target=array_values(array_filter($p['payments'],fn($r)=>$r['identity']==='212200001'))[0]['items'][0];
 lft_assert($target['label']==='Buku Ummi'&&$target['migration']['status']==='inferred'&&$target['migration']['source_code']==='0021','Inference missing or numeric zero stripping chose Basket');
 $insufficient=$rows;unset($insufficient[8]);$check=lop_prepare(array_values($insufficient),ma_cfg(array_values($insufficient)),1,'2026-10-17');$checkItem=array_values(array_filter($check['payments'],fn($r)=>$r['identity']==='212200001'))[0]['items'][0];lft_assert($checkItem['migration']['status']==='unresolved','Fewer than three distinct supporting students accepted');
@@ -37,6 +46,9 @@ $rows[3]['raw']['KETERANGAN']='Pembayaran Basket';$p=lop_prepare($rows,ma_cfg($r
 $rows=[$student,ma_row('lain',['KODE'=>'0015','NAMA'=>'Buku Tabungan']),ma_payment('212200001','','7000','2026-01-02')];
 $p=lop_prepare($rows,ma_cfg($rows),1,'2026-10-17');lft_assert($p['summary']['fee_unresolved']===1,'Blank code inferred from amount alone');
 $copy=$rows[2];$copy['table']='bayar_backup';$copy['reference_only']=true;$copy['raw']['LAIN_LAIN1']='0015';$copy['row_key']=hash('sha256','counterpart');$rows[]=$copy;
+$stream=static function()use($rows): Generator {yield from $rows;};
+$targeted=lma_context($stream,1,'fixture',[$rows[2]['row_key']=>$rows[2]]);
+lft_assert($targeted['fees'][$rows[2]['row_key']]['JUMLAH1']['rule']==='receipt_counterpart','Streamed reconstruction dropped matching receipt evidence');
 $p=lop_prepare($rows,ma_cfg($rows),1,'2026-10-17');lft_assert($p['payments'][0]['items'][0]['label']==='Buku Tabungan'&&$p['summary']['fee_direct']===1,'Complete counterpart not used');
 $rows[2]['raw']['LAIN_LAIN1']='0015';$rows[2]['raw']['LAIN_LAIN2']='0015';$rows[2]['raw']['JUMLAH2']='3000';$rows[2]['money_columns'][]='JUMLAH2';
 [$configured]=lma_configure($rows,ma_cfg($rows),1,[['id'=>123,'nama'=>'Buku Tabungan']]);$p=lop_prepare($rows,$configured,1,'2026-10-17',[123=>'Buku Tabungan']);

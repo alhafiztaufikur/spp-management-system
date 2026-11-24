@@ -186,6 +186,7 @@ $yearStart = (int)substr($selectedYear, 0, 4);
   <link rel="stylesheet" href="assets/css/date_controls.css?v=unitpalette5&amp;mtime=<?= filemtime(__DIR__ . '/assets/css/date_controls.css') ?>">
   <link rel="stylesheet" href="assets/css/master_spp.css?v=<?= filemtime(__DIR__ . '/assets/css/master_spp.css') ?>">
   <link rel="stylesheet" href="assets/css/workspace_readability.css?v=<?= filemtime(__DIR__ . '/assets/css/workspace_readability.css') ?>">
+  <script>if (location.hash === '#spp-rate-panel') document.documentElement.dataset.sppInitialTab = 'rates';</script>
   <script>(function(){var t=localStorage.getItem('spp_theme')||'light';document.documentElement.setAttribute('data-theme',t);})();</script>
 </head>
 <body data-readable-workspace="master-spp">
@@ -225,7 +226,7 @@ $yearStart = (int)substr($selectedYear, 0, 4);
       <section class="main-card master-modern-card spp-main-panel">
         <nav class="spp-workspace-tabs" aria-label="Bagian Master SPP">
           <a href="#spp-rate-panel" data-spp-tab="rates"><?= master_workspace_icon('coins') ?>Tarif SPP</a>
-          <a href="#spp-students-panel" data-spp-tab="students" class="is-active"><?= master_workspace_icon('students') ?>Pilih Siswa</a>
+          <a href="#spp-students-panel" data-spp-tab="students"><?= master_workspace_icon('students') ?>Pilih Siswa</a>
         </nav>
         <section class="spp-tab-panel" id="spp-rate-panel" data-spp-panel="rates">
           <div class="spp-section-heading"><h2>Tarif Dasar per Tingkat</h2></div>
@@ -251,7 +252,7 @@ $yearStart = (int)substr($selectedYear, 0, 4);
           <h2 class="spp-sr-only">Pilih Siswa dan Terbitkan</h2>
           <div class="promotion-filter-bar">
             <div class="search-box"><span class="search-icon" aria-hidden="true"><svg width="18" height="18" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><circle cx="11" cy="11" r="7"/><path d="m20 20-4.2-4.2"/></svg></span><input type="search" id="spp-student-search" placeholder="Cari nama, NIS, atau rombel..." aria-label="Cari siswa"></div>
-            <select class="field-input field-select" id="spp-rombel-filter" name="rombel_filter" aria-label="Rombel" data-filter-multiple data-filter-persist><option value="">Semua rombel</option><?php $rombel=[];foreach($students as $s)$rombel[$s['kelas_rombel_snapshot']]=$s['kelas_rombel_snapshot'];ksort($rombel);foreach($rombel as $r): ?><option value="<?= mspp_e($r) ?>"><?= mspp_e($r) ?></option><?php endforeach; ?></select>
+            <select class="field-input field-select" id="spp-rombel-filter" name="rombel_filter" aria-label="Rombel" size="1" data-filter-multiple data-filter-persist><option value="">Semua rombel</option><?php $rombel=[];foreach($students as $s)$rombel[$s['kelas_rombel_snapshot']]=$s['kelas_rombel_snapshot'];ksort($rombel);foreach($rombel as $r): ?><option value="<?= mspp_e($r) ?>"><?= mspp_e($r) ?></option><?php endforeach; ?></select>
           </div>
 
           <form method="post" id="spp-publish-form" data-first-publication="<?= $master['status']==='draft'?'true':'false' ?>">
@@ -260,7 +261,7 @@ $yearStart = (int)substr($selectedYear, 0, 4);
             <div class="spp-students-table-wrap">
               <div class="promotion-student-list" id="spp-student-list" tabindex="0" aria-label="Daftar siswa untuk penerbitan SPP">
               <div class="spp-students-table-head" aria-hidden="true"><span></span><span>Nama Siswa</span><span>NIS</span><span>Rombel</span><span>Kelas</span><span>Tarif Efektif</span><span>Mulai Tagihan</span><span>Status</span></div>
-              <?php foreach ($students as $idx => $s): $level=(int)$s['kelas'];$net=spp_net_tariff(lop_tariff($koneksi,(string)$s['no_induk'],$selectedYear)??(float)$rates[$level],(float)$s['potongan_spp_nominal']);foreach($studentTariffs[(int)$s['student_id']]['periods']??[] as $tariffPeriod)if($tariffPeriod['month']===($publishDraft['starts'][$s['no_induk']]??$s['komite_mulai_bulan'])){$net['net']=$tariffPeriod['rate'];break;}$search=strtolower($s['NAMA'].' '.$s['no_induk'].' '.$s['kelas_rombel_snapshot']);$initials='';foreach(array_slice(preg_split('/\s+/u',trim((string)$s['NAMA'])),0,2) as $part)$initials.=mb_substr($part,0,1,'UTF-8'); ?>
+              <?php foreach ($students as $idx => $s): $level=(int)$s['kelas'];$draftMonth=$publishDraft['starts'][$s['no_induk']]??null;$startMonth=is_string($draftMonth)&&preg_match('/^(0[1-9]|1[0-2])$/D',$draftMonth)?$draftMonth:$s['komite_mulai_bulan'];$net=spp_net_tariff(lop_tariff($koneksi,(string)$s['no_induk'],$selectedYear)??(float)$rates[$level],(float)$s['potongan_spp_nominal']);foreach($studentTariffs[(int)$s['student_id']]['periods']??[] as $tariffPeriod)if($tariffPeriod['month']===$startMonth){$net['net']=$tariffPeriod['rate'];break;}$search=strtolower($s['NAMA'].' '.$s['no_induk'].' '.$s['kelas_rombel_snapshot']);$initials='';foreach(array_slice(preg_split('/\s+/u',trim((string)$s['NAMA'])),0,2) as $part)$initials.=mb_substr($part,0,1,'UTF-8'); ?>
                 <article class="promotion-student-row spp-publish-row" data-student-id="<?= (int)$s['student_id'] ?>" data-search="<?= mspp_e($search) ?>" data-rombel="<?= mspp_e($s['kelas_rombel_snapshot']) ?>">
                   <label class="promotion-student-check"><input type="checkbox" name="selected_students[]" value="<?= mspp_e($s['no_induk']) ?>" <?= in_array((string)$s['no_induk'],$publishDraft['students'],true)?'checked':'' ?> aria-label="Pilih <?= mspp_e($s['NAMA']) ?>"><span></span></label>
                   <div class="promotion-student-identity"><span class="spp-student-avatar" aria-hidden="true"><?= mspp_e(mb_strtoupper($initials,'UTF-8')) ?></span><div><strong><?= mspp_e($s['NAMA']) ?></strong><small>Potongan Rp <?= mspp_money($s['potongan_spp_nominal']) ?></small><?php if (!(int)$s['is_active']): ?><small>Siswa diarsipkan</small><?php endif; ?></div></div>
@@ -268,7 +269,7 @@ $yearStart = (int)substr($selectedYear, 0, 4);
                   <span class="spp-student-rombel" data-label="Rombel"><?= mspp_e($s['kelas_rombel_snapshot']) ?></span>
                   <span class="kelas-badge" data-label="Kelas">Kelas <?= $level ?></span>
                   <div class="spp-rate-preview"><span>Tarif efektif</span><div class="sct-rate-line"><strong data-student-rate>Rp <?= mspp_money($net['net']) ?></strong><?php if($studentTariffReady): ?><button class="sct-edit-button" type="button" data-edit-student-tariff="<?= (int)$s['student_id'] ?>" <?= $master['status']==='closed'?'disabled title="Buka kembali tahun untuk mengedit tarif"':'title="Edit Tarif"' ?> aria-label="Edit tarif <?= mspp_e($s['NAMA'].' · NIS '.$s['no_induk']) ?>"><?= master_workspace_icon('edit') ?></button><?php endif; ?></div><small class="sct-rate-badge" data-student-rate-badge hidden></small></div>
-                  <label class="promotion-target-field"><span class="spp-start-caption">Mulai tagihan</span><select class="field-input field-select" name="start_month[<?= mspp_e($s['no_induk']) ?>]" aria-label="Mulai tagihan <?= mspp_e($s['NAMA']) ?>"><?php foreach (spp_academic_periods($selectedYear) as $p): ?><option value="<?= $p['bulan'] ?>" <?= $p['bulan'] === ($publishDraft['starts'][$s['no_induk']]??$s['komite_mulai_bulan']) ? 'selected' : '' ?>><?= mspp_e($p['label']) ?></option><?php endforeach; ?></select></label>
+                  <label class="promotion-target-field"><span class="spp-start-caption">Mulai tagihan</span><select class="field-input field-select" name="start_month[<?= mspp_e($s['no_induk']) ?>]" aria-label="Mulai tagihan <?= mspp_e($s['NAMA']) ?>"><?php foreach (spp_academic_periods($selectedYear) as $p): ?><option value="<?= $p['bulan'] ?>" <?= $p['bulan'] === $startMonth ? 'selected' : '' ?>><?= mspp_e($p['label']) ?></option><?php endforeach; ?></select></label>
                   <span data-student-bill-status class="master-status <?= (int)$s['bill_count'] > 0 ? 'is-active' : 'is-inactive' ?>"><?= (int)$s['bill_count'] > 0 ? number_format((int)$s['bill_count']).' bulan'.((int)$s['covered_count']>0?' · Tercakup PSB':((int)$s['waived_count']>0?' · Potongan Penuh':((int)$s['cancelled_count']===(int)$s['bill_count']?' · Dibatalkan':' · Lihat rincian tagihan'))) : 'Belum terbit' ?></span>
                 </article>
               <?php endforeach; ?>
@@ -284,7 +285,7 @@ $yearStart = (int)substr($selectedYear, 0, 4);
         <section class="main-card master-modern-card spp-side-card"><div class="spp-side-heading"><div><h2>Tarif Dasar per Tingkat</h2></div></div><dl class="spp-rate-list"><?php for ($i=$firstLevel+1;$i<=$lastLevel;$i++): ?><div><dt>Kelas <?= $i ?></dt><dd>Rp <?= mspp_money($rates[$i]) ?></dd></div><?php endfor; ?></dl><a href="#spp-rate-panel" class="spp-side-link" data-spp-tab="rates">Lihat Pengaturan Tarif <span aria-hidden="true">&rarr;</span></a></section>
         <section class="spp-year-actions" aria-label="Tindakan tahun SPP">
           <div class="action-bar">
-            <?php if ($master['status'] !== 'closed'): ?><form data-sct-close-year <?= $master['status']==='published'?'':'hidden' ?> method="post" onsubmit="return confirm('Tutup tahun SPP ini?')"><input type="hidden" name="csrf_token" value="<?= mspp_e($_SESSION['csrf_master_spp']) ?>"><input type="hidden" name="aksi" value="tutup"><input type="hidden" name="tahun_ajaran" value="<?= mspp_e($selectedYear) ?>"><button class="btn btn-warning" type="submit"><?= master_workspace_icon('lock') ?>Tutup Tahun</button></form>
+            <?php if ($master['status'] !== 'closed'): ?><form data-sct-close-year <?= $master['status']==='published'?'':'hidden' ?> method="post" data-dialog-confirm="Tutup tahun SPP ini?"><input type="hidden" name="csrf_token" value="<?= mspp_e($_SESSION['csrf_master_spp']) ?>"><input type="hidden" name="aksi" value="tutup"><input type="hidden" name="tahun_ajaran" value="<?= mspp_e($selectedYear) ?>"><button class="btn btn-warning" type="submit"><?= master_workspace_icon('lock') ?>Tutup Tahun</button></form>
             <?php elseif ($master['status'] === 'closed'): ?><form method="post"><input type="hidden" name="csrf_token" value="<?= mspp_e($_SESSION['csrf_master_spp']) ?>"><input type="hidden" name="aksi" value="buka"><input type="hidden" name="tahun_ajaran" value="<?= mspp_e($selectedYear) ?>"><button class="btn btn-primary" type="submit"><?= master_workspace_icon('reset') ?>Buka Kembali</button></form><?php endif; ?>
           </div>
         </section>

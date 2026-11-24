@@ -1,11 +1,21 @@
 /* Scoped presentation refinements; no transaction or report filtering rules. */
+.report-billing-period > :is(.report-billing-months,.report-month-range-button)[hidden]{display:none}
 @media screen and (min-width:1024px){
-  .report-billing-period{border:0;padding:0;margin:0;min-width:0}
-  .report-billing-period legend{padding:0;margin-bottom:8px}
+  .report-billing-period{border:0;padding:10px 0 0;margin:0;min-width:0;position:relative}
+  .report-billing-period legend{padding:0}
   .report-billing-months{display:grid;grid-template-columns:repeat(2,minmax(0,1fr));gap:8px}
   .report-billing-months label{display:grid;gap:4px;min-width:0}
   .report-billing-months label>span{font-size:12px;color:var(--text-muted)}
   .report-billing-months .field-input{width:100%;min-width:0}
+  .report-billing-period .report-month-range-button{min-height:46px}
+  .report-template-shell .report-global-filter-form .report-billing-period .report-month-range-value{font-size:15px;white-space:normal}
+  .report-billing-month-popover[data-spp-floating-open]{display:grid}
+  .report-billing-month-popover .spp-select{--spp-dropdown-font-size:14px}
+  .report-billing-month-popover :is(select,.spp-select-trigger,.spp-select-caption){font-size:14px}
+  .report-billing-month-endpoint{display:grid;gap:8px;min-width:0}
+  .report-billing-month-endpoint strong{font-size:13px}
+  .report-billing-month-endpoint input{width:100%;min-width:0;height:48px}
+  .report-billing-month-popover .report-month-range-popover-actions{gap:8px}
   #global-report-workspace .recap-report-copy .report-period-caption{line-height:1.55;margin:4px 0 16px}
   #global-report-workspace[data-report-template="penerimaan"] .matrix-kelas{box-shadow:none}
   #global-report-workspace[data-report-template="penerimaan"] .matrix-tanggal{text-align:center;font-variant-numeric:tabular-nums;box-shadow:3px 0 4px #0000000d}
@@ -122,10 +132,10 @@
   .report-general-page .finance-transactions .payment-table.report-structured-table tbody :is(.select-col,.report-number-col,.report-id-col,.report-name-col,.aksi-col){position:static;inset:auto;box-shadow:none}
   .report-general-page .finance-transactions .payment-table.report-structured-table thead th[scope="col"]{position:sticky;inset:0 auto auto;z-index:4;background:var(--bg-surface);box-shadow:0 1px 0 var(--border)}
   .report-structured-table .report-col-select{width:4%}.report-structured-table .report-col-number{width:4%}
-  .report-transactions-table .report-col-id{width:11%}.report-transactions-table .report-col-name{width:24%}
+  .report-transactions-table .report-col-id{width:11%}
   .report-transactions-table .report-col-class{width:6%}.report-transactions-table .report-col-period{width:9%}
   .report-transactions-table .report-col-method{width:7%}.report-transactions-table .report-col-money{width:12%}
-  .report-transactions-table .report-col-date{width:13%}.report-transactions-table .report-col-actions{width:10%}
+  .report-transactions-table .report-col-date{width:13%}.report-transactions-table .report-col-actions{width:122px}
   .report-unpaid-table .report-col-id{width:14%}.report-unpaid-table .report-col-class{width:8%}
   .report-unpaid-table .report-col-money{width:13%}.report-unpaid-table .report-col-component{width:19%}
   .report-general-page .finance-transactions .payment-table.report-structured-table .nominal{white-space:normal;overflow-wrap:anywhere}
@@ -135,7 +145,15 @@
   .report-general-page .finance-transactions .payment-table.report-structured-table .report-date-day{white-space:normal}
   html body.report-general-page[data-readable-workspace="finance"] .finance-transactions .payment-table.report-structured-table .btn-tbl-print{font-size:11px!important;padding:7px 6px;gap:5px;min-height:34px;white-space:nowrap;overflow-wrap:normal}
   .report-general-page .finance-transactions .btn-tbl-print svg{flex:none}
-  .report-general-page .finance-transactions .finance-row-menu{margin:5px 0 0}
+  .report-general-page .report-period-default{display:none}
+  .report-general-page .report-period-desktop{display:inline;font-variant-numeric:tabular-nums}
+  .report-general-page .finance-transactions .report-row-actions{display:flex;align-items:center;justify-content:center;gap:6px}
+  .report-general-page .finance-transactions .finance-row-menu{margin:0;flex:none}
+  html body.report-general-page .finance-transactions .report-row-actions .btn-tbl-print,
+  html body.report-general-page .finance-transactions .report-row-actions .finance-row-menu summary{box-sizing:border-box;height:40px;min-height:40px}
+  html body.report-general-page .finance-transactions .report-row-actions .finance-row-menu summary{width:34px;border-radius:9px;background:var(--bg-surface);color:var(--text-secondary)}
+  .report-action-popover{position:fixed;z-index:1080;width:170px;padding:5px;border:1px solid var(--border);border-radius:10px;background:var(--bg-card);box-shadow:var(--shadow)}
+  .report-action-popover .open-payment-activity{width:100%;min-height:38px;justify-content:flex-start;text-align:left;white-space:normal}
 }
 @media(min-width:1024px) and (max-width:1450px){
   html body.report-general-page[data-readable-workspace="finance"] .finance-results{grid-template-columns:minmax(0,1fr)}

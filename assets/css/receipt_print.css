@@ -16,3 +16,15 @@ h1{margin:0;text-align:center;font:700 12.5pt/1.12 "DejaVu Serif","Times New Rom
 .receipt-print-page{display:none}.receipt-pagination-measure .receipt-print-page{display:block!important}.receipt-image-holder{position:absolute;left:-12000px;top:0;pointer-events:none}.receipt-image-paper{width:215.9mm;height:139.7mm;padding:5mm 10mm;background:#fff;color:#000;overflow:visible}.receipt-exporting .receipt-original{display:block}.receipt-exporting .receipt-print-page{display:none}
 @media screen and (max-width:850px){body{overflow-x:auto}.receipt-sheet{margin:14px auto}.print-toolbar{min-width:320px}.receipt-savings-sheet{width:calc(100% - 24px);min-height:0;padding:5mm;margin:14px auto}.receipt-savings-sheet h1{font-size:11pt}.receipt-savings-sheet .identity{font-size:9pt}.receipt-savings-sheet .receipt-footer{font-size:9pt}.receipt-savings-sheet .amount{width:24mm}.receipt-savings-sheet .payments{font-size:10pt}}
 @media print{body{background:#fff}.print-toolbar{display:none!important}.receipt-sheet,.receipt-print-page{width:195.9mm;max-width:100%;min-height:0;margin:0;padding:0;box-shadow:none;break-after:page;page-break-after:always}.receipt-print-page{display:block}.receipt-original{display:none!important}.receipt-sheet.receipt-last,.receipt-print-page.receipt-last{break-after:auto;page-break-after:auto}h1,.receipt-header{break-after:avoid;page-break-after:avoid}}
+.signature-space.receipt-payment-signature { height: 14mm; }
+@media print {
+  .receipt-school-document .receipt-header { padding-bottom: 0; }
+  .receipt-school-document .address { margin: .8mm 0 .55mm; }
+  .receipt-school-document .document-title { padding-top: .55mm; margin-bottom: .7mm; }
+  .receipt-school-document .identity td { padding-top: .2mm; padding-bottom: .2mm; }
+  .receipt-school-document .receipt-column-labels th { padding-top: .4mm; padding-bottom: .5mm; }
+  .receipt-school-document > tbody > .receipt-line > td { padding-top: .2mm; padding-bottom: .2mm; }
+  .receipt-school-document > tbody > .receipt-closing > td { padding-top: .6mm; }
+  .receipt-school-document .receipt-footer { margin-top: .8mm; }
+  .receipt-school-document .signature-date { margin-bottom: 1mm; }
+}

@@ -20,15 +20,16 @@
 .history-rombel-field{min-width:0}
 @media(max-width:1000px){.ph-filter-form,.sw-filter-form{grid-template-columns:repeat(2,minmax(0,1fr))!important}}
 @media(max-width:600px){.ph-filter-form,.sw-filter-form{grid-template-columns:minmax(0,1fr)!important}.student-history .payment-history-table td{font-size:13px}.student-history .history-method{font-size:12px}}
-/* Student identity controls share baselines; the discount section follows paired rows. */
+/* Student identity controls share baselines; fees and discounts follow paired rows. */
 .student-workspace .student-panel-identity .fields-grid{align-items:start;gap:18px 16px}
 .student-workspace .student-panel-identity .field-label{min-height:20px;margin-bottom:8px}
 .student-workspace .student-panel-identity .field-input{min-height:48px;height:48px}
 .student-workspace .student-panel-identity .payment-auto-note{display:block;margin-top:8px;line-height:1.5}
-html body[data-readable-workspace="students"] .student-workspace .student-panel-discounts .student-money-grid{grid-template-columns:repeat(2,minmax(0,1fr));gap:14px}
+html body[data-readable-workspace="students"] .student-workspace :is(.student-panel-fees,.student-panel-discounts) .student-money-grid{grid-template-columns:repeat(2,minmax(0,1fr));gap:14px}
+.student-workspace .student-panel-fees .student-money-grid .field-input{margin-top:auto}
 .student-workspace .student-panel-discounts .student-money-grid>.field-row{min-width:0;gap:10px;padding:20px;border:1px solid var(--border);border-radius:12px;background:var(--bg-surface)}
 .student-workspace .student-panel-discounts .student-money-grid>.field-row:nth-child(even){background:color-mix(in srgb,var(--orange-bg) 55%,var(--bg-card))}
 .student-workspace .student-panel-discounts .student-money-grid .field-label{min-height:0;line-height:1.5;font-size:12px}
 .student-workspace .student-panel-discounts .student-money-grid .field-input{min-height:46px;font-size:16px;background:var(--bg-card)}
 .student-workspace .student-panel-discounts .student-money-grid .payment-auto-note{font-size:12px;line-height:1.6}
-@media(max-width:600px){html body[data-readable-workspace="students"] .student-workspace .student-panel-discounts .student-money-grid{grid-template-columns:minmax(0,1fr)}.student-workspace .student-panel-discounts .student-money-grid>.field-row{padding:16px}}
+@media(max-width:600px){html body[data-readable-workspace="students"] .student-workspace :is(.student-panel-fees,.student-panel-discounts) .student-money-grid{grid-template-columns:minmax(0,1fr)}.student-workspace .student-panel-discounts .student-money-grid>.field-row{padding:16px}}

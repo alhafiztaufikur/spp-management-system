@@ -48,7 +48,7 @@ function payment_edit_draft_save(int $id, $token, ?int $unitId=null): void
 {
     if (!payment_return_entry_for_unit($token, $id, $unitId??unit_active_id())) return;
     $draft = $_POST;
-    unset($draft['csrf_token'], $draft['aksi'], $draft['id'], $draft['_operational_unit'], $draft['return_context'], $draft['request_key']);
+    unset($draft['csrf_token'], $draft['aksi'], $draft['id'], $draft['_operational_unit'], $draft['return_context'], $draft['request_key'], $draft['no_induk']);
     foreach(array_keys($draft) as $name)if(str_starts_with((string)$name,'csrf_'))unset($draft[$name]);
     if (!is_string($draft['activity_request_key'] ?? null) || !preg_match('/^[a-f0-9]{32}$/D', $draft['activity_request_key'])) unset($draft['activity_request_key']);
     $_SESSION['payment_returns'][$token]['draft'] = $draft;
@@ -57,7 +57,7 @@ function payment_edit_draft_save(int $id, $token, ?int $unitId=null): void
 /** Restore only submitted form controls, escaping all user text before rendering. */
 function payment_edit_restore_markup(string $html, array $draft): string
 {
-    $excluded=['aksi','id','csrf_token','return_context','_operational_unit','request_key'];
+    $excluded=['aksi','id','csrf_token','return_context','_operational_unit','request_key','no_induk'];
     $find=static function(string $attrs)use($draft,$excluded){
         if(!preg_match('/\bname="([^"]+)"/',$attrs,$m))return null;
         $name=html_entity_decode($m[1],ENT_QUOTES,'UTF-8');

@@ -2,6 +2,7 @@
 require_once __DIR__.'/other_fee_optional.php';
 require_once __DIR__.'/payment_permissions.php';
 require_once __DIR__ . "/payment_activity.php";
+require_once __DIR__.'/payment_period.php';
 
 function transaction_authorization_requires_request(): bool
 {
@@ -100,6 +101,10 @@ function transaction_authorization_snapshot(mysqli $db, int $paymentId): array
         $allocationStmt->close();
     }
 
+    if ($range = payment_period_meta($db,$paymentId)) {
+        $payment['payment_period_label'] = payment_period_range_label($range);
+        $details['payment_period'] = ['range'=>$range,'rows'=>payment_period_receipt_rows($db,$paymentId)];
+    }
     $snapshot = ['payment' => $payment, 'details' => $details];
     $encoded = json_encode($snapshot, JSON_UNESCAPED_UNICODE | JSON_UNESCAPED_SLASHES | JSON_PRESERVE_ZERO_FRACTION);
     if ($encoded === false) throw new RuntimeException('Snapshot transaksi tidak dapat dibuat.');
@@ -116,7 +121,7 @@ function transaction_authorization_payload(array $source, string $action): array
         'id','no_induk','tanggal_bayar','bulan_bayar','tahun_bayar','sistem_pembayaran',
         'uang_psb','uang_spp','uang_komite','uang_du','potongan_spp',
         'tabungan_wajib','total_jumlah','catatan','kelas_du','tahun_ajaran_du',
-        'tagihan_daftar_ulang_id','du_expected_total','du_expected_paid',
+        'tagihan_daftar_ulang_id','du_expected_total','du_expected_paid','payment_plan','period_choice','period_version',
 
     ];
     $payload = ['aksi' => 'update'];
@@ -157,8 +162,30 @@ function transaction_authorization_create(mysqli $db, int $paymentId, string $ac
         $pending->close();
 
         $snapshot = transaction_authorization_snapshot($db, $paymentId);
-        other_fee_validate_proposal($db,$paymentId,$payload);
-        $payload['_other_fee_names']=other_fee_proposal_names($db,$payload);
+        if ($action === 'edit') {
+            $originalNis = (string)$snapshot['data']['payment']['NO_INDUK'];
+            payment_assert_edit_student($originalNis, $payload['no_induk'] ?? $originalNis);
+            $payload['no_induk'] = $originalNis;
+        }
+        if ($action === 'edit' && isset($snapshot['data']['details']['payment_period'])) {
+            $old = (string)$snapshot['data']['payment']['NO_INDUK'];
+            $student = payment_period_student($db,$old,false,$old);
+            $mode = $payload['payment_plan'] ?? '';
+            $range = $snapshot['data']['details']['payment_period']['range'];
+            $start = $student['NO_INDUK'] === $old && $range['mode'] === 'range' && $mode === 'range' ? $range['mulai'] : null;
+            if (!is_string($mode) || !is_string($payload['period_choice']??null) || !is_string($payload['period_version']??null)) {
+                throw new DomainException('Muat ulang rincian periode sebelum mengajukan koreksi.');
+            }
+            $plan = payment_period_plan($db,$student['NO_INDUK'],$mode,$payload['period_choice'],$paymentId,false,$start);
+            if ($plan['blocking']) throw new DomainException($plan['blocking']);
+            if (!$plan['version'] || !hash_equals($plan['version'],$payload['period_version'])) {
+                throw new DomainException('Rincian tagihan berubah. Periksa kembali sebelum mengajukan koreksi.');
+            }
+            $payload['_payment_period'] = $plan;
+        } else {
+            other_fee_validate_proposal($db,$paymentId,$payload);
+            $payload['_other_fee_names']=other_fee_proposal_names($db,$payload);
+        }
         $payloadJson = json_encode($payload, JSON_UNESCAPED_UNICODE | JSON_UNESCAPED_SLASHES);
         if ($payloadJson === false) throw new RuntimeException('Usulan perubahan tidak dapat disimpan.');
         $payment = $snapshot['data']['payment'];

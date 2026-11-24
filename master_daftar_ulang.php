@@ -91,7 +91,7 @@ if ($_SERVER['REQUEST_METHOD'] === 'POST') {
         } else {
             throw new RuntimeException('Aksi Master Daftar Ulang tidak dikenal.');
         }
-        if(lop_ready($koneksi))lb_refresh_manifests($koneksi,lb_sync_owners($koneksi,array_column(lb_cache($koneksi)['students'],'id')));
+        if(in_array($action,['tutup','buka'],true))du_master_sync_legacy($koneksi);
         $koneksi->commit();
     } catch (Throwable $error) {
         $koneksi->rollback();
@@ -181,8 +181,8 @@ $canEdit=$year['status']!=='closed'&&du_publishable_year($selectedYear)&&($selec
         <?php foreach($yearRows as $yr): ?><option value="<?= master_du_e($yr['label']) ?>" <?= $yr['label']===$selectedYear?'selected':'' ?>><?= master_du_e($yr['label']) ?></option><?php endforeach; ?>
       </select></form>
       <div class="du-year-state"><span class="du-year-state-label">Status:</span><span class="du-year-status is-<?= master_du_e($year['status']) ?>"><span class="du-year-status-dot" aria-hidden="true"></span><?= master_du_e(['draft'=>'Belum terbit','published'=>'Sudah terbit','closed'=>'Tertutup'][$year['status']]) ?></span></div>
-      <?php if($year['status']==='published'): ?><form method="post" onsubmit="return confirm('Tutup tahun ajaran? Tarif dan penerbitan akan dikunci; tunggakan tetap dapat dibayar.')"><input type="hidden" name="csrf_token" value="<?= master_du_e($_SESSION['csrf_master_du']) ?>"><input type="hidden" name="aksi" value="tutup"><input type="hidden" name="tahun_ajaran" value="<?= master_du_e($selectedYear) ?>"><button class="btn btn-ghost" type="submit"><?= master_workspace_icon('lock') ?>Tutup Tahun Ajaran</button></form><?php endif; ?>
-      <?php if($year['status']==='closed'): ?><form method="post" onsubmit="return confirm('Buka kembali tahun ajaran? Histori pembayaran tetap dipertahankan.')"><input type="hidden" name="csrf_token" value="<?= master_du_e($_SESSION['csrf_master_du']) ?>"><input type="hidden" name="aksi" value="buka"><input type="hidden" name="tahun_ajaran" value="<?= master_du_e($selectedYear) ?>"><button class="btn btn-ghost" type="submit"><?= master_workspace_icon('reset') ?>Buka Kembali</button></form><?php endif; ?>
+      <?php if($year['status']==='published'): ?><form method="post" data-dialog-confirm="Tutup tahun ajaran? Tarif dan penerbitan akan dikunci. Tunggakan tetap dapat dibayar."><input type="hidden" name="csrf_token" value="<?= master_du_e($_SESSION['csrf_master_du']) ?>"><input type="hidden" name="aksi" value="tutup"><input type="hidden" name="tahun_ajaran" value="<?= master_du_e($selectedYear) ?>"><button class="btn btn-ghost" type="submit"><?= master_workspace_icon('lock') ?>Tutup Tahun Ajaran</button></form><?php endif; ?>
+      <?php if($year['status']==='closed'): ?><form method="post" data-dialog-confirm="Buka kembali tahun ajaran? Histori pembayaran tetap dipertahankan."><input type="hidden" name="csrf_token" value="<?= master_du_e($_SESSION['csrf_master_du']) ?>"><input type="hidden" name="aksi" value="buka"><input type="hidden" name="tahun_ajaran" value="<?= master_du_e($selectedYear) ?>"><button class="btn btn-ghost" type="submit"><?= master_workspace_icon('reset') ?>Buka Kembali</button></form><?php endif; ?>
     </div>
   </div>
 </section>

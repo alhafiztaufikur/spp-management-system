@@ -62,7 +62,7 @@ $csrf = $e($_SESSION['csrf_master_biaya_lain']);
                 </form>
                 <span data-usage-cell="delete">
                   <?php if ($detailsReady): ?>
-                    <form method="post" action="master_biaya_lain.php" class="fee-row-action" data-confirm-fee="<?= $e($item['nama']) ?>">
+                    <form method="post" action="master_biaya_lain.php" class="fee-row-action" data-dialog-confirm="Hapus master biaya <?= $e($item['nama']) ?>?" data-dialog-tone="danger">
                       <input type="hidden" name="_operational_unit" value="<?= unit_active_id() ?>">
                       <input type="hidden" name="master_tab" value="<?= $masterTab ?>">
                       <input type="hidden" name="page" value="<?= $masterPage ?>">

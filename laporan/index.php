@@ -367,8 +367,6 @@ $exportQuery = filter_build_query([
 <script>
 document.addEventListener('DOMContentLoaded', function(){
   autoHideFlash();
-  document.querySelectorAll('.finance-row-menu .open-payment-activity').forEach(button => button.hidden = false);
-
 });
 </script>
 <script src="../assets/js/report_sections.js?v=<?= filemtime(__DIR__.'/../assets/js/report_sections.js') ?>"></script>

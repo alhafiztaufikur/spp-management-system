@@ -6,6 +6,10 @@
   .payment-input-controls .payment-period-inputs{grid-template-columns:minmax(140px,1fr) 90px!important}
   .payment-input-controls .payment-period-inputs .spp-select-trigger{padding-inline:12px}
   .payment-input-controls .payment-period-inputs .spp-select-caption{white-space:nowrap;text-overflow:clip}
+  .payment-input-controls #form-bayar .biaya-lain-row.is-manual-fee :is(.ll-field-kind,.ll-field-amount){min-width:0;gap:6px}
+  .payment-input-controls #form-bayar .biaya-lain-row.is-manual-fee :is(.biaya-lain-select,.spp-select-trigger,.biaya-lain-nominal){
+    box-sizing:border-box;width:100%;height:52px!important;min-height:52px!important;max-height:52px!important;margin:0;
+  }
 
   .unified-registration .ph-filter-form .search-box{display:flex;align-items:center;gap:10px;min-width:0;padding-inline:14px;background:var(--bg-elevated)}
   .unified-registration .ph-filter-form .search-box:focus-within{border-color:var(--text-muted);box-shadow:0 0 0 1px var(--text-muted);outline:none}

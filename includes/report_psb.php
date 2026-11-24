@@ -31,6 +31,7 @@ function report_psb_amount($value): string {
 
 /** One source document for the PSB preview and PDF, isolated from other report styles. */
 function report_psb_print_document(array $report,int $unit,string $subtitle,string $generated,string $operator,bool $pdf=false): string {
+    require_once __DIR__.'/global_report_print.php';
     $rows=$report['rows'];
     usort($rows,static function($a,$b) use($unit){
         return ((int)($a['unit_id']??$unit)<=>(int)($b['unit_id']??$unit))
@@ -46,7 +47,11 @@ function report_psb_print_document(array $report,int $unit,string $subtitle,stri
     <?php endif; ?>
     @page{size:A4 portrait;margin:12mm}*{box-sizing:border-box}
     body{margin:0;background:#fff;color:#000;font:9pt/1.3 "DejaVu Serif","Times New Roman",serif}
-    .psb-heading{text-align:center;margin-bottom:5mm}.psb-heading h1{font-size:12pt;margin:0 0 2mm}.psb-heading h2{font-size:11pt;margin:0 0 2mm}.psb-heading p{font-size:8pt;margin:1mm 0}
+    .psb-heading{text-align:center;margin-bottom:5mm}.psb-heading h2{font-size:11pt;margin:0 0 2mm}.psb-heading p{font-size:8pt;margin:1mm 0}
+    .psb-heading .kop{width:100%;border-bottom:3px double #15543c;padding-bottom:8px;margin:0 0 5mm;color:#17231d;font-family:"Segoe UI","DejaVu Sans",Arial,sans-serif}
+    .psb-heading .kop td{border:0;vertical-align:middle}.psb-heading .kop img{width:58px;height:58px;object-fit:contain}
+    .psb-heading .kop h1,.psb-heading .kop p{text-align:center}
+    .psb-heading .kop h1{font-size:12pt;line-height:1.3;margin:0}.psb-heading .kop p{font-size:9pt;margin:3px 0}
     .psb-table{width:100%;border-collapse:collapse;table-layout:fixed}.psb-table thead{display:table-header-group}
     .psb-table th,.psb-table td{padding:1mm .7mm;vertical-align:top;border:0;overflow-wrap:break-word}
     .psb-table thead th{border-top:1.5pt solid #000;border-bottom:1pt solid #000;text-align:left;font-size:8pt}
@@ -57,7 +62,7 @@ function report_psb_print_document(array $report,int $unit,string $subtitle,stri
     .psb-footer{position:fixed;bottom:-7mm;left:0;right:0;font-size:7pt;border-top:.5pt solid #000;padding-top:1mm}.psb-footer:after{content:" · Halaman " counter(page)}
     @media screen{body{max-width:186mm;margin:24px auto}.psb-footer{position:static;margin-top:5mm}}
     </style></head><body>
-    <header class="psb-heading"><h1><?= report_e(unit_school_name($unit)) ?></h1><h2>PEMBAYARAN PSB</h2><?php if($subtitle!==''): ?><p><?= report_e($subtitle) ?></p><?php endif; ?></header>
+    <header class="psb-heading"><?= global_report_letterhead($unit,$pdf) ?><h2>PEMBAYARAN PSB</h2><?php if($subtitle!==''): ?><p><?= report_e($subtitle) ?></p><?php endif; ?></header>
     <table class="psb-table"><colgroup><col style="width:5%"><col style="width:8%"><col style="width:14%"><col style="width:28%"><col style="width:15%"><col style="width:15%"><col style="width:15%"></colgroup>
     <thead><tr><th style="width:5%" class="psb-number">NO</th><th style="width:8%">KELAS</th><th style="width:14%">NO. INDUK</th><th style="width:28%">NAMA SISWA</th><th style="width:15%" class="psb-money">JUMLAH</th><th style="width:15%" class="psb-money">U_PSB</th><th style="width:15%" class="psb-money">SISA</th></tr></thead><tbody>
     <?php if(!$rows): ?><tr><td colspan="7">Tidak ada data sesuai filter.</td></tr><?php endif; ?>

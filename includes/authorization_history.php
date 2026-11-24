@@ -3,6 +3,7 @@ require_once __DIR__.'/payment_activity.php';
 require_once __DIR__.'/filter_choices.php';
 require_once __DIR__.'/payment_time.php';
 require_once __DIR__.'/other_fee_optional.php';
+require_once __DIR__.'/payment_period.php';
 
 function authorization_history_source(): string
 {
@@ -108,6 +109,21 @@ function authorization_proposed_snapshot(array $before,array $payload): array
     foreach(['no_induk'=>'NO_INDUK','tanggal_bayar'=>'TGL_BYR','bulan_bayar'=>'BULAN','tahun_bayar'=>'TAHUN','sistem_pembayaran'=>'sistem_pembayaran','catatan'=>'KETERANGAN'] as $key=>$field)
         if(isset($payload[$key]))$after['payment'][$field]=$payload[$key];
     if(isset($payload['tanggal_bayar'],$before['payment']['TGL_BYR']))try{$after['payment']['TGL_BYR']=payment_time_native_update((string)$payload['tanggal_bayar'],(string)$before['payment']['TGL_BYR']);}catch(DomainException $e){/* Retain an invalid proposal for the existing validation/approval flow. */}
+    if (isset($payload['_payment_period'])) {
+        $plan = $payload['_payment_period'];
+        $after['payment']['payment_period_label'] = payment_period_range_label($plan['range']);
+        $after['payment']['U_SPP'] = $plan['spp_total']/100;
+        $after['payment']['U_KOMITE'] = $plan['komite_total']/100;
+        $after['payment']['total_jumlah'] = $plan['total']/100;
+        $rows = [];
+        foreach ($plan['rows'] as $row) {
+            $spp = $row['spp']['remaining'];
+            $komite = $row['komite']['remaining'];
+            if ($spp || $komite) $rows[] = ['period'=>$row['period'],'label'=>$row['label'],'spp'=>$spp,'komite'=>$komite];
+        }
+        $after['details']['payment_period'] = ['range'=>$plan['range'],'rows'=>$rows];
+        return $after;
+    }
     foreach(['uang_psb'=>'U_PSB','uang_spp'=>'U_SPP','uang_komite'=>'U_KOMITE','potongan_spp'=>'potong_spp'] as $key=>$field)
         if(isset($payload[$key]))$after['payment'][$field]=$amount($payload[$key]);
     $du=array_key_exists('uang_du',$payload)?$amount($payload['uang_du']):array_sum(array_column($before['details']['bayar_du']??[],'jumlah'));

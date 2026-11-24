@@ -100,7 +100,7 @@ function payment_failure_flash(Throwable $error, string $fallbackPrefix): array 
 function payment_capture_draft(array $source): array {
     $draft = [];
     foreach (['no_induk', 'tanggal_bayar', 'bulan_bayar', 'tahun_bayar', 'sistem_pembayaran',
-        'tagihan_daftar_ulang_id', 'catatan',  'uang_psb', 'uang_spp', 'uang_komite', 'uang_du'] as $key) {
+        'tagihan_daftar_ulang_id', 'catatan',  'uang_psb', 'uang_spp', 'uang_komite', 'uang_du', 'payment_plan', 'period_choice'] as $key) {
         if (isset($source[$key]) && is_scalar($source[$key])) {
             $draft[$key] = mb_substr((string)$source[$key], 0, 100);
         }

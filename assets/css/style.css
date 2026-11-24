@@ -4932,6 +4932,14 @@ body.spp-warning-open { overflow: hidden; }
   font-size: 10.5px;
   line-height: 1.4;
 }
+:root {
+  --pager-next-bg: var(--accent-hover);
+  --pager-next-text: #fff;
+}
+:root[data-theme="dark"] {
+  --pager-next-bg: var(--accent);
+  --pager-next-text: var(--bg-base);
+}
 .du-pagination-footer {
   display: flex;
   align-items: center;
@@ -4963,7 +4971,7 @@ body.spp-warning-open { overflow: hidden; }
   padding: 7px 10px;
   border: 1px solid var(--border);
   border-radius: 9px;
-  background: var(--surface);
+  background: var(--bg-card);
   color: var(--text-secondary);
   font-size: 11px;
   font-weight: 700;
@@ -4972,20 +4980,24 @@ body.spp-warning-open { overflow: hidden; }
   transition: border-color .16s ease, background .16s ease, color .16s ease;
 }
 a.du-page-link:hover,
-button.du-page-link:not(.is-disabled):hover {
-  border-color: rgba(22,163,74,.4);
-  background: rgba(22,163,74,.08);
+button.du-page-link:not(:disabled, .is-disabled):hover {
+  border-color: var(--border-hover);
+  background: var(--accent-glow);
   color: var(--accent);
   cursor: pointer;
+}
+.du-page-link:focus-visible {
+  outline: 2px solid var(--accent);
+  outline-offset: 2px;
 }
 button.du-page-link {
   font-family: inherit;
   cursor: pointer;
 }
 .du-page-link.is-active {
-  border-color: var(--accent);
-  background: var(--accent);
-  color: #fff;
+  border-color: var(--pager-next-bg);
+  background: var(--pager-next-bg);
+  color: var(--pager-next-text);
 }
 .du-page-link.is-disabled { cursor: not-allowed; opacity: .42; }
 .du-page-mobile-label { display: none; color: var(--text-secondary); font-size: 11px; font-weight: 700; }
@@ -5109,14 +5121,14 @@ button.du-page-link {
   min-height: 32px;
   padding: 7px 11px;
   border-radius: 999px;
-  background: rgba(16, 185, 129, .08);
+  background: var(--accent-glow);
   color: var(--text-secondary);
   font-size: 11.5px;
   font-weight: 700;
 }
 .report-template-shell .du-pagination-info strong {
   margin: 0 3px;
-  color: var(--green);
+  color: var(--accent);
   font-weight: 700;
 }
 .report-settlement-details {

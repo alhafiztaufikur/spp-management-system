@@ -122,6 +122,14 @@ html body[data-readable-workspace="master-registration"] .du-workspace .du-save-
 .du-psb-heading>span { display: grid; place-items: center; flex: 0 0 34px; height: 34px; border-radius: 9px; background: var(--du-icon-soft); color: var(--du-accent); }
 .du-psb-heading svg { width: 21px; height: 21px; }
 .du-psb-heading h4 { font-size: 14px; font-weight: 650; line-height: 1.5; color: var(--du-ink); margin: 0 0 4px; }
+@media screen and (min-width: 1024px) {
+  .du-workspace .du-psb-card { display: grid; grid-template-rows: 1fr auto 1fr; }
+  .du-workspace .du-psb-card .du-rate-card-heading { align-self: start; margin-bottom: 0; }
+  .du-workspace .du-psb-heading { grid-row: 2; gap: 12px; margin: 0; padding-block: 0; }
+  .du-workspace .du-psb-heading > span { flex-basis: 42px; height: 42px; }
+  .du-workspace .du-psb-heading svg { width: 24px; height: 24px; }
+  .du-workspace .du-psb-heading h4 { margin: 0; font-size: 19px; font-weight: 700; }
+}
 
 html[data-theme="dark"] body[data-readable-workspace="master-registration"] .du-workspace {
   --du-ink: #edf5f1; --du-muted: #abbdb7; --du-line: #30443f; --du-accent: #5cd6a8;

@@ -175,7 +175,10 @@ document.addEventListener('DOMContentLoaded', function () {
 <?php endif; ?>
 <!-- Early theme init to prevent flash -->
 <link rel="stylesheet" href="<?= $root ?>assets/css/operation_feedback.css?v=<?= filemtime(__DIR__.'/../assets/css/operation_feedback.css') ?>">
+<link rel="stylesheet" href="<?= $root ?>assets/css/workflow_dialogs.css?v=<?= filemtime(__DIR__.'/../assets/css/workflow_dialogs.css') ?>">
+<link rel="stylesheet" href="<?= $root ?>assets/css/dialogs.css?v=<?= filemtime(__DIR__.'/../assets/css/dialogs.css') ?>">
 <script defer src="<?= $root ?>assets/js/operation_feedback.js?v=<?= filemtime(__DIR__.'/../assets/js/operation_feedback.js') ?>"></script>
+<script defer src="<?= $root ?>assets/js/workflow_dialogs.js?v=<?= filemtime(__DIR__.'/../assets/js/workflow_dialogs.js') ?>"></script>
 <link rel="stylesheet" href="<?= $root ?>assets/css/pagination_desktop.css?v=<?= filemtime(__DIR__.'/../assets/css/pagination_desktop.css') ?>">
 <?php if(($_GET['template']??'')==='riwayat-tagihan'): ?><link rel="stylesheet" href="<?= $root ?>assets/css/billing_history_report.css?v=<?= filemtime(__DIR__.'/../assets/css/billing_history_report.css') ?>"><?php endif; ?>
 <link rel="stylesheet" href="<?= $root ?>assets/css/dropdowns.css?v=<?= filemtime(__DIR__.'/../assets/css/dropdowns.css') ?>">

@@ -118,10 +118,6 @@ function export_cell($value,string $type,array $row=[],string $key=''):string{
     return global_report_cell($value,$type,$row,$key);
 }
 $documentPalette=[1=>['165C44','ECF8F0'],2=>['203E80','EEF2FF'],3=>['832A35','FFF0F1'],0=>['513080','F4EEFF']][$reportUnitId]??['165C44','ECF8F0'];
-$logoPath=realpath(__DIR__.'/../assets/img/school-logo.png');
-// PDF requires GD to render the available bitmap logo.
-$canRenderLogo=$format!=='pdf'||extension_loaded('gd');
-$logoData=$logoPath&&$canRenderLogo?'data:image/png;base64,'.base64_encode((string)file_get_contents($logoPath)):'';
 $pdfMatrixChunks=null;
 ob_start(); if($template==='psb'){echo report_psb_print_document($report,$reportUnitId,$documentSubtitle,$generated,$operator,$format==='pdf');}else { ?>
 <!DOCTYPE html><html lang="id"><head><meta charset="UTF-8"><title><?= report_e($report['title']) ?></title><style>
@@ -181,7 +177,7 @@ h3{font-size:12px;color:#<?= $documentPalette[0] ?>}.data tfoot th,.data tfoot t
 <?php if($cleanOutput&&$format==='pdf'): ?>.global-clean-report .footer{display:none!important}<?php endif; ?>
 <?php if($template==='riwayat-tagihan'): ?>.footer{text-align:right}.footer:after{content:"Halaman " counter(page)}<?php endif; ?>
 </style></head><body id="global-report-workspace" class="global-report-matrix-workspace<?= $template==='riwayat-tagihan'?' billing-history-document':'' ?><?= $cleanOutput?' global-clean-report':'' ?><?= in_array($template,['tabungan-siswa','penerimaan'],true)?' global-clean-address':'' ?><?= $cleanOutput&&global_report_large_address($template)?' global-clean-large-address':'' ?>">
-<table class="kop"><tr><td style="width:70px"><?php if($logoData): ?><img src="<?= $logoData ?>" alt="Logo sekolah"><?php elseif($format==='excel'): ?><div class="kop-logo-text"><?= report_e(unit_label($reportUnitId)) ?></div><?php endif; ?></td><td><h1><?= report_e(unit_school_name($reportUnitId)) ?></h1><p>Perum Bekasi Griya Asri II, Tambun Selatan · Telp. 021-88363466</p></td><td style="width:70px"></td></tr></table>
+<?= global_report_letterhead($reportUnitId,$format==='pdf') ?>
 <div class="title <?= $template==='riwayat-tagihan'?'billing-plain-title':'' ?>"><?php if($template!=='riwayat-tagihan'&&!$hideOutputContext): ?><p>Unit <?= report_e(unit_label($reportUnitId)) ?></p><?php endif; ?><h2><?= report_e(strtoupper($report['title'])) ?></h2><?php if($documentSubtitle!==''): ?><div><?= report_e($documentSubtitle) ?></div><?php endif; ?></div><table class="meta"><tr><td>Dibuat: <?= report_e($generated) ?></td><td style="text-align:right">Petugas: <?= report_e($operator) ?></td></tr></table>
 
 <?php if($isCashRecap):
@@ -260,7 +256,7 @@ else: foreach(global_report_matrix_bands($printMatrix,$printOrientation) as $ban
 </tbody>
 </table></div>
 <?php else: ?><div class="report-standard-scroll"><table class="data report-detail-table"><thead><tr><th>No</th><?php foreach($report['columns'] as $column): ?><th><?= report_e($column[1]) ?></th><?php endforeach; ?></tr></thead><tbody><?php if(!$report['rows']): ?><tr><td colspan="<?= count($report['columns'])+1 ?>" style="text-align:center">Tidak ada data pada filter terpilih.</td></tr><?php else: foreach($report['rows'] as $index=>$row): ?><tr><td class="report-number"><?= $index+1 ?></td><?php foreach($report['columns'] as $column): $type=$column[2]??'text';$key=$column[0];$value=$row[$key]??''; ?><td class="<?= in_array($type,['money','money_optional'],true)?'money':'' ?> <?= in_array($type,['status','html'],true)||in_array($key,['kelas','jenis','periode'],true)?'report-center':'' ?> <?= is_numeric($value)&&(float)$value<0?'negative':'' ?>"><?= export_cell($value,$type,$row,$key) ?></td><?php endforeach; ?></tr><?php endforeach; endif; ?></tbody></table></div><?php endif; ?>
-<?php if($moneyTotals&&global_report_compact_totals($template)): ?><?= global_report_totals_html($moneyTotals,$template,true,!$cleanOutput) ?><?php elseif($moneyTotals&&$template!=='riwayat-tagihan'): ?><table class="data total-table"><caption>Total Rupiah</caption><tbody><?php foreach($moneyTotals as $total): ?><tr><th><?= report_e($total['label']) ?></th><td class="money <?= (float)$total['value']<0?'negative':'' ?>"><?= global_report_print_money($total['value'],!$cleanOutput) ?></td></tr><?php endforeach; ?></tbody></table><?php endif; ?><?php endif; ?>
+<?php if($moneyTotals&&($template==='status'||global_report_compact_totals($template))): ?><?= global_report_totals_html($moneyTotals,$template,true,!$cleanOutput) ?><?php elseif($moneyTotals&&$template!=='riwayat-tagihan'): ?><table class="data total-table"><caption>Total Rupiah</caption><tbody><?php foreach($moneyTotals as $total): ?><tr><th><?= report_e($total['label']) ?></th><td class="money <?= (float)$total['value']<0?'negative':'' ?>"><?= global_report_print_money($total['value'],!$cleanOutput) ?></td></tr><?php endforeach; ?></tbody></table><?php endif; ?><?php endif; ?>
 <?php if($isCashRecap): ?><table class="signatures"><tr><td>Kasir/Petugas,<br><br><br><br>(________________________)</td><td>Bagian Keuangan,<br><br><br><br>(________________________)</td></tr></table></section><?php endif; ?><div class="footer"><?php if(!$cleanOutput&&$template!=='riwayat-tagihan'): ?>SistemSPP · Data laporan bersifat live dan mengikuti koreksi transaksi sampai saat laporan dibuat.<?php endif; ?></div><script src="../assets/js/global_report_workspace.js"></script></body></html>
 <?php } $html=ob_get_clean();
 $safeName=preg_replace('/[^a-z0-9_-]+/i','-',strtolower($template)).'-'.date('Ymd-His');

@@ -19,17 +19,43 @@ function ldu_reclassify_items(array $payment,array $source,array $context,bool $
         $item=lfet_resolve_item($item);
     }unset($item);return $out;
 }
-function ldu_reconstruct_payments(mysqli $db,int $actor): array {
+function ldu_reconstruct_payments(mysqli $db,int $actor,?array &$pendingBatches=null): array {
     require_once __DIR__.'/legacy_full.php'; // The GUI must load the same source helpers as the runner.
     $summary=['changes'=>0,'receipts'=>0,'items'=>0,'amount_cents'=>0,'corrections_preserved'=>0];
     foreach(hp_rows($db,"SELECT b.id,b.unit_id,b.source_id,s.backup_hash FROM legacy_full_batches b JOIN legacy_finance_sources s ON s.id=b.source_id AND s.unit_id=b.unit_id WHERE b.state IN ('completed','verifying')") as $b){
-        $payments=[];
-        foreach(hp_rows($db,"SELECT p.* FROM legacy_op_payments p WHERE p.batch_id=? AND (JSON_SEARCH(p.items,'one','U_KEGIATAN',NULL,'$[*].column') IS NOT NULL OR JSON_SEARCH(p.items,'one','%Daftar%Ulang%',NULL,'$[*].label') IS NOT NULL OR JSON_SEARCH(p.items,'one','DU',NULL,'$[*].label') IS NOT NULL)",[$b['id']]) as $p){$p['items']=json_decode($p['items'],true);foreach($p['items'] as $i)if($i['category']!=='daftar_ulang'&&($i['column']==='U_KEGIATAN'||preg_match('/daftar\s*ulang|^DU$/iu',$i['label']))){$payments[]=$p;break;}}
+        $payments=[];$wanted=[];
+        $query="SELECT p.id,p.version,p.row_key,p.items FROM legacy_op_payments p WHERE p.batch_id=? AND (JSON_SEARCH(p.items,'one','U_KEGIATAN',NULL,'$[*].column') IS NOT NULL OR JSON_SEARCH(p.items,'one','%Daftar%Ulang%',NULL,'$[*].label') IS NOT NULL OR JSON_SEARCH(p.items,'one','DU',NULL,'$[*].label') IS NOT NULL)";
+        foreach(lf_stream_rows($db,hp_sql($db,$query,true),[$b['id']]) as $p){
+            foreach(json_decode($p['items'],true) as $i)if($i['category']!=='daftar_ulang'&&($i['column']==='U_KEGIATAN'||preg_match('/daftar\s*ulang|^DU$/iu',$i['label']))){
+                $payments[(int)$p['id']]=(int)$p['version'];$wanted[$p['row_key']]=true;break;
+            }
+        }
         if(!$payments)continue;
-        $records=[];$sources=[];
-        foreach(hp_rows($db,"SELECT source_table,row_key,raw_data,amounts,reference_only FROM legacy_finance_rows WHERE source_id=? AND source_table IN ('siswa','lain','bayar','bayar_du') ORDER BY id",[$b['source_id']]) as $r){$v=['table'=>$r['source_table'],'raw'=>json_decode($r['raw_data'],true),'row_key'=>$r['row_key'],'source_id'=>(int)$b['source_id'],'unit_id'=>(int)$b['unit_id'],'money_columns'=>array_keys(json_decode($r['amounts'],true)??[]),'reference_only'=>(bool)$r['reference_only']];$records[]=$v;if($v['table']==='bayar')$sources[$v['row_key']]=$v;}
-        $context=lma_context($records,(int)$b['unit_id'],$b['backup_hash']);unset($records);
-        foreach($payments as $p){$locked=hp_one($db,'SELECT * FROM legacy_op_payments WHERE id=? FOR UPDATE',[$p['id']]);if(!$locked||(int)$locked['version']!==(int)$p['version'])throw new DomainException('Transaksi DU berubah; ulangi simulasi.');$source=$sources[$p['row_key']]??null;if(!$source)continue;$corrected=(bool)hp_one($db,"SELECT id FROM legacy_op_audit WHERE entity_type='payment' AND entity_id=? LIMIT 1",[$p['id']]);
+        $sources=[];
+        $record=static fn(array $r)=>['table'=>$r['source_table'],'raw'=>json_decode($r['raw_data'],true),'row_key'=>$r['row_key'],
+            'source_id'=>(int)$b['source_id'],'unit_id'=>(int)$b['unit_id']];
+        $scope=[$b['unit_id'],$b['source_id']];
+        foreach(array_chunk(array_keys($wanted),250) as $keys){
+            $marks=implode(',',array_fill(0,count($keys),'?'));
+            $sql="SELECT source_table,row_key,raw_data,amounts,reference_only FROM legacy_finance_rows
+                WHERE unit_id=? AND source_id=? AND source_table='bayar' AND row_key IN ($marks)";
+            foreach(lf_stream_rows($db,hp_sql($db,$sql,true),array_merge($scope,$keys)) as $r){
+                $sources[$r['row_key']]=$record($r)+['money_columns'=>array_keys(json_decode($r['amounts'],true)??[]),'reference_only'=>(bool)$r['reference_only']];
+            }
+        }
+        $read=static function()use($db,$scope,$record): Generator {
+            $sql="SELECT source_table,row_key,raw_data FROM legacy_finance_rows
+                WHERE unit_id=? AND source_id=? AND source_table IN ('siswa','lain','bayar','bayar_du') ORDER BY id";
+            foreach(lf_stream_rows($db,hp_sql($db,$sql,true),$scope) as $r)yield $record($r);
+        };
+        $context=lma_context($read,(int)$b['unit_id'],$b['backup_hash'],$sources);
+        $beforeChanges=$summary['changes'];
+        foreach($payments as $id=>$version){
+            $p=hp_one($db,'SELECT * FROM legacy_op_payments WHERE id=? FOR UPDATE',[$id]);
+            if(!$p||(int)$p['version']!==$version)throw new DomainException('Transaksi DU berubah; ulangi simulasi.');
+            $source=$sources[$p['row_key']]??null;if(!$source)continue;
+            $corrected=(bool)hp_one($db,"SELECT id FROM legacy_op_audit WHERE entity_type='payment' AND entity_id=? LIMIT 1",[$id]);
+            $p['items']=json_decode($p['items'],true);
             if($corrected){$summary['corrections_preserved']++;continue;}$next=ldu_reclassify_items($p,$source,$context);
             if($next===$p['items'])continue;lfet_validate_payment(array_replace($p,['items'=>$next]));other_fee_lock_items($db,(int)$b['unit_id'],array_merge($p['items'],$next));
             foreach($next as $index=>$item)if($item['category']!==$p['items'][$index]['category']){$summary['items']++;$summary['amount_cents']+=lf_cents($item['amount']);}
@@ -37,7 +63,11 @@ function ldu_reconstruct_payments(mysqli $db,int $actor): array {
             ldu_audit($db,$actor,'du_payment',(int)$p['id'],['items'=>$p['items']],['items'=>$next],['unit_id'=>$b['unit_id']]);$summary['changes']++;$summary['receipts']++;
             ldu_sync_owner_trace($db,(int)$p['owner_id'],$actor);
         }
-        lb_refresh_manifests($db,[$b['id']]);
+        unset($sources,$context,$p,$source,$next);
+        if($summary['changes']!==$beforeChanges){
+            if($pendingBatches!==null)$pendingBatches[]=$b['id'];
+            else lb_refresh_manifests($db,[$b['id']]);
+        }
     }
-    lb_cache($db,true);return $summary;
+    lb_cache($db,refresh:true,invalidateOnly:true);return $summary;
 }

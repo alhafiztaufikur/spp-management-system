@@ -4,6 +4,7 @@ function history_fail(int $status,string $code,string $message): void {http_resp
 if(($_SERVER['REQUEST_METHOD']??'GET')!=='GET'){header('Allow: GET');history_fail(405,'method_not_allowed','Gunakan GET untuk membaca riwayat.');}
 if(empty($_SESSION['admin_id']))history_fail(401,'session_expired','Sesi habis. Silakan masuk kembali.');
 require_once '../koneksi.php';require_once '../includes/auth.php';require_once '../includes/reports.php';require_once '../includes/payment_history_context.php';require_once '../includes/payment_activity.php';require_once '../includes/payment_permissions.php';
+require_once '../includes/payment_period.php';
 if(empty($_SESSION['admin_id']))history_fail(401,'session_expired','Sesi habis. Silakan masuk kembali.');
 if(!hasRole(['admin']))history_fail(403,'access_denied','Akun tidak dapat membuka riwayat pembayaran.');
 requireRole(['admin']);
@@ -39,7 +40,7 @@ try {
         $duByPayment += array_column($duRows,null,'bayar_id');
     }
     $rows=[];
-    foreach($payments as $p){
+    foreach(payment_period_meta_for_rows($koneksi,$payments) as $p){
         $du=$duByPayment[$p['id']]??null;
         $duTotal=(float)($du['total']??0);
         $components=[];foreach(['U_SPP'=>'SPP','U_PSB'=>'PSB','U_KOMITE'=>'Komite'] as $key=>$label)if((float)$p[$key]>.001)$components[]=$label;
@@ -47,7 +48,7 @@ try {
         if($duTotal>.001)$components[]='Daftar Ulang (TA '.$du['years'].')';
         $creator=payment_activity_summary($events[(int)$p['id']]??[])['creator'];
         $canPrint=payment_print_allowed((int)$p['unit_id'],(int)($creator['actor_id']??0));
-        $rows[]=['id'=>(int)$p['id'],'unit_id'=>(int)$p['unit_id'],'tanggal_raw'=>$p['TGL_BYR'],'period_key'=>(int)$p['TAHUN']*100+report_month_code((string)$p['BULAN']),'total_raw'=>(float)$p['total_jumlah'],'components'=>$components,'can_detail'=>true,'can_print'=>$canPrint,'detail_url'=>'detail.php?'.http_build_query(['id'=>(int)$p['id'],'unit_id'=>(int)$p['unit_id'],'readonly'=>'1']),'print_url'=>$canPrint?'../laporan/cetak_struk.php?id='.(int)$p['id']:null,'time_precision'=>'datetime','tanggal_date'=>spp_date_parts($p['TGL_BYR'])['date'],'tanggal_time'=>spp_date_parts($p['TGL_BYR'])['time'],'tanggal'=>spp_date_label($p['TGL_BYR'],true),'periode'=>(report_months()[report_month_code((string)$p['BULAN'])]??$p['BULAN']).' '.$p['TAHUN'],
+        $rows[]=['id'=>(int)$p['id'],'unit_id'=>(int)$p['unit_id'],'tanggal_raw'=>$p['TGL_BYR'],'period_key'=>(int)$p['TAHUN']*100+report_month_code((string)$p['BULAN']),'total_raw'=>(float)$p['total_jumlah'],'components'=>$components,'can_detail'=>true,'can_print'=>$canPrint,'detail_url'=>'detail.php?'.http_build_query(['id'=>(int)$p['id'],'unit_id'=>(int)$p['unit_id'],'readonly'=>'1']),'print_url'=>$canPrint?'../laporan/cetak_struk.php?id='.(int)$p['id']:null,'time_precision'=>'datetime','tanggal_date'=>spp_date_parts($p['TGL_BYR'])['date'],'tanggal_time'=>spp_date_parts($p['TGL_BYR'])['time'],'tanggal'=>spp_date_label($p['TGL_BYR'],true),'periode'=>$p['payment_period_label']??((report_months()[report_month_code((string)$p['BULAN'])]??$p['BULAN']).' '.$p['TAHUN']),
           'komponen'=>$components?implode(', ',$components):'Koreksi','metode'=>$p['sistem_pembayaran'],'operator'=>($creator['actor_name']??'')?:($p['operator_nama']?:'Tidak tercatat'),
           'total'=>'Rp '.number_format((float)$p['total_jumlah'],0,',','.'),'context_year'=>$p['riwayat_tahun_ajaran'],'context_class'=>$p['riwayat_kelas_snapshot']];
     }

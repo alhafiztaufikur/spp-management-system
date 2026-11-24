@@ -12,10 +12,21 @@
     });
   });
   window.addEventListener('beforeunload', event => { if (dirty && !submitting) { event.preventDefault(); event.returnValue = ''; } });
-  document.querySelectorAll('[data-legacy-group-context] select').forEach(select => select.addEventListener('change', () => {
-    // GET replaces group membership; temporary selections never cross groups.
-    if (!dirty || window.confirm('Ada perubahan yang belum disimpan. Ganti kelompok?')) { submitting = true; select.form.requestSubmit(); }
-  }));
+  document.querySelectorAll('[data-legacy-group-context] select').forEach(select => {
+    const currentValue = select.value;
+    select.addEventListener('change', async () => {
+      if (dirty && !await window.workflowConfirm({
+        title: 'Ganti kelompok?',
+        message: 'Ada perubahan yang belum disimpan.',
+        action: 'Ganti kelompok',
+      }, select)) {
+        select.value = currentValue;
+        return;
+      }
+      submitting = true;
+      select.form.requestSubmit();
+    });
+  });
   const job = document.querySelector('[data-import-progress]');
   if (job && ['queued','processing','simulate_queued','simulating','apply_queued','applying'].includes(job.dataset.state)) {
     const poll = async () => { try { const r = await fetch('legacy_import_api.php?action=status&id=' + encodeURIComponent(job.dataset.importProgress), {cache:'no-store',credentials:'same-origin'}); if (!r.ok) throw new Error(); const data = await r.json(); if (data.job.state !== job.dataset.state) { location.reload(); return; } } catch (_) { const message = document.querySelector('[data-network-status]'); if (message) message.textContent = 'Koneksi terputus. Pemeriksaan akan dicoba lagi; Muat Ulang tetap tersedia.'; } setTimeout(poll,5000); }; setTimeout(poll,5000);

@@ -38,6 +38,9 @@ function global_report_matrix(array $report,string $template,int $unit):?array {
             if($template==='penerimaan'&&$key==='total_penerimaan')continue;
             $mapped='g'.$index.'_'.$key;
             $definition=[$mapped,$caption,$type,'source'=>$key,'group'=>$index];
+            if($template==='status'&&($part['component_key']??null)==='daftar_ulang'&&$key==='tagihan'){
+                $definition['du_status_key']='g'.$index.'_status';
+            }
             $columns[]=$definition;$groupColumns[]=$definition;
         }
         if(!$groupColumns)continue;

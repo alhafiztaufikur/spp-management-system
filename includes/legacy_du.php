@@ -117,7 +117,7 @@ function du_publish_proven_legacy_year(mysqli $db,int $yearId,string $year,int $
 }
 
 /** Caller owns transaction + verified backup gate. Changes only DU billing/evidence. */
-function ldu_reconcile(mysqli $db,int $actor,?string $year=null): array {
+function ldu_reconcile(mysqli $db,int $actor,?string $year=null,?array &$pendingBatches=null): array {
     $year=$year??ldu_target_year();$out=['rule'=>LDU_VERSION,'year'=>$year,'changes'=>0,'masters_created'=>0,'bills_created'=>0,'existing'=>0,'unknown'=>0,'lunas'=>0,'belum_lunas'=>0,'principal_cents'=>0,'paid_cents'=>0,'remaining_cents'=>0,'exceptions'=>[]];
     if($year!==ldu_target_year())throw new DomainException('Penerbitan DU otomatis hanya untuk tahun ajaran berjalan.');
     $coverage=du_psb_reconcile($db,$year,$actor);$out['covered_psb']=$coverage['covered_psb'];$out['conflicts']=$coverage['conflicts'];$out['changes']+=$coverage['changes'];
@@ -163,7 +163,11 @@ function ldu_reconcile(mysqli $db,int $actor,?string $year=null): array {
         elseif($pending['resolved']||$pending['message']!==$e['reason']||lf_canonical(json_decode($pending['payload'],true))!==lf_canonical($e)){lf_query($db,'UPDATE legacy_op_pending SET resolved=0,message=?,payload=?,version=version+1 WHERE id=?',[$e['reason'],lf_json($e),$pending['id']]);$out['changes']++;}
     }
     foreach(hp_rows($db,"SELECT id,row_key FROM legacy_op_pending WHERE code='du_evidence' AND resolved=0 AND JSON_UNQUOTE(JSON_EXTRACT(payload,'$.year'))=?",[$year]) as $p)if(!isset($wanted[$p['row_key']])){lf_query($db,'UPDATE legacy_op_pending SET resolved=1,version=version+1 WHERE id=?',[$p['id']]);$out['changes']++;}
-    lb_cache($db,true);$synced=lb_sync_owners($db,array_column($plan['positions'],'owner_id'));lb_refresh_manifests($db,array_unique(array_merge($synced,$batches,array_column($valid,'batch_id'))));
+    $batches=array_merge($batches,array_column($valid,'batch_id'));
+    $owners=array_column($plan['positions'],'owner_id');
+    unset($plan,$valid);
+    if($pendingBatches!==null)$pendingBatches=array_merge($pendingBatches,$batches);
+    else lb_refresh_manifests($db,array_merge($batches,lb_sync_owners($db,$owners)));
     return $out;
 }
 function ldu_verify(mysqli $db): array {

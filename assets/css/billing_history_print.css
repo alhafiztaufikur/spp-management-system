@@ -10,7 +10,7 @@
 .billing-print-table .billing-print-group{break-after:avoid;page-break-after:avoid}
 .billing-print-table .billing-print-group th{font-size:10pt;padding:6pt 3pt 3pt}
 .billing-print-table .billing-print-no,.billing-print-table .billing-print-nis{text-align:center;white-space:nowrap}
-.billing-print-table .billing-print-numeric{text-align:right}
+.billing-print-table .billing-print-numeric{text-align:left}
 .billing-print-money{white-space:nowrap}
 .billing-print-unknown{white-space:normal}
 .billing-print-table .billing-print-name,.billing-print-table .billing-print-description{white-space:normal;overflow-wrap:break-word}

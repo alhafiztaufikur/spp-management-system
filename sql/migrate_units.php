@@ -208,3 +208,4 @@ du_psb_schema_apply($koneksi);
 require_once __DIR__.'/../includes/psb_spp_schema.php';pspp_schema_apply($koneksi);
 require_once __DIR__.'/../includes/spp_advance_schema.php';spa_schema_apply($koneksi);
 require_once __DIR__.'/../includes/student_out_schema.php';sout_schema_apply($koneksi);
+require_once __DIR__.'/../includes/payment_period_schema.php';payment_period_schema_apply($koneksi);

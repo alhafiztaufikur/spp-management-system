@@ -80,6 +80,22 @@
 .ph-info-grid strong,.ph-info-grid small,.ph-info-grid span{display:block;line-height:1.6;overflow-wrap:anywhere}
 .ph-info-grid strong,.ph-info-grid span{font-size:11px}
 .ph-info-grid small{font-size:10px;color:var(--text-muted)}
+.ph-monthly-allocation { margin-block-start: 16px; }
+.ph-allocation-scroll { max-width: 100%; overflow-x: auto; }
+.ph-period-numeric { display: none; }
+@media screen and (min-width: 1024px) {
+  .payment-history-controls .ph-period-default { display: none; }
+  .payment-history-controls .ph-period-numeric { display: inline; font-variant-numeric: tabular-nums; }
+  .payment-history-controls .ph-monthly-allocation .ph-allocation-scroll { margin-block-start: 12px; }
+}
+.ph-monthly-allocation .payment-table { min-width: 340px; }
+.ph-monthly-allocation :is(th, td):not(:first-child) {
+  text-align: right;
+  white-space: nowrap;
+  font-variant-numeric: tabular-nums;
+}
+.ph-monthly-allocation tbody th { text-align: left; }
+.ph-monthly-allocation td:last-child { color: var(--text-primary); font-weight: 700; }
 .ph-info-label{margin-top:9px}
 .ph-lock-note{display:flex;gap:9px;align-items:flex-start;padding:11px;background:var(--bg-surface);border:1px solid var(--border);border-radius:9px;font-size:11px;color:var(--text-muted);line-height:1.6}
 .ph-lock-note svg{flex-shrink:0;width:16px;height:16px;margin-top:2px}

@@ -1,0 +1,263 @@
+.payment-range-fields {
+  display: grid;
+  grid-template-columns: minmax(0, 1fr);
+  gap: 8px;
+  margin-top: 8px;
+}
+.payment-period-monthly-fieldset { padding: 0; margin: 0; border: 0; min-inline-size: 0; }
+.payment-period-select, .payment-range-end, .payment-range-start { display: grid; gap: 6px; min-width: 0; }
+.payment-range-start output { font-weight: 600; }
+.payment-input-controls #form-bayar .payment-input-top {
+  grid-template-columns: minmax(0,1fr);
+  gap: 12px;
+}
+.payment-input-controls #form-bayar .payment-settings-group {
+  container: payment-settings / inline-size;
+  padding: 14px;
+  gap: 12px;
+  border-color: var(--border);
+  background: var(--bg-surface);
+  box-shadow: none;
+}
+.payment-input-controls #form-bayar .payment-panel-kicker {
+  display: flex;
+  align-items: center;
+  gap: 8px;
+  margin: 0;
+  color: var(--text-primary);
+  font-size: 17px;
+  letter-spacing: 0;
+  text-transform: none;
+}
+.payment-panel-kicker .payment-control-icon,
+.payment-period-calendar {
+  width: 16px;
+  height: 16px;
+  flex: none;
+  fill: none;
+  stroke: currentColor;
+  stroke-width: 1.7;
+  stroke-linecap: round;
+  stroke-linejoin: round;
+}
+.payment-panel-kicker .payment-control-icon { color: var(--accent); }
+.payment-input-controls #form-bayar .payment-settings-grid {
+  grid-template-columns: repeat(2,minmax(0,1fr));
+  gap: 12px;
+}
+.payment-input-controls #form-bayar .payment-field-card {
+  min-height: 0;
+  justify-content: flex-start;
+  gap: 6px;
+  padding: 11px 12px;
+  border: 1px solid var(--border);
+  background: var(--bg-card);
+}
+.payment-input-controls #form-bayar .payment-field-card:focus-within {
+  transform: none;
+  border-color: var(--border-hover);
+  box-shadow: none;
+}
+.payment-input-controls #form-bayar .payment-period-card { grid-column: 1 / -1; grid-row: 2; }
+.payment-input-controls #form-bayar .payment-settings-grid :is(.field-label,.payment-period-caption,.payment-year-caption) {
+  display: block;
+  min-height: 0;
+  margin: 0;
+  color: var(--text-secondary);
+  font-size: 13px;
+  font-weight: 650;
+  line-height: 1.5;
+  letter-spacing: 0;
+  text-transform: none;
+}
+.payment-input-controls #form-bayar .payment-settings-grid :is(.field-input,.spp-select-trigger) {
+  width: 100%;
+  min-height: 44px;
+  height: 44px !important;
+  max-height: 44px !important;
+  font-size: 14px;
+}
+.payment-input-controls #form-bayar .payment-settings-grid .spp-select-trigger {
+  gap: 5px;
+  padding-inline: 10px;
+}
+.payment-period-interactive { container: payment-period / inline-size; }
+.payment-period-layout {
+  display: grid;
+  align-items: end;
+  gap: 12px;
+}
+.payment-input-controls .payment-period-interactive .payment-period-inputs {
+  grid-template-columns: minmax(0,1fr) minmax(80px,.65fr) !important;
+  column-gap: 8px;
+  row-gap: 6px;
+  padding-top: 0;
+}
+.payment-period-caption { grid-column: 1; grid-row: 1; }
+.payment-period-interactive .payment-period-inputs > :is(.month-code-select,.spp-select) { grid-column: 1; grid-row: 2; }
+.payment-period-interactive .payment-year-picker { grid-column: 2; grid-row: 1 / 3; }
+.payment-input-controls #form-bayar .payment-period-interactive .payment-year-caption {
+  position: static;
+  margin-bottom: 6px;
+}
+.payment-period-interactive .payment-year-picker::after { bottom: 19px; width: 7px; height: 7px; }
+.payment-period-layout .payment-range-fields { margin-top: 0; }
+.payment-period-layout .payment-range-fields:has(.payment-range-start:not([hidden])) {
+  grid-template-columns: minmax(0,1fr) 14px minmax(0,1fr);
+  align-items: end;
+}
+.payment-range-direction {
+  display: grid;
+  place-items: center;
+  height: 44px;
+  color: var(--text-secondary);
+}
+.payment-range-start[hidden] + .payment-range-direction { display: none; }
+.payment-period-layout .payment-range-start-value {
+  display: flex;
+  align-items: center;
+  gap: 6px;
+  min-height: 44px;
+  padding: 0 9px;
+  border: 1px solid var(--border);
+  border-radius: 10px;
+  background: var(--bg-surface);
+  font-size: 14px;
+}
+.payment-period-layout .payment-range-start output {
+  min-width: 0;
+  overflow: hidden;
+  text-overflow: ellipsis;
+  white-space: nowrap;
+}
+.payment-period-choice-control { position: relative; min-width: 0; }
+.payment-period-choice-control > .payment-period-calendar {
+  position: absolute;
+  z-index: 1;
+  top: 50%;
+  left: 9px;
+  transform: translateY(-50%);
+  pointer-events: none;
+}
+.payment-input-controls #form-bayar .payment-period-choice-control:has(.payment-period-calendar)
+  :is(.field-select,.spp-select-trigger) { padding-left: 30px; }
+.payment-input-controls #form-bayar .payment-overview-panel {
+  justify-self: end;
+  width: min(100%,380px);
+  background: var(--bg-surface);
+  box-shadow: none;
+}
+.payment-input-controls #form-bayar .payment-current-total {
+  display: flex;
+  flex-direction: row;
+  align-items: center;
+  justify-content: space-between;
+  gap: 12px;
+  padding: 14px 16px;
+}
+.payment-input-controls #form-bayar .payment-current-total span {
+  flex: none;
+  color: var(--text-secondary);
+  font-size: 17px;
+  letter-spacing: .04em;
+}
+.payment-input-controls #form-bayar .payment-current-total strong {
+  align-self: auto;
+  min-width: 0;
+  color: var(--accent);
+  font-size: 32px;
+  font-variant-numeric: tabular-nums;
+  white-space: normal;
+  overflow-wrap: anywhere;
+}
+@container payment-settings (min-width: 740px) {
+  .payment-input-controls #form-bayar .payment-settings-grid {
+    grid-template-columns: minmax(134px,.87fr) minmax(420px,3.04fr) minmax(140px,.95fr);
+  }
+  .payment-input-controls #form-bayar .payment-period-card { grid-column: auto; grid-row: auto; }
+}
+@container payment-period (min-width: 420px) {
+  .payment-period-layout { grid-template-columns: minmax(196px,.94fr) minmax(0,2fr); }
+}
+@media (min-width: 1550px) {
+  .payment-input-controls #form-bayar .payment-input-top { grid-template-columns: minmax(0,1fr) minmax(230px,.24fr); }
+  .payment-input-controls #form-bayar .payment-overview-panel { width: 100%; container-type: inline-size; }
+  .payment-input-controls #form-bayar .payment-current-total {
+    flex-direction: column;
+    align-items: flex-start;
+    justify-content: center;
+  }
+  .payment-input-controls #form-bayar .payment-current-total strong {
+    font-size: clamp(24px,10.25cqi,32px);
+    text-align: left;
+  }
+}
+@media (max-width: 600px) {
+  .payment-input-controls #form-bayar .payment-settings-grid { grid-template-columns: minmax(0,1fr); }
+  .payment-input-controls #form-bayar .payment-period-card { grid-column: auto; grid-row: auto; }
+}
+.payment-range-preview {
+  margin-block: 24px;
+  border: 1px solid var(--border);
+  border-radius: 16px;
+  background: var(--bg-card);
+}
+.payment-range-header {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  flex-wrap: wrap;
+  gap: 12px;
+  padding: 17px 20px;
+}
+.payment-range-header h3 { margin: 0; color: var(--text-primary); font-size: 20px; }
+.payment-range-status { margin: 4px 0 0; color: var(--text-secondary); font-size: 16px; }
+.payment-range-status[data-blocked] { color: var(--red); font-weight: 650; }
+.payment-range-count, .payment-range-badge {
+  display: inline-block;
+  border-radius: 8px;
+  font-weight: 650;
+  line-height: 1.4;
+  white-space: nowrap;
+}
+.payment-range-count {
+  padding: 7px 12px;
+  border: 1px solid var(--border);
+  background: var(--accent-glow);
+  color: var(--accent-hover);
+  font-size: 14px;
+}
+.payment-range-count[hidden] { display: none; }
+.payment-range-preview .table-container { margin: 0; border: 0; border-top: 1px solid var(--border); border-radius: 0 0 15px 15px; }
+.payment-range-preview .payment-range-table { min-width: 540px; font-size: 16px; }
+.payment-range-table :is(th,td) { padding: 10px 20px; text-align: left; font-variant-numeric: tabular-nums; }
+.payment-range-table :is(th,td):last-child { text-align: right; }
+.payment-range-preview .payment-range-table thead { background: var(--bg-surface); }
+.payment-range-table thead th { font-size: 14px; text-transform: none; letter-spacing: 0; }
+.payment-range-table tbody th {
+  background: none;
+  color: var(--text-primary);
+  font-size: inherit;
+  text-transform: none;
+  letter-spacing: normal;
+}
+.payment-range-table tbody tr:nth-child(even) { background: color-mix(in srgb,var(--bg-surface) 62%,transparent); }
+.payment-range-table tbody tr:hover { background: var(--accent-glow); }
+.payment-range-table tbody tr:last-child th { border-bottom: 0; }
+.payment-range-badge {
+  padding: 3px 9px;
+  background: var(--bg-surface);
+  color: var(--text-secondary);
+  font-size: 13px;
+}
+.payment-range-badge[data-bill-state="settled"] { background: var(--accent-glow); color: var(--accent-hover); }
+.payment-range-badge[data-bill-state="missing"] { background: var(--orange-bg); color: var(--text-primary); }
+.payment-range-table tbody .payment-range-amount-due { color: var(--text-primary); font-weight: 700; }
+.payment-range-table tbody .payment-range-amount-muted { color: var(--text-muted); }
+.payment-input-controls #spp-warning-overlay { display: none; transition: none; }
+.payment-input-controls #spp-warning-overlay.show { display: grid; visibility: visible; opacity: 1; }
+.payment-input-controls #spp-warning-overlay .spp-warning-dialog { transition: none; }
+[data-payment-period-controls][hidden], [data-payment-period-start][hidden],
+[data-payment-period-preview][hidden], [data-payment-period-table][hidden], [data-payment-period-monthly][hidden], #payment-period-label[hidden] {
+  display: none !important;
+}

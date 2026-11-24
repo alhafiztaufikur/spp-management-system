@@ -3,15 +3,31 @@ require_once __DIR__.'/payment_permissions.php';
 require_once __DIR__.'/legacy_full_read.php';
 require_once __DIR__.'/payment_return.php';
 require_once __DIR__.'/authorization_presentation.php';
+require_once __DIR__.'/payment_period.php';
 
 function payment_history_money($value): string { return 'Rp '.number_format((float)$value,abs((float)$value-round((float)$value))>.00001?2:0,',','.'); }
 function payment_history_class($raw): string { $raw=trim((string)$raw);$year=function_exists('lop_alumni_year')?lop_alumni_year($raw):null;return $year?'Alumni'.$year:($raw?:'Tidak tercatat'); }
 function payment_history_period(array $p): string
 {
+    if (!empty($p['payment_period_label'])) return $p['payment_period_label'];
     if((int)($p['id']??0)<0)return trim((string)($p['source_period']??$p['BULAN']??''))?:'Tidak tercatat';
     $months=['Januari'=>'01','Februari'=>'02','Maret'=>'03','April'=>'04','Mei'=>'05','Juni'=>'06','Juli'=>'07','Agustus'=>'08','September'=>'09','Oktober'=>'10','November'=>'11','Desember'=>'12'];
     $raw=(string)($p['BULAN']??'');
     return ($months[$raw]??str_pad($raw,2,'0',STR_PAD_LEFT)).' '.($p['TAHUN']??'Tidak tercatat');
+}
+function payment_history_period_html(array $payment): string
+{
+    $period=trim(payment_history_period($payment));
+    $label=authorization_escape($period);
+    $months=[];
+    foreach(preg_split('~\s*[–—]\s*|\s+-\s+~u',$period,2) ?: [$period] as $part){
+        $month=lb_payment_month($part);
+        if($month==='')return $label;
+        $months[]=payment_period_numeric_label($month);
+    }
+    $numeric=implode(' – ',$months);
+    if($numeric===$period)return $label;
+    return '<span class="ph-period-default">'.$label.'</span><span class="ph-period-numeric">'.authorization_escape($numeric).'</span>';
 }
 function payment_history_model(mysqli $db,int $id,bool $deleted): array
 {
@@ -37,6 +53,10 @@ function payment_history_model(mysqli $db,int $id,bool $deleted): array
         foreach(['bayar_du','bayar_biaya_lain'] as $table) {
             $s=$db->prepare('SELECT * FROM '.$table.' WHERE bayar_id=? ORDER BY id');$s->bind_param('i',$id);$s->execute();$details[$table]=$s->get_result()->fetch_all(MYSQLI_ASSOC);$s->close();
         }
+        if ($range = payment_period_meta($db,$id)) {
+            $p['payment_period_label'] = payment_period_range_label($range);
+            $details['payment_period'] = ['range'=>$range,'rows'=>payment_period_receipt_rows($db,$id)];
+        }
     }
     $p['kelas_transaksi']=$p['kelas_transaksi']??(($p['kelas_rombel_snapshot']??'')?:($p['KELAS']??'Tidak tercatat'));
     $events=authorization_history_events($db,$id);
@@ -53,7 +73,8 @@ function payment_history_model(mysqli $db,int $id,bool $deleted): array
         $s->bind_param('ii',$id,$id);$s->execute();$request=$s->get_result()->fetch_assoc() ?: null;$s->close();
     }
     return ['payment'=>$p,'deleted'=>$deleted,'events'=>$events,'summary'=>payment_activity_summary($events),'capabilities'=>$caps,'request'=>$request,
-        'components'=>$components,'batch_print'=>$caps['can_print']&&(int)($p['payment_batch_count']??1)===12&&payment_can_print_batch($db,(string)($p['payment_batch_token']??''))];
+        'components'=>$components,'period_rows'=>$details['payment_period']['rows']??[],
+        'batch_print'=>$caps['can_print']&&(int)($p['payment_batch_count']??1)===12&&payment_can_print_batch($db,(string)($p['payment_batch_token']??''))];
 }
 function payment_history_actor(?array $event): void
 {
@@ -65,10 +86,23 @@ function payment_history_render(array $model, ?array $query=null): void
     $p=$model['payment'];$caps=$model['capabilities'];$deleted=$model['deleted'];$summary=$model['summary'];$id=(int)$p['id'];
     $token=$query!==null && !$deleted && ($caps['can_edit']||$caps['can_delete'])?payment_return_create($id,(int)$p['unit_id'],$query,'lihat.php'):'';
     ?>
-    <div class="ph-student"><span class="ph-student-icon"><?= authorization_icon('student') ?></span><div><h3><?= authorization_escape($p['NAMA']??'Tidak tercatat') ?></h3><small><?= !empty($model['legacy_record'])&&!$p['student_id']?'Pemilik rekening · Identitas':'NIS' ?>: <?= authorization_escape($p['NO_INDUK']?:'Tidak tercatat') ?></small><small>NIS Diknas: <?= authorization_escape(($p['NO_induk_diknas']??'')?:'Tidak tercatat') ?></small><?php if(unit_all_readonly()): ?><small>Unit <?= authorization_escape(unit_label((int)$p['unit_id'])) ?></small><?php endif; ?></div><div class="ph-student-period"><span class="kelas-badge">Kelas <?= authorization_escape(payment_history_class($p['kelas_transaksi'])) ?></span><small><?= authorization_icon('calendar') ?> <?= authorization_escape(payment_history_period($p)) ?></small></div></div>
+    <div class="ph-student"><span class="ph-student-icon"><?= authorization_icon('student') ?></span><div><h3><?= authorization_escape($p['NAMA']??'Tidak tercatat') ?></h3><small><?= !empty($model['legacy_record'])&&!$p['student_id']?'Pemilik rekening · Identitas':'NIS' ?>: <?= authorization_escape($p['NO_INDUK']?:'Tidak tercatat') ?></small><small>NIS Diknas: <?= authorization_escape(($p['NO_induk_diknas']??'')?:'Tidak tercatat') ?></small><?php if(unit_all_readonly()): ?><small>Unit <?= authorization_escape(unit_label((int)$p['unit_id'])) ?></small><?php endif; ?></div><div class="ph-student-period"><span class="kelas-badge">Kelas <?= authorization_escape(payment_history_class($p['kelas_transaksi'])) ?></span><small><?= authorization_icon('calendar') ?> <?= payment_history_period_html($p) ?></small></div></div>
     <section class="ph-payment-box"><h4><?= authorization_icon('chart') ?> Detail Pembayaran <span class="ph-status <?= $deleted?'is-deleted':'' ?>"><?= $deleted?'Dihapus':'Aktif' ?></span></h4><div class="ph-payment-overview"><div><small>Total Bayar</small><strong class="ph-total"><?= payment_history_money($p['total_jumlah']) ?></strong></div><div><small>Metode: <?= authorization_escape(($p['sistem_pembayaran']??'')?:'Tidak tercatat') ?></small><small>Tanggal bayar: <?= authorization_escape(payment_time_label($p)) ?></small></div></div><dl class="ph-components"><?php foreach($model['components'] as [$label,$amount]): if(abs($amount)<.001)continue; ?><div><dt><?= authorization_escape($label) ?></dt><dd><?= payment_history_money($amount) ?></dd></div><?php endforeach; ?></dl><?php if(!empty($p['KETERANGAN'])): ?><p class="ph-note"><?= nl2br(authorization_escape($p['KETERANGAN'])) ?></p><?php endif; ?></section>
     <div class="ph-info-grid"><section><h4><?= authorization_icon('user') ?> Operator</h4><small>Dibuat oleh</small><?php payment_history_actor($summary['creator']); ?><small class="ph-info-label">Aktivitas terakhir</small><?php payment_history_actor($summary['last']); ?><small><?= authorization_escape(payment_activity_labels()[$summary['last']['action']??'']??'Tidak tercatat') ?></small><small><?= !empty($summary['last']['occurred_at'])?authorization_escape(spp_date_label($summary['last']['occurred_at'],true,$summary['last']['time_precision']??null)):'Tidak tercatat' ?></small></section><section><h4><?= authorization_icon('history') ?> Informasi Sistem</h4><small>ID Transaksi</small><strong><?= $id<0?'TRX-L-'.(int)$p['unit_id'].'-'.(-$id-1000000000):'TRX-'.str_pad((string)$id,6,'0',STR_PAD_LEFT) ?></strong><?php if($id<0): ?><small>Legacy · <?= authorization_escape($p['source_table']) ?></small><?php endif; ?><small class="ph-info-label">Dibuat pada</small><span><?= authorization_escape(!empty($p['created_at'])?spp_date_label($p['created_at'],true):'Tidak tercatat') ?></span><?php if($id<0): ?><small class="ph-info-label">Diimpor ke SistemSPP</small><span><?= authorization_escape(!empty($p['imported_at'])?spp_date_label($p['imported_at'],true):'Tidak tercatat') ?></span><?php endif; ?><small class="ph-info-label">Diubah pada</small><span><?= authorization_escape(!empty($p['updated_at'])?spp_date_label($p['updated_at'],true):'Tidak tercatat') ?></span><?php if($deleted): ?><small class="ph-info-label">Dihapus oleh</small><?php payment_history_actor($p['_deleted_event']); ?><small><?= authorization_escape(spp_date_label($p['_deleted_event']['occurred_at'],true)) ?></small><?php endif; ?></section></div>
     <?php if($caps['reason']): ?><p class="ph-lock-note" <?= $caps['locked']?'data-payment-locked':'' ?>><?= authorization_icon($caps['locked']?'lock':'alert') ?> <?= authorization_escape($caps['reason']) ?></p><?php endif; ?>
+    <?php if (!empty($model['period_rows'])): ?>
+      <section class="ph-payment-box ph-monthly-allocation"><h4 id="payment-monthly-allocation-title">Alokasi per Bulan</h4>
+        <div class="ph-allocation-scroll" role="region" aria-labelledby="payment-monthly-allocation-title" tabindex="0">
+        <table class="payment-table"><thead><tr><th scope="col">Bulan Tagihan</th><th scope="col">SPP</th><th scope="col">Komite</th><th scope="col">Dibayar</th></tr></thead><tbody>
+        <?php foreach ($model['period_rows'] as $line): ?>
+          <tr><th scope="row"><?= authorization_escape($line['label']) ?></th>
+            <td><?= payment_history_money($line['spp']/100) ?></td><td><?= payment_history_money($line['komite']/100) ?></td>
+            <td><?= payment_history_money(($line['spp']+$line['komite'])/100) ?></td></tr>
+        <?php endforeach; ?>
+        </tbody></table>
+        </div>
+      </section>
+    <?php endif; ?>
     <?php if (!empty($model['request'])): $request=$model['request']; ?>
     <section class="ph-request-status" aria-label="Pengajuan koreksi">
       <h4>Pengajuan #<?= (int)$request['id'] ?> · <?= authorization_escape(['pending'=>'Menunggu Super Admin','approved'=>'Disetujui','rejected'=>'Ditolak','cancelled'=>'Dibatalkan','failed'=>'Gagal'][$request['status']] ?? $request['status']) ?></h4>

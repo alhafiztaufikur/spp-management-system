@@ -19,6 +19,7 @@ require_once '../includes/transaction_authorization.php';
 require_once '../includes/financial_request.php';
 require_once '../includes/payment_return.php';
 require_once '../includes/transaction_entry_date.php';
+require_once '../includes/payment_period.php';
 
 $returnContext = is_string($_POST['return_context'] ?? null) ? $_POST['return_context'] : '';
 $returnPaymentId = (int)($_POST['id'] ?? 0);
@@ -246,17 +247,6 @@ function validate_payment_context(string $tanggal, string $bulan, string $tahun,
     }
 }
 
-function split_payment_amount(float $amount, int $parts): array {
-    $totalCents = (int)round($amount * 100);
-    $baseCents = intdiv($totalCents, $parts);
-    $remainder = $totalCents % $parts;
-    $result = [];
-    for ($index = 0; $index < $parts; $index++) {
-        $result[] = ($baseCents + ($index < $remainder ? 1 : 0)) / 100;
-    }
-    return $result;
-}
-
 function sync_spp_period_claim(mysqli $db, int $bayarId, string $noInduk, string $bulan, string $tahun, float $uangSpp): void {
     $stmt = $db->prepare('DELETE FROM bayar_spp_periode WHERE bayar_id = ?');
     $stmt->bind_param('i', $bayarId);
@@ -299,12 +289,12 @@ function validate_student_and_komite(
     ?string $archivedStudentAllowed = null
 ): array {
     $stmt = $db->prepare("SELECT s.NO_INDUK,s.unit_id,s.legacy_pending,s.KELAS, s.master_kelas_id, s.POMG, s.SPP_PERBULAN, s.is_active,
-        mk.tingkat, mk.kode_rombel, mk.is_placeholder,
+        mk.tingkat, mk.kode_rombel, mk.is_placeholder, mk.legacy_kind,
         (SELECT ta.label FROM siswa_tahun_ajaran sta_l
          JOIN tahun_ajaran ta ON ta.id=sta_l.tahun_ajaran_id
          WHERE sta_l.no_induk=s.NO_INDUK AND sta_l.unit_id=s.unit_id AND sta_l.status='lulus'
          ORDER BY ta.label DESC LIMIT 1) AS graduation_year
-        FROM siswa s LEFT JOIN master_kelas mk ON mk.id=s.master_kelas_id
+        FROM siswa s LEFT JOIN master_kelas mk ON mk.id=s.master_kelas_id AND mk.unit_id=s.unit_id
         WHERE s.NO_INDUK = ? FOR UPDATE");
     $stmt->bind_param('s', $noInduk);
     $stmt->execute();
@@ -312,7 +302,7 @@ function validate_student_and_komite(
     $stmt->close();
     if (!$student) throw new RuntimeException('Data siswa tidak ditemukan.');
     if((int)$student['legacy_pending'])throw new RuntimeException('Siswa Legacy harus diaktifkan dan ditempatkan terlebih dahulu.');
-    $student['is_graduate'] = !empty($student['graduation_year']);
+    $student['is_graduate'] = !empty($student['graduation_year']) || $student['legacy_kind']==='alumni';
     if ((int)$student['is_active'] !== 1 && !$student['is_graduate'] && $noInduk !== $archivedStudentAllowed) {
         throw new RuntimeException('Siswa yang diarsipkan tidak dapat dipakai untuk transaksi baru.');
     }
@@ -632,6 +622,117 @@ function find_linked_payment(mysqli $db, int $bayarId): array {
     return $payment;
 }
 
+function payment_period_confirmed_plan(mysqli $db,array $source,string $nis,int $id = 0,?string $start = null): array {
+    $mode = $source['payment_plan'] ?? '';
+    $choice = $source['period_choice'] ?? '';
+    $version = $source['period_version'] ?? '';
+    if (!in_array($mode,['range','academic'],true) || !is_string($choice) || !is_string($version)) {
+        throw new DomainException('Pilihan periode tidak valid.');
+    }
+    reject_removed_payment_components($source);
+    foreach (['uang_psb','uang_spp','uang_komite','uang_du','potongan_spp','tabungan_wajib','tagihan_daftar_ulang_id'] as $key) {
+        if (!is_scalar($source[$key] ?? '') || parse_amount($source[$key] ?? '') !== 0.0) {
+            throw new DomainException('Pembayaran beberapa bulan memakai sisa SPP dan Komite yang ditampilkan pada rincian.');
+        }
+    }
+    if (array_filter((array)($source['biaya_lain_tagihan_id'] ?? []))
+        || array_filter((array)($source['biaya_lain_nominal'] ?? []),static fn($value)=>!is_scalar($value) || parse_amount($value) !== 0.0)) {
+        throw new DomainException('Gunakan pilihan 1 Bulan untuk membayar Biaya Lain.');
+    }
+    $plan = payment_period_plan($db,$nis,$mode,$choice,$id,true,$start);
+    if ($plan['blocking']) throw new DomainException($plan['blocking']);
+    if (!$plan['version'] || !hash_equals($plan['version'],$version)) {
+        throw new DomainException('Rincian tagihan berubah. Periksa kembali total dan bulan sebelum menyimpan.');
+    }
+    return $plan;
+}
+
+if (in_array($aksi,['update','hapus'],true) && ($periodMeta = payment_period_meta($koneksi,(int)($_POST['id'] ?? 0)))) {
+    $id = (int)$_POST['id'];
+    payment_activity_begin_transaction($koneksi);
+    try {
+        if ($authorizationRequest) {
+            $locked = transaction_authorization_find($koneksi,$authorizationRequestId,true);
+            if (!$locked || $locked['status'] !== 'pending' || (int)$locked['requested_by'] === $authorizationApproverId) {
+                throw new RuntimeException('Permintaan tidak dapat diterapkan.');
+            }
+            transaction_authorization_assert_super($koneksi,$authorizationApproverId);
+        } else {
+            authorization_assert_no_pending($koneksi,$id);
+        }
+        $old = find_linked_payment($koneksi,$id);
+        $periodMeta = payment_period_meta($koneksi,$id);
+        if (!$periodMeta) throw new RuntimeException('Rincian periode transaksi tidak ditemukan.');
+        if ($authorizationRequest) authorization_assert_current_snapshot($koneksi,$locked);
+        $before = transaction_authorization_snapshot($koneksi,$id)['data'];
+        $oldNis = (string)$old['NO_INDUK'];
+        if ($aksi === 'update') payment_assert_edit_student($oldNis, $_POST['no_induk'] ?? null);
+        $student = payment_period_student($koneksi,$oldNis,true,$oldNis);
+        lb_scope_payment_student($koneksi,$oldNis,unit_active_id());
+        $previous = payment_period_receipt_rows($koneksi,$id);
+        $pairs = [];
+        foreach ($previous as $row) {
+            [$year,$month] = explode('-',$row['period']);
+            $pairs[$row['period']] = komite_pair_gap($koneksi,$oldNis,$month,$year);
+        }
+        if ($aksi === 'update') {
+            $start = $periodMeta['mode'] === 'range'
+                && ($_POST['payment_plan'] ?? '') === 'range' ? $periodMeta['mulai'] : null;
+            $plan = payment_period_confirmed_plan($koneksi,$_POST,$oldNis,$id,$start);
+            $method = normalize_payment_method($_POST['sistem_pembayaran'] ?? '');
+            $note = trim((string)($_POST['catatan'] ?? ''));
+            if (mb_strlen($note) > 255) throw new DomainException('Catatan maksimal 255 karakter.');
+            require_once __DIR__.'/../includes/payment_time.php';
+            $date = payment_time_native_update((string)($_POST['tanggal_bayar'] ?? ''),(string)$old['TGL_BYR']);
+            validate_payment_context($date,substr($plan['range']['akhir'],5),substr($plan['range']['akhir'],0,4),$date === $old['TGL_BYR']);
+        }
+        spp_reverse_payment_allocation($koneksi,$id);
+        $stmt = $koneksi->prepare('DELETE FROM bayar_komite WHERE bayar_id=?');
+        $stmt->bind_param('i',$id);
+        $stmt->execute();
+        $stmt->close();
+        if ($aksi === 'update') payment_period_write($koneksi,$student,$plan,$date,$method,current_operator_id(),$note,$id);
+        lb_scope_payment_student($koneksi,$oldNis,unit_active_id());
+        spp_assert_paid_order($koneksi,$oldNis);
+        foreach ($previous as $row) {
+            [$year,$month] = explode('-',$row['period']);
+            $afterGap = komite_pair_gap($koneksi,$oldNis,$month,$year);
+            if ($afterGap && $afterGap !== $pairs[$row['period']]) throw new DomainException('Perubahan akan memisahkan pelunasan SPP dan Komite '.payment_period_label($row['period']).'.');
+            if ($row['komite'] && (komite_bill($koneksi,$oldNis,$month,$year,true)['remaining'] ?? 0) > .001
+                && lf_one($koneksi,"SELECT 1 FROM tagihan_komite t JOIN bayar_komite k
+                    ON k.tagihan_komite_id=t.id AND k.unit_id=t.unit_id WHERE t.no_induk=?
+                    AND (t.tahun,t.bulan)>(?,?) LIMIT 1 FOR UPDATE",[$oldNis,$year,$month])) {
+                throw new DomainException('Komite '.payment_period_label($row['period']).' tidak boleh menjadi tunggakan karena bulan berikutnya sudah dibayar.');
+            }
+        }
+        $after = null;
+        if ($aksi === 'hapus') {
+            $stmt = $koneksi->prepare('DELETE FROM bayar WHERE id=?');
+            $stmt->bind_param('i',$id);
+            $stmt->execute();
+            $stmt->close();
+        } else {
+            $after = transaction_authorization_snapshot($koneksi,$id)['data'];
+        }
+        authorization_finish($koneksi,$authorizationRequest,$authorizationRequestId,$authorizationApproverId,$authorizationDecisionNote);
+        payment_activity_record($koneksi,$id,$aksi === 'hapus' ? 'deleted' : 'edited',(int)$_SESSION['admin_id'],$before,$after,
+            $authorizationRequest ? 'applied:'.$authorizationRequestId : $aksi.':'.bin2hex(random_bytes(16)),
+            $authorizationRequestId ?: null,$authorizationDecisionNote);
+        $koneksi->commit();
+        $_SESSION['flash'] = ['type'=>'success','msg'=>$aksi === 'hapus' ? 'Pembayaran berhasil dibatalkan.' : 'Perubahan pembayaran berhasil disimpan.'];
+    } catch (Throwable $e) {
+        $koneksi->rollback();
+        authorization_fail_after_rollback($koneksi,$authorizationRequest,$authorizationRequestId,$authorizationApproverId,$e);
+        $_SESSION['flash'] = payment_failure_flash($e,'Perubahan gagal: ');
+        if (!$authorizationRequest && $aksi === 'update') {
+            payment_edit_draft_save($id,$returnContext);
+            $returnUrl = payment_return_edit_url($returnContext,$id);
+        }
+    }
+    header('Location: '.($authorizationRequest ? '../otorisasi_transaksi.php' : $returnUrl),true,303);
+    exit;
+}
+
 // ── INSERT ──────────────────────────────────
 if ($aksi === 'input') {
     if ($_SERVER['REQUEST_METHOD'] !== 'POST' || empty($_SESSION['csrf_payment'])
@@ -684,8 +785,28 @@ if ($aksi === 'input') {
     try {
         $tanggal_bayar = transaction_entry_timestamp($_POST['tanggal_bayar'] ?? null);
         financial_request_reserve($koneksi, $requestKey, 'pembayaran', (int)$_SESSION['admin_id']);
+        if (in_array($payment_plan,['range','academic'],true)) {
+            $student = payment_period_student($koneksi,$no_induk,true);
+            $plan = payment_period_confirmed_plan($koneksi,$_POST,$student['NO_INDUK']);
+            $method = normalize_payment_method($sistem_pembayaran);
+            $first = $plan['range']['mulai'];
+            $last = $plan['range']['akhir'];
+            validate_payment_context($tanggal_bayar,substr($last,5),substr($last,0,4),true);
+            $id = payment_period_write($koneksi,$student,$plan,$tanggal_bayar,$method,current_operator_id(),$catatan);
+            payment_activity_record($koneksi,$id,'created',(int)$_SESSION['admin_id'],null,
+                transaction_authorization_snapshot($koneksi,$id)['data'],'created:'.$id);
+            financial_request_complete($koneksi,$requestKey,$id);
+            $koneksi->commit();
+            unset($_SESSION['payment_draft'],$_SESSION['payment_drafts_by_unit'][unit_active_id()]);
+            $_SESSION['flash'] = ['type'=>'success','msg'=>'Pembayaran berhasil disimpan.',
+                'print_payment'=>['id'=>$id,'count'=>1,'bulan'=>substr($first,5),'tahun'=>substr($first,0,4),
+                    'period'=>payment_period_range_label($plan['range']),'source'=>'input',
+                    'unit_id'=>unit_active_id(),'actor_id'=>(int)$_SESSION['admin_id']]];
+            header('Location: form.php',true,303);
+            exit;
+        }
         $usePublishedSpp = spp_billing_schema_ready($koneksi);
-        if ($payment_plan !== 'monthly') throw new RuntimeException('Pembayaran banyak bulan sedang ditangguhkan. Gunakan transaksi bulanan.');
+        if ($payment_plan !== 'monthly') throw new RuntimeException('Pilihan periode tidak valid. Muat ulang formulir.');
         if (!in_array($spp_action, ['bayar'], true)) throw new RuntimeException('Tindakan SPP tidak dikenal.');
         reject_removed_payment_components($_POST);
         $sistem_pembayaran = normalize_payment_method($sistem_pembayaran);
@@ -732,22 +853,6 @@ if ($aksi === 'input') {
         $discount_parts = [$potongan_spp];
         $batch_token = null;
         $batch_count = 1;
-        if ($payment_plan === 'annual') {
-            $monthlyBill = (float)$siswa_data['SPP_PERBULAN'];
-            $annualBill = $monthlyBill * 12;
-            if ($monthlyBill <= 0) throw new RuntimeException('Tagihan SPP bulanan siswa belum diatur.');
-            if (abs($uang_spp - $annualBill) > 0.001) {
-                throw new RuntimeException('Pembayaran tahunan harus senilai 12 bulan penuh, yaitu Rp ' . number_format($annualBill, 0, ',', '.') . '.');
-            }
-            $periods = [];
-            for ($month = 1; $month <= 12; $month++) {
-                $periods[] = ['bulan' => str_pad((string)$month, 2, '0', STR_PAD_LEFT), 'tahun' => (string)$tahun_bayar];
-            }
-            $spp_parts = split_payment_amount($uang_spp, 12);
-            $discount_parts = split_payment_amount($potongan_spp, 12);
-            $batch_token = bin2hex(random_bytes(16));
-            $batch_count = 12;
-        }
 
         foreach ($periods as $index => $period) {
             $isFirst = $index === 0;
@@ -765,8 +870,6 @@ if ($aksi === 'input') {
         validate_graduate_payment($siswa_data, $graduateAmounts, $biaya_lain);
         $legacy_biaya_lain = legacy_biaya_lain_values($biaya_lain);
 
-        // Satu pembayaran tahunan disimpan sebagai 12 header transaksi agar
-        // setiap bulan memiliki nomor dan halaman struk sendiri.
         $sql = "INSERT INTO bayar (
             NO_INDUK, KELAS, U_PSB, U_SPP, U_KOMITE, U_LAIN, KETERANGAN,
             TGL_BYR, BULAN, TAHUN, user_id, sistem_pembayaran,
@@ -844,14 +947,12 @@ if ($aksi === 'input') {
         unset($_SESSION['payment_draft'], $_SESSION['payment_drafts_by_unit'][unit_active_id()]);
         $_SESSION['flash'] = [
             'type' => 'success',
-                'msg' => $payment_plan === 'annual'
-                ? 'Pembayaran tahunan berhasil dibagi menjadi 12 transaksi dan 12 struk!'
-                : 'Data pembayaran berhasil disimpan!',
+            'msg' => 'Data pembayaran berhasil disimpan!',
             'print_payment' => [
                 'id' => $receipt_ids[0],
                 'batch' => $batch_token,
                 'count' => $batch_count,
-                'bulan' => $payment_plan === 'annual' ? '01' : $bulan_bayar,
+                'bulan' => $bulan_bayar,
                 'tahun' => (string)$tahun_bayar,
                 'source' => 'input',
                 'unit_id' => unit_active_id(),
@@ -873,7 +974,6 @@ if ($aksi === 'update') {
     $id = (int)($_POST['id'] ?? 0);
     if ($id <= 0) authorization_abort_before_transaction($koneksi, $authorizationRequest, $authorizationRequestId, $authorizationApproverId, 'ID transaksi tidak valid.', 'lihat.php');
 
-    $no_induk        = trim($_POST['no_induk'] ?? '');
     $tanggal_bayar   = $_POST['tanggal_bayar'] ?? date('Y-m-d H:i:s');
 
     $bulan_bayar     = normalize_month_code($_POST['bulan_bayar'] ?? '');
@@ -900,10 +1000,6 @@ if ($aksi === 'update') {
     $tagihan_daftar_ulang_id = (int)($_POST['tagihan_daftar_ulang_id'] ?? 0);
     $spp_action = (string)($_POST['spp_action'] ?? 'bayar');
 
-    if (empty($no_induk)) {
-        authorization_abort_before_transaction($koneksi, $authorizationRequest, $authorizationRequestId, $authorizationApproverId, 'Pilih siswa terlebih dahulu.', 'edit.php?id=' . $id);
-    }
-
     payment_activity_begin_transaction($koneksi);
     try {
         if ($authorizationRequest) {
@@ -916,6 +1012,8 @@ if ($aksi === 'update') {
             $authorizationRequest = $lockedRequest;
         } else authorization_assert_no_pending($koneksi, $id);
         $old_bayar = find_linked_payment($koneksi, $id);
+        $no_induk = (string)$old_bayar['NO_INDUK'];
+        payment_assert_edit_student($no_induk, $_POST['no_induk'] ?? null);
         require_once __DIR__.'/../includes/payment_time.php';
         $tanggal_bayar = payment_time_native_update((string)$tanggal_bayar,(string)$old_bayar['TGL_BYR']);
         $activityBefore = transaction_authorization_snapshot($koneksi, $id)["data"];
