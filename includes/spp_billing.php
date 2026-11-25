@@ -92,6 +92,26 @@ function spp_current_effective_rate(mysqli $db, string $level, float $discountAm
     $result=spp_net_tariff($base,$discountAmount);$result['year']=(string)$master['label'];$result['basis']='system';$result['rule_version']=LB_RULE_VERSION;return $result;
 }
 
+/** Tarif pembanding pada pemilih kelas di formulir Data Siswa. */
+function spp_student_form_grade_rates(mysqli $db, string $year, array $preview): array {
+    $grades = range(...unit_level_bounds());
+    if (($preview['basis'] ?? '') === 'individual') return array_fill_keys($grades, $preview);
+    if (($preview['basis'] ?? '') === 'legacy') {
+        return array_fill_keys($grades, spp_net_tariff($preview['base'], 0.0) + ['year'=>$year, 'basis'=>'legacy']);
+    }
+    $master = spp_billing_schema_ready($db) ? lf_one($db, "SELECT m.id FROM master_spp_tahun m
+        JOIN tahun_ajaran y ON y.id=m.tahun_ajaran_id AND y.unit_id=m.unit_id
+        WHERE y.label=? AND m.status IN ('published','draft') LIMIT 1", [$year]) : null;
+    $rates = $master ? spp_master_rates($db, (int)$master['id']) : [];
+    $options = [];
+    foreach ($grades as $grade) {
+        $options[$grade] = spp_net_tariff((float)($rates[$grade] ?? 0), 0.0) + ($master
+            ? ['year'=>$year, 'basis'=>'system', 'rule_version'=>LB_RULE_VERSION]
+            : ['year'=>'Belum disiapkan']);
+    }
+    return $options;
+}
+
 /** Menyelaraskan potongan hanya pada penempatan yang sedang diedit. */
 function spp_sync_student_discount(mysqli $db, string $noInduk, float $discountAmount, ?int $placementId): array {
     if (!spp_billing_schema_ready($db) || !$placementId) return ['updated'=>0,'locked'=>0];

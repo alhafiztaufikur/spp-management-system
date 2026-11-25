@@ -16,12 +16,16 @@ function lb_scope_student_read(mysqli $db,string $nis): void {
     $GLOBALS['lb_read_student'][$db->thread_id]=$nis;
 }
 
-/** The new receipt has already locked this student in the active unit. */
-function lb_scope_payment_student(mysqli $db, string $nis, int $unit): void {
+/** The caller has already locked this student in the active unit. */
+function lb_scope_locked_student(mysqli $db, string $nis, int $unit): void {
     if (($_SERVER['REQUEST_METHOD'] ?? '') !== 'POST' || $unit < 1 || $unit !== unit_active_id() || $nis === '') {
-        throw new LogicException('Invalid payment evidence scope.');
+        throw new LogicException('Invalid student evidence scope.');
     }
     $GLOBALS['lb_payment_student'][$db->thread_id] = ['nis' => $nis, 'unit' => $unit, 'object' => spl_object_id($db)];
+}
+
+function lb_scope_payment_student(mysqli $db, string $nis, int $unit): void {
+    lb_scope_locked_student($db,$nis,$unit);
 }
 
 /** Master-page evidence only. The default reconciliation/payment model is unchanged. */

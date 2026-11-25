@@ -21,10 +21,6 @@ if (empty($_SESSION['csrf_student'])) {
     $_SESSION['csrf_student'] = bin2hex(random_bytes(32));
 }
 
-function student_history_count(mysqli $db, string $noInduk): int {
-    return mh_student_counts($db,unit_active_id(),$noInduk)['total'];
-}
-
 function find_student(mysqli $db, int $id, bool $forUpdate = false): ?array {
     $stmt = $db->prepare('SELECT * FROM siswa WHERE id = ? LIMIT 1' . ($forUpdate ? ' FOR UPDATE' : ''));
     $stmt->bind_param('i', $id);
@@ -32,7 +28,6 @@ function find_student(mysqli $db, int $id, bool $forUpdate = false): ?array {
     $student = $stmt->get_result()->fetch_assoc() ?: null;
     $stmt->close();
     if ($student && !empty($student['legacy_pending']) && $forUpdate) throw new RuntimeException('Gunakan Aktivasi Legacy; Pulihkan/Edit biasa tidak diizinkan.');
-    if ($student) $student['history_count'] = mh_student_counts($db,(int)$student['unit_id'],$student['NO_INDUK'],(int)$student['id'])['total'];
     return $student;
 }
 
@@ -143,8 +138,8 @@ if ($_SERVER['REQUEST_METHOD'] === 'POST') {
             $koneksi->begin_transaction();
             promotion_actor_lock($koneksi);
             $oldStudent = $action === 'update' ? find_student($koneksi, $id, true) : null;
-            $effectiveStudent=$oldStudent?lb_psb_effective($koneksi,$oldStudent):[];
             if ($action === 'update' && !$oldStudent) throw new RuntimeException('Data siswa tidak ditemukan.');
+            if ($oldStudent) lb_scope_locked_student($koneksi, $oldStudent['NO_INDUK'], (int)$oldStudent['unit_id']);
             [$noInduk, $name, $class, $classId] = validate_student_identity($koneksi, $_POST, $oldStudent);
             if ($oldStudent && $noInduk !== (string)$oldStudent['NO_INDUK']) {
                 throw new RuntimeException('Nomor induk tidak dapat diubah setelah siswa dibuat karena menjadi penghubung riwayat dan tagihan.');
@@ -186,6 +181,7 @@ if ($_SERVER['REQUEST_METHOD'] === 'POST') {
                 if(student_snapshots_differ($before,$after))write_student_audit($koneksi,$id,$noInduk,'update',$before,$after);
                 $koneksi->commit();$_SESSION['flash']=['type'=>'success','msg'=>'Identitas lulusan berhasil disimpan.'];student_redirect('daftar.php?status=archived');
             }
+            $effectiveStudent=$oldStudent?lb_psb_effective($koneksi,$oldStudent):[];
             $feeInputs = [
                 'PSB' => ['psb', 'Uang PSB'],
                 'potongan_psb_nominal' => ['potongan_psb_nominal', 'Potongan PSB'],
@@ -250,7 +246,7 @@ if ($_SERVER['REQUEST_METHOD'] === 'POST') {
             }
             $sppDiscountAmount = $values['potongan_spp_nominal'];
             $psb = $values['PSB'];
-            $psbDiscountAmount=$values['potongan_psb_nominal'];
+            $psbDiscountAmount = $values['potongan_psb_nominal'];
             $pomg = $values['POMG'];
             $daftarUlang = $values['DAFTAR_ULANG'];
             $totDu = $values['tot_du'];
@@ -262,23 +258,21 @@ if ($_SERVER['REQUEST_METHOD'] === 'POST') {
                     INSERT INTO siswa (
                       NO_INDUK, NAMA, KELAS, SPP_PERBULAN, potongan_spp_nominal, PSB, asal_psb,
                       POMG, DAFTAR_ULANG, NO_induk_diknas,
-                      tot_du, potong_du, is_active
+                      tot_du, potong_du, is_active, potongan_psb_nominal, master_kelas_id
                     ) VALUES (
                       ?, ?, ?, ?, ?, ?, ?, ?, ?,
-                      NULLIF(?, ''), ?, ?, ?
+                      NULLIF(?, ''), ?, ?, ?, ?, ?
                     )
                 ");
                 $stmt->bind_param(
-                    'sssdddiddsddi',
+                    'sssdddiddsddidi',
                     $noInduk, $name, $class, $spp, $sppDiscountAmount, $psb, $asalPsb, $pomg,
-                    $daftarUlang, $nisDiknas, $totDu, $potongDu, $active
+                    $daftarUlang, $nisDiknas, $totDu, $potongDu, $active, $psbDiscountAmount, $classId
                 );
                 $stmt->execute();
                 $id = $koneksi->insert_id;
                 $stmt->close();
-                $discountStmt=$koneksi->prepare('UPDATE siswa SET potongan_psb_nominal=? WHERE id=?');$discountStmt->bind_param('di',$values['potongan_psb_nominal'],$id);$discountStmt->execute();$discountStmt->close();
-                $stmtClass = $koneksi->prepare('UPDATE siswa SET master_kelas_id = ? WHERE id = ?');
-                $stmtClass->bind_param('ii', $classId, $id); $stmtClass->execute(); $stmtClass->close();
+                lb_scope_locked_student($koneksi, $noInduk, unit_active_id());
                 $tariffSync = null;
                 $outResult = sout_transition($koneksi,$id,$oldStudent,$targetKind,(int)$_SESSION['admin_id']);
                 $active=$outResult['is_active'];
@@ -299,18 +293,15 @@ if ($_SERVER['REQUEST_METHOD'] === 'POST') {
                       NO_INDUK=?, NAMA=?, KELAS=?, SPP_PERBULAN=?, potongan_spp_nominal=?, PSB=?, potongan_psb_nominal=?,
                       POMG=?, DAFTAR_ULANG=?,
                       NO_induk_diknas=NULLIF(?, ''),
-                      tot_du=?, potong_du=? WHERE id=?
+                      tot_du=?, potong_du=?, master_kelas_id=? WHERE id=?
                 ");
                 $stmt->bind_param(
-                    'sssddddddsddi',
+                    'sssddddddsddii',
                     $noInduk, $name, $class, $spp, $sppDiscountAmount, $psb,$psbDiscountAmount, $pomg,
-                    $daftarUlang, $nisDiknas, $totDu, $potongDu, $id
+                    $daftarUlang, $nisDiknas, $totDu, $potongDu, $classId, $id
                 );
                 $stmt->execute();
                 $stmt->close();
-                $discountStmt=$koneksi->prepare('UPDATE siswa SET potongan_psb_nominal=? WHERE id=?');$discountStmt->bind_param('di',$values['potongan_psb_nominal'],$id);$discountStmt->execute();$discountStmt->close();
-                $stmtClass = $koneksi->prepare('UPDATE siswa SET master_kelas_id = ? WHERE id = ?');
-                $stmtClass->bind_param('ii', $classId, $id); $stmtClass->execute(); $stmtClass->close();
                 $tariffSync = null;
                 $outResult = sout_transition($koneksi,$id,$oldStudent,$targetKind,(int)$_SESSION['admin_id']);
                 $active=$outResult['is_active'];
@@ -409,6 +400,7 @@ if ($_SERVER['REQUEST_METHOD'] === 'POST') {
             $student = find_student($koneksi, $id, true);
             if($student && $student['KELAS']==='OUT' && $targetStatus==='1')throw new RuntimeException('Pilih rombel tujuan melalui Edit untuk memulihkan siswa Out.');
             if (!$student) throw new RuntimeException('Data siswa tidak ditemukan.');
+            lb_scope_locked_student($koneksi, $student['NO_INDUK'], (int)$student['unit_id']);
             $stmtGraduate = $koneksi->prepare("SELECT 1 FROM siswa_tahun_ajaran WHERE no_induk=? AND status='lulus' LIMIT 1");
             $graduateNoInduk = (string)$student['NO_INDUK'];
             $stmtGraduate->bind_param('s', $graduateNoInduk);
@@ -457,6 +449,8 @@ if ($editId > 0 && !$editStudent) {
     $_SESSION['flash'] = ['type' => 'error', 'msg' => 'Data siswa tidak ditemukan.'];
     student_redirect('daftar.php');
 }
+if ($editStudent && !empty($editStudent['legacy_pending'])) { header('Location: aktivasi_legacy.php?id='.(int)$editStudent['id']); exit; }
+if ($editStudent && $_SERVER['REQUEST_METHOD'] === 'GET') lb_scope_student_read($koneksi, $editStudent['NO_INDUK']);
 
 $query = trim((string)($_GET['q'] ?? ''));
 require_once '../includes/student_filters.php';
@@ -491,12 +485,7 @@ $offset = ($page - 1) * $perPage;
 
 $stmtList = $koneksi->prepare("
     SELECT s.*, mk.jenis AS rombel_jenis, mk.nama_custom AS rombel_nama, mk.tingkat AS master_tingkat, mk.kode_rombel, mk.is_placeholder,
-      COALESCE(admission.spp_rate, s.SPP_PERBULAN) AS display_spp_rate,
-      (SELECT COUNT(*) FROM bayar p WHERE p.NO_INDUK = s.NO_INDUK AND p.unit_id=s.unit_id) AS jml_bayar,
-      ((SELECT COUNT(*) FROM bayar p WHERE p.NO_INDUK = s.NO_INDUK AND p.unit_id=s.unit_id) +
-       (SELECT COUNT(*) FROM bayar_du du WHERE du.no_induk = s.NO_INDUK AND du.unit_id=s.unit_id) +
-       (SELECT COUNT(*) FROM transaksi_m tm WHERE tm.NO_INDUK = s.NO_INDUK AND tm.unit_id=s.unit_id) +
-       (SELECT COUNT(*) FROM transaksi_k tk WHERE tk.NO_INDUK = s.NO_INDUK AND tk.unit_id=s.unit_id)) AS history_count
+      COALESCE(admission.spp_rate, s.SPP_PERBULAN) AS display_spp_rate
     FROM $studentReadSource s
     LEFT JOIN master_kelas mk ON mk.id = s.master_kelas_id
     LEFT JOIN psb_spp_plans admission ON s.KELAS IN ('0', 'PSB') AND admission.unit_id=s.unit_id AND admission.student_id=s.id
@@ -559,7 +548,6 @@ $komiteStartMonth = '07';
 $editStudentYear = $editStudent
     ? spp_student_effective_year($koneksi, (string)$editStudent['NO_INDUK'])
     : du_current_academic_year();
-if ($editStudent && !empty($editStudent['legacy_pending'])) { header('Location: aktivasi_legacy.php?id='.(int)$editStudent['id']); exit; }
 if ($editStudent) {
     $stmtKomiteStart=$koneksi->prepare('SELECT sta.komite_mulai_bulan FROM siswa_tahun_ajaran sta JOIN tahun_ajaran ta ON ta.id=sta.tahun_ajaran_id WHERE sta.no_induk=? AND ta.label=? LIMIT 1');
     $stmtKomiteStart->bind_param('ss',$editStudent['NO_INDUK'],$editStudentYear);$stmtKomiteStart->execute();
@@ -588,7 +576,7 @@ function rupiah_value($value): string {
 $previewLevel = (string)($formStudent['KELAS'] ?? '');
 $previewDiscount = (float)form_student_value('potongan_spp_nominal', $oldInput, $formStudent, $fieldMap, 0);
 $sppRatePreview = spp_current_effective_rate($koneksi, $previewLevel, $previewDiscount, $editStudentYear, $editStudent ? (string)$editStudent['NO_INDUK'] : null);
-$sppRatesByGrade=[];[$firstGrade,$lastGrade]=unit_level_bounds();foreach(range($firstGrade,$lastGrade) as $grade)$sppRatesByGrade[$grade]=spp_current_effective_rate($koneksi,(string)$grade,0,$editStudentYear,$editStudent ? (string)$editStudent['NO_INDUK'] : null);
+$sppRatesByGrade = spp_student_form_grade_rates($koneksi, $editStudentYear, $sppRatePreview);
 if(in_array($previewLevel,['CUSTOM','OUT'],true))$sppRatePreview=['base'=>0,'net'=>0,'year'=>'Nonakademik'];
 if ($formAdmission && in_array($previewLevel, ['0', 'PSB', (string)$admissionFirstLevel], true)) {
     $displayRate = (float)pspp_display_rate($koneksi, $formAdmission);
