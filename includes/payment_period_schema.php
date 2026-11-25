@@ -18,6 +18,12 @@ function payment_period_schema_plan(mysqli $db): array {
         AND TABLE_NAME IN ('pembayaran_rentang','pembayaran_rentang_data')")->fetch_all(MYSQLI_ASSOC);
     $types = array_column($objects, 'TABLE_TYPE', 'TABLE_NAME');
     if (!isset($types['pembayaran_rentang_data'])) {
+        $paymentKeys = $db->query("SELECT GROUP_CONCAT(COLUMN_NAME ORDER BY SEQ_IN_INDEX) AS cols
+            FROM information_schema.STATISTICS WHERE TABLE_SCHEMA=DATABASE()
+            AND TABLE_NAME='bayar_data' AND NON_UNIQUE=0 GROUP BY INDEX_NAME")->fetch_all(MYSQLI_ASSOC);
+        if (!in_array('unit_id,id', array_column($paymentKeys, 'cols'), true)) {
+            $steps[] = 'ALTER TABLE bayar_data ADD UNIQUE KEY uk_payment_period_bayar_unit_id (unit_id, id)';
+        }
         $steps[] = "CREATE TABLE pembayaran_rentang_data (
             bayar_id INT NOT NULL PRIMARY KEY, unit_id TINYINT UNSIGNED NOT NULL,
             mode ENUM('range','academic') NOT NULL, mulai CHAR(7) NOT NULL, akhir CHAR(7) NOT NULL,

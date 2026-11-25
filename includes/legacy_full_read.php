@@ -91,14 +91,14 @@ function lful_monthly_coverage_snapshot(mysqli $db,array $identities,string $cat
         $snapshot['coverage'][$coverage['student_id']][$category][$coverage['period']]=$coverage;
     return $snapshot;
 }
-function lful_coverage_status(mysqli $db,string $nis,string $category,string $period,?array $snapshot=null): ?array {
+function lful_coverage_status(mysqli $db,string $nis,string $category,string $period,?array $snapshot=null,bool $inferHistoricalGap=true): ?array {
     if($snapshot===null){
         if(!lful_is_covered($db,$nis,$category,$period))return null;
         $c=lf_one($db,'SELECT c.*,fs.review_id FROM legacy_full_coverage c JOIN legacy_full_students fs ON fs.student_id=c.student_id AND fs.unit_id=c.unit_id JOIN siswa s ON s.id=c.student_id AND s.unit_id=c.unit_id WHERE s.NO_INDUK=? AND c.category=? AND c.period=?',[$nis,$category,$period]);
     }else{
         $student=$snapshot['students'][$nis]??null;if(!$student)return null;
         $c=$snapshot['coverage'][$student['student_id']][$category][$period]??null;
-        if(!$c&&!(in_array($category,['spp','komite'],true)&&$period<($student['settings']['start_period']??'')))return null;
+        if(!$c&&(!$inferHistoricalGap||!in_array($category,['spp','komite'],true)||$period>=($student['settings']['start_period']??'')))return null;
         if($c)$c['review_id']=$student['review_id'];
     }
     if(!$c)return ['label'=>'Histori Legacy · kewajiban tidak tercatat','bill'=>0.0,'paid'=>0.0];

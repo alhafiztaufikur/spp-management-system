@@ -136,8 +136,19 @@ function payment_period_plan(mysqli $db, string $nis, string $mode, string $choi
         $calendar = (int)substr($startYear,0,4) + ($startMonth < '07' ? 1 : 0);
         $inspectionStart = min($start,$calendar.'-'.$startMonth);
     }
-    $pointer = new DateTimeImmutable($inspectionStart.'-01');
-    while (($period = $pointer->format('Y-m')) <= $end) {
+    $periods = [];
+    $missing = ['spp'=>[], 'komite'=>[]];
+    for ($pointer = new DateTimeImmutable($inspectionStart.'-01'); ($period = $pointer->format('Y-m')) <= $end; $pointer = $pointer->modify('+1 month')) {
+        $periods[] = $period;
+        foreach (array_keys($missing) as $kind) {
+            if (!isset($bills[$period][$kind])) $missing[$kind][] = $period;
+        }
+    }
+    $coverageByKind = [];
+    foreach ($missing as $kind => $months) {
+        $coverageByKind[$kind] = lful_monthly_coverage_snapshot($db, [$nis], $kind, $months);
+    }
+    foreach ($periods as $period) {
         $year = lb_payment_year($period);
         $month = substr($period, 5);
         $placementStart = $starts[$year] ?? '';
@@ -147,7 +158,7 @@ function payment_period_plan(mysqli $db, string $nis, string $mode, string $choi
         foreach (['spp','komite'] as $kind) {
             $bill = $bills[$period][$kind] ?? null;
             if (!$bill) {
-                $coverage = lful_coverage_status($db,$nis,$kind,$period);
+                $coverage = lful_coverage_status($db,$nis,$kind,$period,$coverageByKind[$kind],inferHistoricalGap:false);
                 $state = match($coverage['label'] ?? '') {
                     'Sudah dibayar (Legacy)', 'Lunas (Tunggakan Legacy)' => 'settled',
                     'Tidak ditagihkan (Legacy)', 'Dibatalkan (Legacy)' => 'exempt',
@@ -165,7 +176,6 @@ function payment_period_plan(mysqli $db, string $nis, string $mode, string $choi
             $komite += $line['komite']['remaining'] ?? 0;
             $result['rows'][] = $line;
         }
-        $pointer = $pointer->modify('+1 month');
     }
     $result['spp_total'] = $spp;
     $result['komite_total'] = $komite;
@@ -296,15 +306,27 @@ function payment_period_save_allocations(mysqli $db,array $student,array $plan,s
         $stmt->execute();
         $batchId = (int)$db->insert_id;
         $stmt->close();
-        $allocation = $db->prepare('INSERT INTO spp_alokasi(batch_id,tagihan_spp_id,nominal_dari_bayar) VALUES(?,?,?)');
     }
+    $sppRows = $komiteRows = [];
     foreach ($plan['rows'] as $row) {
         if ($row['spp']['remaining']) {
-            $amount = $row['spp']['remaining']/100;
-            $allocation->bind_param('iid',$batchId,$row['spp']['id'],$amount);
-            $allocation->execute();
+            $sppRows[] = [$batchId,$row['spp']['id'],$row['spp']['remaining']/100];
         }
-        if ($row['komite']['remaining']) komite_save_payment($db,$id,$row['komite'],$row['komite']['remaining']/100);
+        if ($row['komite']['remaining']) {
+            $komiteRows[] = [$id,$row['komite']['id'],$row['komite']['remaining']/100];
+        }
     }
-    if (isset($allocation)) $allocation->close();
+    foreach ([
+        'spp_alokasi(batch_id,tagihan_spp_id,nominal_dari_bayar)' => $sppRows,
+        'bayar_komite(bayar_id,tagihan_komite_id,nominal)' => $komiteRows,
+    ] as $target => $rows) {
+        foreach (array_chunk($rows, 100) as $chunk) {
+            $values = implode(',', array_fill(0, count($chunk), '(?,?,?)'));
+            $parameters = array_merge(...$chunk);
+            $stmt = $db->prepare("INSERT INTO $target VALUES $values");
+            $stmt->bind_param(str_repeat('iid', count($chunk)), ...$parameters);
+            $stmt->execute();
+            $stmt->close();
+        }
+    }
 }

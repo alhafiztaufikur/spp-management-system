@@ -278,7 +278,6 @@ unset($_SESSION['payment_draft']);
 
           <!-- Rincian Pembayaran -->
           <?php if ($periodEnabled) require __DIR__.'/../includes/payment_period_preview.php'; ?>
-          <fieldset class="payment-period-monthly-fieldset"<?= $periodEnabled ? ' data-payment-period-monthly' : '' ?>>
           <div class="section-divider"><span>Rincian Pembayaran</span></div>
           <div class="alert alert-warning payment-overpaid-alert" id="payment-overpaid-alert" hidden></div>
           <div class="alert alert-warning payment-input-overlimit-alert" id="payment-input-overlimit-alert" hidden></div>
@@ -304,7 +303,7 @@ unset($_SESSION['payment_draft']);
                 foreach ($komponen as $i => $k):
                   [$key, $label, $name] = $k;
                 ?>
-                <tr class="<?= $i % 2 === 0 ? 'row-highlight' : '' ?>">
+                <tr class="<?= $i % 2 === 0 ? 'row-highlight' : '' ?>"<?= $periodEnabled && in_array($key, ['spp', 'komite'], true) ? ' data-payment-period-monthly-row' : '' ?>>
                   <td><?php if($key==='du'): ?><div class="du-bill-selector"><button type="button" class="du-selector-trigger" id="du-selector-trigger" aria-haspopup="listbox" aria-controls="du-selector-menu" aria-expanded="false"><span class="du-trigger-label"><?= $label ?></span><span class="du-arrear-warning" id="du-arrear-warning" role="img" hidden></span><span class="du-chevron" aria-hidden="true"><svg viewBox="0 0 16 16" focusable="false"><path d="M3.5 6 8 10 12.5 6"/></svg></span></button><div class="du-selector-menu" id="du-selector-menu" role="listbox" aria-label="Pilih tagihan Daftar Ulang" tabindex="-1" hidden></div></div><?php else: ?><span class="comp-label"<?= $key === 'spp' ? ' id="spp-component-label"' : '' ?>><?= $label ?></span><?php endif; ?><?php if($key==='spp'): ?><small class="du-inline-context du-context-label" id="spp-context-label">Pilih bulan tagihan.</small><?php endif; ?><?php if($key==='komite'): ?><small class="du-inline-context du-context-label" id="komite-context-label">Lunas penuh per bulan.</small><?php endif; ?><?php if(in_array($key,['psb'],true)): ?><small class="du-inline-context du-context-label" id="<?=$key?>-context-label">Pilih siswa untuk melihat tagihan.</small><?php endif; ?><?php if($key==='du'): ?><small class="du-inline-context du-context-label" id="du-context-label">Pilih siswa untuk melihat tagihan.</small><small class="du-inline-context du-master-warning" id="du-master-warning" hidden></small><?php endif; ?></td>
                   <td data-label="Total Tagihan"><input class="tbl-input tbl-system" type="text" value="0" id="<?=$key?>-total" readonly tabindex="-1" aria-readonly="true" /></td>
                   <td data-label="Sudah Terbayar"><input class="tbl-input tbl-system" type="text" value="0" id="<?=$key?>-bayar" readonly tabindex="-1" aria-readonly="true" /></td>
@@ -365,7 +364,6 @@ unset($_SESSION['payment_draft']);
           </template>
 
           <input type="hidden" id="potongan-spp" name="potongan_spp" value="0" />
-          </fieldset>
 
           <input type="hidden" id="catatan" name="catatan" value="">
           <div class="section-divider"><span>History Transaksi Siswa</span></div>

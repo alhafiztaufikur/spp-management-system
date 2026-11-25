@@ -99,7 +99,7 @@ document.addEventListener('DOMContentLoaded', () => {
     status.toggleAttribute('data-blocked', Boolean(result.blocking));
   }
 
-  async function load(selected = '') {
+  async function load(selected = '', includeChoices = false) {
     request?.abort();
     resetResult(nis.value ? 'Memuat rincian tagihan…' : 'Pilih siswa untuk melihat periode tagihan.');
     if (mode.value === 'monthly' || !nis.value) return;
@@ -113,7 +113,7 @@ document.addEventListener('DOMContentLoaded', () => {
       const result = await response.json();
       if (controller.signal.aborted) return;
       if (!response.ok) throw new Error(result.error || 'Rincian gagal dimuat.');
-      if (selected) {
+      if (selected && !includeChoices) {
         show(result);
         return;
       }
@@ -132,12 +132,9 @@ document.addEventListener('DOMContentLoaded', () => {
       choice.disabled = options.length === 1;
       status.textContent = choice.disabled ? 'Belum ada tagihan SPP atau Komite yang bisa dibayar pada pilihan ini.'
         : (!editId ? 'Pilih Bulan Akhir untuk membayar SPP dan Komite.' : options[0].text);
-      if (initialChoice && options.some(option => option.value === initialChoice)) {
-        choice.value = initialChoice;
-        initialChoice = '';
-        load(choice.value);
-      } else {
-        initialChoice = '';
+      if (selected && options.some(option => option.value === selected)) {
+        choice.value = selected;
+        show(result);
       }
     } catch (error) {
       if (controller.signal.aborted) return;
@@ -173,7 +170,9 @@ document.addEventListener('DOMContentLoaded', () => {
     choice.replaceChildren(new Option(nis.value ? 'Memuat…' : 'Pilih siswa dahulu', ''));
     choice.disabled = true;
     controls.querySelector('[data-payment-period-oldest]').textContent = '—';
-    load();
+    const selected = initialChoice;
+    initialChoice = '';
+    load(selected, true);
   }
 
   mode.addEventListener('change', synchronize);
