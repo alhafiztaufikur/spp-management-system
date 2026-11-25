@@ -7,6 +7,7 @@ require_once 'includes/reports.php';
 require_once 'includes/spp_rate_confirmation.php';
 require_once 'includes/student_tariff_consistency.php';
 require_once 'includes/spp_advance.php';
+require_once 'includes/master_year_limit.php';
 requireRole(['admin', 'kasir']);
 lop_preview_tariffs($koneksi);
 if (!spp_billing_schema_ready($koneksi)) die('Schema Master SPP belum tersedia. Hubungi operator untuk migrasi skema.');
@@ -41,6 +42,7 @@ try {
     }
     $selectedYear=du_current_academic_year();
 }
+master_year_check($selectedYear, 'master_spp.php', 'SPP', $_SESSION['csrf_master_spp']);
 $master=mspp_read_year($koneksi,$selectedYear);$masterId=(int)$master['id'];
 $flash=$_SESSION['flash']??null;unset($_SESSION['flash']);
 $studentTariffRequest=$isPost&&is_string($_POST['aksi']??null)&&in_array($_POST['aksi'],['simpan_tarif_siswa','reset_tarif_siswa'],true);
@@ -208,10 +210,10 @@ $yearStart = (int)substr($selectedYear, 0, 4);
       <div class="spp-year-picker">
         <div class="spp-year-control">
           <a class="spp-icon-button" href="master_spp.php?tahun=<?= urlencode(($yearStart - 1) . '/' . $yearStart) ?>" aria-label="Tahun ajaran sebelumnya"><svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><path d="m14 6-6 6 6 6"/></svg></a>
-          <form method="get"><label class="spp-sr-only" for="spp-year-choice">Tahun ajaran</label><select class="field-input field-select" id="spp-year-choice" name="tahun" onchange="this.form.submit()">
+          <form method="get"><label class="spp-sr-only" for="spp-year-choice">Tahun ajaran</label><select class="field-input field-select" id="spp-year-choice" name="tahun" data-master-year-choice="<?= mspp_e($selectedYear) ?>">
           <?php foreach ($years as $year): ?><option value="<?= mspp_e($year) ?>" <?= $year === $selectedYear ? 'selected' : '' ?>><?= mspp_e($year) ?></option><?php endforeach; ?>
           </select><noscript><button type="submit" class="btn btn-ghost">Tampilkan</button></noscript></form>
-          <a class="spp-icon-button" href="master_spp.php?tahun=<?= urlencode(($yearStart + 1) . '/' . ($yearStart + 2)) ?>" aria-label="Tahun ajaran berikutnya"><svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><path d="m10 6 6 6-6 6"/></svg></a>
+          <a class="spp-icon-button" href="master_spp.php?tahun=<?= urlencode(($yearStart + 1) . '/' . ($yearStart + 2)) ?>" data-master-year-link="<?= ($yearStart + 1) . '/' . ($yearStart + 2) ?>" aria-label="Tahun ajaran berikutnya"><svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><path d="m10 6 6 6-6 6"/></svg></a>
         </div>
         <span data-sct-year-status class="recap-status <?= $master['status'] === 'draft' ? 'is-partial' : ($master['status'] === 'published' ? 'is-paid' : 'is-unpaid') ?>"><?= mspp_e(strtoupper($master['status'])) ?></span>
       </div>
@@ -315,4 +317,5 @@ $yearStart = (int)substr($selectedYear, 0, 4);
 <script id="spp-rate-confirmation-data" type="application/json"><?= json_encode(['year'=>$selectedYear,'unit'=>unit_label(unit_active_id()),'rates'=>array_diff_key($rates,[$firstLevel=>true]),'copy'=>array_combine(['simpan_tarif','ubah_tarif_terbit','terbitkan'],array_map(static fn($action)=>spp_rate_confirmation_copy($action,$selectedYear===du_next_year()),['simpan_tarif','ubah_tarif_terbit','terbitkan']))],JSON_HEX_TAG|JSON_HEX_AMP|JSON_HEX_APOS|JSON_HEX_QUOT|JSON_UNESCAPED_UNICODE) ?></script>
 <script src="assets/js/spp_rate_confirmation.js?v=<?= filemtime(__DIR__.'/assets/js/spp_rate_confirmation.js') ?>"></script>
 <script src="assets/js/master_spp.js?v=<?= filemtime(__DIR__ . '/assets/js/master_spp.js') ?>"></script>
+<?php master_year_limit_dialog('master_spp.php', 'SPP'); ?>
 </body></html>

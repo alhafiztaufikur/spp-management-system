@@ -2939,6 +2939,18 @@ body.spp-warning-open { overflow: hidden; }
   transition: transform 0.22s cubic-bezier(0.22, 1, 0.36, 1);
 }
 .spp-warning-overlay.show .spp-warning-dialog { transform: translateY(0) scale(1); }
+.master-year-limit {
+  margin: 0;
+  padding: 0;
+  border: 0;
+  width: 100%;
+  height: 100%;
+  max-width: none;
+  max-height: none;
+  background: transparent;
+}
+.master-year-limit::backdrop { background: transparent; }
+.master-year-limit-fallback { width: min(440px, calc(100% - 32px)); margin: 48px auto; padding: 24px; }
 .spp-warning-title {
   margin: 0;
   color: var(--text-primary);
