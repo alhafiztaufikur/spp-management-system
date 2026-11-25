@@ -12,7 +12,7 @@
  body .desktop-pagination-source{display:none!important}
  body .desktop-pager[hidden]{display:none!important}
  .ph-list-panel>.desktop-pager{padding:0 14px}
- html body#global-report-workspace .report-template-shell>.desktop-pager{box-sizing:border-box;margin:0;padding:16px 24px 20px}
+ html body#global-report-workspace .report-template-shell [data-report-results]>.desktop-pager{box-sizing:border-box;margin:0;padding:16px 24px 20px}
 }
 
 .desktop-only-placeholder{display:none}

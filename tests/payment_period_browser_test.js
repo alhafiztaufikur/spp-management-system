@@ -446,7 +446,7 @@ async function approve(ctx,id) {
     fs.writeFileSync(spreadsheetPath,sheet);
     assert.ok(JSON.parse(cli('xlsx_rows',spreadsheetPath)).some(row => row.includes('November 2026 – April 2027')));
 
-    const statusParams = new URLSearchParams({template:'status',unit:'1',tahun_ajaran:'2026/2027',q:fixture.cases.main.nis});
+    const statusParams = new URLSearchParams({template:'status',unit:'1',rekap:'1',tahun_ajaran:'2026/2027',q:fixture.cases.main.nis});
     const expectedPeriods = ['Juli 2026','Agustus 2026','September 2026','Oktober 2026','November 2026','Desember 2026','Januari 2027','Februari 2027','Maret 2027','April 2027','Mei 2027','Juni 2027'];
     const columnPeriods = async () => (await report.locator('.report-horizontal-matrix th[scope=colgroup]').allTextContents()).map(label => label.split(' · ').at(-1));
     statusParams.set('kategori','spp');

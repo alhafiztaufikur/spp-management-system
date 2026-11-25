@@ -1,21 +1,21 @@
 <?php
 require_once __DIR__.'/filter_choices.php';
-function report_multiple_normalize(mysqli $db,array &$source):array{
+function report_multiple_normalize(mysqli $db,array &$source,?array $catalog=null):array{
     $classes=[];$bounds=($GLOBALS['app_unit_id']??1)===0?[1,12]:report_query_level_bounds();foreach(range(...$bounds) as $level)$classes['tingkat:'.$level]='Tingkat '.$level;
-    foreach(report_classes($db) as $class)$classes['rombel:'.$class['id']]=$class['label'];
-    $years=array_column(report_years($db),'label','label');
+    foreach(($catalog['classes']??report_classes($db)) as $class)$classes['rombel:'.$class['id']]=$class['label'];
+    $years=array_column($catalog['years']??report_years($db),'label','label');
     $operatorPicker=in_array($source['template']??'',['penerimaan','tabungan-siswa','setoran','kas-tabungan'],true)||isset($source['operator']);
-    $operators=$operatorPicker?(($source['template']??'')==='tabungan-siswa'?savings_operator_options($db,false):array_column(report_operator_options($db),'nama','id')):[];
+    $operators=$catalog['operators']??($operatorPicker?(($source['template']??'')==='tabungan-siswa'?savings_operator_options($db,false):array_column(report_operator_options($db),'nama','id')):[]);
     $categoryPicker=in_array($source['template']??'',['status','per-item','penerimaan'],true)||isset($source['kategori']);
     $spec=[
-        'kategori'=>[$categoryPicker?report_categories($db):['spp'=>'SPP'],($source['template']??'')==='penerimaan'?'semua':'spp','semua'],
+        'kategori'=>[$categoryPicker?($catalog['categories']??report_categories($db)):['spp'=>'SPP'],($source['template']??'')==='penerimaan'?'semua':'spp','semua'],
         'kelas'=>[$classes,'',''], 'tahun_ajaran'=>[$years,du_current_academic_year(),array_key_first($years)??du_current_academic_year()],
         'bulan_awal'=>[report_status_months(),date('m'),date('m')],
         'status'=>[array_fill_keys(['tidak_ditagihkan','belum_bayar','cicilan','lunas','covered_psb','rekonsiliasi','ada_pembayaran','tunggakan','dibatalkan'],''),'',''],
         'siswa_status'=>[['active'=>'Aktif','archived'=>'Arsip/Lulus'],($source['template']??'')==='riwayat-tagihan'?'all':'active','all'],
         'metode'=>[['Tunai'=>'Tunai','VA'=>'VA','Qris'=>'QRIS','Legacy'=>'Histori Legacy'],'',''], 'mutasi'=>[['masuk'=>'Masuk','keluar'=>'Keluar'],'',''],
         'saldo_status'=>[['ada_saldo'=>'Ada Saldo','saldo_nol'=>'Saldo Nol'],'',''], 'operator'=>[$operators,'',''],
-        'komponen_tagihan'=>[report_billing_categories($db),'',''],
+        'komponen_tagihan'=>[$catalog['billingCategories']??report_billing_categories($db),'',''],
     ];$multi=[];
     foreach($spec as $key=>[$options,$default,$all]){
         // Range boundary months are scalar; only Status has a month selection filter.

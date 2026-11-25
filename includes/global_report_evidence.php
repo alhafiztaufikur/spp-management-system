@@ -271,27 +271,33 @@ function report_legacy_years(mysqli $db): array {
     $cacheKey=$db->thread_id.':'.report_query_unit_id();
     if($cacheRead&&isset($readCache[$cacheKey]))return $readCache[$cacheKey];
     $years=[];
+    $completed = null;
     foreach(['legacy_full_payments'=>lful_read_ready($db),'legacy_op_payments'=>lop_ready($db)] as $table=>$ready){if(!$ready)continue;
-        $from=" FROM $table p JOIN legacy_full_batches b ON b.id=p.batch_id AND b.unit_id=p.unit_id WHERE b.state='completed'".($table==='legacy_op_payments'?' AND p.cancelled=0':'');
-        // Read the small set of source periods through the covering index first.
-        // Source-year fallback is already represented by these periods. Only DU
-        // receipts can add a different, metadata-backed obligation year.
+        $completed ??= hp_completed_batch_predicate($db,'p');
+        $from=" FROM $table p WHERE ".$completed.($table==='legacy_op_payments'?' AND p.cancelled=0':'');
         $unparsed=[];
-        foreach(hp_rows($db,'SELECT DISTINCT p.source_period'.$from) as $p){$period=report_source_period((string)$p['source_period']);if($period&&$period['year']!=='')$years[$period['year']]=true;elseif($period===null)$unparsed[]="'".$db->real_escape_string((string)$p['source_period'])."'";}
+        foreach(hp_rows($db,hp_scan_sql($db,'SELECT DISTINCT p.source_period'.$from)) as $p){$period=report_source_period((string)$p['source_period']);if($period&&$period['year']!=='')$years[$period['year']]=true;elseif($period===null)$unparsed[]="'".$db->real_escape_string((string)$p['source_period'])."'";}
+        if ($table !== 'legacy_op_payments') continue;
+
         $candidate=report_du_metadata_candidate_sql('p');
-        if($table==='legacy_op_payments')foreach(hp_rows($db,"SELECT DISTINCT migration_du_year FROM (
+        $indexed = history_performance_du_ready($db);
+        if ($indexed) $candidate = history_performance_du_expression('p').'>0 AND ('.$candidate.')';
+        $sql = "SELECT DISTINCT migration_du_year FROM (
             SELECT MIN(mp.period) migration_du_year FROM $table p
-            JOIN legacy_full_batches b ON b.id=p.batch_id AND b.unit_id=p.unit_id
             JOIN JSON_TABLE(CAST(p.items AS JSON),'$[*]' COLUMNS(category VARCHAR(100) PATH '$.category',version INT PATH '$.migration.version' NULL ON EMPTY,period VARCHAR(9) PATH '$.migration.period' NULL ON EMPTY)) mp
-            WHERE b.state='completed' AND p.cancelled=0
-              AND ($candidate)=1
+            WHERE $completed AND p.cancelled=0
+              AND ($candidate)
               AND mp.category='daftar_ulang' AND mp.version IN (1,2,3,4,5)
               AND mp.period REGEXP '^20[0-9]{2}/20[0-9]{2}$'
               AND CAST(RIGHT(mp.period,4) AS UNSIGNED)=CAST(LEFT(mp.period,4) AS UNSIGNED)+1
-            GROUP BY p.unit_id,p.id) metadata_years") as $p)if(lma_year((string)($p['migration_du_year']??''))!=='')$years[$p['migration_du_year']]=true;
+            GROUP BY p.unit_id,p.id) metadata_years";
+        $sql = $indexed
+            ? str_replace('FROM `legacy_op_payments_data` WHERE','FROM `legacy_op_payments_data` FORCE INDEX (`idx_history_du_candidate`) WHERE',hp_sql($db,$sql))
+            : hp_scan_sql($db,$sql);
+        foreach(hp_rows($db,$sql) as $p)if(lma_year((string)($p['migration_du_year']??''))!=='')$years[$p['migration_du_year']]=true;
         // Retain the original SQL fallback for unusual source periods outside
         // the monthly reader's supported range; do not silently drop an option.
-        if($table==='legacy_op_payments'&&$unparsed)foreach(hp_rows($db,'SELECT DISTINCT '.lb_du_year_sql('p').' migration_du_year'.$from." AND JSON_CONTAINS_PATH(p.items,'one','$[0].migration') AND p.source_period IN (".implode(',',$unparsed).')') as $p)if(lma_year((string)($p['migration_du_year']??''))!=='')$years[$p['migration_du_year']]=true;
+        if($unparsed)foreach(hp_rows($db,hp_scan_sql($db,'SELECT DISTINCT '.lb_du_year_sql('p').' migration_du_year'.$from." AND JSON_CONTAINS_PATH(p.items,'one','$[0].migration') AND p.source_period IN (".implode(',',$unparsed).')')) as $p)if(lma_year((string)($p['migration_du_year']??''))!=='')$years[$p['migration_du_year']]=true;
     }
     if($cacheRead)$readCache[$cacheKey]=$years;
     return $years;

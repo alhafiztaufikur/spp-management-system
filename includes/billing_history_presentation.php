@@ -50,8 +50,8 @@ function billing_history_defaults(array $source): array {
     if(!array_key_exists('komponen_tagihan',$source))$source['komponen_tagihan']=['psb','daftar_ulang','spp','komite'];
     return $source;
 }
-function billing_history_years(mysqli $db,array $source): array {
-    $options=billing_history_year_options(report_years($db));$current=du_current_academic_year();
+function billing_history_years(mysqli $db,array $source,?array $years=null): array {
+    $options=billing_history_year_options($years??report_years($db));$current=du_current_academic_year();
     $requested=$source['billing_year']??null;
     if(is_string($requested)&&!isset($options[$requested])&&!in_array($requested,['*','','all','semua','0'],true))$requested=$current;
     return filter_register('billing_year',$requested,$options,$current);

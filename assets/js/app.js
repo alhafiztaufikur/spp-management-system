@@ -432,15 +432,19 @@ function renderStudentSearchPanel(input, forceAll) {
   if (input.dataset.studentSuppressPanel === '1') return;
 
   const query = input.value.trim().toLowerCase();
+  const remote = input.hasAttribute('data-student-remote');
+  if (remote && (query.length < 2 || input.dataset.studentResults !== query)) {
+    closeStudentSearchPanel(input);
+    return;
+  }
   const allOptions = Array.from(list.options);
   const classFilter = studentSearchClassFilter(input);
-  const scopedOptions = studentSearchOptionsForClass(input, allOptions);
-  const showAll = !!forceAll || !query || input.dataset.studentSelected === '1';
+  const scopedOptions = remote ? allOptions : studentSearchOptionsForClass(input, allOptions);
+  const showAll = !remote && (!!forceAll || !query || input.dataset.studentSelected === '1');
 
-  const matches = (!showAll
-    ? scopedOptions.filter(opt => studentSearchText(opt).includes(query))
-    : scopedOptions
-  ).slice(0, showAll ? 12 : 8);
+  const matches = (remote || showAll ? scopedOptions
+    : scopedOptions.filter(opt => studentSearchText(opt).includes(query))
+  ).slice(0, remote ? 20 : showAll ? 12 : 8);
 
   input.setAttribute('aria-expanded', 'true');
   panel.hidden = false;

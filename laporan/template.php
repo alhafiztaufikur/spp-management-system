@@ -7,50 +7,100 @@ requireRole(['admin','bendahara','kasir']);
 require_once __DIR__.'/../includes/global_report_matrix.php';
 $globalScope=in_array($_GET['template']??'',global_report_templates(),true);
 $unitChoice=global_report_validate_choice($_GET['unit']??'');
-$reportUnitId=$globalScope?global_report_scope($koneksi,$_GET):unit_report_scope($koneksi,$unitChoice);
+$reportUnitId=$globalScope?global_report_scope($koneksi,$_GET,false):unit_report_scope($koneksi,$unitChoice);
+$applied = !$globalScope || ($_GET['rekap'] ?? '') === '1';
 $reportScopeQuery=$globalScope?global_report_unit_value($reportUnitId):($reportUnitId===0?'all':'active');
 require_once '../includes/read_session.php';read_session_release();
 $registry=report_registry(); $template=(string)($_GET['template']??'');
 if(!isset($registry[$template])){ header('Location: global.php'); exit; }
 $isPrincipalLetter=$template==='tunggakan-siswa';
-$filters=report_filters($koneksi,$_GET);filter_output_start();
-if($template==='riwayat-tagihan'&&!isset($_GET['siswa_status'])) $filters['siswa_status']='all';
-if(!isset($_GET['kategori'])&&$template==='penerimaan') $filters['kategori']='semua';
-$perItemUsesMonthly=$template==='per-item'&&report_item_is_monthly_category($filters['kategori']);
-$perItemUsesAnnual=$template==='per-item'&&report_item_is_annual_category($filters['kategori']);
-$perItemUsesOneTime=$template==='per-item'&&report_item_is_one_time_category($filters['kategori']);
-$isCashRecap=in_array($template,['setoran','kas-tabungan'],true);
-$isSavingsCashRecap=$template==='kas-tabungan';
-
-$inlineStudentSearch=in_array($template,['psb','status','saldo-tabungan','spp-tahunan','tabungan-siswa','riwayat-tagihan'],true);
-$templateFilterClass='report-filter-'.preg_replace('/[^a-z0-9_-]+/i','-',$template);
-$classes=report_classes($koneksi);$classLevels=array_map('strval',$reportUnitId===0?range(1,12):range(...unit_level_bounds($reportUnitId)));$missingRombel=false;
-require_once '../includes/report_history_page.php';
-$historyPage=null;
-try { if($template==='riwayat-tagihan')$historyPage=report_history_page_data($koneksi,$filters);$report=$historyPage['report']??report_build($koneksi,$template,$filters); }
-catch(Throwable $e){ $report=['title'=>$registry[$template]['label'],'subtitle'=>'Gagal memuat laporan','columns'=>[],'rows'=>[],'error'=>$e->getMessage()]; }
-$report=global_report_present($report,$template,'screen');
-if($missingRombel){$report['rows']=[];$report['error']='Belum ada rombel nyata. Admin perlu membuat Master Kelas/Rombel lalu memindahkan siswa dari placeholder Belum Ditentukan.';}
-$billingGroupedView=$template==='riwayat-tagihan';
-$billingView=$billingGroupedView?billing_history_view($koneksi,$report,$filters):null;
-$billingDetailCount=$billingView['detail_count']??0;
-$periodCaption=$globalScope?global_report_period_caption($koneksi,$filters,$template):'';
-$matrix=global_report_matrix($report,$template,$reportUnitId);
-$displayRows=$matrix?$matrix['rows']:($billingGroupedView?$billingView['rows']:$report['rows']);
-$billingColumns=$billingGroupedView?report_billing_history_component_columns($displayRows):[];
-$billingMatrixWidth=700+count($billingColumns)*154;
-$pagination=report_paginate($displayRows,$filters,false);
-$years=report_years($koneksi); $operatorOptions=!in_array($template,['penerimaan','tabungan-siswa','setoran','kas-tabungan'],true)?[]:($template==='tabungan-siswa'?array_map(static fn($id,$label)=>['id'=>$id,'nama'=>$label,'username'=>''],array_keys(savings_operator_options($koneksi,false)),array_values(savings_operator_options($koneksi,false))):report_operator_options($koneksi)); $operatorFilterLabel=report_operator_filter_label(); $categories=in_array($template,['status','per-item','penerimaan'],true)?report_categories($koneksi):[]; $billingCategories=$template==='riwayat-tagihan'?report_billing_categories($koneksi):[]; $query=array_merge($_GET,report_multiple_query($filters),['template'=>$template,'unit'=>$reportScopeQuery]); if($template==='riwayat-tagihan'){$query['billing_year']=$filters['_billing_years'];unset($query['tahun_tagihan']);if(empty($filters['filter_tanggal_tagihan'])){$query['periode_awal']=$filters['periode_awal'];$query['periode_akhir']=$filters['periode_akhir'];unset($query['tanggal_awal'],$query['tanggal_akhir']);}}
-$moneyTotals=$billingGroupedView?[]:report_money_totals($report,$template);$useGlobalIdentitySticky=in_array($template,['penerimaan','spp-tahunan','per-item','riwayat-tagihan'],true);
-// Screen cards reuse complete filtered aggregates; print/export markup stays independent.
-$screenTotals=$billingGroupedView?billing_history_screen_totals($billingView):$moneyTotals;
-$screenTotalsHtml=$globalScope?global_report_total_cards_html($screenTotals,$billingGroupedView?'-':'—'):'';
-if($template==='penerimaan')$categories=array_map(static fn($label)=>global_report_present_label($label,$template),$categories);
-$studentOptionWhere=" WHERE s.legacy_pending=0".match($filters['siswa_status']){'all'=>'','archived'=>' AND s.is_active=0',default=>' AND s.is_active=1'};
-$studentOptions=$koneksi->query("SELECT s.id AS student_id,s.NO_INDUK,s.unit_id,s.NO_induk_diknas,s.NAMA,s.KELAS,s.master_kelas_id,mk.tingkat AS master_tingkat,mk.kode_rombel,mk.is_placeholder FROM siswa s LEFT JOIN master_kelas mk ON mk.id=s.master_kelas_id$studentOptionWhere ORDER BY s.NAMA ASC")->fetch_all(MYSQLI_ASSOC);
-$studentSearchDisplay=$filters['q'];foreach($studentOptions as $studentOption){if($filters['q']!==''&&($filters['q']===$studentOption['NO_INDUK']||$filters['q']===(string)($studentOption['NO_induk_diknas']??''))){$studentSearchDisplay=$studentOption['NAMA'];break;}}
-$summaryCards=$billingGroupedView?[]:($historyPage['summary']??report_summaries($report['rows']));if(isset($report['student_count']))$summaryCards=['Siswa'=>$report['student_count']]+$summaryCards;$visibleRows=count($pagination['rows']);$totalRows=count($displayRows);$paginationUnit=$template==='penerimaan'?'transaksi':($billingGroupedView?'baris siswa':'baris');$exportQuery=$query;$exportQuery['page']=1;unset($exportQuery['format'],$exportQuery['download'],$exportQuery['preview_action']);$firstShown=$totalRows>0?(($pagination['page']-1)*$pagination['per_page'])+1:0;$lastShown=$totalRows>0?min($totalRows,$pagination['page']*$pagination['per_page']):0;$resultRangeLabel=$totalRows<=0?'0 '.$paginationUnit:($visibleRows===$totalRows?'Semua '.number_format($totalRows).' '.$paginationUnit:number_format($firstShown).' s.d. '.number_format($lastShown).' dari '.number_format($totalRows).' '.$paginationUnit);if($billingGroupedView)$resultRangeLabel.=' · '.number_format($billingDetailCount).' rincian tagihan';
-if($isCashRecap){
+require_once __DIR__.'/../includes/global_report_filter_options.php';
+if ($globalScope && isset($_GET['filter_group'])) {
+    global_report_filter_options_response($koneksi,$template,$_GET,$reportUnitId);
+}
+$deferFilterOptions = $globalScope && !$applied && ($_GET['filter_options'] ?? '') !== '1';
+$filterGroups = $deferFilterOptions ? global_report_filter_groups($template) : [];
+$optionsUrl = 'template.php?'.http_build_query(['template'=>$template,'unit'=>$reportScopeQuery]);
+$completeFiltersUrl = 'template.php?'.http_build_query(array_replace($_GET,['filter_options'=>'1']));
+$report = ['title'=>$registry[$template]['label']];
+$filters = [];
+$billingGroupedView = $template === 'riwayat-tagihan';
+$isCashRecap = in_array($template,['setoran','kas-tabungan'],true);
+$isSavingsCashRecap = $template === 'kas-tabungan';
+$inlineStudentSearch = in_array($template,['psb','status','saldo-tabungan','spp-tahunan','tabungan-siswa','riwayat-tagihan'],true);
+$templateFilterClass = 'report-filter-'.preg_replace('/[^a-z0-9_-]+/i','-',$template);
+$catalog = $globalScope ? global_report_filter_catalog($koneksi,$template,$_GET,$deferFilterOptions) : null;
+$filters = report_filters($koneksi,$_GET,true,$catalog);
+filter_output_start();
+if ($billingGroupedView && !isset($_GET['siswa_status'])) $filters['siswa_status'] = 'all';
+if (!isset($_GET['kategori']) && $template === 'penerimaan') $filters['kategori'] = 'semua';
+if (!$isPrincipalLetter) {
+    $perItemUsesMonthly = $template === 'per-item' && report_item_is_monthly_category($filters['kategori']);
+    $perItemUsesAnnual = $template === 'per-item' && report_item_is_annual_category($filters['kategori']);
+    $perItemUsesOneTime = $template === 'per-item' && report_item_is_one_time_category($filters['kategori']);
+    $classes = $catalog['classes'] ?? report_classes($koneksi);
+    $classLevels = array_map('strval',$reportUnitId===0?range(1,12):range(...unit_level_bounds($reportUnitId)));
+    $years = $catalog['years'] ?? report_years($koneksi);
+    $operatorOptions = $catalog['operators'] ?? [];
+    $operatorFilterLabel = report_operator_filter_label();
+    $categories = array_map(static fn($label)=>global_report_present_label($label,$template),$catalog['categories']??[]);
+    $billingCategories = $catalog['billingCategories'] ?? [];
+    $studentSearchDisplay = $isCashRecap ? '' : global_report_filter_student_display($koneksi,$filters);
+}
+if ($globalScope && !$applied && !$deferFilterOptions && ($_SERVER['HTTP_X_REPORT_FRAGMENT']??'') === 'filters') {
+    header('Cache-Control: private, no-store');
+    require __DIR__.'/../includes/global_report_filter_form.php';
+    exit;
+}
+if ($applied) {
+    require_once '../includes/report_history_page.php';
+    $historyPage = null;
+    try {
+        if ($billingGroupedView) $historyPage = report_history_page_data($koneksi,$filters);
+        $report = $historyPage['report'] ?? report_build($koneksi,$template,$filters);
+        $report = global_report_present($report,$template,'screen');
+    } catch (Throwable $e) {
+        $report = ['title'=>$registry[$template]['label'],'subtitle'=>'Gagal memuat laporan','columns'=>[],'rows'=>[],'error'=>$e->getMessage()];
+    }
+    $billingView = $billingGroupedView ? billing_history_view($koneksi,$report,$filters) : null;
+    $billingDetailCount = $billingView['detail_count'] ?? 0;
+    $periodCaption = $globalScope ? global_report_period_caption($koneksi,$filters,$template) : '';
+    $matrix = global_report_matrix($report,$template,$reportUnitId);
+    $displayRows = $matrix ? $matrix['rows'] : ($billingGroupedView ? $billingView['rows'] : $report['rows']);
+    $pagination = report_paginate($displayRows,$filters,false);
+    $query = array_merge($_GET,report_multiple_query($filters),['template'=>$template,'unit'=>$reportScopeQuery]);
+    unset($query['filter_options']);
+    if ($billingGroupedView) {
+        $query['billing_year'] = $filters['_billing_years'];
+        unset($query['tahun_tagihan']);
+        if (empty($filters['filter_tanggal_tagihan'])) {
+            $query['periode_awal'] = $filters['periode_awal'];
+            $query['periode_akhir'] = $filters['periode_akhir'];
+            unset($query['tanggal_awal'],$query['tanggal_akhir']);
+        }
+    }
+    $moneyTotals = $billingGroupedView ? [] : report_money_totals($report,$template);
+    $useGlobalIdentitySticky = in_array($template,['penerimaan','spp-tahunan','per-item','riwayat-tagihan'],true);
+    $screenTotals = $billingGroupedView ? billing_history_screen_totals($billingView) : $moneyTotals;
+    $screenTotalsHtml = $globalScope ? global_report_total_cards_html($screenTotals,$billingGroupedView?'-':'—') : '';
+    $visibleRows = count($pagination['rows']);
+    $totalRows = count($displayRows);
+    $paginationUnit = $template==='penerimaan' ? 'transaksi' : ($billingGroupedView?'baris siswa':'baris');
+    $exportQuery = $query;
+    $exportQuery['page'] = 1;
+    unset($exportQuery['format'],$exportQuery['download'],$exportQuery['preview_action']);
+    $firstShown = $totalRows>0 ? (($pagination['page']-1)*$pagination['per_page'])+1 : 0;
+    $lastShown = $totalRows>0 ? min($totalRows,$pagination['page']*$pagination['per_page']) : 0;
+    $resultRangeLabel = $totalRows<=0 ? '0 '.$paginationUnit : ($visibleRows===$totalRows
+        ? 'Semua '.number_format($totalRows).' '.$paginationUnit
+        : number_format($firstShown).' s.d. '.number_format($lastShown).' dari '.number_format($totalRows).' '.$paginationUnit);
+    if ($billingGroupedView) $resultRangeLabel .= ' · '.number_format($billingDetailCount).' rincian tagihan';
+    $summaryCards = $billingGroupedView ? [] : ($historyPage['summary'] ?? report_summaries($report['rows']));
+    if (isset($report['student_count'])) $summaryCards = ['Siswa'=>$report['student_count']]+$summaryCards;
+    $billingColumns = $billingGroupedView ? report_billing_history_component_columns($displayRows) : [];
+    $billingMatrixWidth = 700+count($billingColumns)*154;
+}
+if($applied && $isCashRecap){
     $componentSummary=$report['component_summary']??[];
     $componentRows=$report['component_rows']??$componentSummary;
     $methodSummary=$report['method_summary']??[];
@@ -78,52 +128,22 @@ if($isPrincipalLetter){ require __DIR__.'/../includes/principal_letter_page.php'
 <div class="topbar"><button class="sidebar-toggle" onclick="toggleSidebar()" aria-label="Buka navigasi"><svg width="20" height="20" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><line x1="3" y1="6" x2="21" y2="6"/><line x1="3" y1="12" x2="21" y2="12"/><line x1="3" y1="18" x2="21" y2="18"/></svg></button><div class="topbar-title"><h2><?= report_e($report['title']) ?></h2><span class="breadcrumb"><?= $isPrincipalLetter ? '<a href="surat_laporan.php">Surat Laporan</a>' : '<a href="global.php?unit='.($reportScopeQuery).'">Laporan Global</a>' ?> / <?= report_e($registry[$template]['label']) ?></span></div><div class="clock-badge" id="liveClock">--:--:--</div></div>
 <?php if($isPrincipalLetter): ?><a class="letter-back-link letter-principal-back" href="surat_laporan.php">&larr; Kembali ke pilihan surat</a><?php endif; ?>
 <section class="main-card class-recap-card recap-report-shell report-template-shell report-table-<?= report_e($templateFilterClass) ?>">
-<div class="recap-report-header"><div class="recap-report-copy"><span class="recap-class-overline"><?= $isPrincipalLetter ? 'Surat Laporan' : 'Laporan Global' ?></span><h1><?= report_e($report['title']) ?></h1><?php if($globalScope): ?><p class="report-period-caption"><?= report_e($periodCaption) ?></p><?php elseif($isPrincipalLetter): ?><p><?= report_e($report['subtitle']) ?> · <?= number_format($totalRows) ?> <?= report_e($paginationUnit) ?> hasil filter.</p><?php endif; ?><?php if($globalScope): ?><?= global_report_selector($koneksi,$reportUnitId,$_GET,'template.php') ?><?php endif; ?></div>
-<form method="get" class="recap-header-controls report-filter-card report-template-filters report-global-filter-form <?= report_e($templateFilterClass) ?><?= $template==='per-item'&&!$perItemUsesMonthly?' report-per-item-compact':'' ?>"><input type="hidden" name="template" value="<?= report_e($template) ?>"><input type="hidden" name="unit" value="<?= $reportScopeQuery ?>"><div class="report-filter-heading"><span class="recap-filter-label">Filter Laporan</span></div><?php if($template==='tabungan-siswa'): ?><input type="hidden" name="owner_id" value="<?= (int)($filters['owner_id']??0) ?>"><input type="hidden" name="student_id" data-student-identity="1" value="<?= (int)($filters['student_id']??0) ?>"><label class="field-row report-all-period-field"><span class="field-label">Cakupan periode</span><span class="report-period-toggle"><input type="checkbox" name="all_periods" value="1" <?= !empty($filters['all_periods'])?'checked':'' ?>><span class="report-period-switch" aria-hidden="true"></span><span>Semua periode</span></span></label><?php endif; ?>
-<?php if(in_array($template,['penerimaan','setoran','kas-tabungan','tabungan-siswa'],true)||$template==='per-item'): $rangeLabel=$template==='tabungan-siswa'&&!empty($filters['all_periods'])?'Semua periode':($template==='riwayat-tagihan'&&$filters['tanggal_awal']===''?'Semua tanggal':($template==='per-item'?report_item_date_period_label($filters):report_date_range_label($filters['tanggal_awal'],$filters['tanggal_akhir']))); $datePeriodStyle=$template==='per-item'&&($perItemUsesMonthly||$perItemUsesAnnual||$perItemUsesOneTime)?' style="display:none"':''; ?><div class="field-row report-date-range-field" data-per-item-period="date"<?= $datePeriodStyle ?>><label class="field-label"><?= $template==='riwayat-tagihan'?'Tanggal Tagihan Dibuat':'Tanggal Transaksi' ?></label><div class="report-date-range-control report-date-range-picker" data-range-picker data-empty-label="<?= $template==='riwayat-tagihan'?'Semua tanggal':report_e($rangeLabel) ?>"><input type="hidden" name="tanggal_awal" value="<?= report_e($filters['tanggal_awal']) ?>"><input type="hidden" name="tanggal_akhir" value="<?= report_e($filters['tanggal_akhir']) ?>"><button type="button" class="report-date-range-button" aria-expanded="false"><span class="report-date-range-icon"><?= spp_calendar_icon() ?></span><span class="report-date-range-value"><?= report_e($rangeLabel) ?></span></button><div class="report-date-range-popover" hidden><label><span>Mulai</span><input type="date" value="<?= report_e($filters['tanggal_awal']) ?>" data-range-start></label><label><span>Sampai</span><input type="date" value="<?= report_e($filters['tanggal_akhir']) ?>" data-range-end></label><div class="report-date-range-popover-actions"><button type="button" class="btn btn-primary btn-sm" data-range-apply>Terapkan</button></div></div></div></div><?php endif; ?>
-<?php if($billingGroupedView): ?>
-<fieldset class="field-row report-billing-period report-month-range-picker" data-month-range-picker="billing" data-empty-label="Semua bulan">
-<legend class="field-label" id="billing-month-range-label">Periode Tagihan</legend>
-<div class="report-billing-months"><label><span>Bulan awal</span><input class="field-input" type="month" name="periode_awal" value="<?= report_e($filters['periode_awal']) ?>"></label>
-<label><span>Bulan akhir</span><input class="field-input" type="month" name="periode_akhir" value="<?= report_e($filters['periode_akhir']) ?>"></label></div>
-<button type="button" class="report-month-range-button" aria-expanded="false" aria-controls="billing-month-range-panel" aria-labelledby="billing-month-range-label billing-month-range-value" hidden>
-  <span class="report-month-range-icon" aria-hidden="true"><?= spp_calendar_icon() ?></span>
-  <span class="report-month-range-value" id="billing-month-range-value">Semua bulan</span>
-</button>
-<div class="report-month-range-popover report-billing-month-popover" id="billing-month-range-panel" hidden>
-  <?php foreach (['start'=>'Bulan awal','end'=>'Bulan akhir'] as $endpoint=>$caption): ?>
-  <div class="report-billing-month-endpoint" role="group" aria-labelledby="billing-month-<?= $endpoint ?>">
-    <strong id="billing-month-<?= $endpoint ?>"><?= $caption ?></strong>
-    <label><span>Bulan</span><select data-month-range-<?= $endpoint ?> aria-label="<?= $caption ?>">
-      <option value="">Pilih bulan</option>
-      <?php foreach (report_months() as $code=>$month): ?><option value="<?= $code ?>"><?= report_e($month) ?></option><?php endforeach; ?>
-    </select></label>
-    <label><span>Tahun</span><input class="field-input" type="number" min="1000" max="2999" step="1" inputmode="numeric" value="<?= date('Y') ?>" data-month-range-year aria-label="Tahun <?= $endpoint==='start'?'awal':'akhir' ?>" required disabled></label>
-  </div>
-  <?php endforeach; ?>
-  <div class="report-month-range-popover-actions">
-    <button type="button" class="btn btn-ghost btn-sm" data-month-range-clear>Kosongkan</button>
-    <button type="button" class="btn btn-primary btn-sm" data-month-range-apply>Terapkan</button>
+<div class="recap-report-header"><div class="recap-report-copy"><span class="recap-class-overline"><?= $isPrincipalLetter ? 'Surat Laporan' : 'Laporan Global' ?></span><h1><?= report_e($report['title']) ?></h1><?php if($globalScope && $applied && !isset($report['error'])): ?><p class="report-period-caption"><?= report_e($periodCaption) ?></p><?php elseif($isPrincipalLetter): ?><p><?= report_e($report['subtitle']) ?> · <?= number_format($totalRows) ?> <?= report_e($paginationUnit) ?> hasil filter.</p><?php endif; ?><?php if($globalScope): ?><?= global_report_selector($koneksi,$reportUnitId,$_GET,'template.php',false) ?><?php endif; ?></div>
+<?php require __DIR__.'/../includes/global_report_filter_form.php'; ?>
+</div>
+<?php if($globalScope): ?>
+<div class="report-preview-placeholder" data-report-placeholder<?= $applied ? ' hidden' : '' ?>>
+  <h2 data-report-placeholder-label>Pilih filter, lalu klik Tampilkan Rekap.</h2>
+  <div class="report-skeleton" aria-hidden="true">
+    <?php for($row=0;$row<4;$row++): ?>
+    <div class="report-skeleton-row"><span></span><span></span><span></span><span></span></div>
+    <?php endfor; ?>
   </div>
 </div>
-</fieldset>
 <?php endif; ?>
-<?php if($template==='per-item'): ?><div class="field-row" data-per-item-period="one-time"<?= $perItemUsesOneTime?'':' style="display:none"' ?>><span class="field-label">Periode Kewajiban</span><span class="field-input">Sekali saat masuk</span></div><?php endif; ?>
-<?php if(in_array($template,['status','spp-tahunan'],true)||$template==='per-item'): ?><div class="field-row"<?= $template==='per-item'?' data-per-item-period="academic-year"'.($perItemUsesAnnual?'':' style="display:none"'):'' ?>><label class="field-label">Tahun Ajaran</label><select class="field-input field-select" name="tahun_ajaran" data-filter-multiple><?php foreach($years as $year): ?><option value="<?= report_e($year['label']) ?>" <?= $filters['tahun_ajaran']===$year['label']?'selected':'' ?>><?= report_e($year['label'].' · '.$year['status']) ?></option><?php endforeach; ?></select></div><?php endif; ?>
-<?php if(in_array($template,['status','per-item','penerimaan'],true)): ?><div class="field-row"><label class="field-label">Kategori</label><select class="field-input field-select" name="kategori" data-filter-multiple<?= $template==='per-item'?' data-report-item-category':'' ?>><?php if($template==='penerimaan'): ?><option value="semua">Semua kategori</option><?php endif; ?><?php foreach($categories as $key=>$label): ?><option value="<?= report_e($key) ?>" <?= $filters['kategori']===$key?'selected':'' ?>><?= report_e($label) ?></option><?php endforeach; ?></select></div><?php endif; ?>
-<?php if($template==='status'): ?><div class="field-row"><label class="field-label">Bulan Tagihan</label><select class="field-input field-select" name="bulan_awal" data-filter-multiple><?php foreach(report_status_months() as $code=>$month): ?><option value="<?= $code ?>" <?= $filters['bulan_awal']===(string)$code?'selected':'' ?>><?= $month ?></option><?php endforeach; ?></select></div><?php endif; ?>
-<?php if($template==='per-item'): $monthPeriodStyle=$perItemUsesMonthly?'':' style="display:none"'; $monthNames=report_months(); $monthStartLabel=$monthNames[$filters['bulan_awal']]??'Bulan'; $monthEndLabel=$monthNames[$filters['bulan_akhir']]??'Bulan'; ?><div class="field-row report-month-range-field" data-per-item-period="month"<?= $monthPeriodStyle ?>><label class="field-label">Periode Tagihan</label><div class="report-month-range-control report-month-range-picker" data-month-range-picker data-empty-label="Pilih bulan tagihan"><input type="hidden" name="bulan_awal" value="<?= report_e($filters['bulan_awal']) ?>"><input type="hidden" name="bulan_akhir" value="<?= report_e($filters['bulan_akhir']) ?>"><button type="button" class="report-month-range-button" aria-expanded="false"><span class="report-month-range-icon" aria-hidden="true"><?= spp_calendar_icon() ?></span><span class="report-month-range-value"><?= report_e($monthStartLabel.' - '.$monthEndLabel) ?></span></button><div class="report-month-range-popover" hidden><label><span>Bulan Awal</span><select data-month-range-start><?php foreach($monthNames as $code=>$month): ?><option value="<?= $code ?>" <?= $filters['bulan_awal']===$code?'selected':'' ?>><?= report_e($month) ?></option><?php endforeach; ?></select></label><label><span>Bulan Akhir</span><select data-month-range-end><?php foreach($monthNames as $code=>$month): ?><option value="<?= $code ?>" <?= $filters['bulan_akhir']===$code?'selected':'' ?>><?= report_e($month) ?></option><?php endforeach; ?></select></label><div class="report-month-range-popover-actions"><button type="button" class="btn btn-primary btn-sm" data-month-range-apply>Terapkan</button></div></div></div></div><div class="field-row report-year-range-field" data-per-item-period="month"<?= $monthPeriodStyle ?>><label class="field-label">Rentang Tahun Tagihan</label><div class="report-year-range-control report-year-range-picker" data-year-range-picker data-empty-label="Pilih tahun tagihan"><input type="hidden" name="tahun_awal" value="<?= (int)$filters['tahun_awal'] ?>"><input type="hidden" name="tahun_akhir" value="<?= (int)$filters['tahun_akhir'] ?>"><button type="button" class="report-year-range-button" aria-expanded="false"><span class="report-year-range-icon" aria-hidden="true"><?= spp_calendar_icon() ?></span><span class="report-year-range-value"><?= report_e((int)$filters['tahun_awal'].' - '.(int)$filters['tahun_akhir']) ?></span></button><div class="report-year-range-popover" hidden><label><span>Tahun Awal</span><input type="number" min="2000" max="2100" value="<?= (int)$filters['tahun_awal'] ?>" data-year-range-start></label><label><span>Tahun Akhir</span><input type="number" min="2000" max="2100" value="<?= (int)$filters['tahun_akhir'] ?>" data-year-range-end></label><div class="report-year-range-popover-actions"><button type="button" class="btn btn-primary btn-sm" data-year-range-apply>Terapkan</button></div></div></div></div><?php endif; ?>
-<?php if(!$isCashRecap): ?><div class="field-row report-field-kelas"><label class="field-label">Kelas/Rombel</label><select class="field-input field-select" name="kelas" data-filter-multiple data-global-class-filter><option value="" <?= $filters['kelas']===''?'selected':'' ?>>Semua Kelas</option><?php foreach($classLevels as $level): ?><option value="tingkat:<?= $level ?>" <?= $filters['kelas']==='tingkat:'.$level?'selected':'' ?>>Semua Kelas <?= $level ?></option><?php endforeach; ?><?php foreach($classes as $class): ?><option value="rombel:<?= (int)$class['id'] ?>" <?= $filters['kelas']==='rombel:'.((int)$class['id'])?'selected':'' ?>><?= report_e($class['label']) ?></option><?php endforeach; ?></select></div><?php endif; ?>
-<?php if($template==='riwayat-tagihan'): ?><div class="field-row report-field-billing-year"><label class="field-label">Tahun Ajaran</label><select class="field-input field-select" name="billing_year" data-filter-multiple><option value="">Semua Tahun Ajaran</option><?php foreach(billing_history_year_options($years) as $year=>$label): ?><option value="<?= report_e($year) ?>"><?= report_e($label) ?></option><?php endforeach; ?></select></div><div class="field-row report-field-komponen-tagihan"><label class="field-label">Komponen</label><select class="field-input field-select" name="komponen_tagihan" data-filter-multiple><option value="">Semua Komponen</option><?php foreach($billingCategories as $key=>$label): ?><option value="<?= report_e($key) ?>" <?= $filters['komponen_tagihan']===$key?'selected':'' ?>><?= report_e($label) ?></option><?php endforeach; ?></select></div><div class="field-row report-field-status"><label class="field-label">Status</label><select class="field-input field-select" name="status" data-filter-multiple><option value="">Semua Status</option><?php foreach(['tidak_ditagihkan'=>'Tidak Ditagihkan','belum_bayar'=>'Belum Bayar','cicilan'=>'Cicilan','lunas'=>'Lunas','covered_psb'=>'Tercakup PSB','rekonsiliasi'=>'Perlu Rekonsiliasi','dibatalkan'=>'Dibatalkan'] as $key=>$label): ?><option value="<?= $key ?>" <?= $filters['status']===$key?'selected':'' ?>><?= $label ?></option><?php endforeach; ?></select></div><?php endif; ?>
-<?php if(in_array($template,['saldo-tabungan','riwayat-tagihan','tunggakan-siswa'],true)): ?><div class="field-row report-field-siswa-status"><label class="field-label">Status Siswa</label><select class="field-input field-select" name="siswa_status" data-filter-multiple><?php foreach(['active'=>'Aktif','archived'=>'Arsip/Lulus','all'=>'Semua'] as $key=>$label): ?><option value="<?= $key ?>" <?= $filters['siswa_status']===$key?'selected':'' ?>><?= $label ?></option><?php endforeach; ?></select></div><?php endif; ?>
-<?php if($template==='saldo-tabungan'): ?><div class="field-row report-field-saldo-status"><label class="field-label">Status Saldo</label><select class="field-input field-select" name="saldo_status" data-filter-multiple><option value="" <?= $filters['saldo_status']===''?'selected':'' ?>>Semua Saldo</option><option value="ada_saldo" <?= $filters['saldo_status']==='ada_saldo'?'selected':'' ?>>Ada Saldo</option><option value="saldo_nol" <?= $filters['saldo_status']==='saldo_nol'?'selected':'' ?>>Saldo Nol</option></select></div><?php endif; ?>
-<?php if(in_array($template,['penerimaan','tabungan-siswa','setoran','kas-tabungan'],true)): ?><div class="field-row report-field-operator"><label class="field-label">Operator</label><select class="field-input field-select" name="operator" data-filter-multiple><option value=""><?= report_e($operatorFilterLabel) ?></option><?php foreach($operatorOptions as $operator): ?><option value="<?= report_e((string)$operator['id']) ?>" <?= $filters['operator']==(string)$operator['id']?'selected':'' ?>><?= report_e($operator['nama']) ?></option><?php endforeach; ?></select></div><?php endif; ?>
-<?php if($template==='tabungan-siswa'): ?><div class="field-row"><label class="field-label">Jenis Mutasi</label><select class="field-input field-select" name="mutasi" data-filter-multiple><option value="" <?= $filters['mutasi']===''?'selected':'' ?>>Semua Mutasi</option><option value="masuk" <?= $filters['mutasi']==='masuk'?'selected':'' ?>>Masuk</option><option value="keluar" <?= $filters['mutasi']==='keluar'?'selected':'' ?>>Keluar</option></select></div><?php endif; ?>
-<?php if(in_array($template,['penerimaan','setoran'],true)): ?><div class="field-row report-field-metode"><label class="field-label">Metode</label><select class="field-input field-select" name="metode" data-filter-multiple><option value="">Semua metode</option><?php foreach(['Tunai','VA','Qris','Legacy'] as $method): ?><option <?= $filters['metode']===$method?'selected':'' ?>><?= $method ?></option><?php endforeach; ?></select></div><?php endif; ?>
-<?php if(in_array($template,['psb','status','spp-tahunan','per-item'],true)): ?><div class="field-row"><label class="field-label">Status</label><select class="field-input field-select" name="status" data-filter-multiple><option value="">Semua status</option><?php foreach(['tidak_ditagihkan'=>'Tidak Ditagihkan','belum_bayar'=>'Belum Bayar','cicilan'=>'Cicilan','lunas'=>'Lunas','covered_psb'=>'Tercakup PSB','dibatalkan'=>'Dibatalkan','rekonsiliasi'=>'Perlu Rekonsiliasi','ada_pembayaran'=>'Ada Pembayaran','tunggakan'=>'Memiliki Tunggakan'] as $key=>$label): ?><option value="<?= $key ?>" <?= $filters['status']===$key?'selected':'' ?>><?= $label ?></option><?php endforeach; ?></select></div><?php endif; ?>
-<?php if(in_array($template,['psb','status','spp-tahunan','per-item'],true)): ?><div class="field-row report-field-siswa-status"><label class="field-label">Status Siswa</label><select class="field-input field-select" name="siswa_status" data-filter-multiple><?php foreach(['active'=>'Aktif','archived'=>'Arsip/Lulus','all'=>'Semua'] as $key=>$label): ?><option value="<?= $key ?>" <?= $filters['siswa_status']===$key?'selected':'' ?>><?= $label ?></option><?php endforeach; ?></select></div><?php endif; ?>
-<?php if(!$isCashRecap): ?><?php if($inlineStudentSearch): ?><div class="report-inline-search-row"><?php endif; ?><div class="field-row report-per-page-field"><label class="field-label"><?= $billingGroupedView?'Siswa/Halaman':'Baris/Halaman' ?></label><select class="field-input field-select" name="per_page"><?php foreach([25,50,100] as $size): ?><option <?= $filters['per_page']===$size?'selected':'' ?>><?= $size ?></option><?php endforeach; ?></select></div><div class="field-row full-span report-student-field"><label class="field-label" for="global-siswa-search">Cari Siswa (Nama / NIS / NIS Diknas)</label><div class="search-box"><svg width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.5" stroke-linecap="round" stroke-linejoin="round"><circle cx="11" cy="11" r="8"/><line x1="21" y1="21" x2="16.65" y2="16.65"/></svg><input type="text" id="global-siswa-search" data-student-search data-student-fit-viewport="1" data-student-list="global-siswa-list" data-student-select-callback="selectReportStudentSearchOption" data-student-query-target="global-student-query" data-student-class-filter="[data-global-class-filter]" value="<?= report_e($studentSearchDisplay) ?>" placeholder="Ketik nama, NIS, atau NIS Diknas..." autocomplete="off"><input type="hidden" id="global-student-query" name="q" value="<?= report_e($filters['q']) ?>"></div><datalist id="global-siswa-list"><?php foreach($studentOptions as $studentOption): $studentLevel=(string)($studentOption['master_tingkat']?:$studentOption['KELAS']); $studentClassLabel=class_label(['tingkat'=>$studentLevel,'kode_rombel'=>$studentOption['kode_rombel']??'BELUM','is_placeholder'=>$studentOption['is_placeholder']??1]); ?><option value="<?= report_e($studentOption['NAMA']) ?>" data-student-id="<?= (int)($studentOption['student_id']??0) ?>" data-unit-id="<?= (int)($studentOption['unit_id']??0) ?>" data-nis="<?= report_e($studentOption['NO_INDUK']) ?>" data-diknas="<?= report_e((string)($studentOption['NO_induk_diknas']??'')) ?>" data-nama="<?= report_e($studentOption['NAMA']) ?>" data-kelas="<?= report_e(($reportUnitId===0?unit_label((int)$studentOption['unit_id']).' · ':'').$studentClassLabel) ?>" data-kelas-id="<?= (int)($studentOption['master_kelas_id']??0) ?>" data-tingkat="<?= report_e($studentLevel) ?>"><?= report_e($studentOption['NAMA']) ?> (<?= report_e(($reportUnitId===0?unit_label((int)$studentOption['unit_id']).' · ':'').$studentClassLabel) ?>)</option><?php endforeach; ?></datalist></div><?php if($inlineStudentSearch): ?></div><?php endif; ?><?php endif; ?><div class="report-filter-actions"><button class="btn btn-primary" type="submit">Tampilkan Rekap</button><a class="btn btn-ghost" href="template.php?template=<?= urlencode($template) ?>&amp;unit=<?= $reportScopeQuery ?>">Reset</a></div></form></div>
-<?php if(isset($report['error'])): ?><div class="alert alert-error report-template-alert"><?= report_e($report['error']) ?></div><?php endif; ?>
+<?php if($applied): ?>
+<div data-report-results>
+<?php if(isset($report['error'])): ?><div class="alert alert-error report-template-alert"><?= report_e($report['error']) ?></div><?php else: ?>
 <?php if(!empty($report['notes'])): ?><p class="report-evidence-note" role="note"><?= report_e(implode(' ? ',$report['notes'])) ?></p><?php endif; ?>
 <div class="recap-period-strip report-template-strip"><div class="report-strip-copy"><strong><?= report_e($registry[$template]['label']) ?></strong></div><div class="report-strip-tools"><?php if($template!=='psb'): ?><span class="report-result-pill"><?= report_e($resultRangeLabel) ?></span><?php endif; ?><div class="report-export-actions" aria-label="Ekspor laporan"><a class="btn btn-ghost report-export-btn" target="_blank" rel="noopener" href="<?= report_e('export_global.php?'.filter_build_query(array_merge($exportQuery,['format'=>$globalScope?'print':'preview']))) ?>">Cetak</a><a class="btn btn-ghost report-export-btn" target="_blank" rel="noopener" href="<?= report_e('export_global.php?'.filter_build_query(array_merge($exportQuery,['format'=>'preview']))) ?>">PDF</a><a class="btn btn-primary report-export-btn" target="_blank" rel="noopener" href="<?= report_e('export_global.php?'.filter_build_query(array_merge($exportQuery,['format'=>'excel']))) ?>">Excel</a></div></div></div>
 <?php if($isCashRecap): ?><section class="report-settlement-component-card"><div class="report-settlement-section-head"><h3><?= report_e($componentTitle) ?></h3><div class="report-settlement-component-total"><span><?= report_e($componentTotalLabel) ?></span><strong class="<?= (float)($report['component_total']??0)<0?'report-negative':'' ?>"><?= report_money($report['component_total']??0) ?></strong></div></div><div class="table-container report-settlement-component-table"><table class="payment-table"><thead><tr><th class="report-col-no">No</th><th><?= report_e($componentTitle) ?></th><th>Nominal</th></tr></thead><tbody><?php if(!$componentRows): ?><tr><td colspan="3"><div class="empty-state"><p>Belum ada transaksi</p><span>Tidak ada data pada periode dan filter yang dipilih.</span></div></td></tr><?php else: foreach($componentRows as $index=>$component): ?><tr><td class="report-col-no"><?= $index+1 ?></td><td><?= report_e($component['komponen']) ?></td><td class="<?= (float)$component['nominal']<0?'report-negative':'' ?>"><?= report_money($component['nominal']) ?></td></tr><?php endforeach; endif; ?></tbody><tfoot><tr><th colspan="2"><?= report_e($componentTotalLabel) ?></th><th class="<?= (float)($report['component_total']??0)<0?'report-negative':'' ?>"><?= report_money($report['component_total']??0) ?></th></tr></tfoot></table></div></section><section class="report-settlement-method-summary"><h3><?= report_e($summaryTitle) ?></h3><div class="report-settlement-method-grid"><?php foreach($cashSummaryItems as $item): ?><div class="report-settlement-method-card"><span><?= report_e($item['label']) ?></span><strong><?= $item['type']==='money'?report_money($item['value']):number_format((int)$item['value']) ?></strong></div><?php endforeach; ?></div></section><section class="report-settlement-total-card<?= $globalScope?' global-report-legacy-totals':'' ?> <?= $cashTotalValue<0?'is-negative':'' ?>"><div><span><?= report_e($cashTotalLabel) ?></span></div><strong><?= report_money($cashTotalValue) ?></strong></section><?= $screenTotalsHtml ?><?php endif; ?>
@@ -170,6 +190,7 @@ if($isPrincipalLetter){ require __DIR__.'/../includes/principal_letter_page.php'
 <?php endif; ?>
 <?php render_pagination('template.php', $query, $pagination['page'], $pagination['pages'], $pagination['total'], $pagination['per_page'], $paginationUnit); ?>
 <?php endif; ?>
+<?php endif; ?></div><?php endif; ?>
 </section>
 </main></div><script src="../assets/js/date_format.js?v=<?= filemtime(__DIR__ . '/../assets/js/date_format.js') ?>"></script>
   <script src="../assets/js/app.js?v=<?= filemtime(__DIR__ . '/../assets/js/app.js') ?>"></script><?php if($template==='per-item'): ?><script>window.sppAppliedReportCategories=<?= json_encode(report_multiple_values($filters,'kategori'),JSON_HEX_TAG|JSON_HEX_AMP|JSON_HEX_APOS|JSON_HEX_QUOT) ?>;window.sppAnnualReportCategories=<?= json_encode(array_merge(array_keys(annual_fee_components()),['daftar_ulang'])) ?>;</script><script src="../assets/js/report_per_item.js?v=<?= filemtime(__DIR__.'/../assets/js/report_per_item.js') ?>"></script><?php endif; ?><script src="../assets/js/global_report_workspace.js?v=<?= filemtime(__DIR__.'/../assets/js/global_report_workspace.js') ?>"></script></body></html>

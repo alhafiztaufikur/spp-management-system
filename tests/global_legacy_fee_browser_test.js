@@ -18,7 +18,7 @@ function check(ok,label){assert(ok,label);checks.push(label);}
   const page=await context.newPage();page.setDefaultNavigationTimeout(180000);page.on('pageerror',error=>errors.push(error.message));
   for(const width of [1440,390])for(const theme of ['light','dark']){
    await page.setViewportSize({width,height:1000});
-   const params=new URLSearchParams({template:'per-item',unit:'1',kategori:'biaya_lain:20',tanggal_awal:'2026-10-01',tanggal_akhir:'2026-10-26',q:'252601095'});
+   const params=new URLSearchParams({template:'per-item',unit:'1',rekap:'1',kategori:'biaya_lain:20',tanggal_awal:'2026-10-01',tanggal_akhir:'2026-10-26',q:'252601095'});
    await page.goto(fixture.base+'/laporan/template.php?'+params);
    await page.evaluate(value=>{localStorage.setItem('spp_theme',value);document.documentElement.dataset.theme=value;},theme);
    let row=page.locator('tbody tr').filter({hasText:'252601095'}).first();

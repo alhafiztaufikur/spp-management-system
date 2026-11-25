@@ -47,7 +47,11 @@ $leafKeys=[];
 if(count($bands)<2)throw new RuntimeException('Wide receipts do not paginate by component.');
 foreach($bands as $band){
     $printed=global_report_clean_table($band);
-    if(!str_contains($printed,'Tanggal Transaksi')||!str_contains($printed,'21/11/2026')||!str_contains($printed,'<span class="global-clean-transaction-time">Jam tidak tercatat</span>'))throw new RuntimeException('Date or time lost on a component continuation.');
+    $hasDateHeader = preg_match('/<th\b[^>]*data-column="tanggal"[^>]*>TANGGAL<\/th>/', $printed);
+    if (!$hasDateHeader || !str_contains($printed, '21/11/2026')
+        || !str_contains($printed, '<span class="global-clean-transaction-time">Jam tidak tercatat</span>')) {
+        throw new RuntimeException('Date or time lost on a component continuation.');
+    }
     array_push($leafKeys,...array_column(array_slice($band['columns'],$band['identity_count']),0));
 }
 if($leafKeys!==array_column(array_slice($wideMatrix['columns'],$wideMatrix['identity_count']),0))throw new RuntimeException('Print bands lost or duplicated receipt components.');

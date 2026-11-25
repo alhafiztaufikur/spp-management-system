@@ -1,12 +1,209 @@
 // Close the student suggestion panel when focus leaves the search control.
-(() => {
+function initGlobalReportStudentExit() {
   document.querySelectorAll('[data-student-search]').forEach(input => {
+    if (input.dataset.reportExitReady === '1') return;
+    input.dataset.reportExitReady = '1';
     input.addEventListener('blur', () => setTimeout(() => {
       const box = input.closest('.student-combobox');
       if (box && !(window.sppFloatingPanels?.contains(box,document.activeElement) ?? box.contains(document.activeElement))) window.closeStudentSearchPanel?.(input);
     }, 0));
   });
-})();
+}
+initGlobalReportStudentExit();
+
+function globalReportOptionsUrl(form, group) {
+  const url = new URL(form.dataset.reportOptionsUrl, location.href);
+  url.searchParams.set('filter_group', group);
+  return url;
+}
+
+function initGlobalReportOptions(form) {
+  form.querySelectorAll('[data-report-options]').forEach(select => {
+    let pending = false;
+    select.addEventListener('spp:options-open', async ({detail: {status, refresh}}) => {
+      if (pending || select.dataset.reportOptionsLoaded === '1') return;
+      pending = true;
+      status.hidden = false;
+      status.textContent = 'Memuat pilihan historis…';
+      const url = globalReportOptionsUrl(form, select.dataset.reportOptions);
+      try {
+        const response = await fetch(url, {cache:'no-store'});
+        if (!response.ok || response.redirected) throw new Error();
+        const options = await response.json();
+        const existing = new Map(Array.from(select.options, option => [option.value, option]));
+        const selected = new Set(Array.from(select.selectedOptions, option => option.value));
+        const ordered = [];
+        if (existing.has('*')) ordered.push(existing.get('*'));
+        existing.delete('*');
+        options.forEach(({value,label}) => {
+          const option = existing.get(value) || new Option(label,value);
+          option.textContent = label;
+          ordered.push(option);
+          existing.delete(value);
+        });
+        ordered.push(...existing.values());
+        select.replaceChildren(...ordered);
+        for (const option of select.options) option.selected = selected.has(option.value);
+        select.dataset.reportOptionsLoaded = '1';
+        status.hidden = options.length > 0;
+        if (!status.hidden) status.textContent = 'Tidak ada pilihan historis.';
+        refresh();
+        select.dispatchEvent(new Event('spp:options-ready'));
+      } catch {
+        status.textContent = 'Pilihan historis gagal dimuat. Buka kembali untuk mencoba lagi.';
+        refresh();
+      } finally {
+        pending = false;
+      }
+    });
+  });
+}
+
+function initGlobalReportStudentSearch(form) {
+  const input = form.querySelector('[data-student-remote]');
+  if (!input) return;
+  const query = form.querySelector('#global-student-query');
+  const list = document.getElementById(input.dataset.studentList);
+  const filters = Array.from(form.querySelectorAll('select')).filter(select =>
+    ['kelas','siswa_status'].includes(select.name.replace(/\[\]$/,''))
+  );
+  input.removeAttribute('name');
+  input.value = input.dataset.studentDisplay;
+  query.disabled = false;
+  form.querySelectorAll('[data-student-identity]').forEach(field => field.disabled = false);
+  let timer;
+  let controller;
+
+  function cancelSearch() {
+    clearTimeout(timer);
+    controller?.abort();
+  }
+
+  function search() {
+    cancelSearch();
+    list.replaceChildren();
+    delete input.dataset.studentResults;
+    closeStudentSearchPanel(input);
+    const term = input.value.trim();
+    if (term.length < 2) return;
+    const url = globalReportOptionsUrl(form, 'student');
+    url.searchParams.set('q',term);
+    filters.forEach(select => {
+      const name = select.name.replace(/\[\]$/,'')+'[]';
+      Array.from(select.selectedOptions, option => url.searchParams.append(name,option.value));
+    });
+    const request = new AbortController();
+    controller = request;
+    timer = setTimeout(async () => {
+      try {
+        const response = await fetch(url,{signal:request.signal,cache:'no-store'});
+        if (!response.ok || response.redirected) throw new Error();
+        const students = await response.json();
+        if (request.signal.aborted || input.value.trim() !== term) return;
+        list.replaceChildren(...students.map(student => {
+          const option = new Option(student.name,student.name);
+          Object.assign(option.dataset,{
+            studentId:student.id,unitId:student.unit,nis:student.nis,
+            diknas:student.diknas,nama:student.name,kelas:student.class,
+          });
+          return option;
+        }));
+        input.dataset.studentResults = term.toLowerCase();
+        if (document.activeElement === input) renderStudentSearchPanel(input);
+      } catch {
+        if (request.signal.aborted || document.activeElement !== input) return;
+        const message = document.createElement('div');
+        message.className = 'student-search-empty';
+        message.setAttribute('role','status');
+        message.textContent = 'Saran siswa gagal dimuat. Kamu tetap bisa mencari lewat Tampilkan Rekap.';
+        input._studentSearchPanel.replaceChildren(message);
+        input._studentSearchPanel.hidden = false;
+        input.setAttribute('aria-expanded','true');
+        fitStudentSearchPanel(input);
+      }
+    }, 180);
+  }
+  input.addEventListener('input',search);
+  input.addEventListener('keydown',event => {
+    if (event.key === 'Escape') cancelSearch();
+    if (event.key === 'ArrowDown' && !input._studentSearchPanel.hidden) {
+      const first = input._studentSearchPanel.querySelector('button');
+      if (first) {
+        event.preventDefault();
+        first.focus();
+      }
+    }
+  });
+  input._studentSearchPanel.addEventListener('keydown',event => {
+    const choices = Array.from(input._studentSearchPanel.querySelectorAll('button'));
+    const index = choices.indexOf(event.target);
+    if (index < 0) return;
+    if (event.key === 'ArrowDown' || event.key === 'ArrowUp') {
+      event.preventDefault();
+      const next = index + (event.key === 'ArrowDown' ? 1 : -1);
+      (choices[next] || input).focus();
+    } else if (event.key === 'Escape') {
+      event.preventDefault();
+      input.dataset.studentSuppressPanel = '1';
+      closeStudentSearchPanel(input);
+      input.focus();
+    } else if (event.key === 'Enter') {
+      event.preventDefault();
+      event.target.click();
+      input.focus();
+    }
+  });
+  filters.forEach(select => select.addEventListener('change',() => {
+    if (form.querySelector('[name="student_id"]')?.value) {
+      input.value = query.value;
+      syncStudentSearchQueryTarget(input,query.value);
+      delete input.dataset.studentSuppressPanel;
+    }
+    cancelSearch();
+    list.replaceChildren();
+    delete input.dataset.studentResults;
+    closeStudentSearchPanel(input);
+  }));
+  input.addEventListener('focus',() => {
+    if (!input.dataset.studentResults && !input.dataset.studentSuppressPanel) search();
+  });
+}
+
+document.addEventListener('DOMContentLoaded', () => {
+  const workspace = document.getElementById('global-report-workspace');
+  if (!workspace) return;
+  const placeholder = workspace.querySelector('[data-report-placeholder]');
+  const results = workspace.querySelector('[data-report-results]');
+  const label = placeholder.querySelector('[data-report-placeholder-label]');
+  let submitting = false;
+
+  workspace.addEventListener('submit', event => {
+    if (!event.target.matches('.report-global-filter-form') || event.defaultPrevented) return;
+    if (submitting) {
+      event.preventDefault();
+      return;
+    }
+    submitting = true;
+    if (results) results.hidden = true;
+    placeholder.hidden = false;
+    placeholder.setAttribute('aria-busy', 'true');
+    label.textContent = 'Memuat rekap…';
+  });
+
+  window.addEventListener('pageshow', event => {
+    if (!event.persisted || !submitting) return;
+    submitting = false;
+    if (results) results.hidden = false;
+    placeholder.hidden = Boolean(results);
+    placeholder.removeAttribute('aria-busy');
+    label.textContent = 'Pilih filter, lalu klik Tampilkan Rekap.';
+  });
+
+  const form = workspace.querySelector('.report-global-filter-form');
+  if (!form) return;
+  initGlobalReportOptions(form);
+  initGlobalReportStudentSearch(form);
+});
 
 // Keep sticky offsets tied to rendered column widths, including font/viewport changes.
 (() => {

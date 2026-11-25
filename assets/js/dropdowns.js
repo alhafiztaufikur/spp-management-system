@@ -170,20 +170,61 @@
     button.setAttribute('aria-haspopup','dialog');button.setAttribute('aria-controls',panel.id);button.setAttribute('aria-expanded','false');
     const allRow=document.createElement('label'),all=document.createElement('input'),allText=document.createElement('span'),list=document.createElement('div'),footer=document.createElement('div'),count=document.createElement('span'),cancel=document.createElement('button'),apply=document.createElement('button');
     all.type='checkbox';allRow.className='spp-multi-all';allRow.append(all,allText);footer.className='spp-multi-footer';count.setAttribute('aria-live','polite');cancel.type=apply.type='button';cancel.textContent='Batal';apply.textContent='Terapkan';apply.className='spp-multi-apply';footer.append(count,cancel,apply);panel.append(modeNote(true),allRow,list,footer);let draft=new Set(),checks=[];
+    const optionStatus = select.hasAttribute('data-report-options') ? document.createElement('p') : null;
+    if (optionStatus) {
+      optionStatus.className = 'spp-dropdown-empty';
+      optionStatus.setAttribute('role','status');
+      optionStatus.hidden = true;
+      list.before(optionStatus);
+    }
+    let draftAll = false;
     const search=select.dataset.selectSearch==='true'?document.createElement('input'):null;
     if(search){search.type='search';search.className='spp-multi-search';search.placeholder='Cari operator...';search.setAttribute('aria-label','Cari operator');allRow.before(search);search.addEventListener('input',()=>{const term=search.value.trim().toLocaleLowerCase('id');list.querySelectorAll('.spp-multi-option').forEach(row=>row.hidden=!row.textContent.toLocaleLowerCase('id').includes(term));let empty=list.querySelector('[data-search-empty]');if(!empty){empty=document.createElement('p');empty.className='spp-dropdown-empty';empty.dataset.searchEmpty='';empty.textContent='Tidak ada operator yang cocok.';list.append(empty);}empty.hidden=[...list.querySelectorAll('.spp-multi-option')].some(row=>!row.hidden);position(panel,button);});}
     const available=()=>Array.from(select.options).filter(o=>o.value!=='*'&&!o.hidden&&!o.parentElement.hidden);
     const enabled=()=>available().filter(o=>!o.disabled&&!(o.parentElement.tagName==='OPTGROUP'&&o.parentElement.disabled));
-    const committed=()=>select.selectedOptions.length&&Array.from(select.selectedOptions).some(o=>o.value==='*')?new Set(enabled().map(o=>o.value)):new Set(Array.from(select.selectedOptions).filter(o=>enabled().includes(o)).map(o=>o.value));
-    function summary(){const choices=available().filter(o=>committed().has(o.value)),isAll=enabled().length>0&&enabled().every(o=>committed().has(o.value));const allCaption=select.dataset.allLabel||Array.from(select.options).find(o=>o.value==='*'&&o.textContent.trim()!=='Semua pilihan')?.textContent.trim()||'Semua '+label.toLowerCase();setCaption(caption,isAll?allCaption:(choices.slice(0,2).map(o=>o.textContent.trim()).join(', ')+(choices.length>2?' +'+(choices.length-2):''))||'Pilih '+label.toLowerCase());button.title=caption.textContent;button.disabled=select.disabled;button.setAttribute('aria-label',label+': '+caption.textContent);}
+    const committed = (options = enabled()) => {
+      const allSelected = Array.from(select.selectedOptions).some(option=>option.value==='*');
+      return new Set(options.filter(option=>allSelected||option.selected).map(option=>option.value));
+    };
+    function summary() {
+      const values = enabled();
+      const selected = committed(values);
+      const choices = values.filter(option=>selected.has(option.value));
+      const allOption = Array.from(select.options).find(option=>option.value==='*');
+      const complete = !optionStatus || select.dataset.reportOptionsLoaded==='1';
+      const isAll = allOption?.selected || (complete && values.length>0 && selected.size===values.length);
+      const defaultCaption = 'Semua '+label.toLowerCase();
+      const allCaption = select.dataset.allLabel || (allOption?.textContent.trim()!=='Semua pilihan' ? allOption?.textContent.trim() : '') || defaultCaption;
+      const selectedCaption = choices.slice(0,2).map(option=>option.textContent.trim()).join(', ')+(choices.length>2?' +'+(choices.length-2):'');
+      setCaption(caption,isAll?allCaption:selectedCaption||'Pilih '+label.toLowerCase());
+      button.title=caption.textContent;
+      button.disabled=select.disabled;
+      button.setAttribute('aria-label',label+': '+caption.textContent);
+    }
     function state(){const values=enabled();all.checked=values.length>0&&values.every(o=>draft.has(o.value));all.indeterminate=!all.checked&&values.some(o=>draft.has(o.value));all.disabled=!values.length;allText.textContent='Pilih Semua ('+values.length+')';count.textContent=draft.size?draft.size+' pilihan':'Pilih minimal satu opsi';apply.disabled=!draft.size;checks.forEach(c=>c.checked=draft.has(c.value));}
-    function render(){list.replaceChildren();checks=[];let group='';available().forEach(o=>{const section=o.parentElement.tagName==='OPTGROUP'?o.parentElement.label:(select.name.replace('[]','')==='kategori'?(o.value.startsWith('biaya_lain')?'Biaya Lain':'Pembayaran Inti'):'');if(section&&section!==group){const h=document.createElement('div');h.className='spp-dropdown-group';h.textContent=section;list.append(h);group=section;}const row=document.createElement('label'),check=document.createElement('input'),text=document.createElement('span');row.className='spp-multi-option';check.type='checkbox';check.value=o.value;check.disabled=o.disabled||(o.parentElement.tagName==='OPTGROUP'&&o.parentElement.disabled);text.textContent=o.textContent;row.append(check,text);check.addEventListener('change',()=>{check.checked?draft.add(o.value):draft.delete(o.value);state();});list.append(row);checks.push(check);});if(!checks.length){const p=document.createElement('p');p.className='spp-dropdown-empty';p.textContent='Tidak ada pilihan yang cocok.';list.append(p);}state();position(panel,button);}
+    function render(){list.replaceChildren();checks=[];let group='';available().forEach(o=>{const section=o.parentElement.tagName==='OPTGROUP'?o.parentElement.label:(select.name.replace('[]','')==='kategori'?(o.value.startsWith('biaya_lain')?'Biaya Lain':o.value.startsWith('histori:')?'Histori Legacy':'Pembayaran Inti'):'');if(section&&section!==group){const h=document.createElement('div');h.className='spp-dropdown-group';h.textContent=section;list.append(h);group=section;}const row=document.createElement('label'),check=document.createElement('input'),text=document.createElement('span');row.className='spp-multi-option';check.type='checkbox';check.value=o.value;check.disabled=o.disabled||(o.parentElement.tagName==='OPTGROUP'&&o.parentElement.disabled);text.textContent=o.textContent;row.append(check,text);check.addEventListener('change',()=>{draftAll=false;check.checked?draft.add(o.value):draft.delete(o.value);state();});list.append(row);checks.push(check);});if(!checks.length&&!optionStatus){const p=document.createElement('p');p.className='spp-dropdown-empty';p.textContent='Tidak ada pilihan yang cocok.';list.append(p);}state();position(panel,button);}
     let lastSource='';const sourceSignature=()=>select.outerHTML+'|'+Array.from(select.selectedOptions).map(o=>o.value).join('|');
     const instance={select,button,panel,close(){panel.hidden=true;window.sppFloatingPanels.hide(panel);button.setAttribute('aria-expanded','false');draft=committed();},sync(){summary();const signature=sourceSignature();if(active===instance&&signature!==lastSource){draft=committed();render();}lastSource=signature;if(select.disabled&&active===instance)close();}};
-    button.addEventListener('click',()=>{if(active===instance){close(true);return;}close();active=instance;watchAnchor(instance);lastSource=sourceSignature();draft=committed();if(search)search.value='';panel.hidden=false;render();position(panel,button);button.setAttribute('aria-expanded','true');focusOption(checks.find(c=>c.checked&&!c.disabled)||checks.find(c=>!c.disabled)||all,panel);});
+    function refreshOptions() {
+      lastSource = sourceSignature();
+      summary();
+      if (active !== instance) return;
+      const focused = checks.includes(document.activeElement) ? document.activeElement.value : null;
+      if (draftAll) draft = new Set(enabled().map(option=>option.value));
+      render();
+      if (focused !== null) focusOption(checks.find(check=>check.value===focused),panel);
+    }
+    button.addEventListener('click',()=>{
+      if(active===instance){close(true);return;}
+      close();active=instance;watchAnchor(instance);lastSource=sourceSignature();draft=committed();
+      draftAll=Array.from(select.selectedOptions).some(option=>option.value==='*');
+      if(search)search.value='';panel.hidden=false;render();position(panel,button);button.setAttribute('aria-expanded','true');
+      focusOption(checks.find(c=>c.checked&&!c.disabled)||checks.find(c=>!c.disabled)||all,panel);
+      if(optionStatus) select.dispatchEvent(new CustomEvent('spp:options-open',{detail:{status:optionStatus,refresh:refreshOptions}}));
+    });
     button.addEventListener('keydown',e=>{if(['ArrowDown','ArrowUp'].includes(e.key)){e.preventDefault();button.click();}});
-    all.addEventListener('change',()=>{enabled().forEach(o=>all.checked?draft.add(o.value):draft.delete(o.value));state();});cancel.addEventListener('click',()=>close(true));
-    apply.addEventListener('click',()=>{if(!draft.size)return;const isAll=enabled().length>0&&enabled().every(o=>draft.has(o.value));if(isAll&&!Array.from(select.options).some(o=>o.value==='*'))select.prepend(new Option('Semua pilihan','*'));Array.from(select.options).forEach(o=>{o.selected=isAll?o.value==='*':draft.has(o.value);});close(true);summary();select.dispatchEvent(new Event('input',{bubbles:true}));select.dispatchEvent(new Event('change',{bubbles:true}));});
+    all.addEventListener('change',()=>{draftAll=all.checked;enabled().forEach(o=>all.checked?draft.add(o.value):draft.delete(o.value));state();});cancel.addEventListener('click',()=>close(true));
+    apply.addEventListener('click',()=>{if(!draft.size)return;const isAll=optionStatus&&select.dataset.reportOptionsLoaded!=='1'?draftAll:enabled().length>0&&enabled().every(o=>draft.has(o.value));if(isAll&&!Array.from(select.options).some(o=>o.value==='*'))select.prepend(new Option('Semua pilihan','*'));Array.from(select.options).forEach(o=>{o.selected=isAll?o.value==='*':draft.has(o.value);});close(true);summary();select.dispatchEvent(new Event('input',{bubbles:true}));select.dispatchEvent(new Event('change',{bubbles:true}));});
     panel.addEventListener('keydown',e=>{if(e.target===search&&['Enter','Home','End'].includes(e.key)){if(e.key==='Enter')e.preventDefault();return;}if(e.key==='Enter'&&e.target.type==='checkbox'){e.preventDefault();e.target.click();}keyboard(e,[all,...checks.filter(c=>!c.closest('label').hidden)],()=>close(true));});
     select.addEventListener('change',()=>{if(select.hasAttribute('data-filter-persist')){const url=new URL(location.href),key=select.name.replace('[]','');for(const parameter of [...url.searchParams.keys()])if(parameter===key||parameter.startsWith(key+'['))url.searchParams.delete(parameter);for(const value of Array.from(select.selectedOptions).map(o=>o.value))url.searchParams.append(key+'[]',value);url.searchParams.delete('page');url.searchParams.delete('class_page');history.replaceState(null,'',url);}});
     select.addEventListener('change',()=>instance.sync());select.addEventListener('input',()=>instance.sync());select.addEventListener('focus',()=>button.focus({preventScroll:true}));select.addEventListener('invalid',e=>{e.preventDefault();button.setAttribute('aria-invalid','true');button.focus();});select.form?.addEventListener('reset',()=>setTimeout(()=>instance.sync(),0));new MutationObserver(()=>instance.sync()).observe(select,{childList:true,subtree:true,attributes:true,characterData:true});enhanced.set(select,instance);instances.add(instance);['value','selectedIndex'].forEach(key=>{const descriptor=Object.getOwnPropertyDescriptor(HTMLSelectElement.prototype,key);if(descriptor?.get&&descriptor?.set)Object.defineProperty(select,key,{configurable:true,get(){return descriptor.get.call(this);},set(value){descriptor.set.call(this,value);instance.sync();}});});summary();

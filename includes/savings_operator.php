@@ -18,12 +18,16 @@ function savings_operator_where(array $operators,string $owner):string {
     if(!$ids)return ' AND 0=1';
     return ' AND ('.$owner.') IN ('.implode(',',$ids).')';
 }
-function savings_operator_options(mysqli $db,bool $showUsername=true):array {
+function savings_operator_options(mysqli $db,bool $showUsername=true,bool $includeHistory=true):array {
     $options=[];$scope=(int)($GLOBALS['app_unit_id']??unit_active_id());
     static $names=[];$cacheKey=$db->thread_id.':'.$scope;
-    if(!$showUsername&&isset($names[$cacheKey]))return $names[$cacheKey];
+    if($includeHistory&&!$showUsername&&isset($names[$cacheKey]))return $names[$cacheKey];
     $where=$scope===0?'':" WHERE unit_id=$scope OR role IN ('super_admin','admin','kasir')";
     foreach($db->query('SELECT id,nama,username FROM admin'.$where)->fetch_all(MYSQLI_ASSOC) as $a)$options[(string)$a['id']]=$a['nama'].($showUsername&&$a['username']?' (@'.$a['username'].')':'');
+    if (!$includeHistory) {
+        natcasesort($options);
+        return $options+['unknown'=>'Tidak tercatat'];
+    }
     foreach(['transaksi_m'=>'masuk','transaksi_k'=>'keluar'] as $table=>$kind){
         $owner=savings_operator_owner_sql('t.unit_id',"'$kind'",'t.id','t.user_id');
         foreach($db->query("SELECT DISTINCT ($owner) owner_id FROM $table t")->fetch_all(MYSQLI_ASSOC) as $r)if((int)$r['owner_id']>0)$options[(string)$r['owner_id']]??='Operator #'.$r['owner_id'];

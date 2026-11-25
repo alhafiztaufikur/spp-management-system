@@ -45,7 +45,7 @@ if($format==='excel'){
     if($globalScope){$doc['period_caption']=$periodCaption;$doc['subtitle']=$periodCaption;}
     else{$filterText=spp_excel_filter_text($koneksi,$filters,$template);if($filterText!=='')$doc['subtitle'].=' | '.$filterText;}
     if($globalScope)$doc=global_report_clean_excel_document($doc,$template);
-    $query=$_GET;$query['download']='1';$back=$_GET;unset($back['format'],$back['download']);
+    $query=$_GET;$query['download']='1';$back=$_GET;unset($back['format'],$back['download']);if($globalScope)$back['rekap']='1';
     spp_excel_respond($doc,$excelDownload,$template.'-'.date('Ymd-His'),'export_global.php?'.filter_build_query($query),'template.php?'.filter_build_query($back),$matrix?count($matrix['rows']):($template==='riwayat-tagihan'?count(report_history_groups($report)):count($report['rows'])));
 }
 if($template==='tunggakan-siswa'&&in_array($format,['preview','print','pdf'],true)){
@@ -60,7 +60,7 @@ if($template==='tunggakan-siswa'&&in_array($format,['preview','print','pdf'],tru
     if($format!=='pdf'){
         require_once __DIR__.'/../includes/report_preview.php';
         $downloadQuery=$_GET;$downloadQuery['format']='pdf';$downloadQuery['download']='1';unset($downloadQuery['preview_action']);
-        $backQuery=$_GET;unset($backQuery['format'],$backQuery['download'],$backQuery['preview_action']);
+        $backQuery=$_GET;unset($backQuery['format'],$backQuery['download'],$backQuery['preview_action']);if($globalScope)$backQuery['rekap']='1';
         render_report_pdf_preview($letterHtml,[
             'title'=>$report['title'],
             'subtitle'=>$report['subtitle'],
@@ -263,7 +263,7 @@ $safeName=preg_replace('/[^a-z0-9_-]+/i','-',strtolower($template)).'-'.date('Ym
 if(in_array($format,['preview','print'],true)){
     require_once __DIR__.'/../includes/report_preview.php';
     $downloadQuery=$_GET;$downloadQuery['format']='pdf';$downloadQuery['download']='1';$printQuery=$_GET;$printQuery['format']='print';unset($downloadQuery['preview_action']);
-    $backQuery=$_GET;unset($backQuery['format'],$backQuery['preview_action']);
+    $backQuery=$_GET;unset($backQuery['format'],$backQuery['preview_action']);if($globalScope)$backQuery['rekap']='1';
     render_report_pdf_preview($html,[
         'presentation'=>'global','unit'=>$reportUnitId,
         'document_label'=>'A4 '.($printOrientation==='landscape'?'Lanskap':'Potret').' · Tabel interaktif',

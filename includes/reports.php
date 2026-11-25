@@ -78,10 +78,10 @@ function report_billing_date_matches(string $createdAt,array $filters):bool {
     $date=substr($createdAt,0,10);
     return $date!==''&&$date>=$filters['tanggal_awal']&&$date<=$filters['tanggal_akhir'];
 }
-function report_filters(mysqli $db, array $source,bool $registerChoices=true): array {
+function report_filters(mysqli $db, array $source,bool $registerChoices=true,?array $catalog=null): array {
     $source=billing_history_defaults($source);
     $billing=($source['template']??'')==='riwayat-tagihan';
-    $billingYears=$billing?billing_history_years($db,$source):[];
+    $billingYears=$billing?billing_history_years($db,$source,$catalog['years']??null):[];
     [$periodStart,$periodEnd]=$billing?billing_history_month_bounds($source):['',''];
     $legacyBillingDates=$billing&&!array_key_exists('periode_awal',$source)&&!array_key_exists('periode_akhir',$source)
         &&(!empty($source['tanggal_awal'])||!empty($source['tanggal_akhir']));
@@ -89,7 +89,7 @@ function report_filters(mysqli $db, array $source,bool $registerChoices=true): a
     // Internal scalar summaries do not render filter controls. Public callers
     // keep normalization/registration and its full option validation unchanged.
     if(!$registerChoices&&array_filter($source,'is_array'))throw new LogicException('Internal summary filters must be scalar.');
-    $multiple=$registerChoices?report_multiple_normalize($db,$source):[];
+    $multiple=$registerChoices?report_multiple_normalize($db,$source,$catalog):[];
     $today = date('Y-m-d');
     if($billing)[$start,$end]=$legacyBillingDates?report_billing_date_range($source):['',''];
     else {
@@ -110,7 +110,17 @@ function report_filters(mysqli $db, array $source,bool $registerChoices=true): a
     $academicYear = trim((string)($source['tahun_ajaran'] ?? $currentYear));
     if (!preg_match('/^\d{4}\/\d{4}$/', $academicYear)) $academicYear = $currentYear;
     $requestedOperator = trim((string)($source['operator'] ?? ''));
-    $operator = isset($multiple['operator'])?'':(($source['template']??'')==='tabungan-siswa'?(isset(savings_operator_options($db,false)[$requestedOperator])?$requestedOperator:''):report_operator_filter_value($db, $requestedOperator));
+    $operator = '';
+    if (!isset($multiple['operator']) && $requestedOperator !== '') {
+        if (($source['template']??'') === 'tabungan-siswa') {
+            $operators = $catalog['operators'] ?? savings_operator_options($db,false);
+            if (isset($operators[$requestedOperator])) $operator = $requestedOperator;
+        } elseif (!empty($catalog['deferred']) && str_starts_with($requestedOperator,'legacy:')) {
+            if (isset($catalog['operators'][$requestedOperator])) $operator = $requestedOperator;
+        } else {
+            $operator = report_operator_filter_value($db,$requestedOperator);
+        }
+    }
     $selectedId=max(0,(int)($source['student_id']??0));$selected=null;
     if($selectedId){$stmt=$db->prepare('SELECT id,unit_id,NO_INDUK FROM siswa WHERE id=?');$stmt->bind_param('i',$selectedId);$stmt->execute();$selected=$stmt->get_result()->fetch_assoc();$stmt->close();}
     return [
@@ -140,9 +150,11 @@ function report_filters(mysqli $db, array $source,bool $registerChoices=true): a
     ];
 }
 function report_classes(mysqli $db): array { return class_all($db, true); }
-function report_years(mysqli $db): array {
-    $years=array_column(report_scoped_query($db,"SELECT label,CASE WHEN COUNT(DISTINCT status)=1 THEN MIN(status) ELSE 'beragam antarunit' END status FROM tahun_ajaran GROUP BY label")->fetch_all(MYSQLI_ASSOC),null,'label');
-    foreach(report_legacy_years($db) as $year=>$_)$years[$year]??=['label'=>$year,'status'=>'histori'];
+function report_years(mysqli $db, bool $includeHistory = true): array {
+    $years=array_column($db->query("SELECT label,CASE WHEN COUNT(DISTINCT status)=1 THEN MIN(status) ELSE 'beragam antarunit' END status FROM tahun_ajaran GROUP BY label")->fetch_all(MYSQLI_ASSOC),null,'label');
+    if ($includeHistory) {
+        foreach (report_legacy_years($db) as $year => $_) $years[$year] ??= ['label'=>$year,'status'=>'histori'];
+    }
     krsort($years,SORT_STRING);return array_values($years);
 }
 function report_class_filter_value($value): string {
@@ -198,7 +210,7 @@ function report_operators(mysqli $db, string $role = ''): array {
     }
     return report_scoped_query($db,'SELECT id,username,nama,role FROM admin WHERE is_active=1' . $unitWhere . ' ORDER BY nama')->fetch_all(MYSQLI_ASSOC);
 }
-function report_operator_options(mysqli $db): array {
+function report_operator_options(mysqli $db, bool $includeHistory = true): array {
     $roles = report_allowed_operator_roles();
     $placeholders = implode(',', array_fill(0, count($roles), '?'));
     $unitWhere = ($GLOBALS['app_unit_id'] ?? 1) === 0 ? '' : " AND (unit_id=" . report_query_unit_id() . " OR role IN ('super_admin','admin','kasir'))";
@@ -208,7 +220,9 @@ function report_operator_options(mysqli $db): array {
     $stmt->execute();
     $rows = $stmt->get_result()->fetch_all(MYSQLI_ASSOC);
     $stmt->close();
-    foreach(lful_operator_options($db) as $id=>$label)$rows[]=['id'=>$id,'username'=>$id,'nama'=>$label,'role'=>'legacy'];
+    if ($includeHistory) {
+        foreach (lful_operator_options($db) as $id => $label) $rows[] = ['id'=>$id,'username'=>$id,'nama'=>$label,'role'=>'legacy'];
+    }
     return $rows;
 }
 function report_operator_filter_value(mysqli $db, string $operator): string {
@@ -227,14 +241,15 @@ function report_operator_filter_value(mysqli $db, string $operator): string {
     $stmt->close();
     return $row ? (string)$row['id'] : '';
 }
-function report_categories(mysqli $db): array {
+function report_categories(mysqli $db, bool $includeHistory = true): array {
     $items = [
         'spp'=>'SPP','komite'=>'Komite','daftar_ulang'=>'Daftar Ulang',
         'psb'=>'Uang PSB',
     ];
-    foreach(report_scoped_query($db,'SELECT id,nama FROM master_biaya_lain ORDER BY nama')->fetch_all(MYSQLI_ASSOC) as $row) {
+    foreach($db->query('SELECT id,nama FROM master_biaya_lain ORDER BY nama')->fetch_all(MYSQLI_ASSOC) as $row) {
         $items['biaya_lain:'.$row['id']] = 'Biaya Lain '.$row['nama'];
     }
+    if (!$includeHistory) return $items;
     // Only labels are reused within this request. The audit revision invalidates
     // them after a correction; master values and all monetary models stay live.
     static $history=[],$allHistory=[];$scope=(int)($GLOBALS['app_unit_id']??unit_active_id());
@@ -247,7 +262,10 @@ function report_categories(mysqli $db): array {
         }else{
             if(function_exists('lful_read_ready')&&lful_read_ready($db))foreach(hp_rows($db,"SELECT DISTINCT i.unit_id,i.source_column,i.category,i.label FROM legacy_full_items i JOIN legacy_full_payments p ON p.id=i.payment_id AND p.unit_id=i.unit_id JOIN legacy_full_batches b ON b.id=p.batch_id AND b.unit_id=p.unit_id WHERE b.state='completed' AND i.category LIKE 'histori:%' ORDER BY i.category") as $r)$labels[$r['category']]=$byUnit[$r['unit_id']][$r['category']]=lcs_component_view($r)['display_label'].' (Legacy)';
             if($ready){
-                $cursor=report_scoped_query($db,hp_sql($db,"SELECT p.unit_id,p.items FROM legacy_op_payments p JOIN legacy_full_batches b ON b.id=p.batch_id AND b.unit_id=p.unit_id WHERE b.state='completed' AND p.cancelled=0"),MYSQLI_USE_RESULT);
+                // Keep escaped Unicode labels eligible for decoding as well.
+                $cursor=$db->query(hp_scan_sql($db,"SELECT p.unit_id,p.items FROM legacy_op_payments p
+                    WHERE p.cancelled=0 AND ".hp_completed_batch_predicate($db,'p')."
+                    AND (LOCATE('histori:',CAST(p.items AS BINARY))>0 OR LOCATE(CONCAT(CHAR(92),'u'),CAST(p.items AS BINARY))>0)"),MYSQLI_USE_RESULT);
                 try{while($row=$cursor->fetch_assoc())foreach(json_decode($row['items'],true) as $item)if(str_starts_with($item['category'],'histori:'))$labels[$item['category']]=$byUnit[$row['unit_id']][$item['category']]=lcs_component_view($item)['display_label'].' (Legacy)';}
                 finally{$cursor->free();}
             }
@@ -647,7 +665,7 @@ function report_savings_balance_data(mysqli $db,array $f):array{
 }
 function report_billing_categories(mysqli $db):array{
     $categories=['psb'=>'PSB','daftar_ulang'=>'Daftar Ulang','spp'=>'SPP','komite'=>'Komite'];
-    foreach(report_scoped_query($db,'SELECT id,nama FROM master_biaya_lain ORDER BY nama')->fetch_all(MYSQLI_ASSOC) as $item)$categories['biaya_lain:'.(int)$item['id']]=$item['nama'];return $categories;
+    foreach($db->query('SELECT id,nama FROM master_biaya_lain ORDER BY nama')->fetch_all(MYSQLI_ASSOC) as $item)$categories['biaya_lain:'.(int)$item['id']]=$item['nama'];return $categories;
 }
 function report_billing_history_component_order(string $key): int {
     return match($key){

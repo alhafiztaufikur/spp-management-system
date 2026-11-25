@@ -1,8 +1,9 @@
 // Period controls and an explicit boundary between selected and applied filters.
-document.addEventListener('DOMContentLoaded', () => {
+function initReportPerItem() {
   const category = document.querySelector('[data-report-item-category]');
   const form = category?.closest('form');
-  if (!form) return;
+  if (!form || form.dataset.reportPerItemReady === '1') return;
+  form.dataset.reportPerItemReady = '1';
   const exports = document.querySelectorAll('.report-export-btn');
   const monthly = new Set(['spp', 'komite']);
   const annual = new Set(window.sppAnnualReportCategories || []);
@@ -29,6 +30,7 @@ document.addEventListener('DOMContentLoaded', () => {
     if (JSON.stringify([...values].sort()) !== JSON.stringify(applied)) markPending();
   }
   category.addEventListener('change', syncPeriods);
+  category.addEventListener('spp:options-ready', syncPeriods);
   form.addEventListener('change', event => {
     if (event.target.matches('select,input[name]')) markPending();
   });
@@ -44,4 +46,5 @@ document.addEventListener('DOMContentLoaded', () => {
     form.querySelector('[type="submit"]')?.focus({preventScroll: true});
   }));
   syncPeriods();
-});
+}
+document.addEventListener('DOMContentLoaded', initReportPerItem);
